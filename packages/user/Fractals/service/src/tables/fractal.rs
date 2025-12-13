@@ -104,19 +104,6 @@ impl Fractal {
         new_instance
     }
 
-    pub fn init_token(&mut self) {
-        let total_supply = Tokens::call().getToken(self.token_id).max_issued_supply;
-        let quarter_supply: Quantity = (total_supply.value / 4).into();
-
-        Tokens::call().mint(
-            self.token_id,
-            quarter_supply,
-            "Token intitialisation".into(),
-        );
-
-        RewardConsensus::add(self.account, quarter_supply);
-    }
-
     pub fn set_minimum_required_scorers(&mut self, minimum_required_scorers: u8) {
         check_none(
             RewardConsensus::get(self.account),

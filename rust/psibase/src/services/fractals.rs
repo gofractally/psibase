@@ -274,18 +274,6 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Initialise a token for a fractal.
-    ///
-    /// Called only once per fractal.
-    /// Must be called by legislature.  
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    #[action]
-    fn init_token(fractal: AccountNumber) {
-        unimplemented!()
-    }
-
     /// Distribute token for a fractal.
     ///
     /// # Arguments

@@ -409,24 +409,6 @@ pub mod service {
         FractalMember::get_assert(fractal, member).exile();
     }
 
-    /// Initialise a token for a fractal.
-    ///
-    /// Called only once per fractal.
-    /// Must be called by legislature.  
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    #[action]
-    fn init_token(fractal: AccountNumber) {
-        let mut fractal = Fractal::get_assert(fractal);
-        check(
-            fractal.legislature == get_sender(),
-            "only the legislature initialise fractal token",
-        );
-
-        fractal.init_token();
-    }
-
     /// Set ranked guild slots.
     ///
     /// Must be called by legislature.  

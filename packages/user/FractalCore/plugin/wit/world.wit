@@ -6,7 +6,6 @@ interface admin-fractal {
 
     exile-member: func(member: string) -> result<_, error>;
     set-dist-interval: func(distribution-interval-sec: u32) -> result<_, error>;
-    init-token: func() -> result<_, error>;
     set-ranked-guild-slots: func(slots-count: u8) -> result<_, error>;
     set-min-scorers: func(min-scorers: u8) -> result<_, error>;
 

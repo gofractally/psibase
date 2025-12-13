@@ -47,7 +47,6 @@ define_trust! {
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
-            - Initialise fractal token
             - Resign, remove or set a new Guild representative
             - Set minimum scorers required to enable consensus rewards
         ",
@@ -56,7 +55,7 @@ define_trust! {
         None => [get_group_users],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, set_min_scorers, set_ranked_guild_slots, set_dist_interval, init_token, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        High => [exile_member, set_min_scorers, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
 
@@ -97,15 +96,6 @@ impl AdminFractal for FractalCorePlugin {
         set_propose_latch(Some(&fractal.judiciary))?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
-    }
-
-    fn init_token() -> Result<(), Error> {
-        assert_authorized(FunctionName::init_token)?;
-
-        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
-        set_propose_latch(Some(&fractal.legislature))?;
-
-        FractalsPlugin::admin_fractal::init_token()
     }
 }
 
