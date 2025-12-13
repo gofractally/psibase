@@ -17,13 +17,7 @@ export const ConnectPrompt = () => {
     const navigate = useNavigate();
 
     // queries
-    const {
-        data: accounts,
-        isPending,
-        isSuccess,
-        isError,
-        error,
-    } = useGetAllAccounts();
+    const { data: accounts, isPending, isSuccess, error } = useGetAllAccounts();
 
     // mutations
     const connectAccountMutation = useConnectAccount();
@@ -46,7 +40,7 @@ export const ConnectPrompt = () => {
         }
     };
 
-    if (isError && error) {
+    if (error) {
         return (
             <ErrorCard
                 error={
@@ -58,7 +52,7 @@ export const ConnectPrompt = () => {
         );
     }
 
-    if (connectAccountMutation.isError && connectAccountMutation.error) {
+    if (connectAccountMutation.error) {
         return (
             <ErrorCard
                 error={

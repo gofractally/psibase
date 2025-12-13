@@ -3,6 +3,8 @@ import z from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
+import { AuthServices } from "../types";
+
 const supervisor = getSupervisor();
 
 export const useImportKey = (
@@ -12,7 +14,7 @@ export const useImportKey = (
         mutationFn: async (pem) => {
             const privateKey = z.string().parse(pem);
             await supervisor.functionCall({
-                service: "auth-sig",
+                service: AuthServices.AUTH_SIG,
                 plugin: "plugin",
                 intf: "keyvault",
                 method: "importKey",

@@ -33,11 +33,14 @@ import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { b64ToPem, validateB64 } from "./lib/keys";
+import { AuthServices } from "./types";
 
 export const ImportPrompt = () => {
     const navigate = useNavigate();
 
-    const [authService, setAuthService] = useState<string>("auth-sig");
+    const [authService, setAuthService] = useState<string>(
+        AuthServices.AUTH_SIG,
+    );
 
     // modal state
     const [showCannotCreate, setShowCannotCreate] = useState(false);
@@ -91,12 +94,12 @@ export const ImportPrompt = () => {
                 }),
                 privateKey: z.string().refine(
                     (val) => {
-                        if (authService !== "auth-sig") return true;
+                        if (authService !== AuthServices.AUTH_SIG) return true;
                         return validateB64(val);
                     },
                     {
                         message:
-                            authService === "auth-sig"
+                            authService === AuthServices.AUTH_SIG
                                 ? "Private key must be a valid base64 string"
                                 : "Invalid private key",
                     },
@@ -148,7 +151,10 @@ export const ImportPrompt = () => {
 
                                         setAuthService(authService); // so that we know whether to render the private key field
 
-                                        if (authService === "auth-any") {
+                                        if (
+                                            authService ===
+                                            AuthServices.AUTH_ANY
+                                        ) {
                                             // clear any validation errors on the hidden private key field so that the form can be submitted
                                             form.validateField(
                                                 "privateKey",
@@ -157,7 +163,7 @@ export const ImportPrompt = () => {
                                         }
                                     }}
                                 />
-                                {authService === "auth-sig" && (
+                                {authService === AuthServices.AUTH_SIG && (
                                     <form.AppField
                                         name="privateKey"
                                         children={(field) => {
