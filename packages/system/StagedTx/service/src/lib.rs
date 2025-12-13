@@ -29,6 +29,7 @@ pub mod service {
     pub use crate::event::StagedTxEvent;
     use crate::policy::StagedTxPolicy;
     use fracpack::Pack;
+    use psibase::services::transact::ServiceMethod;
     use psibase::services::{events::Wrapper as Events, transact::Wrapper as Transact};
     use psibase::*;
 
@@ -95,10 +96,14 @@ pub mod service {
         emit_update(staged_tx.txid.clone(), StagedTxEvent::ACCEPTED);
 
         if staged_tx.auto_exec {
-            let authorized = staged_tx.parties().iter().all(|sender| {
-                StagedTxPolicy::new(*sender)
-                    .map_or(true, |policy| policy.does_auth(staged_tx.accepters()))
-            });
+            let authorized = staged_tx
+                .invocations()
+                .iter()
+                .all(|(sender, service_method)| {
+                    StagedTxPolicy::new(*sender).map_or(true, |policy| {
+                        policy.does_auth(staged_tx.accepters(), *service_method)
+                    })
+                });
 
             debug_print(&format!("authorized: {}\n", authorized.to_string()));
 
@@ -120,10 +125,14 @@ pub mod service {
 
         emit_update(staged_tx.txid.clone(), StagedTxEvent::REJECTED);
 
-        let rejected = staged_tx.parties().iter().any(|sender| {
-            StagedTxPolicy::new(*sender)
-                .map_or(false, |policy| policy.does_reject(staged_tx.rejecters()))
-        });
+        let rejected = staged_tx
+            .invocations()
+            .iter()
+            .any(|(sender, service_method)| {
+                StagedTxPolicy::new(*sender).map_or(false, |policy| {
+                    policy.does_reject(staged_tx.rejecters(), *service_method)
+                })
+            });
 
         if rejected {
             staged_tx.delete();
@@ -172,7 +181,10 @@ pub mod service {
                     .unwrap_or_else(|| {
                         abort_message(&format!("account {} does not exist", action.sender))
                     })
-                    .does_auth(accepters.clone())
+                    .does_auth(
+                        accepters.clone(),
+                        ServiceMethod::new(action.service, action.method),
+                    )
                 {
                     abort_message(&format!("Authorization for {} failed", action.sender));
                 }
