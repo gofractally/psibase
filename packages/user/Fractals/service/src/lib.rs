@@ -379,21 +379,23 @@ pub mod service {
     ///
     /// # Arguments
     /// * `account` - Account being checked.
+    /// * `method` - Account being checked.
     #[action]
     fn get_policy(
         account: AccountNumber,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
     ) -> auth_dyn::policy::DynamicAuthPolicy {
         use psibase::services::accounts as Accounts;
         let policy = check_some(account_policy(account), "account not supported");
 
-        if method.service == Accounts::SERVICE
-            && method.method == Accounts::action_structs::setAuthServ::ACTION_NAME.into()
-        {
-            return DynamicAuthPolicy::impossible();
+        if method.is_some_and(|method| {
+            method.service == Accounts::SERVICE
+                && method.method == Accounts::action_structs::setAuthServ::ACTION_NAME.into()
+        }) {
+            DynamicAuthPolicy::impossible()
+        } else {
+            policy
         }
-
-        policy
     }
 
     /// Has policy action used by AuthDyn service.

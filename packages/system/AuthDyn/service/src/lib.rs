@@ -39,7 +39,7 @@ pub mod tables {
             int_wrapper::call_to(self.manager).has_policy(self.account)
         }
 
-        pub fn dynamic_policy(&self, service_method: ServiceMethod) -> DynamicAuthPolicy {
+        pub fn dynamic_policy(&self, service_method: Option<ServiceMethod>) -> DynamicAuthPolicy {
             int_wrapper::call_to(self.manager).get_policy(self.account, service_method)
         }
 
@@ -134,7 +134,7 @@ pub mod service {
         method: Option<ServiceMethod>,
         authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        method.is_some_and(|method| is_auth(sender, authorizers, method, authSet, true))
+        is_auth(sender, authorizers, method, authSet, true)
     }
 
     #[action]
@@ -145,7 +145,7 @@ pub mod service {
         method: Option<ServiceMethod>,
         authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        method.is_some_and(|method| is_auth(sender, rejecters, method, authSet, false))
+        is_auth(sender, rejecters, method, authSet, false)
     }
 
     fn is_auth_other(
@@ -168,7 +168,7 @@ pub mod service {
     fn is_auth(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        method: ServiceMethod,
+        method: Option<ServiceMethod>,
         auth_set: Option<Vec<AccountNumber>>,
         is_approval: bool,
     ) -> bool {

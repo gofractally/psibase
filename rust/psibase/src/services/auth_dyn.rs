@@ -71,7 +71,7 @@ pub mod AuthDynIntf {
     };
 
     #[action]
-    pub fn get_policy(account: AccountNumber, method: ServiceMethod) -> DynamicAuthPolicy {
+    pub fn get_policy(account: AccountNumber, method: Option<ServiceMethod>) -> DynamicAuthPolicy {
         unimplemented!()
     }
 
