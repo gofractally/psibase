@@ -118,6 +118,10 @@ impl Fractal {
     }
 
     pub fn set_minimum_required_scorers(&mut self, minimum_required_scorers: u8) {
+        check_none(
+            RewardConsensus::get(self.account),
+            "reward consensus is already enabled, this setting is now redundant",
+        );
         check(
             minimum_required_scorers >= MIN_MINIMUM_REQUIRED_SCORERS,
             "minimum scorers is too low",
