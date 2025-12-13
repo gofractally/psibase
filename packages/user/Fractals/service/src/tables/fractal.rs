@@ -18,7 +18,7 @@ use crate::tables::tables::Guild;
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, fractals, sites, transact};
-use psibase::{check, Action, RawKey, TableQuery};
+use psibase::{check, get_sender, Action, RawKey, TableQuery};
 use psibase::{fracpack::Pack, services::auth_dyn};
 
 impl Fractal {
@@ -102,6 +102,24 @@ impl Fractal {
         new_instance.save();
         new_instance.create_account();
         new_instance
+    }
+
+    pub fn check_sender_is_legislature(&self) {
+        check(
+            self.legislature == get_sender(),
+            "Requires legislature authority",
+        );
+    }
+
+    pub fn check_sender_is_judiciary(&self) {
+        check(
+            self.judiciary == get_sender(),
+            "Requires judiciary authority",
+        );
+    }
+
+    pub fn check_sender_is_fractal(&self) {
+        check(self.account == get_sender(), "Requires fractal authority");
     }
 
     pub fn set_minimum_required_scorers(&mut self, minimum_required_scorers: u8) {

@@ -109,10 +109,8 @@ pub mod service {
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
     fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
-        check(
-            get_sender() == Fractal::get_assert(fractal).legislature,
-            "must be legislature",
-        );
+        Fractal::get_assert(fractal).check_sender_is_legislature();
+
         RewardConsensus::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
     }
 
@@ -122,7 +120,7 @@ pub mod service {
     /// * `display_name` - New display name of the guild.
     #[action]
     fn set_g_disp(display_name: Memo) {
-        Guild::get_assert(get_sender()).set_display_name(display_name);
+        Guild::by_sender().set_display_name(display_name);
     }
 
     /// Set guild bio
@@ -131,7 +129,7 @@ pub mod service {
     /// * `bio` - New bio of the guild.
     #[action]
     fn set_g_bio(bio: Memo) {
-        Guild::get_assert(get_sender()).set_bio(bio);
+        Guild::by_sender().set_bio(bio);
     }
 
     /// Set guild description
@@ -140,7 +138,7 @@ pub mod service {
     /// * `description` - New description of the guild.
     #[action]
     fn set_g_desc(description: String) {
-        Guild::get_assert(get_sender()).set_description(description);
+        Guild::by_sender().set_description(description);
     }
 
     /// Kick member from guild
@@ -213,10 +211,7 @@ pub mod service {
     #[action]
     fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
         let mut fractal = Fractal::get_assert(fractal);
-        check(
-            fractal.legislature == get_sender(),
-            "only the legislature can set the minimum required scorers",
-        );
+        fractal.check_sender_is_legislature();
         fractal.set_minimum_required_scorers(min_scorers);
     }
 
@@ -265,7 +260,7 @@ pub mod service {
         finish_by: u32,
         interval_seconds: u32,
     ) {
-        Guild::get_assert(get_sender()).set_schedule(
+        Guild::by_sender().set_schedule(
             registration,
             deliberation,
             submission,
@@ -402,10 +397,7 @@ pub mod service {
     /// * `member` - The fractal member to be exiled.
     #[action]
     fn exile_member(fractal: AccountNumber, member: AccountNumber) {
-        check(
-            Fractal::get_assert(fractal).judiciary == get_sender(),
-            "only the judiciary can exile members",
-        );
+        Fractal::get_assert(fractal).check_sender_is_judiciary();
         FractalMember::get_assert(fractal, member).exile();
     }
 
@@ -418,13 +410,8 @@ pub mod service {
     /// * `slots_count` - The number of ranked guild slots.
     #[action]
     fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
-        let fractal = Fractal::get_assert(fractal);
-        check(
-            fractal.legislature == get_sender(),
-            "only the legislature initialise fractal token",
-        );
-
-        RewardConsensus::get_assert(fractal.account).set_ranked_guild_slot_count(slots_count);
+        Fractal::get_assert(fractal).check_sender_is_legislature();
+        RewardConsensus::get_assert(fractal).set_ranked_guild_slot_count(slots_count);
     }
 
     /// Distribute token for a fractal.
@@ -449,10 +436,7 @@ pub mod service {
     /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
     #[action]
     fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
-        check(
-            Fractal::get_assert(fractal).legislature == get_sender(),
-            "only the legislature can rank guilds",
-        );
+        Fractal::get_assert(fractal).check_sender_is_legislature();
         RewardConsensus::get_assert(fractal).set_ranked_guilds(guilds);
     }
 
@@ -462,7 +446,7 @@ pub mod service {
     /// * `new_representative` - The account number of the new representative.
     #[action]
     fn set_g_rep(new_representative: AccountNumber) {
-        Guild::get_assert(get_sender()).set_representative(new_representative);
+        Guild::by_sender().set_representative(new_representative);
     }
 
     /// Resign as representative of a guild.
