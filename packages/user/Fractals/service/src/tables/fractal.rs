@@ -2,7 +2,10 @@ use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::{TOKEN_PRECISION, TOKEN_SUPPLY};
+use crate::constants::{
+    DEFAULT_MINIMUM_REQUIRED_SCORERS, MAX_MINIMUM_REQUIRED_SCORERS, MIN_MINIMUM_REQUIRED_SCORERS,
+    TOKEN_PRECISION, TOKEN_SUPPLY,
+};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
@@ -15,8 +18,8 @@ use crate::tables::tables::Guild;
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, fractals, sites, transact};
+use psibase::{check, Action, RawKey, TableQuery};
 use psibase::{fracpack::Pack, services::auth_dyn};
-use psibase::{Action, RawKey, TableQuery};
 
 impl Fractal {
     fn new(
@@ -38,6 +41,7 @@ impl Fractal {
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
+            minimum_required_scorers: DEFAULT_MINIMUM_REQUIRED_SCORERS,
         }
     }
 
@@ -111,6 +115,19 @@ impl Fractal {
         );
 
         RewardConsensus::add(self.account, quarter_supply);
+    }
+
+    pub fn set_minimum_required_scorers(&mut self, minimum_required_scorers: u8) {
+        check(
+            minimum_required_scorers >= MIN_MINIMUM_REQUIRED_SCORERS,
+            "minimum scorers is too low",
+        );
+        check(
+            minimum_required_scorers <= MAX_MINIMUM_REQUIRED_SCORERS,
+            "maximum scorers is too high",
+        );
+        self.minimum_required_scorers = minimum_required_scorers;
+        self.save();
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {

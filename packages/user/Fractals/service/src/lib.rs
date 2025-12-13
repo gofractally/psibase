@@ -23,6 +23,10 @@ pub mod constants {
     pub const DEFAULT_RANKED_GUILD_SLOT_COUNT: u8 = 12;
     pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
 
+    pub const DEFAULT_MINIMUM_REQUIRED_SCORERS: u8 = 8;
+    pub const MIN_MINIMUM_REQUIRED_SCORERS: u8 = 4;
+    pub const MAX_MINIMUM_REQUIRED_SCORERS: u8 = 250;
+
     // Simple limitation + also related to fibonacci function limit.
     pub const MAX_RANKED_GUILDS: u8 = 25;
 
@@ -194,9 +198,26 @@ pub mod service {
             Guild::get_assert(guild_account).evaluation(),
             "evaluation instance does not exist for guild",
         );
-        evaluation.set_pending_scores(0);
+        evaluation.set_pending_scores(Some(0));
 
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
+    }
+
+    /// Set minimum required scorers.
+    ///
+    /// RewardConsensus requires a successful evaluation where at least X evaluation participants (scorers) achieve a non-zero score.  
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to get the policy for
+    /// * `min_scorers` - The account number for the guild.
+    #[action]
+    fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
+        let mut fractal = Fractal::get_assert(fractal);
+        check(
+            fractal.legislature == get_sender(),
+            "only the legislature can set the minimum required scorers",
+        );
+        fractal.set_minimum_required_scorers(min_scorers);
     }
 
     /// Allows a user to join a fractal and immediately become a visa holder.
@@ -269,12 +290,10 @@ pub mod service {
         check_is_eval();
 
         let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
-        let fractal = Guild::get_assert(evaluation.guild).fractal;
-
-        evaluation.save_pending_scores();
+        evaluation.finish_evaluation();
 
         Wrapper::emit().history().evaluation_finished(
-            fractal,
+            Guild::get_assert(evaluation.guild).fractal,
             evaluation.guild,
             evaluation.evaluation_id,
         );
