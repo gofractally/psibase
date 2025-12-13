@@ -283,6 +283,11 @@ pub mod Service {
         unimplemented!()
     }
 
+    #[action]
+    fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
+        unimplemented!()
+    }
+
     /// Rank guilds for a fractal
     ///
     /// This action assigns the fractal's consensus reward distribution to the provided
