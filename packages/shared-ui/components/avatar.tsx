@@ -1,14 +1,21 @@
 import { useAvatar } from "@shared/hooks/use-avatar";
 import { AvatarType } from "@shared/lib/create-identicon";
 import { cn } from "@shared/lib/utils";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 interface Props extends React.ComponentProps<"img"> {
-    account: string;
+    account: string | null;
     type?: AvatarType;
 }
 
 export const Avatar = ({ account, type, ...props }: Props) => {
-    const { avatarSrc } = useAvatar({ account, type });
+    const { avatarSrc, isLoading } = useAvatar({ account, type });
+
+    if (isLoading) {
+        return (
+            <Skeleton className={cn("size-6 rounded-full", props.className)} />
+        );
+    }
 
     return (
         <img
