@@ -265,7 +265,6 @@ pub mod tables {
         pub payee: AccountNumber,
         pub ppm: u32,
         pub remaining: Option<Quantity>,
-        pub to_stream: bool,
     }
 
     impl Levy {

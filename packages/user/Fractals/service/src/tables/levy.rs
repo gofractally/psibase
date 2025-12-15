@@ -13,7 +13,6 @@ impl Levy {
         payee: AccountNumber,
         ppm: u32,
         amount: Option<Quantity>,
-        to_stream: bool,
     ) -> Self {
         Self {
             id: Config::next_levy_id(),
@@ -22,7 +21,6 @@ impl Levy {
             payee,
             ppm,
             remaining: amount,
-            to_stream,
         }
     }
 
@@ -32,7 +30,6 @@ impl Levy {
         payee: AccountNumber,
         ppm: u32,
         amount: Option<Quantity>,
-        to_stream: bool,
     ) -> Self {
         check(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");
 
@@ -40,9 +37,12 @@ impl Levy {
             .into_iter()
             .fold(0 as u32, |acc, levy| acc + levy.ppm);
 
-        check(total_existing_levy_ppm + ppm <= PPM, "accumulated levy ppms breach 100%");
+        check(
+            total_existing_levy_ppm + ppm <= PPM,
+            "accumulated levy ppms breach 100%",
+        );
 
-        let new_instance = Self::new(fractal, member, payee, ppm, amount, to_stream);
+        let new_instance = Self::new(fractal, member, payee, ppm, amount);
 
         new_instance.save();
         new_instance
@@ -96,13 +96,8 @@ impl Levy {
         };
 
         if payment.value > 0 {
-            let member = FractalMember::get_assert(self.fractal, self.payee);
-            let memo = "Levy payment".into();
-            if self.to_stream {
-                member.credit_stream(payment, memo);
-            } else {
-                member.credit_direct(payment, memo);
-            }
+            FractalMember::get_assert(self.fractal, self.payee)
+                .credit_direct(payment, "Levy payment".into());
         }
 
         payment
