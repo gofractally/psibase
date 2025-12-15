@@ -8,6 +8,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XPackages.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
 #include <services/system/VerifySig.hpp>
@@ -145,6 +146,7 @@ namespace
    void loadLocalServices(psibase::TestChain& self)
    {
       using namespace psibase;
+      using LocalService::XPackages;
       auto prefix = psio::convert_to_key(codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
@@ -156,8 +158,9 @@ namespace
       auto                     packages = registry.resolve(packageNames);
       std::vector<HttpRequest> requests;
       tester::raw::checkoutSubjective(self.nativeHandle());
-      for (const auto& package : packages)
+      for (const auto& info : packages)
       {
+         auto package = registry.get(info);
          for (const auto& [account, header, serviceInfo] : package.services)
          {
             auto file = package.archive.getEntry(header);
@@ -194,6 +197,23 @@ namespace
                 .body        = file.read(),
             });
          }
+
+         requests.push_back(HttpRequest{
+             .host        = XPackages::service.str() + "." + rootHost,
+             .method      = "PUT",
+             .target      = "/manifest/" + psio::hex(info.sha256.begin(), info.sha256.end()),
+             .contentType = "application/json",
+             .body        = package.manifest(),
+         });
+         HttpRequest postinstall{
+             .host        = XPackages::service.str() + "." + rootHost,
+             .method      = "POST",
+             .target      = "/postinstall",
+             .contentType = "application/json",
+         };
+         psio::vector_stream stream(postinstall.body);
+         to_json(info, stream);
+         requests.push_back(std::move(postinstall));
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");

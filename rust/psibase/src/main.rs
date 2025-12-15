@@ -1,26 +1,30 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
+use flate2::write::GzEncoder;
 use fracpack::Pack;
 use futures::future::{join_all, try_join_all};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{accounts, auth_delegate, packages, sites, staged_tx, transact};
+use psibase::services::{
+    accounts, auth_delegate, packages, sites, staged_tx, transact, x_packages,
+};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_manifest, get_package_sources,
-    get_tapos_for_head, login_action, new_account_action, push_transaction,
+    get_accounts_to_create, get_installed_manifest, get_local_manifest, get_manifest,
+    get_package_sources, get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, AutoAbort, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageList, PackageOp,
-    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
-    SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec,
-    TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
+    PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
+    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
+    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
 use std::cmp::Ordering;
@@ -325,6 +329,10 @@ struct InstallArgs {
     #[clap(long)]
     reinstall: bool,
 
+    /// Instead of installing to the chain, install local packages to a single node
+    #[clap(long)]
+    local: bool,
+
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
@@ -362,6 +370,10 @@ struct UpgradeArgs {
     #[clap(long)]
     latest: bool,
 
+    /// Instead of installing to the chain, install local packages to a single node
+    #[clap(long)]
+    local: bool,
+
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
     #[clap(short = 'z', long, value_name = "LEVEL", default_value = "4", value_parser = clap::value_parser!(u32).range(1..=11))]
@@ -393,6 +405,10 @@ struct ListArgs {
     /// Account that would install the packages
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
     sender: ExactAccountNumber,
+
+    /// Search for node-local packages instead of on-chain packages
+    #[clap(long)]
+    local: bool,
 }
 
 #[derive(Args, Debug)]
@@ -1592,7 +1608,11 @@ async fn do_install<T: Read + Seek>(
 
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let installed = if args.local {
+        PackageList::local_installed(&args.node_args.api, &mut client).await?
+    } else {
+        PackageList::installed(&args.node_args.api, &mut client).await?
+    };
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
@@ -1605,26 +1625,207 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     )
     .await?;
     let to_install = installed
-        .resolve_changes(&package_registry, &packages, args.reinstall)
+        .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
-    do_install(
-        client,
-        package_registry,
-        to_install,
-        args.sender.into(),
-        &args.node_args,
-        &args.sig_args,
-        &args.tx_args,
-        &args.key,
-        args.compression_level,
+    if args.local {
+        do_install_local(
+            client,
+            package_registry,
+            installed,
+            to_install,
+            &args.node_args,
+            args.compression_level,
+        )
+        .await
+    } else {
+        do_install(
+            client,
+            package_registry,
+            to_install,
+            args.sender.into(),
+            &args.node_args,
+            &args.sig_args,
+            &args.tx_args,
+            &args.key,
+            args.compression_level,
+        )
+        .await
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LocalPackage<'a> {
+    pub name: &'a String,
+    pub version: &'a String,
+    pub description: &'a String,
+    pub depends: &'a Vec<PackageRef>,
+    pub accounts: &'a Vec<AccountNumber>,
+    pub sha256: &'a Checksum256,
+}
+
+impl<'a> From<&'a PackageInfo> for LocalPackage<'a> {
+    fn from(other: &'a PackageInfo) -> Self {
+        LocalPackage {
+            name: &other.name,
+            version: &other.version,
+            description: &other.description,
+            depends: &other.depends,
+            accounts: &other.accounts,
+            sha256: &other.sha256,
+        }
+    }
+}
+
+impl<'a> From<&'a (Meta, PackageOrigin)> for LocalPackage<'a> {
+    fn from(other: &'a (Meta, PackageOrigin)) -> Self {
+        let PackageOrigin::Local { sha256 } = &other.1 else {
+            panic!("Expected a local package")
+        };
+        LocalPackage {
+            name: &other.0.name,
+            version: &other.0.version,
+            description: &other.0.description,
+            depends: &other.0.depends,
+            accounts: &other.0.accounts,
+            sha256: sha256,
+        }
+    }
+}
+
+async fn post_local_info<'a>(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    info: &LocalPackage<'a>,
+    endpoint: &str,
+) -> Result<(), anyhow::Error> {
+    psibase::as_text(
+        client
+            .post(x_packages::SERVICE.url(base_url)?.join(endpoint)?)
+            .json(info),
     )
-    .await
+    .await?;
+    Ok(())
+}
+
+async fn put_local_manifest<'a, R: Read + Seek>(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    info: &LocalPackage<'a>,
+    package: &mut PackagedService<R>,
+) -> Result<(), anyhow::Error> {
+    let manifest = package.manifest();
+    let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    serde_json::to_writer(&mut manifest_encoder, &manifest)?;
+    psibase::as_text(
+        client
+            .put(
+                x_packages::SERVICE
+                    .url(base_url)?
+                    .join(&format!("/manifest/{}", info.sha256))?,
+            )
+            .body(manifest_encoder.finish()?)
+            .header("Content-Type", "application/json")
+            .header("Content-Encoding", "gzip"),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn delete_local_manifest<'a>(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    info: &LocalPackage<'a>,
+) -> Result<(), anyhow::Error> {
+    psibase::as_text(
+        client
+            .delete(
+                x_packages::SERVICE
+                    .url(base_url)?
+                    .join(&format!("/manifest/{}", info.sha256))?,
+            )
+            .json(&info),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn do_install_local<T: Read + Seek>(
+    mut client: reqwest::Client,
+    package_registry: JointRegistry<T>,
+    installed: PackageList,
+    to_install: Vec<PackageOp>,
+    node_args: &NodeArgs,
+    compression_level: u32,
+) -> Result<(), anyhow::Error> {
+    for op in to_install {
+        match op {
+            PackageOp::Install(info) => {
+                let mut package = package_registry.get_by_info(&info).await?;
+                let info: LocalPackage = (&info).into();
+                post_local_info(&node_args.api, &mut client, &info, "/preinstall").await?;
+                put_local_manifest(&node_args.api, &mut client, &info, &mut package).await?;
+                package
+                    .install_local(&node_args.api, &mut client, compression_level)
+                    .await?;
+                post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+            }
+            PackageOp::Replace(old, new) => {
+                let mut package = package_registry.get_by_info(&new).await?;
+                let old_info: LocalPackage = installed.get_by_name(&old.name)?.unwrap().into();
+                if old_info.sha256 == &new.sha256 {
+                    // The only reason to install a package that is identical
+                    // to the currently installed package is to fix corrupted
+                    // files. Nothing needs to be removed (in particular, the
+                    // manifest must not be removed), and we don't need
+                    // to keep track of partial success.
+                    let info: LocalPackage = (&new).into();
+                    put_local_manifest(&node_args.api, &mut client, &info, &mut package).await?;
+                    package
+                        .install_local(&node_args.api, &mut client, compression_level)
+                        .await?;
+                    post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+                } else {
+                    let old_manifest =
+                        get_local_manifest(&node_args.api, &mut client, &old_info.sha256).await?;
+                    let new: LocalPackage = (&new).into();
+                    post_local_info(&node_args.api, &mut client, &new, "/preinstall").await?;
+                    put_local_manifest(&node_args.api, &mut client, &new, &mut package).await?;
+                    post_local_info(&node_args.api, &mut client, &old_info, "/prerm").await?;
+                    package
+                        .install_local(&node_args.api, &mut client, compression_level)
+                        .await?;
+                    old_manifest
+                        .upgrade_local(&node_args.api, &mut client, package.manifest())
+                        .await?;
+                    delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
+                    post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;
+                    post_local_info(&node_args.api, &mut client, &new, "/postinstall").await?;
+                }
+            }
+            PackageOp::Remove(meta) => {
+                let info: LocalPackage = installed.get_by_name(&meta.name)?.unwrap().into();
+                let old_manifest =
+                    get_local_manifest(&node_args.api, &mut client, info.sha256).await?;
+                post_local_info(&node_args.api, &mut client, &info, "/prerm").await?;
+                old_manifest
+                    .remove_local(&node_args.api, &mut client)
+                    .await?;
+                delete_local_manifest(&node_args.api, &mut client, &info).await?;
+                post_local_info(&node_args.api, &mut client, &info, "/postrm").await?;
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed = PackageList::installed(&args.node_args.api, &mut client).await?;
+    let installed = if args.local {
+        PackageList::local_installed(&args.node_args.api, &mut client).await?
+    } else {
+        PackageList::installed(&args.node_args.api, &mut client).await?
+    };
     let mut package_registry = JointRegistry::new();
 
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
@@ -1647,21 +1848,34 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             } else {
                 PackagePreference::Compatible
             },
+            args.local,
         )
         .await?;
 
-    do_install(
-        client,
-        package_registry,
-        to_install,
-        args.sender.into(),
-        &args.node_args,
-        &args.sig_args,
-        &args.tx_args,
-        &args.key,
-        args.compression_level,
-    )
-    .await
+    if args.local {
+        do_install_local(
+            client,
+            package_registry,
+            installed,
+            to_install,
+            &args.node_args,
+            args.compression_level,
+        )
+        .await
+    } else {
+        do_install(
+            client,
+            package_registry,
+            to_install,
+            args.sender.into(),
+            &args.node_args,
+            &args.sig_args,
+            &args.tx_args,
+            &args.key,
+            args.compression_level,
+        )
+        .await
+    }
 }
 
 async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
@@ -1673,8 +1887,11 @@ async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
         args.updates = true;
     }
     // Load the lists of packages that we need
-    let installed =
-        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    let installed = if args.local {
+        PackageList::local_installed(&args.node_args.api, &mut client).await?
+    } else {
+        handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?
+    };
     let reglist = if args.updates || args.available {
         let package_registry = get_package_registry(
             &args.node_args.api,
@@ -1683,7 +1900,7 @@ async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
             client.clone(),
         )
         .await?;
-        PackageList::from_registry(&package_registry)?
+        PackageList::from_registry(&FilteredRegistry::new(package_registry, args.local))?
     } else {
         PackageList::new()
     };
@@ -1724,6 +1941,16 @@ async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
     }
     let mut packages =
         handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+
+    // Locally installed packages might not be accessible, and we
+    // can't reliably identify the error, because access may be
+    // blocked by proxies.
+    if let Ok(local) = PackageList::local_installed(&args.node_args.api, &mut client).await {
+        for (meta, origin) in local.into_info() {
+            packages.insert(meta, origin)
+        }
+    }
+
     let package_registry = get_package_registry(
         &args.node_args.api,
         Some(args.sender.into()),
@@ -1848,6 +2075,13 @@ async fn show_package<T: PackageRegistry + ?Sized>(
                 println!("status: not installed");
             }
         }
+        PackageOrigin::Local { .. } => {
+            if let Some(alt_version) = alt_version {
+                println!("status: upgrade to {} available", alt_version);
+            } else {
+                println!("status: installed");
+            }
+        }
     }
     println!("description: {}", &package.description);
     let mut services: Vec<_> = manifest.services.into_iter().collect();
@@ -1887,8 +2121,13 @@ fn handle_unbooted<T: Default>(list: Result<T, anyhow::Error>) -> Result<T, anyh
 
 async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
-    let installed =
+    let mut installed =
         handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
+    if let Ok(local) = PackageList::local_installed(&args.node_args.api, &mut client).await {
+        for (meta, origin) in local.into_info() {
+            installed.insert(meta, origin)
+        }
+    }
     let mut package_registry = JointRegistry::new();
     let (files, packages) = FileSetRegistry::from_files(&args.packages)?;
     package_registry.push(files)?;
