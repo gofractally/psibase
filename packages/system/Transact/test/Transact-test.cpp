@@ -431,3 +431,25 @@ TEST_CASE("Test firstAuth")
       CHECK(TraceResult{unpackReply<TransactionTrace>(std::move(reply))}.failed(""));
    }
 }
+
+TEST_CASE("Test stats")
+{
+   DefaultTestChain t;
+
+   auto alice = t.addAccount("alice");
+   auto trx   = t.signTransaction(
+       t.makeTransaction({Action{.sender = alice, .service = AccountNumber{"nop"}}}));
+   CHECK(
+       Result<void>(t.post<TransactionTrace>(
+                        Transact::service, "/push_transaction?wait_for=applied", FracPackBody{trx}))
+           .succeeded());
+
+   t.startBlock();
+
+   auto stats = t.get<TxStatsRecord>(Transact::service, "/stats");
+   CHECK(stats.unprocessed == 0);
+   CHECK(stats.total == 1);
+   CHECK(stats.failed == 0);
+   CHECK(stats.succeeded == 1);
+   CHECK(stats.expired == 0);
+}
