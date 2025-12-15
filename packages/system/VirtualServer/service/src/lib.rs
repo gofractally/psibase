@@ -103,6 +103,12 @@ mod service {
         tok.setTokenConf(config.res, TokenFlags::UNTRANSFERABLE.index(), true);
     }
 
+    /// Get the account that receives all resource billing fees
+    #[action]
+    fn get_fee_receiver() -> Option<AccountNumber> {
+        BillingConfig::get().map(|c| c.fee_receiver)
+    }
+
     /// Enable or disable the billing system
     ///
     /// If billing is disabled, resource consumption will still be tracked, but the resources will
