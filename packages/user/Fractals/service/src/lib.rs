@@ -7,6 +7,7 @@ pub mod constants {
     pub const ONE_WEEK: u32 = ONE_DAY * 7;
     const ONE_YEAR: u32 = ONE_WEEK * 52;
 
+    pub const PPM: u32 = 1_000_000;
     pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
     pub const TOKEN_PRECISION: u8 = 4;
     pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;

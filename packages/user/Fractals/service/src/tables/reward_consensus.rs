@@ -122,7 +122,7 @@ impl RewardConsensus {
 
                     for (membership, reward) in member_distributions {
                         FractalMember::get_assert(self.fractal, membership.member)
-                            .deposit_stream(reward.into(), "Guild member reward".into());
+                            .credit_stream(reward.into(), "Guild member consensus reward".into());
                     }
                 }
                 None => tokens_to_recycle += slot_distribution,

@@ -1,3 +1,4 @@
+mod config;
 mod evaluation_instance;
 mod fractal;
 mod fractal_exile;
@@ -6,6 +7,7 @@ mod guild;
 mod guild_application;
 mod guild_attest;
 mod guild_member;
+mod levy;
 mod reward_consensus;
 mod reward_stream;
 
@@ -13,13 +15,27 @@ mod reward_stream;
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{
+        services::tokens::{Quantity, TID},
+        AccountNumber, Fracpack, Memo, TimePointSec, ToSchema,
+    };
 
     use serde::{Deserialize, Serialize};
 
     use crate::tables::fractal_member::StatusU8;
 
-    #[table(name = "FractalTable", index = 0)]
+    #[table(name = "ConfigTable", index = 0)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct Config {
+        pub last_levy_id: u32,
+    }
+
+    impl Config {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[table(name = "FractalTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
@@ -36,7 +52,7 @@ pub mod tables {
         pub minimum_required_scorers: u8,
     }
 
-    #[table(name = "FractalMemberTable", index = 1)]
+    #[table(name = "FractalMemberTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct FractalMember {
@@ -59,7 +75,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "EvaluationInstanceTable", index = 2)]
+    #[table(name = "EvaluationInstanceTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct EvaluationInstance {
@@ -76,7 +92,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildTable", index = 3)]
+    #[table(name = "GuildTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Guild {
@@ -110,7 +126,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildMemberTable", index = 4)]
+    #[table(name = "GuildMemberTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildMember {
@@ -140,7 +156,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildApplicationTable", index = 5)]
+    #[table(name = "GuildApplicationTable", index = 6)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildApplication {
@@ -163,7 +179,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildAttestTable", index = 6)]
+    #[table(name = "GuildAttestTable", index = 7)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildAttest {
@@ -192,7 +208,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "FractalExileTable", index = 7)]
+    #[table(name = "FractalExileTable", index = 8)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct FractalExile {
@@ -213,7 +229,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "RewardStreamTable", index = 8)]
+    #[table(name = "RewardStreamTable", index = 9)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RewardStream {
         #[primary_key]
@@ -230,7 +246,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "RewardConsensusTable", index = 9)]
+    #[table(name = "RewardConsensusTable", index = 10)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RewardConsensus {
         #[primary_key]
@@ -238,5 +254,24 @@ pub mod tables {
         pub reward_stream_id: u32,
         pub ranked_guilds: Vec<AccountNumber>,
         pub ranked_guild_slot_count: u8,
+    }
+
+    #[table(name = "LevyTable", index = 11)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct Levy {
+        pub fractal: AccountNumber,
+        pub member: AccountNumber,
+        pub id: u32,
+        pub payee: AccountNumber,
+        pub ppm: u32,
+        pub remaining: Option<Quantity>,
+        pub to_stream: bool,
+    }
+
+    impl Levy {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, u32) {
+            (self.fractal, self.member, self.id)
+        }
     }
 }
