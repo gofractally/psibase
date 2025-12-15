@@ -183,11 +183,16 @@ namespace
 
 }  // namespace
 
-void TestChain::boot(const std::vector<std::string>& names, bool installUI)
+std::string TestChain::defaultPackageDir()
 {
    auto packageRoot = std::getenv("PSIBASE_DATADIR");
    check(!!packageRoot, "Cannot find package directory: PSIBASE_DATADIR not defined");
-   auto registry = DirectoryRegistry(std::string(packageRoot) + "/packages");
+   return std::string(packageRoot) + "/packages";
+}
+
+void TestChain::boot(const std::vector<std::string>& names, bool installUI)
+{
+   auto registry = DirectoryRegistry(defaultPackageDir());
    std::vector<PackagedService> packages;
    for (auto info : registry.resolve(names, essentialServices))
    {

@@ -75,6 +75,8 @@ namespace psibase
    {
      public:
       DirectoryRegistry(std::string_view path);
+      std::vector<PackageInfo> index() const;
+
       PackagedService get(std::string_view name) const;
       PackagedService get(const PackageInfo& info) const;
       // Packages will be returned in the order that they should be
