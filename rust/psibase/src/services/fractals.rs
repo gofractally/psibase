@@ -240,7 +240,7 @@ pub mod Service {
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
-    fn get_policy(account: AccountNumber, method: ServiceMethod) -> DynamicAuthPolicy {
+    fn get_policy(account: AccountNumber, method: Option<ServiceMethod>) -> DynamicAuthPolicy {
         unimplemented!()
     }
 
