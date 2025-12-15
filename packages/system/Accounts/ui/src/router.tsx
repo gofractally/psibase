@@ -1,7 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
 
-import { AccountSelection } from "./AccountSelection";
-import KeyImport from "./KeyImport";
 import ErrorBoundary from "./components/error-boundary";
 import { ConnectPrompt } from "./connect-prompt";
 import { CreatePrompt } from "./create-prompt";
@@ -14,14 +12,6 @@ const Router = createBrowserRouter([
         element: <Root />,
         errorElement: <ErrorBoundary />,
         children: [
-            {
-                path: "/",
-                element: <AccountSelection />,
-            },
-            {
-                path: "/key",
-                element: <KeyImport />,
-            },
             {
                 path: "/plugin/web/prompt/connect",
                 element: <ConnectPrompt />,

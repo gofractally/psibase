@@ -4,7 +4,7 @@ import {
     useRouteError,
 } from "react-router-dom";
 
-import { ErrorCard } from "./error-card";
+import { ErrorCard } from "@shared/components/error-card";
 
 export const ErrorBoundary = () => {
     const error = useRouteError();
@@ -20,9 +20,9 @@ export const ErrorBoundary = () => {
 
     return (
         <ErrorCard
-            errorMessage={message}
-            action={() => navigate(-1)}
-            actionLabel="Go back"
+            error={new Error(message)}
+            retry={() => navigate(-1)}
+            retryLabel="Go back"
         />
     );
 };
