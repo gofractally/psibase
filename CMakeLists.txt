@@ -1160,6 +1160,7 @@ install(
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
+          ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTransact.psi
