@@ -164,6 +164,7 @@ pub mod tables {
         pub guild: AccountNumber,
         pub member: AccountNumber,
         pub extra_info: String,
+        pub sponsor: Option<AccountNumber>,
         pub created_at: psibase::TimePointSec,
     }
 

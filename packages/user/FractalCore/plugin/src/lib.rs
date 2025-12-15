@@ -212,9 +212,13 @@ impl UserFractal for FractalCorePlugin {
 }
 
 impl UserGuild for FractalCorePlugin {
-    fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
+    fn apply_guild(
+        guild_account: String,
+        sponsor: Option<String>,
+        app: String,
+    ) -> Result<(), Error> {
         assert_authorized(FunctionName::apply_guild)?;
-        FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
+        FractalsPlugin::user_guild::apply_guild(&guild_account, sponsor.as_deref(), &app)
     }
 
     fn attest_membership_app(

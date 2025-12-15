@@ -1,9 +1,13 @@
 use async_graphql::ComplexObject;
 use psibase::{check_none, check_some, AccountNumber, Table};
 
-use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
+use crate::constants::{
+    EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, RECRUITMENT_REWARD_PPM, SCORE_SCALE,
+};
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
+use crate::tables::tables::{
+    Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable, Levy,
+};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -19,10 +23,25 @@ impl GuildMember {
         }
     }
 
-    pub fn add(guild: AccountNumber, member: AccountNumber) -> Self {
+    pub fn add(
+        guild: AccountNumber,
+        member: AccountNumber,
+        sponsor: Option<AccountNumber>,
+    ) -> Self {
         check_none(Self::get(guild, member), "guild member already exists");
         let new_instance = Self::new(guild, member);
         new_instance.save();
+
+        let fractal = Guild::get_assert(guild).fractal;
+        let levy_recipient = sponsor.unwrap_or(fractal);
+        Levy::add(
+            fractal,
+            member,
+            levy_recipient,
+            RECRUITMENT_REWARD_PPM,
+            None,
+        );
+
         new_instance
     }
 

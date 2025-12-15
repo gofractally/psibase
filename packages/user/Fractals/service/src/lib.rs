@@ -8,6 +8,8 @@ pub mod constants {
     const ONE_YEAR: u32 = ONE_WEEK * 52;
 
     pub const PPM: u32 = 1_000_000;
+    pub const RECRUITMENT_REWARD_PPM: u32 = 50_000;
+
     pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
     pub const TOKEN_PRECISION: u8 = 4;
     pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
@@ -49,8 +51,8 @@ pub mod service {
         },
     };
 
-    use psibase::services::auth_dyn;
     use psibase::*;
+    use psibase::{services::auth_dyn, AccountNumber};
 
     /// Creates a new account and fractal.
     ///
@@ -93,14 +95,26 @@ pub mod service {
     /// * `guild_account` - The account number for the guild.
     /// * `extra_info` - Relevant information to the application.
     #[action]
-    fn apply_guild(guild_account: AccountNumber, extra_info: String) {
+    fn apply_guild(
+        guild_account: AccountNumber,
+        sponsor: Option<AccountNumber>,
+        extra_info: String,
+    ) {
         let guild = Guild::get_assert(guild_account);
         let sender = get_sender();
-        check_some(
+
+        let is_applicant_a_citizen = check_some(
             FractalMember::get(guild.fractal, sender),
             "must be a member of a fractal to apply for its guild",
-        );
-        GuildApplication::add(guild.account, sender, extra_info);
+        )
+        .is_citizen();
+
+        if is_applicant_a_citizen {
+            check_none(sponsor, "sponsors not supported for citizens");
+        } else {
+            check_some(sponsor, "non citizens require a sponsor");
+        }
+        GuildApplication::add(guild.account, sender, sponsor, extra_info);
     }
 
     /// Set Fractal distribution interval

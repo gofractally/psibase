@@ -3,7 +3,9 @@ use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Tabl
 
 use crate::{
     constants::PPM,
-    tables::tables::{Config, Fractal, FractalMember, GuildMember, Levy, LevyTable},
+    tables::tables::{
+        Config, Fractal, FractalMember, GuildMember, Levy, LevyTable, RewardConsensus,
+    },
 };
 
 impl Levy {
@@ -96,8 +98,12 @@ impl Levy {
         };
 
         if payment.value > 0 {
-            FractalMember::get_assert(self.fractal, self.payee)
-                .credit_direct(payment, "Levy payment".into());
+            if Fractal::get(self.payee).is_some() {
+                RewardConsensus::get_assert(self.payee).donate(payment, "Levy payment".into());
+            } else {
+                FractalMember::get_assert(self.fractal, self.payee)
+                    .credit_direct(payment, "Levy payment".into());
+            }
         }
 
         payment

@@ -38,11 +38,18 @@ pub mod Service {
 
     /// Apply to join a guild
     ///
+    /// Applicant requires a sponsor if non citizen
+    ///
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
+    /// * `sponsor` - Existing guild member acting as sponsor, only if applicant is a non citizen.
     /// * `extra_info` - Relevant information to the application.
     #[action]
-    fn apply_guild(guild_account: AccountNumber, extra_info: String) {
+    fn apply_guild(
+        guild_account: AccountNumber,
+        sponsor: Option<AccountNumber>,
+        extra_info: String,
+    ) {
         unimplemented!()
     }
 
