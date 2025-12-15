@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type React from "react";
 import z from "zod";
 import { Info } from "lucide-react";
@@ -18,6 +18,12 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@shared/shadcn/ui/accordion";
 
 import { useAppForm } from "@/components/forms/app-form";
 import { useNetworkVariables } from "@/hooks/use-network-variables";
@@ -215,6 +221,40 @@ export const VirtualServer = () => {
         },
     });
 
+    // Helper for labels with an info tooltip
+    const LabelWithInfo = ({
+        label,
+        tooltip,
+    }: {
+        label: string;
+        tooltip: string;
+    }) => (
+        <div className="inline-flex items-center gap-1">
+            <Label>{label}</Label>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>{tooltip}</TooltipContent>
+            </Tooltip>
+        </div>
+    );
+
+    const [advancedOpen, setAdvancedOpen] = useState(false);
+
+    const updateButton = (
+        <div className="mt-1 flex flex-row font-medium">
+            <form.Subscribe selector={(state) => [state.canSubmit, state.isDirty]}>
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {([canSubmit, isDirty]: any) => (
+                    <Button type="submit" disabled={!isDirty || !canSubmit}>
+                        Update
+                    </Button>
+                )}
+            </form.Subscribe>
+        </div>
+    );
+
     return (
         <form
             onSubmit={(e) => {
@@ -229,8 +269,7 @@ export const VirtualServer = () => {
                 </div>
 
                 {/* Server Specs Subsection */}
-                <div className="mb-0 border-b pb-6">
-                    <h4 className="text-sm font-medium mb-4">Server Specs</h4>
+                <div className="mb-0 border-b pb-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <form.Field
                             name="netBps"
@@ -252,20 +291,30 @@ export const VirtualServer = () => {
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             {(field: any) => (
                                 <div>
-                                    <Label>Net Bandwidth (Gbps)</Label>
-                                    <p className="text-muted-foreground text-sm">
-                                        for P2P traffic, Tx traffic, and Query traffic
-                                    </p>
-                                    <Input
-                                        type="text"
-                                        value={field.state.value}
-                                        onChange={(e) => {
-                                            field.handleChange(e.target.value);
-                                        }}
-                                        onBlur={field.handleBlur}
-                                        placeholder="Gbps"
-                                        className="mt-1 w-36"
+                                    <LabelWithInfo
+                                        label="Net bandwidth"
+                                        tooltip="for P2P traffic, Tx traffic, and Query traffic"
                                     />
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <Input
+                                            type="text"
+                                            value={field.state.value}
+                                            onChange={(e) => {
+                                                field.handleChange(e.target.value);
+                                            }}
+                                            onBlur={field.handleBlur}
+                                            placeholder="0"
+                                            className="w-36"
+                                        />
+                                        <Select value="Gbps" onValueChange={() => {}}>
+                                            <SelectTrigger className="w-24" disabled>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Gbps">Gbps</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                     {field.state.meta.errors && (
                                         <p className="text-destructive text-sm mt-1">
                                             {field.state.meta.errors[0]}
@@ -295,10 +344,10 @@ export const VirtualServer = () => {
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             {(field: any) => (
                                 <div>
-                                    <Label>Storage</Label>
-                                    <p className="text-muted-foreground text-sm">
-                                        Total storage space (RAM + SSD)
-                                    </p>
+                                    <LabelWithInfo
+                                        label="Total storage"
+                    tooltip="Total storage space (objective + subjective)"
+                                    />
                                     <div className="mt-1 flex gap-2 items-center">
                                         <Input
                                             type="text"
@@ -319,7 +368,7 @@ export const VirtualServer = () => {
                                                         unitField.handleChange(value as StorageUnit);
                                                     }}
                                                 >
-                                                    <SelectTrigger className="w-20">
+                                                    <SelectTrigger className="w-24">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -342,14 +391,36 @@ export const VirtualServer = () => {
                     </div>
                 </div>
 
+                {/* Update Button position when Advanced is collapsed */}
+                {!advancedOpen && updateButton}
+
                 {/* Network Variables Subsection */}
                 <div>
-                    <h4 className="text-sm font-medium mb-2">Network Variables</h4>
-                    <p className="text-muted-foreground text-sm mb-4">
-                        These variables change how the network specs are derived from the server specs
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <form.Field
+                    <Accordion
+                        type="single"
+                        collapsible
+                        onValueChange={(val) => {
+                            setAdvancedOpen(val === "advanced");
+                        }}
+                    >
+                        <AccordionItem value="advanced">
+                            <AccordionTrigger className="!flex-none !justify-start flex-row-reverse w-fit">
+                                Advanced
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <p className="text-destructive text-xs mb-3">
+                                    WARNING: These are advanced features; ensure you know
+                                    the implications of changing these values!
+                                </p>
+                                <h4 className="text-sm font-medium mb-2">
+                                    Network variables
+                                </h4>
+                                <p className="text-muted-foreground text-sm mb-4">
+                                    These variables change how the network specs are derived
+                                    from the server specs.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <form.Field
                             name="blockReplayFactor"
                             validators={{
                                 onChange: z
@@ -365,34 +436,35 @@ export const VirtualServer = () => {
                                         },
                                     ),
                             }}
-                        >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {(field: any) => (
-                                <div>
-                                    <Label>Block Replay Factor</Label>
-                                    <p className="text-muted-foreground text-sm">
-                                        Block replay speed compared to live network processing
-                                    </p>
-                                    <Input
-                                        type="text"
-                                        value={field.state.value}
-                                        onChange={(e) => {
-                                            field.handleChange(e.target.value);
-                                        }}
-                                        onBlur={field.handleBlur}
-                                        placeholder="0-255"
-                                        className="mt-1 w-36"
-                                    />
-                                    {field.state.meta.errors && (
-                                        <p className="text-destructive text-sm mt-1">
-                                            {field.state.meta.errors[0]}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </form.Field>
+                                    >
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {(field: any) => (
+                                            <div>
+                                                <Label>Block Replay Factor</Label>
+                                                <p className="text-muted-foreground text-sm">
+                                                    Block replay speed compared to live network
+                                                    processing
+                                                </p>
+                                                <Input
+                                                    type="text"
+                                                    value={field.state.value}
+                                                    onChange={(e) => {
+                                                        field.handleChange(e.target.value);
+                                                    }}
+                                                    onBlur={field.handleBlur}
+                                                    placeholder="0-255"
+                                                    className="mt-1 w-36"
+                                                />
+                                                {field.state.meta.errors && (
+                                                    <p className="text-destructive text-sm mt-1">
+                                                        {field.state.meta.errors[0]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </form.Field>
 
-                        <form.Field
+                                    <form.Field
                             name="perBlockSysCpuNs"
                             validators={{
                                 onChange: z
@@ -408,56 +480,64 @@ export const VirtualServer = () => {
                                         },
                                     ),
                             }}
-                        >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {(field: any) => (
-                                <div>
-                                    <Label>Per-Block System CPU</Label>
-                                    <p className="text-muted-foreground text-sm">
-                                        CPU devoted to system execution
-                                    </p>
-                                    <div className="mt-1 flex gap-2 items-center">
-                                        <Input
-                                            type="text"
-                                            value={field.state.value}
-                                            onChange={(e) => {
-                                                field.handleChange(e.target.value);
-                                            }}
-                                            onBlur={field.handleBlur}
-                                            placeholder="0"
-                                            className="w-36"
-                                        />
-                                        <form.Field name="perBlockSysCpuUnit">
-                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                            {(unitField: any) => (
-                                                <Select
-                                                    value={unitField.state.value}
-                                                    onValueChange={(value) => {
-                                                        unitField.handleChange(value as TimeUnit);
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="w-20">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="ns">ns</SelectItem>
-                                                        <SelectItem value="us">us</SelectItem>
-                                                        <SelectItem value="ms">ms</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        </form.Field>
-                                    </div>
-                                    {field.state.meta.errors && (
-                                        <p className="text-destructive text-sm mt-1">
-                                            {field.state.meta.errors[0]}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </form.Field>
+                                    >
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {(field: any) => (
+                                            <div>
+                                                <Label>Per-Block System CPU</Label>
+                                                <p className="text-muted-foreground text-sm">
+                                                    CPU devoted to system execution
+                                                </p>
+                                                <div className="mt-1 flex gap-2 items-center">
+                                                    <Input
+                                                        type="text"
+                                                        value={field.state.value}
+                                                        onChange={(e) => {
+                                                            field.handleChange(e.target.value);
+                                                        }}
+                                                        onBlur={field.handleBlur}
+                                                        placeholder="0"
+                                                        className="w-36"
+                                                    />
+                                                    <form.Field name="perBlockSysCpuUnit">
+                                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {(unitField: any) => (
+                                            <Select
+                                                value={unitField.state.value}
+                                                onValueChange={(value) => {
+                                                    unitField.handleChange(
+                                                        value as TimeUnit,
+                                                    );
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-24">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="ns">
+                                                        ns
+                                                    </SelectItem>
+                                                    <SelectItem value="us">
+                                                        us
+                                                    </SelectItem>
+                                                    <SelectItem value="ms">
+                                                        ms
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                                    </form.Field>
+                                                </div>
+                                                {field.state.meta.errors && (
+                                                    <p className="text-destructive text-sm mt-1">
+                                                        {field.state.meta.errors[0]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </form.Field>
 
-                        <form.Field
+                                    <form.Field
                             name="objStorageBytes"
                             validators={{
                                 onChange: z
@@ -473,56 +553,65 @@ export const VirtualServer = () => {
                                         },
                                     ),
                             }}
-                        >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {(field: any) => (
-                                <div>
-                                    <Label>Objective Storage</Label>
-                                    <p className="text-muted-foreground text-sm">
-                                        Storage devoted to objective state (vs subjective state)
-                                    </p>
-                                    <div className="mt-1 flex gap-2 items-center">
-                                        <Input
-                                            type="text"
-                                            value={field.state.value}
-                                            onChange={(e) => {
-                                                field.handleChange(e.target.value);
-                                            }}
-                                            onBlur={field.handleBlur}
-                                            placeholder="0"
-                                            className="w-36"
-                                        />
-                                        <form.Field name="objStorageUnit">
-                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                            {(unitField: any) => (
-                                                <Select
-                                                    value={unitField.state.value}
-                                                    onValueChange={(value) => {
-                                                        unitField.handleChange(value as StorageUnit);
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="w-20">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="GB">GB</SelectItem>
-                                                        <SelectItem value="TB">TB</SelectItem>
-                                                        <SelectItem value="PB">PB</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        </form.Field>
-                                    </div>
-                                    {field.state.meta.errors && (
-                                        <p className="text-destructive text-sm mt-1">
-                                            {field.state.meta.errors[0]}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </form.Field>
+                                    >
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {(field: any) => (
+                                            <div>
+                                                <Label>Objective Storage</Label>
+                                                <p className="text-muted-foreground text-sm">
+                                                    Storage devoted to objective state (vs subjective
+                                                    state)
+                                                </p>
+                                                <div className="mt-1 flex gap-2 items-center">
+                                                    <Input
+                                                        type="text"
+                                                        value={field.state.value}
+                                                        onChange={(e) => {
+                                                            field.handleChange(e.target.value);
+                                                        }}
+                                                        onBlur={field.handleBlur}
+                                                        placeholder="0"
+                                                        className="w-36"
+                                                    />
+                                                    <form.Field name="objStorageUnit">
+                                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                                        {(unitField: any) => (
+                                                            <Select
+                                                                value={unitField.state.value}
+                                                                onValueChange={(value) => {
+                                                                    unitField.handleChange(
+                                                                        value as StorageUnit,
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <SelectTrigger className="w-24">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="GB">
+                                                                        GB
+                                                                    </SelectItem>
+                                                                    <SelectItem value="TB">
+                                                                        TB
+                                                                    </SelectItem>
+                                                                    <SelectItem value="PB">
+                                                                        PB
+                                                                    </SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        )}
+                                                    </form.Field>
+                                                </div>
+                                                {field.state.meta.errors && (
+                                                    <p className="text-destructive text-sm mt-1">
+                                                        {field.state.meta.errors[0]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </form.Field>
 
-                        <form.Field
+                                    <form.Field
                             name="memoryRatio"
                             validators={{
                                 onChange: z
@@ -538,51 +627,40 @@ export const VirtualServer = () => {
                                         },
                                     ),
                             }}
-                        >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {(field: any) => (
-                                <div>
-                                    <Label>Memory Ratio</Label>
-                                    <p className="text-muted-foreground text-sm">
-                                        Ratio of objective storage to minimum memory, X:1
-                                    </p>
-                                    <Input
-                                        type="text"
-                                        value={field.state.value}
-                                        onChange={(e) => {
-                                            field.handleChange(e.target.value);
-                                        }}
-                                        onBlur={field.handleBlur}
-                                        placeholder="0-255"
-                                        className="mt-1 w-36"
-                                    />
-                                    {field.state.meta.errors && (
-                                        <p className="text-destructive text-sm mt-1">
-                                            {field.state.meta.errors[0]}
-                                        </p>
-                                    )}
+                                    >
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {(field: any) => (
+                                            <div>
+                                                <Label>Memory Ratio</Label>
+                                                <p className="text-muted-foreground text-sm">
+                                                    Ratio of objective storage to minimum memory, X:1
+                                                </p>
+                                                <Input
+                                                    type="text"
+                                                    value={field.state.value}
+                                                    onChange={(e) => {
+                                                        field.handleChange(e.target.value);
+                                                    }}
+                                                    onBlur={field.handleBlur}
+                                                    placeholder="0-255"
+                                                    className="mt-1 w-36"
+                                                />
+                                                {field.state.meta.errors && (
+                                                    <p className="text-destructive text-sm mt-1">
+                                                        {field.state.meta.errors[0]}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </form.Field>
                                 </div>
-                            )}
-                        </form.Field>
-                    </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
 
-                {/* Update Button */}
-                <div className="mt-1 flex flex-row font-medium">
-                    <form.Subscribe
-                        selector={(state) => [state.canSubmit, state.isDirty]}
-                    >
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {([canSubmit, isDirty]: any) => (
-                            <Button
-                                type="submit"
-                                disabled={!isDirty || !canSubmit}
-                            >
-                                Update
-                            </Button>
-                        )}
-                    </form.Subscribe>
-                </div>
+                {/* Update Button when Advanced is expanded */}
+                {advancedOpen && updateButton}
 
                 {/* Network Resources Display */}
                 <form.Subscribe selector={(state) => state.values}>
@@ -616,10 +694,6 @@ export const VirtualServer = () => {
                             return value * TIME_FACTORS[unit];
                         };
 
-                        const getMemoryRatio = (): number => {
-                            return parseFloat(formValues.memoryRatio || "0") || 0;
-                        };
-
                         const getBlockReplayFactor = (): number => {
                             return parseFloat(formValues.blockReplayFactor || "0") || 0;
                         };
@@ -628,17 +702,10 @@ export const VirtualServer = () => {
                         const storageBytes = getStorageBytes();
                         const objStorageBytes = getObjStorageBytes();
                         const perBlockSysCpuNs = getPerBlockSysCpuNs();
-                        const memoryRatio = getMemoryRatio();
                         const blockReplayFactor = getBlockReplayFactor();
 
-                        // Network Resources
-                        const storageDisplay = getBestStorageUnit(storageBytes);
-                        const cpuDisplay = getBestTimeUnit(perBlockSysCpuNs);
                         const netBps = parseFloat(formValues.netBps || "0") || 0;
 
-                        // Resource Allocation
-                        const ramBytes = memoryRatio > 0 ? objStorageBytes / memoryRatio : 0;
-                        const ramDisplay = getBestStorageUnit(ramBytes);
                         const objStorageDisplay = getBestStorageUnit(objStorageBytes);
                         const subjectiveStorageBytes = Math.max(0, storageBytes - objStorageBytes);
                         const subjectiveStorageDisplay = getBestStorageUnit(subjectiveStorageBytes);
@@ -679,85 +746,36 @@ export const VirtualServer = () => {
                         return (
                             <div className="border-t mt-2 pt-2">
                                 <div className="border rounded p-2 m-1">
-                                    <div className="grid grid-cols-3 gap-4">
-                                        <div className="col-span-3">
-                                            <div className="text-sm">Resultant Network Resources</div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="col-span-1 md:col-span-2">
+                                            <div className="text-sm">Billable Resources</div>
                                         </div>
 
+                                        {/* Row 1 (desktop): Objective / Subjective storage */}
                                         <div className="text-sm">
                                             <div>
-                                                <span className="text-muted-foreground">Storage:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(storageDisplay.value)} ${storageDisplay.unit}`}
-                                                />
+                                                <span className="text-muted-foreground">
+                                                    Objective Storage:
+                                                </span>{" "}
+                                                {`${formatNumber(objStorageDisplay.value)} ${objStorageDisplay.unit}`}
                                             </div>
                                         </div>
 
                                         <div className="text-sm">
                                             <div>
-                                                <span className="text-muted-foreground">CPU:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(cpuDisplay.value)} ${cpuDisplay.unit}`}
-                                                />
+                                                <span className="text-muted-foreground">
+                                                    Subjective Storage:
+                                                </span>{" "}
+                                                {`${formatNumber(subjectiveStorageDisplay.value)} ${subjectiveStorageDisplay.unit}`}
                                             </div>
                                         </div>
 
+                                        {/* Row 2 (desktop): CPU / Bandwidth */}
                                         <div className="text-sm">
                                             <div>
-                                                <span className="text-muted-foreground">Bandwidth:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(netBps)} Gbps`}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="col-span-3 mt-1">
-                                            <div className="text-sm">Allocation</div>
-                                        </div>
-
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">RAM:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(ramDisplay.value)} ${ramDisplay.unit}`}
-                                                    tooltipText="= Objective Storage / Memory Ratio"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">Objective Storage:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(objStorageDisplay.value)} ${objStorageDisplay.unit}`}
-                                                    tooltipText="= Objective Storage"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">Subjective Storage:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(subjectiveStorageDisplay.value)} ${subjectiveStorageDisplay.unit}`}
-                                                    tooltipText="= Storage - Objective Storage"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">CPU for system work:</span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(cpuDisplay.value)} ${cpuDisplay.unit}`}
-                                                    tooltipText="= per-block-sys-cpu-ns"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">CPU for transactions:</span>{" "}
+                                                <span className="text-muted-foreground">
+                                                    CPU for transactions:
+                                                </span>{" "}
                                                 <ValueWithInfo
                                                     value={`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
                                                     tooltipText="= (1sec - per-block-sys-cpu-ns) / block-replay-factor"
@@ -765,8 +783,12 @@ export const VirtualServer = () => {
                                             </div>
                                         </div>
 
-                                        {/* Empty cell for alignment */}
-                                        <div></div>
+                                        <div className="text-sm">
+                                            <div>
+                                                <span className="text-muted-foreground">Bandwidth:</span>{" "}
+                                                {`${formatNumber(netBps)} Gbps`}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -777,4 +799,11 @@ export const VirtualServer = () => {
         </form>
     );
 };
+
+
+
+
+
+
+
 
