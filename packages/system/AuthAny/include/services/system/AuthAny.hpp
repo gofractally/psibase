@@ -18,12 +18,10 @@ namespace SystemService
       void canAuthUserSys(psibase::AccountNumber user);
 
       bool isAuthSys(psibase::AccountNumber              sender,
-                     std::vector<psibase::AccountNumber> authorizers,
-                     std::optional<ServiceMethod>        method);
+                     std::vector<psibase::AccountNumber> authorizers);
 
       bool isRejectSys(psibase::AccountNumber              sender,
-                       std::vector<psibase::AccountNumber> rejecters,
-                       std::optional<ServiceMethod>        method);
+                       std::vector<psibase::AccountNumber> rejecters);
    };
    PSIO_REFLECT(AuthAny,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
