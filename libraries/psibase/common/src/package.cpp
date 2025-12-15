@@ -338,7 +338,7 @@ namespace psibase
       return result;
    }
 
-   void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender)
+   std::vector<char> PackagedService::manifest()
    {
       std::vector<char>   manifest;
       psio::vector_stream stream{manifest};
@@ -385,11 +385,6 @@ namespace psibase
          to_json(sender, stream);
          stream.write(',');
 
-         to_json("service", stream);
-         stream.write(':');
-         to_json(service, stream);
-         stream.write(',');
-
          to_json("filename", stream);
          stream.write(':');
          to_json(path, stream);
@@ -397,15 +392,20 @@ namespace psibase
       }
       stream.write(']');
       stream.write('}');
-      manifest = gzip(std::move(manifest));
-      actions.push_back(
-          transactor<Packages>{sender, Packages::service}.postinstall(meta, manifest));
+
+      return manifest;
    }
 
-   const PackageInfo& get(const std::vector<PackageInfo>& index, const PackageRef& ref)
+   void PackagedService::commitInstall(std::vector<Action>& actions, AccountNumber sender)
+   {
+      actions.push_back(transactor<Packages>{sender, Packages::service}.postinstall(
+          meta, gzip(std::move(manifest()))));
+   }
+
+   PackageInfo& get(std::vector<PackageInfo>& index, const PackageRef& ref)
    {
       auto byname = [](const auto& info) -> const auto& { return info.name; };
-      for (const PackageInfo& package : std::ranges::equal_range(index, ref.name, {}, byname))
+      for (PackageInfo& package : std::ranges::equal_range(index, ref.name, {}, byname))
       {
          if (versionMatch(ref.version, package.version))
             return package;
@@ -413,10 +413,10 @@ namespace psibase
       abortMessage("No package matches " + ref.name + "(" + ref.version + ")");
    }
 
-   void dfs(const std::vector<PackageInfo>&   index,
+   void dfs(std::vector<PackageInfo>&         index,
             std::span<const PackageRef>       names,
             std::map<std::string_view, bool>& found,
-            std::vector<const PackageInfo*>&  result)
+            std::vector<PackageInfo*>&        result)
    {
       for (const auto& ref : names)
       {
@@ -465,7 +465,7 @@ namespace psibase
       return PackagedService(readWholeFile(filepath));
    }
 
-   std::vector<PackagedService> DirectoryRegistry::resolve(
+   std::vector<PackageInfo> DirectoryRegistry::resolve(
        std::span<const std::string>   packages,
        std::span<const AccountNumber> priorityServices)
    {
@@ -477,17 +477,17 @@ namespace psibase
       {
          in.push_back({name, "*"});
       }
-      std::vector<const PackageInfo*> selected;
+      std::vector<PackageInfo*> selected;
       {
          std::map<std::string_view, bool> found;
          dfs(index, in, found, selected);
       }
 
       // Make sure that packages containing the priority services are first
-      std::vector<const PackageInfo*> ordered;
+      std::vector<PackageInfo*> ordered;
       {
          std::map<std::string_view, bool> found;
-         for (const PackageInfo* package : selected)
+         for (PackageInfo* package : selected)
          {
             for (auto account : package->accounts)
             {
@@ -508,17 +508,17 @@ namespace psibase
             }
          }
          // The remaining packages are already in the correct order
-         for (const PackageInfo* package : selected)
+         for (PackageInfo* package : selected)
          {
             if (found.find(package->name) == found.end())
                ordered.push_back(package);
          }
       }
 
-      std::vector<PackagedService> result;
+      std::vector<PackageInfo> result;
       for (const auto* package : ordered)
       {
-         result.push_back(get(*package));
+         result.push_back(std::move(*package));
       }
       return result;
    }

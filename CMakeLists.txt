@@ -139,7 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XProxy XSocketListService WSEcho)
+        XPackages XProxy XSocketListService WSEcho)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -990,6 +990,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XPackages.psi
+    NAME XPackages
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages local packages"
+    SERVICE x-packages
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XPackages.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPackages-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XRun.psi
     NAME XRun
     VERSION ${PSIBASE_VERSION}.0
@@ -1067,7 +1079,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XDb XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XRun XSites XTransact
 )
 
 function(write_package_index target dir)
@@ -1087,7 +1099,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
-    XAdmin XDb XDefault XHttp XRun XSites XTransact)
+    XAdmin XDb XDefault XHttp XPackages XRun XSites XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json

@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 
-import { useAppForm } from "@/components/form/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
@@ -169,7 +169,6 @@ export const ScheduleDialog = ({
                             labels={[
                                 "Schedule evaluation",
                                 "Scheduling evaluation...",
-                                "Scheduled evaluation",
                             ]}
                         />
                     </form.AppForm>

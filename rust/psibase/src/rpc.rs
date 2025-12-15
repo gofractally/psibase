@@ -20,7 +20,7 @@ custom_error! { Error
     WrongContentType{ty:String} = "HTTP response has unexpected Content-Type: {ty}",
 }
 
-async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Error> {
+pub async fn as_text(builder: reqwest::RequestBuilder) -> Result<String, anyhow::Error> {
     let mut response = builder.send().await?;
     if response.status().is_client_error() {
         response = response.error_for_status()?;

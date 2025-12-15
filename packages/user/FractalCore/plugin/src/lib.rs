@@ -18,6 +18,8 @@ use bindings::fractals::plugin as FractalsPlugin;
 use bindings::staged_tx::plugin::proposer::set_propose_latch;
 use trust::{assert_authorized, FunctionName};
 
+use crate::bindings::host::common::client::get_receiver;
+
 define_trust! {
     descriptions {
         Low => "
@@ -38,12 +40,14 @@ define_trust! {
             High trust grants the abilities of all lower trust levels, plus these abilities:
             - Proposing a vote in evaluation cycle
             - Exiling a member from a fractal
+            - Set the fractal token distribution schedule
             - Setting the guild evaluation schedule
             - Setting the guild display name
             - Setting the guild bio
             - Setting the guild description
             - Attesting in an evaluation
             - Creating a new guild
+            - Initialise fractal token
             - Resign, remove or set a new Guild representative
         ",
     }
@@ -51,18 +55,47 @@ define_trust! {
         None => [get_group_users],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        High => [exile_member, set_ranked_guild_slots, set_dist_interval, init_token, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
 
 struct FractalCorePlugin;
 
 impl AdminFractal for FractalCorePlugin {
-    fn exile_member(fractal_account: String, member_account: String) -> Result<(), Error> {
+    fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_ranked_guild_slots)?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
+        set_propose_latch(Some(&fractal.legislature))?;
+
+        FractalsPlugin::admin_fractal::set_ranked_guild_slots(slots_count)
+    }
+
+    fn set_dist_interval(interval_seconds: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_dist_interval)?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
+        set_propose_latch(Some(&fractal.legislature))?;
+
+        FractalsPlugin::admin_fractal::set_dist_interval(interval_seconds)
+    }
+
+    fn exile_member(member_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
-        set_propose_latch(Some(&fractal_account))?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
+        set_propose_latch(Some(&fractal.judiciary))?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
+    }
+
+    fn init_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::init_token)?;
+
+        let fractal = FractalsPlugin::queries::get_fractal(&get_receiver())?;
+        set_propose_latch(Some(&fractal.legislature))?;
+
+        FractalsPlugin::admin_fractal::init_token()
     }
 }
 

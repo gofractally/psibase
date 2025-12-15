@@ -24,3 +24,6 @@ psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
 fractals-pkg = { path = "..", version = "0.22.0" }
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "katex-header.html"]
