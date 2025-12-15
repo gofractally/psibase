@@ -1794,44 +1794,18 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/accounts-ui@workspace:system/Accounts/ui"
   dependencies:
-    "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@tailwindcss/vite": "npm:^4.1.8"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
-    dayjs: "npm:^1.11.13"
-    debounce: "npm:^2.1.0"
     eslint: "npm:^9.9.0"
     lucide-react: "npm:^0.429.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-hook-form: "npm:^7.58.1"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
-    vite: "npm:^5.4.1"
-    zod: "npm:^3.23.8"
-  languageName: unknown
-  linkType: soft
-
-"@psibase/authsig-ui@workspace:system/AuthSig/ui":
-  version: 0.0.0-use.local
-  resolution: "@psibase/authsig-ui@workspace:system/AuthSig/ui"
-  dependencies:
-    "@psibase/common-lib": "workspace:*"
-    "@tanstack/react-query": "npm:^5.90.6"
-    "@types/node": "npm:^22.5.0"
-    "@types/react": "npm:^19.1.0"
-    "@types/react-dom": "npm:^19.1.0"
-    eslint: "npm:^9.9.0"
-    lucide-react: "npm:^0.429.0"
-    react: "npm:^19.1.0"
-    react-dom: "npm:^19.1.0"
-    react-qr-code: "npm:^2.0.15"
-    react-router-dom: "npm:^6.26.1"
-    typescript: "npm:^5.7.3"
-    usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     zod: "npm:^3.23.8"
   languageName: unknown
@@ -6692,13 +6666,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"debounce@npm:^2.1.0":
-  version: 2.2.0
-  resolution: "debounce@npm:2.2.0"
-  checksum: 10c0/684536fe9a04c9eea46cf02f119f69aa4071813ba25b9b43370e1503ea60b34fd38d694c7145fa2be504f9d40e7e39354cb9ed155c70954a0eefa391aefe271c
-  languageName: node
-  linkType: hard
-
 "debug@npm:4, debug@npm:^4.1.0, debug@npm:^4.1.1, debug@npm:^4.3.1, debug@npm:^4.3.2, debug@npm:^4.3.4, debug@npm:^4.3.7, debug@npm:^4.4.0":
   version: 4.4.3
   resolution: "debug@npm:4.4.3"
@@ -10800,13 +10767,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"qr.js@npm:0.0.0":
-  version: 0.0.0
-  resolution: "qr.js@npm:0.0.0"
-  checksum: 10c0/1c6a4c7a58d04e52ec2fee99e39b680fdc5b2a510a981df42c36b716a8eac6634d130fc4d65af8f030f2a07dbf5fa046b97cdfa7456c250ebb50a73916efdcb5
-  languageName: node
-  linkType: hard
-
 "quansync@npm:^0.2.11":
   version: 0.2.11
   resolution: "quansync@npm:0.2.11"
@@ -10944,18 +10904,6 @@ __metadata:
   peerDependencies:
     react: ">=16.8.6"
   checksum: 10c0/38234c362fb21cac318e2be83840c8dd5a75a5689ee96d732997cc88c7775032d51d6186232a022c8b74c80c8d1ab943b0f984831a0e9c46357c75da919c66a6
-  languageName: node
-  linkType: hard
-
-"react-qr-code@npm:^2.0.15":
-  version: 2.0.18
-  resolution: "react-qr-code@npm:2.0.18"
-  dependencies:
-    prop-types: "npm:^15.8.1"
-    qr.js: "npm:0.0.0"
-  peerDependencies:
-    react: "*"
-  checksum: 10c0/4e13b795cbb10f1dcf0e39d682bb59851e4c84010ba2be7225b2ad9d5c1ffea52d2d38f884ee26235b7002b8ca99e83b805f55e877663c39d67496764d975cf1
   languageName: node
   linkType: hard
 

@@ -27,10 +27,6 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:system/Accounts/ui"\
     },\
     {\
-      "name": "@psibase/authsig-ui",\
-      "reference": "workspace:system/AuthSig/ui"\
-    },\
-    {\
       "name": "@psibase/common-lib",\
       "reference": "workspace:user/CommonApi/common/packages/common-lib"\
     },\
@@ -92,7 +88,6 @@ const RAW_RUNTIME_STATE =
   "pnpZipBackend": "libzip",\
   "fallbackExclusionList": [\
     ["@psibase/accounts-ui", ["workspace:system/Accounts/ui"]],\
-    ["@psibase/authsig-ui", ["workspace:system/AuthSig/ui"]],\
     ["@psibase/common-lib", ["workspace:user/CommonApi/common/packages/common-lib"]],\
     ["@psibase/config-ui", ["workspace:user/Config/ui"]],\
     ["@psibase/evaluations-ui", ["workspace:user/Evaluations/ui"]],\
@@ -2646,7 +2641,6 @@ const RAW_RUNTIME_STATE =
       ["workspace:system/Accounts/ui", {\
         "packageLocation": "./system/Accounts/ui/",\
         "packageDependencies": [\
-          ["@hookform/resolvers", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.2.2"],\
           ["@psibase/accounts-ui", "workspace:system/Accounts/ui"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@tailwindcss/vite", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:4.1.17"],\
@@ -2654,40 +2648,13 @@ const RAW_RUNTIME_STATE =
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.7"],\
           ["@types/react", "npm:19.2.2"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.2"],\
-          ["dayjs", "npm:1.11.19"],\
-          ["debounce", "npm:2.2.0"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.1"],\
           ["lucide-react", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:0.429.0"],\
           ["react", "npm:19.2.0"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.0"],\
-          ["react-hook-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:7.66.0"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.1"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
           ["vite", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:5.4.21"],\
-          ["zod", "npm:3.25.76"]\
-        ],\
-        "linkType": "SOFT"\
-      }]\
-    ]],\
-    ["@psibase/authsig-ui", [\
-      ["workspace:system/AuthSig/ui", {\
-        "packageLocation": "./system/AuthSig/ui/",\
-        "packageDependencies": [\
-          ["@psibase/authsig-ui", "workspace:system/AuthSig/ui"],\
-          ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
-          ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.7"],\
-          ["@types/node", "npm:22.19.0"],\
-          ["@types/react", "npm:19.2.2"],\
-          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.2"],\
-          ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.1"],\
-          ["lucide-react", "virtual:eec9750b687e80e9b4bad0d59be6d43aec92f76aa3a40311a3f9fee6fabbd3e97ef6266e122a1a47b909d6d9c00666e811802bc985299abb5e24f51be8325726#npm:0.429.0"],\
-          ["react", "npm:19.2.0"],\
-          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.0"],\
-          ["react-qr-code", "virtual:1a2acd14adc9bcc2d91e1a5d9e8e7de810df51090691e5cba4a847bd5f7762c522c5fafe708507c28d5b18b4b905893b6dd66ae885ae51e7c499d13c572ca329#npm:2.0.18"],\
-          ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.1"],\
-          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["usehooks-ts", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.1.1"],\
-          ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"],\
           ["zod", "npm:3.25.76"]\
         ],\
         "linkType": "SOFT"\
@@ -9121,15 +9088,6 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
-    ["debounce", [\
-      ["npm:2.2.0", {\
-        "packageLocation": "../.caches/yarn/debounce-npm-2.2.0-7a8845fa3f-684536fe9a.zip/node_modules/debounce/",\
-        "packageDependencies": [\
-          ["debounce", "npm:2.2.0"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
     ["debug", [\
       ["npm:3.2.7", {\
         "packageLocation": "../.caches/yarn/debug-npm-3.2.7-754e818c7a-37d96ae42c.zip/node_modules/debug/",\
@@ -14217,15 +14175,6 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
-    ["qr.js", [\
-      ["npm:0.0.0", {\
-        "packageLocation": "../.caches/yarn/qr.js-npm-0.0.0-eea89f459b-1c6a4c7a58.zip/node_modules/qr.js/",\
-        "packageDependencies": [\
-          ["qr.js", "npm:0.0.0"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
     ["quansync", [\
       ["npm:0.2.11", {\
         "packageLocation": "../.caches/yarn/quansync-npm-0.2.11-f7bf964a44-cb9a1f8ebc.zip/node_modules/quansync/",\
@@ -14489,30 +14438,6 @@ const RAW_RUNTIME_STATE =
           ["shallow-equal", "npm:1.2.1"],\
           ["theming", "virtual:196f52c0cedd1edf9e7efea45309fc7760048324db01f34b899cce903ce4b83a8cc5c346e2be6c9d807f9ab890bbe2f81d18c0712a8b3ec0d3839117f48da243#npm:3.3.0"],\
           ["tiny-warning", "npm:1.0.3"]\
-        ],\
-        "packagePeers": [\
-          "@types/react",\
-          "react"\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
-    ["react-qr-code", [\
-      ["npm:2.0.18", {\
-        "packageLocation": "../.caches/yarn/react-qr-code-npm-2.0.18-7cdd405db6-4e13b795cb.zip/node_modules/react-qr-code/",\
-        "packageDependencies": [\
-          ["react-qr-code", "npm:2.0.18"]\
-        ],\
-        "linkType": "SOFT"\
-      }],\
-      ["virtual:1a2acd14adc9bcc2d91e1a5d9e8e7de810df51090691e5cba4a847bd5f7762c522c5fafe708507c28d5b18b4b905893b6dd66ae885ae51e7c499d13c572ca329#npm:2.0.18", {\
-        "packageLocation": "./.yarn/__virtual__/react-qr-code-virtual-b274c0d96c/2/.caches/yarn/react-qr-code-npm-2.0.18-7cdd405db6-4e13b795cb.zip/node_modules/react-qr-code/",\
-        "packageDependencies": [\
-          ["@types/react", "npm:19.2.2"],\
-          ["prop-types", "npm:15.8.1"],\
-          ["qr.js", "npm:0.0.0"],\
-          ["react", "npm:19.2.0"],\
-          ["react-qr-code", "virtual:1a2acd14adc9bcc2d91e1a5d9e8e7de810df51090691e5cba4a847bd5f7762c522c5fafe708507c28d5b18b4b905893b6dd66ae885ae51e7c499d13c572ca329#npm:2.0.18"]\
         ],\
         "packagePeers": [\
           "@types/react",\

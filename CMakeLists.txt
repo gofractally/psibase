@@ -544,7 +544,6 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthSig-schema.json
         DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/AuthSig/ui/dist/* /
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
@@ -552,7 +551,6 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
         FLAGS isVerify
-    DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
