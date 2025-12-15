@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 
+import { AuthServices } from "../types";
+
 export const useAccountsLookup = (publicKey: string | undefined | null) =>
     useQuery({
         queryKey: ["accounts", publicKey],
@@ -21,7 +23,7 @@ export const useAccountsLookup = (publicKey: string | undefined | null) =>
           }
         }
       `,
-                "auth-sig",
+                AuthServices.AUTH_SIG,
             );
 
             return z
