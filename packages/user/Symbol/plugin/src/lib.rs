@@ -10,6 +10,7 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::fracpack::Pack;
 use psibase::{define_trust, AccountNumber};
 
+use crate::errors::ErrorType;
 use crate::graphql::fetch_symbol_owner_nft;
 
 mod errors;
@@ -38,16 +39,17 @@ impl Api for SymbolPlugin {
     fn create(symbol: String, deposit: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::create)?;
 
-        let billing_token = bindings::tokens::plugin::helpers::fetch_network_token()?;
+        let billing_token = bindings::tokens::plugin::helpers::fetch_network_token()?
+            .ok_or(ErrorType::BillingTokenNotSet)?;
 
-        if let Some(billing_token) = billing_token {
-            bindings::tokens::plugin::user::credit(
-                billing_token,
-                &symbol::Wrapper::SERVICE.to_string(),
-                &deposit,
-                "".into(),
-            )?;
-        }
+        bindings::tokens::plugin::user::credit(
+            billing_token,
+            &symbol::Wrapper::SERVICE.to_string(),
+            &deposit,
+            "".into(),
+        )
+        // Ignore error code 1, which tokens::credit returns if amount == 0.
+        .or_else(|error| if error.code == 1 { Ok(()) } else { Err(error) })?;
 
         let packed_args = symbol::action_structs::create {
             symbol: AccountNumber::from(symbol.as_str()),

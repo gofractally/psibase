@@ -112,10 +112,11 @@ impl Issuer for TokensPlugin {
     }
 
     fn recall(token_id: u32, amount: Decimal, memo: String, account: String) -> Result<(), Error> {
+        let amount = Self::non_zero(token_id, amount)?;
         assert_authorized(FunctionName::recall)?;
 
         let packed_args = Actions::recall {
-            amount: Self::decimal_to_u64(token_id, amount)?.into(),
+            amount,
             from: account.as_str().into(),
             memo: memo.try_into().unwrap(),
             token_id,
@@ -125,10 +126,12 @@ impl Issuer for TokensPlugin {
     }
 
     fn mint(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
+        let amount = Self::non_zero(token_id, amount)?;
+
         assert_authorized(FunctionName::mint)?;
 
         let packed_args = Actions::mint {
-            amount: Self::decimal_to_u64(token_id, amount)?.into(),
+            amount,
             memo: memo.try_into().unwrap(),
             token_id,
         }
@@ -171,25 +174,32 @@ impl Helpers for TokensPlugin {
     }
 }
 
+impl TokensPlugin {
+    fn non_zero(token_id: u32, amount: String) -> Result<Quantity, Error> {
+        Self::decimal_to_u64(token_id, amount).and_then(|value| {
+            if value == 0 {
+                Err(ErrorType::AmountIsZero.into())
+            } else {
+                Ok(Quantity::from(value))
+            }
+        })
+    }
+}
+
 impl User for TokensPlugin {
     fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
-        let amount: Quantity = Self::decimal_to_u64(token_id, amount)?.into();
-        
-        if amount.value > 0 {
-            assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
-            
-            let packed_args = Actions::credit {
-                amount,
-                memo: memo.try_into().unwrap(),
-                debitor: debitor.as_str().into(),
-                token_id,
-            }
-            .packed();
+        let amount = Self::non_zero(token_id, amount)?;
+        assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
 
-            add_action_to_transaction(Actions::credit::ACTION_NAME, &packed_args)
-        } else {
-            Ok(())
+        let packed_args = Actions::credit {
+            amount,
+            memo: memo.try_into().unwrap(),
+            debitor: debitor.as_str().into(),
+            token_id,
         }
+        .packed();
+
+        add_action_to_transaction(Actions::credit::ACTION_NAME, &packed_args)
     }
 
     fn uncredit(
@@ -198,10 +208,11 @@ impl User for TokensPlugin {
         amount: Decimal,
         memo: String,
     ) -> Result<(), Error> {
+        let amount = Self::non_zero(token_id, amount)?;
         assert_authorized_with_whitelist(FunctionName::uncredit, vec!["homepage".into()])?;
 
         let packed_args = Actions::uncredit {
-            amount: Self::decimal_to_u64(token_id, amount)?.into(),
+            amount,
             memo: memo.try_into().unwrap(),
             debitor: debitor.as_str().into(),
             token_id,
@@ -212,10 +223,11 @@ impl User for TokensPlugin {
     }
 
     fn debit(token_id: u32, creditor: String, amount: Decimal, memo: String) -> Result<(), Error> {
+        let amount = Self::non_zero(token_id, amount)?;
         assert_authorized_with_whitelist(FunctionName::debit, vec!["homepage".into()])?;
 
         let packed_args = Actions::debit {
-            amount: Self::decimal_to_u64(token_id, amount)?.into(),
+            amount,
             creditor: creditor.as_str().into(),
             memo: memo.try_into().unwrap(),
             token_id,
@@ -239,10 +251,12 @@ impl User for TokensPlugin {
     }
 
     fn burn(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
+        let amount = Self::non_zero(token_id, amount)?;
+
         assert_authorized_with_whitelist(FunctionName::burn, vec!["homepage".into()])?;
 
         let packed_args = Actions::burn {
-            amount: Self::decimal_to_u64(token_id, amount)?.into(),
+            amount,
             memo: memo.try_into().unwrap(),
             token_id,
         }
