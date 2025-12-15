@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
@@ -33,8 +33,8 @@ export const Billing = ({
     const { mutateAsync: setEnableBilling } = useSetEnableBilling();
     const { data: billingConfig, isLoading: billingConfigLoading } = useBillingConfig();
 
-    // Track if enableBilling checkbox has been toggled
-    const enableBillingTouchedRef = useRef(false);
+    // Track the submitted/initial value of enableBilling for comparison
+    const [submittedEnableBilling, setSubmittedEnableBilling] = useState<boolean | null>(null);
 
     // Compute initial values from fetched data
     const computedInitialValues = useMemo<BillingFormData>(() => {
@@ -48,6 +48,15 @@ export const Billing = ({
             enableBilling: false,
             tokenFeeReceiverAccount: "",
         };
+    }, [billingConfig]);
+
+    // Update submittedEnableBilling when billingConfig changes
+    useEffect(() => {
+        if (billingConfig) {
+            setSubmittedEnableBilling(billingConfig.enabled);
+        } else {
+            setSubmittedEnableBilling(false);
+        }
     }, [billingConfig]);
 
     const form = useAppForm({
@@ -67,13 +76,18 @@ export const Billing = ({
     // Handle Apply button for enable billing
     const handleApplyEnableBilling = async () => {
         await setEnableBilling([form.state.values.enableBilling]);
-        enableBillingTouchedRef.current = false;
+        // Update the submitted value to the new value
+        setSubmittedEnableBilling(form.state.values.enableBilling);
         // Reset form with current values (cache updates will keep data in sync)
         form.reset(form.state.values);
     };
 
-    // Check if Apply button should be enabled
-    const isApplyEnabled = enableBillingTouchedRef.current;
+    // Check if Apply button should be enabled (enableBilling differs from initial/submitted value)
+    const isApplyEnabled = useMemo(() => {
+        if (submittedEnableBilling === null) return false;
+        return form.state.values.enableBilling !== submittedEnableBilling;
+    }, [form.state.values.enableBilling, submittedEnableBilling]);
+
 
     if (billingConfigLoading) {
         return (
@@ -113,64 +127,71 @@ export const Billing = ({
 
                     <form.Field name="tokenFeeReceiverAccount">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {(accountField: any) => (
-                            <div>
-                                <Label>Token fee receiver account</Label>
-                                <Input
-                                    type="text"
-                                    value={accountField.state.value}
-                                    onChange={(e) => {
-                                        accountField.handleChange(e.target.value);
-                                    }}
-                                    onBlur={accountField.handleBlur}
-                                    placeholder="Enter account name"
-                                    className="mt-1"
-                                />
-                            </div>
-                        )}
+                        {(accountField: any) => {
+                            // Check if Save button should be enabled (field has value and is different from initial)
+                            const currentValue = (accountField.state.value || "").trim();
+                            const initialValue = (computedInitialValues.tokenFeeReceiverAccount || "").trim();
+                            const isSaveEnabled = !hasFeeReceiverAccount && currentValue !== "" && currentValue !== initialValue;
+                            
+                            return (
+                                <div>
+                                    <Label>Token fee receiver account</Label>
+                                    <Input
+                                        type="text"
+                                        value={accountField.state.value}
+                                        onChange={(e) => {
+                                            accountField.handleChange(e.target.value);
+                                        }}
+                                        onBlur={accountField.handleBlur}
+                                        placeholder="Enter account name"
+                                        className="mt-1"
+                                        disabled={hasFeeReceiverAccount}
+                                    />
+                                    {!hasFeeReceiverAccount && (
+                                        <div className="mt-2">
+                                            <Button
+                                                type="submit"
+                                                disabled={!isSaveEnabled}
+                                            >
+                                                Save
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }}
                     </form.Field>
 
                     <form.Field name="enableBilling">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(field: any) => (
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    checked={field.state.value}
-                                    onCheckedChange={(checked) => {
-                                        field.handleChange(!!checked);
-                                        enableBillingTouchedRef.current = true;
-                                    }}
-                                    disabled={!hasFeeReceiverAccount}
-                                />
-                                <Label className="cursor-pointer">
-                                    Enable billing (for public networks)
-                                </Label>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        checked={field.state.value}
+                                        onCheckedChange={(checked) => {
+                                            field.handleChange(!!checked);
+                                        }}
+                                        disabled={!hasFeeReceiverAccount}
+                                    />
+                                    <Label className="cursor-pointer">
+                                        Enable billing (for public networks)
+                                    </Label>
+                                </div>
+                                {hasFeeReceiverAccount && (
+                                    <div className="mt-2">
+                                        <Button
+                                            type="button"
+                                            onClick={handleApplyEnableBilling}
+                                            disabled={!isApplyEnabled}
+                                        >
+                                            Apply
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </form.Field>
-                </div>
-
-                <div className="mt-6 flex flex-row gap-2 font-medium">
-                    {hasFeeReceiverAccount && (
-                        <Button
-                            type="button"
-                            onClick={handleApplyEnableBilling}
-                            disabled={!isApplyEnabled}
-                        >
-                            Apply
-                        </Button>
-                    )}
-                    <form.Subscribe>
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {({ canSubmit }: any) => (
-                            <Button
-                                type="submit"
-                                disabled={!canSubmit}
-                            >
-                                Save
-                            </Button>
-                        )}
-                    </form.Subscribe>
                 </div>
             </form>
         </div>
