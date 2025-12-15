@@ -16,9 +16,6 @@ interface types {
         per-block-sys-cpu-ns: u64,
         /// Amount of storage space in bytes allocated to objective state
         obj-storage-bytes: u64,
-        /// Ratio of objective storage space to minimum memory in bytes per server, X:1
-        /// This is used to suggest a minimum amount of memory for node operators.
-        memory-ratio: u8,
     }
 }
 

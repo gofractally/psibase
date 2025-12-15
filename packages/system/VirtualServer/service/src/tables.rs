@@ -85,8 +85,6 @@ pub mod tables {
         pub per_block_sys_cpu_ns: u64,
         /// Amount of storage space in bytes allocated to objective state
         pub obj_storage_bytes: u64,
-        /// Ratio of objective storage space to minimum memory in bytes per server, X:1
-        pub memory_ratio: u8,
     }
     impl NetworkVariables {
         #[primary_key]
@@ -98,8 +96,6 @@ pub mod tables {
                 block_replay_factor: 5,
                 per_block_sys_cpu_ns: 20_000_000,  // 20ms
                 obj_storage_bytes: 20_000_000_000, // 20 GB
-                memory_ratio: 5, //  Derived from expected 80% of reads/writes in 20% of the total storage, targeting
-                                 //  the 80% serviced entirely in memory
             }
         }
     }

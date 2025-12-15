@@ -64,8 +64,7 @@ impl Admin for VirtualServerPlugin {
                 variables: ServiceTables::NetworkVariables {
                     block_replay_factor: variables.block_replay_factor,
                     per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
-                    obj_storage_bytes: variables.obj_storage_bytes,
-                    memory_ratio: variables.memory_ratio,
+                    obj_storage_bytes: variables.obj_storage_bytes
                 },
             }
             .packed(),

@@ -50,8 +50,12 @@ pub struct ServerSpecs {
     /// Amount of storage space in bytes per server
     pub storage_bytes: u64,
     /// Suggested minimum amount of memory in bytes per server
-    pub min_memory_bytes: u64,
+    pub recommended_min_memory_bytes: u64,
 }
+
+//  Derived from expected 80% of reads/writes in 20% of the total storage, targeting
+//    the 80% serviced entirely in memory
+const MEMORY_RATIO: u8 = 5;
 
 pub struct Query;
 
@@ -67,7 +71,7 @@ impl Query {
     /// These specifications are effectively the minimum specs that any full
     /// node must have available.
     ///
-    /// `min_memory_bytes` is the minimum *suggested* amount of memory in bytes
+    /// `recommended_min_memory_bytes` is the minimum *suggested* amount of memory in bytes
     /// per server. Any less than this amount of memory may result in degraded
     /// node performance.
     async fn get_server_specs(&self) -> ServerSpecs {
@@ -75,13 +79,12 @@ impl Query {
             ServerSpecsTable::read().get_index_pk().get(&()).unwrap();
 
         let network_specs = NetworkSpecsTable::read().get_index_pk().get(&()).unwrap();
-        let vars = NetworkVariables::get();
-        let min_memory_bytes = network_specs.obj_storage_bytes / vars.memory_ratio as u64;
+        let recommended_min_memory_bytes = network_specs.obj_storage_bytes / MEMORY_RATIO as u64;
 
         ServerSpecs {
             net_bps: server_specs.net_bps,
             storage_bytes: server_specs.storage_bytes,
-            min_memory_bytes,
+            recommended_min_memory_bytes,
         }
     }
 
