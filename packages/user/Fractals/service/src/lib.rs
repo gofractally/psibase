@@ -379,7 +379,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `account` - Account being checked.
-    /// * `method` - Account being checked.
+    /// * `method` - Optional method being checked.
     #[action]
     fn get_policy(
         account: AccountNumber,
