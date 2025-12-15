@@ -29,7 +29,7 @@ namespace psibase
                if (!matcher.match(*lty.result, *rty.result))
                   return std::format("Return type for {} does not match", name);
             }
-            else if (!lty.result && rty.result)
+            else if (!lty.result && !rty.result)
             {
             }
             else if (lty.result && !rty.result)
