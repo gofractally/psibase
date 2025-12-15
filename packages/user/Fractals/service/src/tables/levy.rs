@@ -1,5 +1,5 @@
 use async_graphql::ComplexObject;
-use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Table};
+use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
 
 use crate::{
     constants::PPM,
@@ -98,11 +98,11 @@ impl Levy {
         };
 
         if payment.value > 0 {
-            if Fractal::get(self.payee).is_some() {
-                RewardConsensus::get_assert(self.payee).donate(payment, "Levy payment".into());
+            let memo = "Levy payment".into();
+            if let Some(fractal_member) = FractalMember::get(self.fractal, self.payee) {
+                fractal_member.credit_direct(payment, memo);
             } else {
-                FractalMember::get_assert(self.fractal, self.payee)
-                    .credit_direct(payment, "Levy payment".into());
+                RewardConsensus::get_assert(self.payee).donate(payment, memo);
             }
         }
 
