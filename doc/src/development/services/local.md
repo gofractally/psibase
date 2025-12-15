@@ -35,7 +35,7 @@ PSIBASE_SUBJECTIVE_TX
 
 Subjective transactions can be nested and changes to the database are committed at the end of the outermost one.
 
-> Important: The code inside a subjective tx may be executed more than once when there is a write conflict
+> Important: The commit may fail if the database was changed concurrently. When this happens, the body of the subjective tx will run again automatically. The state of the database will be reset first, but any changes to variables in memory will remain. Be especially careful about inserting into a container or conditionally setting a variable inside a subjective transaction.
 
 > Important: An early exit from the subjective tx will abort it, discarding any database changes
 
