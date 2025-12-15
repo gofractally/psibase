@@ -62,11 +62,10 @@ define_trust! {
             - Attesting in an evaluation
             - Creating a new guild
             - Resign, remove or set a new Guild representative
-            - Set minimum scorers required to enable consensus rewards
             ",
     }
     functions {
-        None => [get_group_users, exile_member, set_dist_interval],
+        None => [get_group_users, exile_member, set_dist_interval, dist_token],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
         High => [propose, set_min_scorers, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
@@ -324,6 +323,18 @@ impl UserFractal for FractallyPlugin {
         }
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
+    }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        let packed_args = fractals::action_structs::dist_token {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::dist_token::ACTION_NAME,
+            &packed_args,
+        )
     }
 }
 

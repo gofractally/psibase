@@ -13,6 +13,7 @@ import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNowUnix } from "@/hooks/use-now-unix";
+import { Leadership } from "./leadership";
 
 export const Settings = () => {
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
@@ -73,7 +74,7 @@ export const Settings = () => {
     });
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex flex-col gap-3">
                 <div className="flex justify-between rounded-sm border p-4 ">
                     <div>
@@ -155,6 +156,10 @@ export const Settings = () => {
                             </descriptonForm.AppForm>
                         </form>
                     </div>
+                </div>
+
+                <div>
+                    <Leadership />
                 </div>
             </div>
         </div>

@@ -16,6 +16,8 @@ import { Guilds } from "./pages/fractal/guilds";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
 import { Applications } from "./pages/fractal/membership/applications";
 import { Settings } from "./pages/settings";
+import { Legislative } from "./pages/fractal/branches/legislative";
+import { Judicial } from "./pages/fractal/branches/judicial";
 
 export const router = createBrowserRouter([
     {
@@ -35,6 +37,22 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <MyMembership />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/legislative",
+                element: (
+                    <ProtectedRoute>
+                        <Legislative />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/judicial",
+                element: (
+                    <ProtectedRoute>
+                        <Judicial />
                     </ProtectedRoute>
                 ),
             },
