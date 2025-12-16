@@ -34,10 +34,10 @@ export const ApplyGuildModal = ({
             extraInfo: "",
         },
         onSubmit: async ({ value: { extraInfo } }) => {
-            await applyGuild({
+            await applyGuild([
+                guildAccount!,
                 extraInfo,
-                guildAccount: guildAccount!,
-            });
+            ]);
             openChange(false);
             navigate(`/guild/${guildAccount}/applications/${currentUser}`);
         },

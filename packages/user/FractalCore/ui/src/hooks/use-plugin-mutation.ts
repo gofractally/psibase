@@ -5,72 +5,76 @@ import { supervisor } from "@/supervisor";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { TxStatus, checkLastTx } from "@/lib/checkStaging";
-import { zAccount } from "@/lib/zod/Account";
+import { PluginCall } from "@/lib/plugin";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
-export const zParams = z.object({
-    intf: zAccount,
-    service: zAccount,
-    method: z.string(),
-});
-
-type Params = z.infer<typeof zParams>;
-
-type Meta<T> = {
+type Meta<TParams extends unknown[]> = {
     error: string;
     loading: string;
     success: string;
 } & (
     | {
           isStagable?: false | undefined;
-          onSuccess?: (params: T) => void;
+          onSuccess?: (params: TParams) => void | Promise<void>;
       }
     | {
           isStagable: true;
-          onSuccess?: (params: T, status: TxStatus) => void;
+          onSuccess?: (
+              params: TParams,
+              status: TxStatus,
+          ) => void | Promise<void>;
       }
 );
 
-export const usePluginMutation = <T>(
-    { intf, method, service }: Params,
-    { error, loading, success, isStagable = true, onSuccess }: Meta<T>,
+export const usePluginMutation = <TCall extends PluginCall>(
+    call: TCall,
+    meta: Meta<TCall extends PluginCall<infer P> ? P : never>,
 ) => {
-    return useMutation<void, Error, T, string | number>({
+    const { intf, method, service } = call;
+    const { error, loading, success, isStagable = true, onSuccess } = meta;
+
+    return useMutation<
+        void,
+        Error,
+        TCall extends PluginCall<infer P> ? P : never,
+        string | number
+    >({
         mutationKey: [service, intf, method],
         onMutate: () => {
-            const res = toast.loading(loading);
-            return res;
+            return toast.loading(loading);
         },
-        mutationFn: async (paramsArray) => {
+        mutationFn: async (params) => {
             return supervisor.functionCall({
                 service,
                 intf,
                 method,
-                params: z.any().array().parse(paramsArray),
+                params: z.any().array().parse(params),
             });
         },
-        onError: (errorObj, params, id) => {
-            console.error({ service, intf, method, params, errorObj }, error);
+        onError: (errorObj, _params, toastId) => {
+            console.error({ service, intf, method, error: errorObj });
             toast.error(error, {
                 description: errorObj.message,
-                id,
+                id: toastId,
             });
         },
-        onSuccess: async (_, params, id) => {
+        onSuccess: async (_data, params, toastId) => {
             if (isStagable) {
                 const lastTx = await checkLastTx();
+
                 if (onSuccess) {
-                    onSuccess(params, lastTx);
+                    await onSuccess(params, lastTx);
                 }
-                if (lastTx.type == "executed") {
+
+                if (lastTx.type === "executed") {
                     toast.success(success, {
-                        id,
+                        id: toastId,
                         description: "Change is live.",
                     });
                 } else {
                     toast.success(success, {
-                        id,
+                        id: toastId,
                         description: "Change is proposed.",
                         action: {
                             label: "View",
@@ -81,6 +85,7 @@ export const usePluginMutation = <T>(
                                         "config",
                                         `/pending-transactions/${lastTx.stagedId}`,
                                     ),
+                                    "_blank",
                                 );
                             },
                         },
@@ -88,11 +93,11 @@ export const usePluginMutation = <T>(
                 }
             } else {
                 if (onSuccess) {
-                    (onSuccess as (params: T) => void)(params);
+                    await (
+                        onSuccess as (params: unknown) => Promise<void> | void
+                    )(params);
                 }
-                toast.success(success, {
-                    id,
-                });
+                toast.success(success, { id: toastId });
             }
         },
     });

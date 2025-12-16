@@ -2,10 +2,10 @@ import { queryClient } from "@/queryClient";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { fractalCorePlugin } from "@/lib/constants";
 import { getGuildApplication } from "@/lib/graphql/fractals/getGuildApplication";
+import { fractalCorePlugin } from "@/lib/plugin";
 import QueryKey from "@/lib/queryKeys";
-import { Account, zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@/lib/zod/Account";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -22,14 +22,7 @@ export const zParams = z.object({
 export const useAttestMembershipApp = () => {
     const navigate = useNavigate();
 
-    return usePluginMutation<
-        [
-            guildAccount: Account,
-            member: Account,
-            comment: string,
-            endorses: boolean,
-        ]
-    >(fractalCorePlugin.userGuild.attestMembershipApp, {
+    return usePluginMutation(fractalCorePlugin.userGuild.attestMembershipApp, {
         error: "Failed attesting membership",
         loading: "Attesting",
         success: "Attested",

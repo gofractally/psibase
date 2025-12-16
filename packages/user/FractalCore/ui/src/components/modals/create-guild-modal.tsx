@@ -38,10 +38,10 @@ export const CreateGuildModal = ({
             name: "",
         },
         onSubmit: async ({ value: { name, account } }) => {
-            await createGuild({
+            await createGuild([
                 name,
                 account,
-            });
+            ]);
             openChange(false);
             navigate(`/guild/${account}`);
             refetch();

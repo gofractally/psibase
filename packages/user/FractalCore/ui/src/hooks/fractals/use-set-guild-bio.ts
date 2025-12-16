@@ -1,21 +1,10 @@
-import { Account } from "@/lib/zod/Account";
+import { fractalCorePlugin } from "@/lib/plugin";
 
 import { usePluginMutation } from "../use-plugin-mutation";
-import { useFractalAccount } from "./use-fractal-account";
 
-export const useSetGuildBio = () => {
-    const fractal = useFractalAccount();
-
-    return usePluginMutation<[Account, string]>(
-        {
-            intf: "adminGuild",
-            method: "setBio",
-            service: fractal,
-        },
-        {
-            error: "Failed setting bio",
-            loading: "Setting bio",
-            success: "Set bio",
-        },
-    );
-};
+export const useSetGuildBio = () =>
+    usePluginMutation(fractalCorePlugin.adminGuild.setBio, {
+        error: "Failed setting bio",
+        loading: "Setting bio",
+        success: "Set bio",
+    });
