@@ -50,7 +50,7 @@ interface admin {
     set-specs: func(specs: server-specs) -> result<_, error>;
 }
 
-interface api {
+interface billing {
     use host:types/types.{error};
 
     /// Fills the user's gas tank, allowing them to continue to transact
@@ -61,7 +61,7 @@ interface api {
 }
 
 world imports {
-    import api;
+    import billing;
     import admin;
     import types;
 }

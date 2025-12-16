@@ -5,7 +5,7 @@ mod errors;
 
 use bindings::exports::virtual_server::plugin as Exports;
 use Exports::types::{NetworkVariables, ServerSpecs};
-use Exports::{admin::Guest as Admin, api::Guest as Api};
+use Exports::{admin::Guest as Admin, billing::Guest as Billing};
 
 use bindings::host::common::client;
 use bindings::host::types::types::Error;
@@ -81,7 +81,7 @@ impl Admin for VirtualServerPlugin {
     }
 }
 
-impl Api for VirtualServerPlugin {
+impl Billing for VirtualServerPlugin {
     fn fill_gas_tank() -> Result<(), Error> {
         assert_caller(
             &["transact", "homepage", &client::get_receiver()],
