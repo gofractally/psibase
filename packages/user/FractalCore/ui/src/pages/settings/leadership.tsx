@@ -62,15 +62,15 @@ export const Leadership = () => {
                     confirmDescription={
                         <>
                             This will immediately remove{" "}
-                            <strong>{guild.rep.member}</strong> as representative of the{" "}
-                            <strong>{guild.displayName}</strong> guild. Leadership will
+                            <span className="font-semibold">{guild.rep.member}</span> as representative of the{" "}
+                            <span className="font-semibold">{guild.displayName}</span> guild. Leadership will
                             return to the council.
                         </>
                     }
                     buttonText="Remove"
                     onConfirm={() => removeGuildRep([guild!.account])}
                     isPending={isRemoving}
-                    variant="outline" // or "destructive" if you want red button later
+                    variant="outline"
                 />
             )}
 
