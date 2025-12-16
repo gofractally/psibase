@@ -10,6 +10,7 @@ import { useAppForm } from "@shared/components/form/app-form";
 import { useSetMinScorers } from "@/hooks/fractals/use-set-min-scorers";
 import { zU8 } from '@shared/lib/schemas/u8'
 import { MIN_MINIMUM_REQUIRED_SCORERS } from "@/lib/constants";
+import { useFractal } from "@/hooks/fractals/use-fractal";
 
 export const SetMinScorersModal = ({
     show,
@@ -20,9 +21,10 @@ export const SetMinScorersModal = ({
 }) => {
     const { mutateAsync: setMinScorers } = useSetMinScorers();
 
+    const { data: fractal } = useFractal();
     const form = useAppForm({
         defaultValues: {
-            minScorers: 6
+            minScorers: fractal?.fractal?.minimumRequiredScorers || 4,
         },
         onSubmit: async ({ value: { minScorers } }) => {
             await setMinScorers([minScorers]);

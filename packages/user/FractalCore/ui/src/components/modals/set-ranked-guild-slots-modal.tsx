@@ -23,7 +23,7 @@ export const SetRankedGuildSlots = ({
     const { data: fractal } = useFractal();
     const form = useAppForm({
         defaultValues: {
-            slots: fractal?.fractal?.consensusReward?.rankedGuildSlotCount || 0
+            slots: fractal?.fractal?.consensusReward?.rankedGuildSlotCount || 6
         },
         onSubmit: async ({ value: { slots } }) => {
             await setRankedGuildSlots([slots]);
