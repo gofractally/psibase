@@ -26,6 +26,8 @@ import {
 
 import { Service } from "../components";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
+import { useNetworkVariables } from "../hooks/useNetworkVariables";
+import { useServerSpecs } from "../hooks/useServerSpecs";
 import { Logger } from "../log/logger";
 import {
     PsinodeConfigUI,
@@ -33,6 +35,88 @@ import {
     ServiceConfig,
 } from "./interfaces";
 import { defaultService, newId, writeConfig } from "./utils";
+
+const formatBytes = (bytes: number): string => {
+    if (bytes >= 1e15) {
+        return `${(bytes / 1e15).toFixed(2)} PB`;
+    }
+    if (bytes >= 1e12) {
+        return `${(bytes / 1e12).toFixed(2)} TB`;
+    }
+    if (bytes >= 1e9) {
+        return `${(bytes / 1e9).toFixed(2)} GB`;
+    }
+    return `${bytes} B`;
+};
+
+const formatBps = (bps: number): string => {
+    if (bps >= 1e9) {
+        return `${(bps / 1e9).toFixed(2)} Gbps`;
+    }
+    if (bps >= 1e6) {
+        return `${(bps / 1e6).toFixed(2)} Mbps`;
+    }
+    if (bps >= 1e3) {
+        return `${(bps / 1e3).toFixed(2)} Kbps`;
+    }
+    return `${bps} bps`;
+};
+
+const NodeSpecsContent = () => {
+    const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
+    const { data: networkVariables, isLoading: isLoadingVars } =
+        useNetworkVariables();
+
+    const isLoading = isLoadingSpecs || isLoadingVars;
+
+    const ramBytes =
+        serverSpecs && networkVariables
+            ? serverSpecs.storageBytes / networkVariables.memoryRatio
+            : undefined;
+
+    return (
+        <div className="space-y-4">
+            <div className="rounded-lg border p-4 space-y-4">
+                {isLoading ? (
+                    <div className="space-y-3">
+                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">
+                                Bandwidth:
+                            </span>
+                            <span className="text-sm">
+                                {serverSpecs
+                                    ? formatBps(serverSpecs.bandwidthBps)
+                                    : "N/A"}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">
+                                Storage:
+                            </span>
+                            <span className="text-sm">
+                                {serverSpecs
+                                    ? formatBytes(serverSpecs.storageBytes)
+                                    : "N/A"}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">RAM:</span>
+                            <span className="text-sm">
+                                {ramBytes ? formatBytes(ramBytes) : "N/A"}
+                            </span>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export const ConfigurationPage = () => {
     const { data: config, isLoading, isError } = useConfig();
@@ -172,6 +256,9 @@ export const ConfigurationForm = ({
                             </TabsTrigger>
                             <TabsTrigger value="logs">Logs</TabsTrigger>
                             <TabsTrigger value="services">Services</TabsTrigger>
+                            <TabsTrigger value="node-specs">
+                                Node Specs
+                            </TabsTrigger>
                         </TabsList>
                         <TabsContent value="connections">
                             <Controller
@@ -440,6 +527,9 @@ export const ConfigurationForm = ({
                                     </tbody>
                                 </table>
                             </fieldset>
+                        </TabsContent>
+                        <TabsContent value="node-specs">
+                            <NodeSpecsContent />
                         </TabsContent>
                     </Tabs>
 
