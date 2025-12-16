@@ -7,30 +7,29 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 import { useAppForm } from "@shared/components/form/app-form";
-import { useSetMinScorers } from "@/hooks/fractals/use-set-min-scorers";
 import { zU8 } from '@shared/lib/schemas/u8'
-import { MIN_MINIMUM_REQUIRED_SCORERS } from "@/lib/constants";
+import { useSetRankedGuildSlots } from "@/hooks/fractals/use-set-ranked-guild-slots";
 
-export const SetMinScorersModal = ({
+export const SetRankedGuildSlots = ({
     show,
     openChange,
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { mutateAsync: setMinScorers } = useSetMinScorers();
+    const { mutateAsync: setRankedGuildSlots } = useSetRankedGuildSlots();
 
     const form = useAppForm({
         defaultValues: {
-            minScorers: 6
+            slots: 12
         },
-        onSubmit: async ({ value: { minScorers } }) => {
-            await setMinScorers([minScorers]);
+        onSubmit: async ({ value: { slots } }) => {
+            await setRankedGuildSlots([slots]);
             openChange(false);
         },
         validators: {
             onChange: z.object({
-                minScorers: zU8.min(MIN_MINIMUM_REQUIRED_SCORERS),
+                slots: zU8,
             }),
         },
     });
@@ -45,8 +44,17 @@ export const SetMinScorersModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Set minimum scorers</DialogTitle>
-                    <div className="text-sm text-muted-foreground">Set the minimum amount of fractal members must achieve a non zero score before the fractal token is achieved.</div>
+                    <DialogTitle>Set ranked slots</DialogTitle>
+                    <div className="text-sm text-muted-foreground">
+                        <p>
+                            Sets the number of ranked guild slots for reward distribution.
+                        </p>
+                        <p>
+                            Tokens sent to unoccupied slots are automatically returned to the fractal stream.
+                            Reserving extra slots now ensures new guilds can be ranked later
+                            without disrupting existing allocations.
+                        </p>
+                    </div>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -55,20 +63,20 @@ export const SetMinScorersModal = ({
                         className="mt-3 w-full space-y-6"
                     >
                         <form.AppField
-                            name="minScorers"
+                            name="slots"
                             children={(field) => (
-                                <field.NumberField label="Minimum scorers" />
+                                <field.NumberField label="Slots amount" />
                             )}
                         />
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Set rep", "Setting rep"]}
+                                labels={["Set slot", "Setting slots"]}
                             />
                         </form.AppForm>
                     </form>
                 </DialogHeader>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 };

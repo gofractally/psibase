@@ -26,6 +26,7 @@ import {
 } from "@shared/shadcn/ui/button";
 import { SetMinScorersModal } from "@/components/modals/set-min-scorers-modal";
 import { useState } from "react";
+import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
 
 
 export const Legislative = () => {
@@ -38,6 +39,8 @@ export const Legislative = () => {
 
 
     const [showMinScorersModal, setShowMinScorers] = useState(false);
+    const [showRankedGuildsModal, setShowRankedGuildsModal] = useState(false);
+
     const error = fractalError || guildError;
 
     const { data: currentUser } = useCurrentUser();
@@ -52,6 +55,8 @@ export const Legislative = () => {
     return (
         <div className="mx-auto w-full max-w-5xl p-4 px-6 space-y-8">
             <SetMinScorersModal openChange={(e) => setShowMinScorers(e)} show={showMinScorersModal} />
+            <SetRankedGuildSlots openChange={(e) => setShowRankedGuildsModal(e)} show={showRankedGuildsModal} />
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -81,7 +86,7 @@ export const Legislative = () => {
 
             <GuildOverviewCard guildAccount={data?.account} />
 
-            {isAdministrativeUser && <div className="border rounded-xl p-6">
+            {isAdministrativeUser && <div className="border rounded-xl p-6 flex flex-col gap-2">
                 <div className="text-lg py-2">
                     Control Panel
                 </div>
@@ -104,6 +109,24 @@ export const Legislative = () => {
                         </ItemActions>
                     </Item>
                 )}
+
+                {!awaitingConsensusReward && <Item variant="outline">
+                    <ItemContent>
+                        <ItemTitle>Set ranked guild slots</ItemTitle>
+                        <ItemDescription>
+                            Adjust how many guilds to pay consensus rewards.
+                        </ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowMinScorers(true)}
+                        >
+                            Set ranked guild slots
+                        </Button>
+                    </ItemActions>
+                </Item>}
             </div>}
         </div>
     );
