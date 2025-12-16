@@ -4,6 +4,8 @@ import { FRACTALS_SERVICE } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
+import { zU8 } from "@shared/lib/schemas/u8";
+
 import { graphql } from "../../graphql";
 
 export const zFractal = z
@@ -14,6 +16,7 @@ export const zFractal = z
         consensusReward: z
             .object({
                 rankedGuilds: zAccount.array(),
+                rankedGuildSlotCount: zU8,
                 stream: z.object({
                     lastDistributed: zDateTime,
                     distIntervalSecs: z.number().int(),
@@ -67,6 +70,7 @@ export const getFractal = async (owner: Account) => {
             name
             consensusReward {
                 rankedGuilds
+                rankedGuildSlotCount
                 stream {
                     lastDistributed
                     distIntervalSecs

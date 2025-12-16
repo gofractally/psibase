@@ -9,6 +9,7 @@ import {
 import { useAppForm } from "@shared/components/form/app-form";
 import { zU8 } from '@shared/lib/schemas/u8'
 import { useSetRankedGuildSlots } from "@/hooks/fractals/use-set-ranked-guild-slots";
+import { useFractal } from "@/hooks/fractals/use-fractal";
 
 export const SetRankedGuildSlots = ({
     show,
@@ -19,9 +20,10 @@ export const SetRankedGuildSlots = ({
 }) => {
     const { mutateAsync: setRankedGuildSlots } = useSetRankedGuildSlots();
 
+    const { data: fractal } = useFractal();
     const form = useAppForm({
         defaultValues: {
-            slots: 12
+            slots: fractal?.fractal?.consensusReward?.rankedGuildSlotCount || 0
         },
         onSubmit: async ({ value: { slots } }) => {
             await setRankedGuildSlots([slots]);
