@@ -206,7 +206,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal` - Fractal to get the policy for
-    /// * `min_scorers` - The account number for the guild.
+    /// * `min_scorers` - The minimum amount of scorers required.
     #[action]
     fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
         let mut fractal = Fractal::get_assert(fractal);
