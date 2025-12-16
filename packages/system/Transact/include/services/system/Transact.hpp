@@ -175,8 +175,8 @@ namespace SystemService
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers),
-                method(isRejectSys, sender, rejecters)
+                method(isAuthSys, sender, authorizers, method),
+                method(isRejectSys, sender, rejecters, method)
                 //
    )
 
