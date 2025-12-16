@@ -11,11 +11,11 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import { COUNCIL_SEATS } from "@/lib/constants";
 
 export const Guilds = () => {
     const { data: fractal } = useFractal();
 
-    console.log({ fractal }, "is the fractal guilds");
 
     const navigate = useNavigate();
     const guildsData = fractal?.guilds.nodes;
@@ -23,7 +23,7 @@ export const Guilds = () => {
     const guilds = guildsData || [];
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">All Guilds</h1>
             </div>
@@ -41,7 +41,7 @@ export const Guilds = () => {
                             <TableRow
                                 key={guild.account}
                                 className={cn({
-                                    "bg-background/80": index < 6,
+                                    "bg-background/80": index < COUNCIL_SEATS,
                                 })}
                                 onClick={() => {
                                     navigate(`/guild/${guild.account}/`);
