@@ -43,7 +43,7 @@ impl EvaluationInstance {
     }
 
     pub fn finish_evaluation(&self) {
-        let eval_guild = Guild::get_assert(self.guild);
+        let mut eval_guild = Guild::get_assert(self.guild);
         let fractal = Fractal::get_assert(eval_guild.fractal);
 
         let should_init_consensus = RewardConsensus::get(fractal.account).is_none()
@@ -62,9 +62,13 @@ impl EvaluationInstance {
             }
 
             RewardConsensus::add(fractal.account, (TOKEN_SUPPLY / 4).into());
+            self.save_pending_scores();
+            // Automatically move leadership to the first council
+            // council can set their original representative again if they want to.
+            eval_guild.remove_representative();
+        } else {
+            self.save_pending_scores();
         }
-
-        self.save_pending_scores();
     }
 
     fn internal(&self) -> Option<Evaluation> {
