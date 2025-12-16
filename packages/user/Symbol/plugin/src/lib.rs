@@ -8,6 +8,7 @@ use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
+use psibase::services::tokens;
 use psibase::{define_trust, AccountNumber};
 
 use crate::errors::ErrorType;
@@ -35,6 +36,10 @@ define_trust! {
 
 struct SymbolPlugin;
 
+mod error_codes {
+    pub const CREDITING_ZERO_QUANTITY: u32 = 1;
+}
+
 impl Api for SymbolPlugin {
     fn create(symbol: String, deposit: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::create)?;
@@ -48,8 +53,15 @@ impl Api for SymbolPlugin {
             &deposit,
             "".into(),
         )
-        // Ignore error code 1, which tokens::credit returns if amount == 0.
-        .or_else(|error| if error.code == 1 { Ok(()) } else { Err(error) })?;
+        .or_else(|error| {
+            if error.producer.service == tokens::SERVICE.to_string()
+                && error.code == error_codes::CREDITING_ZERO_QUANTITY
+            {
+                Ok(())
+            } else {
+                Err(error)
+            }
+        })?;
 
         let packed_args = symbol::action_structs::create {
             symbol: AccountNumber::from(symbol.as_str()),
