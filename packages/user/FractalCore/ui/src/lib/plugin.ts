@@ -2,8 +2,6 @@ import type { Account } from "@/lib/zod/Account";
 
 import { getSubDomain } from "@shared/lib/get-sub-domain";
 
-import { evaluationsService } from "./constants";
-
 // Shared call type with typed params
 export type PluginCall<T extends unknown[] = unknown[]> = {
     readonly intf: string;
@@ -189,4 +187,3 @@ export class Plugin {
 
 // Global instances
 export const fractalCorePlugin = new Plugin(getSubDomain());
-export const evaluationsPlugin = new Plugin(evaluationsService);
