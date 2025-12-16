@@ -49,7 +49,6 @@ export const NodeLocalPackages = () => {
                     description: `Installed ${result.installed.length} service(s): ${result.installed.join(", ")}`,
                 });
                 setFile(null);
-                // Reset the file input
                 const fileInput = document.getElementById(
                     "package-file-input",
                 ) as HTMLInputElement;

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import JSZip from "jszip";
+import { lookup } from "mrmime";
 import { util } from "wasm-transpiled";
 import { z } from "zod";
 
@@ -305,22 +306,21 @@ class Chain {
             }
 
             // Install data files
-            const dataFolder = zip.folder("data");
-            if (dataFolder) {
-                const dataFiles: Array<{ path: string; data: ArrayBuffer }> =
-                    [];
+            const dataDir = zip.folder("data");
+            if (dataDir) {
+                const dataFilePromises: Array<{ path: string; data: Promise<ArrayBuffer> }> = [];
 
-                dataFolder.forEach(async (relativePath, file) => {
+                dataDir.forEach((relativePath, file) => {
                     if (!file.dir) {
-                        dataFiles.push({
+                        dataFilePromises.push({
                             path: relativePath,
-                            data: await file.async("arraybuffer"),
+                            data: file.async("arraybuffer"),
                         });
                     }
                 });
 
-                await Promise.all(
-                    dataFiles.map(async (item) => {
+                const resolvedDataFiles = await Promise.all(
+                    dataFilePromises.map(async (item) => {
                         // Await file read
                         const data = await item.data;
                         return { path: item.path, data };
@@ -328,7 +328,7 @@ class Chain {
                 );
 
                 // Data files are stored as: data/<service><path>
-                for (const { path, data } of dataFiles) {
+                for (const { path, data } of resolvedDataFiles) {
                     // Format: <servicename>/<filepath>
                     const firstSlash = path.indexOf("/");
                     if (firstSlash === -1) {
@@ -338,25 +338,7 @@ class Chain {
                     const serviceName = path.substring(0, firstSlash);
                     const filePath = path.substring(firstSlash);
 
-                    let contentType = "application/octet-stream";
-                    if (filePath.endsWith(".html")) {
-                        contentType = "text/html";
-                    } else if (filePath.endsWith(".js")) {
-                        contentType = "application/javascript";
-                    } else if (filePath.endsWith(".css")) {
-                        contentType = "text/css";
-                    } else if (filePath.endsWith(".json")) {
-                        contentType = "application/json";
-                    } else if (filePath.endsWith(".wasm")) {
-                        contentType = "application/wasm";
-                    } else if (
-                        filePath.endsWith(".png") ||
-                        filePath.endsWith(".jpg") ||
-                        filePath.endsWith(".jpeg") ||
-                        filePath.endsWith(".gif")
-                    ) {
-                        contentType = `image/${filePath.split(".").pop()}`;
-                    }
+                    const contentType = lookup(filePath) || "application/octet-stream";
 
                     // PUT to the service subdomain
                     const url = siblingUrl(null, serviceName, filePath);
