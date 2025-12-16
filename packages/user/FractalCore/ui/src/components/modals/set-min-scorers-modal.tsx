@@ -1,0 +1,73 @@
+import { useEffect } from "react";
+import { z } from "zod";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
+import { useAppForm } from "@shared/components/form/app-form";
+import { useSetMinScorers } from "@/hooks/fractals/use-set-min-scorers";
+import { zU8 } from '@shared/lib/schemas/u8'
+
+export const SetMinScorersModal = ({
+    show,
+    openChange,
+}: {
+    show: boolean;
+    openChange: (show: boolean) => void;
+}) => {
+    const { mutateAsync: setMinScorers } = useSetMinScorers();
+
+    const form = useAppForm({
+        defaultValues: {
+            minScorers: 6
+        },
+        onSubmit: async ({ value: { minScorers } }) => {
+            await setMinScorers([minScorers]);
+            openChange(false);
+        },
+        validators: {
+            onChange: z.object({
+                minScorers: zU8,
+            }),
+        },
+    });
+
+    useEffect(() => {
+        if (show && form.state.isSubmitSuccessful) {
+            form.reset();
+        }
+    }, [form, show]);
+
+    return (
+        <Dialog open={show} onOpenChange={openChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Set guild representative</DialogTitle>
+                    <div>Dialog content here</div>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            void form.handleSubmit();
+                        }}
+                        className="mt-3 w-full space-y-6"
+                    >
+                        <form.AppField
+                            name="minScorers"
+                            children={(field) => (
+                                <field.NumberField label="Minimum scorers" />
+                            )}
+                        />
+
+                        <form.AppForm>
+                            <form.SubmitButton
+                                labels={["Set rep", "Setting rep"]}
+                            />
+                        </form.AppForm>
+                    </form>
+                </DialogHeader>
+            </DialogContent>
+        </Dialog>
+    );
+};
