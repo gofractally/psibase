@@ -1,5 +1,6 @@
 import { queryClient } from "@/queryClient";
 
+import { fractalsPlugin } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
@@ -9,11 +10,7 @@ import { useFractalAccount } from "./use-fractal-account";
 export const useResignRep = () => {
     const fractalAccount = useFractalAccount();
     return usePluginMutation<[guildAccount: Account]>(
-        {
-            intf: "adminGuild",
-            method: "resignGuildRep",
-            service: fractalAccount,
-        },
+        fractalsPlugin.adminGuild.resignGuildRep,
         {
             error: "Failed resignation",
             loading: "Resigning",
