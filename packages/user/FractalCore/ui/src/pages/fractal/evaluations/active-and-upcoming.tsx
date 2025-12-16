@@ -18,9 +18,7 @@ import {
 export const ActiveAndUpcoming = () => {
     const { data: guild, isPending: isGuildPending } = useGuild();
 
-
     const isUpcomingEvaluation = !!guild?.evalInstance;
-
 
     return (
         <div className="mx-auto w-full max-w-5xl p-4 px-6">
