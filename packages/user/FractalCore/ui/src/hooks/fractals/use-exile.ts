@@ -1,19 +1,14 @@
 import { queryClient } from "@/queryClient";
 
+import { fractalCorePlugin } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 import { Account } from "@/lib/zod/Account";
 
 import { usePluginMutation } from "../use-plugin-mutation";
-import { useFractalAccount } from "./use-fractal-account";
 
 export const useExile = () => {
-    const fractalAccount = useFractalAccount();
     return usePluginMutation<[member: Account]>(
-        {
-            intf: "adminFractal",
-            method: "exileMember",
-            service: fractalAccount,
-        },
+        fractalCorePlugin.adminFractal.exileMember,
         {
             error: "Failed exile",
             loading: "Exiling member",

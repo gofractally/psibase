@@ -1,3 +1,3 @@
-import { useSubDomain } from "@shared/hooks/use-sub-domain";
+import { getSubDomain } from "@shared/lib/get-sub-domain";
 
-export const useFractalAccount = useSubDomain;
+export const useFractalAccount = getSubDomain;

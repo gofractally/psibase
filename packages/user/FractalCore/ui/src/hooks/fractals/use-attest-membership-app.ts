@@ -2,6 +2,7 @@ import { queryClient } from "@/queryClient";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
+import { fractalCorePlugin } from "@/lib/constants";
 import { getGuildApplication } from "@/lib/graphql/fractals/getGuildApplication";
 import QueryKey from "@/lib/queryKeys";
 import { Account, zAccount } from "@/lib/zod/Account";
@@ -10,7 +11,6 @@ import { zGuildAccount } from "@/lib/zod/Wrappers";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { usePluginMutation } from "../use-plugin-mutation";
-import { useFractalAccount } from "./use-fractal-account";
 
 export const zParams = z.object({
     guildAccount: zGuildAccount,
@@ -20,7 +20,6 @@ export const zParams = z.object({
 });
 
 export const useAttestMembershipApp = () => {
-    const fractal = useFractalAccount();
     const navigate = useNavigate();
 
     return usePluginMutation<
@@ -30,32 +29,25 @@ export const useAttestMembershipApp = () => {
             comment: string,
             endorses: boolean,
         ]
-    >(
-        {
-            method: "attestMembershipApp",
-            service: fractal,
-            intf: "userGuild",
-        },
-        {
-            error: "Failed attesting membership",
-            loading: "Attesting",
-            success: "Attested",
-            isStagable: false,
-            onSuccess: async ([guildAccount, member]) => {
-                const guildApplication = await getGuildApplication(
-                    guildAccount,
-                    member,
-                );
-                if (guildApplication === null) {
-                    toast.success(`${member} is now a member of the guild.`);
-                    navigate(`/guild/${guildAccount}/members`);
-                }
+    >(fractalCorePlugin.userGuild.attestMembershipApp, {
+        error: "Failed attesting membership",
+        loading: "Attesting",
+        success: "Attested",
+        isStagable: false,
+        onSuccess: async ([guildAccount, member]) => {
+            const guildApplication = await getGuildApplication(
+                guildAccount,
+                member,
+            );
+            if (guildApplication === null) {
+                toast.success(`${member} is now a member of the guild.`);
+                navigate(`/guild/${guildAccount}/members`);
+            }
 
-                queryClient.setQueryData(
-                    QueryKey.guildApplication(guildAccount, member),
-                    () => guildApplication,
-                );
-            },
+            queryClient.setQueryData(
+                QueryKey.guildApplication(guildAccount, member),
+                () => guildApplication,
+            );
         },
-    );
+    });
 };

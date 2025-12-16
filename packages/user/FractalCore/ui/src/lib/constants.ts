@@ -1,5 +1,7 @@
 import type { Account } from "@/lib/zod/Account";
 
+import { getSubDomain } from "@shared/lib/get-sub-domain";
+
 import { zAccount } from "./zod/Account";
 
 export const evaluationsService = zAccount.parse("evaluations");
@@ -154,5 +156,5 @@ export class Plugin {
     }
 }
 
-export const fractalsPlugin = new Plugin(fractalsService);
+export const fractalCorePlugin = new Plugin(getSubDomain());
 export const evaluationsPlugin = new Plugin(evaluationsService);
