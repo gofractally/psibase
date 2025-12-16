@@ -25,7 +25,6 @@ pub mod constants {
 
     pub const DEFAULT_MINIMUM_REQUIRED_SCORERS: u8 = 8;
     pub const MIN_MINIMUM_REQUIRED_SCORERS: u8 = 4;
-    pub const MAX_MINIMUM_REQUIRED_SCORERS: u8 = 250;
 
     // Simple limitation + also related to fibonacci function limit.
     pub const MAX_RANKED_GUILDS: u8 = 25;
