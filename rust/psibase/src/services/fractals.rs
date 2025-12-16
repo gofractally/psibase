@@ -318,12 +318,7 @@ pub mod Service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(
-        fractal_account: AccountNumber,
-        guild_account: AccountNumber,
-        evaluation_id: u32,
-    ) {
-    }
+    pub fn evaluation_finished(guild_account: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
     pub fn scheduled_evaluation(
