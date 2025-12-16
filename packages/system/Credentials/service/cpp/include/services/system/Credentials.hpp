@@ -57,6 +57,12 @@ namespace SystemService
       /// Deletes the specified credential.
       /// Can only be called by the credential's issuer.
       void consume(uint32_t id);
+
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers);
+
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters);
    };
 
    // clang-format off
@@ -70,6 +76,8 @@ namespace SystemService
       method(get_pubkey, id),
       method(get_expiry_date, id),
       method(consume, id),
+      method(isAuthSys, sender, authorizers),
+      method(isRejectSys, sender, rejecters)
    );
    // clang-format on
 
