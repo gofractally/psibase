@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
+import { FRACTALS_SERVICE } from "@/lib/constants";
 import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 
@@ -94,7 +94,7 @@ export const getFractal = async (owner: Account) => {
             }
         }
     }`,
-        fractalsService,
+        FRACTALS_SERVICE,
     );
 
     return zFractalRes.parse(fractal);

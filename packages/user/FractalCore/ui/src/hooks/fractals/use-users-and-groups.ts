@@ -2,7 +2,7 @@ import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
+import { FRACTALS_SERVICE } from "@/lib/constants";
 import {
     getUsersAndGroups,
     zUsersAndGroupsResponse,
@@ -26,7 +26,7 @@ export const useUsersAndGroups = (
         queryFn: async () => {
             try {
                 const res = await getUsersAndGroups(
-                    fractalsService,
+                    FRACTALS_SERVICE,
                     evaluationId!,
                 );
 

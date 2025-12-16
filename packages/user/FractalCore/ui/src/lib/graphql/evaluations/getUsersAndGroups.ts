@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { evaluationsService } from "@/lib/constants";
+import { EVALUATIONS_SERVICE } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
 import { Account, zAccount } from "@/lib/zod/Account";
 
@@ -65,7 +65,7 @@ export const getUsersAndGroups = async (
                 }
             }
         }`,
-        evaluationsService,
+        EVALUATIONS_SERVICE,
     );
 
     console.log(res, "was the res");
