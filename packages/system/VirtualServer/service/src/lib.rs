@@ -47,7 +47,7 @@ mod service {
     use crate::{prices::*, rpc::event_types};
     use psibase::services::{
         accounts::Wrapper as Accounts,
-        nft::Wrapper as Nft,
+        nft::{NftHolderFlags, Wrapper as Nft},
         tokens::{BalanceFlags, Quantity, TokenFlags, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
@@ -57,7 +57,7 @@ mod service {
     fn init() {
         InitRow::init();
 
-        Nft::call().setUserConf("manualDebit".into(), true);
+        Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
         Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Wrapper::call().set_specs(MIN_SERVER_SPECS);
         Transact::call().resMonitoring(true);
