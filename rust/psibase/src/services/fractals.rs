@@ -283,6 +283,13 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set minimum required scorers.
+    ///
+    /// RewardConsensus requires a successful evaluation where at least X evaluation participants (scorers) achieve a non-zero score.  
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to get the policy for
+    /// * `min_scorers` - The minimum amount of scorers required.
     #[action]
     fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
         unimplemented!()
