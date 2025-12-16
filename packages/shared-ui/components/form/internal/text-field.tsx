@@ -1,31 +1,34 @@
 import type { ReactNode } from "react";
 
-import { TextInput } from "@shared/components/form/internal/text-input";
+import {
+    TextInput,
+    type TextInputProps,
+} from "@shared/components/form/internal/text-input";
 import { cn } from "@shared/lib/utils";
 import { Label } from "@shared/shadcn/ui/label";
 
 import { useFieldContext } from "../app-form";
 import { FieldErrors } from "./field-errors";
 
-export const TextField = ({
-    label,
-    placeholder,
-    description,
-    rightLabel,
-    required,
-    disabled,
-    startContent,
-    endContent,
-}: {
+type TextFieldProps = Omit<
+    TextInputProps,
+    "value" | "name" | "onChange" | "onBlur" | "aria-invalid" | "ariaInvalid"
+> & {
     label?: string;
     rightLabel?: ReactNode;
-    placeholder?: string;
     description?: string;
-    required?: boolean;
-    disabled?: boolean;
     startContent?: React.ReactNode;
     endContent?: React.ReactNode;
-}) => {
+};
+
+export const TextField = ({
+    label,
+    description,
+    rightLabel,
+    startContent,
+    endContent,
+    ...props
+}: TextFieldProps) => {
     const field = useFieldContext<string>();
 
     const isError = field.state.meta.errors.length > 0;
@@ -47,14 +50,12 @@ export const TextField = ({
                 endContent={endContent}
                 value={field.state.value}
                 name={field.name}
-                required={required}
-                placeholder={placeholder}
                 onChange={(e) => {
                     field.handleChange(e.target.value);
                 }}
                 onBlur={field.handleBlur}
-                disabled={disabled}
                 aria-invalid={isError && isTouched}
+                {...props}
             />
             {description && (
                 <p className="text-muted-foreground text-sm">{description}</p>

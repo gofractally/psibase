@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <psibase/Memo.hpp>
 #include <psibase/psibase.hpp>
 
@@ -12,9 +13,10 @@ namespace UserService
    class Nft : public psibase::Service
    {
      public:
-      using Tables = psibase::ServiceTables<NftTable, NftHolderTable, CreditTable, InitTable>;
+      using Tables = psibase::ServiceTables<NftConfigTable, NftTable, NftHolderTable, CreditTable>;
 
-      static constexpr auto service = psibase::AccountNumber("nft");
+      static constexpr auto         service     = psibase::AccountNumber("nft");
+      static constexpr std::uint8_t manualDebit = 0;
 
       Nft(psio::shared_view_ptr<psibase::Action> action);
 
@@ -24,16 +26,14 @@ namespace UserService
       void credit(NID nftId, psibase::AccountNumber receiver, psio::view<const psibase::Memo> memo);
       void uncredit(NID nftId, psio::view<const psibase::Memo> memo);
       void debit(NID nftId, psio::view<const psibase::Memo> memo);
-      void setUserConf(psibase::EnumElement flag, bool enable);
-
-      std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
+      void setUserConf(std::uint8_t flag, bool enable);
 
       // Read-only:
       NftRecord       getNft(NID nftId);
       NftHolderRecord getNftHolder(psibase::AccountNumber account);
       CreditRecord    getCredRecord(NID nftId);
       bool            exists(NID nftId);
-      bool            getUserConf(psibase::AccountNumber account, psibase::EnumElement flag);
+      bool            getUserConf(psibase::AccountNumber account, std::uint8_t flag);
 
      public:
       struct Events
@@ -45,7 +45,7 @@ namespace UserService
          {
             void minted(NID nftId, Account issuer) {}
             void burned(NID nftId, Account owner) {}
-            void userConfSet(Account account, psibase::EnumElement flag, bool enable) {}
+            void userConfSet(Account account, std::uint8_t flag, bool enable) {}
             void credited(NID nftId, Account sender, Account receiver, MemoView memo) {}
             void uncredited(NID nftId, Account sender, Account receiver, MemoView memo) {}
          };
@@ -70,7 +70,6 @@ namespace UserService
       method(uncredit, nftId, memo),
       method(debit, nftId, memo),
       method(setUserConf, flag, enable),
-      method(serveSys, request),
 
       method(getNft, nftId),
       method(getNftHolder, account),

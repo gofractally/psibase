@@ -1,10 +1,8 @@
-import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 import { type UseMutationResult } from "@tanstack/react-query";
 import {
     ChevronsUpDown,
     Contact,
     Copy,
-    Download,
     LogIn,
     LogOut,
     Moon,
@@ -18,9 +16,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
+import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 
-import { useCanExportAccount } from "@/hooks/use-can-export-account";
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
@@ -134,7 +131,6 @@ export function NavUser() {
         useSelectAccount();
 
     const generateInvite = useGenerateInvite();
-    const { data: canExportAccount } = useCanExportAccount(currentUser);
 
     const onGenerateInvite = () => {
         generateInvite.mutate();
@@ -333,21 +329,6 @@ export function NavUser() {
                             >
                                 <Contact className="mr-2 h-4 w-4" />
                                 Edit profile
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                                disabled={!canExportAccount}
-                                onClick={() => {
-                                    window.location.href = siblingUrl(
-                                        undefined,
-                                        "auth-sig",
-                                        undefined,
-                                        false,
-                                    );
-                                }}
-                            >
-                                <Download className="mr-2 h-4 w-4" />
-                                Export account
                             </DropdownMenuItem>
 
                             {currentUser && (

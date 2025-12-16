@@ -7,8 +7,10 @@
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
+#include <services/local/XPackages.hpp>
 
 using namespace psibase;
+using namespace LocalService;
 
 namespace
 {
@@ -17,7 +19,7 @@ namespace
    {
       TempSocket() {}
       void autoClose(const std::optional<std::string>&) noexcept override {}
-      void send(std::span<const char> data) override
+      void send(Writer&, std::span<const char> data) override
       {
          auto reply = psio::from_frac<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
@@ -39,12 +41,15 @@ namespace
    };
 }  // namespace
 
-void load_local_packages(TransactionContext& tc, const std::vector<PackagedService>& packages)
+void load_local_packages(TransactionContext&             tc,
+                         const DirectoryRegistry&        registry,
+                         const std::vector<PackageInfo>& packages)
 {
    std::vector<HttpRequest> requests;
 
-   for (const auto& package : packages)
+   for (const auto& info : packages)
    {
+      auto package = registry.get(info);
       PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Loading " << package.meta.name;
 
       for (auto [account, header, serviceInfo] : package.services)
@@ -83,6 +88,23 @@ void load_local_packages(TransactionContext& tc, const std::vector<PackagedServi
              .body        = file.read(),
          });
       }
+
+      requests.push_back(HttpRequest{
+          .host        = XPackages::service.str() + "." + rootHost,
+          .method      = "PUT",
+          .target      = "/manifest/" + loggers::to_string(info.sha256),
+          .contentType = "application/json",
+          .body        = package.manifest(),
+      });
+      HttpRequest postinstall{
+          .host        = XPackages::service.str() + "." + rootHost,
+          .method      = "POST",
+          .target      = "/postinstall",
+          .contentType = "application/json",
+      };
+      psio::vector_stream stream(postinstall.body);
+      to_json(info, stream);
+      requests.push_back(std::move(postinstall));
    }
 
    auto socket = std::make_shared<TempSocket>();
@@ -131,7 +153,7 @@ void initialize_database(SystemContext& context, const std::string& template_)
       DirectoryRegistry registry{package_path().string()};
       auto              packages = registry.resolve({&template_, 1});
       bc.start();
-      load_local_packages(tc, packages);
+      load_local_packages(tc, registry, packages);
    }
 
    SocketAutoCloseSet autoClose;

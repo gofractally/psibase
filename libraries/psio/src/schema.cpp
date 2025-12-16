@@ -1670,6 +1670,19 @@ namespace psio::schema_types
                result = c->type.get();
             else if (const Type* t = std::get_if<Type>(&result->value))
                result = schema.get(t->type);
+            else if (const Struct* s = std::get_if<Struct>(&result->value))
+            {
+               if (s->members.size() == 1)
+               {
+                  auto unwrapped = resolveAll(schema, s->members.front().type);
+                  if (std::holds_alternative<Int>(unwrapped->value) ||
+                      std::holds_alternative<Float>(unwrapped->value))
+                  {
+                     return unwrapped;
+                  }
+               }
+               return result;
+            }
             else
                return result;
          }
@@ -1762,7 +1775,10 @@ namespace psio::schema_types
          return true;
       }
       bool match(const Float& lhs, const Float& rhs) { return lhs == rhs; }
-      bool match(const Int& lhs, const Int& rhs) { return lhs == rhs; }
+      bool match(const Int& lhs, const Int& rhs)
+      {
+         return lhs == rhs || (lhs.bits == 8 && rhs.bits == 8);
+      }
       bool match(const FracPack& lhs, const FracPack& rhs) { return match(*lhs.type, *rhs.type); }
       bool match(const FracPack& lhs, const List& rhs)
       {

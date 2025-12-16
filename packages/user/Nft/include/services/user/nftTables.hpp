@@ -1,5 +1,6 @@
 #pragma once
 #include <compare>
+#include <cstdint>
 #include <psibase/AccountNumber.hpp>
 #include <psibase/Bitset.hpp>
 #include <psibase/Table.hpp>
@@ -8,12 +9,18 @@ namespace UserService
 {
    using NID = uint32_t;
 
+   struct NftConfigRow
+   {
+      NID next_id;
+   };
+   PSIO_REFLECT(NftConfigRow, next_id)
+   using NftConfigTable = psibase::Table<NftConfigRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(NftConfigTable)
+
    struct NftHolderRecord
    {
       psibase::AccountNumber account;
-      psibase::Bitset<8>     config;
-
-      using Configurations = psibase::Enum<psibase::EnumElement{"manualDebit"}>;
+      uint8_t                config;
 
       auto operator<=>(const NftHolderRecord&) const = default;
    };
@@ -42,15 +49,15 @@ namespace UserService
    struct CreditRecord
    {
       NID                    nftId;
-      psibase::AccountNumber debitor;
       psibase::AccountNumber creditor;
+      psibase::AccountNumber debitor;
 
       using ByCreditor = psibase::CompositeKey<&CreditRecord::creditor, &CreditRecord::nftId>;
-      using ByDebitor  = psibase::CompositeKey<&CreditRecord::creditor, &CreditRecord::nftId>;
+      using ByDebitor  = psibase::CompositeKey<&CreditRecord::debitor, &CreditRecord::nftId>;
 
       auto operator<=>(const CreditRecord&) const = default;
    };
-   PSIO_REFLECT(CreditRecord, nftId, debitor, creditor);
+   PSIO_REFLECT(CreditRecord, nftId, creditor, debitor);
    using CreditTable = psibase::Table<CreditRecord,
                                       &CreditRecord::nftId,
                                       CreditRecord::ByCreditor{},

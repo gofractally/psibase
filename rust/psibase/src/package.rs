@@ -1,3 +1,5 @@
+#![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 use crate::services::{
     accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
     sites, transact,
@@ -24,6 +26,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use zip::ZipArchive;
 
+#[cfg(not(target_family = "wasm"))]
+use crate::services::{x_admin, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -150,6 +154,17 @@ impl PackageInfo {
             accounts: self.accounts.clone(),
         }
     }
+    pub fn is_local(&self) -> Option<bool> {
+        if self.accounts.is_empty() {
+            None
+        } else {
+            Some(
+                self.accounts
+                    .iter()
+                    .any(|account| account.to_string().starts_with("x-")),
+            )
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -174,10 +189,31 @@ impl InstalledPackageInfo {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LocalPackageInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub depends: Vec<PackageRef>,
+    pub accounts: Vec<AccountNumber>,
+    pub sha256: Checksum256,
+}
+
+impl LocalPackageInfo {
+    pub fn meta(&self) -> Meta {
+        Meta {
+            name: self.name.clone(),
+            version: self.version.clone(),
+            description: self.description.clone(),
+            depends: self.depends.clone(),
+            accounts: self.accounts.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct PackageDataFile {
     pub account: AccountNumber,
-    pub service: AccountNumber,
     pub filename: String,
 }
 
@@ -501,11 +537,6 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
-            let service = if self.has_service(*sender) {
-                *sender
-            } else {
-                sites::SERVICE
-            };
             let file = self.archive.by_index(*index).unwrap();
             let path = data_re
                 .captures(file.name())
@@ -515,7 +546,6 @@ impl<R: Read + Seek> PackagedService<R> {
                 .as_str();
             manifest.push(PackageDataFile {
                 account: *sender,
-                service,
                 filename: path.to_string(),
             });
         }
@@ -743,6 +773,61 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn install_local(
+        &mut self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        _compression_level: u32,
+    ) -> Result<(), anyhow::Error> {
+        for (account, index, _info) in &self.services {
+            crate::as_text(
+                client
+                    .put(
+                        x_admin::SERVICE
+                            .url(base_url)?
+                            .join(&format!("/services/{}", account))?,
+                    )
+                    .body(read(&mut self.archive.by_index(*index)?)?)
+                    .header("Content-Type", "application/wasm"),
+            )
+            .await?;
+        }
+
+        let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$")?;
+        for (sender, index) in &self.data {
+            let mut file = self.archive.by_index(*index)?;
+            let file_name = file.name().to_string();
+            let path = data_re
+                .captures(&file_name)
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .as_str();
+
+            if let Some(t) = mime_guess::from_path(path).first() {
+                let content = read(&mut file)?;
+                // Don't encode the content, for now, because XSites doesn't
+                // implement decoding.
+                // let (content, content_encoding) =
+                //    compress_content(&content, t.essence_str(), compression_level);
+                let builder = client
+                    .put(sender.url(base_url)?.join(path)?)
+                    .header("Content-Type", t.essence_str().to_string())
+                    .body(content);
+                // if let Some(content_encoding) = content_encoding {
+                //     builder = builder.header("Content-Encoding", content_encoding)
+                // }
+                crate::as_text(builder).await?;
+            } else {
+                Err(Error::UnknownFileType {
+                    path: file.name().to_string(),
+                })?
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<R: Read + Seek> PackagedService<R> {
@@ -849,8 +934,7 @@ impl PackageManifest {
         for file in &self.data {
             if !new_files.contains(file) {
                 out.push_action(
-                    sites::Wrapper::pack_from_to(file.account, file.service)
-                        .remove(file.filename.clone()),
+                    sites::Wrapper::pack_from(file.account).remove(file.filename.clone()),
                 )?;
             }
         }
@@ -870,10 +954,7 @@ impl PackageManifest {
     }
     pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
         for file in &self.data {
-            out.push_action(
-                sites::Wrapper::pack_from_to(file.account, file.service)
-                    .remove(file.filename.clone()),
-            )?;
+            out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone()))?;
         }
         for (service, info) in &self.services {
             if info.server.is_some() {
@@ -883,6 +964,60 @@ impl PackageManifest {
                 out.push_action(setcode::Wrapper::pack().setFlags(*service, 0))?;
             }
             out.push_action(set_code_action(*service, vec![]))?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl PackageManifest {
+    // This removes every part of self that is not overwritten by other
+    pub async fn upgrade_local(
+        &self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+        other: PackageManifest,
+    ) -> Result<(), anyhow::Error> {
+        let new_files: HashSet<_> = other.data.into_iter().collect();
+        for file in &self.data {
+            if !new_files.contains(file) {
+                crate::as_text(client.delete(file.account.url(base_url)?.join(&file.filename)?))
+                    .await?;
+            }
+        }
+        for (service, _info) in &self.services {
+            let other_info = other.services.get(service);
+            if other_info.is_none() {
+                crate::as_text(
+                    client.delete(
+                        x_admin::SERVICE
+                            .url(base_url)?
+                            .join(&format!("/services/{}", service))?,
+                    ),
+                )
+                .await?;
+            }
+        }
+        Ok(())
+    }
+    pub async fn remove_local(
+        &self,
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+    ) -> Result<(), anyhow::Error> {
+        for file in &self.data {
+            crate::as_text(client.delete(file.account.url(base_url)?.join(&file.filename)?))
+                .await?;
+        }
+        for (service, _info) in &self.services {
+            crate::as_text(
+                client.delete(
+                    x_admin::SERVICE
+                        .url(base_url)?
+                        .join(&format!("/services/{}", service))?,
+                ),
+            )
+            .await?;
         }
         Ok(())
     }
@@ -1323,9 +1458,37 @@ impl<T: Read + Seek> PackageRegistry for JointRegistry<T> {
     }
 }
 
+pub struct FilteredRegistry<T: PackageRegistry> {
+    source: T,
+    local: bool,
+}
+
+impl<T: PackageRegistry> FilteredRegistry<T> {
+    pub fn new(source: T, local: bool) -> Self {
+        FilteredRegistry { source, local }
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: PackageRegistry> PackageRegistry for FilteredRegistry<T> {
+    type R = T::R;
+    fn index(&self) -> Result<Vec<PackageInfo>, anyhow::Error> {
+        let mut result = self.source.index()?;
+        result.retain(|info| info.is_local() != Some(!self.local));
+        Ok(result)
+    }
+    async fn get_by_info(
+        &self,
+        info: &PackageInfo,
+    ) -> Result<PackagedService<Self::R>, anyhow::Error> {
+        self.source.get_by_info(info).await
+    }
+}
+
 pub enum PackageOrigin {
     Installed { owner: AccountNumber },
     Repo { sha256: Checksum256, file: String },
+    Local { sha256: Checksum256 },
 }
 
 #[derive(Default)]
@@ -1355,6 +1518,23 @@ struct InstalledConnection {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct InstalledQuery {
     installed: InstalledConnection,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LocalPackageEdge {
+    node: LocalPackageInfo,
+}
+
+#[allow(non_snake_case)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LocalPackageConnection {
+    pageInfo: NextPageInfo,
+    edges: Vec<LocalPackageEdge>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct LocalPackageQuery {
+    installed: LocalPackageConnection,
 }
 
 #[allow(non_snake_case)]
@@ -1439,6 +1619,18 @@ pub async fn get_installed_manifest(
 }
 
 #[cfg(not(target_family = "wasm"))]
+pub async fn get_local_manifest(
+    base_url: &reqwest::Url,
+    client: &mut reqwest::Client,
+    sha256: &Checksum256,
+) -> Result<PackageManifest, anyhow::Error> {
+    let url = x_packages::SERVICE
+        .url(base_url)?
+        .join(&format!("/manifest/{}", sha256))?;
+    crate::as_json(client.get(url)).await
+}
+
+#[cfg(not(target_family = "wasm"))]
 pub async fn get_manifest<T: PackageRegistry + ?Sized>(
     reg: &T,
     base_url: &reqwest::Url,
@@ -1456,6 +1648,7 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
                 .await?;
             Ok(package.manifest())
         }
+        PackageOrigin::Local { sha256 } => get_local_manifest(base_url, client, sha256).await,
     }
 }
 
@@ -1468,6 +1661,24 @@ fn max_version(versions: &HashMap<String, (Meta, PackageOrigin)>) -> Result<&str
         }
     }
     Ok(&*result)
+}
+
+fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyhow::Error> {
+    for package in packages {
+        match package {
+            PackageOp::Install(info) | PackageOp::Replace(_, info) => {
+                if info.is_local() == Some(!local) {
+                    Err(anyhow!(
+                        "{} is{} a local package",
+                        &info.name,
+                        if local { " not" } else { "" }
+                    ))?
+                }
+            }
+            PackageOp::Remove(_) => {}
+        }
+    }
+    Ok(())
 }
 
 impl PackageList {
@@ -1489,6 +1700,27 @@ impl PackageList {
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
+            }
+            if !data.installed.pageInfo.hasNextPage {
+                break;
+            }
+            end_cursor = Some(data.installed.pageInfo.endCursor);
+        }
+        Ok(result)
+    }
+    #[cfg(not(target_family = "wasm"))]
+    pub async fn local_installed(
+        base_url: &reqwest::Url,
+        client: &mut reqwest::Client,
+    ) -> Result<Self, anyhow::Error> {
+        let mut end_cursor: Option<String> = None;
+        let mut result = PackageList::new();
+        loop {
+            let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                .await.with_context(|| "Failed to list installed packages")?;
+            for edge in data.installed.edges {
+                result.insert_local(edge.node);
             }
             if !data.installed.pageInfo.hasNextPage {
                 break;
@@ -1524,6 +1756,14 @@ impl PackageList {
     pub fn insert_installed(&mut self, info: InstalledPackageInfo) {
         self.insert(info.meta(), PackageOrigin::Installed { owner: info.owner });
     }
+    pub fn insert_local(&mut self, info: LocalPackageInfo) {
+        self.insert(
+            info.meta(),
+            PackageOrigin::Local {
+                sha256: info.sha256,
+            },
+        )
+    }
 
     pub fn contains_package(&self, name: &str) -> bool {
         self.packages.get(name).is_some()
@@ -1549,10 +1789,11 @@ impl PackageList {
         reg: &T,
         packages: &[String],
         reinstall: bool,
+        local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
-        solve_dependencies(
+        let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
@@ -1560,17 +1801,20 @@ impl PackageList {
             reinstall,
             PackagePreference::Latest,
             PackagePreference::Current,
-        )
+        )?;
+        check_destination(&result, local)?;
+        Ok(result)
     }
     pub async fn resolve_upgrade<T: PackageRegistry + ?Sized>(
         &self,
         reg: &T,
         packages: &[String],
         pref: PackagePreference,
+        local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
         let essential = get_essential_packages(&index, &EssentialServices::new());
-        solve_dependencies(
+        let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
@@ -1582,7 +1826,9 @@ impl PackageList {
             } else {
                 PackagePreference::Current
             },
-        )
+        )?;
+        check_destination(&result, local)?;
+        Ok(result)
     }
     pub fn into_info(self) -> Vec<(Meta, PackageOrigin)> {
         let mut result = vec![];

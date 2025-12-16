@@ -88,7 +88,7 @@ impl TransactionTrace {
             ))
         }
     }
-    pub fn console(&self) -> TraceConsole {
+    pub fn console(&self) -> TraceConsole<'_> {
         return TraceConsole { trace: self };
     }
 }

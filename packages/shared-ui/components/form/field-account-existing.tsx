@@ -1,11 +1,9 @@
-// import { useStore } from "@tanstack/react-form";
 import { User, UserX } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
-import { Supervisor } from "@psibase/common-lib";
-
 import { Avatar } from "@shared/components/avatar";
+import { getAccount, zGetAccountReturn } from "@shared/lib/get-account";
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { withFieldGroup } from "./app-form";
@@ -41,7 +39,7 @@ import { withFieldGroup } from "./app-form";
  *     description={undefined} // NOTE: TS will compalin if you do not provide ALL specified props
  *     placeholder="Enter account name"
  *     disabled={isDisabled}
- *     supervisor={supervisor}
+ *     onValidate={(account) => ...}
  * />
  * ```
  *
@@ -49,7 +47,7 @@ import { withFieldGroup } from "./app-form";
  * @param description - Optional description text
  * @param placeholder - Placeholder text for the input
  * @param disabled - Whether the field is disabled
- * @param supervisor - Consuming app's supervisor instance for account validation
+ * @param onValidate - Callback with validated account meta
  * @returns A field for entering an existing account name with validation
  */
 export const FieldAccountExisting = withFieldGroup({
@@ -61,7 +59,9 @@ export const FieldAccountExisting = withFieldGroup({
         description: undefined as string | undefined,
         placeholder: undefined as string | undefined,
         disabled: false,
-        supervisor: undefined as Supervisor | undefined,
+        onValidate: undefined as
+            | ((account: z.infer<typeof zGetAccountReturn>) => void)
+            | undefined,
     },
     render: function Render({
         group,
@@ -69,13 +69,11 @@ export const FieldAccountExisting = withFieldGroup({
         label,
         description,
         placeholder,
-        supervisor,
+        onValidate,
     }) {
         const [isValidating, setIsValidating] = useState(false);
-        // TODO: can we just use...
-        // const isValidating = useStore(group.form.store, (state) => state.isValidating);
-        // ?
         const [userNotFound, setUserNotFound] = useState(false);
+
         return (
             <group.AppField
                 name="account"
@@ -88,7 +86,10 @@ export const FieldAccountExisting = withFieldGroup({
                             description={description}
                             startContent={
                                 <UserStartContent
-                                    userNotFound={userNotFound}
+                                    userNotFound={
+                                        Boolean(field.state.value) &&
+                                        userNotFound
+                                    }
                                     value={field.state.value}
                                     isValid={field.state.meta.isValid}
                                     isValidating={isValidating}
@@ -101,62 +102,31 @@ export const FieldAccountExisting = withFieldGroup({
                     onChange: () => setIsValidating(true),
                     onChangeAsyncDebounceMs: 500,
                     onChangeAsync: async ({ value }) => {
-                        const exists = await doesAccountExist(
-                            value,
-                            supervisor!,
-                        );
+                        const account = await getAccount(value);
+                        onValidate?.(account);
                         setIsValidating(false);
-                        setUserNotFound(!exists);
-                        return;
+                        const notFound = !account?.accountNum;
+                        setUserNotFound(notFound);
                     },
                     onSubmit: ({ fieldApi }) => {
                         const errors = fieldApi.parseValueWithSchema(zAccount);
                         if (errors) return errors;
                     },
                     onSubmitAsync: async ({ value }) => {
-                        const exists = await doesAccountExist(
-                            value,
-                            supervisor!,
-                        );
+                        const account = await getAccount(value);
+                        onValidate?.(account);
                         setIsValidating(false);
-                        setUserNotFound(!exists);
-                        if (exists) return;
-                        return "Account does not exist";
+                        const notFound = !account?.accountNum;
+                        setUserNotFound(notFound);
+                        if (notFound) {
+                            return "Account does not exist";
+                        }
                     },
                 }}
             />
         );
     },
 });
-
-const zGetAccountReturn = z
-    .object({
-        accountNum: z.string(),
-        authService: z.string(),
-    })
-    .optional();
-
-export const doesAccountExist = async (
-    accountName: string,
-    supervisor: Supervisor,
-): Promise<boolean> => {
-    try {
-        const res = zGetAccountReturn.parse(
-            await supervisor.functionCall({
-                method: "getAccount",
-                params: [accountName],
-                service: "accounts",
-                intf: "api",
-            }),
-        );
-
-        return Boolean(res?.accountNum);
-    } catch (e) {
-        // TODO: read this error, actually throw if there's something wrong, other than being invalid
-        console.error(e);
-        return false;
-    }
-};
 
 const UserStartContent = ({
     userNotFound,

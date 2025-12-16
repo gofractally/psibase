@@ -1525,6 +1525,7 @@ namespace psio
    }
 
    template <typename... T, typename OS, typename E>
+      requires(!use_json_string_for_gql((std::variant<T...>*)nullptr))
    auto gql_query(const std::variant<T...>& value,
                   gql_stream&               input_stream,
                   OS&                       output_stream,

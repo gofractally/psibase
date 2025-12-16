@@ -91,6 +91,43 @@ namespace psibase
       return std::ranges::equal(name, h, {}, ::tolower, ::tolower);
    }
 
+   std::optional<std::string_view> HttpHeader::get(const std::vector<HttpHeader>& headers,
+                                                   std::string_view               name)
+   {
+      for (const auto& header : headers)
+      {
+         if (header.matches(name))
+         {
+            return header.value;
+         }
+      }
+      return {};
+   }
+
+   std::vector<std::string_view> HttpHeader::split(const std::vector<HttpHeader>& headers,
+                                                   std::string_view               name)
+   {
+      std::vector<std::string_view> result;
+      for (const auto& header : headers)
+      {
+         if (header.matches(name))
+         {
+            for (auto range : header.value | std::views::split(','))
+            {
+               std::string_view value = split2sv(range);
+
+               auto low  = value.find_first_not_of(" \t");
+               auto high = value.find_last_not_of(" \t");
+               if (low == std::string::npos)
+                  result.push_back("");
+               else
+                  result.push_back(value.substr(low, high - low + 1));
+            }
+         }
+      }
+      return result;
+   }
+
    std::pair<std::string, std::string> HttpRequest::readQueryItem(std::string_view& query)
    {
       auto end   = query.find('&');
@@ -138,14 +175,12 @@ namespace psibase
 
    std::optional<std::string_view> HttpRequest::getHeader(std::string_view name) const
    {
-      for (const auto& header : headers)
-      {
-         if (header.matches(name))
-         {
-            return header.value;
-         }
-      }
-      return {};
+      return HttpHeader::get(headers, name);
+   }
+
+   std::vector<std::string_view> HttpRequest::getHeaderValues(std::string_view name) const
+   {
+      return HttpHeader::split(headers, name);
    }
 
    void HttpRequest::removeCookie(std::string_view name)
@@ -182,6 +217,11 @@ namespace psibase
          }
          ++iter;
       }
+   }
+
+   void HttpRequest::removeHeader(std::string_view name)
+   {
+      std::erase_if(headers, [name](const HttpHeader& header) { return header.matches(name); });
    }
 
    bool isLocalhost(const HttpRequest& request)

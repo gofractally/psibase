@@ -246,7 +246,7 @@ struct test_chain_ref
 
 struct NullSocket : psibase::Socket
 {
-   void                send(std::span<const char> data) {}
+   void                send(psibase::Writer&, std::span<const char> data) {}
    psibase::SocketInfo info() const { return psibase::ProducerMulticastSocketInfo{}; }
 };
 
@@ -598,7 +598,7 @@ struct HttpSocket : psibase::AutoCloseSocket
       }
       sendImpl(psio::to_frac(reply));
    }
-   void send(std::span<const char> data) override
+   void send(psibase::Writer&, std::span<const char> data) override
    {
       auto reply  = psio::view<const psibase::HttpReply>{data};
       auto status = reply.status().unpack();

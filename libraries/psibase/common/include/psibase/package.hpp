@@ -61,6 +61,8 @@ namespace psibase
       void postinstall(std::vector<Action>& actions, std::span<const PackagedService> packages);
       void commitInstall(std::vector<Action>& actions, AccountNumber sender);
 
+      std::vector<char> manifest();
+
       std::vector<char>                                                    buf;
       zip::ZipReader                                                       archive;
       PackageMeta                                                          meta;
@@ -73,13 +75,15 @@ namespace psibase
    {
      public:
       DirectoryRegistry(std::string_view path);
+      std::vector<PackageInfo> index() const;
+
       PackagedService get(std::string_view name) const;
       PackagedService get(const PackageInfo& info) const;
       // Packages will be returned in the order that they should be
       // installed. Packages containing services in priorityServices
       // will be as close to the front as possible.
-      std::vector<PackagedService> resolve(std::span<const std::string>   packages,
-                                           std::span<const AccountNumber> priorityServices = {});
+      std::vector<PackageInfo> resolve(std::span<const std::string>   packages,
+                                       std::span<const AccountNumber> priorityServices = {});
 
      private:
       std::string path;

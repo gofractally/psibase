@@ -22,9 +22,9 @@ exclude = [
     "AuthAny/plugin/",
     "AuthDelegate/plugin/",
     "AuthSig/plugin/",
-    "Transact/plugin/",
-    "SetCode/plugin/",
     "Producers/plugin/",
+    "SetCode/plugin/",
+    "Transact/plugin/",
 ]
 
 [workspace.package]

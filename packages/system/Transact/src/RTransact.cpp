@@ -318,8 +318,8 @@ namespace
    //
    // Removes any clients from TraceClientTable for whom replies have been claimed.
    using ClaimedSockets = std::tuple<std::vector<std::int32_t>, std::vector<std::int32_t>>;
-   auto claimClientReply(const psibase::Checksum256& id,
-                         const ClientFilter&         clientFilter) -> ClaimedSockets
+   auto claimClientReply(const psibase::Checksum256& id, const ClientFilter& clientFilter)
+       -> ClaimedSockets
    {
       {
          auto                      clients = RTransact{}.open<TraceClientTable>();
@@ -765,7 +765,8 @@ void RTransact::onBlock()
          if (pendingTx.expiration > finalized->time)
             break;
 
-         txids.push_back(pendingTx.id);
+         if (!successfulTxTable.get(pendingTx.id))
+            txids.push_back(pendingTx.id);
       }
    }
 

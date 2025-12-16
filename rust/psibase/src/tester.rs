@@ -8,8 +8,6 @@
 
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
-#[cfg(target_family = "wasm")]
-use crate::MicroSeconds;
 use crate::{
     check, create_boot_transactions, get_optional_result_bytes, get_result_bytes, services,
     status_key, tester_raw, AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow,
@@ -17,6 +15,8 @@ use crate::{
     InnerTraceEnum, PackageRegistry, RunMode, Seconds, SignedTransaction, StatusRow, TimePointSec,
     TimePointUSec, ToKey, Transaction, TransactionTrace,
 };
+#[cfg(target_family = "wasm")]
+use crate::{MicroSeconds, PackageList, PackageOp};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 use futures::executor::block_on;
@@ -169,12 +169,18 @@ impl Chain {
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
-        let packages = block_on(registry.resolve(&package_names)).unwrap();
+        let packages =
+            block_on(PackageList::new().resolve_changes(&registry, &package_names, false, true))
+                .unwrap();
         let mut requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
-        for mut package in packages {
+        for op in packages {
+            let PackageOp::Install(info) = op else {
+                panic!("Only install is expected when there are no existing packages")
+            };
+            let mut package = block_on(registry.get_by_info(&info)).unwrap();
             for (account, info, code) in package.services() {
                 let hash: [u8; 32] = Sha256::digest(&code).into();
                 let code_hash: Checksum256 = hash.into();
@@ -213,6 +219,25 @@ impl Chain {
                     body: file.into(),
                 });
             }
+            requests.push(HttpRequest {
+                host: services::x_packages::SERVICE.to_string() + "." + root_host,
+                method: "PUT".to_string(),
+                target: format!("/manifest/{}", info.sha256),
+                contentType: "application/json".to_string(),
+                headers: vec![],
+                body: serde_json::to_string(&package.manifest())
+                    .unwrap()
+                    .into_bytes()
+                    .into(),
+            });
+            requests.push(HttpRequest {
+                host: services::x_packages::SERVICE.to_string() + "." + root_host,
+                method: "POST".to_string(),
+                target: "/postinstall".to_string(),
+                contentType: "application/json".to_string(),
+                headers: vec![],
+                body: serde_json::to_string(&info).unwrap().into_bytes().into(),
+            });
         }
         check(
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
