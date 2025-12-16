@@ -56,12 +56,11 @@ define_trust! {
             - Proposing a vote in evaluation cycle
             - Exiling a fractal member
             - Setting the guild evaluation schedule
-            - Setting the guild display name
-            - Setting the guild bio
-            - Setting the guild description
+            - Setting the guild display name, bio and description
             - Attesting in an evaluation
             - Creating a new guild
             - Resign, remove or set a new Guild representative
+            - Set ranked guilds
             - Set minimum scorers required to enable consensus rewards
             ",
     }
@@ -69,7 +68,7 @@ define_trust! {
         None => [get_group_users, exile_member, set_dist_interval],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [propose, set_min_scorers, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+        High => [propose, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
 }
@@ -97,6 +96,23 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::set_rank_g_s::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_ranked_guilds)?;
+
+        let packed_args = fractals::action_structs::rank_guilds {
+            fractal: get_sender_app()?,
+            guilds: ranked_guilds
+                .into_iter()
+                .map(|guild| AccountNumber::from(guild.as_str()))
+                .collect(),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::rank_guilds::ACTION_NAME,
             &packed_args,
         )
     }
