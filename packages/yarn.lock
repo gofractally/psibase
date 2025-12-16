@@ -2147,6 +2147,7 @@ __metadata:
     framer-motion: "npm:^11.2.11"
     jszip: "npm:^3.10.1"
     lucide-react: "npm:^0.475.0"
+    mrmime: "npm:^2.0.1"
     react: "npm:^19.1.0"
     react-confetti-explosion: "npm:^2.1.2"
     react-dom: "npm:^19.1.0"
@@ -9885,7 +9886,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mrmime@npm:^2.0.0":
+"mrmime@npm:^2.0.0, mrmime@npm:^2.0.1":
   version: 2.0.1
   resolution: "mrmime@npm:2.0.1"
   checksum: 10c0/af05afd95af202fdd620422f976ad67dc18e6ee29beb03dd1ce950ea6ef664de378e44197246df4c7cdd73d47f2e7143a6e26e473084b9e4aa2095c0ad1e1761

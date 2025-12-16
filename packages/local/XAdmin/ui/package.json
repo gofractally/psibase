@@ -21,6 +21,7 @@
         "framer-motion": "^11.2.11",
         "jszip": "^3.10.1",
         "lucide-react": "^0.475.0",
+        "mrmime": "^2.0.1",
         "react": "^19.1.0",
         "react-confetti-explosion": "^2.1.2",
         "react-dom": "^19.1.0",
