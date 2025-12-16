@@ -77,6 +77,10 @@ impl RewardConsensus {
         new_instance
     }
 
+    pub fn donate(&self, amount: Quantity, memo: Memo) {
+        self.deposit(amount, memo);
+    }
+
     fn deposit(&self, amount: Quantity, memo: Memo) {
         self.reward_stream().deposit(amount, memo);
     }
@@ -122,7 +126,7 @@ impl RewardConsensus {
 
                     for (membership, reward) in member_distributions {
                         FractalMember::get_assert(self.fractal, membership.member)
-                            .deposit_stream(reward.into(), "Guild member reward".into());
+                            .credit_stream(reward.into(), "Guild member consensus reward".into());
                     }
                 }
                 None => tokens_to_recycle += slot_distribution,

@@ -49,7 +49,7 @@ impl Guild {
             Self::new(fractal, guild, rep, display_name, council_role, rep_role);
         new_guild_instance.save();
 
-        GuildMember::add(new_guild_instance.account, rep);
+        GuildMember::add(new_guild_instance.account, rep, None);
 
         AuthDyn::call().newAccount(council_role);
         AuthDyn::call().newAccount(rep_role);

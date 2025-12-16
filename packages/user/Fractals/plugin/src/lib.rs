@@ -344,11 +344,16 @@ impl UserFractal for FractallyPlugin {
 }
 
 impl UserGuild for FractallyPlugin {
-    fn apply_guild(guild_account: String, extra_info: String) -> Result<(), Error> {
+    fn apply_guild(
+        guild_account: String,
+        sponsor: Option<String>,
+        extra_info: String,
+    ) -> Result<(), Error> {
         get_guild(guild_account.clone())?.assert_authorized(FunctionName::apply_guild)?;
 
         let packed_args = fractals::action_structs::apply_guild {
             guild_account: guild_account.as_str().into(),
+            sponsor: sponsor.map(|sponsor| sponsor.as_str().into()),
             extra_info,
         }
         .packed();

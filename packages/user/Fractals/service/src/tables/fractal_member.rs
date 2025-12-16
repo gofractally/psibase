@@ -1,12 +1,13 @@
 use psibase::{
-    abort_message, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
+    abort_message, check, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo,
+    Table,
 };
 
 use crate::{
     constants::MEMBER_STREAM_HALF_LIFE,
     tables::tables::{
         Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
-        GuildAttest, GuildMember,
+        GuildAttest, GuildMember, Levy,
     },
 };
 
@@ -62,7 +63,6 @@ impl FractalMember {
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
         );
-        check_none(Self::get(fractal, account), "account is already a member");
 
         let new_instance = Self::new(fractal, account, status);
         new_instance.save();
@@ -80,14 +80,36 @@ impl FractalMember {
         check_some(Self::get(fractal, account), "member does not exist")
     }
 
-    pub fn deposit_stream(&self, amount: Quantity, memo: Memo) {
-        psibase::services::tokens::Wrapper::call().credit(
-            Fractal::get_assert(self.fractal).token_id,
-            TokenStream::SERVICE,
-            amount,
-            memo,
-        );
+    fn credit(&self, debitor: AccountNumber, amount: Quantity, memo: Memo) {
+        let token_id = Fractal::get_assert(self.fractal).token_id;
+        psibase::services::tokens::Wrapper::call().credit(token_id, debitor, amount, memo);
+    }
+
+    pub fn credit_direct(&self, amount: Quantity, memo: Memo) {
+        self.credit(self.account, amount, memo);
+    }
+
+    pub fn credit_stream(&self, amount: Quantity, memo: Memo) {
+        self.credit(TokenStream::SERVICE, amount, memo);
         TokenStream::call().deposit(self.stream_id, amount);
+    }
+
+    fn claim_from_stream(&self) -> Quantity {
+        psibase::services::token_stream::Wrapper::call().claim(self.stream_id)
+    }
+
+    pub fn withdraw(&self) {
+        let claimed = self.claim_from_stream();
+        check(claimed.value > 0, "nothing to withdraw");
+
+        let to_credit = Levy::levies_of_member(self.fractal, self.account)
+            .into_iter()
+            .fold(claimed, |remaining_amount, mut levy| {
+                let levy_paid = levy.apply_levy(claimed);
+                remaining_amount - levy_paid
+            });
+
+        self.credit_direct(to_credit, "Stream reward".into());
     }
 
     pub fn is_citizen(&self) -> bool {
