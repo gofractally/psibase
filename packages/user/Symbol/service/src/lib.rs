@@ -340,7 +340,7 @@ pub mod service {
 
     #[action]
     fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
-        check(get_sender() == get_service(), "only service can call this action");
+        check(get_sender() == get_service(), "only symbol service can call this action");
         Symbol::add(symbol, recipient);
     }
 
