@@ -44,6 +44,9 @@ class AdminFractal extends PluginInterface {
     get setMinScorers() {
         return this._call<[min: number]>("setMinScorers");
     }
+    get setRankedGuilds() {
+        return this._call<[guilds: Account[]]>("setRankedGuilds");
+    }
 }
 
 class UserFractal extends PluginInterface {

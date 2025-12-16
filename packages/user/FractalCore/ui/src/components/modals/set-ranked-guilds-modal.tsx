@@ -1,0 +1,81 @@
+import { useEffect } from "react";
+import { z } from "zod";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
+import { useAppForm } from "@shared/components/form/app-form";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useSetRankedGuilds } from "@/hooks/fractals/use-set-ranked-guild-slots copy";
+
+export const SetRankedGuilds = ({
+    show,
+    openChange,
+}: {
+    show: boolean;
+    openChange: (show: boolean) => void;
+}) => {
+    const { mutateAsync: setRankedGuilds } = useSetRankedGuilds();
+
+    const { data: fractal } = useFractal();
+    const form = useAppForm({
+        defaultValues: {
+            rankedGuilds: (fractal?.fractal?.consensusReward?.rankedGuilds ?? []).join(',')
+        },
+        onSubmit: async ({ value: { rankedGuilds } }) => {
+            await setRankedGuilds([rankedGuilds.split(',')]);
+            openChange(false);
+        },
+        validators: {
+            onChange: z.object({
+                rankedGuilds: z.string(),
+            }),
+        },
+    });
+
+    useEffect(() => {
+        if (show && form.state.isSubmitSuccessful) {
+            form.reset();
+        }
+    }, [form, show]);
+
+    return (
+        <Dialog open={show} onOpenChange={openChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Set ranked guilds</DialogTitle>
+                    <div className="text-sm text-muted-foreground">
+                        <p>
+                            Rank guilds putting the highest rewarded at the front.
+                        </p>
+                        <p>
+                            Current limit is
+                        </p>
+                    </div>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            void form.handleSubmit();
+                        }}
+                        className="mt-3 w-full space-y-6"
+                    >
+                        <form.AppField
+                            name="rankedGuilds"
+                            children={(field) => (
+                                <field.TextField label="Ranked guild accounts seperated by comma" />
+                            )}
+                        />
+
+                        <form.AppForm>
+                            <form.SubmitButton
+                                labels={["Set ranked guilds", "Setting ranked guilds"]}
+                            />
+                        </form.AppForm>
+                    </form>
+                </DialogHeader>
+            </DialogContent>
+        </Dialog >
+    );
+};

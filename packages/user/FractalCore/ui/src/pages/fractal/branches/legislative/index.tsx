@@ -27,6 +27,7 @@ import {
 import { SetMinScorersModal } from "@/components/modals/set-min-scorers-modal";
 import { useState } from "react";
 import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
+import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
 
 
 export const Legislative = () => {
@@ -40,6 +41,7 @@ export const Legislative = () => {
 
     const [showMinScorersModal, setShowMinScorers] = useState(false);
     const [showRankedGuildsModal, setShowRankedGuildsModal] = useState(false);
+    const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
 
     const error = fractalError || guildError;
 
@@ -56,6 +58,8 @@ export const Legislative = () => {
         <div className="mx-auto w-full max-w-5xl p-4 px-6 space-y-8">
             <SetMinScorersModal openChange={(e) => setShowMinScorers(e)} show={showMinScorersModal} />
             <SetRankedGuildSlots openChange={(e) => setShowRankedGuildsModal(e)} show={showRankedGuildsModal} />
+            <SetRankedGuilds openChange={(e) => setShowRankGuildsModal(e)} show={showRankGuildsModal} />
+
 
             <Card>
                 <CardHeader>
@@ -110,23 +114,46 @@ export const Legislative = () => {
                     </Item>
                 )}
 
-                {!awaitingConsensusReward && <Item variant="outline">
-                    <ItemContent>
-                        <ItemTitle>Set ranked guild slots</ItemTitle>
-                        <ItemDescription>
-                            Adjust how many guilds to pay consensus rewards.
-                        </ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowMinScorers(true)}
-                        >
-                            Set ranked guild slots
-                        </Button>
-                    </ItemActions>
-                </Item>}
+                {!awaitingConsensusReward && <>
+
+                    <Item variant="outline">
+                        <ItemContent>
+                            <ItemTitle>Set ranked guilds</ItemTitle>
+                            <ItemDescription>
+                                Rank guilds for consensus rewards.
+                            </ItemDescription>
+                        </ItemContent>
+                        <ItemActions>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowMinScorers(true)}
+                            >
+                                Rank guilds
+                            </Button>
+                        </ItemActions>
+                    </Item>
+
+                    <Item variant="outline">
+                        <ItemContent>
+                            <ItemTitle>Set ranked guild slots</ItemTitle>
+                            <ItemDescription>
+                                Adjust how many guilds to pay consensus rewards.
+                            </ItemDescription>
+                        </ItemContent>
+                        <ItemActions>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowMinScorers(true)}
+                            >
+                                Set ranked guild slots
+                            </Button>
+                        </ItemActions>
+                    </Item>
+
+                </>
+                }
             </div>}
         </div>
     );
