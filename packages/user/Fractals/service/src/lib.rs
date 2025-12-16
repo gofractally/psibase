@@ -25,7 +25,6 @@ pub mod constants {
 
     pub const DEFAULT_MINIMUM_REQUIRED_SCORERS: u8 = 8;
     pub const MIN_MINIMUM_REQUIRED_SCORERS: u8 = 4;
-    pub const MAX_MINIMUM_REQUIRED_SCORERS: u8 = 250;
 
     // Simple limitation + also related to fibonacci function limit.
     pub const MAX_RANKED_GUILDS: u8 = 25;
@@ -207,7 +206,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal` - Fractal to get the policy for
-    /// * `min_scorers` - The account number for the guild.
+    /// * `min_scorers` - The minimum amount of scorers required.
     #[action]
     fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
         let mut fractal = Fractal::get_assert(fractal);
@@ -287,11 +286,9 @@ pub mod service {
         let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
         evaluation.finish_evaluation();
 
-        Wrapper::emit().history().evaluation_finished(
-            Guild::get_assert(evaluation.guild).fractal,
-            evaluation.guild,
-            evaluation.evaluation_id,
-        );
+        Wrapper::emit()
+            .history()
+            .evaluation_finished(evaluation.guild, evaluation.evaluation_id);
 
         evaluation.schedule_next_evaluation();
     }
@@ -506,7 +503,7 @@ pub mod service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(fractal: AccountNumber, guild: AccountNumber, evaluation_id: u32) {}
+    pub fn evaluation_finished(guild: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
     pub fn scheduled_evaluation(

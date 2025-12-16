@@ -46,8 +46,8 @@ impl EvaluationInstance {
         let mut eval_guild = Guild::get_assert(self.guild);
         let fractal = Fractal::get_assert(eval_guild.fractal);
 
-        let should_init_consensus = RewardConsensus::get(fractal.account).is_none()
-            && fractal.legislature == eval_guild.account;
+        let should_init_consensus = fractal.legislature == eval_guild.account
+            && RewardConsensus::get(fractal.account).is_none();
 
         if should_init_consensus {
             let has_enough_scores = GuildMember::memberships_of_guild(eval_guild.account)

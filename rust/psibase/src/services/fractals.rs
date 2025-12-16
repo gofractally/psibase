@@ -283,6 +283,13 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set minimum required scorers.
+    ///
+    /// RewardConsensus requires a successful evaluation where at least X evaluation participants (scorers) achieve a non-zero score.  
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to get the policy for
+    /// * `min_scorers` - The minimum amount of scorers required.
     #[action]
     fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
         unimplemented!()
@@ -311,12 +318,7 @@ pub mod Service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(
-        fractal_account: AccountNumber,
-        guild_account: AccountNumber,
-        evaluation_id: u32,
-    ) {
-    }
+    pub fn evaluation_finished(guild_account: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
     pub fn scheduled_evaluation(

@@ -3,7 +3,7 @@ use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
 use crate::constants::{
-    DEFAULT_MINIMUM_REQUIRED_SCORERS, MAX_MINIMUM_REQUIRED_SCORERS, MIN_MINIMUM_REQUIRED_SCORERS,
+    DEFAULT_MINIMUM_REQUIRED_SCORERS, MIN_MINIMUM_REQUIRED_SCORERS,
     TOKEN_PRECISION, TOKEN_SUPPLY,
 };
 use crate::tables::tables::{
@@ -130,10 +130,6 @@ impl Fractal {
         check(
             minimum_required_scorers >= MIN_MINIMUM_REQUIRED_SCORERS,
             "minimum scorers is too low",
-        );
-        check(
-            minimum_required_scorers <= MAX_MINIMUM_REQUIRED_SCORERS,
-            "maximum scorers is too high",
         );
         self.minimum_required_scorers = minimum_required_scorers;
         self.save();
