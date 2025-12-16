@@ -10,9 +10,9 @@ import { PluginCall } from "@/lib/plugin";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 type Meta<TParams extends unknown[]> = {
-    error: string;
-    loading: string;
-    success: string;
+    error?: string;
+    loading?: string;
+    success?: string;
 } & (
     | {
           isStagable?: false | undefined;
@@ -32,7 +32,13 @@ export const usePluginMutation = <TCall extends PluginCall>(
     meta: Meta<TCall extends PluginCall<infer P> ? P : never>,
 ) => {
     const { intf, method, service } = call;
-    const { error, loading, success, isStagable = true, onSuccess } = meta;
+    const {
+        error = "Failed",
+        loading = "Loading",
+        success = "Success",
+        isStagable = true,
+        onSuccess,
+    } = meta;
 
     return useMutation<
         void,
