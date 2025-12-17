@@ -4,7 +4,7 @@ import type { Membership } from "@/lib/graphql/fractals/getMembership";
 import dayjs from "dayjs";
 import { Loader2, Plus } from "lucide-react";
 
-import { ErrorCard } from "@/components/error-card";
+import { ErrorCard } from "@shared/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";

@@ -8,7 +8,7 @@ import {
 import { Scale } from "lucide-react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
-import { ErrorCard } from "@/components/error-card";
+import { ErrorCard } from "@shared/components/error-card";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
 import { useCurrentUser } from "@/hooks/use-current-user";

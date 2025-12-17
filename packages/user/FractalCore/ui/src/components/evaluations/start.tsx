@@ -4,7 +4,7 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { Button } from "@shared/shadcn/ui/button";
 
-import { ErrorCard } from "../error-card";
+import { ErrorCard } from "@shared/components/error-card";
 
 
 export const Start = () => {

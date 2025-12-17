@@ -1,7 +1,7 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { ErrorCard } from "@/components/error-card";
+import { ErrorCard } from "@shared/components/error-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
