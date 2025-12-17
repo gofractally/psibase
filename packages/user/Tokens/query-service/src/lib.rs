@@ -45,6 +45,22 @@ mod service {
             }
             Ok(())
         }
+
+        fn get_subaccount(
+            &self,
+            user: AccountNumber,
+            sub_account: &str,
+        ) -> async_graphql::Result<SubAccount> {
+            SubAccountTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&(user, sub_account.to_string()))
+                .ok_or_else(|| {
+                    async_graphql::Error::new(format!(
+                        "Sub-account '{}' not found for user '{}'",
+                        sub_account, user
+                    ))
+                })
+        }
     }
 
     #[Object]
@@ -205,15 +221,7 @@ mod service {
         ) -> async_graphql::Result<SubAccountBalance> {
             self.check_user_auth(user)?;
 
-            let subaccount = SubAccountTable::with_service(tokens::SERVICE)
-                .get_index_pk()
-                .get(&(user, sub_account.clone()))
-                .ok_or_else(|| {
-                    async_graphql::Error::new(format!(
-                        "Sub-account '{}' not found for user '{}'",
-                        sub_account, user
-                    ))
-                })?;
+            let subaccount = self.get_subaccount(user, &sub_account)?;
 
             Ok(SubAccountBalanceTable::with_service(tokens::SERVICE)
                 .get_index_pk()
@@ -237,15 +245,7 @@ mod service {
         ) -> async_graphql::Result<Connection<RawKey, SubAccountBalance>> {
             self.check_user_auth(user)?;
 
-            let subaccount = SubAccountTable::with_service(tokens::SERVICE)
-                .get_index_pk()
-                .get(&(user, sub_account.clone()))
-                .ok_or_else(|| {
-                    async_graphql::Error::new(format!(
-                        "Sub-account '{}' not found for user '{}'",
-                        sub_account, user
-                    ))
-                })?;
+            let subaccount = self.get_subaccount(user, &sub_account)?;
 
             TableQuery::subindex::<TID>(
                 SubAccountBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
