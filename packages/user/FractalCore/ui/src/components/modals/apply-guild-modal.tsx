@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -33,12 +32,13 @@ export const ApplyGuildModal = ({
         defaultValues: {
             extraInfo: "",
         },
-        onSubmit: async ({ value: { extraInfo } }) => {
+        onSubmit: async ({ formApi, value: { extraInfo } }) => {
             await applyGuild([
                 guildAccount!,
                 extraInfo,
             ]);
             openChange(false);
+            formApi.reset();
             navigate(`/guild/${guildAccount}/applications/${currentUser}`);
         },
         validators: {
@@ -48,11 +48,7 @@ export const ApplyGuildModal = ({
         },
     });
 
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
+
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

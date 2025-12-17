@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { z } from "zod";
 import {
     Dialog,
@@ -26,8 +25,9 @@ export const SetMinScorersModal = ({
         defaultValues: {
             minScorers: fractal?.fractal?.minimumRequiredScorers || 4,
         },
-        onSubmit: async ({ value: { minScorers } }) => {
+        onSubmit: async ({ formApi, value: { minScorers } }) => {
             await setMinScorers([minScorers]);
+            formApi.reset({ minScorers });
             openChange(false);
         },
         validators: {
@@ -37,11 +37,6 @@ export const SetMinScorersModal = ({
         },
     });
 
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

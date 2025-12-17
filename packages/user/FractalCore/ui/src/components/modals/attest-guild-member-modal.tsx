@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { z } from "zod";
 
@@ -32,7 +31,7 @@ export const AttestGuildMemberModal = ({
             comment: "",
             endorses: true,
         },
-        onSubmit: async ({ value: { comment, endorses } }) => {
+        onSubmit: async ({ formApi, value: { comment, endorses } }) => {
             await attest([
                 guildAccount!,
                 applicant!,
@@ -40,6 +39,7 @@ export const AttestGuildMemberModal = ({
                 endorses,
             ]);
             openChange(false);
+            formApi.reset();
         },
         validators: {
             onChange: z.object({
@@ -48,12 +48,6 @@ export const AttestGuildMemberModal = ({
             }),
         },
     });
-
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

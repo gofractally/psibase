@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -37,13 +36,14 @@ export const CreateGuildModal = ({
             account: "",
             name: "",
         },
-        onSubmit: async ({ value: { name, account } }) => {
+        onSubmit: async ({ formApi, value: { name, account } }) => {
             await createGuild([
                 name,
                 account,
             ]);
             openChange(false);
             navigate(`/guild/${account}`);
+            formApi.reset()
             refetch();
         },
         validators: {
@@ -51,11 +51,6 @@ export const CreateGuildModal = ({
         },
     });
 
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

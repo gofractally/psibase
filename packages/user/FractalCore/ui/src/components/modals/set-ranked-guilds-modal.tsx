@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { z } from "zod";
 import {
     Dialog,
@@ -24,9 +23,10 @@ export const SetRankedGuilds = ({
         defaultValues: {
             rankedGuilds: (fractal?.fractal?.consensusReward?.rankedGuilds ?? []).join(',')
         },
-        onSubmit: async ({ value: { rankedGuilds } }) => {
+        onSubmit: async ({ formApi, value: { rankedGuilds } }) => {
             await setRankedGuilds([rankedGuilds.split(',')]);
             openChange(false);
+            formApi.reset({ rankedGuilds })
         },
         validators: {
             onChange: z.object({
@@ -35,11 +35,6 @@ export const SetRankedGuilds = ({
         },
     });
 
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

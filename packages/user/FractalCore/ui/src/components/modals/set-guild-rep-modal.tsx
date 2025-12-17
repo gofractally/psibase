@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { z } from "zod";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import {
@@ -28,9 +27,10 @@ export const SetGuildRepModal = ({
                 newRep: ""
             },
         },
-        onSubmit: async ({ value: { representation: { newRep } } }) => {
+        onSubmit: async ({ formApi, value: { representation: { newRep } } }) => {
             await setGuildRep([guildAccount!, newRep]);
             openChange(false);
+            formApi.reset({ representation: { newRep } })
         },
         validators: {
             onChange: z.object({
@@ -40,12 +40,6 @@ export const SetGuildRepModal = ({
             }),
         },
     });
-
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

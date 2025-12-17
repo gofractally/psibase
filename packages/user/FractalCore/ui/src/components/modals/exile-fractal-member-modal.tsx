@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { z } from "zod";
 import {
     Dialog,
@@ -28,9 +27,10 @@ export const ExileFractalMemberModal = ({
                 member: ""
             },
         },
-        onSubmit: async ({ value: { exile: { member } } }) => {
+        onSubmit: async ({ formApi, value: { exile: { member } } }) => {
             await exileMember([member]);
             openChange(false);
+            formApi.reset();
         },
         validators: {
             onChange: z.object({
@@ -41,11 +41,7 @@ export const ExileFractalMemberModal = ({
         },
     });
 
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
+
 
     return (
         <Dialog open={show} onOpenChange={openChange}>

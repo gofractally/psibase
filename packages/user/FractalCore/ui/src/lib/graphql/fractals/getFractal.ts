@@ -8,8 +8,6 @@ import { zU8 } from "@shared/lib/schemas/u8";
 
 import { graphql } from "../../graphql";
 
-import { zDateTime } from "@/lib/zod/DateTime";
-
 export const zFractal = z
     .object({
         account: zAccount,
@@ -36,7 +34,7 @@ export const zFractal = z
     })
     .or(z.null());
 
-const zFractalRes = z.object({
+export const zFractalRes = z.object({
     fractal: zFractal,
     guilds: z.object({
         nodes: z
@@ -62,7 +60,7 @@ const zFractalRes = z.object({
 
 export type FractalRes = z.infer<typeof zFractalRes>;
 
-export const getFractal = async (owner: Account) => {
+export const getFractal = async (owner: Account): Promise<FractalRes> => {
     const fractal = await graphql(
         `
     {
