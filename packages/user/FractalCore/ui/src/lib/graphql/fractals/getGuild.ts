@@ -21,6 +21,8 @@ export const zGuild = z.object({
     description: z.string(),
 });
 
+export type Guild = z.infer<typeof zGuild>;
+
 export const getGuild = async (guildAccount: Account) => {
     const res = await graphql(
         `

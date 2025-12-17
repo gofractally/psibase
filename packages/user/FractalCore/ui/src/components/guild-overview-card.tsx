@@ -10,14 +10,23 @@ import { createIdenticon } from "@shared/lib/create-identicon";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { User, Users, Crown } from "lucide-react";
 import z from "zod";
+import { Guild } from "@/lib/graphql/fractals/getGuild";
 
 const zLeadership = z.enum(['RepAndCouncil', 'RepOnly', 'CouncilOnly']);
+
+const getLeadershipStatus = (guild?: Guild | null): z.infer<typeof zLeadership> | undefined => {
+    if (guild == undefined || guild == null) return;
+    if (guild.rep && guild.council) return zLeadership.Enum.RepAndCouncil;
+    if (guild.rep) return zLeadership.Enum.RepOnly;
+    if (guild.council) return zLeadership.Enum.CouncilOnly;
+    throw new Error("Cannot determine leadership status");
+}
 
 export const GuildOverviewCard = ({ guildAccount }: { guildAccount?: string }) => {
     const { data: guild } = useGuild(guildAccount);
     const { data: chainId } = useChainId();
 
-    const leadershipStatus = guild?.rep ? guild.council ? zLeadership.Enum.RepAndCouncil : zLeadership.Enum.RepOnly : zLeadership.Enum.CouncilOnly
+    const leadershipStatus = getLeadershipStatus(guild);
 
     return (
         <Card>
