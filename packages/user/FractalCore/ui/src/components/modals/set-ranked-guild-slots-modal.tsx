@@ -68,7 +68,7 @@ export const SetRankedGuildSlots = ({
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Set slot", "Setting slots"]}
+                                labels={["Set slots", "Setting slots"]}
                             />
                         </form.AppForm>
                     </form>
