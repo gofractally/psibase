@@ -6,5 +6,5 @@ export const useSetGuildDescription = () =>
     usePluginMutation(fractalCorePlugin.adminGuild.setDescription, {
         error: "Failed setting description",
         loading: "Setting description",
-        success: "Set description.",
+        success: "Set description",
     });
