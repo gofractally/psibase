@@ -43,6 +43,8 @@ pub struct Chain {
     is_auto_block_start: bool,
 }
 
+pub const PRODUCER_ACCOUNT: AccountNumber = AccountNumber::new(account_raw!("prod"));
+
 impl Default for Chain {
     fn default() -> Self {
         Self::new()
@@ -100,7 +102,7 @@ impl Chain {
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
             &None,
-            AccountNumber::new(account_raw!("prod")),
+            PRODUCER_ACCOUNT,
             false,
             TimePointSec { seconds: 10 },
             &mut services[..],
