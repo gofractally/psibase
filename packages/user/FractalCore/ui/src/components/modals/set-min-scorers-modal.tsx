@@ -23,7 +23,7 @@ export const SetMinScorersModal = ({
     const { data: fractal } = useFractal();
     const form = useAppForm({
         defaultValues: {
-            minScorers: fractal?.fractal?.minimumRequiredScorers || 4,
+            minScorers: fractal?.fractal?.minimumRequiredScorers ?? 4,
         },
         onSubmit: async ({ formApi, value: { minScorers } }) => {
             await setMinScorers([minScorers]);
