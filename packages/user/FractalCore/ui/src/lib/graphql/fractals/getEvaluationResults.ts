@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
-import { zAccount } from "@/lib/zod/Account";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zGroupFinishes = z.object({
     groupNumber: z.number(),

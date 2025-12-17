@@ -5,9 +5,9 @@ import { z } from "zod";
 import { getGuildApplication } from "@/lib/graphql/fractals/getGuildApplication";
 import { fractalCorePlugin } from "@/lib/plugin";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { usePluginMutation } from "../use-plugin-mutation";

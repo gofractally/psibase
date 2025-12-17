@@ -1,4 +1,4 @@
-import type { Account } from "@/lib/zod/Account";
+import type { Account } from "@shared/lib/schemas/account";
 
 import { getSubDomain } from "@shared/lib/get-sub-domain";
 

@@ -9,7 +9,8 @@ import {
 } from "@/lib/graphql/evaluations/getUsersAndGroups";
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
-import { Account } from "@/lib/zod/Account";
+
+import { Account } from "@shared/lib/schemas/account";
 
 import { assertUser } from "../use-current-user";
 

@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
-import { Account } from "@/lib/zod/Account";
+
+import { Account } from "@shared/lib/schemas/account";
 
 import { graphql } from "../../graphql";
 

@@ -10,7 +10,7 @@ import { useAppForm } from '@shared/components/form/app-form'
 import { FieldAccountExisting } from '@shared/components/form/field-account-existing'
 
 import { useExile } from "@/hooks/fractals/use-exile";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from '@shared/lib/schemas/account'
 import { supervisor } from "@/supervisor";
 
 export const ExileFractalMemberModal = ({

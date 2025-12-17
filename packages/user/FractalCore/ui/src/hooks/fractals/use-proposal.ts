@@ -5,7 +5,8 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
-import { Account, zAccount } from "@/lib/zod/Account";
+
+import { Account, zAccount } from "@shared/lib/schemas/account";
 
 import { useGuildAccount } from "../use-guild-account";
 import { useFractalAccount } from "./use-fractal-account";

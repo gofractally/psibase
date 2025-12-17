@@ -1,11 +1,14 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
-import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
 
+import { Account, zAccount } from "@shared/lib/schemas/account";
+
 import { graphql } from "../../graphql";
+
+import { zDateTime } from "@/lib/zod/DateTime";
 
 export const zMemberListInstance = z.object({
     account: zAccount,

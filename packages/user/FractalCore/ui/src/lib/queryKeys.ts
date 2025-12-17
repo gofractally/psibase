@@ -1,4 +1,4 @@
-import { Account } from "./zod/Account";
+import { Account } from "@shared/lib/schemas/account";
 
 type QueryKeyGenerator<Prefix extends string = string> = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

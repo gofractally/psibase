@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
-import { Account, zAccount } from "@/lib/zod/Account";
+
+import { Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zCompletedEvaluation = z.object({
     evaluationId: z.number(),

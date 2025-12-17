@@ -5,7 +5,8 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { Account, zAccount } from "@/lib/zod/Account";
+
+import { Account, zAccount } from "@shared/lib/schemas/account";
 
 export type GetCurrentUserRes = string | null;
 

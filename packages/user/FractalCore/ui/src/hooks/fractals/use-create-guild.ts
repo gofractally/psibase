@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { fractalCorePlugin } from "@/lib/plugin";
-import { zAccount } from "@/lib/zod/Account";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { usePluginMutation } from "../use-plugin-mutation";
 

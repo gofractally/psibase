@@ -1,7 +1,8 @@
 import { z } from "zod";
 
+import { Account } from "@shared/lib/schemas/account";
+
 import { graphql } from "./graphql";
-import { Account } from "./zod/Account";
 
 const zRes = z.object({
     getStagedByProposer: z.object({

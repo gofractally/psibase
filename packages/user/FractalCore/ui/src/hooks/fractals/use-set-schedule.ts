@@ -5,10 +5,10 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
 import { zUnix } from "@/lib/zod/Unix";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { assertUser } from "../use-current-user";

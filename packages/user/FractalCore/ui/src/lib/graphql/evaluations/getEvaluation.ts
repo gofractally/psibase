@@ -2,8 +2,9 @@ import { z } from "zod";
 
 import { EVALUATIONS_SERVICE, FRACTALS_SERVICE } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
-import { zAccount } from "@/lib/zod/Account";
 import { zUnix } from "@/lib/zod/Unix";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zEvaluation = z.object({
     id: z.number(),

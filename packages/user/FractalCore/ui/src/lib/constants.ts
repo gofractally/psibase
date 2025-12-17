@@ -1,4 +1,4 @@
-import { zAccount } from "./zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const EVALUATIONS_SERVICE = zAccount.parse("evaluations");
 export const FRACTALS_SERVICE = zAccount.parse("fractals");
