@@ -45,6 +45,7 @@ pub mod tables;
 mod service {
     use crate::tables::tables::*;
     use crate::{prices::*, rpc::event_types};
+    use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
         nft::{NftHolderFlags, Wrapper as Nft},
@@ -61,6 +62,11 @@ mod service {
         Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Wrapper::call().set_specs(MIN_SERVER_SPECS);
         Transact::call().resMonitoring(true);
+
+        // Event indexes
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("resources"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
     }
 
     #[pre_action(exclude(init))]
@@ -90,10 +96,13 @@ mod service {
         let tok = Tokens::call();
         let sys = check_some(tok.getSysToken(), "System token not found");
 
+        const DEFAULT_RESOURCE_BUFFER_SIZE: u64 = 10;
         let config = BillingConfig {
             sys: sys.id,
             res: tok.create(sys.precision, sys.max_issued_supply),
             fee_receiver,
+            min_resource_buffer: DEFAULT_RESOURCE_BUFFER_SIZE
+                * 10u64.pow(sys.precision.value() as u32),
             enabled: false,
         };
         table.put(&config).unwrap();
@@ -121,11 +130,19 @@ mod service {
         BillingConfig::enable(enabled);
     }
 
-    /// Allows a user to buy resource tokens to pay for the resources consumed when transacting
-    /// with the network. The user must already have used the `Tokens::credit` action to credit
-    /// this service with the system token,
+    /// Used to acquire resource tokens for a user.
+    ///
+    /// The resource tokens are consumed when interacting with metered network functionality.
+    ///
+    /// The sender must have already credited the system token to this service to pay
+    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    ///
+    /// # Arguments
+    /// * `amount`   - The amount of resource tokens to buy
+    /// * `for_user` - The user to buy the resource tokens for
+    /// * `memo`     - A memo for the purchase, only used if the sender is not the resource recipient
     #[action]
-    fn buy_res(amount: Quantity) {
+    fn buy_res_for(amount: Quantity, for_user: AccountNumber, memo: Option<psibase::Memo>) {
         let config = check_some(BillingConfig::get(), "Billing not initialized");
 
         let sys = config.sys;
@@ -135,18 +152,67 @@ mod service {
 
         Tokens::call().debit(sys, buyer, amount, "".into());
         Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
-        Tokens::call().credit(res, buyer, amount, "".into()); // TODO: should be credit-sub
+        Tokens::call().toSub(res, for_user.to_string(), amount);
 
-        Wrapper::emit()
-            .history()
-            .resources(buyer, event_types::BOUGHT, amount.value);
+        if buyer == for_user {
+            Wrapper::emit()
+                .history()
+                .resources(buyer, event_types::BOUGHT, amount.value);
+        } else {
+            Wrapper::emit()
+                .history()
+                .resources(for_user, event_types::RECEIVED, amount.value);
+
+            Wrapper::emit().history().subsidized(
+                buyer,
+                for_user,
+                amount.value,
+                memo.unwrap_or("".into()),
+            );
+        };
+    }
+
+    /// Used to acquire resource tokens for the sender
+    ///
+    /// The resource tokens are consumed when interacting with metered network functionality.
+    ///
+    /// The sender must have already credited the system token to this service to pay
+    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    #[action]
+    fn buy_res(amount: Quantity) {
+        buy_res_for(amount, get_sender(), None);
+    }
+
+    /// Refills the sender's resource buffer, allowing them to continue to interact with
+    /// metered network functionality.
+    #[action]
+    fn refill_res_buf() {
+        let config = check_some(BillingConfig::get(), "Billing not initialized");
+
+        let balance = Tokens::call().getBalance(config.res, get_sender());
+        let buffer_capacity = ResourceBuffer::get(get_sender()).buffer_capacity;
+
+        if balance.value >= buffer_capacity {
+            return;
+        }
+
+        let amount = buffer_capacity - balance.value;
+        buy_res(amount.into())
     }
 
     fn bill(user: AccountNumber, amount: u64) {
         if let Some(config) = BillingConfig::get() {
             let res = config.res;
-            Tokens::call().recall(res, user, amount.into(), "".into());
-            Tokens::call().mint(res, amount.into(), "".into());
+
+            let user_str = user.to_string();
+            let amt: Quantity = amount.into();
+            let balance = Tokens::call().getSubBal(res, user_str.clone());
+            check(
+                balance.is_some() && balance.unwrap() >= amt,
+                &format!("{} has insufficient resource balance", &user_str),
+            );
+
+            Tokens::call().fromSub(res, user_str, amt);
         }
     }
 
@@ -185,6 +251,11 @@ mod service {
     #[allow(non_snake_case)]
     #[action]
     fn useNetSys(user: AccountNumber, amount_bytes: u64) {
+        check(
+            get_sender() == Transact::SERVICE,
+            "[useNetSys] Unauthorized",
+        );
+
         let _amount = amount_bytes.saturating_mul(Prices::get_price(Resource::NetworkBandwidth));
         check(_amount < u64::MAX, "network usage overflow");
 
@@ -205,6 +276,11 @@ mod service {
     #[allow(non_snake_case)]
     #[action]
     fn useCpuSys(user: AccountNumber, amount_ns: u64) {
+        check(
+            get_sender() == Transact::SERVICE,
+            "[useCpuSys] Unauthorized",
+        );
+
         let _amount = amount_ns.saturating_mul(Prices::get_price(Resource::Compute));
         check(_amount < u64::MAX, "cpu usage overflow");
 
@@ -217,8 +293,26 @@ mod service {
             .resources(user, event_types::CONSUMED_CPU, _amount);
     }
 
+    #[action]
+    fn get_resources(user: AccountNumber) -> Quantity {
+        let config = check_some(BillingConfig::get(), "Billing not initialized");
+
+        Tokens::call()
+            .getSubBal(config.res, user.to_string())
+            .unwrap_or(0.into())
+    }
+
     #[event(history)]
     fn resources(actor: AccountNumber, action: u8, amount: u64) {}
+
+    #[event(history)]
+    fn subsidized(
+        purchaser: AccountNumber,
+        recipient: AccountNumber,
+        amount: u64,
+        memo: psibase::Memo,
+    ) {
+    }
 
     #[action]
     #[allow(non_snake_case)]

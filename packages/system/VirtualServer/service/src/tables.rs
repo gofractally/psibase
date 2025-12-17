@@ -35,13 +35,26 @@ pub mod tables {
 
     #[table(name = "BillingConfigTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[serde(rename_all = "camelCase")]
     pub struct BillingConfig {
         /// ID of the system token used for objective billing
         pub sys: TID,
+
         /// ID of the resource token
         pub res: TID,
+
         /// Account number that receives all resource billing fees
         pub fee_receiver: AccountNumber,
+
+        /// The minimum amount of resource tokens that a user can have.
+        /// (a minimum is required to ensure the user can at least afford the
+        /// resource cost of acquiring more resources)
+        //pub resource_min: u64,
+
+        /// The minimum amount of resources to buffer on behalf of a user
+        /// if they don't configure their own larger buffer size.
+        pub min_resource_buffer: u64,
+
         /// Whether the resource billing system is enabled
         pub enabled: bool,
     }
@@ -120,6 +133,17 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) {}
     }
+
+    #[table(name = "ResourceBufferTable", index = 5)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    pub struct ResourceBuffer {
+        #[primary_key]
+        pub user: AccountNumber,
+
+        /// The capacity of the resource buffer that gets filled when the user
+        /// acquires resources.
+        pub buffer_capacity: u64,
+    }
 }
 
 mod impls {
@@ -132,12 +156,26 @@ mod impls {
             BillingConfigTable::read().get_index_pk().get(&())
         }
 
+        pub fn get_assert() -> Self {
+            check_some(
+                BillingConfigTable::read().get_index_pk().get(&()),
+                "Billing not yet initialized",
+            )
+        }
+
         pub fn enable(enabled: bool) {
             let table = BillingConfigTable::read_write();
             let mut config =
-                check_some(table.get_index_pk().get(&()), "Service not yet configured");
+                check_some(table.get_index_pk().get(&()), "Billing not yet initialized");
             config.enabled = enabled;
             table.put(&config).unwrap();
+        }
+
+        pub fn get_if_enabled() -> Self {
+            let table = BillingConfigTable::read();
+            let config = check_some(table.get_index_pk().get(&()), "Billing not yet initialized");
+            check(config.enabled, "Billing not enabled");
+            config
         }
     }
 
@@ -268,6 +306,18 @@ mod impls {
                     subj_storage_bytes,
                 })
                 .unwrap();
+        }
+    }
+
+    impl ResourceBuffer {
+        pub fn get(user: AccountNumber) -> Self {
+            ResourceBufferTable::read()
+                .get_index_pk()
+                .get(&user)
+                .unwrap_or_else(|| ResourceBuffer {
+                    user,
+                    buffer_capacity: BillingConfig::get_assert().min_resource_buffer,
+                })
         }
     }
 }

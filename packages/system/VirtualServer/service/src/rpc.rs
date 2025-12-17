@@ -3,14 +3,19 @@ use crate::tables::tables::{
     ServerSpecs as InternalServerSpecs, ServerSpecsTable,
 };
 use async_graphql::{connection::Connection, *};
-use psibase::{AccountNumber, EventQuery, Table};
+use psibase::{
+    check_some,
+    services::tokens::{self as Tokens, Decimal, Quantity},
+    AccountNumber, EventQuery, Table,
+};
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 
 pub mod event_types {
     pub const BOUGHT: u8 = 0;
-    pub const CONSUMED_CPU: u8 = 1;
-    pub const CONSUMED_NET: u8 = 2;
+    pub const RECEIVED: u8 = 1;
+    pub const CONSUMED_CPU: u8 = 2;
+    pub const CONSUMED_NET: u8 = 3;
 }
 
 #[derive(Deserialize, SimpleObject)]
@@ -32,6 +37,25 @@ impl ResourcesEvent {
             event_types::CONSUMED_NET => "Consumed Network Bandwidth",
             _ => "Unknown",
         }
+    }
+}
+
+#[derive(Deserialize, SimpleObject)]
+#[graphql(complex)]
+pub struct SubsidizedEvent {
+    purchaser: AccountNumber,
+    recipient: AccountNumber,
+    #[graphql(skip)]
+    amount: u64,
+    memo: psibase::Memo,
+}
+
+#[ComplexObject]
+impl SubsidizedEvent {
+    pub async fn amount(&self) -> Decimal {
+        let config = check_some(BillingConfig::get(), "Billing not initialized");
+        let token = Tokens::Wrapper::call().getToken(config.sys);
+        Decimal::new(Quantity::from(self.amount), token.precision)
     }
 }
 
@@ -104,7 +128,7 @@ impl Query {
 
     /// Returns the history of resource-related events for the specified actor
     /// (i.e. resource purchase, consumption, etc).
-    async fn res_buy_history(
+    async fn resource_history(
         &self,
         actor: AccountNumber,
         first: Option<i32>,
@@ -120,5 +144,39 @@ impl Query {
             .before(before)
             .after(after)
             .query()
+    }
+
+    // Returns the history of events related to subsidizing resource tokens for others.
+    async fn resource_subsidies(
+        &self,
+        purchaser: AccountNumber,
+        recipient: Option<AccountNumber>,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<u64, SubsidizedEvent>> {
+        let mut conditions = Vec::new();
+        let mut params = Vec::new();
+
+        conditions.push("purchaser = ?".to_string());
+        params.push(purchaser.to_string());
+
+        if let Some(rec) = recipient {
+            conditions.push("recipient = ?".to_string());
+            params.push(rec.to_string());
+        }
+
+        EventQuery::new("history.virtual-server.subsidized")
+            .condition_with_params(conditions.join(" AND "), params)
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+    }
+
+    async fn get_resources(&self, user: AccountNumber) -> Quantity {
+        crate::Wrapper::call().get_resources(user)
     }
 }
