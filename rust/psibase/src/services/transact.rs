@@ -364,13 +364,6 @@ mod service {
     fn headBlockTime() -> crate::TimePointSec {
         unimplemented!()
     }
-    /// Set the metering service
-    ///
-    /// The metering service is the service to which all resource consumption metrics are reported.
-    #[action]
-    fn setMeterServ(meteringService: crate::AccountNumber) {
-        unimplemented!()
-    }
 }
 
 // TODO: inline functions in Transact.hpp
