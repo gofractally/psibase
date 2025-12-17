@@ -26,7 +26,6 @@ import {
 
 import { Service } from "../components";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
-import { useNetworkVariables } from "../hooks/useNetworkVariables";
 import { useServerSpecs } from "../hooks/useServerSpecs";
 import { Logger } from "../log/logger";
 import {
@@ -64,20 +63,14 @@ const formatBps = (bps: number): string => {
 
 const NodeSpecsContent = () => {
     const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
-    const { data: networkVariables, isLoading: isLoadingVars } =
-        useNetworkVariables();
 
-    const isLoading = isLoadingSpecs || isLoadingVars;
-
-    const ramBytes =
-        serverSpecs && networkVariables
-            ? serverSpecs.storageBytes / networkVariables.memoryRatio
-            : undefined;
+    // RAM is now provided directly as recommendedMinMemoryBytes in ServerSpecs
+    const ramBytes = serverSpecs?.recommendedMinMemoryBytes;
 
     return (
         <div className="space-y-4">
             <div className="rounded-lg border p-4 space-y-4">
-                {isLoading ? (
+                {isLoadingSpecs ? (
                     <div className="space-y-3">
                         <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
                         <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />

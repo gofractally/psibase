@@ -7,34 +7,66 @@ import { queryKeys } from "@/lib/queryKeys";
 interface ServerSpecs {
     bandwidthBps: number;
     storageBytes: number;
+    recommendedMinMemoryBytes: number;
 }
 
-const zServerSpecsResponse = z.object({
-    data: z.object({
-        serverSpecs: z.object({
-            bandwidth_bps: z.string(),
-            storage_bytes: z.string(),
+// GraphQL response can have data wrapped or unwrapped, and fields can be camelCase or snake_case
+const zServerSpecsResponse = z.union([
+    // Standard GraphQL response with data wrapper
+    z.object({
+        data: z.object({
+            getServerSpecs: z.object({
+                netBps: z.string().or(z.number()),
+                storageBytes: z.string().or(z.number()),
+                recommendedMinMemoryBytes: z.string().or(z.number()),
+            }),
         }),
     }),
-});
+    // Direct response (unwrapped)
+    z.object({
+        getServerSpecs: z.object({
+            netBps: z.string().or(z.number()),
+            storageBytes: z.string().or(z.number()),
+            recommendedMinMemoryBytes: z.string().or(z.number()),
+        }),
+    }),
+]);
 
 export const useServerSpecs = () => {
     return useQuery<ServerSpecs>({
         queryKey: [...queryKeys.config, "serverSpecs"],
         queryFn: async () => {
             const query = `{
-                serverSpecs {
-                    bandwidth_bps
-                    storage_bytes
+                getServerSpecs {
+                    netBps
+                    storageBytes
+                    recommendedMinMemoryBytes
                 }
             }`;
             const res = await graphql(query, "virtual-server");
 
+            console.log("useServerSpecs raw response:", res);
+
+            // Check for GraphQL errors
+            if (res && typeof res === "object" && "errors" in res) {
+                console.error("GraphQL errors:", res.errors);
+                throw new Error("GraphQL query failed");
+            }
+
+            // Handle case where response might already be unwrapped
             const response = zServerSpecsResponse.parse(res);
 
+            console.log("useServerSpecs parsed response:", response);
+
+            // Handle both wrapped and unwrapped responses
+            const specs = "data" in response 
+                ? response.data.getServerSpecs 
+                : response.getServerSpecs;
+
             return {
-                bandwidthBps: Number(response.data.serverSpecs.bandwidth_bps),
-                storageBytes: Number(response.data.serverSpecs.storage_bytes),
+                bandwidthBps: Number(specs.netBps),
+                storageBytes: Number(specs.storageBytes),
+                recommendedMinMemoryBytes: Number(specs.recommendedMinMemoryBytes),
             };
         },
     });
