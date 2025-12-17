@@ -1,12 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
 import z from "zod";
 
-import { supervisor } from "@/supervisor";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { TxStatus, checkLastTx } from "@/lib/checkStaging";
 import { PluginCall } from "@/lib/plugin";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 type Meta<TParams extends unknown[]> = {

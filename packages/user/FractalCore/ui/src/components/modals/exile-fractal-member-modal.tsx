@@ -11,7 +11,7 @@ import { FieldAccountExisting } from '@shared/components/form/field-account-exis
 
 import { useExile } from "@/hooks/fractals/use-exile";
 import { zAccount } from '@shared/lib/schemas/account'
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const ExileFractalMemberModal = ({
     show,

@@ -10,7 +10,7 @@ import {
 import { useAppForm } from "@shared/components/form/app-form";
 import { useSetGuildRep } from "@/hooks/fractals/use-set-guild-rep";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const SetGuildRepModal = ({
     show,

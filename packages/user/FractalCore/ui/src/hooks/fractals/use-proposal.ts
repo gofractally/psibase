@@ -2,11 +2,10 @@ import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey, { OptionalNumber } from "@/lib/queryKeys";
 
 import { Account, zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 import { useGuildAccount } from "../use-guild-account";
 import { useFractalAccount } from "./use-fractal-account";
