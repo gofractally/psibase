@@ -56,7 +56,7 @@ export const Judicial = () => {
                     </ul>
                     <p className="mt-3 text-muted-foreground">
                         <Gavel className="inline h-4 w-4 mr-1" />
-                        The <span className="font-medium text-primary">{data?.account}</span> guild is selected to act as the judiciary lead by {data?.rep ? `its representative ${data.rep.member}.` : `its council.`}
+                        The <span className="font-medium text-primary">{data?.account}</span> guild is selected to act as the judiciary led by {data?.rep ? `its representative ${data.rep.member}.` : `its council.`}
                     </p>
                 </CardContent>
             </Card>

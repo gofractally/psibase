@@ -82,7 +82,7 @@ export const Legislative = () => {
                     </ul>
                     <p className="mt-3 text-muted-foreground">
                         <Scale className="inline h-4 w-4 mr-1" />
-                        The <span className="font-medium text-primary">{data?.account}</span> guild is selected to act as the legislature lead by {data?.rep ? `its representative ${data.rep.member}.` : `its council.`}
+                        The <span className="font-medium text-primary">{data?.account}</span> guild is selected to act as the legislature led by {data?.rep ? `its representative ${data.rep.member}.` : `its council.`}
                     </p>
                 </CardContent>
             </Card>

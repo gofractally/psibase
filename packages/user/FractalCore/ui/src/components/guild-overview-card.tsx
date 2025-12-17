@@ -65,7 +65,7 @@ export const GuildOverviewCard = ({ guildAccount }: { guildAccount?: string }) =
                             </p>
                         </div>
                         <div className="flex items-center text-muted-foreground">
-                            Lead by {guild?.rep ? `representative ${guild.rep.member}` : 'council'}
+                            Led by {guild?.rep ? `representative ${guild.rep.member}` : 'council'}
                             <div className="border rounded-sm text-primary">
 
                                 {leadershipStatus == zLeadership.Enum.RepOnly && <Crown className="h-7 w-7" />}
