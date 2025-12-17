@@ -11,7 +11,7 @@ import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { createIdenticon } from "@/lib/createIdenticon";
+import { createIdenticon } from "@shared/lib/create-identicon";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { useChainId } from "@shared/hooks/use-chain-id";

@@ -13,7 +13,7 @@ import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useLogout } from "@/hooks/use-logout";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
+import { createIdenticon, generateAvatar } from "@shared/lib/create-identicon";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
@@ -152,8 +152,8 @@ export function NavUser() {
                                     {!isFetchedConnectedAccounts
                                         ? "Loading..."
                                         : isUsingOnlyOption
-                                          ? "Switch account"
-                                          : "Login"}
+                                            ? "Switch account"
+                                            : "Login"}
                                 </span>
                             </DropdownMenuItem>
                         ) : (
@@ -192,7 +192,7 @@ export function NavUser() {
                                                             className="mr-2 h-4 w-4 rounded-none"
                                                             src={createIdenticon(
                                                                 chainId +
-                                                                    connectedAccount,
+                                                                connectedAccount,
                                                             )}
                                                         />
                                                         <span>

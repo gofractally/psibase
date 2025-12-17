@@ -5,7 +5,7 @@ import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useExpectCurrentUser } from "@/hooks/use-expect-current-user";
 import { useSelectAccount } from "@/hooks/use-select-account";
-import { createIdenticon } from "@/lib/createIdenticon";
+import { createIdenticon } from "@shared/lib/create-identicon";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";

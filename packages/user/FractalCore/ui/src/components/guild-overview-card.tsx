@@ -6,7 +6,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { createIdenticon } from "@/lib/createIdenticon";
+import { createIdenticon } from "@shared/lib/create-identicon";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { User, Users, Crown } from "lucide-react";
 import z from "zod";

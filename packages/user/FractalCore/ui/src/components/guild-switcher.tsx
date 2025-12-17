@@ -6,7 +6,7 @@ import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-membership
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { createIdenticon } from "@/lib/createIdenticon";
+import { createIdenticon } from "@shared/lib/create-identicon";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import {
