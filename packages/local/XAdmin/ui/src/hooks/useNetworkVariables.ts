@@ -5,13 +5,17 @@ import { graphql } from "@/lib/graphql";
 import { queryKeys } from "@/lib/queryKeys";
 
 interface NetworkVariables {
-    memoryRatio: number;
+    blockReplayFactor: number;
+    perBlockSysCpuNs: number;
+    objStorageBytes: number;
 }
 
 const zNetworkVariablesResponse = z.object({
     data: z.object({
-        networkVariables: z.object({
-            memory_ratio: z.number(),
+        getNetworkVariables: z.object({
+            blockReplayFactor: z.number(),
+            perBlockSysCpuNs: z.string(),
+            objStorageBytes: z.string(),
         }),
     }),
 });
@@ -21,16 +25,26 @@ export const useNetworkVariables = () => {
         queryKey: [...queryKeys.config, "networkVariables"],
         queryFn: async () => {
             const query = `{
-                networkVariables {
-                    memory_ratio
+                getNetworkVariables {
+                    blockReplayFactor
+                    perBlockSysCpuNs
+                    objStorageBytes
                 }
             }`;
             const res = await graphql(query, "virtual-server");
 
             const response = zNetworkVariablesResponse.parse(res);
 
+            // NetworkVariables no longer has memoryRatio
+            // RAM is now provided directly as recommendedMinMemoryBytes in ServerSpecs
             return {
-                memoryRatio: response.data.networkVariables.memory_ratio,
+                blockReplayFactor: response.data.getNetworkVariables.blockReplayFactor,
+                perBlockSysCpuNs: Number(
+                    response.data.getNetworkVariables.perBlockSysCpuNs,
+                ),
+                objStorageBytes: Number(
+                    response.data.getNetworkVariables.objStorageBytes,
+                ),
             };
         },
     });
