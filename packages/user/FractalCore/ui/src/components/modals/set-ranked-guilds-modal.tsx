@@ -59,7 +59,7 @@ export const SetRankedGuilds = ({
                         <form.AppField
                             name="rankedGuilds"
                             children={(field) => (
-                                <field.TextField label="Ranked guild accounts seperated by comma" />
+                                <field.TextField label="Ranked guild accounts separated by comma" />
                             )}
                         />
 
