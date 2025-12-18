@@ -1,10 +1,12 @@
 import { fractalCorePlugin } from "@/lib/plugin";
 
-import { usePluginMutation } from "../use-plugin-mutation";
+import { usePluginFunctionCallMutation } from "../use-plugin-function-call-mutation";
 
 export const useSetGuildBio = () =>
-    usePluginMutation(fractalCorePlugin.adminGuild.setBio, {
-        error: "Failed setting bio",
-        loading: "Setting bio",
-        success: "Set bio",
+    usePluginFunctionCallMutation(fractalCorePlugin.adminGuild.setBio, {
+        toast: {
+            error: "Failed setting bio",
+            loading: "Setting bio",
+            success: "Set bio",
+        },
     });
