@@ -810,12 +810,13 @@ pub mod tables {
                 .range((self.id, 0)..(self.id, u32::MAX))
                 .collect();
 
-            for mut sub_balance in sub_balances {
+            let sab_table = SubAccountBalanceTable::read_write();
+            for sub_balance in sub_balances {
                 if sub_balance.balance.value > 0 {
                     Balance::get_or_new(self.account, sub_balance.token_id)
                         .add_balance(sub_balance.balance);
                 }
-                sub_balance.delete();
+                sab_table.erase(&sub_balance.pk());
             }
 
             SubAccountTable::new().erase(&(&self.pk()));
