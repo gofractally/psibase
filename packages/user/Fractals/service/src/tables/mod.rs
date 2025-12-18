@@ -146,7 +146,7 @@ pub mod tables {
     pub struct GuildApplication {
         #[graphql(skip)]
         pub guild: AccountNumber,
-        pub member: AccountNumber,
+        pub applicant: AccountNumber,
         pub extra_info: String,
         pub created_at: psibase::TimePointSec,
     }
@@ -154,12 +154,12 @@ pub mod tables {
     impl GuildApplication {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.guild, self.member)
+            (self.guild, self.applicant)
         }
 
         #[secondary_key(1)]
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
-            (self.member, self.guild)
+            (self.applicant, self.guild)
         }
     }
 
@@ -169,8 +169,8 @@ pub mod tables {
     pub struct GuildAttest {
         #[graphql(skip)]
         pub guild: AccountNumber,
-        pub member: AccountNumber,
-        pub attestee: AccountNumber,
+        pub applicant: AccountNumber,
+        pub attester: AccountNumber,
         pub comment: String,
         pub endorses: bool,
     }
@@ -178,17 +178,17 @@ pub mod tables {
     impl GuildAttest {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.guild, self.member, self.attestee)
+            (self.guild, self.applicant, self.attester)
         }
 
         #[secondary_key(1)]
         fn by_guild(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.guild, self.attestee, self.member)
+            (self.guild, self.attester, self.applicant)
         }
 
         #[secondary_key(2)]
-        fn by_attestee(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.attestee, self.guild, self.member)
+        fn by_attester(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.attester, self.guild, self.applicant)
         }
     }
 

@@ -46,13 +46,14 @@ define_trust! {
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
             - Set minimum scorers required to enable consensus rewards
-        ",
+            - Conclude membership applications
+            ",
     }
     functions {
         None => [get_group_users],
         Low => [start_eval, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        High => [exile_member, con_membership_app, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
 
@@ -96,6 +97,17 @@ impl AdminFractal for FractalCorePlugin {
 }
 
 impl AdminGuild for FractalCorePlugin {
+    fn con_membership_app(
+        guild_account: String,
+        member: String,
+        accepted: bool,
+    ) -> Result<(), Error> {
+        assert_authorized(FunctionName::con_membership_app)?;
+        propose::guild(&guild_account)?;
+
+        FractalsPlugin::admin_guild::con_membership_app(&guild_account, &member, accepted)
+    }
+
     fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_guild_rep)?;
         propose::guild(&guild_account)?;
@@ -225,14 +237,14 @@ impl UserGuild for FractalCorePlugin {
 
     fn attest_membership_app(
         guild_account: String,
-        member: String,
+        applicant: String,
         comment: String,
         endorses: bool,
     ) -> Result<(), Error> {
         assert_authorized(FunctionName::attest_membership_app)?;
         FractalsPlugin::user_guild::attest_membership_app(
             &guild_account,
-            &member,
+            &applicant,
             &comment,
             endorses,
         )

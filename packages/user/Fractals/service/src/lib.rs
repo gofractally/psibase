@@ -42,8 +42,8 @@ pub mod service {
     use crate::tables::{
         fractal_member::MemberStatus,
         tables::{
-            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
-            GuildMember, RewardConsensus,
+            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildMember,
+            RewardConsensus,
         },
     };
 
@@ -159,30 +159,21 @@ pub mod service {
     #[action]
     fn at_mem_app(
         guild_account: AccountNumber,
-        member: AccountNumber,
+        applicant: AccountNumber,
         comment: String,
         endorses: bool,
     ) {
-        let sender = get_sender();
+        GuildApplication::get_assert(guild_account, applicant).attest(comment, endorses);
+    }
 
-        let guild = Guild::get_assert(guild_account);
-        let application = check_some(
-            GuildApplication::get(guild.account, member),
-            "application does not exist",
-        );
-        check_some(
-            FractalMember::get(guild.fractal, sender),
-            "must be a member of a fractal to attest",
-        );
-        check_some(
-            GuildMember::get(guild.account, sender),
-            "must be member of the guild to attest",
-        );
-        GuildAttest::set(guild.account, member, sender, comment, endorses);
-
-        if guild_account == sender {
-            application.conclude(endorses)
-        }
+    /// Conclude Guild Membership application
+    ///
+    /// # Arguments
+    /// * `applicant` - Account of the applicant.
+    /// * `accepted` - True to accept application, False will deny and delete the application.
+    #[action]
+    fn con_mem_app(applicant: AccountNumber, accepted: bool) {
+        GuildApplication::get_assert(get_sender(), applicant).conclude(accepted);
     }
 
     /// Starts an evaluation for the specified guild.

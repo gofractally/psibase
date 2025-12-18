@@ -62,13 +62,14 @@ define_trust! {
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
             - Set minimum scorers required to enable consensus rewards
+            - Conclude membership applications
             ",
     }
     functions {
         None => [get_group_users, exile_member, set_dist_interval],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [propose, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+        High => [propose, con_membership_app, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
 }
@@ -185,6 +186,21 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl AdminGuild for FractallyPlugin {
+    fn con_membership_app(guild: String, applicant: String, accepted: bool) -> Result<(), Error> {
+        get_guild(guild)?.assert_authorized(FunctionName::con_membership_app)?;
+
+        let packed_args = fractals::action_structs::con_mem_app {
+            accepted,
+            applicant: applicant.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::con_mem_app::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account.clone())?;
 
@@ -361,7 +377,7 @@ impl UserGuild for FractallyPlugin {
 
     fn attest_membership_app(
         guild_account: String,
-        member: String,
+        applicant: String,
         comment: String,
         endorses: bool,
     ) -> Result<(), Error> {
@@ -372,7 +388,7 @@ impl UserGuild for FractallyPlugin {
             comment,
             endorses,
             guild_account: guild_account.as_str().into(),
-            member: member.as_str().into(),
+            applicant: applicant.as_str().into(),
         }
         .packed();
 

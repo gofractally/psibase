@@ -6,15 +6,15 @@ use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable};
 impl GuildAttest {
     fn new(
         guild: AccountNumber,
-        member: AccountNumber,
-        attestee: AccountNumber,
+        applicant: AccountNumber,
+        attester: AccountNumber,
         comment: String,
         endorses: bool,
     ) -> Self {
         Self {
             guild,
-            member,
-            attestee,
+            applicant,
+            attester,
             comment,
             endorses,
         }
