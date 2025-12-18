@@ -29,9 +29,7 @@ namespace SystemService
          std::printf("canAuthUserSys\n");
    }
 
-   bool AuthAny::isAuthSys(AccountNumber                sender,
-                           std::vector<AccountNumber>   authorizers,
-                           std::optional<ServiceMethod> method)
+   bool AuthAny::isAuthSys(AccountNumber sender, std::vector<AccountNumber> authorizers)
    {
       if (enable_print)
          std::printf("isAuthSys\n");
@@ -39,9 +37,7 @@ namespace SystemService
       return true;
    }
 
-   bool AuthAny::isRejectSys(AccountNumber                sender,
-                             std::vector<AccountNumber>   rejecters,
-                             std::optional<ServiceMethod> method)
+   bool AuthAny::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
    {
       if (enable_print)
          std::printf("isRejectSys\n");
