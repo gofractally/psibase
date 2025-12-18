@@ -1,30 +1,31 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 import { crypto } from "wasm-transpiled";
 import { z } from "zod";
 
-// ShadCN UI Imports
 import { useToast } from "@/components/ui/use-toast";
 
 import { PrevNextButtons } from "@/components/PrevNextButtons";
 import { BlockProducerForm } from "@/components/forms/block-producer";
-// components
 import {
     ChainTypeForm,
     chainTypeSchema,
 } from "@/components/forms/chain-mode-form";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
+import { PromptSaveSigningKey } from "@/components/forms/prompt-save-signing-key";
 import { InstallationSummary } from "@/components/installation-summary";
 import { MultiStepLoader } from "@/components/multi-step-loader";
 import { Steps } from "@/components/steps";
 
-// lib
 import { bootChain } from "@/lib/bootChain";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
 
+import { useAppForm } from "@shared/components/form/app-form";
+import { pemToB64 } from "@shared/lib/b64-key-utils";
+import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
     CardContent,
@@ -34,14 +35,11 @@ import {
 } from "@shared/shadcn/ui/card";
 
 import { useConfig } from "../hooks/useConfig";
-import { useImportAccount } from "../hooks/useImportAccount";
-// hooks
 import { useAddServerKey } from "../hooks/useKeyDevices";
 import { usePackages } from "../hooks/usePackages";
 import { useSelectedRows } from "../hooks/useSelectedRows";
 import { useStepper } from "../hooks/useStepper";
 import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
-// types
 import {
     BootCompleteSchema,
     BootCompleteUpdate,
@@ -51,7 +49,6 @@ import {
     RequestUpdateSchema,
 } from "../types";
 import { DependencyDialog } from "./dependency-dialog";
-// relative imports
 import { SetupWrapper } from "./setup-wrapper";
 
 export const BlockProducerSchema = z.object({
@@ -73,6 +70,11 @@ const isBootCompleteUpdate = (data: unknown): data is BootCompleteUpdate =>
     BootCompleteSchema.safeParse(data).success;
 
 export const CreatePage = () => {
+    const [didSaveKey, setDidSaveKey] = useState(false);
+    const [txSigningPrivateKey, setTxSigningPrivateKey] = useState<string>();
+
+    const { mutateAsync: createAndSetKey } = useAddServerKey();
+
     const blockProducerForm = useForm<z.infer<typeof BlockProducerSchema>>({
         resolver: zodResolver(BlockProducerSchema),
         defaultValues: {
@@ -80,7 +82,7 @@ export const CreatePage = () => {
         },
     });
 
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
     const { toast } = useToast();
 
     const { data: config } = useConfig();
@@ -95,12 +97,48 @@ export const CreatePage = () => {
     const bpName = blockProducerForm.watch("name");
     const keyDevice = keyDeviceForm.watch("id");
 
+    const importForm = useAppForm({
+        defaultValues: {
+            account: "",
+            privateKey: "",
+        },
+        validators: {
+            onChange: z.object({
+                account: zAccount.or(z.literal("")),
+                privateKey: z.string(),
+            }),
+            onSubmit: z.object({
+                account: zAccount.refine(
+                    (val) => val.trim() === bpName?.trim(),
+                    {
+                        message:
+                            "Account name must match the block producer account name you just created",
+                    },
+                ),
+                privateKey: z
+                    .string()
+                    .refine(
+                        (val) => val === pemToB64(txSigningPrivateKey ?? ""),
+                        {
+                            message:
+                                "Private keys do not match. Go back and try again.",
+                        },
+                    ),
+            }),
+        },
+        onSubmit: () => {
+            next();
+        },
+    });
+
     const Step = {
         ChainType: "CHAIN_TYPE",
         BlockProducer: "BLOCK_PRODUCER",
         KeyDevice: "KEY_DEVICE",
         Confirmation: "CONFIRMATION",
         Completion: "COMPLETION",
+        SaveKey: "SAVE_KEY",
+        ConfirmKey: "CONFIRM_KEY",
     } as const;
 
     type StepKey = (typeof Step)[keyof typeof Step];
@@ -114,10 +152,42 @@ export const CreatePage = () => {
         currentStep,
         maxSteps,
     } = useStepper<StepKey>([
-        { step: Step.ChainType, form: chainTypeForm },
-        { step: Step.BlockProducer, form: blockProducerForm },
-        { step: Step.KeyDevice, form: keyDeviceForm, skip: isDev },
+        {
+            step: Step.ChainType,
+            checkCanProceed: async () => {
+                return await chainTypeForm.trigger();
+            },
+        },
+        {
+            step: Step.BlockProducer,
+            checkCanProceed: async () => {
+                return await blockProducerForm.trigger();
+            },
+        },
+        {
+            step: Step.KeyDevice,
+            checkCanProceed: async () => {
+                return await keyDeviceForm.trigger();
+            },
+            skip: isDev,
+        },
         { step: Step.Confirmation },
+        { step: Step.Completion },
+        {
+            step: Step.SaveKey,
+            checkCanProceed: async () => {
+                return await didSaveKey;
+            },
+            skip: isDev,
+        },
+        {
+            step: Step.ConfirmKey,
+            checkCanProceed: async () => {
+                const result = importForm.validate("submit");
+                return Object.keys(result).length === 0;
+            },
+            skip: isDev,
+        },
     ]);
 
     const { data: packages } = usePackages();
@@ -128,9 +198,6 @@ export const CreatePage = () => {
         },
         packages,
     );
-
-    const { mutateAsync: createAndSetKey } = useAddServerKey();
-    const { mutateAsync: importAccount } = useImportAccount();
 
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
@@ -184,6 +251,7 @@ export const CreatePage = () => {
                 if (!isDev) {
                     blockSigningPubKey = await createAndSetKey(keyDevice);
                     txSigningKeyPair = crypto.generateKeypair();
+                    setTxSigningPrivateKey(txSigningKeyPair?.[1]);
                 }
                 const desiredPackageIds = Object.keys(rows);
                 const desiredPackages = packages.filter((pack) =>
@@ -217,14 +285,7 @@ export const CreatePage = () => {
                                     description: "Successfully booted chain.",
                                 });
 
-                                setTimeout(() => {
-                                    navigate("/Dashboard");
-
-                                    importAccount({
-                                        privateKey: txSigningKeyPair?.[1],
-                                        account: bpName,
-                                    });
-                                }, 1000);
+                                next();
                             } else {
                                 setLoading(false);
                                 const message = "Something went wrong.";
@@ -257,6 +318,8 @@ export const CreatePage = () => {
         }
     }, [currentStep, rows, bpName, config]);
 
+    console.log("CURRENT STEP", currentStep);
+
     return (
         <SetupWrapper>
             <DependencyDialog
@@ -271,12 +334,14 @@ export const CreatePage = () => {
                     prom(confirmed);
                 }}
             />
-            <MultiStepLoader
-                loadingStates={loadingStates}
-                loading={loading}
-                completed={currentState[0]}
-                started={currentState[1]}
-            />
+            {currentStep === Step.Completion && (
+                <MultiStepLoader
+                    loadingStates={loadingStates}
+                    loading={loading}
+                    completed={currentState[0]}
+                    started={currentState[1]}
+                />
+            )}
             <div className="relative flex h-full flex-col justify-between ">
                 <div></div>
                 <div className="flex flex-col">
@@ -339,6 +404,73 @@ export const CreatePage = () => {
                     )}
                     {currentStep === Step.Completion && (
                         <div>{errorMessage}</div>
+                    )}
+                    {currentStep === Step.SaveKey && (
+                        <PromptSaveSigningKey
+                            account={bpName}
+                            privateKey={txSigningPrivateKey}
+                            didSaveKey={didSaveKey}
+                            setDidSaveKey={setDidSaveKey}
+                        />
+                    )}
+                    {currentStep === Step.ConfirmKey && (
+                        <importForm.AppForm>
+                            <form
+                                id="import-account-form"
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    await importForm.handleSubmit();
+                                }}
+                                className="flex flex-col gap-6"
+                            >
+                                <CardContent className="flex flex-col">
+                                    <div className="mb-6 flex-1 space-y-2">
+                                        <CardTitle className="text-3xl font-normal">
+                                            Confirm your account
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Use your block producer account
+                                        </CardDescription>
+                                    </div>
+                                    <div className="flex flex-1 flex-col gap-4">
+                                        <importForm.Subscribe
+                                            selector={(state) => [
+                                                state.isSubmitting,
+                                            ]}
+                                        >
+                                            {([isSubmitting]) => (
+                                                <importForm.AppField
+                                                    name="account"
+                                                    children={(field) => {
+                                                        return (
+                                                            <field.TextField
+                                                                label="Account name"
+                                                                disabled={
+                                                                    isSubmitting
+                                                                }
+                                                                placeholder="Account name"
+                                                            />
+                                                        );
+                                                    }}
+                                                />
+                                            )}
+                                        </importForm.Subscribe>
+                                        <importForm.AppField
+                                            name="privateKey"
+                                            children={(field) => {
+                                                return (
+                                                    <field.TextField
+                                                        type="password"
+                                                        label="Private key"
+                                                        placeholder="Private key"
+                                                    />
+                                                );
+                                            }}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </form>
+                        </importForm.AppForm>
                     )}
                 </div>
                 <div className="py-4">

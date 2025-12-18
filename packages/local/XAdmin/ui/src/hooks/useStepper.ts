@@ -1,11 +1,9 @@
 import { useState } from "react";
-import { UseFormReturn } from "react-hook-form";
 
 type Step<T> = {
     step: T | "COMPLETION";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    form?: UseFormReturn<any>;
     skip?: boolean;
+    checkCanProceed?: () => Promise<boolean>;
 };
 
 /**
@@ -23,9 +21,9 @@ export const useStepper = <T>(steps: Step<T>[]) => {
 
     const next = async () => {
         if (canNext) {
-            const currentChecker = availableSteps[currentStepNum - 1].form;
-            const isPassable =
-                !currentChecker || (await currentChecker?.trigger());
+            const currentChecker =
+                availableSteps[currentStepNum - 1].checkCanProceed;
+            const isPassable = !currentChecker || (await currentChecker?.());
             if (isPassable) {
                 setStepNum((step) => (canNext ? step + 1 : step));
             }
@@ -36,13 +34,9 @@ export const useStepper = <T>(steps: Step<T>[]) => {
         setStepNum((step) => (canPrev ? step - 1 : step));
     };
 
-    const isComplete = currentStepNum == numberOfSteps;
-
     return {
         currentStepNum,
-        currentStep: isComplete
-            ? "COMPLETION"
-            : availableSteps[currentStepNum - 1].step,
+        currentStep: availableSteps[currentStepNum - 1].step,
         maxSteps: numberOfSteps,
         next,
         previous,

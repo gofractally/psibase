@@ -2135,6 +2135,7 @@ __metadata:
     "@hookform/resolvers": "npm:^5.1.1"
     "@psibase/common-lib": "workspace:*"
     "@radix-ui/react-toast": "npm:^1.2.1"
+    "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@tanstack/react-table": "npm:^8.20.4"
     "@types/node": "npm:^22.15.0"
