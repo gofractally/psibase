@@ -74,9 +74,10 @@ pub mod tables {
             let nft_id = DiffAdjust::call().create(
                 initial_price,
                 TIME_WINDOW,
-                target,
-                target,
+                target as u64,
+                target as u64,
                 floor_price,
+                RATE_OF_CHANGE,
                 RATE_OF_CHANGE,
             );
             let new_instance = Self::new(symbol_length, nft_id);
