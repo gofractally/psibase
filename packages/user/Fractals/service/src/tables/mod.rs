@@ -6,12 +6,14 @@ mod guild;
 mod guild_application;
 mod guild_attest;
 mod guild_member;
+mod reward_consensus;
+mod reward_stream;
 
 #[psibase::service_tables]
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
 
     use serde::{Deserialize, Serialize};
 
@@ -21,6 +23,7 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
+        #[primary_key]
         pub account: AccountNumber,
         pub created_at: TimePointSec,
         pub name: String,
@@ -29,13 +32,7 @@ pub mod tables {
         pub legislature: AccountNumber,
         #[graphql(skip)]
         pub judiciary: AccountNumber,
-    }
-
-    impl Fractal {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
+        pub token_id: TID,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]
@@ -46,6 +43,7 @@ pub mod tables {
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
         pub member_status: StatusU8,
+        pub stream_id: u32,
     }
 
     impl FractalMember {
@@ -118,8 +116,9 @@ pub mod tables {
         #[graphql(skip)]
         pub guild: AccountNumber,
         pub member: AccountNumber,
+        #[graphql(skip)]
         pub score: u32,
-        pub pending_score: Option<u32>,
+        pub pending_score: Option<u8>,
         pub created_at: psibase::TimePointSec,
     }
 
@@ -211,5 +210,32 @@ pub mod tables {
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
             (self.member, self.fractal)
         }
+    }
+
+    #[table(name = "RewardStreamTable", index = 8)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct RewardStream {
+        #[primary_key]
+        pub stream_id: u32,
+        pub fractal: AccountNumber,
+        pub last_distributed: psibase::TimePointSec,
+        pub dist_interval_secs: u32,
+    }
+
+    impl RewardStream {
+        #[secondary_key(1)]
+        fn by_fractal(&self) -> (AccountNumber, u32) {
+            (self.fractal, self.stream_id)
+        }
+    }
+
+    #[table(name = "RewardConsensusTable", index = 9)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct RewardConsensus {
+        #[primary_key]
+        pub fractal: AccountNumber,
+        pub reward_stream_id: u32,
+        pub ranked_guilds: Vec<AccountNumber>,
+        pub ranked_guild_slot_count: u8,
     }
 }

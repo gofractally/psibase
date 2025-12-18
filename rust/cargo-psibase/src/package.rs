@@ -146,7 +146,7 @@ fn should_build_package(
     }
     let mut existing_data = Vec::new();
     for data in &manifest.data {
-        existing_data.push((data.service.value, data.filename.as_str()));
+        existing_data.push((data.account.value, data.filename.as_str()));
     }
     let mut new_data = Vec::new();
     for (account, dest, src) in data {

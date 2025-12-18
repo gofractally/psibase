@@ -196,7 +196,10 @@ bool isExtension()
 TEST_CASE("schema compat")
 {
    CHECK(isExtension<std::uint8_t, std::uint8_t>());
-   CHECK(!isExtension<std::uint8_t, std::int8_t>());
+   // Special case for char
+   CHECK(isExtension<std::uint8_t, char>());
+   CHECK(isExtension<std::int8_t, char>());
+   CHECK(!isExtension<std::uint16_t, std::int16_t>());
    CHECK(isExtension<std::tuple<>, std::tuple<std::optional<std::uint8_t>>>());
    CHECK(!isExtension<std::tuple<std::optional<std::uint8_t>>, std::tuple<>>());
 }

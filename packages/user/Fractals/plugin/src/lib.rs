@@ -27,7 +27,8 @@ use bindings::evaluations::plugin::user as EvaluationsUser;
 use crate::bindings::accounts;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::errors::ErrorType;
-use crate::graphql::{get_guild, GuildHelper};
+use crate::graphql::fractal::get_fractal;
+use crate::graphql::guild::{get_guild, Guild};
 use crate::helpers::get_sender_app;
 use crate::trust::{assert_authorized, assert_authorized_with_whitelist};
 use psibase::define_trust;
@@ -64,15 +65,15 @@ define_trust! {
             ",
     }
     functions {
-        None => [get_group_users],
+        None => [get_group_users, exile_member, set_dist_interval, init_token],
         Low => [start, close_eval],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [exile_member, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
+        High => [propose, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
 }
 
-impl GuildHelper {
+impl Guild {
     fn assert_authorized(&self, function: FunctionName) -> Result<(), Error> {
         assert_authorized_with_whitelist(function, vec![self.fractal.to_string()])
     }
@@ -85,6 +86,20 @@ impl GuildHelper {
 struct FractallyPlugin;
 
 impl AdminFractal for FractallyPlugin {
+    fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_ranked_guild_slots)?;
+
+        let packed_args = fractals::action_structs::set_rank_g_s {
+            fractal: get_sender_app()?,
+            slots_count,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::set_rank_g_s::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_fractal(
         fractal_account: String,
         guild_account: String,
@@ -120,6 +135,32 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::exile_member::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn init_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::init_token)?;
+
+        let packed_args = fractals::action_structs::init_token {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::init_token::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_dist_interval)?;
+        let packed_args = fractals::action_structs::set_dist_int {
+            fractal: get_sender_app()?,
+            distribution_interval_secs,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::set_dist_int::ACTION_NAME,
             &packed_args,
         )
     }
@@ -417,6 +458,16 @@ impl Queries for FractallyPlugin {
             evaluation_id: guild.evaluation_id,
             council_role: guild.council_role.to_string(),
             rep_role: guild.rep_role.to_string(),
+        })
+    }
+
+    fn get_fractal(fractal_account: String) -> Result<types::Fractal, Error> {
+        let fractal = get_fractal(fractal_account)?;
+        Ok(types::Fractal {
+            fractal: fractal.account.to_string(),
+            judiciary: fractal.judiciary.to_string(),
+            legislature: fractal.legislature.to_string(),
+            token_id: fractal.token_id,
         })
     }
 }
