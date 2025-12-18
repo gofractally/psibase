@@ -12,7 +12,7 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-import { useAppForm } from "../form/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 
 export const ApplyGuildModal = ({
     show,
@@ -71,7 +71,7 @@ export const ApplyGuildModal = ({
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Apply", "Applying", "Applied!"]}
+                                labels={["Apply", "Applying"]}
                             />
                         </form.AppForm>
                     </form>

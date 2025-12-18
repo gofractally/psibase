@@ -11,7 +11,7 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-import { useAppForm } from "../form/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 
 export const AttestGuildMemberModal = ({
     show,
@@ -76,7 +76,7 @@ export const AttestGuildMemberModal = ({
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Attest", "Attesting", "Attested"]}
+                                labels={["Attest", "Attesting"]}
                             />
                         </form.AppForm>
                     </form>

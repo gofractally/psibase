@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useAppForm } from "@/components/form/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 import { ScheduleDialog } from "@/components/schedule-dialog";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";

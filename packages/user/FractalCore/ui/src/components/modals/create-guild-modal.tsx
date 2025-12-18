@@ -14,8 +14,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+import { useAppForm } from "@shared/components/form/app-form";
 
-import { useAppForm } from "../form/app-form";
 
 export const CreateGuildModal = ({
     show,
@@ -97,7 +97,6 @@ export const CreateGuildModal = ({
                                 labels={[
                                     "Create Guild",
                                     "Creating Guild...",
-                                    "Created Guild",
                                 ]}
                             />
                         </form.AppForm>
