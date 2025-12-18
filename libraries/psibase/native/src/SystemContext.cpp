@@ -59,6 +59,11 @@ namespace psibase
       return result;
    }
 
+   std::shared_ptr<Sockets> SharedState::sockets()
+   {
+      return impl->sockets;
+   }
+
    bool SharedState::needGenesis() const
    {
       auto sharedDb = [&]

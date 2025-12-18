@@ -40,6 +40,8 @@ namespace psibase
 
       bool needGenesis() const;
 
+      std::shared_ptr<Sockets> sockets();
+
       std::unique_ptr<SystemContext> getSystemContext();
       void                           addSystemContext(std::unique_ptr<SystemContext> context);
    };
