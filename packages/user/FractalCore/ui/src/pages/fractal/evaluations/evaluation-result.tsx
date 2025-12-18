@@ -43,7 +43,7 @@ export const EvaluationResult = () => {
     const { data } = useEvaluationResults(Number(evaluationId));
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">
                     Results for evaluation {evaluationId}
@@ -95,7 +95,7 @@ export const EvaluationResult = () => {
                                                 className={cn(
                                                     "space-y-2",
                                                     missing.size !==
-                                                        members.size && "mt-4",
+                                                    members.size && "mt-4",
                                                 )}
                                             >
                                                 <h4 className="text-center text-sm font-medium">

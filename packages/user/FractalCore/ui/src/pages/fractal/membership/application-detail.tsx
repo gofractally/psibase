@@ -32,13 +32,13 @@ export const ApplicationDetail = () => {
     const [showModal, setShowModal] = useState(false);
 
     if (application === null) {
-        return <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        return <div className="mx-auto w-full max-w-5xl p-4 px-6">
             Application for {currentUser} to join the guild {guild.data?.displayName} does not exist.
         </div>
     }
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <AttestGuildMemberModal
                 openChange={(e) => setShowModal(e)}
                 show={showModal}
