@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{check, check_some, get_sender, AccountNumber, Memo, TableRecord};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -21,17 +21,66 @@ pub mod tables {
         fn pk(&self) {}
     }
     impl InitRow {
-        pub fn next_subaccount_id() -> u64 {
-            let init_table = InitTable::new();
-            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
-            check(
-                init_row.last_used_subaccount_id < u64::MAX,
-                "Subaccount ID overflow",
-            );
-            init_row.last_used_subaccount_id += 1;
-            init_table.put(&init_row).unwrap();
+        fn new() -> Self {
+            Self {
+                last_used_id: 0,
+                last_used_shared_bal_id: 0,
+                last_used_subaccount_id: 0,
+            }
+        }
 
-            init_row.last_used_subaccount_id
+        pub fn get() -> Option<Self> {
+            InitTable::read().get_index_pk().get(&())
+        }
+
+        pub fn get_assert() -> Self {
+            check_some(Self::get(), "init row does not exist")
+        }
+
+        pub fn init() {
+            check_none(Self::get(), "init row already exists");
+            Self::new().save();
+        }
+
+        pub fn next_token_id() -> TID {
+            let mut init_row = InitRow::get_assert();
+
+            let next_id = check_some(
+                init_row.last_used_id.checked_add(1),
+                "last_used_id overflowed",
+            );
+            init_row.last_used_id = next_id;
+            init_row.save();
+            next_id
+        }
+
+        pub fn next_subaccount_id() -> u64 {
+            let mut init_row = InitRow::get_assert();
+
+            let next_id = check_some(
+                init_row.last_used_subaccount_id.checked_add(1),
+                "last_used_subaccount_id overflowed",
+            );
+            init_row.last_used_subaccount_id = next_id;
+            init_row.save();
+
+            next_id
+        }
+
+        pub fn next_shared_bal_id() -> u64 {
+            let mut init_row = InitRow::get_assert();
+
+            let next_id = check_some(
+                init_row.last_used_shared_bal_id.checked_add(1),
+                "last_used_shared_bal_id overflowed",
+            );
+            init_row.last_used_shared_bal_id = next_id;
+            init_row.save();
+            next_id
+        }
+
+        fn save(&self) {
+            InitTable::read_write().put(&self).unwrap();
         }
     }
 
@@ -59,6 +108,18 @@ pub mod tables {
     });
 
     impl Token {
+        fn new(precision: Precision, max_issued_supply: Quantity) -> Self {
+            Self {
+                id: InitRow::next_token_id(),
+                nft_id: Nfts::call().mint(),
+                issued_supply: 0.into(),
+                burned_supply: 0.into(),
+                max_issued_supply,
+                precision,
+                settings_value: 0,
+            }
+        }
+
         pub fn get(id: TID) -> Option<Self> {
             TokenTable::read().get_index_pk().get(&id)
         }
@@ -79,23 +140,7 @@ pub mod tables {
         }
 
         pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
-            let init_table = InitTable::new();
-            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
-            let new_id = init_row.last_used_id.checked_add(1).unwrap();
-
-            init_row.last_used_id = new_id;
-            init_table.put(&init_row).unwrap();
-
-            let mut new_instance = Self {
-                id: new_id,
-                nft_id: Nfts::call().mint(),
-                issued_supply: 0.into(),
-                burned_supply: 0.into(),
-                max_issued_supply,
-                precision,
-                settings_value: 0,
-            };
-
+            let new_instance = Token::new(precision, max_issued_supply);
             new_instance.save();
 
             let creator = get_sender();
@@ -117,9 +162,8 @@ pub mod tables {
             Nfts::call().getNft(self.nft_id).owner
         }
 
-        fn save(&mut self) {
-            let table = TokenTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            TokenTable::read_write().put(&self).unwrap();
         }
 
         pub fn mint(&mut self, amount: Quantity) {
@@ -252,13 +296,12 @@ pub mod tables {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
-        fn save(&mut self) {
-            let table = BalanceTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            BalanceTable::read_write().put(&self).unwrap();
         }
 
-        fn delete(&mut self) {
-            BalanceTable::new().erase(&(&self.pk()));
+        fn delete(&self) {
+            BalanceTable::read_write().erase(&(&self.pk()));
         }
 
         pub fn add_balance(&mut self, quantity: Quantity) {
@@ -368,17 +411,6 @@ pub mod tables {
     }
 
     impl SharedBalance {
-        fn next_id() -> u64 {
-            let init_table = InitTable::new();
-            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
-            let new_shared_bal_id = init_row.last_used_shared_bal_id.checked_add(1).unwrap();
-
-            init_row.last_used_shared_bal_id = new_shared_bal_id;
-            init_table.put(&init_row).unwrap();
-
-            new_shared_bal_id
-        }
-
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             Token::get_assert(token_id);
             check(
@@ -387,7 +419,7 @@ pub mod tables {
             );
 
             Self {
-                shared_bal_id: Self::next_id(),
+                shared_bal_id: InitRow::next_shared_bal_id(),
                 token_id,
                 creditor,
                 debitor,
@@ -536,12 +568,11 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            SharedBalanceTable::new().erase(&(self.shared_bal_id));
+            SharedBalanceTable::read_write().erase(&(self.shared_bal_id));
         }
 
-        fn save(&mut self) {
-            let table = SharedBalanceTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            SharedBalanceTable::read_write().put(&self).unwrap();
         }
     }
 
@@ -600,11 +631,11 @@ pub mod tables {
         }
 
         pub fn delete(&self) {
-            BalanceConfigTable::new().erase(&(self.pk()));
+            BalanceConfigTable::read_write().erase(&(self.pk()));
         }
 
         fn put(&mut self) {
-            BalanceConfigTable::new().put(&self).unwrap();
+            BalanceConfigTable::read_write().put(&self).unwrap();
         }
 
         fn save(&mut self) {
@@ -651,11 +682,11 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            UserConfigTable::new().erase(&(self.get_primary_key()));
+            UserConfigTable::read_write().erase(&(self.get_primary_key()));
         }
 
-        fn put(&mut self) {
-            UserConfigTable::new().put(&self).unwrap();
+        fn put(&self) {
+            UserConfigTable::read_write().put(&self).unwrap();
         }
 
         fn save(&mut self) {
@@ -740,7 +771,7 @@ pub mod tables {
             token_id: TID,
             shared_bal_id: u64,
         ) {
-            let upt = UserPendingTable::new();
+            let upt = UserPendingTable::read_write();
             upt.erase(&(creditor, token_id, shared_bal_id));
             upt.erase(&(debitor, token_id, shared_bal_id));
         }
@@ -768,9 +799,9 @@ pub mod tables {
     impl SubAccount {
         fn new(owner: AccountNumber, sub_account: String) -> Self {
             Self {
+                id: InitRow::next_subaccount_id(),
                 account: owner,
                 sub_account,
-                id: InitRow::next_subaccount_id(),
             }
         }
 
@@ -782,9 +813,13 @@ pub mod tables {
 
         pub fn get_or_add(owner: AccountNumber, sub_account: String) -> Self {
             Self::get(owner, sub_account.clone()).unwrap_or_else(|| {
-                let mut record = Self::new(owner, sub_account);
-                record.save();
-                record
+                check(
+                    sub_account.len() <= 80,
+                    "Sub-account key must be 80 bytes or less",
+                );
+                let mut new_instance = Self::new(owner, sub_account);
+                new_instance.save();
+                new_instance
             })
         }
 
@@ -800,8 +835,7 @@ pub mod tables {
         }
 
         fn save(&mut self) {
-            let table = SubAccountTable::new();
-            table.put(&self).unwrap();
+            SubAccountTable::read_write().put(&self).unwrap();
         }
 
         pub fn delete(&mut self) {
@@ -818,7 +852,7 @@ pub mod tables {
                 sub_balance.delete();
             }
 
-            SubAccountTable::new().erase(&(&self.pk()));
+            SubAccountTable::read_write().erase(&(&self.pk()));
         }
 
         pub fn add_balance(&mut self, token_id: TID, quantity: Quantity) {
@@ -882,13 +916,12 @@ pub mod tables {
             )
         }
 
-        fn save(&mut self) {
-            let table = SubAccountBalanceTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            SubAccountBalanceTable::read_write().put(&self).unwrap();
         }
 
         pub fn delete(&mut self) {
-            SubAccountBalanceTable::new().erase(&(&self.pk()));
+            SubAccountBalanceTable::read_write().erase(&self.pk());
         }
 
         fn add_balance(&mut self, quantity: Quantity) {
