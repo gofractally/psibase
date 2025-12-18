@@ -18,9 +18,9 @@ pub mod tables {
         #[primary_key]
         pub nft_id: u32,
         pub window_seconds: u32,
-        pub counter: u64,
-        pub target_min: u64,
-        pub target_max: u64,
+        pub counter: u32,
+        pub target_min: u32,
+        pub target_max: u32,
         pub floor_difficulty: u64,
         pub active_difficulty: u64,
         pub last_update: TimePointSec,
@@ -35,8 +35,8 @@ pub mod tables {
             consumer: AccountNumber,
             initial_difficulty: u64,
             window_seconds: u32,
-            target_min: u64,
-            target_max: u64,
+            target_min: u32,
+            target_max: u32,
             floor_difficulty: u64,
             last_update: TimePointSec,
             percent_increase_ppm: u32,
@@ -64,7 +64,7 @@ pub mod tables {
             );
         }
 
-        fn check_targets(target_min: u64, target_max: u64) {
+        fn check_targets(target_min: u32, target_max: u32) {
             check(target_min > 0, "target_min must be above 0");
             check(target_max > 0, "target_max must be above 0");
             check(
@@ -80,8 +80,8 @@ pub mod tables {
         pub fn add(
             initial_difficulty: u64,
             window_seconds: u32,
-            target_min: u64,
-            target_max: u64,
+            target_min: u32,
+            target_max: u32,
             floor_difficulty: u64,
             percent_increase_ppm: u32,
             percent_decrease_ppm: u32,
@@ -180,7 +180,7 @@ pub mod tables {
             check(self.consumer == get_sender(), "must be consumer");
         }
 
-        pub fn increment(&mut self, increment_amount: u64) -> u64 {
+        pub fn increment(&mut self, increment_amount: u32) -> u64 {
             self.check_sender_is_consumer();
             let difficulty = self.check_difficulty_decrease();
             self.counter += increment_amount;
@@ -198,7 +198,7 @@ pub mod tables {
             self.save();
         }
 
-        pub fn set_targets(&mut self, target_min: u64, target_max: u64) {
+        pub fn set_targets(&mut self, target_min: u32, target_max: u32) {
             self.check_sender_has_nft();
             Self::check_targets(target_min, target_max);
             self.check_difficulty_decrease();
@@ -272,8 +272,8 @@ pub mod service {
     fn create(
         initial_difficulty: u64,
         window_seconds: u32,
-        target_min: u64,
-        target_max: u64,
+        target_min: u32,
+        target_max: u32,
         floor_difficulty: u64,
         percent_increase_ppm: u32,
         percent_decrease_ppm: u32,
@@ -310,7 +310,7 @@ pub mod service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `amount` - Amount to increment the counter by
     #[action]
-    fn increment(nft_id: u32, amount: u64) -> u64 {
+    fn increment(nft_id: u32, amount: u32) -> u64 {
         RateLimit::get_assert(nft_id).increment(amount)
     }
 
@@ -323,7 +323,7 @@ pub mod service {
     /// * `target_min` - Minimum target difficulty
     /// * `target_max` - Maximum target difficulty
     #[action]
-    fn set_targets(nft_id: u32, target_min: u64, target_max: u64) {
+    fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
         RateLimit::get_assert(nft_id).set_targets(target_min, target_max);
     }
 
