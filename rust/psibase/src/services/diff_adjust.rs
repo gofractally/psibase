@@ -10,7 +10,8 @@ pub mod Service {
     /// * `target_min` - Minimum rate limit target
     /// * `target_max` - Maximum rate limit target
     /// * `floor_difficulty` - Minimum difficulty
-    /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
+    /// * `percent_increase_ppm` - Percent to increment when over target, 50000 = 5%
+    /// * `percent_decrease_ppm` - Percent to decrement when under target, 50000 = 5%
     #[action]
     fn create(
         initial_difficulty: u64,
@@ -18,7 +19,8 @@ pub mod Service {
         target_min: u32,
         target_max: u32,
         floor_difficulty: u64,
-        percent_change: u32,
+        percent_increase_ppm: u32,
+        percent_decrease_ppm: u32,
     ) -> u32 {
         unimplemented!()
     }
@@ -90,9 +92,10 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `ppm` - Percent ppm 50000 = 5%
+    /// * `increase_ppm` - Percent to increment when over target, 50000 = 5%
+    /// * `decrease_ppm` - Percent to decrement when under target, 50000 = 5%
     #[action]
-    fn set_percent(nft_id: u32, ppm: u32) {
+    fn set_percent(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
         unimplemented!()
     }
 
