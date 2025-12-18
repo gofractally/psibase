@@ -109,6 +109,16 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Conclude Guild Membership application
+    ///
+    /// # Arguments
+    /// * `applicant` - Account of the applicant.
+    /// * `accepted` - True to accept application, False will deny and delete the application.
+    #[action]
+    fn con_mem_app(applicant: AccountNumber, accepted: bool) {
+        unimplemented!()
+    }
+
     /// Starts an evaluation for the specified guild.
     ///
     /// # Arguments
