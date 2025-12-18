@@ -53,8 +53,8 @@ pub mod Service {
     fn create(
         initial_difficulty: u64,
         window_seconds: u32,
-        target_min: u64,
-        target_max: u64,
+        target_min: u32,
+        target_max: u32,
         floor_difficulty: u64,
         percent_increase_ppm: u32,
         percent_decrease_ppm: u32,
@@ -82,7 +82,7 @@ pub mod Service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `amount` - Amount to increment the counter by
     #[action]
-    fn increment(nft_id: u32, amount: u64) -> u64 {
+    fn increment(nft_id: u32, amount: u32) -> u64 {
         unimplemented!()
     }
 
@@ -95,7 +95,7 @@ pub mod Service {
     /// * `target_min` - Minimum target difficulty
     /// * `target_max` - Maximum target difficulty
     #[action]
-    fn set_targets(nft_id: u32, target_min: u64, target_max: u64) {
+    fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
         unimplemented!()
     }
 
