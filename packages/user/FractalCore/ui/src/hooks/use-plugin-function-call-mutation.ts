@@ -80,7 +80,9 @@ export const usePluginFunctionCallMutation = <TCall extends PluginCall>(
             }
             if (options.toast) {
                 const [_data, _params, toastId] = arr;
-                toast.success(toastId);
+                toast.success(options.toast.success, {
+                    id: toastId,
+                });
             }
             if (options.onStagedTransaction) {
                 const [_data, params] = arr;
