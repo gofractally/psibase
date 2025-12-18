@@ -10,7 +10,6 @@ interface ServerSpecs {
     recommendedMinMemoryBytes: number;
 }
 
-// GraphQL response can have data wrapped or unwrapped, and fields can be camelCase or snake_case
 const zServerSpecsResponse = z.union([
     // Standard GraphQL response with data wrapper
     z.object({

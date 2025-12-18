@@ -35,36 +35,27 @@ import {
 } from "./interfaces";
 import { defaultService, newId, writeConfig } from "./utils";
 
-const formatBytes = (bytes: number): string => {
-    if (bytes >= 1e15) {
-        return `${(bytes / 1e15).toFixed(2)} PB`;
+const getHumanFriendlyNumber = (value: number, baseUnit: string, decimals: number = 0): string => {
+    if (value >= 1e15) {
+        return `${(value / 1e15).toFixed(decimals)} P${baseUnit}`;
     }
-    if (bytes >= 1e12) {
-        return `${(bytes / 1e12).toFixed(2)} TB`;
+    if (value >= 1e12) {
+        return `${(value / 1e12).toFixed(decimals)} T${baseUnit}`;
     }
-    if (bytes >= 1e9) {
-        return `${(bytes / 1e9).toFixed(2)} GB`;
+    if (value >= 1e9) {
+        return `${(value / 1e9).toFixed(decimals)} G${baseUnit}`;
     }
-    return `${bytes} B`;
-};
-
-const formatBps = (bps: number): string => {
-    if (bps >= 1e9) {
-        return `${(bps / 1e9).toFixed(2)} Gbps`;
+    if (value >= 1e6) {
+        return `${(value / 1e6).toFixed(decimals)} M${baseUnit}`;
     }
-    if (bps >= 1e6) {
-        return `${(bps / 1e6).toFixed(2)} Mbps`;
+    if (value >= 1e3) {
+        return `${(value / 1e3).toFixed(decimals)} K${baseUnit}`;
     }
-    if (bps >= 1e3) {
-        return `${(bps / 1e3).toFixed(2)} Kbps`;
-    }
-    return `${bps} bps`;
+    return `${Math.round(value)} ${baseUnit}`;
 };
 
 const NodeSpecsContent = () => {
     const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
-
-    // RAM is now provided directly as recommendedMinMemoryBytes in ServerSpecs
     const ramBytes = serverSpecs?.recommendedMinMemoryBytes;
 
     return (
@@ -84,7 +75,7 @@ const NodeSpecsContent = () => {
                             </span>
                             <span className="text-sm">
                                 {serverSpecs
-                                    ? formatBps(serverSpecs.bandwidthBps)
+                                    ? getHumanFriendlyNumber(serverSpecs.bandwidthBps, "bps", 1)
                                     : "N/A"}
                             </span>
                         </div>
@@ -94,14 +85,14 @@ const NodeSpecsContent = () => {
                             </span>
                             <span className="text-sm">
                                 {serverSpecs
-                                    ? formatBytes(serverSpecs.storageBytes)
+                                    ? getHumanFriendlyNumber(serverSpecs.storageBytes, "B")
                                     : "N/A"}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-medium">RAM:</span>
                             <span className="text-sm">
-                                {ramBytes ? formatBytes(ramBytes) : "N/A"}
+                                {ramBytes ? getHumanFriendlyNumber(ramBytes, "B") : "N/A"}
                             </span>
                         </div>
                     </>

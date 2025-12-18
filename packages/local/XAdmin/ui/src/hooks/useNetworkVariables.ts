@@ -35,8 +35,6 @@ export const useNetworkVariables = () => {
 
             const response = zNetworkVariablesResponse.parse(res);
 
-            // NetworkVariables no longer has memoryRatio
-            // RAM is now provided directly as recommendedMinMemoryBytes in ServerSpecs
             return {
                 blockReplayFactor: response.data.getNetworkVariables.blockReplayFactor,
                 perBlockSysCpuNs: Number(
