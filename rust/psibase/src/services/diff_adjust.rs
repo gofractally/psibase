@@ -1,3 +1,40 @@
+//! # Description
+//!
+//! Dynamic difficulty adjustment service for adaptive rate limiting
+//!
+//! This service provides a self-adjusting rate limiting mechanism that dynamically modifies
+//! difficulty thresholds based on observed activity patterns. Each rate limiter is represented
+//! by an NFT, allowing ownership-based administration.
+//!
+//! # Mechanics
+//!
+//! The service operates on a time-windowed counter system:
+//!
+//! 1. **Activity Tracking**: A consumer account increments a counter each time an action occurs.
+//!    The counter accumulates activity within a configurable time window.
+//!
+//! 2. **Difficulty Adjustment**:
+//!    - **Below Target**: If the counter is below `target_min` when a window elapses, the
+//!      difficulty decreases by a configured percentage (subject to a floor value).
+//!    - **Above Target**: If the counter exceeds `target_max` at any point, the difficulty
+//!      immediately increases by a configured percentage, the counter resets, and a new window
+//!      begins.
+//!
+//! 3. **Window-Based Decay**: After each window period (`window_seconds`), if activity was below
+//!    the minimum target, difficulty decays proportionally for each complete window that elapsed.
+//!
+//! 4. **Bounded Adjustments**: Difficulty cannot fall below `floor_difficulty`, ensuring a minimum
+//!    security threshold is maintained.
+//!
+//! # Roles
+//!
+//! - **Admin**: The NFT owner can configure all parameters (targets, window, percentages, floor).
+//!   The NFT is initially minted to the account that creates the rate limiter, but can be
+//!   transferred to change administration.
+//! - **Consumer**: The account designated at creation time can increment the counter and query
+//!   difficulty. The consumer is automatically set to the account that calls `create()` and cannot
+//!   be changed after creation. Initially, the creator is both admin and consumer, but the admin
+//!   role can be transferred via NFT ownership while the consumer remains fixed.
 #[crate::service(name = "diff-adjust", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
@@ -16,8 +53,8 @@ pub mod Service {
     fn create(
         initial_difficulty: u64,
         window_seconds: u32,
-        target_min: u32,
-        target_max: u32,
+        target_min: u64,
+        target_max: u64,
         floor_difficulty: u64,
         percent_increase_ppm: u32,
         percent_decrease_ppm: u32,
@@ -45,7 +82,7 @@ pub mod Service {
     /// * `nft_id` - RateLimit / NFT ID
     /// * `amount` - Amount to increment the counter by
     #[action]
-    fn increment(nft_id: u32, amount: u32) -> u64 {
+    fn increment(nft_id: u32, amount: u64) -> u64 {
         unimplemented!()
     }
 
@@ -58,7 +95,7 @@ pub mod Service {
     /// * `target_min` - Minimum target difficulty
     /// * `target_max` - Maximum target difficulty
     #[action]
-    fn set_targets(nft_id: u32, target_min: u32, target_max: u32) {
+    fn set_targets(nft_id: u32, target_min: u64, target_max: u64) {
         unimplemented!()
     }
 
