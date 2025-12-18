@@ -41,11 +41,11 @@ if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
     if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-x86_64-linux.tar.gz)
-        set(WASI_SDK_SHA256 c6c38aab56e5de88adf6c1ebc9c3ae8da72f88ec2b656fb024eda8d4167a0bc5)
+        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz)
+        set(WASI_SDK_SHA256 87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171)
     elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
-        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-24/wasi-sdk-24.0-arm64-linux.tar.gz)
-        set(WASI_SDK_SHA256 ae6c1417ea161e54bc54c0a168976af57a0c6e53078857886057a71a0d928646)
+        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-linux.tar.gz)
+        set(WASI_SDK_SHA256 052ad773397dc9e5aa99fb4cfef694175e6b1e81bb2ad1d3c8e7b3fc81441b7c)
     endif()
     if(DEFINED WASI_SDK_URL)
         ExternalProject_Add(wasi-sdk
@@ -132,14 +132,14 @@ if(DEFINED WASI_SDK_PREFIX)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
-        CpuLimit Db Events EventIndex Explorer Invite Nft
+        CpuLimit Db Events EventIndex Explorer Invite
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XProxy XSocketListService)
+        XPackages XProxy XSocketListService WSEcho)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -290,7 +290,6 @@ add_rs_component_workspace(packages/:Plugins
     web-crypto
     transact
     workshop
-    nft
     fractal-core
     config
     producers
@@ -486,6 +485,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Nft.psi
+    PATH packages/user/Nft
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Tokens.psi
     PATH packages/user/Tokens
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -539,7 +544,6 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthSig-schema.json
         DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
-        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/AuthSig/ui/dist/* /
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
@@ -547,7 +551,6 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/VerifySig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
         FLAGS isVerify
-    DEPENDS ${AuthSig_js_DEP}
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
@@ -812,19 +815,7 @@ psibase_package(
     DEPENDS ${Plugins_DEP}
 )
 
-psibase_package(
-    OUTPUT ${SERVICE_DIR}/Nft.psi
-    NAME Nft
-    VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Events(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
-    SERVICE nft
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Nft.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Nft-schema.json
-        INIT
-        DATA ${Plugins_OUTPUT_FILE_nft} /plugin.wasm
-    DEPENDS wasm
-    DEPENDS ${Plugins_DEP}
-)
+
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
@@ -997,6 +988,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XPackages.psi
+    NAME XPackages
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Manages local packages"
+    SERVICE x-packages
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XPackages.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPackages-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XRun.psi
     NAME XRun
     VERSION ${PSIBASE_VERSION}.0
@@ -1074,7 +1077,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XDb XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XRun XSites XTransact
 )
 
 function(write_package_index target dir)
@@ -1094,7 +1097,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
-    XAdmin XDb XDefault XHttp XRun XSites XTransact)
+    XAdmin XDb XDefault XHttp XPackages XRun XSites XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1155,6 +1158,7 @@ install(
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
+          ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTransact.psi
@@ -1266,7 +1270,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/WSEcho.psi
+    NAME WSEcho
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Accepts websocket connections and echos all messages"
+    SERVICE x-echo
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/WSEcho.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/WSEcho-schema.json
+        SERVER x-echo
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho)
 
 ExternalProject_Add(
     rust

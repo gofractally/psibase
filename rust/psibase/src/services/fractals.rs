@@ -27,6 +27,16 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set Fractal distribution interval
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
+    #[action]
+    fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
+        unimplemented!()
+    }
+
     /// Apply to join a guild
     ///
     /// # Arguments
@@ -235,6 +245,18 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set ranked guild slots.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `slots_count` - The number of ranked guild slots.
+    #[action]
+    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
+        unimplemented!()
+    }
+
     /// Get policy action used by AuthDyn service.
     ///
     /// # Arguments
@@ -250,6 +272,43 @@ pub mod Service {
     /// * `account` - Account being checked.
     #[action]
     fn has_policy(account: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Rank guilds for a fractal
+    ///
+    /// This action assigns the fractal's consensus reward distribution to the provided
+    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
+    /// guilds in the vector receive progressively larger shares.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    #[action]
+    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
         unimplemented!()
     }
 

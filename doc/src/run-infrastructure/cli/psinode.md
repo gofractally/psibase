@@ -50,6 +50,10 @@ psinode - The psibase blockchain server
 
   The number of threads that run async actions posted by services.
 
+- `--database-template` *local-package*
+
+  When creating new database, the package and all its dependencies will be installed. If the database directory already exists, this option will have no effect.
+
 ### P2P Network Options
 
 - `--p2p`
@@ -58,7 +62,7 @@ psinode - The psibase blockchain server
 
 - `--peer` *url*
 
-  tells psinode a peer to sync with. The argument should have the form `host:port`. This argument can appear any number of times.
+  tells psinode a peer to sync with. This argument can appear any number of times.
 
 - `--autoconnect` *number*
 

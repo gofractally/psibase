@@ -44,8 +44,12 @@ jobs:
           restore-keys: |
             $ubuntu-${{ matrix.ubuntu-version }}-caches-
       - name: Build
+        env:
+          BUILDER_IMAGE_2204: f8d833ccdd03cbaaa2e6319c9c01a93168b82f37
+          BUILDER_IMAGE_2404: 69a0c8fa35ac92723a85000d2775aca292e71e54
         run: |
-          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:c3bf3ba89c5be07279112babbd5b21a60339e516"
+          BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:$BUILDER_IMAGE_${{ matrix.ubuntu-version }}"
+          echo $BUILDER_IMAGE
           bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} "$BUILDER_IMAGE" ${{ matrix.ubuntu-version }}
       - name: Publish packages
         if: fromJSON(env.can-publish) && matrix.ubuntu-version == '2404'

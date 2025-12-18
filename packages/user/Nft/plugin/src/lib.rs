@@ -8,10 +8,10 @@ use bindings::exports::nft::plugin::user_config::Guest as UserConfig;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::{define_trust, FlagsType};
 
-use psibase::services::nft as Nft;
+use psibase::services::nft::{self as Nft, NftHolderFlags};
 
 define_trust! {
     descriptions {
@@ -50,9 +50,9 @@ impl User for NftPlugin {
         trust::assert_authorized(trust::FunctionName::credit)?;
 
         let packed_args = Nft::action_structs::credit {
-            memo,
+            memo: memo.try_into().unwrap(),
             nftId: nft_id,
-            receiver: receiver.as_str().into(),
+            debitor: receiver.as_str().into(),
         }
         .packed();
 
@@ -63,7 +63,7 @@ impl User for NftPlugin {
         trust::assert_authorized(trust::FunctionName::uncredit)?;
 
         let packed_args = Nft::action_structs::uncredit {
-            memo,
+            memo: memo.try_into().unwrap(),
             nftId: nft_id,
         }
         .packed();
@@ -75,7 +75,7 @@ impl User for NftPlugin {
         trust::assert_authorized(trust::FunctionName::debit)?;
 
         let packed_args = Nft::action_structs::debit {
-            memo,
+            memo: memo.try_into().unwrap(),
             nftId: nft_id,
         }
         .packed();
@@ -97,7 +97,7 @@ impl UserConfig for NftPlugin {
         trust::assert_authorized(trust::FunctionName::enable_user_manual_debit)?;
 
         let packed_args = Nft::action_structs::setUserConf {
-            flag: "manualDebit".into(),
+            index: NftHolderFlags::MANUAL_DEBIT.index(),
             enable,
         }
         .packed();

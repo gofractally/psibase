@@ -2,6 +2,37 @@ pub mod helpers;
 mod scoring;
 pub mod tables;
 
+pub mod constants {
+    pub const ONE_DAY: u32 = 86400;
+    pub const ONE_WEEK: u32 = ONE_DAY * 7;
+    const ONE_YEAR: u32 = ONE_WEEK * 52;
+
+    pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
+    pub const TOKEN_PRECISION: u8 = 4;
+    pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
+    pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
+    pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
+    pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
+    pub const COUNCIL_SEATS: u8 = 6;
+
+    pub const MIN_GROUP_SIZE: u8 = 4;
+    pub const MAX_GROUP_SIZE: u8 = 10;
+
+    pub const GUILD_EVALUATION_GROUP_SIZE: u8 = 6;
+
+    pub const DEFAULT_RANKED_GUILD_SLOT_COUNT: u8 = 12;
+    pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
+
+    // Simple limitation + also related to fibonacci function limit.
+    pub const MAX_RANKED_GUILDS: u8 = 25;
+
+    // Expected scaling for use of the continuous_fibonacci func
+    pub const SCORE_SCALE: u32 = 10_000;
+
+    // Determine score sensitivity
+    pub const EMA_ALPHA_DENOMINATOR: u32 = 6;
+}
+
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
@@ -9,7 +40,7 @@ pub mod service {
         fractal_member::MemberStatus,
         tables::{
             EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildAttest,
-            GuildMember,
+            GuildMember, RewardConsensus,
         },
     };
 
@@ -68,6 +99,20 @@ pub mod service {
             "must be a member of a fractal to apply for its guild",
         );
         GuildApplication::add(guild.account, sender, extra_info);
+    }
+
+    /// Set Fractal distribution interval
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
+    #[action]
+    fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
+        check(
+            get_sender() == Fractal::get_assert(fractal).legislature,
+            "must be legislature",
+        );
+        RewardConsensus::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set guild display name
@@ -135,9 +180,9 @@ pub mod service {
             GuildMember::get(guild.account, sender),
             "must be member of the guild to attest",
         );
-        GuildAttest::add(guild.account, member, sender, comment, endorses);
+        GuildAttest::set(guild.account, member, sender, comment, endorses);
 
-        if guild_account == sender || guild.rep.is_some_and(|rep| rep == sender) {
+        if guild_account == sender {
             application.conclude(endorses)
         }
     }
@@ -167,9 +212,21 @@ pub mod service {
     fn join(fractal: AccountNumber) {
         let sender = get_sender();
 
-        check_none(account_policy(fractal), "account cannot be managed");
+        check_none(
+            account_policy(sender),
+            "managed accounts cannot join a fractal",
+        );
 
-        FractalMember::add(fractal, sender, MemberStatus::Visa);
+        // Give founding members (members joined prior to live token) immediate citizenship
+        // otherwise visa.
+        let is_live_token = RewardConsensus::get(fractal).is_some();
+        let member_status = if is_live_token {
+            MemberStatus::Visa
+        } else {
+            MemberStatus::Citizen
+        };
+
+        FractalMember::add(fractal, sender, member_status);
 
         Wrapper::emit().history().joined_fractal(fractal, sender);
     }
@@ -322,16 +379,83 @@ pub mod service {
 
     /// Exile a fractal member.
     ///
+    /// Must be called by judiciary.  
+    ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
     #[action]
     fn exile_member(fractal: AccountNumber, member: AccountNumber) {
         check(
-            Fractal::get_assert(fractal).legislature == get_sender(),
-            "only the legislature can exile members",
+            Fractal::get_assert(fractal).judiciary == get_sender(),
+            "only the judiciary can exile members",
         );
         FractalMember::get_assert(fractal, member).exile();
+    }
+
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        let mut fractal = Fractal::get_assert(fractal);
+        check(
+            fractal.legislature == get_sender(),
+            "only the legislature initialise fractal token",
+        );
+
+        fractal.init_token();
+    }
+
+    /// Set ranked guild slots.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `slots_count` - The number of ranked guild slots.
+    #[action]
+    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
+        let fractal = Fractal::get_assert(fractal);
+        check(
+            fractal.legislature == get_sender(),
+            "only the legislature initialise fractal token",
+        );
+
+        RewardConsensus::get_assert(fractal.account).set_ranked_guild_slot_count(slots_count);
+    }
+
+    /// Distribute token for a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        RewardConsensus::get_assert(fractal).distribute_tokens();
+    }
+
+    /// Rank guilds for a fractal
+    ///
+    /// This action assigns the fractal's consensus reward distribution to the provided
+    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
+    /// guilds in the vector receive progressively larger shares.
+    ///
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    #[action]
+    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
+        check(
+            Fractal::get_assert(fractal).legislature == get_sender(),
+            "only the legislature can rank guilds",
+        );
+        RewardConsensus::get_assert(fractal).set_ranked_guilds(guilds);
     }
 
     /// Set a new representative of the Guild.

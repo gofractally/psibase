@@ -8,7 +8,7 @@ mod tests {
     use psibase::*;
     use serde::Deserialize;
     use serde_json::Value;
-    use Nft::NftRecord;
+    use Nft::Nft as NftRecord;
 
     #[derive(Deserialize)]
     struct Response {

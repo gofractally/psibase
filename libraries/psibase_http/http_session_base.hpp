@@ -5,6 +5,7 @@
 #include <boost/beast/http/message.hpp>
 #include <boost/beast/http/parser.hpp>
 #include <boost/beast/http/vector_body.hpp>
+#include <boost/beast/websocket/stream_base.hpp>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -92,14 +93,21 @@ namespace psibase::http
 
       // Called by the HTTP handler to send a response.
       void operator()(message_type&& msg);
-      void operator()(websocket_upgrade, request_type&& msg, accept_p2p_websocket_t f);
+      void operator()(websocket_upgrade,
+                      request_type&&                                    msg,
+                      accept_p2p_websocket_t                            f,
+                      boost::beast::websocket::stream_base::decorator&& decorator =
+                          boost::beast::websocket::stream_base::decorator([](auto&) {}));
 
-      virtual void write_response(message_type&& msg)                                      = 0;
-      virtual void accept_websocket(request_type&& request, accept_p2p_websocket_t&& next) = 0;
-      virtual void do_read()                                                               = 0;
-      virtual void post(std::function<void()>)                                             = 0;
-      virtual void close_impl(boost::beast::error_code& ec)                                = 0;
-      virtual void shutdown_impl()                                                         = 0;
+      virtual void write_response(message_type&& msg) = 0;
+      virtual void accept_websocket(
+          request_type&&                                    request,
+          accept_p2p_websocket_t&&                          next,
+          boost::beast::websocket::stream_base::decorator&& decorator) = 0;
+      virtual void do_read()                                           = 0;
+      virtual void post(std::function<void()>)                         = 0;
+      virtual void close_impl(boost::beast::error_code& ec)            = 0;
+      virtual void shutdown_impl()                                     = 0;
 
       virtual SocketEndpoint remote_endpoint() const = 0;
       virtual bool           is_secure() const { return false; }
