@@ -90,7 +90,8 @@ pub mod tables {
             let sender = get_sender();
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
-            let last_updated = TransactSvc::call().currentBlock().time.seconds();
+            let last_updated =
+                TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
 
             Self::check_targets(target_min, target_max);
             Self::check_percent_change(percent_increase_ppm);
@@ -124,7 +125,7 @@ pub mod tables {
 
         pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
-            let seconds_elapsed = (now.seconds - self.last_update.seconds) as u32;
+            let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
                 let below_target = self.counter < self.target_min;
@@ -157,7 +158,12 @@ pub mod tables {
                 }
                 self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
                 self.counter = 0;
-                self.last_update = TransactSvc::call().currentBlock().time.seconds();
+                // The update is happening "mid block", so we round up to the next second. In other words,
+                // updates happens at the "end" of the block. Without this, a one-second block window would
+                // cause a percent decrease every block, because a percent increase zeroes out the counter,
+                // so each block would consider a window to have elapsed.
+                self.last_update =
+                    TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1);
                 self.save();
             }
             self.active_difficulty
