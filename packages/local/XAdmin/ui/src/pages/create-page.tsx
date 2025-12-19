@@ -421,7 +421,6 @@ export const CreatePage = () => {
                             packages={packages}
                         />
                     )}
-                    {currentStep === Step.Boot && <div />}
                     {currentStep === Step.SaveKey && (
                         <PromptSaveSigningKey
                             account={bpName}
