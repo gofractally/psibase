@@ -14,6 +14,7 @@ import {
     chainTypeSchema,
 } from "@/components/forms/chain-mode-form";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
+import { PromptConfirmSigningKey } from "@/components/forms/prompt-confirm-signing-key";
 import { PromptSaveSigningKey } from "@/components/forms/prompt-save-signing-key";
 import { InstallationSummary } from "@/components/installation-summary";
 import { MultiStepLoader } from "@/components/multi-step-loader";
@@ -414,63 +415,7 @@ export const CreatePage = () => {
                         />
                     )}
                     {currentStep === Step.ConfirmKey && (
-                        <importForm.AppForm>
-                            <form
-                                id="import-account-form"
-                                onSubmit={async (e) => {
-                                    e.preventDefault();
-                                    await importForm.handleSubmit();
-                                }}
-                                className="flex flex-col gap-6"
-                            >
-                                <CardContent className="flex flex-col">
-                                    <div className="mb-6 flex-1 space-y-2">
-                                        <CardTitle className="text-3xl font-normal">
-                                            Confirm your account
-                                        </CardTitle>
-                                        <CardDescription>
-                                            Use your block producer account
-                                        </CardDescription>
-                                    </div>
-                                    <div className="flex flex-1 flex-col gap-4">
-                                        <importForm.Subscribe
-                                            selector={(state) => [
-                                                state.isSubmitting,
-                                            ]}
-                                        >
-                                            {([isSubmitting]) => (
-                                                <importForm.AppField
-                                                    name="account"
-                                                    children={(field) => {
-                                                        return (
-                                                            <field.TextField
-                                                                label="Account name"
-                                                                disabled={
-                                                                    isSubmitting
-                                                                }
-                                                                placeholder="Account name"
-                                                            />
-                                                        );
-                                                    }}
-                                                />
-                                            )}
-                                        </importForm.Subscribe>
-                                        <importForm.AppField
-                                            name="privateKey"
-                                            children={(field) => {
-                                                return (
-                                                    <field.TextField
-                                                        type="password"
-                                                        label="Private key"
-                                                        placeholder="Private key"
-                                                    />
-                                                );
-                                            }}
-                                        />
-                                    </div>
-                                </CardContent>
-                            </form>
-                        </importForm.AppForm>
+                        <PromptConfirmSigningKey form={importForm} />
                     )}
                 </div>
                 <div className="py-4">
