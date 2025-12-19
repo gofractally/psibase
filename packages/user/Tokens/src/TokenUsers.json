@@ -21,6 +21,15 @@
     },
     {
         "sender": "symbol",
+        "service": "nft",
+        "method": "setUserConf",
+        "data": {
+            "index": 0,
+            "enable": false
+        }
+    },
+    {
+        "sender": "symbol",
         "service": "tokens",
         "method": "create",
         "data": {
@@ -31,10 +40,10 @@
     {
         "sender": "symbol",
         "service": "nft",
-        "method": "debit",
+        "method": "setUserConf",
         "data": {
-            "nftId": 1,
-            "memo": ""
+            "index": 0,
+            "enable": true
         }
     },
     {
