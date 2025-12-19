@@ -11,6 +11,7 @@ namespace SystemService
 
       void useNetSys(psibase::AccountNumber user, uint64_t amount_bytes);
       void useCpuSys(psibase::AccountNumber user, std::chrono::nanoseconds amount_ns);
+      void notifyBlock(psibase::BlockNum block_num);
 
       uint8_t getMaxPeers();
    };
@@ -18,6 +19,7 @@ namespace SystemService
    PSIO_REFLECT(VirtualServer,
                 method(useNetSys, user, amount_bytes),
                 method(useCpuSys, user, cpuUsage),
+                method(notifyBlock),
                 method(getMaxPeers))
 
 }  // namespace SystemService

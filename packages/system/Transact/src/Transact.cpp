@@ -22,6 +22,17 @@ static constexpr auto maxTrxLifetime = psibase::Seconds{60 * 60};  // 1 hour
 
 namespace SystemService
 {
+
+   namespace
+   {
+      bool isResMonitoring()
+      {
+         auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
+         auto config = table.get({});
+         return config && config->enabled;
+      }
+   }  // namespace
+
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
       auto statusTable = open<TransactStatusTable>();
@@ -112,6 +123,12 @@ namespace SystemService
       else
       {
          snap.put({stat.head->header.time, psibase::Seconds{0}});
+      }
+
+      if (isResMonitoring())
+      {
+         auto _ = recurse();
+         to<VirtualServer>().notifyBlock(stat.current.blockNum);
       }
    }
 
@@ -486,13 +503,6 @@ namespace SystemService
          auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
                            ServiceMethod{act.service(), act.method()}, std::vector<ServiceMethod>{},
                            claims);
-      }
-
-      bool isResMonitoring()
-      {
-         auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
-         auto config = table.get({});
-         return config && config->enabled;
       }
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)

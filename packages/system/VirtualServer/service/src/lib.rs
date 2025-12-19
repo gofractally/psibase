@@ -1,4 +1,5 @@
-mod prices;
+#![allow(non_snake_case)]
+
 mod rpc;
 pub mod tables;
 
@@ -41,27 +42,34 @@ pub mod tables;
 /// After each of the above steps, the billing service will be enabled, and users will be
 /// required to buy resources to transact with the network. Use the other actions in this
 /// service to manage server specs, network variables, and billing parameters, as needed.
-#[psibase::service(name = "virtual-server", tables = "tables::tables", recursive = true)]
+#[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
 mod service {
+    use crate::rpc::event_types;
     use crate::tables::tables::*;
-    use crate::{prices::*, rpc::event_types};
     use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
         nft::{NftHolderFlags, Wrapper as Nft},
-        tokens::{BalanceFlags, Quantity, TokenFlags, Wrapper as Tokens},
+        tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
     use psibase::*;
 
     #[action]
     fn init() {
+        if InitRow::is_init() {
+            return;
+        }
+
         InitRow::init();
 
         Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
         Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Wrapper::call().set_specs(MIN_SERVER_SPECS);
         Transact::call().resMonitoring(true);
+
+        // Initialize network resource consumption tracking
+        NetworkBandwidth::initialize();
 
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("resources"), 0);
@@ -86,30 +94,7 @@ mod service {
         check(get_sender() == get_service(), "Unauthorized");
         check(Accounts::call().exists(fee_receiver), "Fee_receiver DNE");
 
-        let table = BillingConfigTable::new();
-
-        check(
-            table.get_index_pk().get(&()).is_none(),
-            "Billing already initialized",
-        );
-
-        let tok = Tokens::call();
-        let sys = check_some(tok.getSysToken(), "System token not found");
-
-        const DEFAULT_RESOURCE_BUFFER_SIZE: u64 = 10;
-        let config = BillingConfig {
-            sys: sys.id,
-            res: tok.create(sys.precision, sys.max_issued_supply),
-            fee_receiver,
-            min_resource_buffer: DEFAULT_RESOURCE_BUFFER_SIZE
-                * 10u64.pow(sys.precision.value() as u32),
-            enabled: false,
-        };
-        table.put(&config).unwrap();
-
-        Nft::call().debit(config.res, "".into());
-        tok.mint(config.res, sys.max_issued_supply, "".into());
-        tok.setTokenConf(config.res, TokenFlags::UNTRANSFERABLE.index(), true);
+        BillingConfig::initialize(fee_receiver);
     }
 
     /// Get the account that receives all resource billing fees
@@ -187,10 +172,9 @@ mod service {
     /// metered network functionality.
     #[action]
     fn refill_res_buf() {
-        let config = check_some(BillingConfig::get(), "Billing not initialized");
-
+        let config = BillingConfig::get_assert();
         let balance = Tokens::call().getBalance(config.res, get_sender());
-        let buffer_capacity = ResourceBuffer::get(get_sender()).buffer_capacity;
+        let buffer_capacity = UserSettings::get(get_sender()).buffer_capacity;
 
         if balance.value >= buffer_capacity {
             return;
@@ -243,12 +227,52 @@ mod service {
         NetworkVariables::set(&variables);
     }
 
+    /// Set the network bandwidth pricing thresholds
+    ///
+    /// Configures the idle and congested thresholds used by the pricing algorithm
+    /// for network bandwidth billing. These thresholds are ppm values representing
+    /// the fraction of total available bandwidth (e.g. 45_0000 = 45%, 55_0000 = 55%).
+    ///
+    /// Below the idle threshold, the price of network bandwidth will decrease.
+    /// Above the congested threshold, the price of network bandwidth will increase.
+    ///
+    /// # Arguments
+    /// * `idle_ppm` - Threshold below which the network is considered idle (ppm)
+    /// * `congested_ppm` - Threshold above which the network is considered congested (ppm)
+    #[action]
+    fn net_thresholds(idle_ppm: u32, congested_ppm: u32) {
+        check(get_sender() == get_service(), "Unauthorized");
+        NetworkBandwidth::set_thresholds(idle_ppm, congested_ppm);
+    }
+
+    /// Set the network bandwidth price change rates
+    ///
+    /// Configures the rate at which the network bandwidth price increases when
+    /// congested and decreases when idle.
+    ///
+    /// # Arguments
+    /// * `doubling_time_sec` - Time it takes to double the price when congested
+    /// * `halving_time_sec` - Time it takes to halve the price when idle
+    #[action]
+    fn net_rates(doubling_time_sec: u32, halving_time_sec: u32) {
+        check(get_sender() == get_service(), "Unauthorized");
+        NetworkBandwidth::set_price_rates(doubling_time_sec, halving_time_sec);
+    }
+
+    #[action]
+    /// Sets the number of blocks over which to compute the average network usage.
+    /// This average usage is compared to the network capacity (every block) to determine
+    /// the price of network bandwidth.
+    fn net_blocks_avg(num_blocks: u8) {
+        check(get_sender() == get_service(), "Unauthorized");
+        NetworkBandwidth::set_num_blocks_to_average(num_blocks);
+    }
+
     /// Called by the system to indicate that the specified user has consumed a
     /// given amount of network bandwidth.
     ///
     /// If billing is enabled, the user will be billed for the consumption of
     /// this resource.
-    #[allow(non_snake_case)]
     #[action]
     fn useNetSys(user: AccountNumber, amount_bytes: u64) {
         check(
@@ -256,16 +280,15 @@ mod service {
             "[useNetSys] Unauthorized",
         );
 
-        let _amount = amount_bytes.saturating_mul(Prices::get_price(Resource::NetworkBandwidth));
-        check(_amount < u64::MAX, "network usage overflow");
+        let cost = NetworkBandwidth::consume(amount_bytes);
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
-            bill(user, 1); // TODO: implement network bandwidth pricing
+            bill(user, cost);
         }
 
         Wrapper::emit()
             .history()
-            .resources(user, event_types::CONSUMED_NET, _amount);
+            .resources(user, event_types::CONSUMED_NET, cost);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -273,33 +296,46 @@ mod service {
     ///
     /// If billing is enabled, the user will be billed for the consumption of
     /// this resource.
-    #[allow(non_snake_case)]
     #[action]
-    fn useCpuSys(user: AccountNumber, amount_ns: u64) {
+    fn useCpuSys(user: AccountNumber, _amount_ns: u64) {
         check(
             get_sender() == Transact::SERVICE,
             "[useCpuSys] Unauthorized",
         );
 
-        let _amount = amount_ns.saturating_mul(Prices::get_price(Resource::Compute));
-        check(_amount < u64::MAX, "cpu usage overflow");
+        //let _amount = amount_ns.saturating_mul(Prices::get_price(Resource::Compute));
+        //check(_amount < u64::MAX, "cpu usage overflow");
+
+        let cost = 1; // TODO: implement cpu pricing
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
-            bill(user, 1); // TODO: implement cpu pricing
+            bill(user, cost);
         }
 
         Wrapper::emit()
             .history()
-            .resources(user, event_types::CONSUMED_CPU, _amount);
+            .resources(user, event_types::CONSUMED_CPU, cost);
     }
 
     #[action]
     fn get_resources(user: AccountNumber) -> Quantity {
-        let config = check_some(BillingConfig::get(), "Billing not initialized");
+        let config = BillingConfig::get_assert();
 
         Tokens::call()
             .getSubBal(config.res, user.to_string())
             .unwrap_or(0.into())
+    }
+
+    #[action]
+    fn notifyBlock(block_num: BlockNum) {
+        check(get_sender() == Transact::SERVICE, "Unauthorized");
+
+        let net_usage = NetworkBandwidth::new_block();
+
+        // Emit the block usage stats every 10 blocks
+        if block_num % 10 == 0 {
+            Wrapper::emit().history().block_summary(net_usage);
+        }
     }
 
     #[event(history)]
@@ -314,8 +350,10 @@ mod service {
     ) {
     }
 
+    #[event(history)]
+    fn block_summary(net_usage_ppm: u32) {}
+
     #[action]
-    #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
         None.or_else(|| serve_graphql(&request, crate::rpc::Query))
             .or_else(|| serve_graphiql(&request))

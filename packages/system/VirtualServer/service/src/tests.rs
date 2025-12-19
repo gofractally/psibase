@@ -209,6 +209,10 @@ mod tests {
             .credit(sys, vserver, 10_0000.into(), "".into())
             .get()?;
 
+        chain.start_block();
+
+        let balance = get_resource_balance(&chain, alice)?;
+        assert!(balance < 10_0000);
         Ok(())
     }
 }
