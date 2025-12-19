@@ -293,7 +293,6 @@ export const CreatePage = () => {
                             } else {
                                 setLoading(false);
                                 const message = "Something went wrong.";
-                                // TODO: Prevent user from proceeding to next step if boot failed.
                                 toast({
                                     title: "Error",
                                     description: message,
