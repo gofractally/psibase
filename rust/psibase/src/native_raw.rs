@@ -160,6 +160,12 @@ extern "C" {
     /// and [getKey] to get found key.
     pub fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32;
 
+    /// Sets the CPU timer to expire after the current transaction/query/callback
+    /// context has run for a given number of nanoseconds. When the timer
+    /// expires, the current context will be terminated. Setting the timeout
+    /// replaces any previous timeout.
+    pub fn setMaxCpuTime(ns: u64);
+
     pub fn checkoutSubjective();
     pub fn commitSubjective() -> bool;
     pub fn abortSubjective();
