@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 type Step<T> = {
-    step: T | "COMPLETION";
+    step: T | "BOOT_SUCCESS";
     skip?: boolean;
     checkCanProceed?: () => Promise<boolean>;
 };
@@ -14,9 +14,9 @@ export const useStepper = <T>(steps: Step<T>[]) => {
     const [currentStepNum, setStepNum] = useState(1);
     const availableSteps = steps.filter((f) => !f.skip);
 
-    const numberOfSteps = availableSteps.length + 1;
+    const numberOfSteps = availableSteps.length;
 
-    const canNext = currentStepNum < numberOfSteps;
+    const canNext = currentStepNum < numberOfSteps + 1;
     const canPrev = currentStepNum > 1;
 
     const next = async () => {
@@ -34,9 +34,13 @@ export const useStepper = <T>(steps: Step<T>[]) => {
         setStepNum((step) => (canPrev ? step - 1 : step));
     };
 
+    const isComplete = currentStepNum == numberOfSteps + 1;
+
     return {
         currentStepNum,
-        currentStep: availableSteps[currentStepNum - 1].step,
+        currentStep: isComplete
+            ? "BOOT_SUCCESS"
+            : availableSteps[currentStepNum - 1].step,
         maxSteps: numberOfSteps,
         next,
         previous,

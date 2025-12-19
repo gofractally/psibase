@@ -8,6 +8,7 @@ import { z } from "zod";
 import { useToast } from "@/components/ui/use-toast";
 
 import { PrevNextButtons } from "@/components/PrevNextButtons";
+import { BootSuccess } from "@/components/boot-success";
 import { BlockProducerForm } from "@/components/forms/block-producer";
 import {
     ChainTypeForm,
@@ -140,6 +141,7 @@ export const CreatePage = () => {
         Completion: "COMPLETION",
         SaveKey: "SAVE_KEY",
         ConfirmKey: "CONFIRM_KEY",
+        BootSuccess: "BOOT_SUCCESS",
     } as const;
 
     type StepKey = (typeof Step)[keyof typeof Step];
@@ -290,6 +292,7 @@ export const CreatePage = () => {
                             } else {
                                 setLoading(false);
                                 const message = "Something went wrong.";
+                                // TODO: Prevent user from proceeding to next step if boot failed.
                                 toast({
                                     title: "Error",
                                     description: message,
@@ -320,6 +323,14 @@ export const CreatePage = () => {
     }, [currentStep, rows, bpName, config]);
 
     console.log("CURRENT STEP", currentStep);
+
+    if (currentStep === Step.BootSuccess) {
+        return (
+            <SetupWrapper>
+                <BootSuccess />
+            </SetupWrapper>
+        );
+    }
 
     return (
         <SetupWrapper>
