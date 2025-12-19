@@ -154,9 +154,24 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) {}
     }
+
+    #[table(name = "CpuTimeTable", index = 7)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    pub struct CpuTime {
+        pub num_blocks_to_average: u8,
+        pub usage_history: Vec<u64>,
+        pub current_usage_ns: u64,
+        pub diff_adjust_id: u32,
+    }
+
+    impl CpuTime {
+        #[primary_key]
+        fn pk(&self) {}
+    }
 }
 
 mod billing_config;
+mod cpu_time;
 mod network_bandwidth;
 mod network_specs;
 mod network_variables;

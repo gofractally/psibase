@@ -71,6 +71,7 @@ mod service {
 
         // Initialize network resource consumption tracking
         NetworkBandwidth::initialize();
+        CpuTime::initialize();
 
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("resources"), 0);
@@ -298,14 +299,13 @@ mod service {
     /// If billing is enabled, the user will be billed for the consumption of
     /// this resource.
     #[action]
-    fn useCpuSys(user: AccountNumber, _amount_ns: u64) {
+    fn useCpuSys(user: AccountNumber, amount_ns: u64) {
         check(
             get_sender() == Transact::SERVICE,
             "[useCpuSys] Unauthorized",
         );
 
-        //let cost = CpuTime::consume(amount_ns);
-        let cost = 1; // TODO: implement cpu pricing
+        let cost = CpuTime::consume(amount_ns);
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
             bill(user, cost);
@@ -330,10 +330,13 @@ mod service {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
         let net_usage = NetworkBandwidth::new_block();
+        let cpu_usage = CpuTime::new_block();
 
         // Emit the block usage stats every 10 blocks
         if block_num % 10 == 0 {
-            Wrapper::emit().history().block_summary(net_usage);
+            Wrapper::emit()
+                .history()
+                .block_summary(net_usage, cpu_usage);
         }
     }
 
@@ -341,12 +344,10 @@ mod service {
     ///
     /// Returns None if there is no limit for the specified account
     #[action]
-    fn getCpuLimit(_account: AccountNumber) -> Option<u64> {
+    fn getCpuLimit(account: AccountNumber) -> Option<u64> {
         check(get_sender() == CpuLimit::SERVICE, "Unauthorized");
 
-        // Todo
-        //CpuTime::get_cpu_limit(account)
-        Some(1_000_000_000u64) // 1 second
+        Some(CpuTime::get_cpu_limit(account))
     }
 
     #[event(history)]
@@ -362,7 +363,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(net_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 
     #[action]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {

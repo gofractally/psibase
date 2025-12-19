@@ -4,8 +4,14 @@
 mod tests {
 
     use psibase::{
+        account,
         fracpack::Pack,
-        services::{http_server, staged_tx, tokens},
+        services::{
+            http_server,
+            nft::Wrapper as Nft,
+            staged_tx,
+            tokens::{self, Precision, Quantity, Wrapper as Tokens},
+        },
         tester, AccountNumber, Action, ChainEmptyResult,
     };
     use serde::Deserialize;
@@ -121,13 +127,50 @@ mod tests {
         Ok(response.data.getResources.value)
     }
 
-    #[psibase::test_case(packages("VirtualServer", "TokenUsers", "StagedTx"))]
+    fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
+        let tokens_service = tokens::Wrapper::SERVICE;
+        let symbol = account!("symbol");
+        let alice = account!("alice");
+        let bob = account!("bob");
+
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+
+        let supply: u64 = 10_000_000_000_000_0000u64.into();
+        let sys = tokens::Wrapper::push_from(chain, symbol)
+            .create(Precision::new(4).unwrap(), Quantity::from(supply))
+            .get()?;
+
+        let nid = Tokens::push(&chain).getToken(sys).get()?.nft_id;
+        Nft::push_from(chain, symbol).debit(nid, "".into()).get()?;
+
+        Tokens::push_from(chain, tokens_service)
+            .setSysToken(sys)
+            .get()?;
+
+        tokens::Wrapper::push_from(chain, symbol)
+            .mint(sys, Quantity::from(supply), "".into())
+            .get()?;
+
+        tokens::Wrapper::push_from(chain, symbol)
+            .credit(sys, alice, 1_000_0000u64.into(), "".into())
+            .get()?;
+
+        tokens::Wrapper::push_from(chain, symbol)
+            .credit(sys, bob, 1_000_0000u64.into(), "".into())
+            .get()?;
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("VirtualServer", "StagedTx"))]
     fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        // Depending on TokenUsers so it sets up the system token for me
         let vserver = Wrapper::SERVICE;
         let tokens = tokens::Wrapper::SERVICE;
         let sys: tokens::TID = 1;
         let alice = AccountNumber::from("alice");
+
+        initial_setup(&chain)?;
 
         // This is still needed even though the package config specifies the server...
         http_server::Wrapper::push_from(&chain, vserver)
@@ -145,12 +188,13 @@ mod tests {
                 fee_receiver: tokens,
             },
         )?;
+
         let config = get_billing_config(&chain)?;
         assert!(config.fee_receiver == tokens);
 
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
-        tokens::Wrapper::push_from(&chain, alice) // Alice holds tokens from TokenUsers pkg
+        tokens::Wrapper::push_from(&chain, alice)
             .credit(sys, PRODUCER_ACCOUNT, 100_0000.into(), "".into())
             .get()?;
 
@@ -209,10 +253,13 @@ mod tests {
             .credit(sys, vserver, 10_0000.into(), "".into())
             .get()?;
 
-        chain.start_block();
+        chain.finish_block();
 
         let balance = get_resource_balance(&chain, alice)?;
         assert!(balance < 10_0000);
+
+        println!("alice resource balance: {}", balance);
+
         Ok(())
     }
 }
