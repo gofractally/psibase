@@ -24,6 +24,7 @@ import { bootChain } from "@/lib/bootChain";
 import { getId } from "@/lib/getId";
 import { getRequiredPackages } from "@/lib/getRequiredPackages";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { zAccount } from "@shared/lib/schemas/account";
@@ -330,6 +331,14 @@ export const CreatePage = () => {
         );
     }
 
+    if (errorMessage) {
+        return (
+            <SetupWrapper>
+                <ErrorCard error={new Error(errorMessage)} />
+            </SetupWrapper>
+        );
+    }
+
     return (
         <SetupWrapper>
             <DependencyDialog
@@ -412,7 +421,7 @@ export const CreatePage = () => {
                             packages={packages}
                         />
                     )}
-                    {currentStep === Step.Boot && <div>{errorMessage}</div>}
+                    {currentStep === Step.Boot && <div />}
                     {currentStep === Step.SaveKey && (
                         <PromptSaveSigningKey
                             account={bpName}
