@@ -39,7 +39,7 @@ export const useStepper = <T>(steps: Step<T>[]) => {
     return {
         currentStepNum,
         currentStep: isComplete
-            ? "BOOT_SUCCESS"
+            ? "BOOT_COMPLETE"
             : availableSteps[currentStepNum - 1].step,
         maxSteps: numberOfSteps,
         next,

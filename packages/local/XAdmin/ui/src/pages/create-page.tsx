@@ -137,11 +137,11 @@ export const CreatePage = () => {
         ChainType: "CHAIN_TYPE",
         BlockProducer: "BLOCK_PRODUCER",
         KeyDevice: "KEY_DEVICE",
-        Confirmation: "CONFIRMATION",
-        Completion: "COMPLETION",
+        PreBootConfirmation: "PRE_BOOT_CONFIRMATION",
+        Boot: "BOOT",
         SaveKey: "SAVE_KEY",
         ConfirmKey: "CONFIRM_KEY",
-        BootSuccess: "BOOT_SUCCESS",
+        BootComplete: "BOOT_COMPLETE",
     } as const;
 
     type StepKey = (typeof Step)[keyof typeof Step];
@@ -174,8 +174,8 @@ export const CreatePage = () => {
             },
             skip: isDev,
         },
-        { step: Step.Confirmation },
-        { step: Step.Completion },
+        { step: Step.PreBootConfirmation },
+        { step: Step.Boot },
         {
             step: Step.SaveKey,
             checkCanProceed: async () => {
@@ -225,7 +225,7 @@ export const CreatePage = () => {
     );
 
     useEffect(() => {
-        if (currentStep === Step.Confirmation) {
+        if (currentStep === Step.PreBootConfirmation) {
             const state = suggestedSelection.reduce(
                 (acc, item) => ({ ...acc, [getId(item)]: true }),
                 {},
@@ -310,11 +310,11 @@ export const CreatePage = () => {
             }
         };
 
-        if (currentStep === Step.Completion && !installRan.current && config) {
+        if (currentStep === Step.Boot && !installRan.current && config) {
             setLoading(true);
             installRan.current = true;
             setKeysAndBoot();
-        } else if (currentStep === Step.Confirmation) {
+        } else if (currentStep === Step.PreBootConfirmation) {
             // This case allows the user to retry after a failed step 4.
             if (installRan.current) {
                 installRan.current = false;
@@ -322,9 +322,7 @@ export const CreatePage = () => {
         }
     }, [currentStep, rows, bpName, config]);
 
-    console.log("CURRENT STEP", currentStep);
-
-    if (currentStep === Step.BootSuccess) {
+    if (currentStep === Step.BootComplete) {
         return (
             <SetupWrapper>
                 <BootSuccess />
@@ -346,7 +344,7 @@ export const CreatePage = () => {
                     prom(confirmed);
                 }}
             />
-            {currentStep === Step.Completion && (
+            {currentStep === Step.Boot && (
                 <MultiStepLoader
                     loadingStates={loadingStates}
                     loading={loading}
@@ -404,7 +402,7 @@ export const CreatePage = () => {
                             </Card>
                         </div>
                     )}
-                    {currentStep === Step.Confirmation && (
+                    {currentStep === Step.PreBootConfirmation && (
                         <InstallationSummary
                             isDev={isDev}
                             bpName={bpName}
@@ -414,9 +412,7 @@ export const CreatePage = () => {
                             packages={packages}
                         />
                     )}
-                    {currentStep === Step.Completion && (
-                        <div>{errorMessage}</div>
-                    )}
+                    {currentStep === Step.Boot && <div>{errorMessage}</div>}
                     {currentStep === Step.SaveKey && (
                         <PromptSaveSigningKey
                             account={bpName}
