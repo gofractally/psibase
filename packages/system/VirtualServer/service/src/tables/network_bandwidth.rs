@@ -84,10 +84,10 @@ impl NetworkBandwidth {
         bandwidth.current_usage_bps += amount_bits;
         table.put(&bandwidth).unwrap();
 
-        let price_per_byte = Self::price(); // Maybe this should be price per 100 bytes?
-        let price = amount_bytes.saturating_mul(price_per_byte);
-        check(price < u64::MAX, "network usage overflow");
-        price
+        let price = Self::price_per_byte(); // Maybe this should be price per 100 bytes?
+        let cost = amount_bytes.saturating_mul(price);
+        check(cost < u64::MAX, "network usage overflow");
+        cost
     }
 
     pub fn new_block() -> u32 {
@@ -128,7 +128,7 @@ impl NetworkBandwidth {
         ppm
     }
 
-    pub fn price() -> u64 {
+    pub fn price_per_byte() -> u64 {
         DiffAdjust::call().get_diff(Self::get().diff_adjust_id)
     }
 
