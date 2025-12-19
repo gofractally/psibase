@@ -5,6 +5,7 @@ import {
     Package,
     Pickaxe,
     Settings,
+    Server,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -43,6 +44,11 @@ export const appMenus: Menu[] = [
         title: "Pending transactions",
         icon: ListTodo,
         path: "pending-transactions",
+    },
+    {
+        title: "Resources",
+        icon: Server,
+        path: "resources",
     },
     {
         title: "Settings",
