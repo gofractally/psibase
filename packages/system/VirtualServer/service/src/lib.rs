@@ -49,6 +49,7 @@ mod service {
     use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
+        cpu_limit::Wrapper as CpuLimit,
         nft::{NftHolderFlags, Wrapper as Nft},
         tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
@@ -303,9 +304,7 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        //let _amount = amount_ns.saturating_mul(Prices::get_price(Resource::Compute));
-        //check(_amount < u64::MAX, "cpu usage overflow");
-
+        //let cost = CpuTime::consume(amount_ns);
         let cost = 1; // TODO: implement cpu pricing
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
@@ -336,6 +335,18 @@ mod service {
         if block_num % 10 == 0 {
             Wrapper::emit().history().block_summary(net_usage);
         }
+    }
+
+    /// Gets the CPU limit (in ns) for the specified account
+    ///
+    /// Returns None if there is no limit for the specified account
+    #[action]
+    fn getCpuLimit(_account: AccountNumber) -> Option<u64> {
+        check(get_sender() == CpuLimit::SERVICE, "Unauthorized");
+
+        // Todo
+        //CpuTime::get_cpu_limit(account)
+        Some(1_000_000_000u64) // 1 second
     }
 
     #[event(history)]
