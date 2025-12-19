@@ -268,6 +268,8 @@ pub mod service {
     /// * `floor_difficulty` - Minimum difficulty
     /// * `percent_increase_ppm` - Percent to increment when over target, 50000 = 5%
     /// * `percent_decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    ///
+    /// Returns the ID of the NFT that can be used for administration of the rate limit.
     #[action]
     fn create(
         initial_difficulty: u64,
