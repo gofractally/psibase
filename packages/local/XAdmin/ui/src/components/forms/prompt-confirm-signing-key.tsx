@@ -1,4 +1,5 @@
 import { withForm } from "@shared/components/form/app-form";
+import { GlowingCard } from "@shared/components/glowing-card";
 import {
     CardContent,
     CardDescription,
@@ -22,7 +23,7 @@ export const PromptConfirmSigningKey = withForm({
         };
 
         return (
-            <div id="import-account-form" className="flex flex-col gap-6">
+            <GlowingCard className="w-xl mx-auto">
                 <CardContent className="flex flex-col">
                     <div className="mb-6 flex-1 space-y-2">
                         <CardTitle className="text-3xl font-normal">
@@ -60,7 +61,7 @@ export const PromptConfirmSigningKey = withForm({
                         />
                     </div>
                 </CardContent>
-            </div>
+            </GlowingCard>
         );
     },
 });
