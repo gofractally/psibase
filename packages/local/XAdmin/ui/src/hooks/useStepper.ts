@@ -4,6 +4,7 @@ type Step<T> = {
     step: T | "BOOT_SUCCESS";
     skip?: boolean;
     checkCanProceed?: () => Promise<boolean>;
+    noPrev?: boolean;
 };
 
 /**
@@ -13,16 +14,15 @@ type Step<T> = {
 export const useStepper = <T>(steps: Step<T>[]) => {
     const [currentStepNum, setStepNum] = useState(1);
     const availableSteps = steps.filter((f) => !f.skip);
-
     const numberOfSteps = availableSteps.length;
+    const currentStep = availableSteps[currentStepNum - 1];
 
     const canNext = currentStepNum < numberOfSteps + 1;
-    const canPrev = currentStepNum > 1;
+    const canPrev = !currentStep?.noPrev;
 
     const next = async () => {
         if (canNext) {
-            const currentChecker =
-                availableSteps[currentStepNum - 1].checkCanProceed;
+            const currentChecker = currentStep.checkCanProceed;
             const isPassable = !currentChecker || (await currentChecker?.());
             if (isPassable) {
                 setStepNum((step) => (canNext ? step + 1 : step));
@@ -38,9 +38,7 @@ export const useStepper = <T>(steps: Step<T>[]) => {
 
     return {
         currentStepNum,
-        currentStep: isComplete
-            ? "BOOT_COMPLETE"
-            : availableSteps[currentStepNum - 1].step,
+        currentStep: isComplete ? "BOOT_COMPLETE" : currentStep.step,
         maxSteps: numberOfSteps,
         next,
         previous,

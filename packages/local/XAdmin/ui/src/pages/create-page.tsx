@@ -1,7 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-// import { useNavigate } from "react-router-dom";
 import { crypto } from "wasm-transpiled";
 import { z } from "zod";
 
@@ -84,7 +83,6 @@ export const CreatePage = () => {
         },
     });
 
-    // const navigate = useNavigate();
     const { toast } = useToast();
 
     const { data: config } = useConfig();
@@ -160,6 +158,7 @@ export const CreatePage = () => {
             checkCanProceed: async () => {
                 return await chainTypeForm.trigger();
             },
+            noPrev: true,
         },
         {
             step: Step.BlockProducer,
@@ -175,13 +174,14 @@ export const CreatePage = () => {
             skip: isDev,
         },
         { step: Step.PreBootConfirmation },
-        { step: Step.Boot },
+        { step: Step.Boot, noPrev: true },
         {
             step: Step.SaveKey,
             checkCanProceed: async () => {
                 return await didSaveKey;
             },
             skip: isDev,
+            noPrev: true,
         },
         {
             step: Step.ConfirmKey,
