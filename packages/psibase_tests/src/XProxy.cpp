@@ -8,12 +8,21 @@
 using namespace psibase;
 using namespace LocalService;
 
+void spinFor(std::chrono::steady_clock::duration duration)
+{
+   auto end = std::chrono::steady_clock::now() + duration;
+   while (std::chrono::steady_clock::now() < end)
+   {
+   }
+}
+
 struct OriginServerRow
 {
    std::string                   host;
    std::optional<TLSInfo>        tls;
    std::optional<SocketEndpoint> endpoint;
-   PSIO_REFLECT(OriginServerRow, host, tls, endpoint)
+   std::optional<MicroSeconds>   spin;
+   PSIO_REFLECT(OriginServerRow, host, tls, endpoint, spin)
 };
 using OriginServerTable = psibase::Table<OriginServerRow, SingletonKey{}>;
 PSIO_REFLECT_TYPENAME(OriginServerTable)
@@ -98,22 +107,25 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
       if (originServer)
       {
          req.host = originServer->host;
-         std::int32_t upstream;
+         std::int32_t          upstream;
+         psibase::MethodNumber callback;
          if (isWebSocketHandshake(req))
          {
-            upstream = to<XHttp>().websocket(req, MethodNumber{"onAccept"}, MethodNumber{"onError"},
-                                             originServer->tls, originServer->endpoint);
+            upstream = to<XHttp>().websocket(req, originServer->tls, originServer->endpoint);
+            callback = MethodNumber{"onAccept"};
          }
          else
          {
-            upstream =
-                to<XHttp>().sendRequest(req, MethodNumber{"onReply"}, MethodNumber{"onError"},
-                                        originServer->tls, originServer->endpoint);
+            upstream = to<XHttp>().sendRequest(req, originServer->tls, originServer->endpoint);
+            callback = MethodNumber{"onReply"};
          }
+         if (originServer->spin)
+            spinFor(*originServer->spin);
          auto requests = open<ProxyTable>();
          PSIBASE_SUBJECTIVE_TX
          {
             to<XHttp>().autoClose(*socket, false);
+            to<XHttp>().setCallback(upstream, callback, MethodNumber{"onError"});
             requests.put({upstream, *socket});
          }
          return {};

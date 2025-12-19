@@ -91,11 +91,15 @@ let socket = x_http::Wrapper::call().sendRequest(
         contentType: Default::default(),
         body: Default::default(),
     },
-    method!("succeeded"),
-    method!("failed"),
     None,
     None,
 );
+subjective_tx! {
+    x_http::Wrapper::call().setCallback(socket,
+        method!("succeeded"), method!("failed"));
+    // Add socket to a table so we know what to do
+    // with the response
+}
 
 ...
 #[action]
@@ -111,10 +115,15 @@ std::int32_t socket = to<XHttp>().sendRequest(
         .method = "GET",
         .target = "https://example.com/"
     },
-    MethodNumber{"succeeded"},
-    MethodNumber{"failed"},
     std::nullopt, std::nullopt
 );
+PSIBASE_SUBJECTIVE_TX
+{
+    to<XHttp>().setCallback(socket,
+        MethodNumber{"succeeded"}, MethodNumber{"failed"});
+    // Add socket to a table so we know what to do
+    // with the response
+}
 
 ...
 void succeeded(std::int32_t socket, HttpReply reply);
@@ -139,11 +148,15 @@ let socket = x_http::Wrapper::call().websocket(
         contentType: Default::default(),
         body: Default::default(),
     },
-    method!("connected"),
-    method!("failed"),
     None,
     None,
 );
+subjective_tx! {
+    x_http::Wrapper::call().setCallback(socket,
+        method!("connected"), method!("failed"));
+    // Add socket to a table so we know what to do with the
+    // messages we receive
+}
 
 ...
 #[action]
@@ -167,10 +180,15 @@ std::int32_t socket = to<XHttp>().websocket(
         .method = "GET",
         .target = "https://websocket.example.com/"
     },
-    MethodNumber{"connected"},
-    MethodNumber{"failed"},
     std::nullopt, std::nullopt
 );
+PSIBASE_SUBJECTIVE_TX
+{
+    to<XHttp>().setCallback(socket,
+        MethodNumber{"connected"}, MethodNumber{"failed"});
+    // Add socket to a table so we know what to do with the
+    // messages we receive
+}
 
 ...
 void connected(std::int32_t socket, HttpReply reply)
