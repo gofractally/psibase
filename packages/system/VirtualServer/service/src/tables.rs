@@ -141,30 +141,51 @@ pub mod tables {
         pub buffer_capacity: u64,
     }
 
-    #[table(name = "NetworkBandwidthTable", index = 6)]
+    #[table(name = "NetPricingTable", index = 6)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
-    pub struct NetworkBandwidth {
+    #[graphql(complex)]
+    pub struct NetPricing {
+        /// The number of blocks over which to compute the average usage
         pub num_blocks_to_average: u8,
+
+        #[graphql(skip)]
+        /// The actual history of network bandwidth usage over the last
+        /// `num_blocks_to_average` blocks
         pub usage_history: Vec<u64>,
+
+        #[graphql(skip)]
+        /// The network bandwidth usage in bits per second for the current block
         pub current_usage_bps: u64,
+
+        #[graphql(skip)]
+        /// The ID Of the diff adjust object used to calculate price
         pub diff_adjust_id: u32,
+
+        /// The approximate amount of time it takes to double the price when congested
+        pub doubling_time_sec: u32,
+
+        /// The approximate amount of time it takes to halve the price when idle
+        pub halving_time_sec: u32,
     }
 
-    impl NetworkBandwidth {
+    impl NetPricing {
         #[primary_key]
         fn pk(&self) {}
     }
 
-    #[table(name = "CpuTimeTable", index = 7)]
+    #[table(name = "CpuPricingTable", index = 7)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
-    pub struct CpuTime {
+    #[graphql(complex)]
+    pub struct CpuPricing {
         pub num_blocks_to_average: u8,
         pub usage_history: Vec<u64>,
         pub current_usage_ns: u64,
         pub diff_adjust_id: u32,
+        pub doubling_time_sec: u32,
+        pub halving_time_sec: u32,
     }
 
-    impl CpuTime {
+    impl CpuPricing {
         #[primary_key]
         fn pk(&self) {}
     }

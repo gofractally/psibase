@@ -70,8 +70,8 @@ mod service {
         Transact::call().resMonitoring(true);
 
         // Initialize network resource consumption tracking
-        NetworkBandwidth::initialize();
-        CpuTime::initialize();
+        NetPricing::initialize();
+        CpuPricing::initialize();
 
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("resources"), 0);
@@ -244,7 +244,7 @@ mod service {
     #[action]
     fn net_thresholds(idle_ppm: u32, congested_ppm: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetworkBandwidth::set_thresholds(idle_ppm, congested_ppm);
+        NetPricing::set_thresholds(idle_ppm, congested_ppm);
     }
 
     /// Set the network bandwidth price change rates
@@ -258,7 +258,7 @@ mod service {
     #[action]
     fn net_rates(doubling_time_sec: u32, halving_time_sec: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetworkBandwidth::set_price_rates(doubling_time_sec, halving_time_sec);
+        NetPricing::set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
     #[action]
@@ -267,7 +267,7 @@ mod service {
     /// the price of network bandwidth.
     fn net_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetworkBandwidth::set_num_blocks_to_average(num_blocks);
+        NetPricing::set_num_blocks_to_average(num_blocks);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -282,7 +282,7 @@ mod service {
             "[useNetSys] Unauthorized",
         );
 
-        let cost = NetworkBandwidth::consume(amount_bytes);
+        let cost = NetPricing::consume(amount_bytes);
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
             bill(user, cost);
@@ -305,7 +305,7 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let cost = CpuTime::consume(amount_ns);
+        let cost = CpuPricing::consume(amount_ns);
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
             bill(user, cost);
@@ -329,8 +329,8 @@ mod service {
     fn notifyBlock(block_num: BlockNum) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
-        let net_usage = NetworkBandwidth::new_block();
-        let cpu_usage = CpuTime::new_block();
+        let net_usage = NetPricing::new_block();
+        let cpu_usage = CpuPricing::new_block();
 
         // Emit the block usage stats every 10 blocks
         if block_num % 10 == 0 {
@@ -347,7 +347,7 @@ mod service {
     fn getCpuLimit(account: AccountNumber) -> Option<u64> {
         check(get_sender() == CpuLimit::SERVICE, "Unauthorized");
 
-        Some(CpuTime::get_cpu_limit(account))
+        Some(CpuPricing::get_cpu_limit(account))
     }
 
     #[event(history)]

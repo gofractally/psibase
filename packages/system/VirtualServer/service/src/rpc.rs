@@ -1,6 +1,6 @@
 use crate::tables::tables::{
-    BillingConfig, BillingConfigTable, NetworkSpecs, NetworkSpecsTable, NetworkVariables,
-    ServerSpecs as InternalServerSpecs, ServerSpecsTable,
+    BillingConfig, BillingConfigTable, CpuPricing, NetPricing, NetworkSpecs, NetworkSpecsTable,
+    NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable,
 };
 use async_graphql::{connection::Connection, *};
 use psibase::{
@@ -124,6 +124,16 @@ impl Query {
     /// These are therefore the specs that are relevant for metering/billing.
     async fn get_network_specs(&self) -> NetworkSpecs {
         NetworkSpecsTable::read().get_index_pk().get(&()).unwrap()
+    }
+
+    /// Returns the data related to pricing of network bandwidth
+    async fn network_pricing(&self) -> Option<NetPricing> {
+        NetPricing::get()
+    }
+
+    /// Returns the data relatd to pricing of CPU time
+    async fn cpu_pricing(&self) -> Option<CpuPricing> {
+        CpuPricing::get()
     }
 
     /// Returns the history of resource-related events for the specified actor
