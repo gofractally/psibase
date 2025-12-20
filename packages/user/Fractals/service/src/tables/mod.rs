@@ -13,7 +13,9 @@ mod reward_stream;
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{
+        define_flags, services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema,
+    };
 
     use serde::{Deserialize, Serialize};
 
@@ -33,7 +35,7 @@ pub mod tables {
         #[graphql(skip)]
         pub judiciary: AccountNumber,
         pub token_id: TID,
-        pub minimum_required_scorers: u8,
+        pub token_init_threshold: u8,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]
@@ -91,7 +93,13 @@ pub mod tables {
         pub rep_role: AccountNumber,
         pub bio: Memo,
         pub description: String,
+        pub rank_ordering_threshold: u8,
+        pub settings: u8,
     }
+
+    define_flags!(GuildFlags, u8, {
+        rank_ordering,
+    });
 
     impl Guild {
         #[secondary_key(1)]
@@ -121,6 +129,9 @@ pub mod tables {
         pub score: u32,
         pub pending_score: Option<u8>,
         pub created_at: psibase::TimePointSec,
+        pub is_candidate: bool,
+        pub candidacy_eligible_from: psibase::TimePointSec,
+        pub attendance: u16,
     }
 
     impl GuildMember {
@@ -135,8 +146,8 @@ pub mod tables {
         }
 
         #[secondary_key(2)]
-        fn by_score(&self) -> (AccountNumber, u32, AccountNumber) {
-            (self.guild, self.score, self.member)
+        fn by_score(&self) -> (AccountNumber, bool, u32, AccountNumber) {
+            (self.guild, self.is_candidate, self.score, self.member)
         }
     }
 

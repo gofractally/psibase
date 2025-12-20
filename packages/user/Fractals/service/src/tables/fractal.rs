@@ -2,10 +2,7 @@ use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::{
-    DEFAULT_MINIMUM_REQUIRED_SCORERS, MIN_MINIMUM_REQUIRED_SCORERS,
-    TOKEN_PRECISION, TOKEN_SUPPLY,
-};
+use crate::constants::{DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION, TOKEN_SUPPLY};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
@@ -41,7 +38,7 @@ impl Fractal {
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
-            minimum_required_scorers: DEFAULT_MINIMUM_REQUIRED_SCORERS,
+            token_init_threshold: DEFAULT_TOKEN_INIT_THRESHOLD,
         }
     }
 
@@ -122,19 +119,6 @@ impl Fractal {
         check(self.account == get_sender(), "Requires fractal authority");
     }
 
-    pub fn set_minimum_required_scorers(&mut self, minimum_required_scorers: u8) {
-        check_none(
-            RewardConsensus::get(self.account),
-            "reward consensus is already enabled, this setting is now redundant",
-        );
-        check(
-            minimum_required_scorers >= MIN_MINIMUM_REQUIRED_SCORERS,
-            "minimum scorers is too low",
-        );
-        self.minimum_required_scorers = minimum_required_scorers;
-        self.save();
-    }
-
     pub fn get(fractal: AccountNumber) -> Option<Self> {
         FractalTable::read().get_index_pk().get(&(fractal))
     }
@@ -144,6 +128,26 @@ impl Fractal {
             Self::get(fractal),
             &format!("fractal {} does not exist", fractal.to_string()),
         )
+    }
+
+    pub fn init_token(&self) {
+        let legislature_guild = Guild::get_assert(self.legislature);
+
+        check(
+            legislature_guild.active_member_count() >= self.token_init_threshold.into(),
+            "active member count does not meet token init threshold",
+        );
+
+        RewardConsensus::add(self.account, (TOKEN_SUPPLY / 4).into());
+    }
+
+    pub fn set_token_threshold(&mut self, threshold: u8) {
+        check_none(
+            RewardConsensus::get(self.account),
+            "token has already been initialised",
+        );
+        self.token_init_threshold = threshold;
+        self.save();
     }
 
     fn save(&self) {
