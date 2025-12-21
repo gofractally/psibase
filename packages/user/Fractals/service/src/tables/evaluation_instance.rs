@@ -1,8 +1,10 @@
+use std::collections::{HashMap, HashSet};
+
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
 use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
-use crate::helpers::{assign_decreasing_levels, RollingBitset};
+use crate::helpers::assign_decreasing_levels;
 use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
 use crate::{
     helpers::parse_rank_to_accounts,
@@ -44,14 +46,10 @@ impl EvaluationInstance {
 
     pub fn finish_evaluation(&self) {
         let mut guild = Guild::get_assert(self.guild);
-
-        if guild.is_rank_ordering() {
-            self.close_pending_scores(None);
-        } else {
-            self.close_pending_scores(Some(1));
-            if guild.active_member_count() >= guild.rank_ordering_threshold as usize {
-                guild.enable_rank_ordering();
-            }
+        let all_scores_are_equal = !guild.is_rank_ordering();
+        self.close_pending_scores(all_scores_are_equal.then_some(1));
+        if guild.active_member_count() >= guild.rank_ordering_threshold as usize {
+            guild.enable_rank_ordering();
         }
     }
 
@@ -61,12 +59,13 @@ impl EvaluationInstance {
             .get(&(get_service(), self.evaluation_id))
     }
 
-    pub fn users(&self, group_number: Option<u32>) -> Option<Vec<User>> {
+    pub fn users(&self, group_number: Option<u32>) -> Vec<User> {
         let fractals_service = get_service();
         let evaluation_id = self.evaluation_id;
 
-        let res = match group_number {
-            Some(group_number) => UserTable::with_service(evaluations::SERVICE)
+        let table = UserTable::with_service(evaluations::SERVICE);
+        match group_number {
+            Some(group_number) => table
                 .get_index_by_group()
                 .range(
                     (
@@ -83,7 +82,7 @@ impl EvaluationInstance {
                         ),
                 )
                 .collect(),
-            None => UserTable::with_service(evaluations::SERVICE)
+            None => table
                 .get_index_pk()
                 .range(
                     (fractals_service, evaluation_id, AccountNumber::new(0))
@@ -94,9 +93,7 @@ impl EvaluationInstance {
                         ),
                 )
                 .collect(),
-        };
-
-        Some(res)
+        }
     }
 
     fn create_evaluation(
@@ -190,43 +187,71 @@ impl EvaluationInstance {
             )
             .for_each(|mut account| {
                 account.pending_score = Some(0);
-                account.attendance = RollingBitset::from(account.attendance).mark(true).value();
-                table.put(&account).unwrap();
+                account.save_to(&table);
             });
     }
 
-    pub fn close_pending_scores(&self, overwrite_score: Option<u8>) {
-        let table = GuildMemberTable::read_write();
-        table
+    pub fn close_pending_scores(&self, forced_pending_score: Option<u8>) {
+        let guild_member_table = GuildMemberTable::read_write();
+
+        let evaluation_participants: HashSet<AccountNumber> = self
+            .users(None)
+            .into_iter()
+            .map(|account| account.user)
+            .collect();
+
+        guild_member_table
             .get_index_pk()
             .range(
                 (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
             )
-            .filter(|account| account.pending_score.is_some())
-            .for_each(|mut account| {
-                if overwrite_score.is_some() {
-                    account.pending_score = overwrite_score;
+            .filter(|account| {
+                let was_member_at_evaluation_start = account.pending_score.is_some();
+                was_member_at_evaluation_start
+            })
+            .for_each(|mut guild_member| {
+                if forced_pending_score.is_some() {
+                    guild_member.pending_score = forced_pending_score;
                 }
-                account.apply_pending_score();
-                table.put(&account).unwrap();
+
+                let attended_evaluation = evaluation_participants.contains(&guild_member.member);
+                guild_member.apply_new_score(attended_evaluation);
+                guild_member.save_to(&guild_member_table);
             });
     }
 
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
-        let group_members = self.users(Some(group_number)).unwrap();
+        let guild_member_table = GuildMemberTable::read_write();
 
-        let fractal_group_result = parse_rank_to_accounts(
-            vanilla_group_result,
-            group_members.into_iter().map(|user| user.user).collect(),
-        );
+        let group_members: Vec<_> = self
+            .users(Some(group_number))
+            .into_iter()
+            .map(|user| user.user)
+            .collect();
 
-        let guild_member_levels = assign_decreasing_levels(
+        let fractal_group_result =
+            parse_rank_to_accounts(vanilla_group_result, group_members.clone());
+
+        let level_by_account: HashMap<AccountNumber, u8> = assign_decreasing_levels(
             fractal_group_result,
             Some(GUILD_EVALUATION_GROUP_SIZE.into()),
-        );
+        )
+        .into_iter()
+        .map(|(level, member)| (member, level as u8))
+        .collect();
 
-        for (level, account) in guild_member_levels {
-            GuildMember::get_assert(self.guild, account).set_pending_score(Some(level as u8));
+        for account in group_members {
+            // Don't assume the evaluation group member is still a GuildMember,
+            // maybe he was kicked in the mean time.
+            if let Some(mut guild_member) =
+                GuildMember::get_from(&guild_member_table, self.guild, account)
+            {
+                let level_achieved = level_by_account.get(&account).copied();
+                if let Some(new_level) = level_achieved {
+                    guild_member.set_new_score(new_level);
+                }
+                guild_member.save_to(&guild_member_table);
+            }
         }
     }
 }

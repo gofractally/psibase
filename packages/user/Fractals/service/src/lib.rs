@@ -359,7 +359,6 @@ pub mod service {
         check_is_eval();
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))
-            .unwrap()
             .len();
         let is_valid_attestation = attestation
             .iter()

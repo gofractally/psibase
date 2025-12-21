@@ -36,23 +36,16 @@ impl GuildMember {
             .get(&(guild, member))
     }
 
+    pub fn get_from(
+        table: &GuildMemberTable,
+        guild: AccountNumber,
+        member: AccountNumber,
+    ) -> Option<Self> {
+        table.get_index_pk().get(&(guild, member))
+    }
+
     pub fn get_assert(guild: AccountNumber, member: AccountNumber) -> Self {
         check_some(Self::get(guild, member), "guild member does not exist")
-    }
-
-    pub fn set_pending_score(&mut self, pending_score: Option<u8>) {
-        self.pending_score = pending_score;
-        self.save();
-    }
-
-    pub fn apply_pending_score(&mut self) {
-        if let Some(pending_score) = self.pending_score.take() {
-            self.score = calculate_ema_u32(
-                pending_score as u32 * SCORE_SCALE,
-                self.score,
-                Fraction::new(1, EMA_ALPHA_DENOMINATOR),
-            );
-        }
     }
 
     pub fn kick(&self) {
@@ -80,6 +73,21 @@ impl GuildMember {
         }
     }
 
+    pub fn set_pending_score(&mut self, pending_score: Option<u8>) {
+        self.pending_score = pending_score;
+    }
+
+    pub fn apply_new_score(&mut self, attended: bool) {
+        self.attendance = RollingBitset::from(self.attendance).mark(attended).value();
+        if let Some(pending_score) = self.pending_score.take() {
+            self.score = calculate_ema_u32(
+                pending_score as u32 * SCORE_SCALE,
+                self.score,
+                Fraction::new(1, EMA_ALPHA_DENOMINATOR),
+            );
+        }
+    }
+
     fn remove(&self) {
         let table = GuildAttestTable::read_write();
         let members = GuildAttest::attestations_by_guild_member(self.guild, self.member);
@@ -91,10 +99,12 @@ impl GuildMember {
         GuildMemberTable::read_write().remove(&self);
     }
 
+    pub fn save_to(&self, table: &GuildMemberTable) {
+        table.put(&self).expect("failed to save");
+    }
+
     fn save(&self) {
-        GuildMemberTable::read_write()
-            .put(&self)
-            .expect("failed to save");
+        self.save_to(&GuildMemberTable::read_write());
     }
 }
 

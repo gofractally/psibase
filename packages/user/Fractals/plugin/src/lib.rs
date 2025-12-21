@@ -158,7 +158,7 @@ impl AdminFractal for FractallyPlugin {
     }
 
     fn set_token_threshold(threshold: u8) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_token_threshold);
+        assert_authorized(FunctionName::set_token_threshold)?;
 
         let packed_args = fractals::action_structs::set_tkn_thrs {
             fractal: get_sender_app()?,

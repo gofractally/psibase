@@ -145,7 +145,7 @@ impl Guild {
                 (self.account, AccountNumber::from(0))
                     ..=(self.account, AccountNumber::from(u64::MAX)),
             )
-            .filter(|account| RollingBitset::from(account.attendance).count_set() > 1)
+            .filter(|account| RollingBitset::from(account.attendance).count_last_n_set(4) > 1)
             .count()
     }
 

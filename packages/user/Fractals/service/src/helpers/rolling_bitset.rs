@@ -1,44 +1,51 @@
-type Type = u16;
-
-/// A rolling number bit activity tracker.
-/// Newest event is stored in the least-significant bit (LSB).
-/// Oldest bit automatically drops off after 8 entries.
+/// A rolling 16-bit activity tracker.
+/// Newest event → LSB. Oldest drops off after 16 events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct RollingBitset(Type);
+pub struct RollingBitset(u16);
 
 impl RollingBitset {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self(0)
     }
 
-    /// Mark an event: true = set bit (1), false = clear bit (0)
-    /// This shifts left and adds the new bit as the *least significant bit*
     pub fn mark(mut self, value: bool) -> Self {
-        // Shift left and add new bit; oldest bit falls off naturally
-        self.0 = (self.0 << 1) | (value as Type);
+        self.0 = (self.0 << 1) | (value as u16);
         self
     }
 
-    /// Get the bit value for the last `n` events (0 = most recent, 1 = previous, etc.)
-    /// Returns None if asking beyond recordable events
-    pub fn get(&self, events_ago: Type) -> bool {
-        let bit = (self.0 >> events_ago) & 1;
-        bit != 0
+    /// Get event from the past (0 = most recent)
+    pub fn get(self, events_ago: usize) -> bool {
+        events_ago < 16 && ((self.0 >> events_ago) & 1) != 0
     }
 
-    /// How many of the last events are set (true)?
-    pub fn count_set(&self) -> Type {
-        self.0.count_ones() as Type
+    /// Total trues in entire history
+    pub fn count_set(self) -> u16 {
+        self.0.count_ones() as u16
     }
 
-    /// Raw type value (useful for storage in DB)
-    pub fn value(&self) -> Type {
+    /// How many of the last n events were true?
+    pub fn count_last_n_set(self, n: usize) -> u16 {
+        let n = n.min(16);
+        if n == 0 {
+            return 0;
+        }
+        let mask = if n == 16 { u16::MAX } else { (1u16 << n) - 1 };
+        (self.0 & mask).count_ones() as u16
+    }
+
+    /// Raw value for DB storage
+    pub const fn value(self) -> u16 {
         self.0
     }
 }
 
-impl From<Type> for RollingBitset {
-    fn from(value: Type) -> Self {
+impl From<u16> for RollingBitset {
+    fn from(value: u16) -> Self {
         Self(value)
+    }
+}
+impl From<RollingBitset> for u16 {
+    fn from(b: RollingBitset) -> u16 {
+        b.0
     }
 }
