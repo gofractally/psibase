@@ -127,7 +127,7 @@ pub mod tables {
         pub member: AccountNumber,
         #[graphql(skip)]
         pub score: u32,
-        pub pending_score: Option<u8>,
+        pub pending_level: Option<u8>,
         pub created_at: psibase::TimePointSec,
         pub is_candidate: bool,
         pub candidacy_eligible_from: psibase::TimePointSec,

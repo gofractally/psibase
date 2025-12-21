@@ -46,8 +46,8 @@ impl EvaluationInstance {
 
     pub fn finish_evaluation(&self) {
         let mut guild = Guild::get_assert(self.guild);
-        let all_scores_are_equal = !guild.is_rank_ordering();
-        self.close_pending_scores(all_scores_are_equal.then_some(1));
+        let equal_levels_for_all_attendees = !guild.is_rank_ordering();
+        self.close_pending_levels(equal_levels_for_all_attendees.then_some(1));
         if guild.active_member_count() >= guild.rank_ordering_threshold as usize {
             guild.enable_rank_ordering();
         }
@@ -178,7 +178,7 @@ impl EvaluationInstance {
         table.put(&self).expect("failed to save");
     }
 
-    pub fn open_pending_scores(&self) {
+    pub fn open_pending_levels(&self) {
         let table = GuildMemberTable::read_write();
         table
             .get_index_pk()
@@ -186,12 +186,12 @@ impl EvaluationInstance {
                 (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
             )
             .for_each(|mut account| {
-                account.pending_score = Some(0);
+                account.open_pending_level();
                 account.save_to(&table);
             });
     }
 
-    pub fn close_pending_scores(&self, forced_pending_score: Option<u8>) {
+    pub fn close_pending_levels(&self, forced_pending_level: Option<u8>) {
         let guild_member_table = GuildMemberTable::read_write();
 
         let evaluation_participants: HashSet<AccountNumber> = self
@@ -206,16 +206,17 @@ impl EvaluationInstance {
                 (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
             )
             .filter(|account| {
-                let was_member_at_evaluation_start = account.pending_score.is_some();
+                let was_member_at_evaluation_start = account.pending_level.is_some();
                 was_member_at_evaluation_start
             })
             .for_each(|mut guild_member| {
-                if forced_pending_score.is_some() {
-                    guild_member.pending_score = forced_pending_score;
+                let attended_evaluation = evaluation_participants.contains(&guild_member.member);
+
+                if attended_evaluation && forced_pending_level.is_some() {
+                    guild_member.update_pending_level(forced_pending_level.unwrap());
                 }
 
-                let attended_evaluation = evaluation_participants.contains(&guild_member.member);
-                guild_member.apply_new_score(attended_evaluation);
+                guild_member.apply_pending_level_to_score(attended_evaluation);
                 guild_member.save_to(&guild_member_table);
             });
     }
@@ -248,7 +249,7 @@ impl EvaluationInstance {
             {
                 let level_achieved = level_by_account.get(&account).copied();
                 if let Some(new_level) = level_achieved {
-                    guild_member.set_new_score(new_level);
+                    guild_member.update_pending_level(new_level);
                 }
                 guild_member.save_to(&guild_member_table);
             }

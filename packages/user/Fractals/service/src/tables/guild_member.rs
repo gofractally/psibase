@@ -14,7 +14,7 @@ impl GuildMember {
         Self {
             guild,
             member,
-            pending_score: None,
+            pending_level: None,
             score: 0,
             created_at: now,
             is_candidate: false,
@@ -73,19 +73,32 @@ impl GuildMember {
         }
     }
 
-    pub fn set_pending_score(&mut self, pending_score: Option<u8>) {
-        self.pending_score = pending_score;
+    fn set_pending_level(&mut self, pending_level: Option<u8>) {
+        self.pending_level = pending_level;
     }
 
-    pub fn apply_new_score(&mut self, attended: bool) {
+    // 1. Called for every guild member at the start of a duration
+    // Setting a pending score to 0 regardless of evaluation attendance introduces decay
+    pub fn open_pending_level(&mut self) {
+        self.set_pending_level(Some(0));
+    }
+
+    // 2. Optionally called either when the GuildMember has achieved a level in a successful group evaluation
+    // Or is called when rank_ordering is not enabled,
+    pub fn update_pending_level(&mut self, pending_level: u8) {
+        self.set_pending_level(Some(pending_level));
+    }
+
+    // 3. Called when finishing an evaluation and taking the pending level to create the new score.
+    pub fn apply_pending_level_to_score(&mut self, attended: bool) {
         self.attendance = RollingBitset::from(self.attendance).mark(attended).value();
-        if let Some(pending_score) = self.pending_score.take() {
-            self.score = calculate_ema_u32(
-                pending_score as u32 * SCORE_SCALE,
-                self.score,
-                Fraction::new(1, EMA_ALPHA_DENOMINATOR),
-            );
-        }
+        let pending_level = self.pending_level.take().unwrap();
+
+        self.score = calculate_ema_u32(
+            pending_level as u32 * SCORE_SCALE,
+            self.score,
+            Fraction::new(1, EMA_ALPHA_DENOMINATOR),
+        );
     }
 
     fn remove(&self) {

@@ -210,7 +210,7 @@ pub mod service {
             Guild::get_assert(guild_account).evaluation(),
             "evaluation instance does not exist for guild",
         );
-        evaluation.open_pending_scores();
+        evaluation.open_pending_levels();
 
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
     }
