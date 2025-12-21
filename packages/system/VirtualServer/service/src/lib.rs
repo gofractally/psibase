@@ -270,6 +270,65 @@ mod service {
         NetPricing::set_num_blocks_to_average(num_blocks);
     }
 
+    /// Sets the size of the billable unit of network bandwidth.
+    ///
+    /// This unit is also the minimum amount billed for bandwidth in a single transaction.
+    #[action]
+    fn net_min_unit(bits: u64) {
+        check(get_sender() == get_service(), "Unauthorized");
+        NetPricing::set_billable_unit(bits);
+    }
+
+    /// Set the CPU pricing thresholds
+    ///
+    /// Configures the idle and congested thresholds used by the pricing algorithm
+    /// for CPU billing. These thresholds are ppm values representing
+    /// the fraction of total available CPU (e.g. 45_0000 = 45%, 55_0000 = 55%).
+    ///
+    /// Below the idle threshold, the price of CPU will decrease.
+    /// Above the congested threshold, the price of CPU will increase.
+    ///
+    /// # Arguments
+    /// * `idle_ppm` - Threshold below which the network is considered idle (ppm)
+    /// * `congested_ppm` - Threshold above which the network is considered congested (ppm)
+    #[action]
+    fn cpu_thresholds(idle_ppm: u32, congested_ppm: u32) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_thresholds(idle_ppm, congested_ppm);
+    }
+
+    /// Set the CPU price change rates
+    ///
+    /// Configures the rate at which the CPU price increases when
+    /// congested and decreases when idle.
+    ///
+    /// # Arguments
+    /// * `doubling_time_sec` - Time it takes to double the price when congested
+    /// * `halving_time_sec` - Time it takes to halve the price when idle
+    #[action]
+    fn cpu_rates(doubling_time_sec: u32, halving_time_sec: u32) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_change_rates(doubling_time_sec, halving_time_sec);
+    }
+
+    #[action]
+    /// Sets the number of blocks over which to compute the average CPU usage.
+    /// This average usage is compared to the network capacity (every block) to determine
+    /// the price of CPU.
+    fn cpu_blocks_avg(num_blocks: u8) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_num_blocks_to_average(num_blocks);
+    }
+
+    /// Sets the size of the billable unit of CPU time.
+    ///
+    /// This unit is also the minimum amount billed for CPU in a single transaction.
+    #[action]
+    fn cpu_min_unit(ns: u64) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_billable_unit(ns);
+    }
+
     /// Called by the system to indicate that the specified user has consumed a
     /// given amount of network bandwidth.
     ///

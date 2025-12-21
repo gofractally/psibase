@@ -166,6 +166,11 @@ pub mod tables {
 
         /// The approximate amount of time it takes to halve the price when idle
         pub halving_time_sec: u32,
+
+        /// The unit of billable network bandwidth.
+        ///
+        /// This is also the minimum amount of network bandwidth to bill for.
+        pub billable_unit: u64,
     }
 
     impl NetPricing {
@@ -177,12 +182,32 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
     pub struct CpuPricing {
+        /// The number of blocks over which to compute the average usage
         pub num_blocks_to_average: u8,
+
+        #[graphql(skip)]
+        /// The actual history of CPU time usage over the last
+        /// `num_blocks_to_average` blocks
         pub usage_history: Vec<u64>,
+
+        #[graphql(skip)]
+        /// The CPU time usage in nanoseconds for the current block
         pub current_usage_ns: u64,
+
+        #[graphql(skip)]
+        /// The ID Of the diff adjust object used to calculate price
         pub diff_adjust_id: u32,
+
+        /// The approximate amount of time it takes to double the price when congested
         pub doubling_time_sec: u32,
+
+        /// The approximate amount of time it takes to halve the price when idle
         pub halving_time_sec: u32,
+
+        /// The unit of billable CPU time.
+        ///
+        /// This is also the minimum amount of CPU time to bill for.
+        pub billable_unit: u64,
     }
 
     impl CpuPricing {
@@ -196,5 +221,8 @@ mod cpu_pricing;
 mod net_pricing;
 mod network_specs;
 mod network_variables;
+mod pricing_common;
 mod server_specs;
 mod user_settings;
+
+pub use pricing_common::*;
