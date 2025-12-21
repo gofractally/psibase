@@ -192,8 +192,8 @@ pub mod tables {
 }
 
 mod billing_config;
-mod cpu_time;
-mod network_bandwidth;
+mod cpu_pricing;
+mod net_pricing;
 mod network_specs;
 mod network_variables;
 mod server_specs;
