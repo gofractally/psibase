@@ -1,5 +1,5 @@
 use async_graphql::ComplexObject;
-use psibase::{check_none, check_some, AccountNumber, Table};
+use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
 use crate::helpers::RollingBitset;
@@ -99,6 +99,22 @@ impl GuildMember {
             self.score,
             Fraction::new(1, EMA_ALPHA_DENOMINATOR),
         );
+    }
+
+    pub fn set_candidacy(&mut self, active: bool) {
+        check(self.is_candidate != active, "candidacy state unchanged");
+        let now = TransactSvc::call().currentBlock().time.seconds();
+        if active {
+            check(
+                now >= self.candidacy_eligible_from,
+                "candidacy not eligible yet",
+            );
+        } else {
+            let guild = Guild::get_assert(self.guild);
+            self.candidacy_eligible_from = (now.seconds + guild.candidacy_cooldown as i64).into();
+        }
+        self.is_candidate = active;
+        self.save();
     }
 
     fn remove(&self) {

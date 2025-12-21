@@ -4,7 +4,8 @@ use psibase::services::auth_dyn::Wrapper as AuthDyn;
 use psibase::{check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, Table};
 
 use crate::constants::{
-    COUNCIL_SEATS, DEFAULT_RANK_ORDERING_THRESHOLD, MIN_RANK_ORDERING_THRESHOLD,
+    COUNCIL_SEATS, DEFAULT_CANDIDACY_COOLDOWN, DEFAULT_RANK_ORDERING_THRESHOLD,
+    MAX_CANDIDACY_COOLDOWN, MIN_RANK_ORDERING_THRESHOLD,
 };
 use crate::helpers::{two_thirds_plus_one, RollingBitset};
 use crate::tables::tables::{
@@ -32,6 +33,7 @@ impl Guild {
             rep_role,
             rank_ordering_threshold: DEFAULT_RANK_ORDERING_THRESHOLD,
             settings: 0,
+            candidacy_cooldown: DEFAULT_CANDIDACY_COOLDOWN,
         }
     }
 
@@ -78,6 +80,15 @@ impl Guild {
         AuthDyn::call().newAccount(guild);
 
         new_guild_instance
+    }
+
+    pub fn set_candidacy_cooldown(&mut self, cooldown_seconds: u32) {
+        check(
+            cooldown_seconds <= MAX_CANDIDACY_COOLDOWN,
+            "cooldown seconds breaches max limit",
+        );
+        self.candidacy_cooldown = cooldown_seconds;
+        self.save();
     }
 
     pub fn set_rank_ordering_threshold(&mut self, rank_ordering_threshold: u8) {

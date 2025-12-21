@@ -95,6 +95,7 @@ pub mod tables {
         pub description: String,
         pub rank_ordering_threshold: u8,
         pub settings: u8,
+        pub candidacy_cooldown: u32,
     }
 
     define_flags!(GuildFlags, u8, {

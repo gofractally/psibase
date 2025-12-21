@@ -37,6 +37,11 @@ pub mod constants {
 
     // Determine score sensitivity
     pub const EMA_ALPHA_DENOMINATOR: u32 = 6;
+
+    // Candidacy cool down determines how long a guild member must wait
+    // before he can make himself a candidate again.
+    pub const DEFAULT_CANDIDACY_COOLDOWN: u32 = ONE_WEEK;
+    pub const MAX_CANDIDACY_COOLDOWN: u32 = ONE_YEAR / 4;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
@@ -224,6 +229,30 @@ pub mod service {
     #[action]
     fn set_rnk_thrs(threshold: u8) {
         Guild::by_sender().set_rank_ordering_threshold(threshold);
+    }
+
+    /// Register candidacy.
+    ///
+    /// Register your candidacy to serve on a Guild council.  
+    ///
+    /// # Arguments
+    /// * `guild` - Guild candidate is member of
+    /// * `active`- True to become a candidate, False to retire
+    #[action]
+    fn reg_can(guild: AccountNumber, active: bool) {
+        GuildMember::get_assert(guild, get_sender()).set_candidacy(active);
+    }
+
+    /// Set the candidacy cooldown period.
+    ///
+    /// This defines how many seconds a guild member must wait after retiring their candidacy
+    /// before they are allowed to become a candidate again.
+    ///
+    /// # Arguments
+    /// * `cooldown_seconds` - The cooldown duration in seconds (0 disables the cooldown).
+    #[action]
+    fn set_can_cool(cooldown_seconds: u32) {
+        Guild::by_sender().set_candidacy_cooldown(cooldown_seconds);
     }
 
     /// Set token threshold.
