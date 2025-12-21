@@ -56,7 +56,7 @@ impl NetPricing {
         let price = Self::price();
 
         let mut amount_units = amount_bits / bandwidth.billable_unit;
-        amount_units = amount_units.max(bandwidth.billable_unit);
+        amount_units = amount_units.max(1);
 
         let cost = amount_units.saturating_mul(price);
         check(cost < u64::MAX, "network usage overflow");

@@ -49,7 +49,7 @@ impl CpuPricing {
         let price = Self::price();
 
         let mut amount_units = amount_ns / cpu_time.billable_unit;
-        amount_units = amount_units.max(cpu_time.billable_unit);
+        amount_units = amount_units.max(1);
 
         let cost = amount_units.saturating_mul(price);
         check(cost < u64::MAX, "CPU usage overflow");
