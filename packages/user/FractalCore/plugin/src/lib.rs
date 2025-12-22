@@ -25,6 +25,7 @@ define_trust! {
             - Starting an evaluation cycle
             - Closing an evaluation cycle
             - Trigger a fractal wide token distribution
+            - Initialise fractal token
         ",
         Medium => "
         Medium trust grants the abilities of the Low trust level, plus these abilities:
@@ -46,27 +47,20 @@ define_trust! {
             - Creating a new guild
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
-            - Set minimum scorers required to enable consensus rewards
+            - Set token init and guild ranking threshold
         ",
     }
     functions {
         None => [get_group_users],
         Low => [start_eval, close_eval, dist_token],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        High => [exile_member, set_rank_ordering_threshold, set_token_threshold, init_token, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
 
 struct FractalCorePlugin;
 
 impl AdminFractal for FractalCorePlugin {
-    fn set_min_scorers(min_scorers: u8) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_min_scorers)?;
-        propose::legislature()?;
-
-        FractalsPlugin::admin_fractal::set_min_scorers(min_scorers)
-    }
-
     fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
         assert_authorized(FunctionName::set_ranked_guild_slots)?;
         propose::legislature()?;
@@ -94,9 +88,30 @@ impl AdminFractal for FractalCorePlugin {
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
     }
+
+    fn set_token_threshold(threshold: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_token_threshold)?;
+        propose::judiciary()?;
+
+        FractalsPlugin::admin_fractal::set_token_threshold(threshold)
+    }
+
+    fn init_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::init_token)?;
+        propose::judiciary()?;
+
+        FractalsPlugin::admin_fractal::init_token()
+    }
 }
 
 impl AdminGuild for FractalCorePlugin {
+    fn set_rank_ordering_threshold(guild_account: String, threshold: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_rank_ordering_threshold)?;
+        propose::guild(&guild_account)?;
+
+        FractalsPlugin::admin_guild::set_rank_ordering_threshold(threshold)
+    }
+
     fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_guild_rep)?;
         propose::guild(&guild_account)?;

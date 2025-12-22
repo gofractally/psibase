@@ -1,12 +1,16 @@
 use async_graphql::ComplexObject;
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
-use psibase::{check_none, check_some, get_sender, AccountNumber, Memo, Table};
+use psibase::{check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, Table};
 
-use crate::constants::COUNCIL_SEATS;
-use crate::helpers::two_thirds_plus_one;
+use crate::constants::{
+    COUNCIL_SEATS, DEFAULT_CANDIDACY_COOLDOWN, DEFAULT_RANK_ORDERING_THRESHOLD,
+    MAX_CANDIDACY_COOLDOWN, MIN_RANK_ORDERING_THRESHOLD,
+};
+use crate::helpers::{two_thirds_plus_one, RollingBitset};
 use crate::tables::tables::{
-    EvaluationInstance, Fractal, FractalMember, Guild, GuildMember, GuildMemberTable, GuildTable,
+    EvaluationInstance, Fractal, FractalMember, Guild, GuildFlags, GuildMember, GuildMemberTable,
+    GuildTable,
 };
 
 impl Guild {
@@ -27,7 +31,27 @@ impl Guild {
             description: "".to_string(),
             council_role,
             rep_role,
+            rank_ordering_threshold: DEFAULT_RANK_ORDERING_THRESHOLD,
+            settings: 0,
+            candidacy_cooldown: DEFAULT_CANDIDACY_COOLDOWN,
         }
+    }
+
+    fn get_setting(&self, flag: GuildFlags) -> bool {
+        Flags::new(self.settings).get(flag)
+    }
+
+    fn set_setting(&mut self, flag: GuildFlags, enable: bool) {
+        self.settings = Flags::new(self.settings).set(flag, enable).value();
+        self.save();
+    }
+
+    pub fn is_rank_ordering(&self) -> bool {
+        self.get_setting(GuildFlags::RANK_ORDERING)
+    }
+
+    pub fn enable_rank_ordering(&mut self) {
+        self.set_setting(GuildFlags::RANK_ORDERING, true);
     }
 
     pub fn add(
@@ -56,6 +80,24 @@ impl Guild {
         AuthDyn::call().newAccount(guild);
 
         new_guild_instance
+    }
+
+    pub fn set_candidacy_cooldown(&mut self, cooldown_seconds: u32) {
+        check(
+            cooldown_seconds <= MAX_CANDIDACY_COOLDOWN,
+            "cooldown seconds breaches max limit",
+        );
+        self.candidacy_cooldown = cooldown_seconds;
+        self.save();
+    }
+
+    pub fn set_rank_ordering_threshold(&mut self, rank_ordering_threshold: u8) {
+        check(
+            rank_ordering_threshold >= MIN_RANK_ORDERING_THRESHOLD,
+            "minimum scorers is too low",
+        );
+        self.rank_ordering_threshold = rank_ordering_threshold;
+        self.save();
     }
 
     pub fn get(account: AccountNumber) -> Option<Self> {
@@ -107,12 +149,23 @@ impl Guild {
         )
     }
 
+    pub fn active_member_count(&self) -> usize {
+        GuildMemberTable::read()
+            .get_index_pk()
+            .range(
+                (self.account, AccountNumber::from(0))
+                    ..=(self.account, AccountNumber::from(u64::MAX)),
+            )
+            .filter(|account| RollingBitset::from(account.attendance).count_last_n_set(4) > 1)
+            .count()
+    }
+
     pub fn council_members(&self) -> Option<Vec<GuildMember>> {
         let council: Vec<GuildMember> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
-                (self.account, 0, AccountNumber::new(0))
-                    ..=(self.account, u32::MAX, AccountNumber::new(u64::MAX)),
+                (self.account, true, 0, AccountNumber::new(0))
+                    ..=(self.account, true, u32::MAX, AccountNumber::new(u64::MAX)),
             )
             .rev()
             .take(COUNCIL_SEATS as usize)
