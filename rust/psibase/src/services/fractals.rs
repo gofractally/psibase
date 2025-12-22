@@ -97,8 +97,8 @@ pub mod Service {
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
     /// * `member` - Member to attest.
-    /// * `comment` - Any comment relevant to application.
-    /// * `endorses` - True if in favour of application.
+    /// * `comment` - Any comment relevant to the application.
+    /// * `endorses` - True if in favour of the application.
     #[action]
     fn at_mem_app(
         guild_account: AccountNumber,
@@ -312,11 +312,11 @@ pub mod Service {
     /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
     /// guilds in the vector receive progressively larger shares.
     ///
-    /// Must be called by legislature.  
+    /// Must be called by the legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
-    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    /// * `guilds` - Ranked guilds, from highest rewarded to lowest.
     #[action]
     fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
         unimplemented!()
