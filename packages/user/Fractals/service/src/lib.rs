@@ -23,8 +23,11 @@ pub mod constants {
     pub const DEFAULT_RANKED_GUILD_SLOT_COUNT: u8 = 12;
     pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
 
-    pub const DEFAULT_MINIMUM_REQUIRED_SCORERS: u8 = 8;
-    pub const MIN_MINIMUM_REQUIRED_SCORERS: u8 = 4;
+    pub const DEFAULT_RANK_ORDERING_THRESHOLD: u8 = 8;
+    pub const MIN_RANK_ORDERING_THRESHOLD: u8 = 4;
+
+    pub const DEFAULT_TOKEN_INIT_THRESHOLD: u8 = 8;
+    pub const MIN_TOKEN_INIT_THRESHOLD: u8 = 4;
 
     // Simple limitation + also related to fibonacci function limit.
     pub const MAX_RANKED_GUILDS: u8 = 25;
@@ -34,6 +37,11 @@ pub mod constants {
 
     // Determine score sensitivity
     pub const EMA_ALPHA_DENOMINATOR: u32 = 6;
+
+    // Candidacy cool down determines how long a guild member must wait
+    // before he can make himself a candidate again.
+    pub const DEFAULT_CANDIDACY_COOLDOWN: u32 = ONE_WEEK;
+    pub const MAX_CANDIDACY_COOLDOWN: u32 = ONE_YEAR / 4;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
@@ -83,6 +91,18 @@ pub mod service {
         );
 
         Wrapper::emit().history().created_fractal(fractal_account);
+    }
+
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        Fractal::get_assert(fractal).init_token();
     }
 
     /// Apply to join a guild
@@ -186,23 +206,58 @@ pub mod service {
             Guild::get_assert(guild_account).evaluation(),
             "evaluation instance does not exist for guild",
         );
-        evaluation.set_pending_scores(Some(0));
+        evaluation.open_pending_levels();
 
         psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
     }
 
-    /// Set minimum required scorers.
+    /// Set rank ordering threshold.
     ///
-    /// RewardConsensus requires a successful evaluation where at least X evaluation participants (scorers) achieve a non-zero score.  
+    /// Amount of active participants a guild must have prior to auto-enabling rank ordering.  
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to get the policy for
-    /// * `min_scorers` - The minimum amount of scorers required.
+    /// * `threshold` - The minimum amount of active members required.
     #[action]
-    fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
+    fn set_rnk_thrs(threshold: u8) {
+        Guild::by_sender().set_rank_ordering_threshold(threshold);
+    }
+
+    /// Register candidacy.
+    ///
+    /// Register your candidacy to serve on a Guild council.  
+    ///
+    /// # Arguments
+    /// * `guild` - Guild candidate is member of
+    /// * `active`- True to become a candidate, False to retire
+    #[action]
+    fn reg_can(guild: AccountNumber, active: bool) {
+        GuildMember::get_assert(guild, get_sender()).set_candidacy(active);
+    }
+
+    /// Set the candidacy cooldown period.
+    ///
+    /// This defines how many seconds a guild member must wait after retiring their candidacy
+    /// before they are allowed to become a candidate again.
+    ///
+    /// # Arguments
+    /// * `cooldown_seconds` - The cooldown duration in seconds (0 disables the cooldown).
+    #[action]
+    fn set_can_cool(cooldown_seconds: u32) {
+        Guild::by_sender().set_candidacy_cooldown(cooldown_seconds);
+    }
+
+    /// Set token threshold.
+    ///
+    /// Sets the required amount of active members in the legistlature guild before the token can be initialised.  
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `threshold` - The minimum amount of active members required.
+    #[action]
+    fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
         let mut fractal = Fractal::get_assert(fractal);
         fractal.check_sender_is_legislature();
-        fractal.set_minimum_required_scorers(min_scorers);
+        fractal.set_token_threshold(threshold);
     }
 
     /// Allows a user to join a fractal and immediately become a visa holder.
@@ -324,7 +379,6 @@ pub mod service {
         check_is_eval();
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))
-            .unwrap()
             .len();
         let is_valid_attestation = attestation
             .iter()

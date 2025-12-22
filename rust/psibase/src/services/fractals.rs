@@ -293,15 +293,26 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set minimum required scorers.
+    /// Set rank ordering threshold.
     ///
-    /// RewardConsensus requires a successful evaluation where at least X evaluation participants (scorers) achieve a non-zero score.  
+    /// Amount of active participants a guild must have prior to auto-enabling rank ordering.  
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to get the policy for
-    /// * `min_scorers` - The minimum amount of scorers required.
+    /// * `threshold` - The minimum amount of active members required.
     #[action]
-    fn set_min_scrs(fractal: AccountNumber, min_scorers: u8) {
+    fn set_rnk_thrs(threshold: u8) {
+        unimplemented!()
+    }
+
+    /// Set token threshold.
+    ///
+    /// Sets the required amount of active members in the legistlature guild before the token can be initialised.  
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `threshold` - The minimum amount of active members required.
+    #[action]
+    fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
         unimplemented!()
     }
 
