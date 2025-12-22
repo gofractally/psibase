@@ -452,14 +452,12 @@ struct LoginArgs {
     #[command(flatten)]
     node_args: NodeArgs,
 
-    #[command(flatten)]
-    sig_args: SigArgs,
+    /// Sign with this key (repeatable)
+    #[clap(short = 's', long, value_name = "KEY")]
+    sign: Vec<AnyPrivateKey>,
 
     /// The account logging in
     user: ExactAccountNumber,
-
-    /// The app to log in to
-    app: ExactAccountNumber,
 }
 
 #[derive(Subcommand, Debug)]
@@ -500,7 +498,12 @@ enum Command {
     /// Shows package contents
     Info(InfoArgs),
 
-    /// Get a bearer token that can be used to access an app
+    /// Login to a node
+    ///
+    /// Returns a bearer token that can used to access authenticated
+    /// APIs. The token can only be used with the host that created
+    /// it. The request must be signed with the same keys that the
+    /// account would use for a transaction.
     Login(LoginArgs),
 
     /// Setup the psibase local config file
@@ -2192,7 +2195,7 @@ async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
         .api
         .domain()
         .expect("api must use a domain name");
-    let actions = vec![login_action(args.user.into(), args.app.into(), root_host)];
+    let actions = vec![login_action(args.user.into(), transact::SERVICE, root_host)];
 
     let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(10));
     let tapos = Tapos {
@@ -2212,7 +2215,7 @@ async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
             .post(transact::SERVICE.url(&args.node_args.api)?.join("/login")?)
             .header("Content-Type", "application/octet-stream")
             .header("Accept", "application/json")
-            .body(sign_transaction(trx, &args.sig_args.sign)?.packed()),
+            .body(sign_transaction(trx, &args.sign)?.packed()),
     )
     .await?;
     println!("{} {}", reply.token_type, reply.access_token);
@@ -2284,7 +2287,7 @@ fn print_subcommand_help<'a, I: Iterator<Item = &'a OsString>>(
             unrecognized_subcommand(command, name);
         }
     } else {
-        command.print_help().unwrap();
+        command.print_long_help().unwrap();
     }
 }
 
