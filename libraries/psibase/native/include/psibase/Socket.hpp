@@ -34,9 +34,16 @@ namespace psibase
 
    struct AutoCloseSocket : Socket
    {
-      virtual bool        canAutoClose() const override;
-      virtual void        autoClose(const std::optional<std::string>& message) noexcept = 0;
-      SocketAutoCloseSet* owner                                                         = nullptr;
+      virtual bool canAutoClose() const override;
+      virtual void autoClose(const std::optional<std::string>& message) noexcept = 0;
+      virtual void onLock();
+      // owner can be non-null if either autoClosing or autoCloseLocked is true
+      // If autoCloseLocked is true, then only the context that holds the lock
+      // can set autoClose.
+      SocketAutoCloseSet* owner           = nullptr;
+      bool                autoCloseLocked = false;
+      bool                autoClosing     = false;
+      bool                pendingLock     = false;
    };
 
    struct SocketChange
@@ -73,7 +80,14 @@ namespace psibase
                              bool                       value,
                              SocketAutoCloseSet*        owner,
                              std::vector<SocketChange>* diff = nullptr);
-      bool         applyChanges(const std::vector<SocketChange>& diff, SocketAutoCloseSet* owner);
+      /// Returns true if autoClose was locked immediately for the socket.
+      /// If the socket currently has autoClose enabled, the lock will be
+      /// acquired when autoClose is disabled, and AutoCloseSocket::onLock
+      /// will be called.
+      bool lockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket);
+      void unlockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket);
+      void setOwner(const std::shared_ptr<AutoCloseSocket>& socket, SocketAutoCloseSet* owner);
+      bool applyChanges(const std::vector<SocketChange>& diff, SocketAutoCloseSet* owner);
    };
 
 }  // namespace psibase

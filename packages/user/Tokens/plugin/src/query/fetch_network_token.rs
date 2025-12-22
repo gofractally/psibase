@@ -10,7 +10,7 @@ pub struct Response {
 
 #[derive(Serialize, Deserialize)]
 pub struct Data {
-    pub config: Token,
+    pub config: Option<Token>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -19,7 +19,7 @@ pub struct Token {
     pub sys_tid: u32,
 }
 
-pub fn fetch_network_token() -> Result<u32, ErrorType> {
+pub fn fetch_network_token() -> Result<Option<u32>, ErrorType> {
     let query = format!(
         r#"query {{
         	config {{
@@ -34,5 +34,5 @@ pub fn fetch_network_token() -> Result<u32, ErrorType> {
             serde_json::from_str(&result).map_err(|e| ErrorType::QueryError(e.to_string()))
         })
         .and_then(|response_root: Response| Ok(response_root.data.config))
-        .and_then(|token| Ok(token.sys_tid))
+        .and_then(|token| Ok(token.map(|token| token.sys_tid)))
 }

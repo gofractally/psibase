@@ -9,33 +9,35 @@ mod service {
         unimplemented!()
     }
 
-    /// Sends an HTTP request and returns the new socket. When the response
+    /// Sends an HTTP request and returns the new socket.
+    ///
+    /// Must be followed by `setCallback(socket, callback, err)`, or the
+    /// socket will be closed when the current context exits. When the response
     /// is available, it will be passed to `sender::callback(socket, reply)`.
     /// If the the request fails without a response, calls `sender::err(socket)`
     #[action]
     fn sendRequest(
         request: HttpRequest,
-        callback: MethodNumber,
-        err: MethodNumber,
         tls: Option<TLSInfo>,
         endpoint: Option<SocketEndpoint>,
     ) -> i32 {
         unimplemented!()
     }
 
-    /// Opens a websocket connection and returns the new socket. The
+    /// Opens a websocket connection and returns the new socket.
+    ///
+    /// Must be followed by `setCallback(socket, callback, err)`, or the
+    /// socket will be closed when the current context exits. The
     /// request method must be GET. The required headers for the websocket
     /// handshake will be added to the request if they are not already
     /// provided. If the connection is successfully established, calls
     /// `sender::callback(socket, reply)`. If the request fails without
-    /// a response, calls `sender::err(socket, None)`. If the response
+    /// a response, calls `sender::err(socket, nullopt)`. If the response
     /// does not complete a websocket handshake, calls
-    /// `sender::err(socket, Some(reply))`
+    /// `sender::err(socket, optional(reply))`
     #[action]
     fn websocket(
         request: HttpRequest,
-        callback: MethodNumber,
-        err: MethodNumber,
         tls: Option<TLSInfo>,
         endpoint: Option<SocketEndpoint>,
     ) -> i32 {

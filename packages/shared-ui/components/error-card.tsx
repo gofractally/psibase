@@ -10,12 +10,15 @@ import {
 } from "@shared/shadcn/ui/card";
 
 interface Props {
-    error: Error;
+    error?: Error;
     retry?: () => void;
     retryLabel?: string;
 }
 
 export const ErrorCard = ({ error, retry, retryLabel = "Login" }: Props) => {
+    const message =
+        error?.message ||
+        "Something went wrong. Check the console for more details.";
     return (
         <Card className="mx-auto mt-4 w-[350px]">
             <CardHeader>
@@ -23,7 +26,7 @@ export const ErrorCard = ({ error, retry, retryLabel = "Login" }: Props) => {
                     <TriangleAlert className="text-destructive h-12 w-12" />
                 </div>
                 <CardTitle>Uh oh</CardTitle>
-                <CardDescription>{error.message}</CardDescription>
+                <CardDescription>{message}</CardDescription>
                 {retry && (
                     <CardFooter className="flex justify-end">
                         <Button

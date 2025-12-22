@@ -14,6 +14,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/SocketInfo.hpp>
+#include <psibase/TransactionContext.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/http.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -76,11 +77,11 @@ namespace
       return true;
    }
    template <typename Stream>
-   struct HttpClientSocket : AutoCloseSocket
+   struct HttpClientSocket : AutoCloseSocket, std::enable_shared_from_this<HttpClientSocket<Stream>>
    {
       template <typename... A>
-      explicit HttpClientSocket(boost::asio::io_context& context, A&&... a)
-          : stream(boost::asio::make_strand(context), std::forward<A>(a)...)
+      explicit HttpClientSocket(boost::asio::io_context& context, server_state& server, A&&... a)
+          : stream(boost::asio::make_strand(context), std::forward<A>(a)...), server(server)
       {
       }
       void do_write(std::shared_ptr<HttpClientSocket>&& self, HttpRequest&& req)
@@ -113,7 +114,7 @@ namespace
                                }
                             });
       }
-      void do_read(std::shared_ptr<HttpClientSocket>&& self, server_state& server)
+      void do_read(std::shared_ptr<HttpClientSocket>&& self)
       {
          // Apply a reasonable limit to the allowed size
          // of the body in bytes to prevent abuse.
@@ -121,82 +122,91 @@ namespace
          // Read a request using the parser-oriented interface
          boost::beast::http::async_read(
              stream, buffer, parser,
-             [self = std::move(self), &server](const std::error_code& ec,
-                                               std::size_t            bytes_transferred)
+             [self = std::move(self)](const std::error_code& ec,
+                                      std::size_t            bytes_transferred) mutable
              {
                 if (ec)
                 {
                    PSIBASE_LOG(self->logger, warning)
                        << "Failed to read HTTP response: " << ec.message();
-                   self->do_error(server, ec);
+                   self->do_error(ec);
                 }
                 else
                 {
-                   auto system = server.sharedState->getSystemContext();
-
-                   psio::finally f{[&]()
-                                   { server.sharedState->addSystemContext(std::move(system)); }};
-                   BlockContext  bc{*system, system->sharedDatabase.getHead(),
-                                   system->sharedDatabase.createWriter(), true};
-                   bc.start();
-
-                   self->writeInfo(*bc.writer);
-
-                   SignedTransaction trx;
-                   TransactionTrace  trace;
-
-                   auto breply = self->parser.get();
-
-                   HttpReply reply{
-                       .status      = static_cast<HttpStatus>(breply.result_int()),
-                       .contentType = breply[bhttp::field::content_type],
-                       .body        = breply.body(),
-                   };
-
-                   for (auto&& header : breply)
-                   {
-                      reply.headers.push_back(HttpHeader{std::string(header.name_string()),
-                                                         std::string(header.value())});
-                   }
-
-                   Action action{
-                       .sender  = AccountNumber(),
-                       .service = proxyServiceNum,
-                       .rawData = psio::convert_to_frac(std::tuple(self->id, psio::to_frac(reply))),
-                   };
-
-                   if (self->request && isWebSocketHandshake(*self->request, reply))
-                   {
-                      auto newSocket         = std::make_shared<WebSocket>(server, self->info());
-                      const HttpRequest& req = *self->request;
-                      // TODO: We must wait for the request to be completely sent before moving
-                      // the stream.
-                      auto impl =
-                          std::make_unique<WebSocketImpl<boost::beast::websocket::stream<Stream>>>(
-                              boost::beast::websocket::stream<Stream>(completed_handshake{},
-                                                                      std::move(self->stream), req,
-                                                                      std::move(breply)));
-                      self->replace(*bc.writer, newSocket);
-                      WebSocket::setImpl(std::move(newSocket), std::move(impl));
-                   }
-
-                   try
-                   {
-                      auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
-                      BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-                      PSIBASE_LOG(bc.trxLogger, debug)
-                          << action.service.str() << "::recv succeeded";
-                   }
-                   catch (std::exception& e)
-                   {
-                      BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-                      PSIBASE_LOG(bc.trxLogger, warning)
-                          << action.service.str() << "::recv failed: " << e.what();
-                   }
+                   if (self->server.sharedState->sockets()->lockAutoClose(self))
+                      do_recv(std::move(self));
                 }
              });
       }
-      void do_error(server_state& server, const std::error_code& ec)
+      // Must hold the auto close lock before calling this
+      static void do_recv(std::shared_ptr<HttpClientSocket>&& self)
+      {
+         auto unlock =
+             psio::finally{[&] { self->server.sharedState->sockets()->unlockAutoClose(self); }};
+         auto system = self->server.sharedState->getSystemContext();
+
+         psio::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
+         BlockContext  bc{*system, system->sharedDatabase.getHead(),
+                         system->sharedDatabase.createWriter(), true};
+         bc.start();
+
+         self->writeInfo(*bc.writer);
+
+         SignedTransaction trx;
+         TransactionTrace  trace;
+
+         TransactionContext tc{bc, trx, trace, DbMode::rpc()};
+
+         system->sockets->setOwner(self, &tc.ownedSockets);
+
+         auto breply = self->parser.get();
+
+         HttpReply reply{
+             .status      = static_cast<HttpStatus>(breply.result_int()),
+             .contentType = breply[bhttp::field::content_type],
+             .body        = breply.body(),
+         };
+
+         for (auto&& header : breply)
+         {
+            reply.headers.push_back(
+                HttpHeader{std::string(header.name_string()), std::string(header.value())});
+         }
+
+         Action action{
+             .sender  = AccountNumber(),
+             .service = proxyServiceNum,
+             .rawData = psio::convert_to_frac(std::tuple(self->id, psio::to_frac(reply))),
+         };
+
+         if (self->request && isWebSocketHandshake(*self->request, reply))
+         {
+            auto               newSocket = std::make_shared<WebSocket>(self->server, self->info());
+            const HttpRequest& req       = *self->request;
+            // TODO: We must wait for the request to be completely sent before moving
+            // the stream.
+            auto impl = std::make_unique<WebSocketImpl<boost::beast::websocket::stream<Stream>>>(
+                boost::beast::websocket::stream<Stream>(
+                    completed_handshake{}, std::move(self->stream), req, std::move(breply)));
+            self->replace(*bc.writer, newSocket);
+            WebSocket::setImpl(std::move(newSocket), std::move(impl));
+         }
+
+         try
+         {
+            auto& atrace = trace.actionTraces.emplace_back();
+            tc.execExport("recv", std::move(action), atrace);
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::recv succeeded";
+         }
+         catch (std::exception& e)
+         {
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
+            PSIBASE_LOG(bc.trxLogger, warning)
+                << action.service.str() << "::recv failed: " << e.what();
+         }
+      }
+      void do_error(const std::error_code& ec)
       {
          auto system = server.sharedState->getSystemContext();
 
@@ -229,10 +239,16 @@ namespace
       {
          abortMessage("Cannot send additional requests through a client socket");
       }
-      virtual SocketInfo   info() const override { return savedInfo; }
-      virtual void         autoClose(const std::optional<std::string>& message) noexcept override {}
-      Stream               stream;
-      HttpClientSocketInfo savedInfo;
+      virtual SocketInfo info() const override { return savedInfo; }
+      virtual void       autoClose(const std::optional<std::string>& message) noexcept override {}
+      virtual void       onLock() override
+      {
+         boost::asio::post(stream.get_executor(), [self = this->shared_from_this()]() mutable
+                           { do_recv(std::move(self)); });
+      }
+      Stream                                                                     stream;
+      server_state&                                                              server;
+      HttpClientSocketInfo                                                       savedInfo;
       boost::beast::http::response_parser<boost::beast::http::vector_body<char>> parser;
       boost::beast::flat_buffer                                                  buffer;
       psibase::loggers::common_logger                                            logger;
@@ -308,7 +324,7 @@ namespace
       {
          using tls_stream = boost::beast::ssl_stream<boost::beast::tcp_stream>;
          auto result      = std::make_shared<HttpClientSocket<tls_stream>>(
-             context, *state.http_config->tls_context);
+             context, state, *state.http_config->tls_context);
          add(result);
          auto [host, _] = split_port(hostport);
          result->stream.set_verify_mode(boost::asio::ssl::verify_peer);
@@ -335,7 +351,7 @@ namespace
       }
       else
       {
-         auto result = std::make_shared<HttpClientSocket<boost::beast::tcp_stream>>(context);
+         auto result = std::make_shared<HttpClientSocket<boost::beast::tcp_stream>>(context, state);
          add(result);
          do_connect(std::move(result), std::forward<E>(endpoint), std::forward<F>(next));
       }
@@ -383,7 +399,7 @@ namespace
    {
       if (tls)
          abortMessage("Local socket does not support TLS");
-      auto result = std::make_shared<HttpClientSocket<local_stream>>(context);
+      auto result = std::make_shared<HttpClientSocket<local_stream>>(context, state);
       add(result);
       do_connect(std::move(result), boost::asio::local::stream_protocol::endpoint(endpoint.path),
                  std::forward<F>(next));
@@ -403,7 +419,7 @@ void psibase::http::send_request(boost::asio::io_context&        context,
       if (ec)
       {
          PSIBASE_LOG(socket->logger, warning) << "Connection failed: " << ec.message();
-         socket->do_error(state, ec);
+         socket->do_error(ec);
       }
       else
       {
@@ -411,7 +427,7 @@ void psibase::http::send_request(boost::asio::io_context&        context,
              toSocketEndpoint(get_lowest_layer(socket->stream).socket().remote_endpoint());
          socket->savedInfo.tls = isSecure(socket->stream) ? std::optional<TLSInfo>() : std::nullopt;
          socket->do_write(std::shared_ptr{socket}, std::move(req));
-         socket->do_read(std::move(socket), state);
+         socket->do_read(std::move(socket));
       }
    };
    if (!endpoint)
