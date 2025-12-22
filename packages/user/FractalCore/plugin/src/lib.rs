@@ -24,6 +24,7 @@ define_trust! {
         Low trust grants these abilities:
             - Starting an evaluation cycle
             - Closing an evaluation cycle
+            - Trigger a fractal wide token distribution
             - Initialise fractal token
         ",
         Medium => "
@@ -51,7 +52,7 @@ define_trust! {
     }
     functions {
         None => [get_group_users],
-        Low => [start_eval, close_eval],
+        Low => [start_eval, close_eval, dist_token],
         Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
         High => [exile_member, set_rank_ordering_threshold, set_token_threshold, init_token, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
@@ -229,6 +230,11 @@ impl UserFractal for FractalCorePlugin {
     fn join() -> Result<(), Error> {
         assert_authorized(FunctionName::join)?;
         FractalsPlugin::user_fractal::join()
+    }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        FractalsPlugin::user_fractal::dist_token()
     }
 }
 

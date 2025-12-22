@@ -8,6 +8,8 @@ import { MyMembership } from "@/pages/fractal/membership/my-membership";
 import { Layout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/protected-route";
 
+import { Judicial } from "./pages/fractal/branches/judicial";
+import { Legislative } from "./pages/fractal/branches/legislative";
 import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
 import { AllGuildMembers } from "./pages/fractal/guild-membership/all-guild-members";
@@ -35,6 +37,22 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <MyMembership />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/legislative",
+                element: (
+                    <ProtectedRoute>
+                        <Legislative />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/judicial",
+                element: (
+                    <ProtectedRoute>
+                        <Judicial />
                     </ProtectedRoute>
                 ),
             },
