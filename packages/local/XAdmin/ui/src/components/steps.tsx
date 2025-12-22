@@ -19,7 +19,7 @@ export const Steps = ({
                     <Fragment key={index}>
                         <div
                             className={cn(
-                                "bg-border h-6 w-6 rounded-full transition-colors duration-300",
+                                "bg-border aspect-square h-6 w-6 rounded-full transition-colors duration-300",
                                 {
                                     "bg-primary": isPresentOrPast,
                                 },
