@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useSetMinScorers } from "@/hooks/fractals/use-set-min-scorers";
+import { useSetTokenThreshold } from "@/hooks/fractals/use-set-min-scorers";
 import { MIN_MINIMUM_REQUIRED_SCORERS } from "@/lib/constants";
 
 import { useAppForm } from "@shared/components/form/app-form";
@@ -20,21 +20,21 @@ export const SetMinScorersModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { mutateAsync: setMinScorers } = useSetMinScorers();
+    const { mutateAsync: setTokenThreshold } = useSetTokenThreshold();
 
     const { data: fractal } = useFractal();
     const form = useAppForm({
         defaultValues: {
-            minScorers: fractal?.fractal?.minimumRequiredScorers ?? 4,
+            tokenThreshold: fractal?.fractal?.tokenInitThreshold ?? 4,
         },
-        onSubmit: async ({ formApi, value: { minScorers } }) => {
-            await setMinScorers([minScorers]);
-            formApi.reset({ minScorers });
+        onSubmit: async ({ formApi, value: { tokenThreshold } }) => {
+            await setTokenThreshold([tokenThreshold]);
+            formApi.reset({ tokenThreshold });
             openChange(false);
         },
         validators: {
             onChange: z.object({
-                minScorers: zU8.min(MIN_MINIMUM_REQUIRED_SCORERS),
+                tokenThreshold: zU8.min(MIN_MINIMUM_REQUIRED_SCORERS),
             }),
         },
     });
@@ -45,8 +45,8 @@ export const SetMinScorersModal = ({
                 <DialogHeader>
                     <DialogTitle>Set minimum scorers</DialogTitle>
                     <div className="text-muted-foreground text-sm">
-                        Set the minimum amount of fractal members must achieve a
-                        non zero score before the fractal token is achieved.
+                        Set the minimum number of active guild members of the legislation
+                        before the fractal token is pushed into circulation.
                     </div>
                     <form
                         onSubmit={(e) => {
@@ -56,15 +56,15 @@ export const SetMinScorersModal = ({
                         className="mt-3 w-full space-y-6"
                     >
                         <form.AppField
-                            name="minScorers"
+                            name="tokenThreshold"
                             children={(field) => (
-                                <field.NumberField label="Minimum scorers" />
+                                <field.NumberField label="Minimum active members" />
                             )}
                         />
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Set rep", "Setting rep"]}
+                                labels={["Set threshold", "Setting threshold"]}
                             />
                         </form.AppForm>
                     </form>

@@ -18,6 +18,7 @@ import { Guilds } from "./pages/fractal/guilds";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
 import { Applications } from "./pages/fractal/membership/applications";
 import { Settings } from "./pages/settings";
+import { Leadership } from "./pages/leadership";
 
 export const router = createBrowserRouter([
     {
@@ -137,6 +138,15 @@ export const router = createBrowserRouter([
                         element: (
                             <ProtectedRoute>
                                 <EvaluationDeliberation />
+                            </ProtectedRoute>
+                        ),
+                    },
+
+                    {
+                        path: "leadership",
+                        element: (
+                            <ProtectedRoute>
+                                <Leadership />
                             </ProtectedRoute>
                         ),
                     },

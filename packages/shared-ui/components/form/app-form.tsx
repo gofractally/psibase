@@ -7,6 +7,7 @@ import { SelectField } from "./internal/select-field";
 import { SubmitButton } from "./internal/submit-button";
 import { TextField } from "./internal/text-field";
 import { CheckboxField } from "./internal/checkbox-field";
+import { SwitchField } from "./internal/switch-field";
 
 export const { fieldContext, formContext, useFieldContext, useFormContext } =
     createFormHookContexts();
@@ -18,6 +19,7 @@ const { useAppForm, withForm, withFieldGroup } = createFormHook({
         TextField,
         NumberField,
         SelectField,
+        SwitchField,
         DateTime: DateTimePicker24h,
         EvaluationDuration: EvaluationDurationSelect,
         CheckboxField

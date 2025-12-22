@@ -11,7 +11,7 @@ import { graphql } from "../../graphql";
 export const zFractal = z
     .object({
         account: zAccount,
-        minimumRequiredScorers: zU8,
+        tokenInitThreshold: zU8,
         createdAt: zDateTime,
         name: z.string(),
         consensusReward: z
@@ -66,7 +66,7 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
     {
         fractal(fractal: "${owner}") {     
             account
-            minimumRequiredScorers
+            tokenInitThreshold
             createdAt
             mission
             name

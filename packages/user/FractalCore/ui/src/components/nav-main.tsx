@@ -9,6 +9,7 @@ import {
     Scale,
     SettingsIcon,
     Users,
+    UsersRound,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -125,6 +126,11 @@ export function NavMain() {
             path: `/guild/${guildAccount}`,
             menus: [
                 {
+                    title: "Leadership",
+                    icon: UsersRound,
+                    path: "leadership",
+                },
+                {
                     title: "Settings",
                     icon: SettingsIcon,
                     path: "settings",
@@ -164,7 +170,7 @@ export function NavMain() {
                         ))}
                         {item.button && (
                             <button
-                                onClick={() => {}}
+                                onClick={() => { }}
                                 className="border-muted-foreground/50 hover:border-primary rounded-sm border border-dashed py-3 text-sm"
                             >
                                 Create Guild

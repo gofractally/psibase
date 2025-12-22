@@ -41,8 +41,8 @@ class AdminFractal extends PluginInterface {
     get setRankedGuildSlots() {
         return this._call<[slots: number]>("setRankedGuildSlots");
     }
-    get setMinScorers() {
-        return this._call<[min: number]>("setMinScorers");
+    get setTokenThreshold() {
+        return this._call<[threshold: number]>("setTokenThreshold");
     }
     get setRankedGuilds() {
         return this._call<[guilds: Account[]]>("setRankedGuilds");
@@ -154,6 +154,12 @@ class UserGuild extends PluginInterface {
                 endorses: boolean,
             ]
         >("attestMembershipApp");
+    }
+
+    get registerCandidacy() {
+        return this._call<[guildAccount: Account, active: boolean]>(
+            "registerCandidacy",
+        );
     }
 }
 

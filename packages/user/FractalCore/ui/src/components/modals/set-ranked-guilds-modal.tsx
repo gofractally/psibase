@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useSetRankedGuilds } from "@/hooks/fractals/use-set-ranked-guild-slots copy";
+import { useSetRankedGuilds } from "@/hooks/fractals/use-set-ranked-guilds";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import {

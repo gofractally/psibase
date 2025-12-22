@@ -2,11 +2,11 @@ import { updateFractalCache } from "@/hooks/fractals/use-fractal";
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 import { fractalCorePlugin } from "@/lib/plugin";
 
-export const useSetMinScorers = () =>
-    usePluginMutation(fractalCorePlugin.adminFractal.setMinScorers, {
-        loading: "Setting minimum scorers..",
-        success: "Set minimum scorers",
-        onSuccess: ([minimumRequiredScorers]) => {
+export const useSetTokenThreshold = () =>
+    usePluginMutation(fractalCorePlugin.adminFractal.setTokenThreshold, {
+        loading: "Setting token threshold..",
+        success: "Set token threshold",
+        onSuccess: ([threshold]) => {
             updateFractalCache((old) => {
                 if (!old?.fractal) {
                     return old;
@@ -16,7 +16,7 @@ export const useSetMinScorers = () =>
                     ...old,
                     fractal: {
                         ...old.fractal,
-                        minimumRequiredScorers,
+                        tokenInitThreshold: threshold,
                     },
                 };
             });
