@@ -12,7 +12,8 @@ mod service {
     use tokens::{
         helpers::{identify_token_type, to_fixed, TokenType},
         tables::tables::{
-            Balance, BalanceTable, ConfigRow, ConfigTable, Token, TokenTable, UserConfig,
+            Balance, BalanceTable, ConfigRow, ConfigTable, SubAccount, SubAccountBalance,
+            SubAccountBalanceTable, SubAccountTable, Token, TokenTable, UserConfig,
             UserConfigTable,
         },
     };
@@ -43,6 +44,22 @@ mod service {
                 )));
             }
             Ok(())
+        }
+
+        fn get_subaccount(
+            &self,
+            user: AccountNumber,
+            sub_account: &str,
+        ) -> async_graphql::Result<SubAccount> {
+            SubAccountTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&(user, sub_account.to_string()))
+                .ok_or_else(|| {
+                    async_graphql::Error::new(format!(
+                        "Sub-account '{}' not found for user '{}'",
+                        sub_account, user
+                    ))
+                })
         }
     }
 
@@ -170,6 +187,76 @@ mod service {
                     nft.owner == user
                 })
                 .collect()
+        }
+
+        /// Returns the specified user's sub-accounts.
+        async fn user_subaccounts(
+            &self,
+            user: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, SubAccount>> {
+            self.check_user_auth(user)?;
+
+            TableQuery::subindex::<String>(
+                SubAccountTable::with_service(tokens::SERVICE).get_index_pk(),
+                &(user),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
+        /// Returns the token balance for a specific sub-account and token.
+        async fn subaccount_balance(
+            &self,
+            user: AccountNumber,
+            sub_account: String,
+            token_id: TID,
+        ) -> async_graphql::Result<SubAccountBalance> {
+            self.check_user_auth(user)?;
+
+            let subaccount = self.get_subaccount(user, &sub_account)?;
+
+            Ok(SubAccountBalanceTable::with_service(tokens::SERVICE)
+                .get_index_pk()
+                .get(&(subaccount.id, token_id))
+                .unwrap_or(SubAccountBalance {
+                    subaccount_id: subaccount.id,
+                    token_id,
+                    balance: 0.into(),
+                }))
+        }
+
+        /// Returns a paginated list of all token balances for the specified sub-account.
+        async fn subaccount_balances(
+            &self,
+            user: AccountNumber,
+            sub_account: String,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, SubAccountBalance>> {
+            self.check_user_auth(user)?;
+
+            let subaccount = self.get_subaccount(user, &sub_account)?;
+
+            TableQuery::subindex::<TID>(
+                SubAccountBalanceTable::with_service(tokens::SERVICE).get_index_pk(),
+                &(subaccount.id),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         /// Returns a paginated subset of all historical events (that haven't yet been pruned

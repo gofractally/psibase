@@ -340,6 +340,53 @@ mod service {
         unimplemented!()
     }
 
+    /// Sends tokens from an account's primary balance into a "sub-account" balance
+    ///
+    /// The sub-account will be created if it does not exist.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    /// * `amount`   - Amount of tokens to send
+    #[action]
+    fn toSub(token_id: TID, sub_account: String, amount: Quantity) {
+        unimplemented!()
+    }
+
+    /// Returns tokens from a "sub-account" balance into the account's primary balance
+    ///
+    /// The sub-account will not be deleted if it becomes empty, it must be manually
+    /// deleted with `deleteSub`.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    /// * `amount`   - Amount of tokens to return
+    #[action]
+    fn fromSub(token_id: TID, sub_account: String, amount: Quantity) {
+        unimplemented!()
+    }
+
+    /// Creates a new "sub-account" with an empty balance
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn createSub(sub_account: String) {
+        unimplemented!()
+    }
+
+    /// Deletes a "sub-account" balance
+    ///
+    /// All nonzero token balances in the sub-account will be returned to the primary balance.
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn deleteSub(sub_account: String) {
+        unimplemented!()
+    }
+
     /// Sets the system token
     ///
     /// # Arguments
@@ -358,6 +405,19 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn getSysToken() -> Option<TokenRecord> {
+        unimplemented!()
+    }
+
+    /// Get the token balance of the sender's specified sub-account
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    ///
+    /// Returns the token balance of the sender's specified sub-account
+    /// or `None` if the sub-account does not exist
+    #[action]
+    fn getSubBal(token_id: TID, sub_account: String) -> Option<Quantity> {
         unimplemented!()
     }
 

@@ -4,7 +4,7 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{check, check_some, get_sender, AccountNumber, Memo, TableRecord};
+    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord};
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -14,10 +14,74 @@ pub mod tables {
     pub struct InitRow {
         pub last_used_id: TID,
         pub last_used_shared_bal_id: u64,
+        pub last_used_subaccount_id: u64,
     }
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
+    }
+    impl InitRow {
+        fn new() -> Self {
+            Self {
+                last_used_id: 0,
+                last_used_shared_bal_id: 0,
+                last_used_subaccount_id: 0,
+            }
+        }
+
+        pub fn get() -> Option<Self> {
+            InitTable::read().get_index_pk().get(&())
+        }
+
+        pub fn get_assert() -> Self {
+            check_some(Self::get(), "init row does not exist")
+        }
+
+        pub fn init() {
+            check_none(Self::get(), "init row already exists");
+            Self::new().save();
+        }
+
+        pub fn next_token_id() -> TID {
+            let mut init_row = InitRow::get_assert();
+
+            let next_id = check_some(
+                init_row.last_used_id.checked_add(1),
+                "last_used_id overflowed",
+            );
+            init_row.last_used_id = next_id;
+            init_row.save();
+            next_id
+        }
+
+        pub fn next_subaccount_id() -> u64 {
+            let mut init_row = InitRow::get_assert();
+
+            let next_id = check_some(
+                init_row.last_used_subaccount_id.checked_add(1),
+                "last_used_subaccount_id overflowed",
+            );
+            init_row.last_used_subaccount_id = next_id;
+            init_row.save();
+
+            next_id
+        }
+
+        pub fn next_shared_bal_id() -> u64 {
+            let mut init_row = InitRow::get_assert();
+
+            let next_id = check_some(
+                init_row.last_used_shared_bal_id.checked_add(1),
+                "last_used_shared_bal_id overflowed",
+            );
+            init_row.last_used_shared_bal_id = next_id;
+            init_row.save();
+            next_id
+        }
+
+        fn save(&self) {
+            InitTable::read_write().put(&self).unwrap();
+        }
     }
 
     #[table(name = "TokenTable", index = 1)]
@@ -44,6 +108,18 @@ pub mod tables {
     });
 
     impl Token {
+        fn new(precision: Precision, max_issued_supply: Quantity) -> Self {
+            Self {
+                id: InitRow::next_token_id(),
+                nft_id: Nfts::call().mint(),
+                issued_supply: 0.into(),
+                burned_supply: 0.into(),
+                max_issued_supply,
+                precision,
+                settings_value: 0,
+            }
+        }
+
         pub fn get(id: TID) -> Option<Self> {
             TokenTable::read().get_index_pk().get(&id)
         }
@@ -64,23 +140,7 @@ pub mod tables {
         }
 
         pub fn add(precision: Precision, max_issued_supply: Quantity) -> Self {
-            let init_table = InitTable::new();
-            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
-            let new_id = init_row.last_used_id.checked_add(1).unwrap();
-
-            init_row.last_used_id = new_id;
-            init_table.put(&init_row).unwrap();
-
-            let mut new_instance = Self {
-                id: new_id,
-                nft_id: Nfts::call().mint(),
-                issued_supply: 0.into(),
-                burned_supply: 0.into(),
-                max_issued_supply,
-                precision,
-                settings_value: 0,
-            };
-
+            let new_instance = Token::new(precision, max_issued_supply);
             new_instance.save();
 
             let creator = get_sender();
@@ -89,7 +149,9 @@ pub mod tables {
                 Nfts::call().credit(
                     new_instance.nft_id,
                     creator,
-                    format!("NFT for token ID {}", new_instance.id).as_str().into(),
+                    format!("NFT for token ID {}", new_instance.id)
+                        .as_str()
+                        .into(),
                 );
             }
 
@@ -100,9 +162,8 @@ pub mod tables {
             Nfts::call().getNft(self.nft_id).owner
         }
 
-        fn save(&mut self) {
-            let table = TokenTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            TokenTable::read_write().put(&self).unwrap();
         }
 
         pub fn mint(&mut self, amount: Quantity) {
@@ -224,25 +285,31 @@ pub mod tables {
                 .get(&(account, token_id))
         }
 
+        pub fn get_assert(account: AccountNumber, token_id: TID) -> Self {
+            check_some(
+                Self::get(account, token_id),
+                &format!("{} has no balance of token ID {}", account, token_id),
+            )
+        }
+
         pub fn get_or_new(account: AccountNumber, token_id: TID) -> Self {
             Self::get(account, token_id).unwrap_or(Self::new(account, token_id))
         }
 
-        fn save(&mut self) {
-            let table = BalanceTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            BalanceTable::read_write().put(&self).unwrap();
         }
 
-        fn delete(&mut self) {
-            BalanceTable::new().erase(&(&self.pk()));
+        fn delete(&self) {
+            BalanceTable::read_write().erase(&(&self.pk()));
         }
 
-        fn add_balance(&mut self, quantity: Quantity) {
+        pub fn add_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance + quantity;
             self.save();
         }
 
-        fn sub_balance(&mut self, quantity: Quantity) {
+        pub fn sub_balance(&mut self, quantity: Quantity) {
             check(self.balance >= quantity, "Insufficient token balance");
             self.balance = self.balance - quantity;
 
@@ -268,13 +335,7 @@ pub mod tables {
     #[ComplexObject]
     impl Balance {
         pub async fn balance(&self) -> Decimal {
-            Decimal::new(
-                self.balance,
-                Token::get_assert(self.token_id)
-                    .precision
-                    .try_into()
-                    .unwrap(),
-            )
+            Decimal::new(self.balance, Token::get_assert(self.token_id).precision)
         }
 
         pub async fn settings(&self) -> BalanceFlagsJson {
@@ -350,17 +411,6 @@ pub mod tables {
     }
 
     impl SharedBalance {
-        fn next_id() -> u64 {
-            let init_table = InitTable::new();
-            let mut init_row = init_table.get_index_pk().get(&()).unwrap();
-            let new_shared_bal_id = init_row.last_used_shared_bal_id.checked_add(1).unwrap();
-
-            init_row.last_used_shared_bal_id = new_shared_bal_id;
-            init_table.put(&init_row).unwrap();
-
-            new_shared_bal_id
-        }
-
         fn new(creditor: AccountNumber, debitor: AccountNumber, token_id: TID) -> Self {
             Token::get_assert(token_id);
             check(
@@ -369,7 +419,7 @@ pub mod tables {
             );
 
             Self {
-                shared_bal_id: Self::next_id(),
+                shared_bal_id: InitRow::next_shared_bal_id(),
                 token_id,
                 creditor,
                 debitor,
@@ -518,12 +568,11 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            SharedBalanceTable::new().erase(&(self.shared_bal_id));
+            SharedBalanceTable::read_write().erase(&(self.shared_bal_id));
         }
 
-        fn save(&mut self) {
-            let table = SharedBalanceTable::new();
-            table.put(&self).unwrap();
+        fn save(&self) {
+            SharedBalanceTable::read_write().put(&self).unwrap();
         }
     }
 
@@ -582,11 +631,11 @@ pub mod tables {
         }
 
         pub fn delete(&self) {
-            BalanceConfigTable::new().erase(&(self.pk()));
+            BalanceConfigTable::read_write().erase(&(self.pk()));
         }
 
         fn put(&mut self) {
-            BalanceConfigTable::new().put(&self).unwrap();
+            BalanceConfigTable::read_write().put(&self).unwrap();
         }
 
         fn save(&mut self) {
@@ -633,11 +682,11 @@ pub mod tables {
         }
 
         fn delete(&self) {
-            UserConfigTable::new().erase(&(self.get_primary_key()));
+            UserConfigTable::read_write().erase(&(self.get_primary_key()));
         }
 
-        fn put(&mut self) {
-            UserConfigTable::new().put(&self).unwrap();
+        fn put(&self) {
+            UserConfigTable::read_write().put(&self).unwrap();
         }
 
         fn save(&mut self) {
@@ -722,9 +771,193 @@ pub mod tables {
             token_id: TID,
             shared_bal_id: u64,
         ) {
-            let upt = UserPendingTable::new();
+            let upt = UserPendingTable::read_write();
             upt.erase(&(creditor, token_id, shared_bal_id));
             upt.erase(&(debitor, token_id, shared_bal_id));
+        }
+    }
+
+    #[table(name = "SubAccountTable", index = 8)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    pub struct SubAccount {
+        pub account: AccountNumber,
+        pub sub_account: String,
+        #[graphql(skip)]
+        pub id: u64,
+    }
+    impl SubAccount {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, String) {
+            (self.account, self.sub_account.clone())
+        }
+
+        #[secondary_key(1)]
+        fn by_id(&self) -> u64 {
+            self.id
+        }
+    }
+    impl SubAccount {
+        fn new(owner: AccountNumber, sub_account: String) -> Self {
+            Self {
+                id: InitRow::next_subaccount_id(),
+                account: owner,
+                sub_account,
+            }
+        }
+
+        pub fn get(owner: AccountNumber, sub_account: String) -> Option<Self> {
+            SubAccountTable::read()
+                .get_index_pk()
+                .get(&(owner, sub_account))
+        }
+
+        pub fn get_or_add(owner: AccountNumber, sub_account: String) -> Self {
+            Self::get(owner, sub_account.clone()).unwrap_or_else(|| {
+                check(
+                    sub_account.len() <= 80,
+                    "Sub-account key must be 80 bytes or less",
+                );
+                let mut new_instance = Self::new(owner, sub_account);
+                new_instance.save();
+                new_instance
+            })
+        }
+
+        pub fn get_assert(owner: AccountNumber, sub_account: String) -> Self {
+            check_some(
+                Self::get(owner, sub_account.clone()),
+                &format!("{} has no sub-account '{}'", owner, sub_account),
+            )
+        }
+
+        pub fn get_by_id(id: u64) -> Option<Self> {
+            SubAccountTable::read().get_index_by_id().get(&id)
+        }
+
+        fn save(&mut self) {
+            SubAccountTable::read_write().put(&self).unwrap();
+        }
+
+        pub fn delete(&mut self) {
+            let sub_balances: Vec<_> = SubAccountBalanceTable::read()
+                .get_index_pk()
+                .range((self.id, 0)..(self.id, u32::MAX))
+                .collect();
+
+            let sab_table = SubAccountBalanceTable::read_write();
+            for sub_balance in sub_balances {
+                if sub_balance.balance.value > 0 {
+                    Balance::get_or_new(self.account, sub_balance.token_id)
+                        .add_balance(sub_balance.balance);
+                }
+                sab_table.erase(&sub_balance.pk());
+            }
+
+            SubAccountTable::read_write().erase(&(&self.pk()));
+        }
+
+        pub fn add_balance(&mut self, token_id: TID, quantity: Quantity) {
+            Balance::get_assert(self.account, token_id).sub_balance(quantity);
+            SubAccountBalance::get_or_new(self.id, token_id).add_balance(quantity);
+        }
+
+        pub fn sub_balance(&mut self, token_id: TID, quantity: Quantity) {
+            SubAccountBalance::get_assert(self.id, token_id).sub_balance(quantity);
+            Balance::get_or_new(self.account, token_id).add_balance(quantity);
+        }
+
+        pub fn get_balance(&self, token_id: TID) -> Quantity {
+            SubAccountBalance::get_or_new(self.id, token_id).get_balance()
+        }
+    }
+
+    #[table(name = "SubAccountBalanceTable", index = 9)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject)]
+    #[graphql(complex)]
+    pub struct SubAccountBalance {
+        #[graphql(skip)]
+        pub subaccount_id: u64,
+        pub token_id: TID,
+        #[graphql(skip)]
+        pub balance: Quantity,
+    }
+    impl SubAccountBalance {
+        #[primary_key]
+        fn pk(&self) -> (u64, TID) {
+            (self.subaccount_id, self.token_id)
+        }
+    }
+    impl SubAccountBalance {
+        fn new(subaccount_id: u64, token_id: TID) -> Self {
+            Token::get_assert(token_id);
+            Self {
+                subaccount_id,
+                token_id,
+                balance: 0.into(),
+            }
+        }
+
+        fn get(subaccount_id: u64, token_id: TID) -> Option<Self> {
+            SubAccountBalanceTable::read()
+                .get_index_pk()
+                .get(&(subaccount_id, token_id))
+        }
+
+        pub fn get_or_new(subaccount_id: u64, token_id: TID) -> Self {
+            Self::get(subaccount_id, token_id).unwrap_or(Self::new(subaccount_id, token_id))
+        }
+
+        pub fn get_assert(subaccount_id: u64, token_id: TID) -> Self {
+            check_some(
+                Self::get(subaccount_id, token_id),
+                &format!(
+                    "Sub-account balance does not exist for subaccount ID {} and token ID {}",
+                    subaccount_id, token_id
+                ),
+            )
+        }
+
+        fn save(&self) {
+            SubAccountBalanceTable::read_write().put(&self).unwrap();
+        }
+
+        pub fn delete(&mut self) {
+            SubAccountBalanceTable::read_write().erase(&self.pk());
+        }
+
+        fn add_balance(&mut self, quantity: Quantity) {
+            self.balance = self.balance + quantity;
+            self.save();
+        }
+
+        fn sub_balance(&mut self, quantity: Quantity) {
+            check(self.balance >= quantity, "Insufficient sub-account balance");
+            self.balance = self.balance - quantity;
+            self.save();
+        }
+
+        pub fn get_balance(&self) -> Quantity {
+            self.balance
+        }
+    }
+    #[ComplexObject]
+    impl SubAccountBalance {
+        pub async fn balance(&self) -> Decimal {
+            Decimal::new(self.balance, Token::get_assert(self.token_id).precision)
+        }
+
+        pub async fn token(&self) -> Token {
+            Token::get_assert(self.token_id)
+        }
+
+        pub async fn account(&self) -> AccountNumber {
+            SubAccount::get_by_id(self.subaccount_id).unwrap().account
+        }
+
+        pub async fn subaccount(&self) -> String {
+            SubAccount::get_by_id(self.subaccount_id)
+                .unwrap()
+                .sub_account
         }
     }
 }
