@@ -1,16 +1,17 @@
 import { z } from "zod";
+
+import { useExile } from "@/hooks/fractals/use-exile";
+
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useAppForm } from '@shared/components/form/app-form'
-import { FieldAccountExisting } from '@shared/components/form/field-account-existing'
-
-import { useExile } from "@/hooks/fractals/use-exile";
-import { zAccount } from '@shared/lib/schemas/account'
-import { supervisor } from "@shared/lib/supervisor";
 
 export const ExileFractalMemberModal = ({
     show,
@@ -24,10 +25,15 @@ export const ExileFractalMemberModal = ({
     const form = useAppForm({
         defaultValues: {
             exile: {
-                member: ""
+                member: "",
             },
         },
-        onSubmit: async ({ formApi, value: { exile: { member } } }) => {
+        onSubmit: async ({
+            formApi,
+            value: {
+                exile: { member },
+            },
+        }) => {
             await exileMember([member]);
             openChange(false);
             formApi.reset();
@@ -36,12 +42,10 @@ export const ExileFractalMemberModal = ({
             onChange: z.object({
                 exile: z.object({
                     member: zAccount,
-                })
+                }),
             }),
         },
     });
-
-
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
@@ -57,7 +61,7 @@ export const ExileFractalMemberModal = ({
                     >
                         <FieldAccountExisting
                             form={form}
-                            fields={{ account: 'exile.member' }}
+                            fields={{ account: "exile.member" }}
                             label="Recipient Account"
                             description={undefined}
                             placeholder="Enter account name"
@@ -66,9 +70,7 @@ export const ExileFractalMemberModal = ({
                         />
 
                         <form.AppForm>
-                            <form.SubmitButton
-                                labels={["Exile", "Exiling"]}
-                            />
+                            <form.SubmitButton labels={["Exile", "Exiling"]} />
                         </form.AppForm>
                     </form>
                 </DialogHeader>

@@ -13,7 +13,6 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-
 export const AllGuildMembers = () => {
     const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
@@ -43,9 +42,7 @@ export const AllGuildMembers = () => {
                                 <TableCell className="font-medium">
                                     {member.member}
                                 </TableCell>
-                                <TableCell>
-                                    {member.score}
-                                </TableCell>
+                                <TableCell>{member.score}</TableCell>
                                 <TableCell>
                                     {dayjs(member.createdAt).format(
                                         "MMMM D, YYYY",

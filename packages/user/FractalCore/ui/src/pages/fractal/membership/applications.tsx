@@ -86,8 +86,8 @@ export const Applications = () => {
                             isGuildMember || isPending
                                 ? undefined
                                 : () => {
-                                    setShowGuildModal(true);
-                                }
+                                      setShowGuildModal(true);
+                                  }
                         }
                     />
                 )}

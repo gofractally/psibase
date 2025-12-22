@@ -1,11 +1,4 @@
 import {
-    Item,
-    ItemActions,
-    ItemContent,
-    ItemDescription,
-    ItemTitle,
-} from "@shared/shadcn/ui/item";
-import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -17,6 +10,13 @@ import {
     AlertDialogTrigger,
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
+import {
+    Item,
+    ItemActions,
+    ItemContent,
+    ItemDescription,
+    ItemTitle,
+} from "@shared/shadcn/ui/item";
 
 type AlertItemProps = {
     title: string;
@@ -48,7 +48,11 @@ export const AlertItem = ({
             <ItemActions>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
-                        <Button variant={variant} size="sm" disabled={isPending}>
+                        <Button
+                            variant={variant}
+                            size="sm"
+                            disabled={isPending}
+                        >
                             {buttonText}
                         </Button>
                     </AlertDialogTrigger>

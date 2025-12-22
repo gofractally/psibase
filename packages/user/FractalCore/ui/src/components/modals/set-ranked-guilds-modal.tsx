@@ -1,13 +1,15 @@
 import { z } from "zod";
+
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useSetRankedGuilds } from "@/hooks/fractals/use-set-ranked-guild-slots copy";
+
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useAppForm } from "@shared/components/form/app-form";
-import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useSetRankedGuilds } from "@/hooks/fractals/use-set-ranked-guild-slots copy";
 
 export const SetRankedGuilds = ({
     show,
@@ -21,12 +23,14 @@ export const SetRankedGuilds = ({
     const { data: fractal } = useFractal();
     const form = useAppForm({
         defaultValues: {
-            rankedGuilds: (fractal?.fractal?.consensusReward?.rankedGuilds ?? []).join(',')
+            rankedGuilds: (
+                fractal?.fractal?.consensusReward?.rankedGuilds ?? []
+            ).join(","),
         },
         onSubmit: async ({ formApi, value: { rankedGuilds } }) => {
-            await setRankedGuilds([rankedGuilds.split(',')]);
+            await setRankedGuilds([rankedGuilds.split(",")]);
             openChange(false);
-            formApi.reset({ rankedGuilds })
+            formApi.reset({ rankedGuilds });
         },
         validators: {
             onChange: z.object({
@@ -35,19 +39,17 @@ export const SetRankedGuilds = ({
         },
     });
 
-
     return (
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Set ranked guilds</DialogTitle>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-muted-foreground text-sm">
                         <p>
-                            Rank guilds putting the highest rewarded at the front.
+                            Rank guilds putting the highest rewarded at the
+                            front.
                         </p>
-                        <p>
-                            Current limit is
-                        </p>
+                        <p>Current limit is</p>
                     </div>
                     <form
                         onSubmit={(e) => {
@@ -65,12 +67,15 @@ export const SetRankedGuilds = ({
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Set ranked guilds", "Setting ranked guilds"]}
+                                labels={[
+                                    "Set ranked guilds",
+                                    "Setting ranked guilds",
+                                ]}
                             />
                         </form.AppForm>
                     </form>
                 </DialogHeader>
             </DialogContent>
-        </Dialog >
+        </Dialog>
     );
 };

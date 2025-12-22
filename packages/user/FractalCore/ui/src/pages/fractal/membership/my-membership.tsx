@@ -2,19 +2,21 @@ import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
+import humanizeDuration from "humanize-duration";
 import { Loader2, Plus } from "lucide-react";
 
-import { ErrorCard } from "@shared/components/error-card";
-
+import { useDistToken } from "@/hooks/fractals/use-dist-token";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { createIdenticon } from "@shared/lib/create-identicon";
+import { useNowUnix } from "@/hooks/use-now-unix";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { createIdenticon } from "@shared/lib/create-identicon";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -25,10 +27,6 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { useNowUnix } from "@/hooks/use-now-unix";
-import humanizeDuration from "humanize-duration";
-import { useDistToken } from "@/hooks/fractals/use-dist-token";
-
 
 const humanize = (ms: number) =>
     humanizeDuration(ms, {
@@ -36,7 +34,6 @@ const humanize = (ms: number) =>
         largest: 3,
         round: true,
     });
-
 
 export const MyMembership = () => {
     const fractalAccount = useFractalAccount();
@@ -161,63 +158,77 @@ const FractalOverviewCard = ({
     );
 };
 
-
 const ConsensusRewardStatusCard = () => {
-
     const { data: fractal, isLoading } = useFractal();
     const now = useNowUnix();
 
-    const { mutateAsync: distributeToken, isPending: isDistributing } = useDistToken()
+    const { mutateAsync: distributeToken, isPending: isDistributing } =
+        useDistToken();
 
     if (isLoading) return null;
     if (!fractal?.fractal?.consensusReward) return null;
 
-    const intervalPeriod = humanize(fractal.fractal.consensusReward.stream.distIntervalSecs * 1000)
+    const intervalPeriod = humanize(
+        fractal.fractal.consensusReward.stream.distIntervalSecs * 1000,
+    );
     const nextPeriod = fractal.fractal.consensusReward.stream.lastDistributed;
 
-    const nextClaimTime = dayjs(nextPeriod).add(fractal.fractal.consensusReward.stream.distIntervalSecs, 'seconds');
+    const nextClaimTime = dayjs(nextPeriod).add(
+        fractal.fractal.consensusReward.stream.distIntervalSecs,
+        "seconds",
+    );
     const isClaimTime = nextClaimTime.unix() < now;
 
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Consensus Rewards</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                            Reward distribution interval
+                        </span>
+                        <span className="text-muted-foreground text-sm">
+                            Every {intervalPeriod}
+                        </span>
+                    </div>
 
-    return <Card>
-        <CardHeader>
-            <CardTitle>Consensus Rewards</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                        Reward distribution interval
-                    </span>
-                    <span className="text-muted-foreground text-sm">
-                        Every {intervalPeriod}
-                    </span>
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                            Next distribution
+                        </span>
+                        <span className="text-muted-foreground text-sm">
+                            {isClaimTime ? (
+                                <Button
+                                    disabled={isDistributing}
+                                    onClick={() => {
+                                        distributeToken([]);
+                                    }}
+                                >
+                                    Claim now
+                                </Button>
+                            ) : (
+                                `${nextClaimTime.format(
+                                    "MMMM D, YYYY [at] h:mm A z",
+                                )} (${humanize(nextClaimTime.diff(dayjs()))})`
+                            )}
+                        </span>
+                    </div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">
-                        Next distribution
-                    </span>
-                    <span className="text-muted-foreground text-sm">
-                        {isClaimTime ? <Button disabled={isDistributing} onClick={() => { distributeToken([]) }}>Claim now</Button> : `${nextClaimTime.format(
-                            "MMMM D, YYYY [at] h:mm A z",
-                        )} (${humanize(nextClaimTime.diff(dayjs()))})`}
-                    </span>
-                </div>
-            </div>
-        </CardContent>
-    </Card>
-}
-
-
+            </CardContent>
+        </Card>
+    );
+};
 
 const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
     const status =
         membership == null
             ? "Not a member"
             : membership
-                ? getMemberLabel(membership.memberStatus)
-                : "Loading...";
+              ? getMemberLabel(membership.memberStatus)
+              : "Loading...";
     return (
         <Card>
             <CardHeader>

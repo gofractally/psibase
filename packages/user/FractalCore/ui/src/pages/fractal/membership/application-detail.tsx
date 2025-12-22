@@ -6,6 +6,7 @@ import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-
 
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import {
@@ -14,7 +15,6 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { useGuild } from "@/hooks/use-guild";
 
 export const ApplicationDetail = () => {
     const { applicant } = useParams();
@@ -32,9 +32,12 @@ export const ApplicationDetail = () => {
     const [showModal, setShowModal] = useState(false);
 
     if (application === null) {
-        return <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            Application for {currentUser} to join the guild {guild.data?.displayName} does not exist.
-        </div>
+        return (
+            <div className="mx-auto w-full max-w-5xl p-4 px-6">
+                Application for {currentUser} to join the guild{" "}
+                {guild.data?.displayName} does not exist.
+            </div>
+        );
     }
 
     return (
@@ -60,7 +63,9 @@ export const ApplicationDetail = () => {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-3">{application?.extraInfo}</div>
+                        <div className="space-y-3">
+                            {application?.extraInfo}
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -76,7 +81,7 @@ export const ApplicationDetail = () => {
                     <CardContent>
                         <div className="flex flex-col gap-2">
                             {application?.attestations &&
-                                application?.attestations.length > 0 ? (
+                            application?.attestations.length > 0 ? (
                                 application?.attestations.map((attest) => (
                                     <div
                                         key={attest.attestee}
@@ -100,8 +105,8 @@ export const ApplicationDetail = () => {
                                         isSelf
                                             ? undefined
                                             : () => {
-                                                setShowModal(true);
-                                            }
+                                                  setShowModal(true);
+                                              }
                                     }
                                     buttonLabel="Create attestation"
                                     description="No attestations have been made in favour or against this application."

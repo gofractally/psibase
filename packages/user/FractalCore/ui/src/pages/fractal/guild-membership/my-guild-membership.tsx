@@ -1,20 +1,17 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { ErrorCard } from "@shared/components/error-card";
+import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Card,
-    CardContent,
-} from "@shared/shadcn/ui/card";
+import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { GuildOverviewCard } from "@/components/guild-overview-card";
 
 export const MyGuildMembership = () => {
     const {
@@ -60,7 +57,6 @@ export const MyGuildMembership = () => {
         </div>
     );
 };
-
 
 // const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
 //     const status =

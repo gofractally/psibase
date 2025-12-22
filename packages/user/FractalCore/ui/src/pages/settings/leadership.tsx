@@ -1,5 +1,14 @@
+import { useState } from "react";
+
+import { AlertItem } from "@/components/alert-item";
+import { SetGuildRepModal } from "@/components/modals/set-guild-rep-modal";
+
+import { useRemoveGuildRep } from "@/hooks/fractals/use-remove-guild-rep";
+import { useResignRep } from "@/hooks/fractals/use-resign-rep";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useGuild } from "@/hooks/use-guild"
+import { useGuild } from "@/hooks/use-guild";
+
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Item,
     ItemActions,
@@ -7,14 +16,6 @@ import {
     ItemDescription,
     ItemTitle,
 } from "@shared/shadcn/ui/item";
-import {
-    Button
-} from "@shared/shadcn/ui/button";
-import { useResignRep } from "@/hooks/fractals/use-resign-rep";
-import { useRemoveGuildRep } from "@/hooks/fractals/use-remove-guild-rep";
-import { SetGuildRepModal } from "@/components/modals/set-guild-rep-modal";
-import { useState } from "react";
-import { AlertItem } from "@/components/alert-item";
 
 export const Leadership = () => {
     const { data: guild } = useGuild();
@@ -25,7 +26,8 @@ export const Leadership = () => {
         currentUser && guild?.council?.includes(currentUser);
 
     const { mutateAsync: resignAsRep, isPending: isResigning } = useResignRep();
-    const { mutateAsync: removeGuildRep, isPending: isRemoving } = useRemoveGuildRep();
+    const { mutateAsync: removeGuildRep, isPending: isRemoving } =
+        useRemoveGuildRep();
 
     const [showRepModal, setShowRepModal] = useState(false);
 
@@ -44,8 +46,8 @@ export const Leadership = () => {
                     confirmDescription={
                         <>
                             You will no longer be the representative of the{" "}
-                            <strong>{guild?.displayName}</strong> guild. Leadership will
-                            return to the council.
+                            <strong>{guild?.displayName}</strong> guild.
+                            Leadership will return to the council.
                         </>
                     }
                     buttonText="Resign"
@@ -62,9 +64,14 @@ export const Leadership = () => {
                     confirmDescription={
                         <>
                             This will immediately remove{" "}
-                            <span className="font-semibold">{guild.rep.member}</span> as representative of the{" "}
-                            <span className="font-semibold">{guild.displayName}</span> guild. Leadership will
-                            return to the council.
+                            <span className="font-semibold">
+                                {guild.rep.member}
+                            </span>{" "}
+                            as representative of the{" "}
+                            <span className="font-semibold">
+                                {guild.displayName}
+                            </span>{" "}
+                            guild. Leadership will return to the council.
                         </>
                     }
                     buttonText="Remove"

@@ -5,14 +5,13 @@ import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { useAppForm } from "@shared/components/form/app-form";
 
 export const ApplyGuildModal = ({
     show,
@@ -33,10 +32,7 @@ export const ApplyGuildModal = ({
             extraInfo: "",
         },
         onSubmit: async ({ formApi, value: { extraInfo } }) => {
-            await applyGuild([
-                guildAccount!,
-                extraInfo,
-            ]);
+            await applyGuild([guildAccount!, extraInfo]);
             openChange(false);
             formApi.reset();
             navigate(`/guild/${guildAccount}/applications/${currentUser}`);
@@ -47,8 +43,6 @@ export const ApplyGuildModal = ({
             }),
         },
     });
-
-
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
@@ -70,9 +64,7 @@ export const ApplyGuildModal = ({
                         />
 
                         <form.AppForm>
-                            <form.SubmitButton
-                                labels={["Apply", "Applying"]}
-                            />
+                            <form.SubmitButton labels={["Apply", "Applying"]} />
                         </form.AppForm>
                     </form>
                 </DialogHeader>

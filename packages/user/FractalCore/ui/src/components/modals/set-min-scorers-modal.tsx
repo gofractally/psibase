@@ -1,15 +1,17 @@
 import { z } from "zod";
+
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useSetMinScorers } from "@/hooks/fractals/use-set-min-scorers";
+import { MIN_MINIMUM_REQUIRED_SCORERS } from "@/lib/constants";
+
+import { useAppForm } from "@shared/components/form/app-form";
+import { zU8 } from "@shared/lib/schemas/u8";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useAppForm } from "@shared/components/form/app-form";
-import { useSetMinScorers } from "@/hooks/fractals/use-set-min-scorers";
-import { zU8 } from '@shared/lib/schemas/u8'
-import { MIN_MINIMUM_REQUIRED_SCORERS } from "@/lib/constants";
-import { useFractal } from "@/hooks/fractals/use-fractal";
 
 export const SetMinScorersModal = ({
     show,
@@ -37,13 +39,15 @@ export const SetMinScorersModal = ({
         },
     });
 
-
     return (
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Set minimum scorers</DialogTitle>
-                    <div className="text-sm text-muted-foreground">Set the minimum amount of fractal members must achieve a non zero score before the fractal token is achieved.</div>
+                    <div className="text-muted-foreground text-sm">
+                        Set the minimum amount of fractal members must achieve a
+                        non zero score before the fractal token is achieved.
+                    </div>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();

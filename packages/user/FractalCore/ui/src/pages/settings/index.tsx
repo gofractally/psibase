@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useAppForm } from "@shared/components/form/app-form";
 import { ScheduleDialog } from "@/components/schedule-dialog";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
@@ -13,6 +12,9 @@ import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNowUnix } from "@/hooks/use-now-unix";
+
+import { useAppForm } from "@shared/components/form/app-form";
+
 import { Leadership } from "./leadership";
 
 export const Settings = () => {
@@ -35,26 +37,32 @@ export const Settings = () => {
         defaultValues: {
             displayName: guild?.displayName ?? "",
             bio: guild?.bio ?? "",
-            description: guild?.description ?? ""
+            description: guild?.description ?? "",
         },
-        onSubmit: async ({ value: { displayName, bio, description }, formApi }) => {
+        onSubmit: async ({
+            value: { displayName, bio, description },
+            formApi,
+        }) => {
             try {
-
                 const promises = [];
 
-                if (!formApi.getFieldMeta('displayName')?.isDefaultValue) {
-                    promises.push(setGuildDisplayName([guildAccount!, displayName]))
+                if (!formApi.getFieldMeta("displayName")?.isDefaultValue) {
+                    promises.push(
+                        setGuildDisplayName([guildAccount!, displayName]),
+                    );
                 }
-                if (!formApi.getFieldMeta('bio')?.isDefaultValue) {
-                    promises.push(setGuildBio([guildAccount!, bio]))
+                if (!formApi.getFieldMeta("bio")?.isDefaultValue) {
+                    promises.push(setGuildBio([guildAccount!, bio]));
                 }
-                if (!formApi.getFieldMeta('description')?.isDefaultValue) {
-                    promises.push(setGuildDescription([guildAccount!, description]))
+                if (!formApi.getFieldMeta("description")?.isDefaultValue) {
+                    promises.push(
+                        setGuildDescription([guildAccount!, description]),
+                    );
                 }
 
-                await Promise.all(promises)
+                await Promise.all(promises);
             } catch (e) {
-                refetch()
+                refetch();
                 throw e;
             }
         },
@@ -103,7 +111,7 @@ export const Settings = () => {
                             void form.handleSubmit();
                         }}
                     >
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 my-2">
+                        <div className="my-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <form.AppField
                                 name="displayName"
                                 children={(field) => (
@@ -117,7 +125,6 @@ export const Settings = () => {
                                 )}
                             />
                             <div className="col-span-2">
-
                                 <form.AppField
                                     name="description"
                                     children={(field) => (
@@ -125,7 +132,6 @@ export const Settings = () => {
                                     )}
                                 />
                             </div>
-
                         </div>
                         <form.AppForm>
                             <form.SubmitButton />

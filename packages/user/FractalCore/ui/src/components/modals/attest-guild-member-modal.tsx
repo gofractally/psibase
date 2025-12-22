@@ -4,14 +4,13 @@ import { z } from "zod";
 import { useAttestMembershipApp } from "@/hooks/fractals/use-attest-membership-app";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { useAppForm } from "@shared/components/form/app-form";
 
 export const AttestGuildMemberModal = ({
     show,
@@ -32,12 +31,7 @@ export const AttestGuildMemberModal = ({
             endorses: true,
         },
         onSubmit: async ({ formApi, value: { comment, endorses } }) => {
-            await attest([
-                guildAccount!,
-                applicant!,
-                comment,
-                endorses,
-            ]);
+            await attest([guildAccount!, applicant!, comment, endorses]);
             openChange(false);
             formApi.reset();
         },

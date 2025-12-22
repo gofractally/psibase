@@ -1,28 +1,36 @@
+import { Crown, User, Users } from "lucide-react";
+import z from "zod";
+
 import { useGuild } from "@/hooks/use-guild";
+import { Guild } from "@/lib/graphql/fractals/getGuild";
+
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { createIdenticon } from "@shared/lib/create-identicon";
 import {
     Card,
     CardContent,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { createIdenticon } from "@shared/lib/create-identicon";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-import { User, Users, Crown } from "lucide-react";
-import z from "zod";
-import { Guild } from "@/lib/graphql/fractals/getGuild";
 
-const zLeadership = z.enum(['RepAndCouncil', 'RepOnly', 'CouncilOnly']);
+const zLeadership = z.enum(["RepAndCouncil", "RepOnly", "CouncilOnly"]);
 
-const getLeadershipStatus = (guild?: Guild | null): z.infer<typeof zLeadership> | undefined => {
+const getLeadershipStatus = (
+    guild?: Guild | null,
+): z.infer<typeof zLeadership> | undefined => {
     if (guild == undefined || guild == null) return;
     if (guild.rep && guild.council) return zLeadership.Enum.RepAndCouncil;
     if (guild.rep) return zLeadership.Enum.RepOnly;
     if (guild.council) return zLeadership.Enum.CouncilOnly;
     throw new Error("Cannot determine leadership status");
-}
+};
 
-export const GuildOverviewCard = ({ guildAccount }: { guildAccount?: string }) => {
+export const GuildOverviewCard = ({
+    guildAccount,
+}: {
+    guildAccount?: string;
+}) => {
     const { data: guild } = useGuild(guildAccount);
     const { data: chainId } = useChainId();
 
@@ -64,20 +72,29 @@ export const GuildOverviewCard = ({ guildAccount }: { guildAccount?: string }) =
                                 {guild?.description || "No mission available."}
                             </p>
                         </div>
-                        <div className="flex items-center text-muted-foreground">
-                            Led by {guild?.rep ? `representative ${guild.rep.member}` : 'council'}
-                            <div className="border rounded-sm text-primary">
-
-                                {leadershipStatus == zLeadership.Enum.RepOnly && <Crown className="h-7 w-7" />}
-                                {leadershipStatus == zLeadership.Enum.RepAndCouncil && <User className="h-7 w-7" />}
-                                {leadershipStatus == zLeadership.Enum.CouncilOnly && <Users className="h-7 w-7" />}
+                        <div className="text-muted-foreground flex items-center">
+                            Led by{" "}
+                            {guild?.rep
+                                ? `representative ${guild.rep.member}`
+                                : "council"}
+                            <div className="text-primary rounded-sm border">
+                                {leadershipStatus ==
+                                    zLeadership.Enum.RepOnly && (
+                                    <Crown className="h-7 w-7" />
+                                )}
+                                {leadershipStatus ==
+                                    zLeadership.Enum.RepAndCouncil && (
+                                    <User className="h-7 w-7" />
+                                )}
+                                {leadershipStatus ==
+                                    zLeadership.Enum.CouncilOnly && (
+                                    <Users className="h-7 w-7" />
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
-
             </CardContent>
-
         </Card>
     );
 };

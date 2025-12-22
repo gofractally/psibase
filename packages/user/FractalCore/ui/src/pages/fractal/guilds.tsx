@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
+import { COUNCIL_SEATS } from "@/lib/constants";
 
 import { cn } from "@shared/lib/utils";
 import {
@@ -11,11 +12,9 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
-import { COUNCIL_SEATS } from "@/lib/constants";
 
 export const Guilds = () => {
     const { data: fractal } = useFractal();
-
 
     const navigate = useNavigate();
     const guildsData = fractal?.guilds.nodes;

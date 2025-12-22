@@ -1,15 +1,17 @@
 import { z } from "zod";
+
+import { useSetGuildRep } from "@/hooks/fractals/use-set-guild-rep";
 import { useGuildAccount } from "@/hooks/use-guild-account";
+
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { supervisor } from "@shared/lib/supervisor";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useAppForm } from "@shared/components/form/app-form";
-import { useSetGuildRep } from "@/hooks/fractals/use-set-guild-rep";
-import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
-import { supervisor } from "@shared/lib/supervisor";
 
 export const SetGuildRepModal = ({
     show,
@@ -24,19 +26,24 @@ export const SetGuildRepModal = ({
     const form = useAppForm({
         defaultValues: {
             representation: {
-                newRep: ""
+                newRep: "",
             },
         },
-        onSubmit: async ({ formApi, value: { representation: { newRep } } }) => {
+        onSubmit: async ({
+            formApi,
+            value: {
+                representation: { newRep },
+            },
+        }) => {
             await setGuildRep([guildAccount!, newRep]);
             openChange(false);
-            formApi.reset({ representation: { newRep } })
+            formApi.reset({ representation: { newRep } });
         },
         validators: {
             onChange: z.object({
                 representation: z.object({
                     newRep: z.string(),
-                })
+                }),
             }),
         },
     });
@@ -55,7 +62,7 @@ export const SetGuildRepModal = ({
                     >
                         <FieldAccountExisting
                             form={form}
-                            fields={{ account: 'representation.newRep' }}
+                            fields={{ account: "representation.newRep" }}
                             label="New representative"
                             description={undefined}
                             placeholder="Enter account name"

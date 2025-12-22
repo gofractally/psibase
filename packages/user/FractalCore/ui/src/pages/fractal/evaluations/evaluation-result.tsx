@@ -95,7 +95,7 @@ export const EvaluationResult = () => {
                                                 className={cn(
                                                     "space-y-2",
                                                     missing.size !==
-                                                    members.size && "mt-4",
+                                                        members.size && "mt-4",
                                                 )}
                                             >
                                                 <h4 className="text-center text-sm font-medium">
