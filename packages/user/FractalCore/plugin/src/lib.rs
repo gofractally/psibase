@@ -53,7 +53,7 @@ define_trust! {
     functions {
         None => [get_group_users],
         Low => [start_eval, close_eval, dist_token],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
+        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, register_candidacy],
         High => [exile_member, set_rank_ordering_threshold, set_token_threshold, init_token, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
     }
 }
@@ -242,6 +242,11 @@ impl UserGuild for FractalCorePlugin {
     fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
         assert_authorized(FunctionName::apply_guild)?;
         FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
+    }
+
+    fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
+        assert_authorized(FunctionName::register_candidacy)?;
+        FractalsPlugin::user_guild::register_candidacy(&guild_account, active)
     }
 
     fn attest_membership_app(

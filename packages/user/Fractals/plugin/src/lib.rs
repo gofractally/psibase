@@ -68,7 +68,7 @@ define_trust! {
     functions {
         None => [get_group_users, exile_member, set_dist_interval, init_token],
         Low => [start, close_eval, dist_token],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
+        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal, register_candidacy],
         High => [propose, set_rank_ordering_threshold, set_token_threshold, set_ranked_guilds, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
 ],
     }
@@ -394,6 +394,18 @@ impl UserGuild for FractallyPlugin {
             fractals::action_structs::apply_guild::ACTION_NAME,
             &packed_args,
         )
+    }
+
+    fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
+        get_guild(guild_account.clone())?.assert_authorized(FunctionName::register_candidacy)?;
+
+        let packed_args = fractals::action_structs::reg_can {
+            guild: guild_account.as_str().into(),
+            active,
+        }
+        .packed();
+
+        add_action_to_transaction(fractals::action_structs::reg_can::ACTION_NAME, &packed_args)
     }
 
     fn attest_membership_app(
