@@ -55,8 +55,8 @@ impl NetPricing {
 
         let price = Self::price();
 
-        let mut amount_units = amount_bits / bandwidth.billable_unit;
-        amount_units = amount_units.max(1);
+        // Round up to the nearest billable unit
+        let amount_units = (amount_bits + bandwidth.billable_unit - 1) / bandwidth.billable_unit;
 
         let cost = amount_units.saturating_mul(price);
         check(cost < u64::MAX, "network usage overflow");
@@ -70,18 +70,16 @@ impl NetPricing {
             "Network bandwidth not initialized",
         );
 
-        let ppm = calculate_new_block_ppm(
+        let last_block_usage_ppm = update_average_usage(
             &mut bandwidth.usage_history,
-            bandwidth.current_usage_bps,
+            &mut bandwidth.current_usage_bps,
             bandwidth.num_blocks_to_average,
             NetworkSpecs::get().net_bps,
             bandwidth.diff_adjust_id,
         );
-
-        bandwidth.current_usage_bps = 0;
         table.put(&bandwidth).unwrap();
 
-        ppm
+        last_block_usage_ppm
     }
 
     pub fn price() -> u64 {

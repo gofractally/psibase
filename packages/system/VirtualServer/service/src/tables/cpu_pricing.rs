@@ -48,8 +48,8 @@ impl CpuPricing {
 
         let price = Self::price();
 
-        let mut amount_units = amount_ns / cpu_time.billable_unit;
-        amount_units = amount_units.max(1);
+        // Round up to the nearest billable unit
+        let amount_units = (amount_ns + cpu_time.billable_unit - 1) / cpu_time.billable_unit;
 
         let cost = amount_units.saturating_mul(price);
         check(cost < u64::MAX, "CPU usage overflow");
@@ -60,18 +60,16 @@ impl CpuPricing {
         let table = CpuPricingTable::read_write();
         let mut cpu_time = check_some(table.get_index_pk().get(&()), "CPU time not initialized");
 
-        let ppm = calculate_new_block_ppm(
+        let last_block_usage_ppm = update_average_usage(
             &mut cpu_time.usage_history,
-            cpu_time.current_usage_ns,
+            &mut cpu_time.current_usage_ns,
             cpu_time.num_blocks_to_average,
             NetworkSpecs::get().cpu_ns,
             cpu_time.diff_adjust_id,
         );
-
-        cpu_time.current_usage_ns = 0;
         table.put(&cpu_time).unwrap();
 
-        ppm
+        last_block_usage_ppm
     }
 
     pub fn price() -> u64 {

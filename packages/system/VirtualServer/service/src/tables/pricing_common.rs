@@ -42,14 +42,14 @@ pub fn create_diff_adjust(doubling_time_sec: u32, halving_time_sec: u32) -> u32 
     diff_adjust_id
 }
 
-pub fn calculate_new_block_ppm(
+pub fn update_average_usage(
     usage_history: &mut Vec<u64>,
-    current_usage: u64,
+    current_usage: &mut u64,
     num_blocks_to_average: u8,
     capacity: u64,
     diff_adjust_id: u32,
 ) -> u32 {
-    usage_history.insert(0, current_usage);
+    usage_history.insert(0, *current_usage);
     if usage_history.len() > num_blocks_to_average as usize {
         usage_history.pop();
     }
@@ -69,6 +69,9 @@ pub fn calculate_new_block_ppm(
     let ppm = ppm as u32;
 
     DiffAdjust::call().increment(diff_adjust_id, ppm);
+
+    // Reset current usage
+    *current_usage = 0;
 
     ppm
 }

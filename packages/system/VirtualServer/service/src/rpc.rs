@@ -131,7 +131,7 @@ impl Query {
         NetPricing::get()
     }
 
-    /// Returns the data relatd to pricing of CPU time
+    /// Returns the data related to pricing of CPU time
     async fn cpu_pricing(&self) -> Option<CpuPricing> {
         CpuPricing::get()
     }
