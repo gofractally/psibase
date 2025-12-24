@@ -331,6 +331,16 @@ mod service {
             .await
         }
 
+        async fn guild_membership(
+            &self,
+            guild: AccountNumber,
+            member: AccountNumber,
+        ) -> Option<GuildMember> {
+            GuildMemberTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&(guild, member))
+        }
+
         async fn members(
             &self,
             fractal: AccountNumber,

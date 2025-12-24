@@ -18,6 +18,8 @@ interface user-fractal {
     use host:types/types.{error};
 
     join: func() -> result<_, error>;
+    dist-token: func() -> result<_, error>;
+
 
 }
 
@@ -60,6 +62,7 @@ interface admin-guild {
 
 interface user-guild {
     use host:types/types.{error};
+    register-candidacy: func(guild-account: string, active: bool) -> result<_, error>;
 
     apply-guild: func(guild-account: string, app: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;

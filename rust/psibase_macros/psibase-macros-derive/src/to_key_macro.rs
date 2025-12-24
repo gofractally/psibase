@@ -23,7 +23,7 @@ struct StructField<'a> {
     ty: &'a syn::Type,
 }
 
-fn struct_fields(data: &DataStruct) -> Vec<StructField> {
+fn struct_fields(data: &DataStruct) -> Vec<StructField<'_>> {
     match &data.fields {
         Fields::Named(named) => named
             .named

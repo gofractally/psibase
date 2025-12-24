@@ -7,7 +7,7 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{native_raw, AccountNumber, DbId, ToKey};
+use crate::{native_raw, AccountNumber, DbId, MicroSeconds, ToKey};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
@@ -337,6 +337,16 @@ pub fn kv_max<K: ToKey, V: UnpackOwned>(db: &KvHandle, key: &K) -> Option<V> {
 pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
     let size = unsafe { native_raw::getSequential(db_id, id) };
     get_optional_result_bytes(size)
+}
+
+/// Sets the CPU timer to expire after the current transaction/query/callback
+/// context has run for a given time. When the timer
+/// expires, the current context will be terminated. Setting the timeout
+/// replaces any previous timeout.
+pub fn set_max_cpu_time<T: Into<MicroSeconds>>(time: T) {
+    let time: MicroSeconds = time.into();
+    let time = (time.value * 1000) as u64;
+    unsafe { native_raw::setMaxCpuTime(time) }
 }
 
 pub use scopeguard;

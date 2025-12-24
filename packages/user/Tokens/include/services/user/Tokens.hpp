@@ -14,7 +14,7 @@ namespace UserService
    class Tokens : public psibase::Service
    {
      public:
-      using Tables = psibase::ServiceTables<TokenTable, TokenHolderTable, InitTable>;
+      using Tables = psibase::ServiceTables<TokensInitTable, TokenTable>;
 
       using Memo = psibase::Memo;
 

@@ -55,6 +55,11 @@ pub mod Service {
     }
 
     #[action]
+    fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
     fn exists(symbol: AccountNumber) -> bool {
         unimplemented!()
     }

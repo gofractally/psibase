@@ -67,11 +67,10 @@ define_trust! {
             ",
     }
     functions {
-        None => [get_group_users, exile_member, set_dist_interval, init_token],
-        Low => [start, close_eval],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [propose, con_membership_app, set_rank_ordering_threshold, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
-],
+        None => [exile_member, get_group_users, init_token, set_dist_interval],
+        Low => [close_eval, dist_token, start],
+        Medium => [apply_guild, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        High => [attest, con_membership_app, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -382,6 +381,18 @@ impl UserFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        let packed_args = fractals::action_structs::dist_token {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::dist_token::ACTION_NAME,
+            &packed_args,
+        )
+    }
 }
 
 impl UserGuild for FractallyPlugin {
@@ -398,6 +409,18 @@ impl UserGuild for FractallyPlugin {
             fractals::action_structs::apply_guild::ACTION_NAME,
             &packed_args,
         )
+    }
+
+    fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
+        get_guild(guild_account.clone())?.assert_authorized(FunctionName::register_candidacy)?;
+
+        let packed_args = fractals::action_structs::reg_can {
+            guild: guild_account.as_str().into(),
+            active,
+        }
+        .packed();
+
+        add_action_to_transaction(fractals::action_structs::reg_can::ACTION_NAME, &packed_args)
     }
 
     fn attest_membership_app(

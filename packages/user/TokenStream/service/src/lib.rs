@@ -232,7 +232,7 @@ pub mod service {
         );
 
         stream.deposit(amount);
-        
+
         Wrapper::emit().history().updated(
             nft_id,
             sender,
@@ -247,7 +247,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - ID of the stream AKA Redeemer NFT ID.
-    /// 
+    ///
     /// Returns quantity of amount claimed
     #[action]
     fn claim(nft_id: u32) -> Quantity {
@@ -257,23 +257,25 @@ pub mod service {
         let sender = get_sender();
         stream.check_is_owner(sender);
 
-        Tokens::call().credit(
-            stream.token_id,
-            sender,
-            claimed_amount,
-            Memo::try_from(format!("Claim from stream {}", nft_id)).unwrap(),
-        );
-
-        Wrapper::emit().history().updated(
-            nft_id,
-            sender,
-            "claimed".to_string(),
-            Decimal::new(
+        if claimed_amount.value > 0 {
+            Tokens::call().credit(
+                stream.token_id,
+                sender,
                 claimed_amount,
-                Tokens::call().getToken(stream.token_id).precision,
-            )
-            .to_string(),
-        );
+                Memo::try_from(format!("Claim from stream {}", nft_id)).unwrap(),
+            );
+
+            Wrapper::emit().history().updated(
+                nft_id,
+                sender,
+                "claimed".to_string(),
+                Decimal::new(
+                    claimed_amount,
+                    Tokens::call().getToken(stream.token_id).precision,
+                )
+                .to_string(),
+            );
+        }
         claimed_amount
     }
 

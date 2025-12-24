@@ -24,6 +24,7 @@ define_trust! {
         Low trust grants these abilities:
             - Starting an evaluation cycle
             - Closing an evaluation cycle
+            - Trigger a fractal wide token distribution
             - Initialise fractal token
         ",
         Medium => "
@@ -53,9 +54,9 @@ define_trust! {
     }
     functions {
         None => [get_group_users],
-        Low => [start_eval, close_eval],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal],
-        High => [exile_member, con_membership_app, set_rank_ordering_threshold, set_token_threshold, init_token, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        Low => [close_eval, dist_token, start_eval],
+        Medium => [apply_guild, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
+        High => [attest, con_membership_app, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -243,12 +244,22 @@ impl UserFractal for FractalCorePlugin {
         assert_authorized(FunctionName::join)?;
         FractalsPlugin::user_fractal::join()
     }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        FractalsPlugin::user_fractal::dist_token()
+    }
 }
 
 impl UserGuild for FractalCorePlugin {
     fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
         assert_authorized(FunctionName::apply_guild)?;
         FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
+    }
+
+    fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
+        assert_authorized(FunctionName::register_candidacy)?;
+        FractalsPlugin::user_guild::register_candidacy(&guild_account, active)
     }
 
     fn attest_membership_app(

@@ -53,6 +53,8 @@ bool AutoCloseSocket::canAutoClose() const
    return true;
 }
 
+void AutoCloseSocket::onLock() {}
+
 void SocketAutoCloseSet::close(Writer&                           writer,
                                Sockets&                          parent,
                                const std::optional<std::string>& message)
@@ -177,8 +179,9 @@ void Sockets::add(Writer&                        writer,
       if (owner)
       {
          assert(socket->canAutoClose());
-         auto sockptr   = std::static_pointer_cast<AutoCloseSocket>(socket);
-         sockptr->owner = owner;
+         auto sockptr         = std::static_pointer_cast<AutoCloseSocket>(socket);
+         sockptr->owner       = owner;
+         sockptr->autoClosing = true;
          owner->sockets.insert(sockptr);
       }
       socket->weak_sockets = shared_from_this();
@@ -264,6 +267,7 @@ std::int32_t Sockets::autoClose(std::int32_t               fd,
                                 std::vector<SocketChange>* diff)
 {
    std::shared_ptr<AutoCloseSocket> sockptr;
+   bool                             acquireLock = false;
    {
       std::lock_guard l{mutex};
       if (fd < 0 || fd >= sockets.size() || !sockets[fd])
@@ -275,11 +279,21 @@ std::int32_t Sockets::autoClose(std::int32_t               fd,
 
       sockptr = std::static_pointer_cast<AutoCloseSocket>(p);
 
-      if (sockptr->owner && sockptr->owner != owner)
+      if ((sockptr->autoClosing || sockptr->autoCloseLocked) && sockptr->owner != owner)
          return wasi_errno_acces;
 
-      if (!diff)
-         sockptr->owner = value ? owner : nullptr;
+      acquireLock = !value && !diff && sockptr->pendingLock;
+
+      if (!diff && !sockptr->autoCloseLocked)
+      {
+         sockptr->autoClosing = value;
+         sockptr->owner       = value ? owner : nullptr;
+      }
+      if (acquireLock)
+      {
+         sockptr->pendingLock     = false;
+         sockptr->autoCloseLocked = true;
+      }
    }
 
    if (diff)
@@ -293,27 +307,87 @@ std::int32_t Sockets::autoClose(std::int32_t               fd,
       else
          owner->sockets.erase(sockptr);
    }
+   if (acquireLock)
+   {
+      sockptr->onLock();
+   }
    return 0;
 }
+
+bool Sockets::lockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket)
+{
+   bool            okay = false;
+   std::lock_guard l{mutex};
+   assert(!socket->autoCloseLocked);
+   assert(!socket->pendingLock);
+   if (!socket->autoClosing)
+   {
+      socket->autoCloseLocked = true;
+      return true;
+   }
+   else
+   {
+      socket->pendingLock = true;
+      return false;
+   }
+}
+
+void Sockets::unlockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket)
+{
+   std::lock_guard l{mutex};
+   assert(socket->autoCloseLocked);
+   assert(!socket->pendingLock);
+   socket->autoCloseLocked = false;
+   if (!socket->autoClosing)
+   {
+      socket->owner = nullptr;
+   }
+}
+
+void Sockets::setOwner(const std::shared_ptr<AutoCloseSocket>& socket, SocketAutoCloseSet* owner)
+{
+   std::lock_guard l{mutex};
+   assert(!socket->autoClosing);
+   assert(socket->autoCloseLocked);
+   assert(socket->owner == nullptr);
+   socket->owner = owner;
+}
+
 bool Sockets::applyChanges(const std::vector<SocketChange>& diff, SocketAutoCloseSet* owner)
 {
    std::lock_guard l{mutex};
    for (const auto& change : diff)
    {
-      if (change.socket->closed || change.socket->owner && change.socket->owner != owner)
+      if (change.socket->closed || (change.socket->autoClosing || change.socket->autoCloseLocked) &&
+                                       change.socket->owner != owner)
          return false;
    }
    for (const auto& change : diff)
    {
-      if (change.socket->owner && !change.owner)
+      if (change.socket->autoClosing && !change.owner)
       {
          owner->sockets.erase(change.socket);
       }
-      else if (!change.socket->owner && change.owner)
+      else if (!change.socket->autoClosing && change.owner)
       {
          owner->sockets.insert(change.socket);
       }
-      change.socket->owner = change.owner;
+      change.socket->autoClosing = change.owner != nullptr;
+      if (!change.socket->autoCloseLocked)
+         change.socket->owner = change.owner;
+   }
+   // Processing pending locks has to come after updating all sockets,
+   // because autoClose might be disabled and then re-enabled again
+   // in the changeset.
+   for (const auto& change : diff)
+   {
+      if (change.socket->pendingLock && !change.socket->autoClosing)
+      {
+         assert(!change.socket->autoCloseLocked);
+         change.socket->autoCloseLocked = true;
+         change.socket->pendingLock     = false;
+         change.socket->onLock();
+      }
    }
    return true;
 }

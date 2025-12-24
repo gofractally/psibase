@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
-import { Account } from "@/lib/zod/Account";
+import { FRACTALS_SERVICE } from "@/lib/constants";
+import { zDateTime } from "@/lib/zod/DateTime";
+
+import { Account } from "@shared/lib/schemas/account";
 
 import { graphql } from "../../graphql";
 
@@ -12,40 +14,46 @@ const FractalSchema = z.object({
 const GuildSchema = z.object({
     account: z.string(),
     displayName: z.string(),
+    candidacyCooldown: z.number().int(),
     fractal: FractalSchema,
 });
 
-const NodeSchema = z.object({
-    guild: GuildSchema,
-});
-
-const GuildMembershipsSchema = z.object({
-    nodes: z.array(NodeSchema),
-});
+const NodeSchema = z
+    .object({
+        guild: GuildSchema,
+        score: z.number(),
+        candidacyEligibleFrom: zDateTime,
+        isCandidate: z.boolean(),
+    })
+    .nullable();
 
 const DataSchema = z.object({
-    guildMemberships: GuildMembershipsSchema,
+    guildMembership: NodeSchema,
 });
 
-export const getGuildMemberships = async (member: Account) => {
+export const getGuildMembership = async (guild: Account, member: Account) => {
     const res = await graphql(
         `
         {
-            guildMemberships(member:"${member}") {
-                nodes {
+            guildMembership(guild:"${guild}", member:"${member}") {
+                isCandidate
+                score
+                candidacyEligibleFrom
                     guild {
                         account
                         displayName
+                        candidacyCooldown
                         fractal {
                             account
                         }
                     }
-                }
+
             }
         }
     `,
-        fractalsService,
+        FRACTALS_SERVICE,
     );
 
-    return DataSchema.parse(res).guildMemberships.nodes;
+    console.log("raw", res);
+    return DataSchema.parse(res).guildMembership;
 };

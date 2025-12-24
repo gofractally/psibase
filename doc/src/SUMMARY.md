@@ -63,6 +63,7 @@
       - [Initializing Services](development/services/rust-service/pre-action.md)
       - [Reference]()
         - [Web Services](development/services/rust-service/reference/web-services.md)
+    - [Local Services](development/services/local.md)
   - [Plugins]()
   - [Front-ends](development/front-ends/README.md)
     - [User onboarding]()

@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -6,14 +5,13 @@ import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { useAppForm } from "../form/app-form";
 
 export const ApplyGuildModal = ({
     show,
@@ -33,12 +31,10 @@ export const ApplyGuildModal = ({
         defaultValues: {
             extraInfo: "",
         },
-        onSubmit: async ({ value: { extraInfo } }) => {
-            await applyGuild({
-                extraInfo,
-                guildAccount: guildAccount!,
-            });
+        onSubmit: async ({ formApi, value: { extraInfo } }) => {
+            await applyGuild([guildAccount!, extraInfo]);
             openChange(false);
+            formApi.reset();
             navigate(`/guild/${guildAccount}/applications/${currentUser}`);
         },
         validators: {
@@ -47,12 +43,6 @@ export const ApplyGuildModal = ({
             }),
         },
     });
-
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
@@ -74,9 +64,7 @@ export const ApplyGuildModal = ({
                         />
 
                         <form.AppForm>
-                            <form.SubmitButton
-                                labels={["Apply", "Applying", "Applied!"]}
-                            />
+                            <form.SubmitButton labels={["Apply", "Applying"]} />
                         </form.AppForm>
                     </form>
                 </DialogHeader>

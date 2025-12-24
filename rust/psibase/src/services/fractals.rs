@@ -97,8 +97,8 @@ pub mod Service {
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
     /// * `member` - Member to attest.
-    /// * `comment` - Any comment relevant to application.
-    /// * `endorses` - True if in favour of application.
+    /// * `comment` - Any comment relevant to the application.
+    /// * `endorses` - True if in favour of the application.
     #[action]
     fn at_mem_app(
         guild_account: AccountNumber,
@@ -304,6 +304,42 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Initialise a token for a fractal.
+    ///
+    /// Called only once per fractal.
+    /// Must be called by legislature.  
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn init_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Register candidacy.
+    ///
+    /// Register your candidacy to serve on a Guild council.  
+    ///
+    /// # Arguments
+    /// * `guild` - Guild candidate is member of
+    /// * `active`- True to become a candidate, False to retire
+    #[action]
+    fn reg_can(guild: AccountNumber, active: bool) {
+        unimplemented!()
+    }
+
+    /// Set the candidacy cooldown period.
+    ///
+    /// This defines how many seconds a guild member must wait after retiring their candidacy
+    /// before they are allowed to become a candidate again.
+    ///
+    /// # Arguments
+    /// * `cooldown_seconds` - The cooldown duration in seconds (0 disables the cooldown).
+    #[action]
+    fn set_can_cool(cooldown_seconds: u32) {
+        unimplemented!()
+    }
+
     /// Set token threshold.
     ///
     /// Sets the required amount of active members in the legistlature guild before the token can be initialised.  
@@ -322,11 +358,11 @@ pub mod Service {
     /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
     /// guilds in the vector receive progressively larger shares.
     ///
-    /// Must be called by legislature.  
+    /// Must be called by the legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
-    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    /// * `guilds` - Ranked guilds, from highest rewarded to lowest.
     #[action]
     fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
         unimplemented!()

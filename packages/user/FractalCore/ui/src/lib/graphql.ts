@@ -1,6 +1,6 @@
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Account, zAccount } from "./zod/Account";
+import { Account, zAccount } from "@shared/lib/schemas/account";
 
 interface Error {
     message: string;

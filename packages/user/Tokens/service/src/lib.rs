@@ -461,7 +461,7 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
+        SharedBalance::get_or_new(creditor, get_sender(), token_id).reject(memo);
     }
 
     /// Sets the system token

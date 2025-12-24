@@ -2,14 +2,12 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::check_none;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
-    use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft};
+    use psibase::services::nft::{Nft as NftRecord, Wrapper as Nft, NID};
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, TID};
-    use psibase::{
-        check, check_some, get_sender, services::nft::NID, AccountNumber, Fracpack, Table, ToSchema,
-    };
+    use psibase::{check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{check_none, get_service};
     use serde::{Deserialize, Serialize};
 
     use crate::service::{CREATED, MAPPED};
@@ -51,6 +49,24 @@ pub mod tables {
                 Self::get(symbol_length),
                 format!("symbol length of {} not supported", symbol_length).as_str(),
             )
+        }
+
+        pub fn bill_sender(&self) {
+            let sender = get_sender();
+            let billing_token =
+                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
+
+            let price = Quantity::from(DiffAdjust::call().increment(self.nftId, 1));
+
+            if price.value > 0 {
+                Tokens::call().debit(
+                    billing_token,
+                    sender,
+                    price,
+                    "symbol purchase".to_string().try_into().unwrap(),
+                );
+                Tokens::call().reject(billing_token, sender, "Dust return".try_into().unwrap())
+            }
         }
 
         pub fn delete(&self) {
@@ -130,30 +146,21 @@ pub mod tables {
             check_some(Self::get(symbol), "Symbol does not exist")
         }
 
-        pub fn add(symbol: AccountNumber) -> Self {
+        pub fn add(symbol: AccountNumber, recipient: AccountNumber) -> Self {
             check_none(Symbol::get(symbol), "Symbol already exists");
-            let length_record = SymbolLength::get(symbol.to_string().len() as u8);
             check(
-                length_record.is_some()
-                    && symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
-                "Symbol may only contain 3 to 7 lowercase alphabetic characters",
+                symbol.to_string().chars().all(|c| c.is_ascii_lowercase()),
+                "Symbol may only contain lowercase alphabetic characters",
             );
-            let length_record = length_record.unwrap();
             let sender = get_sender();
-            let billing_token =
-                check_some(Tokens::call().getSysToken(), "system token must be defined").id;
 
-            if sender != crate::Wrapper::SERVICE {
-                let price = Quantity::from(DiffAdjust::call().increment(length_record.nftId, 1));
-
-                if price.value > 0 {
-                    Tokens::call().debit(
-                        billing_token,
-                        sender,
-                        price,
-                        "symbol purchase".to_string().try_into().unwrap(),
-                    );
-                }
+            let is_billable = sender != get_service();
+            if is_billable {
+                check_some(
+                    SymbolLength::get(symbol.to_string().len() as u8),
+                    "Symbol length is not for sale",
+                )
+                .bill_sender();
             }
 
             crate::Wrapper::emit()
@@ -165,26 +172,29 @@ pub mod tables {
 
             Nft::call().credit(
                 new_instance.ownerNft,
-                sender,
+                recipient,
                 format!("This NFT conveys ownership of symbol: {}", symbol)
-                    .try_into()
-                    .unwrap(),
+                    .as_str()
+                    .into(),
             );
 
             new_instance
         }
 
+        fn check_is_owner_of_nft(nft_id: NID, user: AccountNumber) {
+            check(
+                Nft::call().getNft(nft_id).owner == user,
+                "Missing required authority",
+            );
+        }
+
         pub fn map_symbol(&mut self, token_id: TID) {
             let token_owner_nft = Tokens::call().getToken(token_id).nft_id;
             let symbol_owner_nft = self.ownerNft;
-            check(
-                Nft::call().getNft(token_owner_nft).owner == get_sender(),
-                "Missing required authority",
-            );
-            check(
-                Nft::call().getNft(symbol_owner_nft).owner == get_sender(),
-                "Missing required authority",
-            );
+            let sender = get_sender();
+
+            Self::check_is_owner_of_nft(token_owner_nft, sender);
+            Self::check_is_owner_of_nft(symbol_owner_nft, sender);
 
             Nft::call().debit(symbol_owner_nft, "mapping symbol to token".into());
             Nft::call().burn(symbol_owner_nft);
@@ -325,7 +335,13 @@ pub mod service {
 
     #[action]
     fn create(symbol: AccountNumber) {
-        Symbol::add(symbol);
+        Symbol::add(symbol, get_sender());
+    }
+
+    #[action]
+    fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
+        check(get_sender() == get_service(), "only symbol service can call this action");
+        Symbol::add(symbol, recipient);
     }
 
     #[action]

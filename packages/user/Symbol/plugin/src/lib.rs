@@ -8,8 +8,10 @@ use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::fracpack::Pack;
+use psibase::services::tokens;
 use psibase::{define_trust, AccountNumber};
 
+use crate::errors::ErrorType;
 use crate::graphql::fetch_symbol_owner_nft;
 
 mod errors;
@@ -34,17 +36,32 @@ define_trust! {
 
 struct SymbolPlugin;
 
+mod error_codes {
+    pub const CREDITING_ZERO_QUANTITY: u32 = 1;
+}
+
 impl Api for SymbolPlugin {
     fn create(symbol: String, deposit: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::create)?;
 
-        let billing_token = bindings::tokens::plugin::helpers::fetch_network_token()?;
+        let billing_token = bindings::tokens::plugin::helpers::fetch_network_token()?
+            .ok_or(ErrorType::BillingTokenNotSet)?;
+
         bindings::tokens::plugin::user::credit(
             billing_token,
             &symbol::Wrapper::SERVICE.to_string(),
             &deposit,
             "".into(),
-        )?;
+        )
+        .or_else(|error| {
+            if error.producer.service == tokens::SERVICE.to_string()
+                && error.code == error_codes::CREDITING_ZERO_QUANTITY
+            {
+                Ok(())
+            } else {
+                Err(error)
+            }
+        })?;
 
         let packed_args = symbol::action_structs::create {
             symbol: AccountNumber::from(symbol.as_str()),
@@ -73,6 +90,23 @@ impl Api for SymbolPlugin {
 }
 
 impl Admin for SymbolPlugin {
+    fn create(symbol: String, recipient: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::create,
+            vec!["config".to_string()],
+        )?;
+
+        let packed_args = symbol::action_structs::admin_create {
+            symbol: AccountNumber::from(symbol.as_str()),
+            recipient: AccountNumber::from(recipient.as_str()),
+        }
+        .packed();
+        add_action_to_transaction(
+            symbol::action_structs::admin_create::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn sell_length(
         length: u8,
         initial_price: u64,
