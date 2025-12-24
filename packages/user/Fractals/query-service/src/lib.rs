@@ -165,11 +165,11 @@ mod service {
         async fn guild_application(
             &self,
             guild: AccountNumber,
-            member: AccountNumber,
+            applicant: AccountNumber,
         ) -> Option<GuildApplication> {
             GuildApplicationTable::with_service(fractals::SERVICE)
                 .get_index_pk()
-                .get(&(guild, member))
+                .get(&(guild, applicant))
         }
 
         async fn guild_applications(

@@ -27,6 +27,8 @@ interface admin-guild {
     set-guild-rep: func(guild-account: string, rep: string) -> result<_, error>;
     resign-guild-rep: func(guild-account: string) -> result<_, error>;
     remove-guild-rep: func(guild-account: string) -> result<_, error>;
+
+    con-membership-app: func(guild-account: string, member: string, accepted: bool) -> result<_, error>;
     set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
 
 }
@@ -44,7 +46,7 @@ interface user-guild {
 
     register-candidacy: func(guild-account: string, active: bool) -> result<_, error>;
     apply-guild: func(guild-account: string, extra-info: string) -> result<_, error>;
-    attest-membership-app: func(guild-account: string, member: string, comment: string, endorses: bool) -> result<_, error>;
+    attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
 }
 
 interface user-eval {

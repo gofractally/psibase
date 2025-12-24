@@ -47,14 +47,16 @@ define_trust! {
             - Creating a new guild
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
+            - Set minimum scorers required to enable consensus rewards
+            - Conclude membership applications
             - Set token init and guild ranking threshold
-        ",
+            ",
     }
     functions {
         None => [get_group_users],
-        Low => [start_eval, close_eval, dist_token],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, register_candidacy],
-        High => [exile_member, set_rank_ordering_threshold, set_token_threshold, init_token, set_min_scorers, set_ranked_guilds, set_ranked_guild_slots, set_dist_interval, propose, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep],
+        Low => [close_eval, dist_token, start_eval],
+        Medium => [apply_guild, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
+        High => [attest, con_membership_app, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -105,6 +107,17 @@ impl AdminFractal for FractalCorePlugin {
 }
 
 impl AdminGuild for FractalCorePlugin {
+    fn con_membership_app(
+        guild_account: String,
+        member: String,
+        accepted: bool,
+    ) -> Result<(), Error> {
+        assert_authorized(FunctionName::con_membership_app)?;
+        propose::guild(&guild_account)?;
+
+        FractalsPlugin::admin_guild::con_membership_app(&guild_account, &member, accepted)
+    }
+
     fn set_rank_ordering_threshold(guild_account: String, threshold: u8) -> Result<(), Error> {
         assert_authorized(FunctionName::set_rank_ordering_threshold)?;
         propose::guild(&guild_account)?;
@@ -251,14 +264,14 @@ impl UserGuild for FractalCorePlugin {
 
     fn attest_membership_app(
         guild_account: String,
-        member: String,
+        applicant: String,
         comment: String,
         endorses: bool,
     ) -> Result<(), Error> {
         assert_authorized(FunctionName::attest_membership_app)?;
         FractalsPlugin::user_guild::attest_membership_app(
             &guild_account,
-            &member,
+            &applicant,
             &comment,
             endorses,
         )
