@@ -24,7 +24,7 @@ export const NumberField = ({
     const isBlurred = state.meta.isBlurred;
 
     return (
-        <div>
+        <div className="flex flex-col gap-2">
             <Label className={cn(isError && isBlurred && "text-destructive")}>
                 {label}
             </Label>

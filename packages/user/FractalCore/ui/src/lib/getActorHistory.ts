@@ -1,7 +1,8 @@
 import z from "zod";
 
+import { Account, zAccount } from "@shared/lib/schemas/account";
+
 import { graphql } from "./graphql";
-import { Account, zAccount } from "./zod/Account";
 import { zDateTime } from "./zod/DateTime";
 
 const HistoryItem = z.object({

@@ -1,18 +1,16 @@
-import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { z } from "zod";
 
 import { useAttestMembershipApp } from "@/hooks/fractals/use-attest-membership-app";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { useAppForm } from "../form/app-form";
 
 export const AttestGuildMemberModal = ({
     show,
@@ -32,14 +30,10 @@ export const AttestGuildMemberModal = ({
             comment: "",
             endorses: true,
         },
-        onSubmit: async ({ value: { comment, endorses } }) => {
-            await attest([
-                guildAccount!,
-                applicant!,
-                comment,
-                endorses,
-            ]);
+        onSubmit: async ({ formApi, value: { comment, endorses } }) => {
+            await attest([guildAccount!, applicant!, comment, endorses]);
             openChange(false);
+            formApi.reset();
         },
         validators: {
             onChange: z.object({
@@ -48,12 +42,6 @@ export const AttestGuildMemberModal = ({
             }),
         },
     });
-
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
@@ -82,7 +70,7 @@ export const AttestGuildMemberModal = ({
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Attest", "Attesting", "Attested"]}
+                                labels={["Attest", "Attesting"]}
                             />
                         </form.AppForm>
                     </form>

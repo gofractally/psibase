@@ -2,7 +2,7 @@ use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::{TOKEN_PRECISION, TOKEN_SUPPLY};
+use crate::constants::{DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION, TOKEN_SUPPLY};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
@@ -15,8 +15,8 @@ use crate::tables::tables::Guild;
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, fractals, sites, transact};
+use psibase::{check, get_sender, Action, RawKey, TableQuery};
 use psibase::{fracpack::Pack, services::auth_dyn};
-use psibase::{Action, RawKey, TableQuery};
 
 impl Fractal {
     fn new(
@@ -38,6 +38,7 @@ impl Fractal {
             name,
             judiciary: genesis_guild,
             legislature: genesis_guild,
+            token_init_threshold: DEFAULT_TOKEN_INIT_THRESHOLD,
         }
     }
 
@@ -100,17 +101,22 @@ impl Fractal {
         new_instance
     }
 
-    pub fn init_token(&mut self) {
-        let total_supply = Tokens::call().getToken(self.token_id).max_issued_supply;
-        let quarter_supply: Quantity = (total_supply.value / 4).into();
-
-        Tokens::call().mint(
-            self.token_id,
-            quarter_supply,
-            "Token intitialisation".into(),
+    pub fn check_sender_is_legislature(&self) {
+        check(
+            self.legislature == get_sender(),
+            "Requires legislature authority",
         );
+    }
 
-        RewardConsensus::add(self.account, quarter_supply);
+    pub fn check_sender_is_judiciary(&self) {
+        check(
+            self.judiciary == get_sender(),
+            "Requires judiciary authority",
+        );
+    }
+
+    pub fn check_sender_is_fractal(&self) {
+        check(self.account == get_sender(), "Requires fractal authority");
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -122,6 +128,26 @@ impl Fractal {
             Self::get(fractal),
             &format!("fractal {} does not exist", fractal.to_string()),
         )
+    }
+
+    pub fn init_token(&self) {
+        let legislature_guild = Guild::get_assert(self.legislature);
+
+        check(
+            legislature_guild.active_member_count() >= self.token_init_threshold.into(),
+            "active member count does not meet token init threshold",
+        );
+
+        RewardConsensus::add(self.account, (TOKEN_SUPPLY / 4).into());
+    }
+
+    pub fn set_token_threshold(&mut self, threshold: u8) {
+        check_none(
+            RewardConsensus::get(self.account),
+            "token has already been initialised",
+        );
+        self.token_init_threshold = threshold;
+        self.save();
     }
 
     fn save(&self) {

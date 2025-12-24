@@ -1,3 +1,4 @@
+use async_graphql::ComplexObject;
 use std::collections::HashSet;
 
 use psibase::{abort_message, check, check_none, check_some, AccountNumber, Memo, Table};
@@ -168,6 +169,13 @@ impl RewardConsensus {
     }
 
     fn reward_stream(&self) -> RewardStream {
+        RewardStream::get_assert(self.reward_stream_id)
+    }
+}
+
+#[ComplexObject]
+impl RewardConsensus {
+    pub async fn stream(&self) -> RewardStream {
         RewardStream::get_assert(self.reward_stream_id)
     }
 }

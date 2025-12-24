@@ -1,4 +1,4 @@
-import { Account } from "./zod/Account";
+import { Account } from "@shared/lib/schemas/account";
 
 type QueryKeyGenerator<Prefix extends string = string> = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -13,6 +13,8 @@ const QueryKey = {
     memberships: (user: OptionalAccount) => ["memberships", user] as const,
     guildMemberships: (user: OptionalAccount) =>
         ["guildMemberships", user] as const,
+    guildMembership: (guild: OptionalAccount, member: OptionalAccount) =>
+        ["guildMembership", guild, member] as const,
     guild: (guild: OptionalAccount) => ["guild", guild] as const,
     currentUser: () => ["currentUser"] as const,
     chainId: () => ["chainId"] as const,
@@ -23,7 +25,8 @@ const QueryKey = {
     fractal: (account: OptionalAccount) => ["fractal", account] as const,
     branding: () => ["branding"] as const,
     logout: () => ["logout"] as const,
-    members: (account: OptionalAccount) => ["members", account] as const,
+    members: (fractalAccount: OptionalAccount) =>
+        ["members", fractalAccount] as const,
     scores: (guildAccount: OptionalAccount) =>
         ["scores", guildAccount] as const,
     membership: (fractal: OptionalAccount, user: OptionalAccount) =>

@@ -8,6 +8,8 @@ import { MyMembership } from "@/pages/fractal/membership/my-membership";
 import { Layout } from "@/components/layout";
 import { ProtectedRoute } from "@/components/protected-route";
 
+import { Judicial } from "./pages/fractal/branches/judicial";
+import { Legislative } from "./pages/fractal/branches/legislative";
 import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
 import { AllGuildMembers } from "./pages/fractal/guild-membership/all-guild-members";
@@ -16,6 +18,7 @@ import { Guilds } from "./pages/fractal/guilds";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
 import { Applications } from "./pages/fractal/membership/applications";
 import { Settings } from "./pages/settings";
+import { Leadership } from "./pages/leadership";
 
 export const router = createBrowserRouter([
     {
@@ -35,6 +38,22 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <MyMembership />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/legislative",
+                element: (
+                    <ProtectedRoute>
+                        <Legislative />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/judicial",
+                element: (
+                    <ProtectedRoute>
+                        <Judicial />
                     </ProtectedRoute>
                 ),
             },
@@ -119,6 +138,15 @@ export const router = createBrowserRouter([
                         element: (
                             <ProtectedRoute>
                                 <EvaluationDeliberation />
+                            </ProtectedRoute>
+                        ),
+                    },
+
+                    {
+                        path: "leadership",
+                        element: (
+                            <ProtectedRoute>
+                                <Leadership />
                             </ProtectedRoute>
                         ),
                     },

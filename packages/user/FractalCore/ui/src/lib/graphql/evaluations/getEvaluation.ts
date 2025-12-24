@@ -1,9 +1,10 @@
 import { z } from "zod";
 
-import { evaluationsService, fractalsService } from "@/lib/constants";
+import { EVALUATIONS_SERVICE, FRACTALS_SERVICE } from "@/lib/constants";
 import { graphql } from "@/lib/graphql";
-import { zAccount } from "@/lib/zod/Account";
 import { zUnix } from "@/lib/zod/Unix";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zEvaluation = z.object({
     id: z.number(),
@@ -24,7 +25,7 @@ export const getEvaluation = async (id: number) => {
     const evaluation = await graphql(
         `
     {
-        getEvaluation(owner: "${fractalsService}", evaluationId: ${id}) {     
+        getEvaluation(owner: "${FRACTALS_SERVICE}", evaluationId: ${id}) {     
             id,
             createdAt,
             owner,
@@ -37,7 +38,7 @@ export const getEvaluation = async (id: number) => {
             numOptions
         } 
     }`,
-        evaluationsService,
+        EVALUATIONS_SERVICE,
     );
 
     const response = z

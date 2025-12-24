@@ -14,8 +14,8 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
-import { Account } from "@/lib/zod/Account";
 
+import { Account } from "@shared/lib/schemas/account";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -165,7 +165,7 @@ export const EvaluationDeliberation = () => {
     } = useRanking();
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <GroupStatus />
             <div className="mt-3">
                 <div>

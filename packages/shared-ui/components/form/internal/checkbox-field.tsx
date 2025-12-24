@@ -2,8 +2,8 @@ import { cn } from "@shared/lib/utils";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { useFieldContext } from "./app-form";
 import { FieldErrors } from "./field-errors";
+import { useFieldContext } from "../app-form";
 
 export const CheckboxField = ({
     label,

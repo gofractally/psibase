@@ -2,19 +2,21 @@ import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
+import humanizeDuration from "humanize-duration";
 import { Loader2, Plus } from "lucide-react";
 
-import { ErrorCard } from "@/components/error-card";
-
+import { useDistToken } from "@/hooks/fractals/use-dist-token";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { createIdenticon } from "@/lib/createIdenticon";
+import { useNowUnix } from "@/hooks/use-now-unix";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { createIdenticon } from "@shared/lib/create-identicon";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -25,6 +27,13 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+
+const humanize = (ms: number) =>
+    humanizeDuration(ms, {
+        units: ["w", "d", "h", "m", "s"],
+        largest: 3,
+        round: true,
+    });
 
 export const MyMembership = () => {
     const fractalAccount = useFractalAccount();
@@ -72,7 +81,7 @@ export const MyMembership = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">My membership</h1>
             </div>
@@ -91,6 +100,7 @@ export const MyMembership = () => {
                             chainId={chainId}
                         />
                         <MembershipStatusCard membership={membership} />
+                        <ConsensusRewardStatusCard />
                         {membership == null && (
                             <JoinFractalCard fractalAccount={fractalAccount} />
                         )}
@@ -141,6 +151,70 @@ const FractalOverviewCard = ({
                             {fractal?.fractal?.mission ||
                                 "No mission available"}
                         </p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
+const ConsensusRewardStatusCard = () => {
+    const { data: fractal, isLoading } = useFractal();
+    const now = useNowUnix();
+
+    const { mutateAsync: distributeToken, isPending: isDistributing } =
+        useDistToken();
+
+    if (isLoading) return null;
+    if (!fractal?.fractal?.consensusReward) return null;
+
+    const intervalPeriod = humanize(
+        fractal.fractal.consensusReward.stream.distIntervalSecs * 1000,
+    );
+    const nextPeriod = fractal.fractal.consensusReward.stream.lastDistributed;
+
+    const nextClaimTime = dayjs(nextPeriod).add(
+        fractal.fractal.consensusReward.stream.distIntervalSecs,
+        "seconds",
+    );
+    const isClaimTime = nextClaimTime.unix() < now;
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Consensus Rewards</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                            Reward distribution interval
+                        </span>
+                        <span className="text-muted-foreground text-sm">
+                            Every {intervalPeriod}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">
+                            Next distribution
+                        </span>
+                        <span className="text-muted-foreground text-sm">
+                            {isClaimTime ? (
+                                <Button
+                                    disabled={isDistributing}
+                                    onClick={() => {
+                                        distributeToken([]);
+                                    }}
+                                >
+                                    Claim now
+                                </Button>
+                            ) : (
+                                `${nextClaimTime.format(
+                                    "MMMM D, YYYY [at] h:mm A z",
+                                )} (${humanize(nextClaimTime.diff(dayjs()))})`
+                            )}
+                        </span>
                     </div>
                 </div>
             </CardContent>
