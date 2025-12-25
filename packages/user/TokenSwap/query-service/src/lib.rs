@@ -2,7 +2,10 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use psibase::*;
+    use psibase::{
+        services::tokens::{Quantity, TID},
+        *,
+    };
     use serde::Deserialize;
 
     #[derive(Deserialize, SimpleObject)]
@@ -15,9 +18,8 @@ mod service {
 
     #[Object]
     impl Query {
-        /// This query gets the current value of the Example Thing.
-        async fn example_thing(&self) -> String {
-            token_swap::Wrapper::call().getExampleThing()
+        async fn quote(&self, pool_id: u32, token_in: TID, amount: Quantity) -> String {
+            "quote".into()
         }
 
         /// This query gets paginated historical updates of the Example Thing.
@@ -40,9 +42,8 @@ mod service {
     #[action]
     #[allow(non_snake_case)]
     fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-            // Services graphql queries
+        // Services graphql queries
         None.or_else(|| serve_graphql(&request, Query))
-
             // Serves a GraphiQL UI interface at the /graphiql endpoint
             .or_else(|| serve_graphiql(&request))
     }

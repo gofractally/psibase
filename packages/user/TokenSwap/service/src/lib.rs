@@ -147,7 +147,8 @@ pub mod tables {
             self.debit_reserves_from_sender(amount_a_use, amount_b_use);
             self.deposit_into_reserve(self.token_a, amount_a_use);
             self.deposit_into_reserve(self.token_b, amount_b_use);
-            self.mint_sender_lp_tokens(lp_tokens_to_mint.into());
+            self.mint_lp_tokens(lp_tokens_to_mint);
+            self.credit_sender_lp_tokens(lp_tokens_to_mint);
         }
 
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
@@ -196,10 +197,12 @@ pub mod tables {
             tokens.reject(self.token_b, sender, "memo".into());
         }
 
-        pub fn mint_sender_lp_tokens(&self, amount: Quantity) {
-            let tokens = Tokens::call();
-            tokens.mint(self.liquidity_token, amount, "LP Token".into());
-            tokens.credit(
+        pub fn mint_lp_tokens(&self, amount: Quantity) {
+            Tokens::call().mint(self.liquidity_token, amount, "LP Token".into());
+        }
+
+        pub fn credit_sender_lp_tokens(&self, amount: Quantity) {
+            Tokens::call().credit(
                 self.liquidity_token,
                 get_sender(),
                 amount,
@@ -227,7 +230,17 @@ pub mod tables {
                 initial_lp_tokens.value > 100,
                 "not enough initial liquidity",
             );
-            pool.mint_sender_lp_tokens(initial_lp_tokens);
+
+            // Keep a tiny amount of liquidity tokens for the service as dead / stale= tokens
+            // so it keeps the pool permanently functional.
+            // tokens aren't burned as that will reduce the total supply which negates this intended affect
+            let dead_tokens: Quantity = 10.into();
+            check(
+                initial_lp_tokens > dead_tokens,
+                "initial too small for dead tokens",
+            );
+            pool.mint_lp_tokens(initial_lp_tokens);
+            pool.credit_sender_lp_tokens(initial_lp_tokens - dead_tokens);
 
             pool.save();
             pool
