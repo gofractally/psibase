@@ -1,19 +1,15 @@
-mod constants {
-    pub const PPM: u128 = 1_000_000;
-}
 mod uniswap;
 
 #[psibase::service_tables]
 pub mod tables {
 
     use psibase::services::nft::NID;
-    use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::services::tokens::{Quantity, TokenRecord, TID};
+    use psibase::services::tokens::{Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
         check, check_none, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
     };
 
-    use crate::uniswap::{mul_div, share_of_lp_tokens, swap, PPM};
+    use crate::uniswap::{mul_div, share_of_lp_tokens, sqrt, swap, PPM};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -121,24 +117,21 @@ pub mod tables {
             amount_a_min: Quantity,
             amount_b_min: Quantity,
         ) {
-            let reserve_a = self.get_balance(self.token_a);
-            let reserve_b = self.get_balance(self.token_b);
+            let (reserve_a, reserve_b) = self.get_reserves();
 
-            let pool_is_empty = reserve_a.value == 0 || reserve_b.value == 0;
-            check(!pool_is_empty, "pool is empty");
+            let pool_has_reserves = reserve_a.value > 0 && reserve_b.value > 0;
+            check(pool_has_reserves, "pool does not have sufficient reserves");
 
-            let amount_a_optimal = swap(amount_b_desired, reserve_b, reserve_a, 0);
-            let amount_b_optimal = swap(amount_a_desired, reserve_a, reserve_b, 0);
+            let amount_a_optimal = mul_div(amount_b_desired, reserve_a, reserve_b);
+            let amount_b_optimal = mul_div(amount_a_desired, reserve_b, reserve_a);
 
-            let (amount_a_use, amount_b_use) = if amount_a_optimal <= amount_a_desired {
-                (amount_a_optimal, amount_b_desired)
-            } else {
+            let (amount_a_use, amount_b_use) = if amount_b_optimal <= amount_b_desired {
                 (amount_a_desired, amount_b_optimal)
+            } else {
+                (amount_a_optimal, amount_b_desired)
             };
             check(amount_a_use >= amount_a_min, "amount a below minimum");
             check(amount_b_use >= amount_b_min, "amount b below minimum");
-
-            self.debit_reserve_tokens_from_sender(amount_a_use, amount_b_use);
 
             let total_liquidity = self.get_lp_supply();
 
@@ -151,52 +144,56 @@ pub mod tables {
 
             check(lp_tokens_to_mint.value > 0, "no liquidity to mint");
 
-            self.mint_sender_lp_tokens(lp_tokens_to_mint.into())
+            self.debit_reserves_from_sender(amount_a_use, amount_b_use);
+            self.deposit_into_reserve(self.token_a, amount_a_use);
+            self.deposit_into_reserve(self.token_b, amount_b_use);
+            self.mint_sender_lp_tokens(lp_tokens_to_mint.into());
         }
 
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
+            self.debit_lp_tokens_from_sender(liquidity_amount);
+
+            let lp_supply = self.get_lp_supply();
+
+            let lp_share_ppm =
+                (liquidity_amount.value as u128) * PPM as u128 / (lp_supply.value as u128);
+
+            let (a_reserve, b_reserve) = self.get_reserves();
+            let a_reserve = a_reserve.value as u128;
+            let b_reserve = b_reserve.value as u128;
+
+            let a_share: Quantity = ((a_reserve * lp_share_ppm / PPM as u128) as u64).into();
+            let b_share: Quantity = ((b_reserve * lp_share_ppm / PPM as u128) as u64).into();
+
+            self.withdraw_reserves_to_sender(a_share, b_share);
+            self.burn_lp_tokens(liquidity_amount);
+        }
+
+        fn withdraw_reserves_to_sender(&self, a_amount: Quantity, b_amount: Quantity) {
+            self.withdraw_from_reserve(self.token_a, a_amount);
+            self.withdraw_from_reserve(self.token_b, b_amount);
+            let tokens = Tokens::call();
+            let sender = get_sender();
+            tokens.credit(self.token_a, sender, a_amount, "memo".into());
+            tokens.credit(self.token_b, sender, b_amount, "memo".into());
+        }
+
+        pub fn debit_lp_tokens_from_sender(&self, liquidity_amount: Quantity) {
             Tokens::call().debit(
                 self.liquidity_token,
                 get_sender(),
                 liquidity_amount,
                 "Liquidity withdrawal".into(),
             );
-            let lp_supply = self.get_lp_supply();
-
-            let lp_share_ppm =
-                (liquidity_amount.value as u128) * PPM as u128 / (lp_supply.value as u128);
-
-            let a_reserve = self.get_balance(self.token_a).value as u128;
-            let b_reserve = self.get_balance(self.token_b).value as u128;
-
-            let a_share: Quantity = ((a_reserve * lp_share_ppm / PPM as u128) as u64).into();
-            let b_share: Quantity = ((b_reserve * lp_share_ppm / PPM as u128) as u64).into();
-
-            self.withdraw_reserves(a_share, b_share);
-            self.credit_reserve_tokens_to_sender(a_share, b_share);
-
-            self.burn_lp_tokens(liquidity_amount);
         }
 
-        fn withdraw_reserves(&self, a_amount: Quantity, b_amount: Quantity) {
-            self.withdraw_from_reserves(self.token_a, a_amount);
-            self.withdraw_from_reserves(self.token_b, b_amount);
-        }
-
-        pub fn debit_reserve_tokens_from_sender(&self, amount_a: Quantity, amount_b: Quantity) {
+        pub fn debit_reserves_from_sender(&self, amount_a: Quantity, amount_b: Quantity) {
             let tokens = Tokens::call();
             let sender = get_sender();
             tokens.debit(self.token_a, sender, amount_a, "memo".into());
             tokens.debit(self.token_b, sender, amount_b, "memo".into());
             tokens.reject(self.token_a, sender, "memo".into());
             tokens.reject(self.token_b, sender, "memo".into());
-        }
-
-        pub fn credit_reserve_tokens_to_sender(&self, amount_a: Quantity, amount_b: Quantity) {
-            let tokens = Tokens::call();
-            let sender = get_sender();
-            tokens.credit(self.token_a, sender, amount_a, "memo".into());
-            tokens.credit(self.token_b, sender, amount_b, "memo".into());
         }
 
         pub fn mint_sender_lp_tokens(&self, amount: Quantity) {
@@ -217,13 +214,13 @@ pub mod tables {
         pub fn add(a_token: TID, b_token: TID, a_amount: Quantity, b_amount: Quantity) -> Self {
             let pool = Self::new(a_token, b_token);
 
-            pool.debit_reserve_tokens_from_sender(a_amount, b_amount);
-            pool.deposit_into_reserves(a_token, a_amount);
-            pool.deposit_into_reserves(b_token, b_amount);
+            pool.debit_reserves_from_sender(a_amount, b_amount);
+            pool.deposit_into_reserve(a_token, a_amount);
+            pool.deposit_into_reserve(b_token, b_amount);
 
             let initial_lp_tokens: Quantity = {
                 let product = a_amount.value as u128 * b_amount.value as u128;
-                let sqrt_approx = (product as f64).sqrt() as u128;
+                let sqrt_approx = sqrt(product);
                 (sqrt_approx as u64).into()
             };
             check(
@@ -275,18 +272,26 @@ pub mod tables {
             self.id.to_string()
         }
 
-        pub fn get_balance(&self, tid: TID) -> Quantity {
+        pub fn get_reserve(&self, tid: TID) -> Quantity {
+            check(self.includes_token(tid), "token not supported in reserve");
             check_some(
                 Tokens::call().getSubBal(tid, self.pool_sub_account_id()),
-                "expecting missing reserve a balance",
+                "reserve balance not found",
             )
         }
 
-        fn deposit_into_reserves(&self, token_id: TID, amount: Quantity) {
+        pub fn get_reserves(&self) -> (Quantity, Quantity) {
+            (
+                self.get_reserve(self.token_a),
+                self.get_reserve(self.token_b),
+            )
+        }
+
+        fn deposit_into_reserve(&self, token_id: TID, amount: Quantity) {
             Tokens::call().toSub(token_id, self.pool_sub_account_id(), amount);
         }
 
-        fn withdraw_from_reserves(&self, token_id: TID, amount: Quantity) {
+        fn withdraw_from_reserve(&self, token_id: TID, amount: Quantity) {
             Tokens::call().fromSub(token_id, self.pool_sub_account_id(), amount);
         }
 
@@ -297,16 +302,14 @@ pub mod tables {
         pub fn swap(&mut self, incoming_token: TID, incoming_amount: Quantity) -> (TID, Quantity) {
             check(self.includes_token(incoming_token), "path token mismatch");
 
-            self.deposit_into_reserves(incoming_token, incoming_amount);
-
             let outgoing_token = if incoming_token == self.token_a {
                 self.token_b
             } else {
                 self.token_a
             };
 
-            let incoming_reserve = self.get_balance(incoming_token);
-            let outgoing_reserve = self.get_balance(outgoing_token);
+            let incoming_reserve = self.get_reserve(incoming_token);
+            let outgoing_reserve = self.get_reserve(outgoing_token);
 
             let tariff_ppm = if incoming_token == self.token_a {
                 self.token_a_tariff_ppm
@@ -314,16 +317,17 @@ pub mod tables {
                 self.token_b_tariff_ppm
             };
 
-            let quantity_out = swap(
+            let outgoing_amount = swap(
                 incoming_amount,
                 incoming_reserve,
                 outgoing_reserve,
                 tariff_ppm,
             );
 
-            self.withdraw_from_reserves(outgoing_token, quantity_out);
+            self.deposit_into_reserve(incoming_token, incoming_amount);
+            self.withdraw_from_reserve(outgoing_token, outgoing_amount);
             self.save();
-            (outgoing_token, quantity_out)
+            (outgoing_token, outgoing_amount)
         }
     }
 }
