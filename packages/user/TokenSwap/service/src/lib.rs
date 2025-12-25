@@ -5,13 +5,15 @@ mod uniswap;
 
 #[psibase::service_tables]
 pub mod tables {
-    use psibase::services::nft::{self, NID};
-    use psibase::services::tokens::Wrapper as Tokens;
-    use psibase::services::tokens::{Quantity, TokenRecord, Wrapper as Tokens, TID};
-    use psibase::{abort_message, check, get_sender, AccountNumber};
-    use psibase::{check_none, check_some, Fracpack, Table, ToSchema};
 
-    use crate::uniswap::{mul_div, quote, swap, PPM};
+    use psibase::services::nft::NID;
+    use psibase::services::tokens::Wrapper as Tokens;
+    use psibase::services::tokens::{Quantity, TokenRecord, TID};
+    use psibase::{
+        check, check_none, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
+    };
+
+    use crate::uniswap::{mul_div, share_of_lp_tokens, swap, PPM};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -125,8 +127,8 @@ pub mod tables {
             let pool_is_empty = reserve_a.value == 0 || reserve_b.value == 0;
             check(!pool_is_empty, "pool is empty");
 
-            let amount_a_optimal = quote(amount_b_desired, reserve_b, reserve_a);
-            let amount_b_optimal = quote(amount_a_desired, reserve_a, reserve_b);
+            let amount_a_optimal = swap(amount_b_desired, reserve_b, reserve_a, 0);
+            let amount_b_optimal = swap(amount_a_desired, reserve_a, reserve_b, 0);
 
             let (amount_a_use, amount_b_use) = if amount_a_optimal <= amount_a_desired {
                 (amount_a_optimal, amount_b_desired)
@@ -140,13 +142,16 @@ pub mod tables {
 
             let total_liquidity = self.get_lp_supply();
 
-            let liquidity_from_a_deposit = mul_div(amount_a_use, total_liquidity, reserve_a);
-            let liquidity_from_b_deposit = mul_div(amount_b_use, total_liquidity, reserve_b);
-            let lp_tokens_to_mint = liquidity_from_a_deposit.min(liquidity_from_b_deposit);
+            let lp_tokens_from_a_deposit =
+                share_of_lp_tokens(amount_a_use, reserve_a, total_liquidity);
+            let lp_tokens_from_b_deposit =
+                share_of_lp_tokens(amount_b_use, reserve_b, total_liquidity);
+
+            let lp_tokens_to_mint = lp_tokens_from_a_deposit.min(lp_tokens_from_b_deposit);
 
             check(lp_tokens_to_mint.value > 0, "no liquidity to mint");
 
-            self.mint_sender_lp_tokens(lp_tokens_to_mint)
+            self.mint_sender_lp_tokens(lp_tokens_to_mint.into())
         }
 
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
@@ -158,18 +163,19 @@ pub mod tables {
             );
             let lp_supply = self.get_lp_supply();
 
-            let lp_share_ppm = (liquidity_amount.value as u128) * PPM / (lp_supply.value as u128);
+            let lp_share_ppm =
+                (liquidity_amount.value as u128) * PPM as u128 / (lp_supply.value as u128);
 
             let a_reserve = self.get_balance(self.token_a).value as u128;
             let b_reserve = self.get_balance(self.token_b).value as u128;
 
-            let a_share: Quantity = ((a_reserve * lp_share_ppm / PPM) as u64).into();
-            let b_share: Quantity = ((b_reserve * lp_share_ppm / PPM) as u64).into();
+            let a_share: Quantity = ((a_reserve * lp_share_ppm / PPM as u128) as u64).into();
+            let b_share: Quantity = ((b_reserve * lp_share_ppm / PPM as u128) as u64).into();
 
             self.withdraw_reserves(a_share, b_share);
             self.credit_reserve_tokens_to_sender(a_share, b_share);
 
-            self.burn_sender_lp_tokens(liquidity_amount);
+            self.burn_lp_tokens(liquidity_amount);
         }
 
         fn withdraw_reserves(&self, a_amount: Quantity, b_amount: Quantity) {
@@ -204,9 +210,8 @@ pub mod tables {
             )
         }
 
-        pub fn burn_sender_lp_tokens(&self, amount: Quantity) {
-            let tokens = psibase::services::tokens::Wrapper::call();
-            tokens.burn(self.liquidity_token, amount, "Liquidity withdrawal".into());
+        pub fn burn_lp_tokens(&self, amount: Quantity) {
+            Tokens::call().burn(self.liquidity_token, amount, "Liquidity withdrawal".into());
         }
 
         pub fn add(a_token: TID, b_token: TID, a_amount: Quantity, b_amount: Quantity) -> Self {
@@ -313,7 +318,7 @@ pub mod tables {
                 incoming_amount,
                 incoming_reserve,
                 outgoing_reserve,
-                tariff_ppm as u128,
+                tariff_ppm,
             );
 
             self.withdraw_from_reserves(outgoing_token, quantity_out);
