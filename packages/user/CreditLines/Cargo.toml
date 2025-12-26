@@ -1,0 +1,26 @@
+[package]
+name = "credit-lines-pkg"                      # Crate name
+description = "IOU tracker"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "CreditLines"
+services = ["credit-lines"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.22.0"
+Sites = "0.22.0"
+Permissions = "0.22.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+credit-lines = { path = "service", version = "0.22.0" }
+r-credit-lines = { path = "query-service", version = "0.22.0" }
+credit-lines-plugin = { path = "plugin", version = "0.22.0" }

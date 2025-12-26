@@ -1,0 +1,15 @@
+[package]
+name = "r-credit-lines"
+description = "RPC service for credit-lines"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+credit-lines = { path = "../service", version = "0.22.0" }
+async-graphql.workspace = true
+psibase-user-workspace-hack.workspace = true

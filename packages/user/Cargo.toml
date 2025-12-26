@@ -50,6 +50,10 @@ members = [
     "Nft/service",
     "Nft/plugin",
     "Nft/query-service",
+    "CreditLines",
+    "CreditLines/service",
+    "CreditLines/query-service",
+    "CreditLines/plugin",
 ]
 
 exclude = [

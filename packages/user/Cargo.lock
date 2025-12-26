@@ -724,6 +724,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "credit-lines"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "credit-lines-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "credit-lines-pkg"
+version = "0.22.0"
+dependencies = [
+ "credit-lines",
+ "credit-lines-plugin",
+ "r-credit-lines",
+]
+
+[[package]]
+name = "credit-lines-plugin"
+version = "0.22.0"
+dependencies = [
+ "credit-lines",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2473,6 +2507,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "r-credit-lines"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "credit-lines",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
