@@ -134,7 +134,6 @@ pub mod tables {
                 self.creditor,
                 self.balance,
                 self.author == self.creditor,
-                self.memo.clone(),
             );
             self.erase();
         }
@@ -253,7 +252,6 @@ pub mod tables {
             creditor: AccountNumber,
             amount: i64,
             ignore_limit: bool,
-            memo: Memo,
         ) {
             check(amount > 0, "amount must be positive");
             self.check_is_party(creditor);
@@ -272,21 +270,12 @@ pub mod tables {
             }
             self.balance = new_balance;
             self.save();
-
-            let debitor = self.counter_party(creditor);
-            crate::Wrapper::emit().history().credited(
-                self.ticker,
-                creditor,
-                debitor,
-                amount,
-                memo.to_string(),
-            );
         }
 
-        pub fn draw(&mut self, debitor: AccountNumber, amount: i64, memo: Memo) {
+        pub fn draw(&mut self, debitor: AccountNumber, amount: i64) {
             self.check_is_party(debitor);
             let creditor = self.counter_party(debitor);
-            self.credit_counter_party(creditor, amount, false, memo);
+            self.credit_counter_party(creditor, amount, false);
         }
 
         fn check_balance_limit(&self, balance_to_check: i64) {
@@ -377,6 +366,8 @@ pub mod tables {
 
 #[psibase::service(name = "credit-lines", tables = "tables")]
 pub mod service {
+    use std::collections::HashSet;
+
     use crate::tables::{Config, CreditLine, PendingCredit};
     use psibase::*;
 
@@ -431,21 +422,41 @@ pub mod service {
     }
 
     #[action]
-    fn draw(ticker: AccountNumber, creditor: AccountNumber, amount: i64, memo: Memo) {
+    fn draw(ticker: AccountNumber, creditors: Vec<AccountNumber>, amount: i64, memo: Memo) {
         let debitor = get_sender();
-        check(debitor != creditor, "creditor cannot be debitor");
-        CreditLine::get_or_add(ticker, debitor, creditor).draw(debitor, amount, memo);
+
+        let mut current_debitor = debitor;
+
+        // Alice wants to owe Edward
+        // Edward trusts Charlie, Charlie trusts Bob, Bob trusts Alice
+        // So Alice draws on Bob, Bob draws on Charlie, Charlie draws on Edward
+
+        // 1. Alice debitor draws on Bob creditor
+        // 2. Bob debitor draws on Charlie creditor
+        // 3. Charlie debitor draws on Edward creditor
+
+        let mut seen = HashSet::new();
+        for creditor in creditors.clone() {
+            check(seen.insert(creditor), "duplicate creditor in list");
+            CreditLine::get_assert(ticker, current_debitor, creditor).draw(current_debitor, amount);
+            current_debitor = creditor;
+        }
+
+        crate::Wrapper::emit().history().credited(
+            ticker,
+            creditors
+                .into_iter()
+                .map(|a| a.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+                .to_string(),
+            amount,
+            memo.to_string(),
+        );
     }
 
     #[event(history)]
-    pub fn credited(
-        ticker: AccountNumber,
-        creditor: AccountNumber,
-        debitor: AccountNumber,
-        amount: i64,
-        memo: String,
-    ) {
-    }
+    pub fn credited(ticker: AccountNumber, parties: String, amount: i64, memo: String) {}
 }
 
 #[cfg(test)]
