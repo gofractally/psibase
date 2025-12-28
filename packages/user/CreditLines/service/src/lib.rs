@@ -1,15 +1,61 @@
+use psibase::{check, AccountNumber};
+
+pub fn sort_accounts(a: AccountNumber, b: AccountNumber) -> (AccountNumber, AccountNumber) {
+    check(a.value != b.value, "both items are the same");
+    if a.value < b.value {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::{check, check_some, AccountNumber, Fracpack, Table, ToSchema};
+    use psibase::{
+        check, check_none, check_some, get_sender, AccountNumber, Fracpack, Memo, Table, ToSchema,
+    };
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "InitTable", index = 0)]
+    use crate::sort_accounts;
+
+    #[table(name = "ConfigTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
+    pub struct Config {
+        last_used_draft_id: u32,
+    }
+
+    impl Config {
         #[primary_key]
         fn pk(&self) {}
+
+        pub fn next_id() -> u32 {
+            let table = ConfigTable::read_write();
+            let mut config = check_some(
+                table.get_index_pk().get(&()),
+                "config row not found, service not initialized",
+            );
+            let next_id = check_some(
+                config.last_used_draft_id.checked_add(1),
+                "draft id overflow",
+            );
+            config.last_used_draft_id = next_id;
+            table.put(&config).unwrap();
+            next_id
+        }
+
+        pub fn get() -> Option<Self> {
+            ConfigTable::read().get_index_pk().get(&())
+        }
+
+        pub fn add() {
+            check_none(Config::get(), "config row already exists");
+            let table = ConfigTable::read_write();
+            let config = Config {
+                last_used_draft_id: 0,
+            };
+            table.put(&config).unwrap();
+        }
     }
 
     #[table(name = "CreditLineTable", index = 1)]
@@ -25,19 +71,95 @@ pub mod tables {
         pub max_credit_limit_by_b: i64,
     }
 
+    #[table(name = "PendingCreditTable", index = 2)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct PendingCredit {
+        #[primary_key]
+        pub id: u32,
+        pub ticker: AccountNumber,
+        pub creditor: AccountNumber,
+        pub debitor: AccountNumber,
+        pub balance: i64,
+        pub author: AccountNumber,
+        pub memo: Memo,
+    }
+
+    impl PendingCredit {
+        fn new(
+            ticker: AccountNumber,
+            creditor: AccountNumber,
+            debitor: AccountNumber,
+            balance: i64,
+            memo: Memo,
+        ) -> Self {
+            check(balance > 0, "balance must be positive");
+            Self {
+                id: Config::next_id(),
+                author: get_sender(),
+                ticker,
+                creditor,
+                debitor,
+                balance,
+                memo,
+            }
+        }
+
+        pub fn get(id: u32) -> Option<Self> {
+            PendingCreditTable::read().get_index_pk().get(&id)
+        }
+
+        pub fn get_assert(id: u32) -> Self {
+            check_some(PendingCredit::get(id), "draft not found")
+        }
+
+        pub fn add(
+            ticker: AccountNumber,
+            creditor: AccountNumber,
+            debitor: AccountNumber,
+            balance: i64,
+            memo: Memo,
+        ) -> Self {
+            let pending_credit = Self::new(ticker, creditor, debitor, balance, memo);
+            pending_credit.save();
+            pending_credit
+        }
+
+        pub fn accept(&mut self) {
+            check(
+                get_sender() == self.debitor,
+                "only debitor can accept the draft",
+            );
+            let mut credit_line = CreditLine::get_or_new(self.ticker, self.creditor, self.debitor);
+            credit_line.credit_counter_party(
+                self.creditor,
+                self.balance,
+                self.author == self.creditor,
+                self.memo.clone(),
+            );
+            self.erase();
+        }
+
+        pub fn cancel(&self) {
+            check(
+                get_sender() == self.author,
+                "only author can cancel the draft",
+            );
+            self.erase();
+        }
+
+        fn erase(&self) {
+            PendingCreditTable::read_write().erase(&self.id);
+        }
+
+        fn save(&self) {
+            PendingCreditTable::read_write().put(&self).unwrap()
+        }
+    }
+
     impl CreditLine {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
             (self.ticker, self.account_a, self.account_b)
-        }
-
-        pub fn sort_accounts(a: AccountNumber, b: AccountNumber) -> (AccountNumber, AccountNumber) {
-            check(a.value != b.value, "both items are the same");
-            if a.value < b.value {
-                (a, b)
-            } else {
-                (b, a)
-            }
         }
 
         fn new(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
@@ -52,7 +174,7 @@ pub mod tables {
         }
 
         fn get(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Option<Self> {
-            let (a, b) = Self::sort_accounts(a, b);
+            let (a, b) = sort_accounts(a, b);
             CreditLineTable::read().get_index_pk().get(&(ticker, a, b))
         }
 
@@ -67,14 +189,23 @@ pub mod tables {
             )
         }
 
+        fn counter_party(&self, account: AccountNumber) -> AccountNumber {
+            self.check_is_party(account);
+            if account == self.account_a {
+                self.account_b
+            } else {
+                self.account_a
+            }
+        }
+
         pub fn get_or_new(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
-            let (a, b) = Self::sort_accounts(a, b);
+            let (a, b) = sort_accounts(a, b);
 
             Self::get(ticker, a, b).unwrap_or_else(|| Self::new(ticker, a, b))
         }
 
         pub fn set_credit_limit(&mut self, creditor: AccountNumber, credit_limit: i64) {
-            check(credit_limit > 0, "credit limit must be positive");
+            check(credit_limit >= 0, "credit limit must be positive");
 
             self.check_is_party(creditor);
             if creditor == self.account_a {
@@ -90,9 +221,11 @@ pub mod tables {
             creditor: AccountNumber,
             amount: i64,
             ignore_limit: bool,
+            memo: Memo,
         ) {
             check(amount > 0, "amount must be positive");
             self.check_is_party(creditor);
+
             let new_balance = if creditor == self.account_a {
                 self.balance
                     .checked_add(amount)
@@ -107,16 +240,21 @@ pub mod tables {
             }
             self.balance = new_balance;
             self.save();
+
+            let debitor = self.counter_party(creditor);
+            crate::Wrapper::emit().history().credited(
+                self.ticker,
+                creditor,
+                debitor,
+                amount,
+                memo.to_string(),
+            );
         }
 
-        pub fn draw(&mut self, debitor: AccountNumber, amount: i64) {
+        pub fn draw(&mut self, debitor: AccountNumber, amount: i64, memo: Memo) {
             self.check_is_party(debitor);
-            let creditor = if debitor == self.account_a {
-                self.account_b
-            } else {
-                self.account_a
-            };
-            self.credit_counter_party(creditor, amount, false);
+            let creditor = self.counter_party(debitor);
+            self.credit_counter_party(creditor, amount, false, memo);
         }
 
         fn check_balance_limit(&self, balance_to_check: i64) {
@@ -134,7 +272,7 @@ pub mod tables {
                     )
                 }
             } else {
-                let is_expanding_debt = balance_to_check > self.balance;
+                let is_expanding_debt = balance_to_check < self.balance;
                 if is_expanding_debt {
                     check(
                         balance_to_check.abs() <= self.max_credit_limit_by_b,
@@ -142,11 +280,6 @@ pub mod tables {
                     )
                 }
             }
-        }
-
-        pub fn extend_credit(&mut self, creditor: AccountNumber, amount: i64) {
-            self.check_is_party(creditor);
-            self.credit_counter_party(creditor, amount, true);
         }
 
         fn save(&self) {
@@ -157,22 +290,19 @@ pub mod tables {
 
 #[psibase::service(name = "credit-lines", tables = "tables")]
 pub mod service {
-    use crate::tables::{CreditLine, InitRow, InitTable};
+    use crate::tables::{Config, CreditLine, PendingCredit};
     use psibase::*;
 
     #[action]
     fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
+        if Config::get().is_none() {
+            Config::add();
+        }
     }
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table = InitTable::new();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
+        check_some(Config::get(), "service not inited");
     }
 
     #[action]
@@ -182,29 +312,37 @@ pub mod service {
     }
 
     #[action]
-    fn credit(ticker: AccountNumber, debitor: AccountNumber, amount: i64, memo: Memo) {
-        let creditor = get_sender();
-        CreditLine::get_or_new(ticker, creditor, debitor).extend_credit(creditor, amount);
-        crate::Wrapper::emit().history().credited(
-            ticker,
-            creditor,
-            debitor,
-            amount,
-            memo.to_string(),
+    fn new_pen_cred(
+        ticker: AccountNumber,
+        creditor: AccountNumber,
+        debitor: AccountNumber,
+        amount: i64,
+        memo: Memo,
+    ) {
+        let sender = get_sender();
+        check(
+            sender == creditor || sender == debitor,
+            "only the creditor or debitor can create a draft",
         );
+        check(debitor != creditor, "creditor cannot be debitor");
+        PendingCredit::add(ticker, creditor, debitor, amount, memo);
+    }
+
+    #[action]
+    fn accept_pen(proposal_id: u32) {
+        PendingCredit::get_assert(proposal_id).accept();
+    }
+
+    #[action]
+    fn cancel_pen(proposal_id: u32) {
+        PendingCredit::get_assert(proposal_id).cancel();
     }
 
     #[action]
     fn draw(ticker: AccountNumber, creditor: AccountNumber, amount: i64, memo: Memo) {
         let debitor = get_sender();
-        CreditLine::get_or_new(ticker, debitor, creditor).draw(debitor, amount);
-        crate::Wrapper::emit().history().credited(
-            ticker,
-            creditor,
-            debitor,
-            amount,
-            memo.to_string(),
-        );
+        check(debitor != creditor, "creditor cannot be debitor");
+        CreditLine::get_or_new(ticker, debitor, creditor).draw(debitor, amount, memo);
     }
 
     #[event(history)]
