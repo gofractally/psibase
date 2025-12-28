@@ -129,7 +129,7 @@ pub mod tables {
                 get_sender() == self.debitor,
                 "only debitor can accept the draft",
             );
-            let mut credit_line = CreditLine::get_or_new(self.ticker, self.creditor, self.debitor);
+            let mut credit_line = CreditLine::get_or_add(self.ticker, self.creditor, self.debitor);
             credit_line.credit_counter_party(
                 self.creditor,
                 self.balance,
@@ -198,10 +198,42 @@ pub mod tables {
             }
         }
 
-        pub fn get_or_new(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
+        fn add(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
+            let (a, b) = sort_accounts(a, b);
+            let new_instance = Self::new(ticker, a, b);
+            new_instance.save();
+            CreditRelation::add_bidirect(ticker, a, b);
+            new_instance
+        }
+
+        pub fn get_or_add(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
             let (a, b) = sort_accounts(a, b);
 
-            Self::get(ticker, a, b).unwrap_or_else(|| Self::new(ticker, a, b))
+            Self::get(ticker, a, b).unwrap_or_else(|| Self::add(ticker, a, b))
+        }
+
+        pub fn get_assert(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
+            check_some(
+                Self::get(ticker, a, b),
+                "credit line not found between the two accounts for the given ticker",
+            )
+        }
+
+        pub fn remove(&self) {
+            check(
+                self.balance == 0,
+                "cannot remove non-zero balance credit line",
+            );
+            check(
+                self.max_credit_limit_by_a == 0,
+                "cannot remove credit line with non-zero credit limit for account A",
+            );
+            check(
+                self.max_credit_limit_by_b == 0,
+                "cannot remove credit line with non-zero credit limit for account B",
+            );
+            self.erase();
+            CreditRelation::remove_bidirect(self.ticker, self.account_a, self.account_b);
         }
 
         pub fn set_credit_limit(&mut self, creditor: AccountNumber, credit_limit: i64) {
@@ -282,8 +314,63 @@ pub mod tables {
             }
         }
 
+        fn erase(&self) {
+            CreditLineTable::read_write().erase(&self.pk());
+        }
+
         fn save(&self) {
             CreditLineTable::read_write().put(&self).unwrap()
+        }
+    }
+
+    #[table(name = "CreditRelationTable", index = 3)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct CreditRelation {
+        pub account: AccountNumber,
+        pub ticker: AccountNumber,
+        pub counter_party: AccountNumber,
+    }
+
+    impl CreditRelation {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.account, self.ticker, self.counter_party)
+        }
+
+        pub fn new(
+            account: AccountNumber,
+            ticker: AccountNumber,
+            counter_party: AccountNumber,
+        ) -> Self {
+            Self {
+                account,
+                ticker,
+                counter_party,
+            }
+        }
+
+        fn add(
+            account: AccountNumber,
+            ticker: AccountNumber,
+            counter_party: AccountNumber,
+        ) -> Self {
+            let new_instance = Self::new(account, ticker, counter_party);
+            new_instance.save();
+            new_instance
+        }
+
+        pub fn add_bidirect(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) {
+            Self::add(a, ticker, b);
+            Self::add(b, ticker, a);
+        }
+
+        pub fn remove_bidirect(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) {
+            CreditRelationTable::read_write().erase(&(a, ticker, b));
+            CreditRelationTable::read_write().erase(&(b, ticker, a));
+        }
+
+        fn save(&self) {
+            CreditRelationTable::read_write().put(&self).unwrap()
         }
     }
 }
@@ -308,7 +395,12 @@ pub mod service {
     #[action]
     fn set_credit_limit(ticker: AccountNumber, counter_party: AccountNumber, max_credit: i64) {
         let sender = get_sender();
-        CreditLine::get_or_new(ticker, sender, counter_party).set_credit_limit(sender, max_credit);
+        CreditLine::get_or_add(ticker, sender, counter_party).set_credit_limit(sender, max_credit);
+    }
+
+    #[action]
+    fn del_line(ticker: AccountNumber, counter_party: AccountNumber) {
+        CreditLine::get_assert(ticker, get_sender(), counter_party).remove();
     }
 
     #[action]
@@ -342,7 +434,7 @@ pub mod service {
     fn draw(ticker: AccountNumber, creditor: AccountNumber, amount: i64, memo: Memo) {
         let debitor = get_sender();
         check(debitor != creditor, "creditor cannot be debitor");
-        CreditLine::get_or_new(ticker, debitor, creditor).draw(debitor, amount, memo);
+        CreditLine::get_or_add(ticker, debitor, creditor).draw(debitor, amount, memo);
     }
 
     #[event(history)]
