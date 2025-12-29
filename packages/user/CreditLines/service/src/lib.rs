@@ -510,7 +510,6 @@ pub mod service {
 
     #[action]
     fn del_line(ticker: AccountNumber, counter_party: AccountNumber) {
-        Ticker::check_exists(ticker);
         CreditLine::get_assert(ticker, get_sender(), counter_party).remove();
     }
 
@@ -526,7 +525,7 @@ pub mod service {
         let sender = get_sender();
         check(
             sender == creditor || sender == debitor,
-            "only the creditor or debitor can create a draft",
+            "only the creditor or debitor can create a pending credit between each other",
         );
         check(debitor != creditor, "creditor cannot be debitor");
         PendingCredit::add(ticker, creditor, debitor, amount, memo);
