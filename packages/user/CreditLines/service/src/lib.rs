@@ -78,6 +78,7 @@ pub mod tables {
         pub account_b: AccountNumber,
         // If balance is positive, a account is creditor / extended a loan, b account is debitor / in debt
         // If balance is negative, b account is creditor / extended a loan, a account is debitor / in debt
+        #[graphql(skip)]
         pub balance: i64,
         pub max_credit_limit_by_a: i64, // Max credit a will extend to b
         pub max_credit_limit_by_b: i64, // Max credit b will extend to a
@@ -461,6 +462,10 @@ pub mod tables {
             } else {
                 Some(self.account_b)
             }
+        }
+
+        async fn balance(&self) -> i64 {
+            self.balance.abs()
         }
 
         async fn debitor(&self) -> Option<AccountNumber> {
