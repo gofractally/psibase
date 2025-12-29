@@ -1,4 +1,5 @@
 use psibase::{check, AccountNumber};
+mod interest;
 
 pub fn sort_accounts(a: AccountNumber, b: AccountNumber) -> (AccountNumber, AccountNumber) {
     check(a.value != b.value, "both items are the same");
@@ -9,17 +10,26 @@ pub fn sort_accounts(a: AccountNumber, b: AccountNumber) -> (AccountNumber, Acco
     }
 }
 
+mod constants {
+    pub const ONE_DAY_SECONDS: u32 = 86400;
+    pub const ONE_WEEK_SECONDS: u32 = ONE_DAY_SECONDS * 7;
+
+    pub const MIN_GRACE_PERIOD_SECONDS: u32 = ONE_WEEK_SECONDS;
+}
+
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
+    use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::{
         check, check_none, check_some, get_sender, services::tokens::Precision, AccountNumber,
-        Fracpack, Memo, Table, ToSchema,
+        Fracpack, Memo, Table, TimePointSec, ToSchema,
     };
 
     use serde::{Deserialize, Serialize};
 
-    use crate::sort_accounts;
+    use crate::interest::compute_compounded_balance;
+    use crate::{constants, sort_accounts};
 
     #[table(name = "ConfigTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
@@ -69,8 +79,14 @@ pub mod tables {
         // If balance is positive, a account is creditor / extended a loan, b account is debitor / in debt
         // If balance is negative, b account is creditor / extended a loan, a account is debitor / in debt
         pub balance: i64,
-        pub max_credit_limit_by_a: i64,
-        pub max_credit_limit_by_b: i64,
+        pub max_credit_limit_by_a: i64, // Max credit a will extend to b
+        pub max_credit_limit_by_b: i64, // Max credit b will extend to a
+
+        pub interest_rate_by_a: u32, // in parts per million (ppm)
+        pub interest_rate_by_b: u32, // in parts per million (ppm)
+        pub grace_period_by_a: u32,  // Seconds
+        pub grace_period_by_b: u32,  // Seconds
+        pub last_accrued: TimePointSec,
     }
 
     #[table(name = "PendingCreditTable", index = 2)]
@@ -105,9 +121,15 @@ pub mod tables {
             memo: Memo,
         ) -> Self {
             check(balance > 0, "balance must be positive");
+            let author = get_sender();
+            check(
+                author == creditor || author == debitor,
+                "only the creditor or debitor can create a pending credit between each other",
+            );
+            check(creditor != debitor, "creditor cannot be debitor");
             Self {
                 id: Config::next_id(),
-                author: get_sender(),
+                author,
                 ticker,
                 creditor,
                 debitor,
@@ -131,6 +153,7 @@ pub mod tables {
             balance: i64,
             memo: Memo,
         ) -> Self {
+            Ticker::check_exists(ticker);
             let pending_credit = Self::new(ticker, creditor, debitor, balance, memo);
             pending_credit.save();
             pending_credit
@@ -153,9 +176,11 @@ pub mod tables {
                     "only creditor can accept the pending credit",
                 );
             }
+
             CreditLine::get_or_add(self.ticker, self.creditor, self.debitor).credit_counter_party(
                 self.creditor,
                 self.balance,
+                // When accepting a pending credit, we ignore credit limits because the counter party suggested it.
                 true,
             );
             self.erase();
@@ -184,14 +209,19 @@ pub mod tables {
             (self.ticker, self.account_a, self.account_b)
         }
 
-        fn new(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
+        fn new(ticker: AccountNumber, account_a: AccountNumber, account_b: AccountNumber) -> Self {
             Self {
                 ticker,
-                account_a: a,
-                account_b: b,
+                account_a,
+                account_b,
                 balance: 0,
                 max_credit_limit_by_a: 0,
                 max_credit_limit_by_b: 0,
+                grace_period_by_a: constants::MIN_GRACE_PERIOD_SECONDS,
+                grace_period_by_b: constants::MIN_GRACE_PERIOD_SECONDS,
+                interest_rate_by_a: 0,
+                interest_rate_by_b: 0,
+                last_accrued: TransactSvc::call().currentBlock().time.seconds(),
             }
         }
 
@@ -221,6 +251,7 @@ pub mod tables {
         }
 
         fn add(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
+            Ticker::check_exists(ticker);
             let (a, b) = sort_accounts(a, b);
             let new_instance = Self::new(ticker, a, b);
             new_instance.save();
@@ -229,8 +260,6 @@ pub mod tables {
         }
 
         pub fn get_or_add(ticker: AccountNumber, a: AccountNumber, b: AccountNumber) -> Self {
-            let (a, b) = sort_accounts(a, b);
-
             Self::get(ticker, a, b).unwrap_or_else(|| Self::add(ticker, a, b))
         }
 
@@ -258,6 +287,20 @@ pub mod tables {
             CreditRelation::remove_bidirect(self.ticker, self.account_a, self.account_b);
         }
 
+        pub fn set_grace_period(&mut self, party: AccountNumber, grace_period: u32) {
+            self.check_is_party(party);
+            check(
+                grace_period >= constants::MIN_GRACE_PERIOD_SECONDS,
+                "grace period must be at least 7 days",
+            );
+            if party == self.account_a {
+                self.grace_period_by_a = grace_period;
+            } else {
+                self.grace_period_by_b = grace_period;
+            }
+            self.save()
+        }
+
         pub fn set_credit_limit(&mut self, creditor: AccountNumber, credit_limit: i64) {
             check(credit_limit >= 0, "credit limit must be 0 or above");
 
@@ -270,6 +313,58 @@ pub mod tables {
             self.save()
         }
 
+        pub fn set_interest_rate(&mut self, setter: AccountNumber, rate_ppm: u32) {
+            self.check_is_party(setter);
+
+            if self.balance != 0 {
+                let creditor = if self.balance > 0 {
+                    self.account_a
+                } else {
+                    self.account_b
+                };
+                check(
+                    setter != creditor,
+                    "creditor cannot change interest rate while there is outstanding debt",
+                );
+            }
+
+            if setter == self.account_a {
+                self.interest_rate_by_a = rate_ppm;
+            } else {
+                self.interest_rate_by_b = rate_ppm;
+            }
+            self.save()
+        }
+
+        pub fn accrue_interest(&mut self) {
+            let now = TransactSvc::call().currentBlock().time.seconds();
+            // If now is before last accrued, then we're in an interest free period.
+            if now.seconds <= self.last_accrued.seconds {
+                return;
+            }
+            let elapsed_seconds = now.seconds - self.last_accrued.seconds;
+            let whole_days_elapsed = elapsed_seconds / constants::ONE_DAY_SECONDS as i64;
+            if whole_days_elapsed == 0 {
+                return;
+            }
+
+            let a_is_creditor = self.balance > 0;
+            let interest_rate = if a_is_creditor {
+                self.interest_rate_by_a
+            } else {
+                self.interest_rate_by_b
+            };
+
+            self.balance =
+                compute_compounded_balance(self.balance, interest_rate, whole_days_elapsed as u32);
+
+            self.last_accrued = (self.last_accrued.seconds
+                + whole_days_elapsed * constants::ONE_DAY_SECONDS as i64)
+                .into();
+
+            self.save();
+        }
+
         fn credit_counter_party(
             &mut self,
             creditor: AccountNumber,
@@ -277,7 +372,11 @@ pub mod tables {
             ignore_limit: bool,
         ) {
             check(amount > 0, "amount must be positive");
+            self.accrue_interest();
             self.check_is_party(creditor);
+
+            let before_a_is_creditor = self.balance > 0;
+            let was_debt = self.balance != 0;
 
             let new_balance = if creditor == self.account_a {
                 self.balance
@@ -292,6 +391,21 @@ pub mod tables {
                 self.check_balance_limit(new_balance);
             }
             self.balance = new_balance;
+            let is_debt = self.balance != 0;
+            let is_new_debt = !was_debt && is_debt;
+            let after_a_is_creditor = self.balance > 0;
+            let is_flip_of_creditor = before_a_is_creditor != after_a_is_creditor;
+
+            if (is_flip_of_creditor && is_debt) || is_new_debt {
+                let now = TransactSvc::call().currentBlock().time.seconds();
+                let grace = if after_a_is_creditor {
+                    self.grace_period_by_a
+                } else {
+                    self.grace_period_by_b
+                };
+                self.last_accrued = (now.seconds + grace as i64).into();
+            }
+
             self.save();
         }
 
@@ -308,16 +422,16 @@ pub mod tables {
             let a_is_creditor = balance_to_check > 0;
 
             if a_is_creditor {
-                let is_expanding_debt = balance_to_check > self.balance;
-                if is_expanding_debt {
+                let is_debt_expanding = balance_to_check > self.balance;
+                if is_debt_expanding {
                     check(
                         balance_to_check <= self.max_credit_limit_by_a,
                         "breaches max limit",
                     )
                 }
             } else {
-                let is_expanding_debt = balance_to_check < self.balance;
-                if is_expanding_debt {
+                let is_debt_expanding = balance_to_check < self.balance;
+                if is_debt_expanding {
                     check(
                         balance_to_check.abs() <= self.max_credit_limit_by_b,
                         "breaches max limit",
@@ -502,6 +616,11 @@ pub mod service {
     }
 
     #[action]
+    fn accrue(ticker: AccountNumber, account_a: AccountNumber, account_b: AccountNumber) {
+        CreditLine::get_assert(ticker, account_a, account_b).accrue_interest();
+    }
+
+    #[action]
     fn set_crd_lim(ticker: AccountNumber, counter_party: AccountNumber, max_credit: i64) {
         Ticker::check_exists(ticker);
         let sender = get_sender();
@@ -514,6 +633,12 @@ pub mod service {
     }
 
     #[action]
+    fn set_int_rate(ticker: AccountNumber, counter_party: AccountNumber, rate_ppm: u32) {
+        let sender = get_sender();
+        CreditLine::get_or_add(ticker, sender, counter_party).set_interest_rate(sender, rate_ppm);
+    }
+
+    #[action]
     fn new_pen_cred(
         ticker: AccountNumber,
         creditor: AccountNumber,
@@ -521,14 +646,14 @@ pub mod service {
         amount: i64,
         memo: Memo,
     ) {
-        Ticker::check_exists(ticker);
-        let sender = get_sender();
-        check(
-            sender == creditor || sender == debitor,
-            "only the creditor or debitor can create a pending credit between each other",
-        );
-        check(debitor != creditor, "creditor cannot be debitor");
         PendingCredit::add(ticker, creditor, debitor, amount, memo);
+    }
+
+    #[action]
+    fn set_grace(ticker: AccountNumber, counter_party: AccountNumber, grace_period: u32) {
+        let sender = get_sender();
+        CreditLine::get_or_add(ticker, sender, counter_party)
+            .set_grace_period(sender, grace_period);
     }
 
     #[action]
