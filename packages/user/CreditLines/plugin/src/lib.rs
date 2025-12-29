@@ -7,8 +7,8 @@ use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::{define_trust, Memo};
 
 mod errors;
 use errors::ErrorType;
@@ -34,6 +34,96 @@ define_trust! {
 struct CreditLinesPlugin;
 
 impl Api for CreditLinesPlugin {
+    fn accept_pending_credit(
+        id: u32,
+    ) -> Result<(), bindings::exports::credit_lines::plugin::api::Error> {
+        let packed_args = credit_lines::action_structs::accept_pen { proposal_id: id }.packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::accept_pen::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn cancel_pending_credit(id: u32) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::cancel_pen { proposal_id: id }.packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::cancel_pen::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn del_credit_line(ticker: String, counter_party: String) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::del_line {
+            ticker: ticker.as_str().into(),
+            counter_party: counter_party.as_str().into(),
+        }
+        .packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::del_line::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn accrue_interest(ticker: String, account_a: String, account_b: String) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::accrue {
+            ticker: ticker.as_str().into(),
+            account_a: account_a.as_str().into(),
+            account_b: account_b.as_str().into(),
+        }
+        .packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::accrue::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn add_ticker(ticker: String, name: String, precision: u8) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::add_ticker {
+            ticker: ticker.as_str().into(),
+            label: Memo::try_from(name.as_str()).unwrap(),
+            precision: precision.try_into().unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::add_ticker::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_grace_period(
+        ticker: String,
+        counter_party: String,
+        grace_period_seconds: u32,
+    ) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::set_grace {
+            ticker: ticker.as_str().into(),
+            counter_party: counter_party.as_str().into(),
+            grace_period: grace_period_seconds,
+        }
+        .packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::set_grace::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_interest_rate(
+        ticker: String,
+        counter_party: String,
+        interest_rate_ppm: u32,
+    ) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::set_int_rate {
+            ticker: ticker.as_str().into(),
+            counter_party: counter_party.as_str().into(),
+            rate_ppm: interest_rate_ppm,
+        }
+        .packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::set_int_rate::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn draw(
         ticker: String,
         creditors: Vec<String>,

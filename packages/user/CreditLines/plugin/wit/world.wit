@@ -7,6 +7,16 @@ interface api {
 
     new-pending-credit: func(ticker: string, debitor: string, creditor: string, amount: s64, memo: string) -> result<_, error>;
     set-credit-limit: func(ticker: string, debitor: string, max-credit: s64) -> result<_, error>;
+
+    add-ticker: func(ticker: string, name: string, precision: u8) -> result<_, error>;
+    accrue-interest: func(ticker: string, account-a: string, account-b: string) -> result<_, error>;
+    set-interest-rate: func(ticker: string, counter-party: string, interest-rate-ppm: u32) -> result<_, error>;
+    set-grace-period: func(ticker: string, counter-party: string, grace-period-seconds: u32) -> result<_, error>;
+
+    del-credit-line: func(ticker: string, counter-party: string) -> result<_, error>;
+
+    accept-pending-credit: func(id: u32) -> result<_, error>;
+    cancel-pending-credit: func(id: u32) -> result<_, error>;
 }
 
 interface queries {

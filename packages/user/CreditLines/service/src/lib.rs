@@ -668,6 +668,8 @@ pub mod service {
 
     #[action]
     fn draw(ticker: AccountNumber, creditors: Vec<AccountNumber>, amount: i64, memo: Memo) {
+        check(!creditors.is_empty(), "credit path cannot be empty");
+
         Ticker::check_exists(ticker);
         let debitor = get_sender();
         let mut current_debitor = debitor;
