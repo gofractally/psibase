@@ -2,7 +2,11 @@ package credit-lines:plugin;
 
 interface api {
     use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
+
+    draw: func(ticker: string, creditors: list<string>, amount: s64, memo: string) -> result<_, error>;
+
+    new-pending-credit: func(ticker: string, debitor: string, creditor: string, amount: s64, memo: string) -> result<_, error>;
+    set-credit-limit: func(ticker: string, debitor: string, max-credit: s64) -> result<_, error>;
 }
 
 interface queries {

@@ -11,10 +11,12 @@ pub fn sort_accounts(a: AccountNumber, b: AccountNumber) -> (AccountNumber, Acco
 
 #[psibase::service_tables]
 pub mod tables {
-    use async_graphql::SimpleObject;
+    use async_graphql::{ComplexObject, SimpleObject};
     use psibase::{
-        check, check_none, check_some, get_sender, AccountNumber, Fracpack, Memo, Table, ToSchema,
+        check, check_none, check_some, get_sender, services::tokens::Precision, AccountNumber,
+        Fracpack, Memo, Table, ToSchema,
     };
+
     use serde::{Deserialize, Serialize};
 
     use crate::sort_accounts;
@@ -85,6 +87,16 @@ pub mod tables {
     }
 
     impl PendingCredit {
+        #[secondary_key(1)]
+        fn by_creditor(&self) -> (AccountNumber, AccountNumber, u32) {
+            (self.creditor, self.debitor, self.id)
+        }
+
+        #[secondary_key(2)]
+        fn by_debitor(&self) -> (AccountNumber, AccountNumber, u32) {
+            (self.debitor, self.creditor, self.id)
+        }
+
         fn new(
             ticker: AccountNumber,
             creditor: AccountNumber,
@@ -125,15 +137,26 @@ pub mod tables {
         }
 
         pub fn accept(&mut self) {
-            check(
-                get_sender() == self.debitor,
-                "only debitor can accept the draft",
-            );
-            let mut credit_line = CreditLine::get_or_add(self.ticker, self.creditor, self.debitor);
-            credit_line.credit_counter_party(
+            // A pending credit can be created by either party.
+            // If it was the debitor who created it, it means he's applying for a loan, so only the creditor can accept.
+            // If it was the creditor who created it, it means he's offering a loan, so only the debitor can accept.
+
+            let sender = get_sender();
+            if self.author == self.creditor {
+                check(
+                    sender == self.debitor,
+                    "only debitor can accept the pending credit",
+                );
+            } else {
+                check(
+                    sender == self.creditor,
+                    "only creditor can accept the pending credit",
+                );
+            }
+            CreditLine::get_or_add(self.ticker, self.creditor, self.debitor).credit_counter_party(
                 self.creditor,
                 self.balance,
-                self.author == self.creditor,
+                true,
             );
             self.erase();
         }
@@ -236,7 +259,7 @@ pub mod tables {
         }
 
         pub fn set_credit_limit(&mut self, creditor: AccountNumber, credit_limit: i64) {
-            check(credit_limit >= 0, "credit limit must be positive");
+            check(credit_limit >= 0, "credit limit must be 0 or above");
 
             self.check_is_party(creditor);
             if creditor == self.account_a {
@@ -312,8 +335,36 @@ pub mod tables {
         }
     }
 
+    #[ComplexObject]
+    impl CreditLine {
+        async fn creditor(&self) -> Option<AccountNumber> {
+            if self.balance == 0 {
+                return None;
+            }
+
+            if self.balance > 0 {
+                Some(self.account_a)
+            } else {
+                Some(self.account_b)
+            }
+        }
+
+        async fn debitor(&self) -> Option<AccountNumber> {
+            if self.balance == 0 {
+                return None;
+            }
+
+            if self.balance > 0 {
+                Some(self.account_b)
+            } else {
+                Some(self.account_a)
+            }
+        }
+    }
+
     #[table(name = "CreditRelationTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct CreditRelation {
         pub account: AccountNumber,
         pub ticker: AccountNumber,
@@ -362,20 +413,82 @@ pub mod tables {
             CreditRelationTable::read_write().put(&self).unwrap()
         }
     }
+
+    #[ComplexObject]
+    impl CreditRelation {
+        async fn credit_line(&self) -> Option<CreditLine> {
+            CreditLine::get(self.ticker, self.account, self.counter_party)
+        }
+    }
+
+    #[table(name = "TickerTable", index = 4)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct Ticker {
+        #[primary_key]
+        pub ticker: AccountNumber,
+        pub label: Memo,
+        pub precision: Precision,
+    }
+
+    impl Ticker {
+        fn new(ticker: AccountNumber, label: Memo, precision: Precision) -> Self {
+            Self {
+                ticker,
+                label,
+                precision,
+            }
+        }
+
+        pub fn get(ticker: AccountNumber) -> Option<Self> {
+            TickerTable::read().get_index_pk().get(&ticker)
+        }
+
+        pub fn check_exists(ticker: AccountNumber) {
+            check_some(Self::get(ticker), "ticker does not exist");
+        }
+
+        pub fn add(ticker: AccountNumber, label: Memo, precision: Precision) -> Self {
+            check_none(Self::get(ticker), "ticker already exists");
+            let new_instance = Self::new(ticker, label, precision);
+            new_instance.save();
+            new_instance
+        }
+
+        fn save(&self) {
+            TickerTable::read_write().put(&self).unwrap()
+        }
+    }
 }
 
 #[psibase::service(name = "credit-lines", tables = "tables")]
 pub mod service {
     use std::collections::HashSet;
 
-    use crate::tables::{Config, CreditLine, PendingCredit};
-    use psibase::*;
+    use crate::tables::{Config, CreditLine, PendingCredit, Ticker};
+    use psibase::{services::tokens::Precision, *};
 
     #[action]
     fn init() {
-        if Config::get().is_none() {
-            Config::add();
+        if Config::get().is_some() {
+            return;
         }
+
+        Config::add();
+        let new_ticker = |tick: &str, label: &str, precision: u8| {
+            Ticker::add(
+                AccountNumber::from(tick),
+                Memo::from(label),
+                precision.try_into().unwrap(),
+            );
+        };
+        new_ticker("gbp", "British Pound", 2);
+        new_ticker("usd", "United States Dollar", 2);
+        new_ticker("aud", "Australian Dollar", 2);
+        new_ticker("eur", "Euro", 2);
+        new_ticker("jpy", "Japanese Yen", 0);
+        new_ticker("cny", "Chinese Yuan", 2);
+        new_ticker("cad", "Canadian Dollar", 2);
+        new_ticker("btc", "Bitcoin", 8);
     }
 
     #[pre_action(exclude(init))]
@@ -384,13 +497,20 @@ pub mod service {
     }
 
     #[action]
-    fn set_credit_limit(ticker: AccountNumber, counter_party: AccountNumber, max_credit: i64) {
+    fn add_ticker(ticker: AccountNumber, label: Memo, precision: Precision) {
+        Ticker::add(ticker, label, precision);
+    }
+
+    #[action]
+    fn set_crd_lim(ticker: AccountNumber, counter_party: AccountNumber, max_credit: i64) {
+        Ticker::check_exists(ticker);
         let sender = get_sender();
         CreditLine::get_or_add(ticker, sender, counter_party).set_credit_limit(sender, max_credit);
     }
 
     #[action]
     fn del_line(ticker: AccountNumber, counter_party: AccountNumber) {
+        Ticker::check_exists(ticker);
         CreditLine::get_assert(ticker, get_sender(), counter_party).remove();
     }
 
@@ -402,6 +522,7 @@ pub mod service {
         amount: i64,
         memo: Memo,
     ) {
+        Ticker::check_exists(ticker);
         let sender = get_sender();
         check(
             sender == creditor || sender == debitor,
@@ -423,8 +544,8 @@ pub mod service {
 
     #[action]
     fn draw(ticker: AccountNumber, creditors: Vec<AccountNumber>, amount: i64, memo: Memo) {
+        Ticker::check_exists(ticker);
         let debitor = get_sender();
-
         let mut current_debitor = debitor;
 
         // Alice wants to owe Edward

@@ -34,11 +34,59 @@ define_trust! {
 struct CreditLinesPlugin;
 
 impl Api for CreditLinesPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = credit_lines::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
-        Ok(())
+    fn draw(
+        ticker: String,
+        creditors: Vec<String>,
+        amount: i64,
+        memo: String,
+    ) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::draw {
+            ticker: ticker.as_str().into(),
+            creditors: creditors.into_iter().map(|c| c.as_str().into()).collect(),
+            amount: amount.try_into().unwrap(),
+            memo: memo.try_into().unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(
+            credit_lines::action_structs::draw::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn new_pending_credit(
+        ticker: String,
+        debitor: String,
+        creditor: String,
+        amount: i64,
+        memo: String,
+    ) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::new_pen_cred {
+            ticker: ticker.as_str().into(),
+            debitor: debitor.as_str().into(),
+            creditor: creditor.as_str().into(),
+            amount: amount.into(),
+            memo: memo.try_into().unwrap(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            credit_lines::action_structs::new_pen_cred::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_credit_limit(ticker: String, debitor: String, amount: i64) -> Result<(), Error> {
+        let packed_args = credit_lines::action_structs::set_crd_lim {
+            ticker: ticker.as_str().into(),
+            counter_party: debitor.as_str().into(),
+            max_credit: amount.into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            credit_lines::action_structs::set_crd_lim::ACTION_NAME,
+            &packed_args,
+        )
     }
 }
 
@@ -63,7 +111,7 @@ impl Queries for CreditLinesPlugin {
             &CommonServer::post_graphql_get_json(&graphql_str)?,
         );
 
-        let examplething_val = 
+        let examplething_val =
             examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
         Ok(examplething_val.data.example_thing)
