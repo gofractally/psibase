@@ -55,7 +55,7 @@ pub mod tables {
     }
 
     #[table(name = "PoolTable", index = 1)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Fracpack, Debug)]
     pub struct Pool {
         #[primary_key]
         pub id: u32,

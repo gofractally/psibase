@@ -7,6 +7,7 @@ mod service {
         *,
     };
     use serde::Deserialize;
+    use token_swap::tables::{Pool, PoolTable};
 
     #[derive(Deserialize, SimpleObject)]
     struct HistoricalUpdate {
@@ -20,6 +21,25 @@ mod service {
     impl Query {
         async fn quote(&self, pool_id: u32, token_in: TID, amount: Quantity) -> String {
             "quote".into()
+        }
+
+        async fn all_pools(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, Pool>> {
+            TableQuery::subindex::<u32>(
+                PoolTable::with_service(token_swap::SERVICE).get_index_pk(),
+                &(),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         /// This query gets paginated historical updates of the Example Thing.
