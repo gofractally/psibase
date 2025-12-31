@@ -3,13 +3,15 @@ mod uniswap;
 #[psibase::service_tables]
 pub mod tables {
 
+    use async_graphql::SimpleObject;
     use psibase::services::nft::NID;
+    use psibase::services::token_swap::{swap, PPM};
     use psibase::services::tokens::{Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
         check, check_none, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
     };
 
-    use crate::uniswap::{mul_div, share_of_lp_tokens, sqrt, swap, PPM};
+    use crate::uniswap::{mul_div, share_of_lp_tokens, sqrt};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -336,6 +338,7 @@ pub mod tables {
                 outgoing_reserve,
                 tariff_ppm,
             );
+            check(outgoing_amount.value > 0, "outgoing amount is 0");
 
             self.deposit_into_reserve(incoming_token, incoming_amount);
             self.withdraw_from_reserve(outgoing_token, outgoing_amount);
