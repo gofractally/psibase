@@ -151,10 +151,8 @@ pub mod tables {
 
             let total_liquidity = self.get_lp_supply();
 
-            let lp_tokens_from_a_deposit =
-                share_of_lp_tokens(amount_a_use, reserve_a, total_liquidity);
-            let lp_tokens_from_b_deposit =
-                share_of_lp_tokens(amount_b_use, reserve_b, total_liquidity);
+            let lp_tokens_from_a_deposit = mul_div(amount_a_use, total_liquidity, reserve_a);
+            let lp_tokens_from_b_deposit = mul_div(amount_b_use, total_liquidity, reserve_b);
 
             let lp_tokens_to_mint = lp_tokens_from_a_deposit.min(lp_tokens_from_b_deposit);
 
@@ -168,21 +166,22 @@ pub mod tables {
         }
 
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
+            check(
+                liquidity_amount.value > 0,
+                "liquidity amount must be positive",
+            );
             self.debit_lp_tokens_from_sender(liquidity_amount);
 
+            let (a_reserve, b_reserve) = self.get_reserves();
             let lp_supply = self.get_lp_supply();
 
-            let lp_share_ppm =
-                (liquidity_amount.value as u128) * PPM as u128 / (lp_supply.value as u128);
+            let a_amount = mul_div(liquidity_amount, a_reserve, lp_supply);
+            let b_amount = mul_div(liquidity_amount, b_reserve, lp_supply);
 
-            let (a_reserve, b_reserve) = self.get_reserves();
-            let a_reserve = a_reserve.value as u128;
-            let b_reserve = b_reserve.value as u128;
+            check(a_amount.value > 0, "no a token reserve balance to return");
+            check(b_amount.value > 0, "no b token reserve balance to return");
 
-            let a_share: Quantity = ((a_reserve * lp_share_ppm / PPM as u128) as u64).into();
-            let b_share: Quantity = ((b_reserve * lp_share_ppm / PPM as u128) as u64).into();
-
-            self.withdraw_reserves_to_sender(a_share, b_share);
+            self.withdraw_reserves_to_sender(a_amount, b_amount);
             self.burn_lp_tokens(liquidity_amount);
         }
 
