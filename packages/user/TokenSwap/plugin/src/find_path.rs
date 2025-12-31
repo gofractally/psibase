@@ -3,9 +3,13 @@ use std::{
     collections::{BinaryHeap, HashMap},
 };
 
-use psibase::services::{token_swap::swap, tokens::Quantity};
+use psibase::services::{
+    token_swap::swap,
+    tokens::{Quantity, TID},
+};
 
-struct Pool {
+#[derive(Clone)]
+pub struct Pool {
     id: u32,
     token_a: u32,
     token_b: u32,
@@ -43,12 +47,10 @@ impl PartialEq for SearchState {
 
 impl Eq for SearchState {}
 
-type TID = u32;
-
 pub fn find_path(
     all_pools: Vec<Pool>,
-    amount: Quantity,
     from: TID,
+    amount: Quantity,
     to: TID,
     max_hops: u8,
 ) -> (Vec<Pool>, Quantity) {
@@ -62,7 +64,7 @@ pub fn find_path(
         graph
             .entry(pool.token_a)
             .or_insert_with(Vec::new)
-            .push(pool);
+            .push(pool.clone());
 
         graph
             .entry(pool.token_b)
@@ -154,7 +156,8 @@ pub fn find_path(
                 if is_new_best_amount_found {
                     best_amount_found_dictionary.insert(output_token, next_amount);
 
-                    let new_path = search_state.path.clone().push(pool.clone());
+                    let mut new_path = search_state.path.clone();
+                    new_path.push(pool.clone());
 
                     search_states.push(SearchState {
                         token: output_token,

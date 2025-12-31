@@ -1,5 +1,5 @@
 [package]
-name = "token-swap-pkg"                      # Crate name
+name = "token-swap-pkg"              # Crate name
 description = "AMM based token swap"
 version.workspace = true
 rust-version.workspace = true
@@ -16,6 +16,8 @@ services = ["token-swap"]
 HttpServer = "0.22.0"
 Sites = "0.22.0"
 Permissions = "0.22.0"
+Tokens = "0.22.0"
+
 
 [lib]
 crate-type = ["rlib"]

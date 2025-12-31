@@ -3,10 +3,10 @@ mod uniswap;
 #[psibase::service_tables]
 pub mod tables {
 
-    use async_graphql::SimpleObject;
+    use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::NID;
     use psibase::services::token_swap::{swap, PPM};
-    use psibase::services::tokens::{Quantity, TokenRecord, Wrapper as Tokens, TID};
+    use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
         check, check_none, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
     };
@@ -58,13 +58,17 @@ pub mod tables {
 
     #[table(name = "PoolTable", index = 1)]
     #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Fracpack, Debug)]
+    #[graphql(complex)]
     pub struct Pool {
         #[primary_key]
         pub id: u32,
+        #[graphql(skip)]
         pub liquidity_token: TID,
+        #[graphql(skip)]
         pub token_a: TID,
         pub token_a_tariff_ppm: u32,
         pub token_a_admin: NID,
+        #[graphql(skip)]
         pub token_b: TID,
         pub token_b_tariff_ppm: u32,
         pub token_b_admin: NID,
@@ -76,7 +80,10 @@ pub mod tables {
         }
 
         pub fn get_assert(id: u32) -> Self {
-            check_some(Self::get(id), "pool does not exist")
+            check_some(
+                Self::get(id),
+                format!("pool does not exist id: {}", id).as_str(),
+            )
         }
 
         fn get_liquidity_token(&self) -> TokenRecord {
@@ -92,6 +99,7 @@ pub mod tables {
             check(token_a != token_b, "reserve tokens cannot be the same");
 
             let nft = psibase::services::nft::Wrapper::call();
+            let tokens = psibase::services::tokens::Wrapper::call();
             let sender = get_sender();
 
             let mint_and_send_back = |memo| {
@@ -100,9 +108,15 @@ pub mod tables {
                 id
             };
 
+            let liquidity_token = tokens.create(4.try_into().unwrap(), u64::MAX.into());
+            nft.debit(
+                tokens.getToken(liquidity_token).nft_id,
+                "Liquidity token creation".into(),
+            );
+
             Self {
                 id: Config::next_pool_id(),
-                liquidity_token: Tokens::call().create(4.try_into().unwrap(), u64::MAX.into()),
+                liquidity_token,
                 token_a,
                 token_b,
                 token_a_tariff_ppm: 0,
@@ -346,6 +360,31 @@ pub mod tables {
             (outgoing_token, outgoing_amount)
         }
     }
+
+    #[ComplexObject]
+    impl Pool {
+        pub async fn a_balance(&self) -> Decimal {
+            let precision = Tokens::call().getToken(self.token_a).precision;
+            Decimal::new(self.get_reserve(self.token_a), precision)
+        }
+
+        pub async fn b_balance(&self) -> Decimal {
+            let precision = Tokens::call().getToken(self.token_b).precision;
+            Decimal::new(self.get_reserve(self.token_b), precision)
+        }
+
+        pub async fn liquidity_token(&self) -> TokenRecord {
+            psibase::services::tokens::Wrapper::call().getToken(self.liquidity_token)
+        }
+
+        pub async fn token_a(&self) -> TokenRecord {
+            psibase::services::tokens::Wrapper::call().getToken(self.token_a)
+        }
+
+        pub async fn token_b(&self) -> TokenRecord {
+            psibase::services::tokens::Wrapper::call().getToken(self.token_b)
+        }
+    }
 }
 
 #[psibase::service(name = "token-swap", tables = "tables")]
@@ -418,6 +457,7 @@ pub mod service {
 
     #[action]
     fn swap(pools: Vec<u32>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
+        check(pools.len() > 0, "pools length must be at least 1");
         let sender = get_sender();
         let tokens_service = psibase::services::tokens::Wrapper::call();
         tokens_service.debit(token_in, sender, amount_in, "Swap".into());

@@ -19,10 +19,6 @@ mod service {
 
     #[Object]
     impl Query {
-        async fn quote(&self, pool_id: u32, token_in: TID, amount: Quantity) -> String {
-            "quote".into()
-        }
-
         async fn all_pools(
             &self,
             first: Option<i32>,
