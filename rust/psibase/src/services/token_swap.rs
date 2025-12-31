@@ -71,6 +71,11 @@ pub mod Service {
     }
 
     #[action]
+    fn get_reserves(pool_id: u32) -> (Quantity, Quantity) {
+        unimplemented!()
+    }
+
+    #[action]
     fn add_liquidity(
         pool_id: u32,
         amount_a_desired: Quantity,

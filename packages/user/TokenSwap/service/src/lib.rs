@@ -11,7 +11,7 @@ pub mod tables {
         check, check_none, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
     };
 
-    use crate::uniswap::{mul_div, share_of_lp_tokens, sqrt};
+    use crate::uniswap::{mul_div, sqrt};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "ConfigTable", index = 0)]
@@ -392,7 +392,7 @@ pub mod service {
     use psibase::{
         services::{
             nft::NID,
-            tokens::{Quantity, TID},
+            tokens::{self, Decimal, Quantity, TID},
         },
         *,
     };
@@ -428,6 +428,11 @@ pub mod service {
     #[action]
     fn set_tarriff(pool_id: u32, token: TID, ppm: u32) {
         Pool::get_assert(pool_id).set_tarriff(token, ppm)
+    }
+
+    #[action]
+    fn get_reserves(pool_id: u32) -> (Quantity, Quantity) {
+        Pool::get_assert(pool_id).get_reserves()
     }
 
     #[action]
