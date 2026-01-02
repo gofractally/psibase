@@ -5,7 +5,7 @@ pub mod tables {
 
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::NID;
-    use psibase::services::token_swap::{swap, PPM};
+    use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
         check, check_none, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
@@ -363,25 +363,27 @@ pub mod tables {
     #[ComplexObject]
     impl Pool {
         pub async fn a_balance(&self) -> Decimal {
+            let amount = TokenSwap::call().get_reserve(self.id, self.token_a);
             let precision = Tokens::call().getToken(self.token_a).precision;
-            Decimal::new(self.get_reserve(self.token_a), precision)
+            Decimal::new(amount, precision)
         }
 
         pub async fn b_balance(&self) -> Decimal {
+            let amount = TokenSwap::call().get_reserve(self.id, self.token_b);
             let precision = Tokens::call().getToken(self.token_b).precision;
-            Decimal::new(self.get_reserve(self.token_b), precision)
+            Decimal::new(amount, precision)
         }
 
         pub async fn liquidity_token(&self) -> TokenRecord {
-            psibase::services::tokens::Wrapper::call().getToken(self.liquidity_token)
+            Tokens::call().getToken(self.liquidity_token)
         }
 
         pub async fn token_a(&self) -> TokenRecord {
-            psibase::services::tokens::Wrapper::call().getToken(self.token_a)
+            Tokens::call().getToken(self.token_a)
         }
 
         pub async fn token_b(&self) -> TokenRecord {
-            psibase::services::tokens::Wrapper::call().getToken(self.token_b)
+            Tokens::call().getToken(self.token_b)
         }
     }
 }
@@ -431,8 +433,8 @@ pub mod service {
     }
 
     #[action]
-    fn get_reserves(pool_id: u32) -> (Quantity, Quantity) {
-        Pool::get_assert(pool_id).get_reserves()
+    fn get_reserve(pool_id: u32, token_id: TID) -> Quantity {
+        Pool::get_assert(pool_id).get_reserve(token_id)
     }
 
     #[action]

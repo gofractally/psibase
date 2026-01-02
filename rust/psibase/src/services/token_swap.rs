@@ -71,7 +71,7 @@ pub mod Service {
     }
 
     #[action]
-    fn get_reserves(pool_id: u32) -> (Quantity, Quantity) {
+    fn get_reserve(pool_id: u32, token_id: TID) -> Quantity {
         unimplemented!()
     }
 
