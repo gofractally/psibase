@@ -11,8 +11,6 @@ plugin = "token-swap-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "token-swap", service = "token-swap", method = "init", data = {} },
-    { sender = "token-swap", service = "sites", method = "enablespa", data = { enable = true } },
-    { sender = "token-swap", service = "tokens", method = "setUserConf", data = { index = 0, enabled = true } },
 ]
 
 [dependencies]

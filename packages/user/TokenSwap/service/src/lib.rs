@@ -64,12 +64,10 @@ pub mod tables {
         pub id: u32,
         #[graphql(skip)]
         pub liquidity_token: TID,
-        #[graphql(skip)]
-        pub token_a: TID,
+        pub token_a_id: TID,
         pub token_a_tariff_ppm: u32,
         pub token_a_admin: NID,
-        #[graphql(skip)]
-        pub token_b: TID,
+        pub token_b_id: TID,
         pub token_b_tariff_ppm: u32,
         pub token_b_admin: NID,
     }
@@ -95,8 +93,11 @@ pub mod tables {
             token.issued_supply - token.burned_supply
         }
 
-        fn new(token_a: TID, token_b: TID) -> Self {
-            check(token_a != token_b, "reserve tokens cannot be the same");
+        fn new(token_a_id: TID, token_b_id: TID) -> Self {
+            check(
+                token_a_id != token_b_id,
+                "reserve tokens cannot be the same",
+            );
 
             let nft = psibase::services::nft::Wrapper::call();
             let tokens = psibase::services::tokens::Wrapper::call();
@@ -117,8 +118,8 @@ pub mod tables {
             Self {
                 id: Config::next_pool_id(),
                 liquidity_token,
-                token_a,
-                token_b,
+                token_a_id,
+                token_b_id,
                 token_a_tariff_ppm: 0,
                 token_b_tariff_ppm: 0,
                 token_a_admin: mint_and_send_back("Token A administration".into()),
@@ -159,8 +160,8 @@ pub mod tables {
             check(lp_tokens_to_mint.value > 0, "no liquidity to mint");
 
             self.debit_reserves_from_sender(amount_a_use, amount_b_use);
-            self.deposit_into_reserve(self.token_a, amount_a_use);
-            self.deposit_into_reserve(self.token_b, amount_b_use);
+            self.deposit_into_reserve(self.token_a_id, amount_a_use);
+            self.deposit_into_reserve(self.token_b_id, amount_b_use);
             self.mint_lp_tokens(lp_tokens_to_mint);
             self.credit_sender_lp_tokens(lp_tokens_to_mint);
         }
@@ -186,12 +187,12 @@ pub mod tables {
         }
 
         fn withdraw_reserves_to_sender(&self, a_amount: Quantity, b_amount: Quantity) {
-            self.withdraw_from_reserve(self.token_a, a_amount);
-            self.withdraw_from_reserve(self.token_b, b_amount);
+            self.withdraw_from_reserve(self.token_a_id, a_amount);
+            self.withdraw_from_reserve(self.token_b_id, b_amount);
             let tokens = Tokens::call();
             let sender = get_sender();
-            tokens.credit(self.token_a, sender, a_amount, "memo".into());
-            tokens.credit(self.token_b, sender, b_amount, "memo".into());
+            tokens.credit(self.token_a_id, sender, a_amount, "memo".into());
+            tokens.credit(self.token_b_id, sender, b_amount, "memo".into());
         }
 
         pub fn debit_lp_tokens_from_sender(&self, liquidity_amount: Quantity) {
@@ -206,10 +207,10 @@ pub mod tables {
         pub fn debit_reserves_from_sender(&self, amount_a: Quantity, amount_b: Quantity) {
             let tokens = Tokens::call();
             let sender = get_sender();
-            tokens.debit(self.token_a, sender, amount_a, "memo".into());
-            tokens.debit(self.token_b, sender, amount_b, "memo".into());
-            tokens.reject(self.token_a, sender, "memo".into());
-            tokens.reject(self.token_b, sender, "memo".into());
+            tokens.debit(self.token_a_id, sender, amount_a, "memo".into());
+            tokens.debit(self.token_b_id, sender, amount_b, "memo".into());
+            tokens.reject(self.token_a_id, sender, "memo".into());
+            tokens.reject(self.token_b_id, sender, "memo".into());
         }
 
         pub fn mint_lp_tokens(&self, amount: Quantity) {
@@ -276,7 +277,7 @@ pub mod tables {
             check(fee_ppm < PPM as u32, "fee too high");
             check(self.includes_token(token), "token not supported in pool");
 
-            let is_token_a = self.token_a == token;
+            let is_token_a = self.token_a_id == token;
 
             if is_token_a {
                 self.check_sender_owns_nft(self.token_a_admin);
@@ -310,8 +311,8 @@ pub mod tables {
 
         pub fn get_reserves(&self) -> (Quantity, Quantity) {
             (
-                self.get_reserve(self.token_a),
-                self.get_reserve(self.token_b),
+                self.get_reserve(self.token_a_id),
+                self.get_reserve(self.token_b_id),
             )
         }
 
@@ -324,22 +325,22 @@ pub mod tables {
         }
 
         pub fn includes_token(&self, token_id: TID) -> bool {
-            self.token_a == token_id || self.token_b == token_id
+            self.token_a_id == token_id || self.token_b_id == token_id
         }
 
         pub fn swap(&mut self, incoming_token: TID, incoming_amount: Quantity) -> (TID, Quantity) {
             check(self.includes_token(incoming_token), "path token mismatch");
 
-            let outgoing_token = if incoming_token == self.token_a {
-                self.token_b
+            let outgoing_token = if incoming_token == self.token_a_id {
+                self.token_b_id
             } else {
-                self.token_a
+                self.token_a_id
             };
 
             let incoming_reserve = self.get_reserve(incoming_token);
             let outgoing_reserve = self.get_reserve(outgoing_token);
 
-            let tariff_ppm = if incoming_token == self.token_a {
+            let tariff_ppm = if incoming_token == self.token_a_id {
                 self.token_a_tariff_ppm
             } else {
                 self.token_b_tariff_ppm
@@ -363,14 +364,14 @@ pub mod tables {
     #[ComplexObject]
     impl Pool {
         pub async fn a_balance(&self) -> Decimal {
-            let amount = TokenSwap::call().get_reserve(self.id, self.token_a);
-            let precision = Tokens::call().getToken(self.token_a).precision;
+            let amount = TokenSwap::call().get_reserve(self.id, self.token_a_id);
+            let precision = Tokens::call().getToken(self.token_a_id).precision;
             Decimal::new(amount, precision)
         }
 
         pub async fn b_balance(&self) -> Decimal {
-            let amount = TokenSwap::call().get_reserve(self.id, self.token_b);
-            let precision = Tokens::call().getToken(self.token_b).precision;
+            let amount = TokenSwap::call().get_reserve(self.id, self.token_b_id);
+            let precision = Tokens::call().getToken(self.token_b_id).precision;
             Decimal::new(amount, precision)
         }
 
@@ -379,11 +380,11 @@ pub mod tables {
         }
 
         pub async fn token_a(&self) -> TokenRecord {
-            Tokens::call().getToken(self.token_a)
+            Tokens::call().getToken(self.token_a_id)
         }
 
         pub async fn token_b(&self) -> TokenRecord {
-            Tokens::call().getToken(self.token_b)
+            Tokens::call().getToken(self.token_b_id)
         }
     }
 }
@@ -394,7 +395,7 @@ pub mod service {
     use psibase::{
         services::{
             nft::NID,
-            tokens::{self, Decimal, Quantity, TID},
+            tokens::{Quantity, TID},
         },
         *,
     };
