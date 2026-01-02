@@ -19,6 +19,12 @@ mod errors;
 use errors::ErrorType;
 use psibase::services::tokens::{Quantity, TID};
 
+use crate::{
+    bindings::{exports::token_swap::plugin::api::Path, tokens::plugin::helpers::u64_to_decimal},
+    find_path::find_path,
+    graphql::fetch_all_pools,
+};
+
 define_trust! {
     descriptions {
         Low => "
@@ -45,8 +51,23 @@ impl Api for TokenSwapPlugin {
         amount: String,
         to_token: u32,
         max_hops: u8,
-    ) -> Result<String, Error> {
-        Ok("f".to_string())
+    ) -> Result<Path, Error> {
+        let pools = fetch_all_pools()?;
+
+        let (pools, return_amount) = find_path(
+            pools.into_iter().map(|pool| pool.into()).collect(),
+            from_token,
+            decimal_to_u64(from_token, &amount)?.into(),
+            to_token,
+            max_hops,
+        );
+
+        let pool_ids = pools.into_iter().map(|pool| pool.id).collect();
+
+        Ok(Path {
+            to_return: u64_to_decimal(to_token, return_amount.value)?,
+            pools: pool_ids,
+        })
     }
 
     fn add_liquidity(

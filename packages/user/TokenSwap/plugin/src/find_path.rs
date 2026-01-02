@@ -8,15 +8,31 @@ use psibase::services::{
     tokens::{Quantity, TID},
 };
 
+use crate::graphql::GraphQLPool;
+
 #[derive(Clone)]
 pub struct Pool {
-    id: u32,
-    token_a: u32,
-    token_b: u32,
-    reserve_a: Quantity,
-    reserve_b: Quantity,
-    token_a_tariff_ppm: u32,
-    token_b_tariff_ppm: u32,
+    pub id: u32,
+    pub token_a: u32,
+    pub token_b: u32,
+    pub reserve_a: Quantity,
+    pub reserve_b: Quantity,
+    pub token_a_tariff_ppm: u32,
+    pub token_b_tariff_ppm: u32,
+}
+
+impl From<GraphQLPool> for Pool {
+    fn from(value: GraphQLPool) -> Self {
+        Self {
+            id: value.id,
+            reserve_a: value.a_balance.quantity,
+            reserve_b: value.b_balance.quantity,
+            token_a: value.token_a_id,
+            token_b: value.token_b_id,
+            token_a_tariff_ppm: value.token_a_tariff_ppm,
+            token_b_tariff_ppm: value.token_b_tariff_ppm,
+        }
+    }
 }
 
 #[derive(Clone)]

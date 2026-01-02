@@ -2,10 +2,7 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use psibase::{
-        services::tokens::{Quantity, TID},
-        *,
-    };
+    use psibase::*;
     use serde::Deserialize;
     use token_swap::tables::{Pool, PoolTable};
 
