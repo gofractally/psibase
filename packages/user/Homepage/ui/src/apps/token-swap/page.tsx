@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@share
 import z from "zod";
 import { useBoolean } from "usehooks-ts";
 import { ConfirmSwapModal } from "./components/swap-modal";
+import { DevModal } from "./components/dev-modal";
 
 
 const AmountField = ({ amount, setAmount, balance, symbol, name, onSelect }: { onSelect: () => void, name?: string, symbol?: string, balance?: string, amount: string, setAmount: (text: string) => void }) => {
@@ -86,6 +87,7 @@ export const SwapPage = () => {
     const isSwapPossible = fromAmount && fromToken && toToken && fromToken.symbol !== toToken.symbol;
 
     const { value: showModal, setValue: setShowModal } = useBoolean()
+    const { value: showDevModal, setValue: setShowDevModal } = useBoolean()
 
     const selectToken = (selection: SelectionType) => {
         setSelectingToken(selection);
@@ -97,6 +99,8 @@ export const SwapPage = () => {
     return (
         <div className="container max-w-lg mx-auto py-12 px-4">
             <ConfirmSwapModal openChange={(e) => { setShowModal(e) }} show={showModal} />
+            <DevModal openChange={(e) => { setShowDevModal(e) }} show={showDevModal} />
+
             <Card className="border-2 shadow-xl">
                 <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
