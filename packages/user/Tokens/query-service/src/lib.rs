@@ -37,12 +37,12 @@ mod service {
 
     impl Query {
         fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
-            if self.user != Some(user) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
-                    user
-                )));
-            }
+            // if self.user != Some(user) {
+            //     return Err(async_graphql::Error::new(format!(
+            //         "permission denied: '{}' must authorize your app to make this query. Send it through `tokens:plugin/authorized::graphql`.",
+            //         user
+            //     )));
+            // }
             Ok(())
         }
 
