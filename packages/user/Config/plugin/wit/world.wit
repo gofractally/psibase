@@ -46,6 +46,14 @@ interface producers {
 interface symbol {
     use host:types/types.{error};
 
+
+    /// Creates a new symbol. An NFT representing ownership of this symbol will be credited to the creator account.
+    ///
+    /// Parameters:
+    /// * `symbol` - The symbol to create
+    /// * `recipient` - The recipient account to receive the ownership NFT
+    create: func(symbol: string, recipient: string) -> result<_, error>;
+
     /// Start selling symbols of a certain length
     sell-length: func(length: u8, initial-price: u64, target: u32, floor-price: u64) -> result<_, error>;
 

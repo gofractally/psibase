@@ -10,10 +10,20 @@ using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
 
-using Temporary = TemporaryTables<PendingRequestTable>;
-
 namespace
 {
+   // This is used to store outgoing HTTP requests before their callbacks are set.
+   struct TempResponseHandlerRow
+   {
+      std::int32_t           socket;
+      SocketType             type;
+      psibase::AccountNumber service;
+   };
+   PSIO_REFLECT(TempResponseHandlerRow, socket, type, service)
+   using TempResponseHandlerTable = Table<TempResponseHandlerRow, &TempResponseHandlerRow::socket>;
+
+   using Temporary = TemporaryTables<PendingRequestTable, TempResponseHandlerTable>;
+
    bool matches(psio::view<const HttpHeader> header, std::string_view h)
    {
       return std::ranges::equal(std::string_view{header.name()}, h, {}, ::tolower, ::tolower);
@@ -152,7 +162,7 @@ extern "C" [[clang::export_name("recv")]] void recv()
          if (row->type == SocketType::http)
          {
             requests.remove(*row);
-            socketAutoClose(socket, true);
+            check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
          }
          else if (row->type == SocketType::handshake)
          {
@@ -169,7 +179,7 @@ extern "C" [[clang::export_name("recv")]] void recv()
             else
             {
                requests.remove(*row);
-               socketAutoClose(socket, true);
+               check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
             }
          }
       }
@@ -225,7 +235,7 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
       {
          requests.remove(*row);
       }
-      socketAutoClose(socket, true);
+      check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
    }
 
    if (row)
@@ -266,8 +276,6 @@ void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
 }
 
 std::int32_t XHttp::sendRequest(HttpRequest                   request,
-                                MethodNumber                  callback,
-                                MethodNumber                  err,
                                 std::optional<TLSInfo>        tls,
                                 std::optional<SocketEndpoint> endpoint)
 {
@@ -278,20 +286,17 @@ std::int32_t XHttp::sendRequest(HttpRequest                   request,
       if (!codeTable.get(sender))
          abortMessage("Only local services can use sendRequest");
    }
-   auto requests = Session{}.open<ResponseHandlerTable>();
+   auto requests = Temporary{}.open<TempResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
    PSIBASE_SUBJECTIVE_TX
    {
-      requests.put({sock, SocketType::http, sender, callback, err});
-      socketAutoClose(sock, false);
+      requests.put({sock, SocketType::http, sender});
    }
    return sock;
 }
 
 std::int32_t XHttp::websocket(HttpRequest                   request,
-                              MethodNumber                  callback,
-                              MethodNumber                  err,
                               std::optional<TLSInfo>        tls,
                               std::optional<SocketEndpoint> endpoint)
 {
@@ -302,13 +307,12 @@ std::int32_t XHttp::websocket(HttpRequest                   request,
       if (!codeTable.get(sender))
          abortMessage("Only local services can use sendRequest");
    }
-   auto requests = Session{}.open<ResponseHandlerTable>();
+   auto requests = Temporary{}.open<TempResponseHandlerTable>();
    auto sock     = socketOpen(request, tls, endpoint);
    check(sock >= 0, "Failed to open socket");
    PSIBASE_SUBJECTIVE_TX
    {
-      requests.put({sock, SocketType::handshake, sender, callback, err});
-      socketAutoClose(sock, false);
+      requests.put({sock, SocketType::handshake, sender});
    }
    return sock;
 }
@@ -335,7 +339,7 @@ void XHttp::autoClose(std::int32_t socket, bool value)
             abortMessage(sender.str() + " cannot send a response on socket " +
                          std::to_string(socket));
       }
-      socketAutoClose(socket, value);
+      check(socketAutoClose(socket, value) == 0, "Failed to change auto-close");
    }
 }
 
@@ -349,7 +353,7 @@ void XHttp::close(std::int32_t socket)
       if (!row || row->service != sender)
          abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
       requests.remove(*row);
-      socketAutoClose(socket, true);
+      check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
    }
 }
 
@@ -414,6 +418,16 @@ void XHttp::setCallback(std::int32_t          socket,
    PSIBASE_SUBJECTIVE_TX
    {
       auto row = requests.get(socket);
+      if (!row)
+      {
+         auto temp = Temporary{}.open<TempResponseHandlerTable>();
+         if (auto tempRow = temp.get(socket))
+         {
+            row = {tempRow->socket, tempRow->type, tempRow->service, callback, err};
+            temp.remove(*tempRow);
+            check(socketAutoClose(socket, false) == 0, "Failed to disable auto-close");
+         }
+      }
       if (!row || row->service != sender)
          abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
       row->method = callback;

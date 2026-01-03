@@ -7,6 +7,7 @@ import { prompt } from "@psibase/common-lib";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
+import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
@@ -28,7 +29,6 @@ import { PasswordVisibilityButton } from "./components/password-visibility-butto
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
-import { b64ToPem, pemToB64, validateB64 } from "./lib/keys";
 
 export const CreatePrompt = () => {
     const [key, setKey] = useState<string>("");
