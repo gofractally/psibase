@@ -1,5 +1,5 @@
 import { ArrowDownUp, ChevronDown, Settings } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useBoolean } from "usehooks-ts";
 // import {
 //     Tabs,
@@ -42,8 +42,10 @@ const AmountField = ({
     symbol,
     name,
     onSelect,
+    label
 }: {
     onSelect: () => void;
+    label: string
     name?: string;
     symbol?: string;
     balance?: string;
@@ -53,7 +55,7 @@ const AmountField = ({
     return (
         <div className="space-y-2">
             <div className="text-muted-foreground flex justify-between text-sm">
-                <Label htmlFor="x">From</Label>
+                <Label htmlFor="x">{label}</Label>
                 <div>
                     {balance && (
                         <Button
@@ -110,16 +112,25 @@ export const SwapPage = () => {
     const { data: pools, error } = usePools();
 
     console.log(pools, "was pools", error);
-    const uniqueTokens =
-        pools
-            ?.flatMap((pool) => [
-                { id: pool.tokenAId, symbol: pool.tokenASymbol },
-                { id: pool.tokenBId, symbol: pool.tokenBSymbol },
-            ])
-            .filter(
-                (item, index, arr) =>
-                    arr.findIndex((i) => i.id == item.id) == index,
-            ) || [];
+    const uniqueTokens = useMemo(() => pools
+        ?.flatMap((pool) => [
+            { id: pool.tokenAId, symbol: pool.tokenASymbol },
+            { id: pool.tokenBId, symbol: pool.tokenBSymbol },
+        ])
+        .filter(
+            (item, index, arr) =>
+                arr.findIndex((i) => i.id == item.id) == index,
+        ) || [], [pools])
+
+
+    useEffect(() => {
+        if (!fromTokenId && !toTokenId && uniqueTokens.length >= 2) {
+            const [first, second] = uniqueTokens;
+            setFromToken(first.id);
+            setToToken(second.id);
+
+        }
+    }, [uniqueTokens, fromTokenId, toTokenId])
 
     const fromToken = uniqueTokens.find((token) => token.id == fromTokenId);
 
@@ -222,6 +233,7 @@ export const SwapPage = () => {
                     {/* From */}
                     <AmountField
                         amount={fromAmount}
+                        label="From"
                         setAmount={(amount) => {
                             setFromAmount(amount);
                         }}
@@ -252,6 +264,7 @@ export const SwapPage = () => {
 
                     {/* To */}
                     <AmountField
+                        label="To"
                         amount={toAmount}
                         setAmount={(amount) => {
                             setToAmount(amount);
