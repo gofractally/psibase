@@ -1,15 +1,17 @@
+import { useEffect, useState } from "react";
+
+import { cn } from "@shared/lib/utils";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useSlippageTolerance } from "../hooks/use-slippage-tolerance";
-import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import { cn } from "@shared/lib/utils";
-import { useState, useEffect } from "react";
+
+import { useSlippageTolerance } from "../hooks/use-slippage-tolerance";
 
 interface TradeSettingsModalProps {
     show: boolean;
@@ -24,24 +26,28 @@ export const TradeSettingsModal = ({
 }: TradeSettingsModalProps) => {
     const [slippageTolerance, setSlippageTolerance] = useSlippageTolerance();
     const [customValue, setCustomValue] = useState<string>(
-        PRESET_SLIPPAGES.includes(slippageTolerance) ? "" : slippageTolerance.toString()
+        PRESET_SLIPPAGES.includes(slippageTolerance)
+            ? ""
+            : slippageTolerance.toString(),
     );
     const [activePreset, setActivePreset] = useState<number | "custom">(
         PRESET_SLIPPAGES.includes(slippageTolerance)
             ? slippageTolerance
-            : "custom"
+            : "custom",
     );
 
     // Sync with hook when modal opens
     useEffect(() => {
         if (show) {
             setCustomValue(
-                PRESET_SLIPPAGES.includes(slippageTolerance) ? "" : slippageTolerance.toString()
+                PRESET_SLIPPAGES.includes(slippageTolerance)
+                    ? ""
+                    : slippageTolerance.toString(),
             );
             setActivePreset(
                 PRESET_SLIPPAGES.includes(slippageTolerance)
                     ? slippageTolerance
-                    : "custom"
+                    : "custom",
             );
         }
     }, [show, slippageTolerance]);
@@ -81,11 +87,16 @@ export const TradeSettingsModal = ({
                             {PRESET_SLIPPAGES.map((preset) => (
                                 <Button
                                     key={preset}
-                                    variant={activePreset === preset ? "default" : "outline"}
+                                    variant={
+                                        activePreset === preset
+                                            ? "default"
+                                            : "outline"
+                                    }
                                     size="sm"
                                     className={cn(
                                         "flex-1",
-                                        activePreset === preset && "bg-primary text-primary-foreground"
+                                        activePreset === preset &&
+                                            "bg-primary text-primary-foreground",
                                     )}
                                     onClick={() => handlePresetClick(preset)}
                                 >
@@ -102,11 +113,14 @@ export const TradeSettingsModal = ({
                                 placeholder="Custom"
                                 className="max-w-[120px]"
                             />
-                            <span className="text-sm text-muted-foreground">%</span>
+                            <span className="text-muted-foreground text-sm">
+                                %
+                            </span>
                         </div>
 
-                        <p className="text-xs text-muted-foreground">
-                            Your transaction may revert if price changes unfavorably by more than this percentage.
+                        <p className="text-muted-foreground text-xs">
+                            Your transaction may revert if price changes
+                            unfavorably by more than this percentage.
                         </p>
                     </div>
 
