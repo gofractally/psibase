@@ -5,7 +5,6 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/shadcn/ui/select";
 import { Separator } from "@shared/shadcn/ui/separator";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@shared/shadcn/ui/tooltip";
@@ -20,6 +19,10 @@ import z from "zod";
 import { useBoolean } from "usehooks-ts";
 import { ConfirmSwapModal } from "./components/swap-modal";
 import { DevModal } from "./components/dev-modal";
+import { usePools } from "./hooks/use-pools";
+import { PickTokenModal } from "./components/pick-token-modal";
+import { TradeSettingsModal } from "./components/trade-settings-modal";
+import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
 
 
 const AmountField = ({ amount, setAmount, balance, symbol, name, onSelect }: { onSelect: () => void, name?: string, symbol?: string, balance?: string, amount: string, setAmount: (text: string) => void }) => {
@@ -57,49 +60,67 @@ const AmountField = ({ amount, setAmount, balance, symbol, name, onSelect }: { o
     </div >
 }
 
-const popularTokens = [
-    { symbol: "ETH", name: "Ethereum", icon: "⟨ETH⟩" },
-    { symbol: "USDC", name: "USD Coin", icon: "⟨USDC⟩" },
-    { symbol: "USDT", name: "Tether", icon: "⟨USDT⟩" },
-    { symbol: "DAI", name: "Dai", icon: "⟨DAI⟩" },
-    { symbol: "WBTC", name: "Wrapped BTC", icon: "⟨WBTC⟩" },
-];
-
 const zSelectionType = z.enum(['From', 'To'])
 type SelectionType = z.infer<typeof zSelectionType>;
 
 export const SwapPage = () => {
     const [fromAmount, setFromAmount] = useState("");
     const [toAmount, setToAmount] = useState("");
-    const [fromToken, setFromToken] = useState(popularTokens[0]);
-    const [toToken, setToToken] = useState(popularTokens[1]);
-    const [slippage, setSlippage] = useState("0.5");
+    const [fromTokenId, setFromToken] = useState<number>();
+    const [toTokenId, setToToken] = useState<number>();
+    const [slippage] = useSlippageTolerance();
+
+
+    const { data: pools, error } = usePools();
+
+    console.log(pools, 'was pools', error)
+    const uniqueTokens = pools?.flatMap(pool => [{ id: pool.tokenAId, symbol: pool.tokenASymbol }, { id: pool.tokenBId, symbol: pool.tokenBSymbol }]).filter((item, index, arr) => arr.findIndex(i => i.id == item.id) == index) || [];
+
+
+    const fromToken = uniqueTokens.find(token => token.id == fromTokenId);
+
+    const toToken = uniqueTokens.find(token => token.id == toTokenId);
 
     const [selectingToken, setSelectingToken] = useState<z.infer<typeof zSelectionType>>()
 
     const switchTokens = () => {
-        setFromToken(toToken);
-        setToToken(fromToken);
+        setFromToken(toTokenId);
+        setToToken(fromTokenId);
         setFromAmount(toAmount);
         setToAmount(fromAmount);
     };
 
-    const isSwapPossible = fromAmount && fromToken && toToken && fromToken.symbol !== toToken.symbol;
+    const isSwapPossible = true;
 
-    const { value: showModal, setValue: setShowModal } = useBoolean()
+    const { value: showPickTokenModal, setValue: setPickTokenModal } = useBoolean()
     const { value: showDevModal, setValue: setShowDevModal } = useBoolean()
+    const { value: showSwapModal, setValue: setShowSwapModal } = useBoolean()
+    const { value: showSettingsModal, setValue: setShowSettingsModal } = useBoolean()
+
+
+
 
     const selectToken = (selection: SelectionType) => {
         setSelectingToken(selection);
-        setShowModal(true)
+        setPickTokenModal(true)
+    }
+    const selectedToken = (id: number) => {
+        if (selectingToken == 'From') {
+            setFromToken(id)
+        } else {
+            setToToken(id)
+        }
     }
 
-    console.log({ selectingToken, setSlippage })
+    console.log({ selectingToken, })
 
     return (
         <div className="container max-w-lg mx-auto py-12 px-4">
-            <ConfirmSwapModal openChange={(e) => { setShowModal(e) }} show={showModal} />
+            <ConfirmSwapModal openChange={(e) => { setShowSwapModal(e) }} show={showSwapModal} />
             <DevModal openChange={(e) => { setShowDevModal(e) }} show={showDevModal} />
+            <TradeSettingsModal openChange={(e) => { setShowSettingsModal(e) }} show={showSettingsModal} />
+
+            <PickTokenModal onSelectToken={(id) => selectedToken(id)} tokens={uniqueTokens || []} openChange={(e) => { setPickTokenModal(e) }} show={showPickTokenModal} />
 
             <Card className="border-2 shadow-xl">
                 <CardHeader className="pb-4">
@@ -108,7 +129,7 @@ export const SwapPage = () => {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon">
+                                    <Button onClick={() => { setShowSettingsModal(true) }} variant="ghost" size="icon">
                                         <Settings className="h-5 w-5" />
                                     </Button>
                                 </TooltipTrigger>
@@ -123,7 +144,7 @@ export const SwapPage = () => {
 
                 <CardContent className="space-y-6">
                     {/* From */}
-                    <AmountField amount={fromAmount} setAmount={amount => { setFromAmount(amount) }} onSelect={() => { selectToken(zSelectionType.Enum.From) }} balance="1.1234" name="Bitcoin" symbol="BTC" />
+                    <AmountField amount={fromAmount} setAmount={amount => { setFromAmount(amount) }} onSelect={() => { selectToken(zSelectionType.Enum.From) }} balance="1.1234" name="" symbol={fromToken?.symbol || fromToken?.id.toString() || ''} />
 
                     {/* Switch arrow */}
                     <div className="relative flex justify-center">
@@ -141,7 +162,9 @@ export const SwapPage = () => {
                     </div>
 
                     {/* To */}
-                    <div className="space-y-2">
+                    <AmountField amount={toAmount} setAmount={amount => { setToAmount(amount) }} onSelect={() => { selectToken(zSelectionType.Enum.To) }} balance="1.1234" name="" symbol={toToken?.symbol || toToken?.id.toString() || ''} />
+
+                    {/* <div className="space-y-2">
                         <div className="flex justify-between text-sm text-muted-foreground">
                             <Label htmlFor="to">To</Label>
                             <span>Balance: 0.00 {toToken.symbol}</span>
@@ -183,14 +206,14 @@ export const SwapPage = () => {
                                 </Select>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
                     {/* Price info */}
                     {isSwapPossible && (
                         <div className="text-sm space-y-1 text-muted-foreground">
                             <div className="flex justify-between">
                                 <span>Estimated output</span>
-                                <span>~{Number(fromAmount) * 1800} {toToken.symbol}</span>
+                                <span>~{Number(fromAmount) * 1800} {toTokenId}</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Price impact</span>
@@ -210,12 +233,12 @@ export const SwapPage = () => {
                         className="w-full h-14 text-lg font-semibold"
                         disabled={!isSwapPossible}
                         onClick={() => {
-                            setShowModal(true)
+                            setPickTokenModal(true)
                         }}
                     >
                         {!fromAmount
                             ? "Enter amount"
-                            : fromToken.symbol === toToken.symbol
+                            : fromTokenId === toTokenId
                                 ? "Select different tokens"
                                 : "Swap"}
                     </Button>

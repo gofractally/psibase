@@ -383,8 +383,20 @@ pub mod tables {
             Tokens::call().getToken(self.token_a_id)
         }
 
+        pub async fn token_a_symbol(&self) -> Option<AccountNumber> {
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.id)
+                .map(|s| s.symbolId)
+        }
+
         pub async fn token_b(&self) -> TokenRecord {
             Tokens::call().getToken(self.token_b_id)
+        }
+
+        pub async fn token_b_symbol(&self) -> Option<AccountNumber> {
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.id)
+                .map(|s| s.symbolId)
         }
     }
 }

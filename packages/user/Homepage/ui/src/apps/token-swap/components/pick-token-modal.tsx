@@ -1,0 +1,69 @@
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
+import { cn } from "@shared/lib/utils";
+
+interface Token {
+    id: number;
+    symbol: string | null;
+}
+
+interface PickTokenModalProps {
+    show: boolean;
+    openChange: (open: boolean) => void;
+    onSelectToken: (id: number) => void;
+    tokens: Token[];
+}
+
+export const PickTokenModal = ({
+    show,
+    openChange,
+    onSelectToken,
+    tokens,
+}: PickTokenModalProps) => {
+    return (
+        <Dialog open={show} onOpenChange={openChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Select Token</DialogTitle>
+                </DialogHeader>
+
+                <div className="max-h-[60vh] overflow-y-auto -mx-1 px-1 py-2">
+                    {tokens.length === 0 ? (
+                        <div className="py-6 text-center text-muted-foreground">
+                            No tokens available
+                        </div>
+                    ) : (
+                        <div className="space-y-1">
+                            {tokens.map((token) => (
+                                <button
+                                    key={token.id}
+                                    onClick={() => {
+                                        onSelectToken(token.id);
+                                        openChange(false); // optional: close after selection
+                                    }}
+                                    className={cn(
+                                        "w-full flex items-center justify-between rounded-md px-4 py-3 text-left",
+                                        "hover:bg-accent hover:text-accent-foreground",
+                                        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                                        "transition-colors"
+                                    )}
+                                >
+                                    <div className="font-medium">
+                                        {token.symbol ?? "Unknown"}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground font-mono">
+                                        {token.id}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
