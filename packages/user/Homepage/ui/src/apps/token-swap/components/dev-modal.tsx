@@ -7,6 +7,14 @@ import {
     DialogDescription
 } from "@shared/shadcn/ui/dialog";
 
+import {
+    tokenSwap,
+    tokens,
+    usePluginFunctionCallMutation
+} from "@shared/lib/plugins";
+import z from "zod";
+
+import { Button } from "@shared/shadcn/ui/button"
 
 
 export const DevModal = ({
@@ -18,6 +26,17 @@ export const DevModal = ({
 }) => {
 
 
+    const { mutateAsync: createPool } = usePluginFunctionCallMutation(tokenSwap.api.newPool, {});
+    const { mutateAsync: createToken, isPending: isCreatingToken } = usePluginFunctionCallMutation(tokens.issuer.create, {});
+    const { mutateAsync: mintToken, isPending: isMintingToken } = usePluginFunctionCallMutation(tokens.issuer.mint, {});
+
+
+
+    const createTwoTokens = async () => {
+        await createToken([4, '1000']);
+        await createToken([4, '1000'])
+    }
+
 
 
 
@@ -28,9 +47,22 @@ export const DevModal = ({
                 <DialogHeader>
                     <DialogTitle>Dev tools</DialogTitle>
                     <DialogDescription>
-                        Make changes to your profile here. Click save when you&apos;re
-                        done.
-                    </DialogDescription>                </DialogHeader>
+                        Only for development purposes.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-2">
+                    <Button onClick={() => createTwoTokens()} disabled={isCreatingToken}>Create two tokens</Button>
+                    <Button onClick={() => {
+                        mintToken([z.number({ coerce: true }).parse(window.prompt('TokenID?')), '1000', ''])
+                    }} disabled={isMintingToken}>Mint</Button>
+
+                    <Button onClick={() => {
+                        const tokenA = z.number({ coerce: true }).parse(window.prompt('Token A ID?'));
+                        const tokenB = z.number({ coerce: true }).parse(window.prompt('Token B ID?'))
+                        createPool([tokenA, tokenB, '300', '300'])
+                    }} disabled={isMintingToken}>Create pool</Button>
+
+                </div>
             </DialogContent>
         </Dialog>
     );
