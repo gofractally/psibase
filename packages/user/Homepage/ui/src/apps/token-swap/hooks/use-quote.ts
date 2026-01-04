@@ -1,4 +1,4 @@
-import { usePluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
+import { usePluginFunctionQuery } from "@shared/lib/plugins";
 import { tokenSwap } from "@shared/lib/plugins";
 
 export const useQuote = (
