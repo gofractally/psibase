@@ -1,4 +1,4 @@
-import { PluginInterface } from "@shared/hooks/use-plugin-function-mutation";
+import { PluginInterface } from "@shared/hooks/plugin-function";
 import { Account } from "@shared/lib/schemas/account";
 
 type TID = number;

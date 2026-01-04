@@ -34,6 +34,8 @@ import { ConfirmSwapModal } from "./components/swap-modal";
 import { TradeSettingsModal } from "./components/trade-settings-modal";
 import { usePools } from "./hooks/use-pools";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
+import { useQuote } from "./hooks/use-quote";
+import { useSwap } from "./hooks/use-swap";
 
 const AmountField = ({
     amount,
@@ -42,8 +44,10 @@ const AmountField = ({
     symbol,
     name,
     onSelect,
-    label
+    label,
+    disabled
 }: {
+    disabled?: boolean
     onSelect: () => void;
     label: string
     name?: string;
@@ -71,6 +75,7 @@ const AmountField = ({
 
             <div className="relative">
                 <Input
+                    disabled={disabled}
                     id="x"
                     type="text"
                     placeholder="0.0"
@@ -111,6 +116,8 @@ export const SwapPage = () => {
 
     const { data: pools, error } = usePools();
 
+
+    const { mutateAsync: swap, isPending: isSwapping } = useSwap();
     console.log(pools, "was pools", error);
     const uniqueTokens = useMemo(() => pools
         ?.flatMap((pool) => [
@@ -135,6 +142,17 @@ export const SwapPage = () => {
     const fromToken = uniqueTokens.find((token) => token.id == fromTokenId);
 
     const toToken = uniqueTokens.find((token) => token.id == toTokenId);
+
+    const { data: quotedAmount } = useQuote(fromTokenId, fromAmount, toTokenId)
+
+    console.log({ quotedAmount })
+
+    useEffect(() => {
+        if (quotedAmount) {
+            setToAmount(quotedAmount.toReturn)
+        }
+    }, [quotedAmount])
+
 
     const [selectingToken, setSelectingToken] =
         useState<z.infer<typeof zSelectionType>>();
@@ -168,6 +186,8 @@ export const SwapPage = () => {
     };
 
     console.log({ selectingToken });
+
+    const minimumReturn = Number(toAmount) * (1 - slippage);
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12">
@@ -264,6 +284,7 @@ export const SwapPage = () => {
 
                     {/* To */}
                     <AmountField
+                        disabled
                         label="To"
                         amount={toAmount}
                         setAmount={(amount) => {
@@ -325,9 +346,9 @@ export const SwapPage = () => {
                     {isSwapPossible && (
                         <div className="text-muted-foreground space-y-1 text-sm">
                             <div className="flex justify-between">
-                                <span>Estimated output</span>
+                                <span>Minimum output</span>
                                 <span>
-                                    ~{Number(fromAmount) * 1800} {toTokenId}
+                                    ~{minimumReturn.toFixed(4)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
@@ -336,7 +357,7 @@ export const SwapPage = () => {
                             </div>
                             <div className="flex justify-between">
                                 <span>Slippage tolerance</span>
-                                <span>{slippage}%</span>
+                                <span>{(slippage / 100).toFixed(2)}%</span>
                             </div>
                         </div>
                     )}
@@ -346,9 +367,10 @@ export const SwapPage = () => {
                     <Button
                         size="lg"
                         className="h-14 w-full text-lg font-semibold"
-                        disabled={!isSwapPossible}
+                        disabled={!isSwapPossible || isSwapping}
                         onClick={() => {
                             setPickTokenModal(true);
+                            swap([Array.from(quotedAmount!.pools).map(String), fromTokenId!, fromAmount, '0.001'])
                         }}
                     >
                         {!fromAmount

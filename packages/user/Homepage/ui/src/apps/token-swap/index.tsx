@@ -1,5 +1,5 @@
 import { AppConfigType } from "@/configuredApps";
-import { ArrowRightLeft, BookUser } from "lucide-react";
+import { ArrowRightLeft } from "lucide-react";
 
 import { zAccount } from "@/lib/zod/Account";
 

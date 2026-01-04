@@ -53,7 +53,7 @@ export const TradeSettingsModal = ({
     }, [show, slippageTolerance]);
 
     const handlePresetClick = (value: number) => {
-        setSlippageTolerance(value);
+        setSlippageTolerance(value / 100);
         setActivePreset(value);
         setCustomValue("");
     };
@@ -96,7 +96,7 @@ export const TradeSettingsModal = ({
                                     className={cn(
                                         "flex-1",
                                         activePreset === preset &&
-                                            "bg-primary text-primary-foreground",
+                                        "bg-primary text-primary-foreground",
                                     )}
                                     onClick={() => handlePresetClick(preset)}
                                 >

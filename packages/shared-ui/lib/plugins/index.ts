@@ -1,4 +1,4 @@
-import { usePluginFunctionMutation } from "@shared/hooks/use-plugin-function-mutation";
+import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plugin-function-mutation";
 
 import { Plugin as TokenSwap } from "./token-swap";
 import { Plugin as Tokens } from "./tokens";

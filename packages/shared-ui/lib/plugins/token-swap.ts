@@ -1,4 +1,4 @@
-import { PluginInterface } from "@shared/hooks/use-plugin-function-mutation";
+import { PluginInterface } from "@shared/hooks/plugin-function/index";
 import { Account } from "@shared/lib/schemas/account";
 
 type TID = number;
@@ -9,9 +9,11 @@ class Api extends PluginInterface {
 
     get getAmount() {
         return this._call<
-            [fromToken: TID, amount: Decimal, toToken: TID, maxHops: number]
+            [fromToken: TID, amount: Decimal, toToken: TID, maxHops: number],
+            { pools: Uint32Array[]; toReturn: string }
         >("getAmount");
     }
+
     get newPool() {
         return this._call<
             [tokenA: TID, tokenB: TID, amountA: Decimal, amountB: Decimal]
