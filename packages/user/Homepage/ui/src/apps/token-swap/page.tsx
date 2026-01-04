@@ -298,50 +298,6 @@ export const SwapPage = () => {
                         symbol={toToken?.symbol || toToken?.id.toString() || ""}
                     />
 
-                    {/* <div className="space-y-2">
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                            <Label htmlFor="to">To</Label>
-                            <span>Balance: 0.00 {toToken.symbol}</span>
-                        </div>
-
-                        <div className="relative">
-                            <Input
-                                id="to"
-                                type="text"
-                                placeholder="0.0"
-                                value={toAmount}
-                                readOnly
-                                className="pr-28 h-16 text-lg font-medium bg-muted/30"
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                <Select
-                                    value={toToken.symbol}
-                                    onValueChange={(val) => setToToken(popularTokens.find(t => t.symbol === val)!)}
-                                >
-                                    <SelectTrigger className="w-28 h-10 rounded-full border bg-muted/50">
-                                        <SelectValue placeholder="Select token">
-                                            <div className="flex items-center gap-2">
-                                                <span>{toToken.icon}</span>
-                                                <span className="font-semibold">{toToken.symbol}</span>
-                                            </div>
-                                        </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {popularTokens.map((token) => (
-                                            <SelectItem key={token.symbol} value={token.symbol}>
-                                                <div className="flex items-center gap-2">
-                                                    <span>{token.icon}</span>
-                                                    <span>{token.symbol}</span>
-                                                    <span className="text-xs text-muted-foreground ml-2">{token.name}</span>
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    </div> */}
-
                     {/* Price info */}
                     {isSwapPossible && (
                         <div className="text-muted-foreground space-y-1 text-sm">
