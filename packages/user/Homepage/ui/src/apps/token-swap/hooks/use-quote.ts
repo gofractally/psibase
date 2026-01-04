@@ -9,7 +9,7 @@ export const useQuote = (
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
         tokenSwap.api.getAmount,
-        [fromToken!, amount!, toToken!, 4],
+        [fromToken!, amount!, toToken!, 3],
         { enabled: !!(fromToken && amount && toToken && isAmountValid) },
     );
 };
