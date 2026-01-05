@@ -1,0 +1,26 @@
+[package]
+name = "prem-accounts-pkg"             # Crate name
+description = "An example application"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "PremAccounts"
+services = ["prem-accounts"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.22.0"
+Sites = "0.22.0"
+Permissions = "0.22.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+prem-accounts = { path = "service", version = "0.22.0" }
+r-prem-accts = { path = "query-service", version = "0.22.0" }
+prem-accounts-plugin = { path = "plugin", version = "0.22.0" }
