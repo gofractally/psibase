@@ -44,7 +44,7 @@ pub mod tables;
 /// service to manage server specs, network variables, and billing parameters, as needed.
 #[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
 mod service {
-    use crate::rpc::event_types;
+    use crate::rpc::resource_events;
     use crate::tables::tables::*;
     use psibase::services::events;
     use psibase::services::{
@@ -168,22 +168,9 @@ mod service {
         Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
         Tokens::call().toSub(res, for_user.to_string(), amount);
 
-        if buyer == for_user {
-            Wrapper::emit()
-                .history()
-                .resources(buyer, event_types::BOUGHT, amount.value);
-        } else {
-            Wrapper::emit()
-                .history()
-                .resources(for_user, event_types::RECEIVED, amount.value);
-
-            Wrapper::emit().history().subsidized(
-                buyer,
-                for_user,
-                amount.value,
-                memo.unwrap_or("".into()),
-            );
-        };
+        Wrapper::emit()
+            .history()
+            .bought(buyer, for_user, amount.value, memo.unwrap_or("".into()));
     }
 
     /// Used to acquire resource tokens for the sender
@@ -349,7 +336,7 @@ mod service {
 
         Wrapper::emit()
             .history()
-            .resources(user, event_types::CONSUMED_NET, cost);
+            .consumed(user, resource_events::CONSUMED_NET, amount_bytes);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -372,7 +359,7 @@ mod service {
 
         Wrapper::emit()
             .history()
-            .resources(user, event_types::CONSUMED_CPU, cost);
+            .consumed(user, resource_events::CONSUMED_CPU, amount_ns);
     }
 
     #[action]
@@ -409,11 +396,17 @@ mod service {
         Some(CpuPricing::get_cpu_limit(account))
     }
 
-    #[event(history)]
-    fn resources(actor: AccountNumber, action: u8, amount: u64) {}
+    #[action]
+    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
+        None.or_else(|| serve_graphql(&request, crate::rpc::Query))
+            .or_else(|| serve_graphiql(&request))
+    }
 
     #[event(history)]
-    fn subsidized(
+    fn consumed(account: AccountNumber, resource_event: u8, amount: u64) {}
+
+    #[event(history)]
+    fn bought(
         purchaser: AccountNumber,
         recipient: AccountNumber,
         amount: u64,
@@ -424,11 +417,9 @@ mod service {
     #[event(history)]
     fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 
-    #[action]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_graphql(&request, crate::rpc::Query))
-            .or_else(|| serve_graphiql(&request))
-    }
+    // TODO: Ideally, this is emitted once per transaction with the total amount billed by the transaction
+    #[event(history)]
+    fn billed(account: AccountNumber, amount: u64) {}
 }
 
 #[cfg(test)]

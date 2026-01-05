@@ -1,7 +1,7 @@
 use crate::tables::tables::*;
 use psibase::services::{
     nft::Wrapper as Nft,
-    tokens::{TokenFlags, Wrapper as Tokens},
+    tokens::{TokenFlags, TokenRecord, Wrapper as Tokens},
 };
 use psibase::*;
 
@@ -56,5 +56,10 @@ impl BillingConfig {
         let config = check_some(table.get_index_pk().get(&()), "Billing not yet initialized");
         check(config.enabled, "Billing not enabled");
         config
+    }
+
+    pub fn get_sys_token() -> TokenRecord {
+        let config = Self::get_assert();
+        Tokens::call().getToken(config.sys)
     }
 }
