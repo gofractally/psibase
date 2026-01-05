@@ -10607,6 +10607,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"prem-accounts@workspace:user/PremAccounts/ui":
+  version: 0.0.0-use.local
+  resolution: "prem-accounts@workspace:user/PremAccounts/ui"
+  dependencies:
+    "@tanstack/react-query": "npm:^5.90.6"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    eslint: "npm:^9.15.0"
+    lucide-react: "npm:^0.475.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    typescript: "npm:^5.7.3"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.24.2"
+  languageName: unknown
+  linkType: soft
+
 "prettier-linter-helpers@npm:^1.0.0":
   version: 1.0.1
   resolution: "prettier-linter-helpers@npm:1.0.1"
