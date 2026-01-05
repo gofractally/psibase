@@ -148,7 +148,6 @@ export const SwapPage = () => {
             const [first, second] = uniqueTokens;
             setFromToken(first.id);
             setToToken(second.id);
-
         }
     }, [uniqueTokens, fromTokenId, toTokenId])
 
@@ -341,11 +340,11 @@ export const SwapPage = () => {
                             triggerSwap()
                         }}
                     >
-                        {!fromAmount
-                            ? "Enter amount"
-                            : sameTokensSelected
+                        {fromAmount
+                            ? sameTokensSelected
                                 ? "Select different tokens"
-                                : "Swap"}
+                                : "Swap"
+                            : "Enter amount"}
                     </Button>
                 </CardFooter>
             </Card>
