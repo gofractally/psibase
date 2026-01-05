@@ -36,6 +36,8 @@ import { usePools } from "./hooks/use-pools";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
 import { useQuote } from "./hooks/use-quote";
 import { useSwap } from "./hooks/use-swap";
+import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 const AmountField = ({
     amount,
@@ -67,7 +69,7 @@ const AmountField = ({
                             variant={"link"}
                             onClick={() => setAmount(balance)}
                         >
-                            Balance: {balance} {symbol}
+                            Balance: {balance}
                         </Button>
                     )}
                 </div>
@@ -114,10 +116,21 @@ export const SwapPage = () => {
     const [toTokenId, setToToken] = useState<number>();
     const [slippage] = useSlippageTolerance();
 
-    const { data: pools, error } = usePools();
+    const { data: pools, error, refetch } = usePools();
+
+
+    const { data: currentUser } = useCurrentUser()
+    const { data: tokenBalances } = useUserTokenBalances(currentUser)
 
 
     const { mutateAsync: swap, isPending: isSwapping } = useSwap();
+
+    const triggerSwap = async () => {
+
+        await swap([Array.from(quotedAmount!.pools).map(String), fromTokenId!, fromAmount, '0.001'])
+        refetch()
+    }
+
     console.log(pools, "was pools", error);
     const uniqueTokens = useMemo(() => pools
         ?.flatMap((pool) => [
@@ -185,9 +198,7 @@ export const SwapPage = () => {
         }
     };
 
-    console.log({ selectingToken });
-
-    const minimumReturn = Number(toAmount) * (1 - slippage);
+    const minimumReturn = Number(toAmount) * (1 - slippage / 100);
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12">
@@ -260,7 +271,7 @@ export const SwapPage = () => {
                         onSelect={() => {
                             selectToken(zSelectionType.Enum.From);
                         }}
-                        balance="1.1234"
+                        balance={tokenBalances?.find(balance => balance.id == fromTokenId)?.balance?.format({ includeLabel: false })}
                         name=""
                         symbol={
                             fromToken?.symbol || fromToken?.id.toString() || ""
@@ -293,7 +304,7 @@ export const SwapPage = () => {
                         onSelect={() => {
                             selectToken(zSelectionType.Enum.To);
                         }}
-                        balance="1.1234"
+                        balance={tokenBalances?.find(balance => balance.id == toTokenId)?.balance?.format({ includeLabel: false })}
                         name=""
                         symbol={toToken?.symbol || toToken?.id.toString() || ""}
                     />
@@ -313,7 +324,7 @@ export const SwapPage = () => {
                             </div>
                             <div className="flex justify-between">
                                 <span>Slippage tolerance</span>
-                                <span>{(slippage / 100).toFixed(2)}%</span>
+                                <span>{slippage}%</span>
                             </div>
                         </div>
                     )}
@@ -325,8 +336,7 @@ export const SwapPage = () => {
                         className="h-14 w-full text-lg font-semibold"
                         disabled={!isSwapPossible || isSwapping}
                         onClick={() => {
-                            setPickTokenModal(true);
-                            swap([Array.from(quotedAmount!.pools).map(String), fromTokenId!, fromAmount, '0.001'])
+                            triggerSwap()
                         }}
                     >
                         {!fromAmount

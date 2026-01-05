@@ -3,7 +3,7 @@ import z from "zod";
 import {
     tokenSwap,
     tokens,
-    usePluginFunctionCallMutation,
+    usePluginFunctionMutation,
 } from "@shared/lib/plugins";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -21,18 +21,18 @@ export const DevModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { mutateAsync: createPool } = usePluginFunctionCallMutation(
+    const { mutateAsync: createPool } = usePluginFunctionMutation(
         tokenSwap.api.newPool,
         {},
     );
     const { mutateAsync: createToken, isPending: isCreatingToken } =
-        usePluginFunctionCallMutation(tokens.issuer.create, {});
+        usePluginFunctionMutation(tokens.issuer.create, {});
     const { mutateAsync: mintToken, isPending: isMintingToken } =
-        usePluginFunctionCallMutation(tokens.issuer.mint, {});
+        usePluginFunctionMutation(tokens.issuer.mint, {});
 
     const createTwoTokens = async () => {
-        await createToken([4, "1000"]);
-        await createToken([4, "1000"]);
+        await createToken([4, "1000000000"]);
+        await createToken([4, "1000000000"]);
     };
 
     return (
@@ -56,8 +56,10 @@ export const DevModal = ({
                             mintToken([
                                 z
                                     .number({ coerce: true })
-                                    .parse(window.prompt("TokenID?")),
-                                "1000",
+                                    .parse(window.prompt("Token ID?")),
+                                z
+                                    .string()
+                                    .parse(window.prompt("Amount?")),
                                 "",
                             ]);
                         }}
@@ -71,10 +73,17 @@ export const DevModal = ({
                             const tokenA = z
                                 .number({ coerce: true })
                                 .parse(window.prompt("Token A ID?"));
+                            const tokenAAmount = z
+                                .string()
+                                .parse(window.prompt("Token A amount?"));
                             const tokenB = z
                                 .number({ coerce: true })
                                 .parse(window.prompt("Token B ID?"));
-                            createPool([tokenA, tokenB, "300", "300"]);
+
+                            const tokenBAmount = z
+                                .string()
+                                .parse(window.prompt("Token B amount?"))
+                            createPool([tokenA, tokenB, tokenAAmount, tokenBAmount]);
                         }}
                         disabled={isMintingToken}
                     >
