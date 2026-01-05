@@ -28,7 +28,7 @@ define_trust! {
     }
     functions {
         Low => [get_prices],
-        High => [buy],
+        High => [buy, claim],
     }
 }
 
@@ -63,9 +63,8 @@ struct GetPricesData {
 }
 
 impl Queries for PremAccountsPlugin {
+    // TODO: Should this query also be an action for srv-to-srv calls?
     fn get_prices() -> Result<Vec<u64>, Error> {
-        trust::assert_authorized(trust::FunctionName::get_prices)?;
-
         let graphql_str = "query { getPrices }";
 
         let response = serde_json::from_str::<GetPricesResponse>(
