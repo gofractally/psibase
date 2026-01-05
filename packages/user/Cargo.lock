@@ -2585,6 +2585,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-token-swap"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "token-swap",
+]
+
+[[package]]
 name = "r-tokens"
 version = "0.22.0"
 dependencies = [
@@ -3388,6 +3400,40 @@ dependencies = [
  "serde",
  "serde_json",
  "token-stream",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "token-swap"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+ "token-swap-pkg",
+]
+
+[[package]]
+name = "token-swap-pkg"
+version = "0.22.0"
+dependencies = [
+ "r-token-swap",
+ "token-swap",
+ "token-swap-plugin",
+]
+
+[[package]]
+name = "token-swap-plugin"
+version = "0.22.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "token-swap",
  "wit-bindgen-rt",
 ]
 

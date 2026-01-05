@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Book, Coins, Mail, MoveRight } from "lucide-react";
+import { ArrowRightLeft, Book, Coins, Mail, MoveRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -28,6 +28,12 @@ const apps: App[] = [
         description: "Send tokens and manage balances.",
         icon: <Coins className="h-6 w-6" />,
         service: zAccount.parse("tokens"),
+    },
+    {
+        title: "Swap",
+        description: "DeFi trading pools.",
+        icon: <ArrowRightLeft className="h-6 w-6" />,
+        service: zAccount.parse("token-swap"),
     },
     {
         title: "Chain mail",
