@@ -105,6 +105,33 @@ mod service {
         BillingConfig::get().map(|c| c.fee_receiver)
     }
 
+    /// Set the virtual server specs
+    ///
+    /// These are effectively the minimum specs that any node that participates
+    /// in the network must have available.
+    #[action]
+    fn set_specs(specs: ServerSpecs) {
+        check(get_sender() == get_service(), "Unauthorized");
+
+        ServerSpecs::set(&specs);
+        NetworkSpecs::set_from(&specs);
+    }
+
+    /// These variables change how the network specs are derived from the server
+    /// specs.
+    ///
+    /// The "network specs" are the specifications of the server as perceived by
+    /// a user of the network, which is not the same as the specs needed by each
+    /// of the actual nodes. Only a subset of the nodes resources are available for
+    /// use by users of the network to account for other overhead and system
+    /// functionality.
+    #[action]
+    fn set_network_variables(variables: NetworkVariables) {
+        check(get_sender() == get_service(), "Unauthorized");
+
+        NetworkVariables::set(&variables);
+    }
+
     /// Enable or disable the billing system
     ///
     /// If billing is disabled, resource consumption will still be tracked, but the resources will
@@ -200,33 +227,6 @@ mod service {
 
             Tokens::call().fromSub(res, user_str, amt);
         }
-    }
-
-    /// Set the virtual server specs
-    ///
-    /// These are effectively the minimum specs that any node that participates
-    /// in the network must have available.
-    #[action]
-    fn set_specs(specs: ServerSpecs) {
-        check(get_sender() == get_service(), "Unauthorized");
-
-        ServerSpecs::set(&specs);
-        NetworkSpecs::set_from(&specs);
-    }
-
-    /// These variables change how the network specs are derived from the server
-    /// specs.
-    ///
-    /// The "network specs" are the specifications of the server as perceived by
-    /// a user of the network, which is not the same as the specs needed by each
-    /// of the actual nodes. Only a subset of the nodes resources are available for
-    /// use by users of the network to account for other overhead and system
-    /// functionality.
-    #[action]
-    fn set_network_variables(variables: NetworkVariables) {
-        check(get_sender() == get_service(), "Unauthorized");
-
-        NetworkVariables::set(&variables);
     }
 
     /// Set the network bandwidth pricing thresholds
