@@ -456,7 +456,6 @@ export const App = () => {
                         <TabsTrigger value="buy">Buy</TabsTrigger>
                         <TabsTrigger value="purchased-names">Purchased Names</TabsTrigger>
                     </TabsList>
-
                     <TabsContent value="buy" className="mt-6">
                         <div className="grid grid-cols-6">
                             <div className="col-span-6 grid grid-cols-6">
