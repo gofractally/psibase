@@ -42,6 +42,31 @@ pub fn create_diff_adjust(doubling_time_sec: u32, halving_time_sec: u32) -> u32 
     diff_adjust_id
 }
 
+fn average(list: &[u64]) -> u64 {
+    if list.is_empty() {
+        return 0;
+    }
+    // Use u128 internally to avoid overflow on the sum
+    (list.iter().map(|&x| x as u128).sum::<u128>() / list.len() as u128) as u64
+}
+
+fn delta_squared(v: u64, average: u64) -> u128 {
+    let d = v as i128 - average as i128;
+    let d_abs = d.abs() as u128;
+    d_abs * d_abs
+}
+
+fn var(list: &[u64], average: u64) -> u64 {
+    if list.is_empty() {
+        return 0;
+    }
+    let d_squared = |&x: &u64| -> u128 { delta_squared(x, average) };
+
+    (list.iter().map(d_squared).sum::<u128>() / list.len() as u128) as u64
+}
+
+/// Updates the average_history with the specified current_usage, then zeroes out the current_usage.
+/// Increments the specified diff_adjust by the amount of the average usage in PPM (of total capacity).
 pub fn update_average_usage(
     usage_history: &mut Vec<u64>,
     current_usage: &mut u64,
@@ -54,23 +79,44 @@ pub fn update_average_usage(
         usage_history.pop();
     }
 
-    let avg: u64 = if usage_history.is_empty() {
-        0
+    // When rate-limiting resource usage, we want to include the usage of the current block
+    // in the calculation, assuming that it is going to be full.
+    let mut padded_usage = usage_history.clone();
+    padded_usage.push(capacity); // Add a block of max capacity
+
+    // Calculating the number of standard deviations we are over the average
+    // Working in sigma-squared space to avoid square roots
+    let avg = average(&padded_usage);
+    let variance = var(&padded_usage, avg);
+    let d2 = delta_squared(*current_usage, avg);
+    let factor = d2 as u128 / variance as u128;
+
+    let _sigma: u8 = if factor > 25 {
+        5
+    } else if factor > 16 {
+        4
+    } else if factor > 9 {
+        3
+    } else if factor > 4 {
+        2
+    } else if factor > 1 {
+        1
     } else {
-        usage_history.iter().sum::<u64>() / usage_history.len() as u64
+        0
     };
 
-    let mut ppm = ratio_to_ppm(avg, capacity);
+    let ppm = ratio_to_ppm(avg, capacity);
 
-    // Clamp to 10x "full capacity" If we are that far over our limit, I think we can just
-    // lose the real multiple. (needs to be clamped somewhere because it can only be u32
-    // to work with the diffadjust api)
-    ppm = ppm.min(10_000_000);
-    let ppm = ppm as u32;
+    // We need to clamp this to fit in u32 which is a DiffAdjust constraint.
+    // This clamps it at u32 max, which means that if the usage is more than 4,294x over capacity,
+    //   then we lose the real multiple. With this implementation, all that matters is that the PPM
+    //   is over the target, the absolute value is not really relevant.
+    let ppm = ppm.min(u32::MAX as u128) as u32;
 
+    // Consider whether we should, in any circumstance (e.g. usage in multiples excess
+    // of capacity), increment multiple times.
     DiffAdjust::call().increment(diff_adjust_id, ppm);
 
-    // Reset current usage
     *current_usage = 0;
 
     ppm
