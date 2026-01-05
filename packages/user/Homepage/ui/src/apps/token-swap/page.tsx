@@ -177,7 +177,6 @@ export const SwapPage = () => {
         setToAmount(fromAmount);
     };
 
-    const isSwapPossible = true;
 
     const { value: showPickTokenModal, setValue: setPickTokenModal } =
         useBoolean();
@@ -199,6 +198,9 @@ export const SwapPage = () => {
     };
 
     const minimumReturn = Number(toAmount) * (1 - slippage / 100);
+    const sameTokensSelected = fromTokenId === toTokenId;
+    const isSwapPossible = !sameTokensSelected;
+
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12">
@@ -341,7 +343,7 @@ export const SwapPage = () => {
                     >
                         {!fromAmount
                             ? "Enter amount"
-                            : fromTokenId === toTokenId
+                            : sameTokensSelected
                                 ? "Select different tokens"
                                 : "Swap"}
                     </Button>
