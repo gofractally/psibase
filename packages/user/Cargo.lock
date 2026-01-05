@@ -2278,6 +2278,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "prem-accounts"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "prem-accounts-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "prem-accounts-pkg"
+version = "0.22.0"
+dependencies = [
+ "prem-accounts",
+ "prem-accounts-plugin",
+ "r-prem-accts",
+]
+
+[[package]]
+name = "prem-accounts-plugin"
+version = "0.22.0"
+dependencies = [
+ "prem-accounts",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "primeorder"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2556,6 +2590,19 @@ version = "0.22.0"
 dependencies = [
  "async-graphql",
  "nft",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-prem-accts"
+version = "0.22.0"
+dependencies = [
+ "async-graphql",
+ "diff-adjust",
+ "prem-accounts",
  "psibase",
  "psibase-user-workspace-hack",
  "serde",
