@@ -7,7 +7,9 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{native_raw, AccountNumber, DbId, MicroSeconds, ToKey};
+use crate::{
+    native_raw, AccountNumber, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey,
+};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
@@ -389,6 +391,21 @@ macro_rules! subjective_tx {
             }
         };
         r
+    }
+}
+
+/// Starts a new HTTP request and returns the socket
+pub fn socket_open(
+    req: HttpRequest,
+    tls: Option<TLSInfo>,
+    endpoint: Option<SocketEndpoint>,
+) -> Result<i32, anyhow::Error> {
+    let packed = (req, tls, endpoint).packed();
+    let sock = unsafe { native_raw::socketOpen(packed.as_ptr(), packed.len()) };
+    if sock >= 0 {
+        Ok(sock)
+    } else {
+        Err(anyhow!("socket_open: {}", -sock))
     }
 }
 
