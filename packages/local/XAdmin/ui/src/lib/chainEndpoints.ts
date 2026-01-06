@@ -247,6 +247,61 @@ class Chain {
         return TransactStats.parse(await getJson(url));
     }
 
+    async installDataFiles(zip: JSZip): Promise<void> {
+        const dataDir = zip.folder("data");
+        if (dataDir) {
+            const dataFilePromises: Array<{ path: string; data: Promise<ArrayBuffer> }> = [];
+
+            dataDir.forEach((relativePath, file) => {
+                if (!file.dir) {
+                    dataFilePromises.push({
+                        path: relativePath,
+                        data: file.async("arraybuffer"),
+                    });
+                }
+            });
+
+            const resolvedDataFiles = await Promise.all(
+                dataFilePromises.map(async (item) => {
+                    // Await file read
+                    const data = await item.data;
+                    return { path: item.path, data };
+                }),
+            );
+
+            // Data files are stored as: data/<service><path>
+            for (const { path, data } of resolvedDataFiles) {
+                // Format: <servicename>/<filepath>
+                const firstSlash = path.indexOf("/");
+                if (firstSlash === -1) {
+                    console.warn(`Invalid data file path: ${path}`);
+                    continue;
+                }
+                const serviceName = path.substring(0, firstSlash);
+                const filePath = path.substring(firstSlash);
+
+                const contentType = lookup(filePath) || "application/octet-stream";
+
+                // PUT to the service subdomain
+                const url = siblingUrl(null, serviceName, filePath);
+                const response = await fetch(url, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": contentType,
+                    },
+                    body: data,
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(
+                        `Failed to upload data file ${filePath} to ${serviceName}: ${response.status} ${errorText}`,
+                    );
+                }
+            }
+        }
+    }
+
     public async installNodeLocalPackage(file: File): Promise<{
         success: boolean;
         installed: string[];
@@ -257,7 +312,7 @@ class Chain {
         const allServices: string[] = [];
 
         try {
-            const zip = await JSZip.loadAsync(file);
+            const zip: JSZip = await JSZip.loadAsync(file);
 
             zip.folder("service")?.forEach((relativePath) => {
                 if (relativePath.endsWith(".wasm")) {
@@ -276,17 +331,47 @@ class Chain {
                 );
             }
 
+            // POST {...<meta.json>, "sha256": <package hash>} to x-packages.<base_url>/preinstall
+            const metaJsonFileContents = zip.file("meta.json");
+            if (!metaJsonFileContents) {
+                throw new Error("meta.json file not found in package");
+            }
+            const metaJson = JSON.parse(await metaJsonFileContents.async("text"));
+            
+            // Compute SHA256 from the entire package file
+            const fileArrayBuffer = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest("SHA-256", fileArrayBuffer);
+            const sha256 = Array.from(new Uint8Array(hashBuffer))
+                .map((byte) => byte.toString(16).padStart(2, "0"))
+                .join("");
+            
+            const metaContents = {
+                ...metaJson,
+                sha256,
+            };
+            const response = await fetch(`${siblingUrl(null, "x-packages", "/preinstall")}/${sha256}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(metaContents),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to install package: ${response.status} ${response.statusText}`);
+            }
+
             // Install services
             for (const serviceName of allServices) {
                 const wasmFile = zip.file(`service/${serviceName}.wasm`);
-                if (!wasmFile) {
+                const jsonMetaFile = zip.file(`service/${serviceName}.json`);
+                if (!wasmFile || !jsonMetaFile) {
                     throw new Error(
                         `Service ${serviceName} .wasm file not found in package`,
                     );
                 }
 
                 const wasmData = await wasmFile.async("arraybuffer");
-
                 const response = await fetch(`/services/${serviceName}`, {
                     method: "PUT",
                     headers: {
@@ -295,68 +380,82 @@ class Chain {
                     body: wasmData,
                 });
 
-                if (!response.ok) {
+                const jsonMeta = await jsonMetaFile.async("arraybuffer");
+                const responseJson = await fetch(`/services/${serviceName}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: jsonMeta,
+                });
+
+                if (!response.ok || !responseJson.ok) {
                     const errorText = await response.text();
                     throw new Error(
-                        `Failed to install service ${serviceName}: ${response.status} ${errorText}`,
+                        `Failed to install service ${serviceName}: ${!response.status ? response.status : responseJson.status} ${errorText}`,
                     );
                 }
 
                 installed.push(serviceName);
             }
 
-            // Install data files
-            const dataDir = zip.folder("data");
-            if (dataDir) {
-                const dataFilePromises: Array<{ path: string; data: Promise<ArrayBuffer> }> = [];
+            await this.installDataFiles(zip);
 
+            // TODO: PUT { services: { <account>: <service.json> }, data: <file list>[] } to x-packages.<base_url>/manifest/<package hash>
+            const services = await Promise.all(
+                allServices.map(async (serviceName) => {
+                    const serviceJsonFile = zip.file(`service/${serviceName}.json`);
+                    if (!serviceJsonFile) {
+                        throw new Error(`Service ${serviceName} .json file not found in package`);
+                    }
+                    return {
+                        [serviceName]: JSON.parse(await serviceJsonFile.async("text")),
+                    };
+                }),
+            );
+            
+            const dataDir = zip.folder("data");
+            const data: Array<{ account: string; filename: string }> = [];
+            if (dataDir) {
                 dataDir.forEach((relativePath, file) => {
                     if (!file.dir) {
-                        dataFilePromises.push({
-                            path: relativePath,
-                            data: file.async("arraybuffer"),
-                        });
+                        // Format: <servicename>/<filepath>
+                        const firstSlash = relativePath.indexOf("/");
+                        if (firstSlash === -1) {
+                            console.warn(`Invalid data file path: ${relativePath}`);
+                            return;
+                        }
+                        const account = relativePath.substring(0, firstSlash);
+                        const filename = relativePath.substring(firstSlash);
+                        data.push({ account, filename });
                     }
                 });
+            }
+            
+            const manifestResponse = await fetch(`${siblingUrl(null, "x-packages", "/manifest")}/${sha256}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    services,
+                    data,
+                }),
+            });
+            if (!manifestResponse.ok) {
+                throw new Error(`Failed to install package: ${manifestResponse.status} ${manifestResponse.statusText}`);
+            }
 
-                const resolvedDataFiles = await Promise.all(
-                    dataFilePromises.map(async (item) => {
-                        // Await file read
-                        const data = await item.data;
-                        return { path: item.path, data };
-                    }),
-                );
-
-                // Data files are stored as: data/<service><path>
-                for (const { path, data } of resolvedDataFiles) {
-                    // Format: <servicename>/<filepath>
-                    const firstSlash = path.indexOf("/");
-                    if (firstSlash === -1) {
-                        console.warn(`Invalid data file path: ${path}`);
-                        continue;
-                    }
-                    const serviceName = path.substring(0, firstSlash);
-                    const filePath = path.substring(firstSlash);
-
-                    const contentType = lookup(filePath) || "application/octet-stream";
-
-                    // PUT to the service subdomain
-                    const url = siblingUrl(null, serviceName, filePath);
-                    const response = await fetch(url, {
-                        method: "PUT",
-                        headers: {
-                            "Content-Type": contentType,
-                        },
-                        body: data,
-                    });
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(
-                            `Failed to upload data file ${filePath} to ${serviceName}: ${response.status} ${errorText}`,
-                        );
-                    }
-                }
+            // TODO: POST {...<meta.json>, "sha256": <package hash>} to x-packages.<base_url>/postinstall
+            const postinstallResponse = await fetch(`${siblingUrl(null, "x-packages", "/postinstall")}/${sha256}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(metaContents),
+            });
+            if (!postinstallResponse.ok) {
+                throw new Error(`Failed to install package: ${postinstallResponse.status} ${postinstallResponse.statusText}`);
             }
 
             return {
