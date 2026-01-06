@@ -1,6 +1,6 @@
 use crate::tables::tables::{
     BillingConfig, BillingConfigTable, CpuPricing, NetPricing, NetworkSpecs, NetworkSpecsTable,
-    NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable,
+    NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable, UserSettings,
 };
 use async_graphql::{connection::Connection, *};
 use psibase::{
@@ -91,7 +91,7 @@ impl BlockUsageEvent {
     }
 }
 
-#[derive(Deserialize, SimpleObject)]
+#[derive(SimpleObject)]
 pub struct ServerSpecs {
     /// Amount of bandwidth capacity per second per server
     pub net_bps: u64,
@@ -99,6 +99,15 @@ pub struct ServerSpecs {
     pub storage_bytes: u64,
     /// Suggested minimum amount of memory in bytes per server
     pub recommended_min_memory_bytes: u64,
+}
+
+#[derive(SimpleObject)]
+pub struct UserResources {
+    /// Balance of resources owned by the user
+    balance: Quantity,
+
+    /// The capacity of the user's resource buffer
+    buffer_capacity: Quantity,
 }
 
 //  Derived from expected 80% of reads/writes in 20% of the total storage, targeting
@@ -186,9 +195,13 @@ impl Query {
 
     /// Returns the current amount of resources for the specified user.
     /// The specified user must have authorized the query.
-    async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<Quantity> {
+    async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
         self.check_user_auth(user)?;
-        Ok(crate::Wrapper::call().get_resources(user))
+
+        Ok(UserResources {
+            balance: crate::Wrapper::call().get_resources(user),
+            buffer_capacity: UserSettings::get(user).buffer_capacity.into(),
+        })
     }
 
     /// Returns the history of resource-consumption events for the specified account.
