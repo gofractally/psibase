@@ -24,12 +24,6 @@ impl Precision {
     }
 }
 
-impl From<u8> for Precision {
-    fn from(value: u8) -> Self {
-        Self::new(value).unwrap()
-    }
-}
-
 impl std::fmt::Display for Precision {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)

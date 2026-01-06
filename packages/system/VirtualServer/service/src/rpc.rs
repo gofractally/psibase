@@ -4,7 +4,7 @@ use crate::tables::tables::{
 };
 use async_graphql::{connection::Connection, *};
 use psibase::{
-    services::tokens::{Decimal, Quantity},
+    services::tokens::{Decimal, Precision, Quantity},
     AccountNumber, EventQuery, Table,
 };
 use serde::Deserialize;
@@ -76,12 +76,18 @@ pub struct BlockUsageEvent {
 impl BlockUsageEvent {
     /// The amount of network usage in the block as a percentage of total capacity
     pub async fn net_usage_pct(&self) -> Decimal {
-        Decimal::new(Quantity::from(self.net_usage_ppm), 4.into())
+        Decimal::new(
+            Quantity::from(self.net_usage_ppm as u64),
+            Precision::new(4).unwrap(),
+        )
     }
 
     /// The amount of CPU usage in the block as a percentage of total capacity
     pub async fn cpu_usage_pct(&self) -> Decimal {
-        Decimal::new(Quantity::from(self.cpu_usage_ppm), 4.into())
+        Decimal::new(
+            Quantity::from(self.cpu_usage_ppm as u64),
+            Precision::new(4).unwrap(),
+        )
     }
 }
 
