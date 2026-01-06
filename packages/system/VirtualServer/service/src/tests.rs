@@ -41,13 +41,13 @@ mod tests {
     }
 
     #[derive(Deserialize)]
-    struct Resources {
+    struct ResourceQuantity {
         value: u64,
     }
 
     #[derive(Deserialize)]
     struct ResourcesData {
-        getResources: Resources,
+        userResources: ResourceQuantity,
     }
 
     // Propose a system action
@@ -108,23 +108,25 @@ mod tests {
     fn get_resource_balance(
         chain: &psibase::Chain,
         user: AccountNumber,
+        auth_token: &str,
     ) -> Result<u64, psibase::Error> {
-        let balance: serde_json::Value = chain.graphql(
+        let balance: serde_json::Value = chain.graphql_auth(
             Wrapper::SERVICE,
             &format!(
                 r#"
                     query {{
-                        getResources(user: "{}") {{
+                        userResources(user: "{}") {{
                             value
                         }}
                     }}
                 "#,
                 user
             ),
+            auth_token,
         )?;
 
         let response: Response<ResourcesData> = serde_json::from_value(balance)?;
-        Ok(response.data.getResources.value)
+        Ok(response.data.userResources.value)
     }
 
     fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
@@ -172,6 +174,9 @@ mod tests {
 
         initial_setup(&chain)?;
 
+        let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
+        let token_a = chain.login(alice, Wrapper::SERVICE)?;
+
         // This is still needed even though the package config specifies the server...
         http_server::Wrapper::push_from(&chain, vserver)
             .registerServer(vserver)
@@ -215,7 +220,7 @@ mod tests {
             .refill_res_buf()
             .get()?;
         assert_eq!(
-            get_resource_balance(&chain, PRODUCER_ACCOUNT)?,
+            get_resource_balance(&chain, PRODUCER_ACCOUNT, &token_prod)?,
             config.min_resource_buffer
         );
 
@@ -246,7 +251,7 @@ mod tests {
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .buy_res_for(10_0000.into(), alice, Some("".into()))
             .get()?;
-        assert_eq!(get_resource_balance(&chain, alice)?, 10_0000);
+        assert_eq!(get_resource_balance(&chain, alice, &token_a)?, 10_0000);
 
         // Now alice can transact
         tokens::Wrapper::push_from(&chain, alice)
@@ -255,7 +260,7 @@ mod tests {
 
         chain.finish_block();
 
-        let balance = get_resource_balance(&chain, alice)?;
+        let balance = get_resource_balance(&chain, alice, &token_a)?;
         assert!(balance < 10_0000);
 
         println!("alice resource balance: {}", balance);
