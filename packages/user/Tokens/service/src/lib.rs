@@ -23,15 +23,8 @@ pub mod service {
 
     #[action]
     fn init() {
-        let table = InitTable::new();
-
-        if table.get_index_pk().get(&()).is_none() {
-            let init_instance = InitRow {
-                last_used_id: 0,
-                last_used_shared_bal_id: 0,
-                last_used_subaccount_id: 0,
-            };
-            table.put(&init_instance).unwrap();
+        if InitRow::get().is_none() {
+            InitRow::init();
 
             Nfts::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
@@ -454,7 +447,75 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
+        SharedBalance::get_or_new(creditor, get_sender(), token_id).reject(memo);
+    }
+
+    /// Sends tokens from an account's primary balance into a "sub-account" balance
+    ///
+    /// The sub-account will be created if it does not exist.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    /// * `amount`   - Amount of tokens to send
+    #[action]
+    fn toSub(token_id: TID, sub_account: String, amount: Quantity) {
+        let owner = get_sender();
+        SubAccount::get_or_add(owner, sub_account.clone()).add_balance(token_id, amount);
+
+        Wrapper::emit().history().balChanged(
+            token_id,
+            owner,
+            owner,
+            "toSub".to_string(),
+            fmt_amount(token_id, amount),
+            Memo::new(sub_account).unwrap(),
+        );
+    }
+
+    /// Returns tokens from a "sub-account" balance into the account's primary balance
+    ///
+    /// The sub-account will not be deleted if it becomes empty, it must be manually
+    /// deleted with `deleteSub`.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    /// * `amount`   - Amount of tokens to return
+    #[action]
+    fn fromSub(token_id: TID, sub_account: String, amount: Quantity) {
+        let owner = get_sender();
+
+        SubAccount::get_assert(owner, sub_account.clone()).sub_balance(token_id, amount);
+
+        Wrapper::emit().history().balChanged(
+            token_id,
+            owner,
+            owner,
+            "fromSub".to_string(),
+            fmt_amount(token_id, amount),
+            Memo::new(sub_account).unwrap(),
+        );
+    }
+
+    /// Creates a new "sub-account" with an empty balance
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn createSub(sub_account: String) {
+        SubAccount::get_or_add(get_sender(), sub_account);
+    }
+
+    /// Deletes a "sub-account" balance
+    ///
+    /// All nonzero token balances in the sub-account will be returned to the primary balance.
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn deleteSub(sub_account: String) {
+        SubAccount::get_assert(get_sender(), sub_account).delete();
     }
 
     /// Sends tokens from an account's primary balance into a "sub-account" balance

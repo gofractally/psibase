@@ -59,7 +59,7 @@ class TestFetch(unittest.TestCase):
 
         XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
 
-        with a.post('/set_origin_server', service='x-proxy', json={"host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath}) as reply:
+        with a.post('/set_origin_server', service='x-proxy', json={"host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath, "spin": 100000}) as reply:
             reply.raise_for_status()
 
         with a.get('/config', service='x-proxy') as reply:

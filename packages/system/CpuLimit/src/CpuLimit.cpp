@@ -38,7 +38,7 @@ namespace SystemService
          limit = std::chrono::nanoseconds::max();
       }
 
-      psibase::raw::setMaxTransactionTime(limit.count());
+      psibase::raw::setMaxCpuTime(limit.count());
    }
 }  // namespace SystemService
 

@@ -18,7 +18,11 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
    auto target = req.path();
 
    auto table = open<ContentTable>();
-   if (req.method == "PUT")
+   if (req.method == "OPTIONS")
+   {
+      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+   }
+   else if (req.method == "PUT")
    {
       if (auto reply = to<XAdmin>().checkAuth(req, socket))
          return reply;
@@ -37,7 +41,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       {
          table.put(row);
       }
-      return HttpReply{};
+      return HttpReply{.headers = allowCors(req, XAdmin::service)};
    }
    else if (req.method == "GET")
    {
@@ -55,6 +59,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
          auto reply = HttpReply{
              .contentType = std::move(row->contentType),
              .body        = std::move(row->content),
+             .headers     = allowCors(req, XAdmin::service),
          };
          if (row->contentEncoding)
          {
@@ -75,7 +80,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       {
          table.erase(target);
       }
-      return HttpReply{};
+      return HttpReply{.headers = allowCors(req, XAdmin::service)};
    }
    else
    {

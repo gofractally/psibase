@@ -251,9 +251,11 @@ namespace psibase
       /// This function is non-deterministic and is only available in subjective services.
       PSIBASE_NATIVE(getRandom) void getRandom(void* buf, std::uint32_t len);
 
-      /// Sets the transaction timer to expire a given number of nanoseconds
-      /// after the beginning of the current transaction.
-      PSIBASE_NATIVE(setMaxTransactionTime) void setMaxTransactionTime(uint64_t ns);
+      /// Sets the CPU timer to expire after the current transaction/query/callback
+      /// context has run for a given number of nanoseconds. When the timer
+      /// expires, the current context will be terminated. Setting the timeout
+      /// replaces any previous timeout.
+      PSIBASE_NATIVE(setMaxCpuTime) void setMaxCpuTime(uint64_t ns);
 
       /// Loads the subjective database
       ///

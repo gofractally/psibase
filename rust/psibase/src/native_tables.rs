@@ -24,7 +24,9 @@ pub const SCHEDULED_SNAPSHOT_TABLE: NativeTable = 12;
 pub const LOG_TRUNCATE_TABLE: NativeTable = 13;
 pub const SOCKET_TABLE: NativeTable = 14;
 pub const RUN_TABLE: NativeTable = 15;
+pub const ENV_TABLE: NativeTable = 16;
 pub const HOST_CONFIG_TABLE: NativeTable = 17;
+pub const PENDING_SHUTDOWN_TABLE: NativeTable = 18;
 
 pub const NATIVE_TABLE_PRIMARY_INDEX: NativeIndex = 0;
 
@@ -404,6 +406,20 @@ impl RunRow {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+pub struct EnvRow {
+    pub name: String,
+    pub value: String,
+}
+
+impl EnvRow {
+    pub const DB: DbId = DbId::NativeSession;
+    pub fn key(&self) -> (NativeTable, NativeIndex, String) {
+        (ENV_TABLE, NATIVE_TABLE_PRIMARY_INDEX, self.name.clone())
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct HostConfigRow {
     pub hostVersion: String,
     pub config: String,
@@ -413,5 +429,18 @@ impl HostConfigRow {
     pub const DB: DbId = DbId::NativeSession;
     pub fn key(&self) -> (NativeTable, NativeIndex) {
         (HOST_CONFIG_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
+    }
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct PendingShutdownRow {
+    pub args: String,
+}
+
+impl PendingShutdownRow {
+    pub const DB: DbId = DbId::NativeSession;
+    pub fn key(&self) -> (NativeTable, NativeIndex) {
+        (PENDING_SHUTDOWN_TABLE, NATIVE_TABLE_PRIMARY_INDEX)
     }
 }

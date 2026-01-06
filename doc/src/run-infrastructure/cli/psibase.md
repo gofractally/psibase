@@ -6,18 +6,19 @@ psibase - The psibase blockchain command line client
 
 ## SYNOPSIS
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
-`psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
-`psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
-`psibase` [`-a` *url*] `info` *packages*\.\.\.  
-`psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
-`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
-`psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
-`psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
-`psibase` [`-a` *url*] `push` *files*\.\.\.  
-`psibase` [`-a` *url*] `search` *regex*\.\.\.  
-`psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
+`psibase` `boot` [`-a` *url*] [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
+`psibase` `create` [`-a` *url*] [`-i` | `-k` *public-key*] [`-S` *sender*] *name*  
+`psibase` `deploy` [`-a` *url*] [`-p`] *account* *wasm* *schema*  
+`psibase` `info` [`-a` *url*] *packages*\.\.\.  
+`psibase` `install` [`-a` *url*] [`-k` *public-key*] *packages*\.\.\.  
+`psibase` `list` [`-a` *url*] [`--all` | `--available` | `--installed` | `--updates`]  
+`psibase` `login` [`-a` *url*] *account*  
+`psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key*] *account*  
+`psibase` `publish` [`-a` *url*] `-S` *sender* *files*\.\.\.  
+`psibase` `push` [`-a` *url*] *files*\.\.\.  
+`psibase` `search` [`-a` *url*] *regex*\.\.\.  
+`psibase` `upgrade` [`-a` *url*] [`--latest`] [*packages*\.\.\.]  
+`psibase` `upload` [`-a` *url*] [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 `psibase` *subcommand* [*args*\.\.\.]  
 
 ## DESCRIPTION
@@ -28,11 +29,23 @@ psibase - The psibase blockchain command line client
 
 - `-a`, `--api` *url*
 
-  `psinode` API Endpoint. The default is `http://psibase.localhost/`
-  
+  `psinode` API Endpoint. The default is `http://psibase.localhost:8080/`
+
+- `--console[=true|false]`
+
+  For commands that push transactions to the chain, controls whether the console output of the transactions is shown
+
 - `-h`, `--help`
 
   Print help information
+
+- `--proposer` *account*
+
+  For commands that push transactions to the chain, the transactions will be proposed as staged transactions instead of being directly applied.
+
+- `--proxy` *url*
+
+  Proxy for HTTP request. The URL's scheme can be `http:`, `https:`, or `unix:`.
 
 - `-s`, `--sign` *private-key*
 
@@ -52,7 +65,7 @@ psibase - The psibase blockchain command line client
 
 ### boot
 
-`psibase` [`-a` *url*] `boot` [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
+`psibase` `boot` [`-a` *url*] [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
 
 The boot command deploys a set of system services and web interfaces suitable for development. The chain will have a single block producer. The chain can only be booted once.
 
@@ -80,9 +93,13 @@ The boot command deploys a set of system services and web interfaces suitable fo
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
+- `-z`, `--compression-level` *level*
+
+  Configure compression level for static content uploaded by the boot packages (1=fastest, 11=most compression) [default: 4]
+
 ### create
 
-`psibase` [`-a` *url*] `create` [`-i` | `-k` *public-key*] [-S *sender*] *name*  
+`psibase` `create` [`-a` *url*] [`-i` | `-k` *public-key*] [`-S` *sender*] *name*  
 
 Create or modify an account
 
@@ -102,7 +119,7 @@ Create or modify an account
 
 ### deploy
 
-`psibase` [`-a` *url*] `deploy` [`-p`] *account* *wasm* *schema*  
+`psibase` `deploy` [`-a` *url*] [`-p`] *account* *wasm* *schema*  
 
 Deploy a service
 
@@ -129,14 +146,14 @@ Deploy a service
 - `-p`, `--register-proxy`
 
   Register the service with HttpServer. This allows the service to host a website, serve RPC requests, and serve GraphQL requests.
-  
+
 - `-S`, `--sender` *sender*
 
   Sender to use when creating the account [default: accounts]
 
 ### info
 
-`psibase` [`-a` *url*] `info` *packages*\.\.\.  
+`psibase` `info` [`-a` *url*] *packages*\.\.\.  
 
 Displays the contents of packages
 
@@ -148,9 +165,13 @@ Displays the contents of packages
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
+- `-S`, `--sender` *account*
+
+  Account that would install the packages. If this account has configured package sources on-chain, those sources will be used [default: root]
+
 ### install
 
-`psibase` [`-a` *url*] `install` [`-k` *public-key*] *packages*\.\.\.  
+`psibase` `install` [`-a` *url*] [`-k` *public-key*] *packages*\.\.\.  
 
 Install packages to the chain along with all dependencies. If any of the requested packages are already installed, they will be updated if a newer version is available.
 
@@ -158,11 +179,15 @@ Install packages to the chain along with all dependencies. If any of the request
 
   Packages to install
 
-- `-k` *public-key*
+- `-k`, `--key` *public-key*
 
-  Set all accounts created by the new packages to authenticate using this key. If no key is provided, the accounts will not require authentication. The public key can be any of the following:
+  Set all accounts created by the new packages to authenticate using this key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
+
+- `--local`
+
+  Instead of installing to the chain, install local packages to a single node
 
 - `--reinstall`
 
@@ -172,9 +197,17 @@ Install packages to the chain along with all dependencies. If any of the request
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
+- `-S`, `--sender` *sender*
+
+  Sender to use for installing. The packages and all accounts that they create will be owned by this account. If this account has configured package sources on-chain, those sources will be used [default: root]
+
+- `-z`, `--compression-level` *level*
+
+  Configure compression level for static content uploaded by the packages (1=fastest, 11=most compression) [default: 4]
+
 ### list
 
-`psibase` [`-a` *url*] `list` [`--all` | `--available` | `--installed` | `--updates`]  
+`psibase` `list` [`-a` *url*] [`--all` | `--available` | `--installed` | `--updates`]  
 
 Prints a list of packages from the chain and/or package repositories
 
@@ -194,13 +227,31 @@ Prints a list of packages from the chain and/or package repositories
 
   Prints installed packages that have newer versions available in the repository
 
+- `--local`
+
+  Search for node-local packages instead of on-chain packages
+
 - `--package-source` *url*
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
+- `-S`, `--sender` *account*
+
+  Account that would install the packages. If this account has configured package sources on-chain, those sources will be used [default: root]
+
+### login
+
+`psibase` `login` [`-a` *url*] *account*  
+
+Get a bearer token that can used to access authenticated APIs. The token can only be used with the host that created it. The request must be signed with the same keys that the account would use for a transaction.
+
+- *account*
+
+  The account logging in
+
 ### modify
 
-`psibase` [`-a` *url*] `modify` [`-i` | `-k` *public-key*] *account*  
+`psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key*] *account*  
 
 Modify an account
 
@@ -216,13 +267,13 @@ Modify an account
 
 ### publish
 
-`psibase` [`-a` *url*] `publish` `-S` *sender* *files*\.\.\.  
+`psibase` `publish` [`-a` *url*] `-S` *sender* *files*\.\.\.  
 
 Publish packages to a package repository. A package will be skipped if the sender has already published it with the same version.
 
 - `-S` *sender*
 
-  The account that owns the packages
+  The account publishing the packages. Files are uploaded to this account's subdomain
 
 - *files*
 
@@ -230,7 +281,7 @@ Publish packages to a package repository. A package will be skipped if the sende
 
 ### push
 
-`psibase` [`-a` *url*] `push` *files*\.\.\.  
+`psibase` `push` [`-a` *url*] *files*\.\.\.  
 
 Push a transaction to the chain.
 
@@ -240,7 +291,7 @@ Push a transaction to the chain.
 
 ### search
 
-`psibase` [`-a` *url*] `search` *regex*\.\.\.  
+`psibase` `search` [`-a` *url*] *regex*\.\.\.  
 
 Search for packages
 
@@ -252,23 +303,49 @@ Search for packages
 
   Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
 
+- `-S`, `--sender` *account*
+
+  Account that would install the packages. If this account has configured package sources on-chain, those sources will be used [default: root]
+
 ### upgrade
 
-`psibase` [`-a` *url*] `upgrade` [`--latest`] [*packages*\.\.\.]  
+`psibase` `upgrade` [`-a` *url*] [`--latest`] [*packages*\.\.\.]  
 
 Upgrade installed packages. This will not upgrade packages to a new major version unless `--latest` is used.
-
-- `--latest`
-
-  Don't limit upgrades to versions that are compatible with the current version.
 
 - *packages*
 
   The names of packages to upgrade. The default is to upgrade all packages that are currently installed.
 
+- `-k`, `--key` *public-key*
+
+  Set all accounts created by new packages to authenticate using this key. The public key can be any of the following:
+  - A file containing a PEM or DER encoded public key
+  - A PKCS #11 URI
+
+- `--latest`
+
+  Don't limit upgrades to versions that are compatible with the current version.
+
+- `--local`
+
+  Instead of installing to the chain, install local packages to a single node
+
+- `--package-source` *url*
+
+  Specifies a package repository. If multiple repositories are provided, the ones listed earlier will be preferred over those listed later. The default is the local package repository.
+
+- `-S`, `--sender` *sender*
+
+  Sender to use for installing. The packages and all accounts that they create will be owned by this account. If this account has configured package sources on-chain, those sources will be used [default: root]
+
+- `-z`, `--compression-level` *level*
+
+  Configure compression level for static content uploaded by the packages (1=fastest, 11=most compression) [default: 4]
+
 ### upload
 
-`psibase` [`-a` *url*] `upload` [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
+`psibase` `upload` [`-a` *url*] [`-r`] [`-t` *content-type*] *source* [*dest*] `-S` *sender*  
 
 Upload a file to a service's subdomain. The file will be stored to and served from the sender's namespace within the `sites` service.
 
@@ -291,6 +368,10 @@ Upload a file to a service's subdomain. The file will be stored to and served fr
 - `-S`, `--sender` *sender*
 
   Account to use as the sender of the transaction. Required. Files are uploaded to this account's subdomain.
+
+- `-z`, `--compression-level` *level*
+
+  Configure compression level for the files (1=fastest, 11=most compression) [default: 4]
 
 ### Custom Commands
 

@@ -281,7 +281,7 @@ impl Sub<Seconds> for TimePointUSec {
 #[fracpack(definition_will_not_change, fracpack_mod = "fracpack")]
 #[to_key(psibase_mod = "crate")]
 pub struct MicroSeconds {
-    value: i64,
+    pub value: i64,
 }
 
 impl MicroSeconds {

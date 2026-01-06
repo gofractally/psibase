@@ -304,7 +304,9 @@ pub mod service {
         RateLimit::get_assert(nft_id).check_difficulty_decrease()
     }
 
-    /// Increment RateLimit instance, potentially increasing RateLimit
+    /// Increment RateLimit instance
+    /// 
+    /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
     /// * Requires sender to be consumer account.
     ///
