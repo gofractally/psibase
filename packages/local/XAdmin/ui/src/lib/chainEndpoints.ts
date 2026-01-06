@@ -1,6 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import JSZip from "jszip";
-import { lookup } from "mrmime";
 import { util } from "wasm-transpiled";
 import { z } from "zod";
 
@@ -22,6 +20,15 @@ import {
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import { recursiveFetch } from "./recursiveFetch";
+import {
+    extractPackage,
+    buildManifestPayload,
+    installAllServices,
+    installDataFiles,
+    callPreinstall,
+    installManifest,
+    callPostinstall,
+} from "./chainEndpoints/index";
 
 export const Peer = z
     .object({
@@ -247,60 +254,6 @@ class Chain {
         return TransactStats.parse(await getJson(url));
     }
 
-    async installDataFiles(zip: JSZip): Promise<void> {
-        const dataDir = zip.folder("data");
-        if (dataDir) {
-            const dataFilePromises: Array<{ path: string; data: Promise<ArrayBuffer> }> = [];
-
-            dataDir.forEach((relativePath, file) => {
-                if (!file.dir) {
-                    dataFilePromises.push({
-                        path: relativePath,
-                        data: file.async("arraybuffer"),
-                    });
-                }
-            });
-
-            const resolvedDataFiles = await Promise.all(
-                dataFilePromises.map(async (item) => {
-                    // Await file read
-                    const data = await item.data;
-                    return { path: item.path, data };
-                }),
-            );
-
-            // Data files are stored as: data/<service><path>
-            for (const { path, data } of resolvedDataFiles) {
-                // Format: <servicename>/<filepath>
-                const firstSlash = path.indexOf("/");
-                if (firstSlash === -1) {
-                    console.warn(`Invalid data file path: ${path}`);
-                    continue;
-                }
-                const serviceName = path.substring(0, firstSlash);
-                const filePath = path.substring(firstSlash);
-
-                const contentType = lookup(filePath) || "application/octet-stream";
-
-                // PUT to the service subdomain
-                const url = siblingUrl(null, serviceName, filePath);
-                const response = await fetch(url, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": contentType,
-                    },
-                    body: data,
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(
-                        `Failed to upload data file ${filePath} to ${serviceName}: ${response.status} ${errorText}`,
-                    );
-                }
-            }
-        }
-    }
 
     public async installNodeLocalPackage(file: File): Promise<{
         success: boolean;
@@ -308,141 +261,20 @@ class Chain {
         failed?: { name: string; error: string };
         notAttempted: string[];
     }> {
-        const installed: string[] = [];
-        const allServices: string[] = [];
+        let installed: string[] = [];
+        let allServices: string[] = [];
 
         try {
-            const zip: JSZip = await JSZip.loadAsync(file);
+            const { zip, services, meta, sha256 } = await extractPackage(file);
+            allServices = services;
 
-            zip.folder("service")?.forEach((relativePath) => {
-                if (relativePath.endsWith(".wasm")) {
-                    const serviceName = relativePath.replace(".wasm", "");
-                    allServices.push(serviceName);
-                }
-            });
+            await callPreinstall(meta);
+            installed = await installAllServices(zip, services);
+            await installDataFiles(zip);
 
-            const invalidServices = allServices.filter(
-                (name) => !name.startsWith("x-"),
-            );
-            if (invalidServices.length > 0) {
-                throw new Error(
-                    `Invalid service name(s): ${invalidServices.join(", ")}. ` +
-                        `Only node-local services with "x-" prefix can be installed via this method.`,
-                );
-            }
-
-            const metaJsonFileContents = zip.file("meta.json");
-            if (!metaJsonFileContents) {
-                throw new Error("meta.json file not found in package");
-            }
-            const metaJson = JSON.parse(await metaJsonFileContents.async("text"));
-            
-            const fileArrayBuffer = await file.arrayBuffer();
-            const hashBuffer = await crypto.subtle.digest("SHA-256", fileArrayBuffer);
-            const sha256 = Array.from(new Uint8Array(hashBuffer))
-                .map((byte) => byte.toString(16).padStart(2, "0"))
-                .join("");
-            
-            const metaContents = {
-                ...metaJson,
-                sha256,
-            };
-            const response = await fetch(`${siblingUrl(null, "x-packages", "/preinstall")}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(metaContents),
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to install package: ${response.status} ${response.statusText}`);
-            }
-
-            // Install services
-            for (const serviceName of allServices) {
-                const wasmFile = zip.file(`service/${serviceName}.wasm`);
-                const jsonMetaFile = zip.file(`service/${serviceName}.json`);
-                if (!wasmFile || !jsonMetaFile) {
-                    throw new Error(
-                        `Service ${serviceName} .wasm file not found in package`,
-                    );
-                }
-
-                const wasmData = await wasmFile.async("arraybuffer");
-                const response = await fetch(`/services/${serviceName}`, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/wasm",
-                    },
-                    body: wasmData,
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(
-                        `Failed to install service ${serviceName}: ${response.status} ${errorText}`,
-                    );
-                }
-
-                installed.push(serviceName);
-            }
-
-            await this.installDataFiles(zip);
-
-            const services = await Promise.all(
-                allServices.map(async (serviceName) => {
-                    const serviceJsonFile = zip.file(`service/${serviceName}.json`);
-                    if (!serviceJsonFile) {
-                        throw new Error(`Service ${serviceName} .json file not found in package`);
-                    }
-                    return {
-                        [serviceName]: JSON.parse(await serviceJsonFile.async("text")),
-                    };
-                }),
-            );
-            const dataDir = zip.folder("data");
-            const data: Array<{ account: string; filename: string }> = [];
-            if (dataDir) {
-                dataDir.forEach((relativePath, file) => {
-                    if (!file.dir) {
-                        // Format: <servicename>/<filepath>
-                        const firstSlash = relativePath.indexOf("/");
-                        if (firstSlash === -1) {
-                            console.warn(`Invalid data file path: ${relativePath}`);
-                            return;
-                        }
-                        const account = relativePath.substring(0, firstSlash);
-                        const filename = relativePath.substring(firstSlash);
-                        data.push({ account, filename });
-                    }
-                });
-            }
-            
-            const manifestResponse = await fetch(`${siblingUrl(null, "x-packages", "/manifest")}/${sha256}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    services,
-                    data,
-                }),
-            });
-            if (!manifestResponse.ok) {
-                throw new Error(`Failed to install package: ${manifestResponse.status} ${manifestResponse.statusText}`);
-            }
-
-            const postinstallResponse = await fetch(`${siblingUrl(null, "x-packages", "/postinstall")}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(metaContents),
-            });
-            if (!postinstallResponse.ok) {
-                throw new Error(`Failed to install package: ${postinstallResponse.status} ${postinstallResponse.statusText}`);
-            }
+            const manifestPayload = await buildManifestPayload(zip, services);
+            await installManifest(sha256, manifestPayload);
+            await callPostinstall(meta);
 
             return {
                 success: true,

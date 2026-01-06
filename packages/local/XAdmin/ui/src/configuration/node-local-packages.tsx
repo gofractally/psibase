@@ -1,4 +1,4 @@
-import { Upload } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -119,7 +119,11 @@ export const NodeLocalPackages = () => {
                 disabled={!file || isInstalling}
                 className="gap-2"
             >
-                <Upload size={16} />
+                {isInstalling ? (
+                    <Loader2 size={16} className="animate-spin" />
+                ) : (
+                    <Upload size={16} />
+                )}
                 {isInstalling ? "Installing..." : "Install Package"}
             </Button>
 
