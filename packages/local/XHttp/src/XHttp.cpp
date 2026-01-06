@@ -1,5 +1,6 @@
 #include <services/local/XHttp.hpp>
 
+#include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
 #include <services/local/XAdmin.hpp>
@@ -302,6 +303,18 @@ std::int32_t XHttp::websocket(HttpRequest                   request,
 {
    auto sender    = getSender();
    auto codeTable = Native::subjective(KvMode::read).open<CodeTable>();
+   if (!request.getHeader("connection"))
+   {
+      request.headers.push_back({"Connection", "Upgrade"});
+   }
+   if (!request.getHeader("upgrade"))
+   {
+      request.headers.push_back({"Upgrade", "websocket"});
+   }
+   if (!request.getHeader("Sec-WebSocket-Key"))
+   {
+      request.headers.push_back({"Sec-WebSocket-Key", randomWebSocketKey()});
+   }
    PSIBASE_SUBJECTIVE_TX
    {
       if (!codeTable.get(sender))
