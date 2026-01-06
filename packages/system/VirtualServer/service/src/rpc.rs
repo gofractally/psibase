@@ -105,7 +105,31 @@ pub struct ServerSpecs {
 //    the 80% serviced entirely in memory
 const MEMORY_RATIO: u8 = 5;
 
-pub struct Query;
+pub struct Query {
+    pub user: Option<AccountNumber>,
+}
+
+impl Query {
+    fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
+        if self.user != Some(user) {
+            return Err(async_graphql::Error::new(format!(
+                "permission denied: '{}' must authorize your app to make this query.",
+                user
+            )));
+        }
+        Ok(())
+    }
+
+    fn check_users_auth(&self, u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
+        if self.user != Some(u1) && self.user != Some(u2) {
+            return Err(async_graphql::Error::new(format!(
+                "permission denied: either '{}' or '{}' must authorize your app to make this query.",
+                u1, u2
+            )));
+        }
+        Ok(())
+    }
+}
 
 #[Object]
 impl Query {
@@ -160,6 +184,12 @@ impl Query {
         CpuPricing::get()
     }
 
+    /// Returns the current amount of resources for the specified user
+    async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<Quantity> {
+        self.check_user_auth(user)?;
+        Ok(crate::Wrapper::call().get_resources(user))
+    }
+
     /// Returns the history of resource-consumption events for the specified actor
     async fn consumed_history(
         &self,
@@ -169,6 +199,8 @@ impl Query {
         before: Option<String>,
         after: Option<String>,
     ) -> async_graphql::Result<Connection<u64, ConsumptionEvent>> {
+        self.check_user_auth(account)?;
+
         let condition = "account = '?'".to_string();
         let param = account.to_string();
 
@@ -197,6 +229,13 @@ impl Query {
             ));
         }
 
+        match (purchaser.as_ref(), recipient.as_ref()) {
+            (Some(p), None) => self.check_user_auth(*p)?,
+            (None, Some(r)) => self.check_user_auth(*r)?,
+            (Some(p), Some(r)) => self.check_users_auth(*p, *r)?,
+            (None, None) => unreachable!(),
+        }
+
         let mut conditions = Vec::new();
         let mut params = Vec::new();
 
@@ -217,10 +256,6 @@ impl Query {
             .before(before)
             .after(after)
             .query()
-    }
-
-    async fn user_resources(&self, user: AccountNumber) -> Quantity {
-        crate::Wrapper::call().get_resources(user)
     }
 
     /// Returns the history of block usage events

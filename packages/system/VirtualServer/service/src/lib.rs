@@ -399,8 +399,17 @@ mod service {
     }
 
     #[action]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_graphql(&request, crate::rpc::Query))
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
+        check(
+            get_sender() == AccountNumber::from("http-server"),
+            "permission denied: tokens::serveSys only callable by 'http-server'",
+        );
+
+        None.or_else(|| serve_graphql(&request, crate::rpc::Query { user }))
             .or_else(|| serve_graphiql(&request))
     }
 
