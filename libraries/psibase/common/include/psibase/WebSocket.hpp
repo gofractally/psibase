@@ -9,4 +9,5 @@ namespace psibase
    bool isWebSocketHandshake(const HttpReply& reply);
    bool isWebSocketHandshake(const HttpRequest& request, const HttpReply& reply);
    std::optional<HttpReply> webSocketHandshake(const HttpRequest& request);
+   std::string              randomWebSocketKey();
 }  // namespace psibase
