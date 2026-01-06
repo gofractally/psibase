@@ -184,13 +184,15 @@ impl Query {
         CpuPricing::get()
     }
 
-    /// Returns the current amount of resources for the specified user
+    /// Returns the current amount of resources for the specified user.
+    /// The specified user must have authorized the query.
     async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<Quantity> {
         self.check_user_auth(user)?;
         Ok(crate::Wrapper::call().get_resources(user))
     }
 
-    /// Returns the history of resource-consumption events for the specified actor
+    /// Returns the history of resource-consumption events for the specified account.
+    /// The specified account must have authorized the query.
     async fn consumed_history(
         &self,
         account: AccountNumber,
@@ -214,6 +216,9 @@ impl Query {
     }
 
     // Returns the history of events related to the purchase of resource tokens.
+    /// Either 'purchaser' or 'recipient' (or both) must be specified.
+    /// If one of 'purchaser' or 'recipient' is set, that account must have authorized the query.
+    /// If both are set, then either account must have authorized the query.
     async fn bought_history(
         &self,
         purchaser: Option<AccountNumber>,
