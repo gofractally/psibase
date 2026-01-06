@@ -4,8 +4,10 @@
 mod tests {
     use crate::helpers::to_fixed;
     use crate::Wrapper;
-    use psibase::services::tokens::{Precision, Quantity};
+    use psibase::services::http_server;
+    use psibase::services::tokens::{Decimal, Precision, Quantity, TokensError};
     use psibase::*;
+    use std::str::FromStr;
 
     const MANUAL_DEBIT: u8 = 0;
 
@@ -16,6 +18,17 @@ mod tests {
             contains_error,
             "Error \"{}\" does not contain: \"{}\"",
             err, message
+        );
+    }
+
+    fn assert_query_error<T: std::fmt::Debug>(result: Result<T, psibase::Error>, message: &str) {
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        let contains_error = err_msg.contains(message);
+        assert!(
+            contains_error,
+            "Error \"{}\" does not contain: \"{}\"",
+            err_msg, message
         );
     }
 
@@ -154,5 +167,196 @@ mod tests {
         // test_large_precision
         assert_eq!(to_fixed("123.4", 8), "123.40000000");
         assert_eq!(to_fixed("0", 5), "0.00000");
+    }
+
+    #[derive(serde::Deserialize)]
+    struct SubaccountBalance {
+        balance: String,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct SubaccountBalanceData {
+        subaccountBalance: Option<SubaccountBalance>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct GraphQLError {
+        message: String,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Response<T> {
+        data: Option<T>,
+        errors: Option<Vec<GraphQLError>>,
+    }
+
+    fn get_subaccount_balance(
+        chain: &psibase::Chain,
+        account: AccountNumber,
+        subaccount: &str,
+        token_id: u32,
+        auth_token: &String,
+    ) -> Result<u64, psibase::Error> {
+        let query = format!(
+            r#"query {{
+                subaccountBalance(user: "{}", subAccount: "{}", tokenId: {}) {{
+                    balance
+                }}
+            }}"#,
+            account, subaccount, token_id
+        );
+        let response: Response<SubaccountBalanceData> =
+            chain.graphql_auth(Wrapper::SERVICE, &query, auth_token)?;
+
+        if let Some(errors) = response.errors {
+            return Err(anyhow!("GraphQL error: {}", errors[0].message).into());
+        }
+
+        let Some(data) = response.data else {
+            return Err(anyhow!("GraphQL response has no data").into());
+        };
+
+        let d = Decimal::from_str(&data.subaccountBalance.unwrap().balance)
+            .map_err(|e: TokensError| anyhow!("Failed to parse balance: {}", e))?;
+
+        Ok(d.quantity.value)
+    }
+
+    #[psibase::test_case(packages("Tokens"))]
+    fn test_subaccounts(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init();
+        http_server::Wrapper::push_from(&chain, Wrapper::SERVICE)
+            .registerServer(account!("r-tokens"))
+            .get()?;
+        chain.finish_block();
+
+        let alice = account!("alice");
+        chain.new_account(alice).unwrap();
+
+        let bob = account!("bob");
+        chain.new_account(bob).unwrap();
+
+        let token_a = chain.login(account!("alice"), Wrapper::SERVICE)?;
+        let token_b = chain.login(account!("bob"), Wrapper::SERVICE)?;
+
+        let a = Wrapper::push_from(&chain, alice);
+        let b = Wrapper::push_from(&chain, bob);
+
+        let tid = a.create(4.try_into().unwrap(), 100_0000.into()).get()?;
+        a.mint(tid, 10_0000.into(), "".into()).get()?;
+        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
+        a.credit(tid, bob, 10_0000.into(), "".into()).get()?;
+        a.mint(tid, 10_0000.into(), "".into()).get()?;
+
+        let checking = "checking".to_string();
+        let savings = "savings".to_string();
+
+        // Check send to a sub-account
+        a.toSub(tid, savings.clone(), 5_0000.into()).get()?;
+        assert_eq!(5_0000, a.getBalance(tid, alice).get()?.value);
+        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(5_0000, balance);
+        a.toSub(tid, savings.clone(), 3_0000.into()).get()?;
+        assert_eq!(2_0000, a.getBalance(tid, alice).get()?.value);
+        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(8_0000, balance);
+
+        // Check retrieve from a sub-account
+        a.fromSub(tid, savings.clone(), 2_0000.into()).get()?;
+        assert_eq!(4_0000, a.getBalance(tid, alice).get()?.value);
+        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(6_0000, balance);
+
+        a.fromSub(tid, savings.clone(), 6_0000.into()).get()?;
+        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
+        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(0, balance);
+
+        // Check overdraw from a sub-account
+        assert_error(
+            a.fromSub(tid, savings.clone(), 1.into()),
+            "Insufficient sub-account balance",
+        );
+
+        // Check overdraw from primary
+        assert_error(
+            a.toSub(tid, savings.clone(), 100_0000.into()),
+            "Insufficient token balance",
+        );
+
+        // Check multiple sub-accounts
+        a.toSub(tid, savings.clone(), 3_0000.into()).get()?;
+        a.toSub(tid, checking.clone(), 5_0000.into()).get()?;
+        assert_eq!(2_0000, a.getBalance(tid, alice).get()?.value);
+        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        assert_eq!(3_0000, savings_balance);
+        assert_eq!(5_0000, checking_balance);
+
+        a.toSub(tid, savings.clone(), 1_0000.into());
+        assert_eq!(1_0000, a.getBalance(tid, alice).get()?.value);
+        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        assert_eq!(4_0000, savings_balance);
+        assert_eq!(5_0000, checking_balance);
+
+        a.fromSub(tid, checking.clone(), 2_0000.into());
+        assert_eq!(3_0000, a.getBalance(tid, alice).get()?.value);
+        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        assert_eq!(4_0000, savings_balance);
+        assert_eq!(3_0000, checking_balance);
+
+        // Check delete sub-account
+        a.deleteSub(savings.clone()).get()?;
+        a.deleteSub(checking.clone()).get()?;
+        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
+
+        assert_query_error(
+            get_subaccount_balance(&chain, alice, &savings, tid, &token_a),
+            "Sub-account 'savings' not found",
+        );
+
+        assert_query_error(
+            get_subaccount_balance(&chain, alice, &checking, tid, &token_a),
+            "Sub-account 'checking' not found",
+        );
+
+        // Check sub-account key length validation
+        let long_key = "a".repeat(80);
+        a.createSub(long_key.clone()).get()?;
+        a.deleteSub(long_key.clone()).get()?;
+
+        let too_long_key = "a".repeat(81);
+        assert_error(
+            a.createSub(too_long_key.clone()),
+            "Sub-account key must be 80 bytes or less",
+        );
+
+        // Avoid cross-account sub-account contamination
+        a.toSub(tid, savings.clone(), 1_0000.into()).get()?;
+        b.toSub(tid, savings.clone(), 2_0000.into()).get()?;
+        let savings_balance_a = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let savings_balance_b = get_subaccount_balance(&chain, bob, &savings, tid, &token_b)?;
+        assert_eq!(1_0000, savings_balance_a);
+        assert_eq!(2_0000, savings_balance_b);
+        a.deleteSub(savings.clone()).get()?;
+        b.deleteSub(savings.clone()).get()?;
+
+        // Check multiple tokens in same sub-account
+        a.toSub(tid, savings.clone(), 2_0000.into()).get()?;
+        assert_eq!(8_0000, a.getBalance(tid, alice).get()?.value);
+
+        let tid2 = a.create(4.try_into().unwrap(), 100_0000.into()).get()?;
+        a.mint(tid2, 5_0000.into(), "".into()).get()?;
+        a.toSub(tid2, savings.clone(), 3_0000.into()).get()?;
+        assert_eq!(2_0000, a.getBalance(tid2, alice).get()?.value);
+
+        let savings_balance_1 = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let savings_balance_2 = get_subaccount_balance(&chain, alice, &savings, tid2, &token_a)?;
+        assert_eq!(2_0000, savings_balance_1);
+        assert_eq!(3_0000, savings_balance_2);
+
+        Ok(())
     }
 }

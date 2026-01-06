@@ -194,6 +194,41 @@ namespace UserService
       /// * `memo`     - Memo
       void recall(TID tokenId, psibase::AccountNumber from, Quantity amount, Memo memo);
 
+      /// Sends tokens from an account's primary balance into a "sub-account" balance
+      ///
+      /// The sub-account will be created if it does not exist.
+      ///
+      /// # Arguments
+      /// * `token_id` - Unique token identifier
+      /// * `sub_account` - Sub-account key
+      /// * `amount`   - Amount of tokens to send
+      void toSub(TID tokenId, std::string subAccount, Quantity amount);
+
+      /// Returns tokens from a "sub-account" balance into the account's primary balance
+      ///
+      /// The sub-account will not be deleted if it becomes empty, it must be manually
+      /// deleted with `deleteSub`.
+      ///
+      /// # Arguments
+      /// * `token_id` - Unique token identifier
+      /// * `sub_account` - Sub-account key
+      /// * `amount`   - Amount of tokens to return
+      void fromSub(TID tokenId, std::string subAccount, Quantity amount);
+
+      /// Creates a new "sub-account" with an empty balance
+      ///
+      /// # Arguments
+      /// * `sub_account` - Sub-account key
+      void createSub(std::string subAccount);
+
+      /// Deletes a "sub-account" balance
+      ///
+      /// All nonzero token balances in the sub-account will be returned to the primary balance.
+      ///
+      /// # Arguments
+      /// * `sub_account` - Sub-account key
+      void deleteSub(std::string subAccount);
+
       // Read-only interface:
 
       /// Lookup token details
@@ -290,6 +325,16 @@ namespace UserService
       /// Gets the system token details (if set), otherwise returns `None`
       std::optional<TokenRecord> getSysToken();
 
+      /// Get the token balance of the sender's specified sub-account
+      ///
+      /// # Arguments
+      /// * `token_id` - Unique token identifier
+      /// * `sub_account` - Sub-account key
+      ///
+      /// Returns the token balance of the sender's specified sub-account
+      /// or `None` if the sub-account does not exist
+      std::optional<Quantity> getSubBal(TID tokenId, std::string subAccount);
+
      private:
       void checkAccountValid(psibase::AccountNumber account);
       bool isSenderIssuer(TID tokenId);
@@ -328,12 +373,17 @@ namespace UserService
       method(credit, tokenId, debitor, amount, memo),
       method(uncredit, tokenId, debitor, amount, memo),
       method(reject, tokenId, creditor, memo),
+      method(toSub, tokenId, subAccount, amount),
+      method(fromSub, tokenId, subAccount, amount),
+      method(createSub, subAccount),
+      method(deleteSub, subAccount),
       method(debit, tokenId, creditor, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
       method(getUserConf, account, index),
       method(setSysToken, tokenId),
       method(getSysToken),
+      method(getSubBal, tokenId, subAccount),
       method(getBalance, tokenId, account),
       method(getSharedBal, tokenId, creditor, debitor),
       method(getBalConf, account, tokenId, index),

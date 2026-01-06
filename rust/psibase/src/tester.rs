@@ -9,19 +9,21 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    check, create_boot_transactions, get_optional_result_bytes, get_result_bytes, services,
-    status_key, tester_raw, AccountNumber, Action, BlockTime, Caller, Checksum256, CodeByHashRow,
-    CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpReply, HttpRequest,
-    InnerTraceEnum, PackageRegistry, RunMode, Seconds, SignedTransaction, StatusRow, TimePointSec,
-    TimePointUSec, ToKey, Transaction, TransactionTrace,
+    actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
+    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
+    Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
+    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry, RunMode, Seconds,
+    SignedTransaction, StatusRow, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
 use anyhow::anyhow;
+use chrono::Utc;
 use fracpack::{Pack, Unpack, UnpackOwned};
 use futures::executor::block_on;
 use psibase_macros::account_raw;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -42,6 +44,8 @@ pub struct Chain {
     producing: Cell<bool>,
     is_auto_block_start: bool,
 }
+
+pub const PRODUCER_ACCOUNT: AccountNumber = AccountNumber::new(account_raw!("prod"));
 
 impl Default for Chain {
     fn default() -> Self {
@@ -100,7 +104,7 @@ impl Chain {
         let (boot_tx, subsequent_tx) = create_boot_transactions(
             &None,
             &None,
-            AccountNumber::new(account_raw!("prod")),
+            PRODUCER_ACCOUNT,
             false,
             TimePointSec { seconds: 10 },
             &mut services[..],
@@ -519,14 +523,7 @@ impl Chain {
     }
 
     pub fn get(&self, account: AccountNumber, target: &str) -> Result<HttpReply, anyhow::Error> {
-        self.http(&HttpRequest {
-            host: format!("{}.psibase.io", account),
-            method: "GET".into(),
-            target: target.into(),
-            contentType: "".into(),
-            body: <Vec<u8>>::new().into(),
-            headers: vec![],
-        })
+        self.get_auth(account, target, "")
     }
 
     pub fn post(
@@ -535,14 +532,7 @@ impl Chain {
         target: &str,
         data: HttpBody,
     ) -> Result<HttpReply, anyhow::Error> {
-        self.http(&HttpRequest {
-            host: format!("{}.psibase.io", account),
-            method: "POST".into(),
-            target: target.into(),
-            contentType: data.contentType,
-            body: data.body,
-            headers: vec![],
-        })
+        self.post_auth(account, target, data, "")
     }
 
     pub fn graphql<T: DeserializeOwned>(
@@ -550,8 +540,107 @@ impl Chain {
         account: AccountNumber,
         query: &str,
     ) -> Result<T, anyhow::Error> {
-        self.post(account, "/graphql", HttpBody::graphql(query))?
+        self.graphql_auth(account, query, "")
+    }
+
+    pub fn get_auth(
+        &self,
+        account: AccountNumber,
+        target: &str,
+        token: &str,
+    ) -> Result<HttpReply, anyhow::Error> {
+        let mut headers = Vec::new();
+        if !token.is_empty() {
+            headers.push(HttpHeader::new(
+                "Authorization",
+                &format!("Bearer {}", token),
+            ));
+        }
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            method: "GET".into(),
+            target: target.into(),
+            contentType: "".into(),
+            body: <Vec<u8>>::new().into(),
+            headers,
+        })
+    }
+
+    pub fn post_auth(
+        &self,
+        account: AccountNumber,
+        target: &str,
+        data: HttpBody,
+        token: &str,
+    ) -> Result<HttpReply, anyhow::Error> {
+        let mut headers = Vec::new();
+        if !token.is_empty() {
+            headers.push(HttpHeader::new(
+                "Authorization",
+                &format!("Bearer {}", token),
+            ));
+        }
+        self.http(&HttpRequest {
+            host: format!("{}.psibase.io", account),
+            method: "POST".into(),
+            target: target.into(),
+            contentType: data.contentType,
+            body: data.body,
+            headers,
+        })
+    }
+
+    pub fn graphql_auth<T: DeserializeOwned>(
+        &self,
+        account: AccountNumber,
+        query: &str,
+        token: &str,
+    ) -> Result<T, anyhow::Error> {
+        self.post_auth(account, "/graphql", HttpBody::graphql(query), token)?
             .json()
+    }
+
+    pub fn login(
+        &self,
+        user: AccountNumber,
+        service: AccountNumber,
+    ) -> Result<String, anyhow::Error> {
+        let expiration = TimePointSec::from(Utc::now()) + Seconds::new(10);
+
+        let tapos = Tapos {
+            expiration,
+            refBlockSuffix: 0,
+            flags: Tapos::DO_NOT_BROADCAST_FLAG,
+            refBlockIndex: 0,
+        };
+
+        let trx = Transaction {
+            tapos,
+            actions: vec![login_action(user, service, "psibase.io")],
+            claims: vec![],
+        };
+
+        let strx = SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: vec![],
+        };
+
+        let reply = self.post(
+            services::transact::SERVICE,
+            "/login",
+            HttpBody {
+                contentType: "application/octet-stream".into(),
+                body: strx.packed().into(),
+            },
+        )?;
+
+        #[derive(Deserialize)]
+        struct LoginReply {
+            access_token: String,
+        }
+
+        let login_reply: LoginReply = reply.json()?;
+        Ok(login_reply.access_token)
     }
 }
 
