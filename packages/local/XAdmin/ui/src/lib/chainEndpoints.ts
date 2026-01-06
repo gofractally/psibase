@@ -331,14 +331,12 @@ class Chain {
                 );
             }
 
-            // POST {...<meta.json>, "sha256": <package hash>} to x-packages.<base_url>/preinstall
             const metaJsonFileContents = zip.file("meta.json");
             if (!metaJsonFileContents) {
                 throw new Error("meta.json file not found in package");
             }
             const metaJson = JSON.parse(await metaJsonFileContents.async("text"));
             
-            // Compute SHA256 from the entire package file
             const fileArrayBuffer = await file.arrayBuffer();
             const hashBuffer = await crypto.subtle.digest("SHA-256", fileArrayBuffer);
             const sha256 = Array.from(new Uint8Array(hashBuffer))
@@ -349,7 +347,7 @@ class Chain {
                 ...metaJson,
                 sha256,
             };
-            const response = await fetch(`${siblingUrl(null, "x-packages", "/preinstall")}/${sha256}`, {
+            const response = await fetch(`${siblingUrl(null, "x-packages", "/preinstall")}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -380,19 +378,10 @@ class Chain {
                     body: wasmData,
                 });
 
-                const jsonMeta = await jsonMetaFile.async("arraybuffer");
-                const responseJson = await fetch(`/services/${serviceName}`, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: jsonMeta,
-                });
-
-                if (!response.ok || !responseJson.ok) {
+                if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(
-                        `Failed to install service ${serviceName}: ${!response.status ? response.status : responseJson.status} ${errorText}`,
+                        `Failed to install service ${serviceName}: ${response.status} ${errorText}`,
                     );
                 }
 
@@ -401,7 +390,6 @@ class Chain {
 
             await this.installDataFiles(zip);
 
-            // TODO: PUT { services: { <account>: <service.json> }, data: <file list>[] } to x-packages.<base_url>/manifest/<package hash>
             const services = await Promise.all(
                 allServices.map(async (serviceName) => {
                     const serviceJsonFile = zip.file(`service/${serviceName}.json`);
@@ -413,7 +401,6 @@ class Chain {
                     };
                 }),
             );
-            
             const dataDir = zip.folder("data");
             const data: Array<{ account: string; filename: string }> = [];
             if (dataDir) {
@@ -446,8 +433,7 @@ class Chain {
                 throw new Error(`Failed to install package: ${manifestResponse.status} ${manifestResponse.statusText}`);
             }
 
-            // TODO: POST {...<meta.json>, "sha256": <package hash>} to x-packages.<base_url>/postinstall
-            const postinstallResponse = await fetch(`${siblingUrl(null, "x-packages", "/postinstall")}/${sha256}`, {
+            const postinstallResponse = await fetch(`${siblingUrl(null, "x-packages", "/postinstall")}`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
