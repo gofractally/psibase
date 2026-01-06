@@ -74,9 +74,11 @@ mod service {
         CpuPricing::initialize();
 
         // Event indexes
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("resources"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("bought"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("bought"), 1);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("block_summary"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("billed"), 0);
     }
 
     #[pre_action(exclude(init))]
@@ -382,7 +384,7 @@ mod service {
         if block_num % 10 == 0 {
             Wrapper::emit()
                 .history()
-                .block_summary(net_usage, cpu_usage);
+                .block_summary(block_num, net_usage, cpu_usage);
         }
     }
 
@@ -415,7 +417,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 
     // TODO: Ideally, this is emitted once per transaction with the total amount billed by the transaction
     #[event(history)]
