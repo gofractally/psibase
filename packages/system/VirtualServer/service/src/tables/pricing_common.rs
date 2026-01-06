@@ -50,61 +50,21 @@ fn average(list: &[u64]) -> u64 {
     (list.iter().map(|&x| x as u128).sum::<u128>() / list.len() as u128) as u64
 }
 
-fn delta_squared(v: u64, average: u64) -> u128 {
-    let d = v as i128 - average as i128;
-    let d_abs = d.abs() as u128;
-    d_abs * d_abs
-}
-
-fn var(list: &[u64], average: u64) -> u64 {
-    if list.is_empty() {
-        return 0;
-    }
-    let d_squared = |&x: &u64| -> u128 { delta_squared(x, average) };
-
-    (list.iter().map(d_squared).sum::<u128>() / list.len() as u128) as u64
-}
-
 /// Updates the average_history with the specified current_usage, then zeroes out the current_usage.
 /// Increments the specified diff_adjust by the amount of the average usage in PPM (of total capacity).
 pub fn update_average_usage(
     usage_history: &mut Vec<u64>,
-    current_usage: &mut u64,
+    last_block_usage: &mut u64,
     num_blocks_to_average: u8,
     capacity: u64,
     diff_adjust_id: u32,
 ) -> u32 {
-    usage_history.insert(0, *current_usage);
+    usage_history.insert(0, *last_block_usage);
     if usage_history.len() > num_blocks_to_average as usize {
         usage_history.pop();
     }
 
-    // When rate-limiting resource usage, we want to include the usage of the current block
-    // in the calculation, assuming that it is going to be full.
-    let mut padded_usage = usage_history.clone();
-    padded_usage.push(capacity); // Add a block of max capacity
-
-    // Calculating the number of standard deviations we are over the average
-    // Working in sigma-squared space to avoid square roots
-    let avg = average(&padded_usage);
-    let variance = var(&padded_usage, avg);
-    let d2 = delta_squared(*current_usage, avg);
-    let factor = d2 as u128 / variance as u128;
-
-    let _sigma: u8 = if factor > 25 {
-        5
-    } else if factor > 16 {
-        4
-    } else if factor > 9 {
-        3
-    } else if factor > 4 {
-        2
-    } else if factor > 1 {
-        1
-    } else {
-        0
-    };
-
+    let avg = average(&usage_history);
     let ppm = ratio_to_ppm(avg, capacity);
 
     // We need to clamp this to fit in u32 which is a DiffAdjust constraint.
@@ -117,7 +77,7 @@ pub fn update_average_usage(
     // of capacity), increment multiple times.
     DiffAdjust::call().increment(diff_adjust_id, ppm);
 
-    *current_usage = 0;
+    *last_block_usage = 0;
 
     ppm
 }
