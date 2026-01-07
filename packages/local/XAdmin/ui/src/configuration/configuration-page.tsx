@@ -26,6 +26,7 @@ import {
 
 import { Service } from "../components";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
+import { useServerSpecs } from "../hooks/useServerSpecs";
 import { Logger } from "../log/logger";
 import {
     PsinodeConfigUI,
@@ -33,6 +34,73 @@ import {
     ServiceConfig,
 } from "./interfaces";
 import { defaultService, newId, writeConfig } from "./utils";
+
+const getHumanFriendlyNumber = (value: number, baseUnit: string, decimals: number = 0): string => {
+    if (value >= 1e15) {
+        return `${(value / 1e15).toFixed(decimals)} P${baseUnit}`;
+    }
+    if (value >= 1e12) {
+        return `${(value / 1e12).toFixed(decimals)} T${baseUnit}`;
+    }
+    if (value >= 1e9) {
+        return `${(value / 1e9).toFixed(decimals)} G${baseUnit}`;
+    }
+    if (value >= 1e6) {
+        return `${(value / 1e6).toFixed(decimals)} M${baseUnit}`;
+    }
+    if (value >= 1e3) {
+        return `${(value / 1e3).toFixed(decimals)} K${baseUnit}`;
+    }
+    return `${Math.round(value)} ${baseUnit}`;
+};
+
+const NodeSpecsContent = () => {
+    const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
+    const ramBytes = serverSpecs?.recommendedMinMemoryBytes;
+
+    return (
+        <div className="space-y-4">
+            <div className="rounded-lg border p-4 space-y-4">
+                {isLoadingSpecs ? (
+                    <div className="space-y-3">
+                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">
+                                Bandwidth:
+                            </span>
+                            <span className="text-sm">
+                                {serverSpecs
+                                    ? getHumanFriendlyNumber(serverSpecs.bandwidthBps, "bps", 1)
+                                    : "N/A"}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">
+                                Storage:
+                            </span>
+                            <span className="text-sm">
+                                {serverSpecs
+                                    ? getHumanFriendlyNumber(serverSpecs.storageBytes, "B")
+                                    : "N/A"}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium">RAM:</span>
+                            <span className="text-sm">
+                                {ramBytes ? getHumanFriendlyNumber(ramBytes, "B") : "N/A"}
+                            </span>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export const ConfigurationPage = () => {
     const { data: config, isLoading, isError } = useConfig();
@@ -172,6 +240,9 @@ export const ConfigurationForm = ({
                             </TabsTrigger>
                             <TabsTrigger value="logs">Logs</TabsTrigger>
                             <TabsTrigger value="services">Services</TabsTrigger>
+                            <TabsTrigger value="node-specs">
+                                Node Specs
+                            </TabsTrigger>
                         </TabsList>
                         <TabsContent value="connections">
                             <Controller
@@ -440,6 +511,9 @@ export const ConfigurationForm = ({
                                     </tbody>
                                 </table>
                             </fieldset>
+                        </TabsContent>
+                        <TabsContent value="node-specs">
+                            <NodeSpecsContent />
                         </TabsContent>
                     </Tabs>
 
