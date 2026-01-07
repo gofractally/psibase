@@ -382,7 +382,7 @@ namespace psibase
       RunMode mode;
       // The initial time limit for the action. If the
       // action has sufficient permissions, it can change
-      // the limit using setMaxTransactionTime. The limit
+      // the limit using setMaxCpuTime. The limit
       // only applies to the action. The continuation is
       // not limited and therefore should be a system service.
       MicroSeconds maxTime;

@@ -4,7 +4,7 @@
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 
-#include <services/system/Accounts.hpp>
+#include <services/system/VirtualServer.hpp>
 
 using psibase::check;
 
@@ -21,22 +21,24 @@ namespace SystemService
 
    void CpuLimit::setCpuLimit(psibase::AccountNumber account)
    {
-      // TODO: Lookup up available CPU balance
+      auto cpu_limit = psibase::to<VirtualServer>().getCpuLimit(account);
 
-      // if (row->resourceBalance)
-      // {
-      //    auto limit = 0;
-      //    // add leeway with saturation
-      //    if (limit <= std::chrono::nanoseconds::max() - leeway)
-      //    {
-      //       limit += leeway;
-      //    }
-      //    else
-      //    {
-      //       limit = std::chrono::nanoseconds::max();
-      //    }
-      //    psibase::raw::setMaxTransactionTime(limit.count());
-      // }
+      if (!cpu_limit.has_value())
+         return;
+
+      auto limit = std::chrono::nanoseconds(*cpu_limit);
+
+      // add leeway with saturation
+      if (limit <= std::chrono::nanoseconds::max() - leeway)
+      {
+         limit += leeway;
+      }
+      else
+      {
+         limit = std::chrono::nanoseconds::max();
+      }
+
+      psibase::raw::setMaxCpuTime(limit.count());
    }
 }  // namespace SystemService
 

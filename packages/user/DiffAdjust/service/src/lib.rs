@@ -304,7 +304,9 @@ pub mod service {
         RateLimit::get_assert(nft_id).check_difficulty_decrease()
     }
 
-    /// Increment RateLimit instance, potentially increasing RateLimit
+    /// Increment RateLimit instance
+    /// 
+    /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
     /// * Requires sender to be consumer account.
     ///
@@ -375,6 +377,17 @@ pub mod service {
     #[action]
     fn delete(nft_id: u32) {
         RateLimit::get_assert(nft_id).delete()
+    }
+
+    /// Get targets
+    ///
+    /// Gets the minimum and maximum targets for the specified DiffAdjust
+    ///
+    /// Returns (target_min, target_max)
+    #[action]
+    fn get_targets(nft_id: u32) -> (u32, u32) {
+        let r = RateLimit::get_assert(nft_id);
+        (r.target_min, r.target_max)
     }
 }
 

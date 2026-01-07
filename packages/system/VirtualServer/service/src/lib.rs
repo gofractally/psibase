@@ -44,11 +44,12 @@ pub mod tables;
 /// service to manage server specs, network variables, and billing parameters, as needed.
 #[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
 mod service {
-    use crate::rpc::event_types;
+    use crate::rpc::resource_events;
     use crate::tables::tables::*;
     use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
+        cpu_limit::Wrapper as CpuLimit,
         nft::{NftHolderFlags, Wrapper as Nft},
         tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
@@ -69,12 +70,15 @@ mod service {
         Transact::call().resMonitoring(true);
 
         // Initialize network resource consumption tracking
-        NetworkBandwidth::initialize();
+        NetPricing::initialize();
+        CpuPricing::initialize();
 
         // Event indexes
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("resources"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("bought"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("bought"), 1);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("block_summary"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("billed"), 0);
     }
 
     #[pre_action(exclude(init))]
@@ -101,6 +105,33 @@ mod service {
     #[action]
     fn get_fee_receiver() -> Option<AccountNumber> {
         BillingConfig::get().map(|c| c.fee_receiver)
+    }
+
+    /// Set the virtual server specs
+    ///
+    /// These are effectively the minimum specs that any node that participates
+    /// in the network must have available.
+    #[action]
+    fn set_specs(specs: ServerSpecs) {
+        check(get_sender() == get_service(), "Unauthorized");
+
+        ServerSpecs::set(&specs);
+        NetworkSpecs::set_from(&specs);
+    }
+
+    /// These variables change how the network specs are derived from the server
+    /// specs.
+    ///
+    /// The "network specs" are the specifications of the server as perceived by
+    /// a user of the network, which is not the same as the specs needed by each
+    /// of the actual nodes. Only a subset of the nodes resources are available for
+    /// use by users of the network to account for other overhead and system
+    /// functionality.
+    #[action]
+    fn set_network_variables(variables: NetworkVariables) {
+        check(get_sender() == get_service(), "Unauthorized");
+
+        NetworkVariables::set(&variables);
     }
 
     /// Enable or disable the billing system
@@ -139,22 +170,9 @@ mod service {
         Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
         Tokens::call().toSub(res, for_user.to_string(), amount);
 
-        if buyer == for_user {
-            Wrapper::emit()
-                .history()
-                .resources(buyer, event_types::BOUGHT, amount.value);
-        } else {
-            Wrapper::emit()
-                .history()
-                .resources(for_user, event_types::RECEIVED, amount.value);
-
-            Wrapper::emit().history().subsidized(
-                buyer,
-                for_user,
-                amount.value,
-                memo.unwrap_or("".into()),
-            );
-        };
+        Wrapper::emit()
+            .history()
+            .bought(buyer, for_user, amount.value, memo.unwrap_or("".into()));
     }
 
     /// Used to acquire resource tokens for the sender
@@ -200,33 +218,6 @@ mod service {
         }
     }
 
-    /// Set the virtual server specs
-    ///
-    /// These are effectively the minimum specs that any node that participates
-    /// in the network must have available.
-    #[action]
-    fn set_specs(specs: ServerSpecs) {
-        check(get_sender() == get_service(), "Unauthorized");
-
-        ServerSpecs::set(&specs);
-        NetworkSpecs::set_from(&specs);
-    }
-
-    /// These variables change how the network specs are derived from the server
-    /// specs.
-    ///
-    /// The "network specs" are the specifications of the server as perceived by
-    /// a user of the network, which is not the same as the specs needed by each
-    /// of the actual nodes. Only a subset of the nodes resources are available for
-    /// use by users of the network to account for other overhead and system
-    /// functionality.
-    #[action]
-    fn set_network_variables(variables: NetworkVariables) {
-        check(get_sender() == get_service(), "Unauthorized");
-
-        NetworkVariables::set(&variables);
-    }
-
     /// Set the network bandwidth pricing thresholds
     ///
     /// Configures the idle and congested thresholds used by the pricing algorithm
@@ -242,7 +233,7 @@ mod service {
     #[action]
     fn net_thresholds(idle_ppm: u32, congested_ppm: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetworkBandwidth::set_thresholds(idle_ppm, congested_ppm);
+        NetPricing::set_thresholds(idle_ppm, congested_ppm);
     }
 
     /// Set the network bandwidth price change rates
@@ -256,7 +247,7 @@ mod service {
     #[action]
     fn net_rates(doubling_time_sec: u32, halving_time_sec: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetworkBandwidth::set_price_rates(doubling_time_sec, halving_time_sec);
+        NetPricing::set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
     #[action]
@@ -265,7 +256,66 @@ mod service {
     /// the price of network bandwidth.
     fn net_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetworkBandwidth::set_num_blocks_to_average(num_blocks);
+        NetPricing::set_num_blocks_to_average(num_blocks);
+    }
+
+    /// Sets the size of the billable unit of network bandwidth.
+    ///
+    /// This unit is also the minimum amount billed for bandwidth in a single transaction.
+    #[action]
+    fn net_min_unit(bits: u64) {
+        check(get_sender() == get_service(), "Unauthorized");
+        NetPricing::set_billable_unit(bits);
+    }
+
+    /// Set the CPU pricing thresholds
+    ///
+    /// Configures the idle and congested thresholds used by the pricing algorithm
+    /// for CPU billing. These thresholds are ppm values representing
+    /// the fraction of total available CPU (e.g. 45_0000 = 45%, 55_0000 = 55%).
+    ///
+    /// Below the idle threshold, the price of CPU will decrease.
+    /// Above the congested threshold, the price of CPU will increase.
+    ///
+    /// # Arguments
+    /// * `idle_ppm` - Threshold below which the network is considered idle (ppm)
+    /// * `congested_ppm` - Threshold above which the network is considered congested (ppm)
+    #[action]
+    fn cpu_thresholds(idle_ppm: u32, congested_ppm: u32) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_thresholds(idle_ppm, congested_ppm);
+    }
+
+    /// Set the CPU price change rates
+    ///
+    /// Configures the rate at which the CPU price increases when
+    /// congested and decreases when idle.
+    ///
+    /// # Arguments
+    /// * `doubling_time_sec` - Time it takes to double the price when congested
+    /// * `halving_time_sec` - Time it takes to halve the price when idle
+    #[action]
+    fn cpu_rates(doubling_time_sec: u32, halving_time_sec: u32) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_change_rates(doubling_time_sec, halving_time_sec);
+    }
+
+    #[action]
+    /// Sets the number of blocks over which to compute the average CPU usage.
+    /// This average usage is compared to the network capacity (every block) to determine
+    /// the price of CPU.
+    fn cpu_blocks_avg(num_blocks: u8) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_num_blocks_to_average(num_blocks);
+    }
+
+    /// Sets the size of the billable unit of CPU time.
+    ///
+    /// This unit is also the minimum amount billed for CPU in a single transaction.
+    #[action]
+    fn cpu_min_unit(ns: u64) {
+        check(get_sender() == get_service(), "Unauthorized");
+        CpuPricing::set_billable_unit(ns);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -280,7 +330,7 @@ mod service {
             "[useNetSys] Unauthorized",
         );
 
-        let cost = NetworkBandwidth::consume(amount_bytes);
+        let cost = NetPricing::consume(amount_bytes);
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
             bill(user, cost);
@@ -288,7 +338,7 @@ mod service {
 
         Wrapper::emit()
             .history()
-            .resources(user, event_types::CONSUMED_NET, cost);
+            .consumed(user, resource_events::CONSUMED_NET, amount_bytes);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -297,16 +347,13 @@ mod service {
     /// If billing is enabled, the user will be billed for the consumption of
     /// this resource.
     #[action]
-    fn useCpuSys(user: AccountNumber, _amount_ns: u64) {
+    fn useCpuSys(user: AccountNumber, amount_ns: u64) {
         check(
             get_sender() == Transact::SERVICE,
             "[useCpuSys] Unauthorized",
         );
 
-        //let _amount = amount_ns.saturating_mul(Prices::get_price(Resource::Compute));
-        //check(_amount < u64::MAX, "cpu usage overflow");
-
-        let cost = 1; // TODO: implement cpu pricing
+        let cost = CpuPricing::consume(amount_ns);
 
         if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
             bill(user, cost);
@@ -314,7 +361,7 @@ mod service {
 
         Wrapper::emit()
             .history()
-            .resources(user, event_types::CONSUMED_CPU, cost);
+            .consumed(user, resource_events::CONSUMED_CPU, amount_ns);
     }
 
     #[action]
@@ -330,19 +377,47 @@ mod service {
     fn notifyBlock(block_num: BlockNum) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
-        let net_usage = NetworkBandwidth::new_block();
+        let net_usage = NetPricing::new_block();
+        let cpu_usage = CpuPricing::new_block();
 
         // Emit the block usage stats every 10 blocks
         if block_num % 10 == 0 {
-            Wrapper::emit().history().block_summary(net_usage);
+            Wrapper::emit()
+                .history()
+                .block_summary(block_num, net_usage, cpu_usage);
         }
     }
 
-    #[event(history)]
-    fn resources(actor: AccountNumber, action: u8, amount: u64) {}
+    /// Gets the CPU limit (in ns) for the specified account
+    ///
+    /// Returns None if there is no limit for the specified account
+    #[action]
+    fn getCpuLimit(account: AccountNumber) -> Option<u64> {
+        check(get_sender() == CpuLimit::SERVICE, "Unauthorized");
+
+        Some(CpuPricing::get_cpu_limit(account))
+    }
+
+    #[action]
+    fn serveSys(
+        request: HttpRequest,
+        _socket: Option<i32>,
+        user: Option<AccountNumber>,
+    ) -> Option<HttpReply> {
+        check(
+            get_sender() == AccountNumber::from("http-server"),
+            "permission denied: tokens::serveSys only callable by 'http-server'",
+        );
+
+        None.or_else(|| serve_graphql(&request, crate::rpc::Query { user }))
+            .or_else(|| serve_graphiql(&request))
+    }
 
     #[event(history)]
-    fn subsidized(
+    fn consumed(account: AccountNumber, resource_event: u8, amount: u64) {}
+
+    #[event(history)]
+    fn bought(
         purchaser: AccountNumber,
         recipient: AccountNumber,
         amount: u64,
@@ -351,13 +426,11 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(net_usage_ppm: u32) {}
+    fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 
-    #[action]
-    fn serveSys(request: HttpRequest) -> Option<HttpReply> {
-        None.or_else(|| serve_graphql(&request, crate::rpc::Query))
-            .or_else(|| serve_graphiql(&request))
-    }
+    // TODO: Ideally, this is emitted once per transaction with the total amount billed by the transaction
+    #[event(history)]
+    fn billed(account: AccountNumber, amount: u64) {}
 }
 
 #[cfg(test)]

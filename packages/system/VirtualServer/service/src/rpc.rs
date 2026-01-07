@@ -1,70 +1,94 @@
 use crate::tables::tables::{
-    BillingConfig, BillingConfigTable, NetworkSpecs, NetworkSpecsTable, NetworkVariables,
-    ServerSpecs as InternalServerSpecs, ServerSpecsTable,
+    BillingConfig, BillingConfigTable, CpuPricing, NetPricing, NetworkSpecs, NetworkSpecsTable,
+    NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable,
 };
 use async_graphql::{connection::Connection, *};
 use psibase::{
-    check_some,
-    services::tokens::{self as Tokens, Decimal, Quantity},
+    services::tokens::{Decimal, Precision, Quantity},
     AccountNumber, EventQuery, Table,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 
-pub mod event_types {
-    pub const BOUGHT: u8 = 0;
-    pub const RECEIVED: u8 = 1;
-    pub const CONSUMED_CPU: u8 = 2;
-    pub const CONSUMED_NET: u8 = 3;
+pub mod resource_events {
+    pub const CONSUMED_CPU: u8 = 0;
+    pub const CONSUMED_NET: u8 = 1;
+    pub const _CONSUMED_STOR: u8 = 2;
+    pub const _FREED_STOR: u8 = 3;
 }
 
 #[derive(Deserialize, SimpleObject)]
 #[graphql(complex)]
-pub struct ResourcesEvent {
-    actor: AccountNumber,
+pub struct ConsumptionEvent {
+    account: AccountNumber,
     #[graphql(skip)]
-    action: u8,
+    resource_event: u8,
     #[serde(deserialize_with = "deserialize_number_from_string")]
+    #[graphql(skip)]
     amount: u64,
 }
 
 #[ComplexObject]
-impl ResourcesEvent {
-    pub async fn action(&self) -> &'static str {
-        match self.action {
-            event_types::BOUGHT => "Bought",
-            event_types::CONSUMED_CPU => "Consumed CPU",
-            event_types::CONSUMED_NET => "Consumed Network Bandwidth",
+impl ConsumptionEvent {
+    pub async fn event(&self) -> &'static str {
+        match self.resource_event {
+            resource_events::CONSUMED_CPU => "Consumed CPU",
+            resource_events::CONSUMED_NET => "Consumed Network Bandwidth",
             _ => "Unknown",
         }
+    }
+
+    pub async fn amount(&self) -> Decimal {
+        let token = BillingConfig::get_sys_token();
+        Decimal::new(Quantity::from(self.amount), token.precision)
     }
 }
 
 #[derive(Deserialize, SimpleObject)]
 #[graphql(complex)]
-pub struct SubsidizedEvent {
+pub struct BoughtEvent {
     purchaser: AccountNumber,
     recipient: AccountNumber,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     #[graphql(skip)]
     amount: u64,
     memo: psibase::Memo,
 }
 
 #[ComplexObject]
-impl SubsidizedEvent {
+impl BoughtEvent {
     pub async fn amount(&self) -> Decimal {
-        let config = check_some(BillingConfig::get(), "Billing not initialized");
-        let token = Tokens::Wrapper::call().getToken(config.sys);
+        let token = BillingConfig::get_sys_token();
         Decimal::new(Quantity::from(self.amount), token.precision)
     }
 }
 
 #[derive(Deserialize, SimpleObject)]
-pub struct ResourceEvent {
-    actor: AccountNumber,
-    action: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    amount: u64,
+#[graphql(complex)]
+pub struct BlockUsageEvent {
+    /// The amount of network usage in the block in ppm (parts per million) of total capacity
+    net_usage_ppm: u32,
+    /// The amount of CPU usage in the block in ppm (parts per million) of total capacity
+    cpu_usage_ppm: u32,
+}
+
+#[ComplexObject]
+impl BlockUsageEvent {
+    /// The amount of network usage in the block as a percentage of total capacity
+    pub async fn net_usage_pct(&self) -> Decimal {
+        Decimal::new(
+            Quantity::from(self.net_usage_ppm as u64),
+            Precision::new(4).unwrap(),
+        )
+    }
+
+    /// The amount of CPU usage in the block as a percentage of total capacity
+    pub async fn cpu_usage_pct(&self) -> Decimal {
+        Decimal::new(
+            Quantity::from(self.cpu_usage_ppm as u64),
+            Precision::new(4).unwrap(),
+        )
+    }
 }
 
 #[derive(Deserialize, SimpleObject)]
@@ -81,7 +105,31 @@ pub struct ServerSpecs {
 //    the 80% serviced entirely in memory
 const MEMORY_RATIO: u8 = 5;
 
-pub struct Query;
+pub struct Query {
+    pub user: Option<AccountNumber>,
+}
+
+impl Query {
+    fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
+        if self.user != Some(user) {
+            return Err(async_graphql::Error::new(format!(
+                "permission denied: '{}' must authorize your app to make this query.",
+                user
+            )));
+        }
+        Ok(())
+    }
+
+    fn check_users_auth(&self, u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
+        if self.user != Some(u1) && self.user != Some(u2) {
+            return Err(async_graphql::Error::new(format!(
+                "permission denied: either '{}' or '{}' must authorize your app to make this query.",
+                u1, u2
+            )));
+        }
+        Ok(())
+    }
+}
 
 #[Object]
 impl Query {
@@ -126,19 +174,40 @@ impl Query {
         NetworkSpecsTable::read().get_index_pk().get(&()).unwrap()
     }
 
-    /// Returns the history of resource-related events for the specified actor
-    /// (i.e. resource purchase, consumption, etc).
-    async fn resource_history(
+    /// Returns the data related to pricing of network bandwidth
+    async fn network_pricing(&self) -> Option<NetPricing> {
+        NetPricing::get()
+    }
+
+    /// Returns the data related to pricing of CPU time
+    async fn cpu_pricing(&self) -> Option<CpuPricing> {
+        CpuPricing::get()
+    }
+
+    /// Returns the current amount of resources for the specified user.
+    /// The specified user must have authorized the query.
+    async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<Quantity> {
+        self.check_user_auth(user)?;
+        Ok(crate::Wrapper::call().get_resources(user))
+    }
+
+    /// Returns the history of resource-consumption events for the specified account.
+    /// The specified account must have authorized the query.
+    async fn consumed_history(
         &self,
-        actor: AccountNumber,
+        account: AccountNumber,
         first: Option<i32>,
         last: Option<i32>,
         before: Option<String>,
         after: Option<String>,
-    ) -> async_graphql::Result<Connection<u64, ResourceEvent>> {
-        let actor = actor.to_string();
-        EventQuery::new("history.virtual-server.resources")
-            .condition(format!("actor = '{}'", actor))
+    ) -> async_graphql::Result<Connection<u64, ConsumptionEvent>> {
+        self.check_user_auth(account)?;
+
+        let condition = "account = '?'".to_string();
+        let param = account.to_string();
+
+        EventQuery::new("history.virtual-server.consumed")
+            .condition_with_params(condition, vec![param])
             .first(first)
             .last(last)
             .before(before)
@@ -146,28 +215,46 @@ impl Query {
             .query()
     }
 
-    // Returns the history of events related to subsidizing resource tokens for others.
-    async fn resource_subsidies(
+    // Returns the history of events related to the purchase of resource tokens.
+    /// Either 'purchaser' or 'recipient' (or both) must be specified.
+    /// If one of 'purchaser' or 'recipient' is set, that account must have authorized the query.
+    /// If both are set, then either account must have authorized the query.
+    async fn bought_history(
         &self,
-        purchaser: AccountNumber,
+        purchaser: Option<AccountNumber>,
         recipient: Option<AccountNumber>,
         first: Option<i32>,
         last: Option<i32>,
         before: Option<String>,
         after: Option<String>,
-    ) -> async_graphql::Result<Connection<u64, SubsidizedEvent>> {
+    ) -> async_graphql::Result<Connection<u64, BoughtEvent>> {
+        if purchaser.is_none() && recipient.is_none() {
+            return Err(async_graphql::Error::new(
+                "Either 'purchaser' or 'recipient' (or both) must be specified",
+            ));
+        }
+
+        match (purchaser.as_ref(), recipient.as_ref()) {
+            (Some(p), None) => self.check_user_auth(*p)?,
+            (None, Some(r)) => self.check_user_auth(*r)?,
+            (Some(p), Some(r)) => self.check_users_auth(*p, *r)?,
+            (None, None) => unreachable!(),
+        }
+
         let mut conditions = Vec::new();
         let mut params = Vec::new();
 
-        conditions.push("purchaser = ?".to_string());
-        params.push(purchaser.to_string());
-
-        if let Some(rec) = recipient {
-            conditions.push("recipient = ?".to_string());
-            params.push(rec.to_string());
+        if let Some(purchaser) = purchaser {
+            conditions.push("purchaser = ?".to_string());
+            params.push(purchaser.to_string());
         }
 
-        EventQuery::new("history.virtual-server.subsidized")
+        if let Some(recipient) = recipient {
+            conditions.push("recipient = ?".to_string());
+            params.push(recipient.to_string());
+        }
+
+        EventQuery::new("history.virtual-server.bought")
             .condition_with_params(conditions.join(" AND "), params)
             .first(first)
             .last(last)
@@ -176,7 +263,22 @@ impl Query {
             .query()
     }
 
-    async fn get_resources(&self, user: AccountNumber) -> Quantity {
-        crate::Wrapper::call().get_resources(user)
+    /// Returns the history of block usage events
+    ///
+    /// One block usage event is emitted every 10 blocks. It contains a summary of the
+    /// average resource consumption of the network in the latest block.
+    async fn block_usage_history(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<u64, BlockUsageEvent>> {
+        EventQuery::new("history.virtual-server.block_summary")
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
     }
 }

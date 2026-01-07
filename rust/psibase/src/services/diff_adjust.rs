@@ -146,6 +146,16 @@ pub mod Service {
     fn delete(nft_id: u32) {
         unimplemented!()
     }
+
+    /// Get targets
+    ///
+    /// Gets the minimum and maximum targets for the specified DiffAdjust
+    ///
+    /// Returns (target_min, target_max)
+    #[action]
+    fn get_targets(nft_id: u32) -> (u32, u32) {
+        unimplemented!()
+    }
 }
 
 #[test]

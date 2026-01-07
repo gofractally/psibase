@@ -23,15 +23,8 @@ pub mod service {
 
     #[action]
     fn init() {
-        let table = InitTable::new();
-
-        if table.get_index_pk().get(&()).is_none() {
-            let init_instance = InitRow {
-                last_used_id: 0,
-                last_used_shared_bal_id: 0,
-                last_used_subaccount_id: 0,
-            };
-            table.put(&init_instance).unwrap();
+        if InitRow::get().is_none() {
+            InitRow::init();
 
             Nfts::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
@@ -454,7 +447,7 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
+        SharedBalance::get_or_new(creditor, get_sender(), token_id).reject(memo);
     }
 
     /// Sends tokens from an account's primary balance into a "sub-account" balance
@@ -467,14 +460,8 @@ pub mod service {
     /// * `amount`   - Amount of tokens to send
     #[action]
     fn toSub(token_id: TID, sub_account: String, amount: Quantity) {
-        check(
-            sub_account.len() <= 80,
-            "Sub-account key must be 80 bytes or less",
-        );
-
         let owner = get_sender();
-        let mut subaccount = SubAccount::get_or_add(owner, sub_account.clone());
-        subaccount.add_balance(token_id, amount);
+        SubAccount::get_or_add(owner, sub_account.clone()).add_balance(token_id, amount);
 
         Wrapper::emit().history().balChanged(
             token_id,
@@ -498,8 +485,8 @@ pub mod service {
     #[action]
     fn fromSub(token_id: TID, sub_account: String, amount: Quantity) {
         let owner = get_sender();
-        let mut subaccount = SubAccount::get_assert(owner, sub_account.clone());
-        subaccount.sub_balance(token_id, amount);
+
+        SubAccount::get_assert(owner, sub_account.clone()).sub_balance(token_id, amount);
 
         Wrapper::emit().history().balChanged(
             token_id,
@@ -517,11 +504,6 @@ pub mod service {
     /// * `sub_account` - Sub-account key
     #[action]
     fn createSub(sub_account: String) {
-        check(
-            sub_account.len() <= 80,
-            "Sub-account key must be 80 bytes or less",
-        );
-
         SubAccount::get_or_add(get_sender(), sub_account);
     }
 

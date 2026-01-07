@@ -52,16 +52,20 @@ namespace LocalService
       /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
       void send(std::int32_t socket, psio::view<const std::vector<char>> data);
 
-      /// Sends an HTTP request and returns the new socket. When the response
+      /// Sends an HTTP request and returns the new socket.
+      ///
+      /// Must be followed by `setCallback(socket, callback, err)`, or the
+      /// socket will be closed when the current context exits. When the response
       /// is available, it will be passed to `sender::callback(socket, reply)`.
       /// If the the request fails without a response, calls `sender::err(socket)`
       std::int32_t sendRequest(psibase::HttpRequest                   request,
-                               psibase::MethodNumber                  callback,
-                               psibase::MethodNumber                  err,
                                std::optional<psibase::TLSInfo>        tls,
                                std::optional<psibase::SocketEndpoint> endpoint);
 
-      /// Opens a websocket connection and returns the new socket. The
+      /// Opens a websocket connection and returns the new socket.
+      ///
+      /// Must be followed by `setCallback(socket, callback, err)`, or the
+      /// socket will be closed when the current context exits. The
       /// request method must be GET. The required headers for the websocket
       /// handshake will be added to the request if they are not already
       /// provided. If the connection is successfully established, calls
@@ -70,8 +74,6 @@ namespace LocalService
       /// does not complete a websocket handshake, calls
       /// `sender::err(socket, optional(reply))`
       std::int32_t websocket(psibase::HttpRequest                   request,
-                             psibase::MethodNumber                  callback,
-                             psibase::MethodNumber                  err,
                              std::optional<psibase::TLSInfo>        tls,
                              std::optional<psibase::SocketEndpoint> endpoint);
 
@@ -91,8 +93,10 @@ namespace LocalService
                   psibase::MethodNumber     callback,
                   psibase::MethodNumber     err);
 
-      /// Changes the callback for a socket. The sender must be the owner
+      /// Changes the callbacks for a socket. The sender must be the owner
       /// of the socket.
+      ///
+      /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void setCallback(std::int32_t          socket,
                        psibase::MethodNumber callback,
                        psibase::MethodNumber err);
@@ -109,8 +113,8 @@ namespace LocalService
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data),
-                method(sendRequest, request, callback, err, tls, endpoint),
-                method(websocket, request, callback, err, tls, endpoint),
+                method(sendRequest, request, tls, endpoint),
+                method(websocket, request, tls, endpoint),
                 method(autoClose, socket, value),
                 method(sendReply, socket, response),
                 method(accept, socket, reply, callback, err),
