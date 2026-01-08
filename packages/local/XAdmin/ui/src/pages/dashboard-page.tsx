@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Label, Pie, PieChart } from "recharts";
 
 import {
@@ -12,7 +13,6 @@ import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
-    type CustomTooltipProps,
 } from "@shared/shadcn/ui/chart";
 import { Separator } from "@shared/shadcn/ui/separator";
 
@@ -52,42 +52,45 @@ export function Component() {
     const { data } = usePerformance();
     const { data: txStats } = useTransactStats();
 
-    const chartData = [
-        {
-            memType: "database",
-            usage: bytesToMb(data?.memory.database || 0),
-            fill: "var(--color-database)",
-        },
-        {
-            memType: "code",
-            usage: bytesToMb(data?.memory.code || 0),
-            fill: "var(--color-code)",
-        },
-        {
-            memType: "data",
-            usage: bytesToMb(data?.memory.data || 0),
-            fill: "var(--color-data)",
-        },
-        {
-            memType: "wasmMemory",
-            usage: bytesToMb(data?.memory.wasmMemory || 0),
-            fill: "var(--color-wasmMemory)",
-        },
-        {
-            memType: "wasmCode",
-            usage: bytesToMb(data?.memory.wasmCode || 0),
-            fill: "var(--color-wasmCode)",
-        },
-        {
-            memType: "unclassified",
-            usage: bytesToMb(data?.memory.unclassified || 0),
-            fill: "var(--color-unclassified)",
-        },
-    ];
+    const chartData = React.useMemo(
+        () => [
+            {
+                memType: "database",
+                usage: bytesToMb(data?.memory.database || 0),
+                fill: "var(--color-database)",
+            },
+            {
+                memType: "code",
+                usage: bytesToMb(data?.memory.code || 0),
+                fill: "var(--color-code)",
+            },
+            {
+                memType: "data",
+                usage: bytesToMb(data?.memory.data || 0),
+                fill: "var(--color-data)",
+            },
+            {
+                memType: "wasmMemory",
+                usage: bytesToMb(data?.memory.wasmMemory || 0),
+                fill: "var(--color-wasmMemory)",
+            },
+            {
+                memType: "wasmCode",
+                usage: bytesToMb(data?.memory.wasmCode || 0),
+                fill: "var(--color-wasmCode)",
+            },
+            {
+                memType: "unclassified",
+                usage: bytesToMb(data?.memory.unclassified || 0),
+                fill: "var(--color-unclassified)",
+            },
+        ],
+        [data],
+    );
 
-    const totalVisitorsBytes = chartData
-        ? chartData.reduce((acc, curr) => acc + curr.usage, 0)
-        : 0;
+    const totalVisitorsBytes = React.useMemo(() => {
+        return chartData.reduce((acc, curr) => acc + curr.usage, 0);
+    }, [chartData]);
 
     if (!chartData) return <div>Loading...</div>;
 
@@ -103,10 +106,12 @@ export function Component() {
                 >
                     <PieChart width={250} height={250}>
                         <ChartTooltip
-                            cursor={false}
-                            content={(props: CustomTooltipProps) => (
-                                <ChartTooltipContent {...props} hideLabel />
-                            )}
+                            content={
+                                <ChartTooltipContent
+                                    hideLabel
+                                    indicator="dashed"
+                                />
+                            }
                         />
                         <Pie
                             data={chartData}
