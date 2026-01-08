@@ -1,27 +1,26 @@
-import * as React from "react";
 import {
+    FileText,
+    Key,
     LayoutDashboard,
     Network,
-    FileText,
     Settings,
-    Key,
 } from "lucide-react";
+import * as React from "react";
 import { NavLink } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useBranding } from "@shared/hooks/use-branding";
-import { HoverBorderGradient } from "@shared/components/hover-border-gradient";
+import { NetworkLogo } from "@shared/components/network-logo";
 import {
     Sidebar,
     SidebarContent,
     SidebarFooter,
+    SidebarGroup,
+    SidebarGroupLabel,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarGroup,
-    SidebarGroupLabel,
 } from "@shared/shadcn/ui/sidebar";
 
 import { useKeyDevices } from "../hooks/useKeyDevices";
@@ -33,7 +32,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { data: keyDevices } = useKeyDevices();
     const isBootable = status && status.includes("needgenesis");
     const hasKeyDevices = keyDevices && keyDevices.length > 0;
-    const { data: networkName } = useBranding({ enabled: !isBootable });
 
     if (isLoadingStatus) {
         return null;
@@ -44,19 +42,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <a
-                                href={siblingUrl()}
-                                title={`${networkName || "Network"} home`}
-                            >
-                                <HoverBorderGradient
-                                    as="div"
-                                    containerClassName="rounded-full"
-                                    className="flex items-center space-x-2 bg-white text-black dark:bg-black dark:text-white"
-                                >
-                                    <span>{networkName || "Network"}</span>
-                                </HoverBorderGradient>
-                            </a>
+                        <SidebarMenuButton
+                            size="lg"
+                            asChild
+                            onClick={() => {
+                                window.top!.location.href = siblingUrl();
+                            }}
+                        >
+                            <NetworkLogo />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
@@ -143,4 +136,3 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </Sidebar>
     );
 }
-
