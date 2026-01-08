@@ -104,7 +104,7 @@ export function Component() {
                     config={chartConfig}
                     style={{ width: "250px", height: "250px" }}
                 >
-                    <PieChart width={250} height={250}>
+                    <PieChart>
                         <ChartTooltip
                             content={
                                 <ChartTooltipContent
@@ -117,10 +117,7 @@ export function Component() {
                             data={chartData}
                             dataKey="usage"
                             nameKey="memType"
-                            cx={125}
-                            cy={125}
                             innerRadius={60}
-                            outerRadius={100}
                             strokeWidth={5}
                         >
                             <Label
