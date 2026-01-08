@@ -25,7 +25,7 @@ export async function installManifest(
     sha256: string,
     payload: ManifestPayload,
 ): Promise<void> {
-    const response = await fetch(`${siblingUrl(null, "x-packages", "/manifest")}/${sha256}`, {
+    const response = await fetch(`${siblingUrl(null, "x-packages", "/manifest")}/${sha256.toUpperCase()}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",

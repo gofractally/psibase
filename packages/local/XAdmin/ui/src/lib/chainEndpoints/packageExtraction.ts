@@ -1,9 +1,40 @@
 import JSZip from "jszip";
+import { z } from "zod";
 
-export interface PackageMeta {
-    sha256: string;
-    [key: string]: unknown;
-}
+const packageDependencySchema = z.object({
+    name: z.string(),
+    version: z.string(),
+});
+
+const packageMetaSchema = z.object({
+    name: z.string(),
+    version: z.string(),
+    description: z.string(),
+    depends: z.array(packageDependencySchema),
+    accounts: z.array(z.string()),
+}).passthrough(); // Allow adding properties later, e.g., sha256
+
+// These are complex nested structures, so we validate the top-level structure
+// but allow flexibility in deeply nested schema definitions
+const serviceJsonSchema = z.object({
+    flags: z.array(z.unknown()).optional(),
+    server: z.string().optional(),
+    schema: z.record(z.string(), z.unknown()).optional(), // Deeply nested, complex structure
+}).passthrough(); // Allow additional properties
+
+const manifestPayloadSchema = z.object({
+    services: z.record(z.string(), serviceJsonSchema),
+    data: z.array(
+        z.object({
+            account: z.string(),
+            filename: z.string(),
+        }),
+    ),
+});
+
+export type PackageMeta = z.infer<typeof packageMetaSchema> & {
+    sha256?: string; // sha256 is added by us, so it's optional in the base type
+};
 
 export interface ExtractedPackage {
     zip: JSZip;
@@ -42,13 +73,14 @@ export function validateNodeLocalServices(services: string[]): void {
 /**
  * Load and parse meta.json from the package
  */
-export async function loadPackageMeta(zip: JSZip): Promise<Record<string, unknown>> {
+export async function loadPackageMeta(zip: JSZip): Promise<z.infer<typeof packageMetaSchema>> {
     const metaJsonFile = zip.file("meta.json");
     if (!metaJsonFile) {
         throw new Error("meta.json file not found in package");
     }
     const metaText = await metaJsonFile.async("text");
-    return JSON.parse(metaText);
+    const parsed = JSON.parse(metaText);
+    return packageMetaSchema.parse(parsed);
 }
 
 /**
@@ -85,10 +117,7 @@ export async function extractPackage(file: File): Promise<ExtractedPackage> {
     };
 }
 
-export interface ManifestPayload {
-    services: Array<Record<string, unknown>>;
-    data: Array<{ account: string; filename: string }>;
-}
+export type ManifestPayload = z.infer<typeof manifestPayloadSchema>;
 
 /**
  * Build the complete manifest payload (services + data)
@@ -97,20 +126,18 @@ export async function buildManifestPayload(
     zip: JSZip,
     serviceNames: string[],
 ): Promise<ManifestPayload> {
-    // Build services array
-    const services = await Promise.all(
+    const services = Object.assign({}, ...(await Promise.all(
         serviceNames.map(async (serviceName) => {
             const serviceJsonFile = zip.file(`service/${serviceName}.json`);
             if (!serviceJsonFile) {
                 throw new Error(`Service ${serviceName} .json file not found in package`);
             }
             return {
-                [serviceName]: JSON.parse(await serviceJsonFile.async("text")),
+                [serviceName]: serviceJsonSchema.parse(JSON.parse(await serviceJsonFile.async("text"))),
             };
         }),
-    );
-
-    // Build data array
+    )));
+    
     const dataDir = zip.folder("data");
     const data: Array<{ account: string; filename: string }> = [];
     
@@ -130,5 +157,5 @@ export async function buildManifestPayload(
         });
     }
 
-    return { services, data };
+    return manifestPayloadSchema.parse({ services, data });
 }

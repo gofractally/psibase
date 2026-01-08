@@ -269,11 +269,13 @@ class Chain {
             allServices = services;
 
             await callPreinstall(meta);
-            installed = await installAllServices(zip, services);
-            await installDataFiles(zip);
 
             const manifestPayload = await buildManifestPayload(zip, services);
             await installManifest(sha256, manifestPayload);
+
+            installed = await installAllServices(zip, services);
+            await installDataFiles(zip);
+
             await callPostinstall(meta);
 
             return {
