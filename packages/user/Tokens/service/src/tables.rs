@@ -415,7 +415,7 @@ pub mod tables {
             Token::get_assert(token_id);
             check(
                 creditor != debitor,
-                format!("Sender cannot be receiver").as_str(),
+                format!("Sender {} cannot also be receiver", creditor).as_str(),
             );
 
             Self {
