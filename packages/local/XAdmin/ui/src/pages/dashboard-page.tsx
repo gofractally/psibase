@@ -22,27 +22,27 @@ import { useTransactStats } from "../hooks/useTransactStats";
 const chartConfig = {
     database: {
         label: "Database",
-        color: "hsl(var(--chart-1))",
+        color: "var(--chart-1)",
     },
     code: {
         label: "Code",
-        color: "hsl(var(--chart-2))",
+        color: "var(--chart-2)",
     },
     data: {
         label: "Data",
-        color: "hsl(var(--chart-5))",
+        color: "var(--chart-5)",
     },
     wasmMemory: {
         label: "WASM Memory",
-        color: "hsl(var(--chart-3))",
+        color: "var(--chart-3)",
     },
     wasmCode: {
         label: "WASM Code",
-        color: "hsl(var(--chart-4))",
+        color: "var(--chart-4)",
     },
     unclassified: {
         label: "Unclassified",
-        color: "hsl(var(--chart-5))",
+        color: "var(--chart-5)",
     },
 } satisfies ChartConfig;
 

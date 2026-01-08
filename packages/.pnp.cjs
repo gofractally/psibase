@@ -10412,10 +10412,10 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["fast-equals", [\
-      ["npm:5.3.2", {\
-        "packageLocation": "../.caches/yarn/fast-equals-npm-5.3.2-d1a4b3f516-babadb98fb.zip/node_modules/fast-equals/",\
+      ["npm:5.4.0", {\
+        "packageLocation": "../.caches/yarn/fast-equals-npm-5.4.0-b27b2b0199-4fdce3a8f8.zip/node_modules/fast-equals/",\
         "packageDependencies": [\
-          ["fast-equals", "npm:5.3.2"]\
+          ["fast-equals", "npm:5.4.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -14626,7 +14626,7 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@types/react", "npm:19.2.2"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.2"],\
-          ["fast-equals", "npm:5.3.2"],\
+          ["fast-equals", "npm:5.4.0"],\
           ["prop-types", "npm:15.8.1"],\
           ["react", "npm:19.2.0"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.0"],\
