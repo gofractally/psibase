@@ -96,12 +96,12 @@ export function Component() {
             <CardHeader className="items-center pb-0">
                 <CardTitle>RAM Usage</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 pb-0">
+            <CardContent className="flex flex-1 items-center justify-center pb-0">
                 <ChartContainer
                     config={chartConfig}
-                    className="mx-auto aspect-square max-h-[250px]"
+                    style={{ width: "250px", height: "250px" }}
                 >
-                    <PieChart>
+                    <PieChart width={250} height={250}>
                         <ChartTooltip
                             cursor={false}
                             content={(props: CustomTooltipProps) => (
@@ -112,7 +112,10 @@ export function Component() {
                             data={chartData}
                             dataKey="usage"
                             nameKey="memType"
+                            cx={125}
+                            cy={125}
                             innerRadius={60}
+                            outerRadius={100}
                             strokeWidth={5}
                         >
                             <Label
