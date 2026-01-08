@@ -138,8 +138,11 @@ impl VirtualServer for ConfigPlugin {
     }
 
     fn enable_billing(enabled: bool) -> Result<(), Error> {
-        set_propose_latch(Some("virtual-server"))?;
+        if enabled {
+            virtual_server::plugin::billing::fill_gas_tank()?;
+        }
 
+        set_propose_latch(Some("virtual-server"))?;
         virtual_server::plugin::admin::enable_billing(enabled)
     }
 }
