@@ -5,7 +5,7 @@ import { StatusBanner } from "./components/status-banner";
 
 function App() {
     return (
-        <div className="mx-auto max-w-screen-xl px-4 py-4">
+        <div className="max-w-screen-xl px-4 py-4">
             <div className="space-y-2 py-2">
                 <StatusBanner />
                 <ProducerKeyLockedBanner />
