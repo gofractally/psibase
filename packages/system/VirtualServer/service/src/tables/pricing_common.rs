@@ -18,7 +18,11 @@ pub fn time_to_rate_ppm(t: u32) -> u32 {
 
 #[derive(SimpleObject)]
 pub struct Thresholds {
+    /// The percentage of average consumption below which the price of the
+    /// resource will decrease
     pub idle_pct: String,
+    /// The percentage of average consumption above which the price of the
+    /// resource will increase
     pub congested_pct: String,
 }
 

@@ -162,9 +162,9 @@ pub mod tables {
         /// The approximate amount of time it takes to halve the price when idle
         pub halving_time_sec: u32,
 
-        /// The unit of billable network bandwidth.
-        ///
-        /// This is also the minimum amount of network bandwidth to bill for.
+        /// This is some number of bits that represents the smallest unit of billable
+        /// network bandwidth. Consumed network bandwidth is rounded up to the nearest
+        /// billable unit.
         pub billable_unit: u64,
     }
 
@@ -199,9 +199,8 @@ pub mod tables {
         /// The approximate amount of time it takes to halve the price when idle
         pub halving_time_sec: u32,
 
-        /// The unit of billable CPU time.
-        ///
-        /// This is also the minimum amount of CPU time to bill for.
+        /// This is some number of nanoseconds that represents the smallest unit of
+        /// billable CPU time. Consumed CPU time is rounded up to the nearest billable unit.
         pub billable_unit: u64,
     }
 
