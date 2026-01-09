@@ -78,7 +78,6 @@ mod service {
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("block_summary"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("billed"), 0);
 
         // TODO: Iterate over the system service tables and aggregate code rows as pre-allocated objective disk space
         // (the accounts service init already does such iterating, use as reference.)
