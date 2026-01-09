@@ -123,14 +123,19 @@ impl NetPricing {
 
 #[ComplexObject]
 impl NetPricing {
+    /// The network usage as a percentage of the total network bandwidth capacity averaged
+    ///  over the last `num_blocks_to_average` blocks
     pub async fn avg_usage_pct(&self) -> String {
         avg_usage_pct_str(&self.usage_history, NetworkSpecs::get().net_bps)
     }
 
+    /// The threshold percentages below/above which the network bandwidth price
+    /// will decrease/increase
     pub async fn thresholds(&self) -> Thresholds {
         get_thresholds_pct(Self::get_check().diff_adjust_id)
     }
 
+    /// The price of network bandwidth per billable unit of network bandwidth
     pub async fn price_per_unit(&self) -> u64 {
         DiffAdjust::call().get_diff(self.diff_adjust_id)
     }

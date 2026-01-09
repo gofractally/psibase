@@ -98,7 +98,12 @@ impl CpuPricing {
     }
 
     pub fn get_cpu_limit(_account: AccountNumber) -> u64 {
-        200_000_000u64 // 200 milliseconds
+        // TODO: How to determine the CPU limit for an account, given that we don't know how much
+        // of the resources in the buffer will be consumed by runtime billing (e.g. db writes)
+
+        // TEMPORARY
+        // return the entire block's worth of CPU time
+        NetworkSpecs::get().cpu_ns
     }
 
     pub fn set_billable_unit(amount_ns: u64) {
@@ -111,14 +116,18 @@ impl CpuPricing {
 
 #[ComplexObject]
 impl CpuPricing {
+    /// The CPU usage as a percentage of the total CPU capacity averaged over the
+    ///  last `num_blocks_to_average` blocks
     pub async fn avg_usage_pct(&self) -> String {
         avg_usage_pct_str(&self.usage_history, NetworkSpecs::get().cpu_ns)
     }
 
+    /// The threshold percentages below/above which the CPU price will decrease/increase
     pub async fn thresholds(&self) -> Thresholds {
         get_thresholds_pct(Self::get_check().diff_adjust_id)
     }
 
+    /// The price of CPU per billable unit of CPU
     pub async fn price_per_unit(&self) -> u64 {
         DiffAdjust::call().get_diff(self.diff_adjust_id)
     }
