@@ -22,11 +22,6 @@ struct UserResources {
     buffer_capacity_raw: u64,
 }
 
-#[derive(Deserialize)]
-struct Quantity {
-    value: u64,
-}
-
 pub fn get_user_resources(user: &str) -> Result<(u64, u64), Error> {
     let query = format!(
         r#"query {{
