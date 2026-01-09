@@ -123,7 +123,6 @@ namespace psibase::net
                                }
                             });
       }
-      bool        is_open() const override { return !closed; }
       static auto translate_close_code(close_code code)
       {
          namespace websocket = boost::beast::websocket;
@@ -144,19 +143,14 @@ namespace psibase::net
       }
       void close(close_code code) override
       {
-         if (!closed)
-         {
-            closed = true;
-            boost::asio::dispatch(
-                stream.get_executor(),
-                [self = this->shared_from_this(), code]() mutable
-                {
-                   auto p = self.get();
-                   p->stream.async_close(
-                       translate_close_code(code),
-                       [self = std::move(self)](const std::error_code& ec) mutable {});
-                });
-         }
+         boost::asio::dispatch(stream.get_executor(),
+                               [self = this->shared_from_this(), code]() mutable
+                               {
+                                  auto p = self.get();
+                                  p->stream.async_close(translate_close_code(code),
+                                                        [self = std::move(self)](
+                                                            const std::error_code& ec) mutable {});
+                               });
       }
       std::string endpoint() const override
       {
@@ -176,8 +170,6 @@ namespace psibase::net
       std::vector<char>                       inbox;
       // Grrrr...
       std::optional<boost::asio::dynamic_vector_buffer<char, std::allocator<char>>> buffer;
-      // Avoid calling close more than once
-      bool closed = false;
       //
       bool need_close_msg = false;
    };

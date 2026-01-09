@@ -40,7 +40,6 @@ namespace psibase::net
       using write_handler = std::function<void(const std::error_code&)>;
       virtual void async_write(std::vector<char>&&, write_handler) = 0;
       virtual void async_read(read_handler)                        = 0;
-      virtual bool is_open() const                                 = 0;
       virtual void close(close_code)                               = 0;
       // Information for display
       virtual std::string endpoint() const { return ""; }
@@ -48,6 +47,7 @@ namespace psibase::net
       loggers::common_logger   logger;
       std::vector<std::string> urls;
       std::optional<NodeId>    id;
+      bool                     closed = false;
       // This is used to manage closing duplicate connections
       // - A peer is identified by host:id
       // - A secure connection will be kept over an insecure connection
@@ -403,7 +403,7 @@ namespace psibase::net
                        ctx,
                        [this, c = std::move(c), id, buf = std::move(buf)]() mutable
                        {
-                          if (c->is_open())
+                          if (!c->closed)
                           {
                              network().recv(id, std::move(buf));
                           }
@@ -417,8 +417,12 @@ namespace psibase::net
          for (auto& [id, conn] : _connections)
          {
             static_cast<Derived*>(this)->network().disconnect(id);
-            conn->close(restart ? connection_base::close_code::restart
-                                : connection_base::close_code::shutdown);
+            if (!conn->closed)
+            {
+               conn->closed = true;
+               conn->close(restart ? connection_base::close_code::restart
+                                   : connection_base::close_code::shutdown);
+            }
             autoconnector->disconnect(conn);
          }
          _connections.clear();
@@ -430,7 +434,11 @@ namespace psibase::net
          if (iter != _connections.end())
          {
             static_cast<Derived*>(this)->network().disconnect(id);
-            iter->second->close(code);
+            if (!iter->second->closed)
+            {
+               iter->second->closed = true;
+               iter->second->close(code);
+            }
             autoconnector->disconnect(iter->second);
             _connections.erase(iter);
             return true;
