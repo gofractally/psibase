@@ -2958,6 +2958,7 @@ dependencies = [
 name = "virtual-server-pkg"
 version = "0.22.0"
 dependencies = [
+ "async-graphql",
  "psibase-system-workspace-hack",
  "virtual-server",
  "virtual-server-plugin",

@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-mod rpc;
+pub mod rpc;
 pub mod tables;
 
 /// Virtual Server Service
@@ -44,7 +44,7 @@ pub mod tables;
 /// service to manage server specs, network variables, and billing parameters, as needed.
 #[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
 mod service {
-    use crate::rpc::resource_events;
+    use crate::rpc::resources;
     use crate::tables::tables::*;
     use psibase::services::events;
     use psibase::services::{
@@ -75,10 +75,13 @@ mod service {
 
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("bought"), 0);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("bought"), 1);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
+        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("block_summary"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("billed"), 0);
+
+        // TODO: Iterate over the system service tables and aggregate code rows as pre-allocated objective disk space
+        // (the accounts service init already does such iterating, use as reference.)
     }
 
     #[pre_action(exclude(init))]
@@ -170,9 +173,16 @@ mod service {
         Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
         Tokens::call().toSub(res, for_user.to_string(), amount);
 
-        Wrapper::emit()
-            .history()
-            .bought(buyer, for_user, amount.value, memo.unwrap_or("".into()));
+        if buyer != for_user {
+            // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
+            // can be reconstructed from the user's own token `balChanged` event history.
+            Wrapper::emit().history().subsidized(
+                buyer,
+                for_user,
+                amount.value,
+                memo.unwrap_or("".into()),
+            );
+        }
     }
 
     /// Used to acquire resource tokens for the sender
@@ -190,7 +200,7 @@ mod service {
     /// metered network functionality.
     #[action]
     fn refill_res_buf() {
-        let config = BillingConfig::get_assert();
+        let config: BillingConfig = BillingConfig::get_assert();
         let balance = Tokens::call().getBalance(config.res, get_sender());
         let buffer_capacity = UserSettings::get(get_sender()).buffer_capacity;
 
@@ -203,6 +213,10 @@ mod service {
     }
 
     fn bill(user: AccountNumber, amount: u64) {
+        if amount == 0 {
+            return;
+        }
+
         if let Some(config) = BillingConfig::get() {
             let res = config.res;
 
@@ -250,10 +264,10 @@ mod service {
         NetPricing::set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
-    #[action]
     /// Sets the number of blocks over which to compute the average network usage.
     /// This average usage is compared to the network capacity (every block) to determine
     /// the price of network bandwidth.
+    #[action]
     fn net_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
         NetPricing::set_num_blocks_to_average(num_blocks);
@@ -330,15 +344,19 @@ mod service {
             "[useNetSys] Unauthorized",
         );
 
-        let cost = NetPricing::consume(amount_bytes);
+        let mut cost = NetPricing::consume(amount_bytes);
 
-        if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
-            bill(user, cost);
+        if BillingConfig::get()
+            .map(|c| c.enabled == false)
+            .unwrap_or(true)
+        {
+            cost = 0
         }
+        bill(user, cost);
 
         Wrapper::emit()
             .history()
-            .consumed(user, resource_events::CONSUMED_NET, amount_bytes);
+            .consumed(user, resources::NET, amount_bytes, cost);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -353,15 +371,19 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let cost = CpuPricing::consume(amount_ns);
+        let mut cost = CpuPricing::consume(amount_ns);
 
-        if BillingConfig::get().map(|c| c.enabled).unwrap_or(false) {
-            bill(user, cost);
+        if BillingConfig::get()
+            .map(|c| c.enabled == false)
+            .unwrap_or(true)
+        {
+            cost = 0
         }
+        bill(user, cost);
 
         Wrapper::emit()
             .history()
-            .consumed(user, resource_events::CONSUMED_CPU, amount_ns);
+            .consumed(user, resources::CPU, amount_ns, cost);
     }
 
     #[action]
@@ -414,10 +436,10 @@ mod service {
     }
 
     #[event(history)]
-    fn consumed(account: AccountNumber, resource_event: u8, amount: u64) {}
+    fn consumed(account: AccountNumber, resource: u8, amount: u64, cost: u64) {}
 
     #[event(history)]
-    fn bought(
+    fn subsidized(
         purchaser: AccountNumber,
         recipient: AccountNumber,
         amount: u64,
@@ -427,10 +449,6 @@ mod service {
 
     #[event(history)]
     fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
-
-    // TODO: Ideally, this is emitted once per transaction with the total amount billed by the transaction
-    #[event(history)]
-    fn billed(account: AccountNumber, amount: u64) {}
 }
 
 #[cfg(test)]

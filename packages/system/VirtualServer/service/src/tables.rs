@@ -42,11 +42,6 @@ pub mod tables {
         /// Account number that receives all resource billing fees
         pub fee_receiver: AccountNumber,
 
-        /// The minimum amount of resource tokens that a user can have.
-        /// (a minimum is required to ensure the user can at least afford the
-        /// resource cost of acquiring more resources)
-        //pub resource_min: u64,
-
         /// The minimum amount of resources to buffer on behalf of a user
         /// if they don't configure their own larger buffer size.
         pub min_resource_buffer: u64,
