@@ -98,7 +98,12 @@ impl CpuPricing {
     }
 
     pub fn get_cpu_limit(_account: AccountNumber) -> u64 {
-        200_000_000u64 // 200 milliseconds
+        // TODO: How to determine the CPU limit for an account, given that we don't know how much
+        // of the resources in the buffer will be consumed by runtime billing (e.g. db writes)
+
+        // TEMPORARY
+        // return the entire block's worth of CPU time
+        NetworkSpecs::get().cpu_ns
     }
 
     pub fn set_billable_unit(amount_ns: u64) {
