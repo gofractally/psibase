@@ -31,8 +31,14 @@ import { useServerSpecs } from "@/hooks/use-server-specs";
 import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
 import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
 
-type StorageUnit = "GB" | "TB" | "PB";
-type TimeUnit = "ns" | "us" | "ms";
+import {
+    type StorageUnit,
+    type TimeUnit,
+    STORAGE_FACTORS,
+    TIME_FACTORS,
+    getBestStorageUnit,
+    getBestTimeUnit,
+} from "@/lib/unit-conversions";
 
 interface VirtualServerFormData {
     // Server Specs
@@ -46,60 +52,6 @@ interface VirtualServerFormData {
     objStorageBytes: string; // Obj storage input value
     objStorageUnit: StorageUnit; // Obj storage unit (GB, TB, PB)
     memoryRatio: string; // u8 (0-255)
-}
-
-// Conversion factors
-const STORAGE_FACTORS: Record<StorageUnit, number> = {
-    GB: 1_000_000_000, // 1e9
-    TB: 1_000_000_000_000, // 1e12
-    PB: 1_000_000_000_000_000, // 1e15
-};
-
-const TIME_FACTORS: Record<TimeUnit, number> = {
-    ns: 1,
-    us: 1_000, // 1e3
-    ms: 1_000_000, // 1e6
-};
-
-// Helper function to determine the best storage unit for a value (between 1-999)
-function getBestStorageUnit(bytes: number): { value: number; unit: StorageUnit } {
-    if (bytes === 0) return { value: 0, unit: "GB" };
-    
-    // Try PB first
-    const pbValue = bytes / STORAGE_FACTORS.PB;
-    if (pbValue >= 1 && pbValue < 1000) {
-        return { value: pbValue, unit: "PB" };
-    }
-    
-    // Try TB
-    const tbValue = bytes / STORAGE_FACTORS.TB;
-    if (tbValue >= 1 && tbValue < 1000) {
-        return { value: tbValue, unit: "TB" };
-    }
-    
-    // Default to GB
-    const gbValue = bytes / STORAGE_FACTORS.GB;
-    return { value: gbValue, unit: "GB" };
-}
-
-// Helper function to determine the best time unit for a value (between 1-999)
-function getBestTimeUnit(nanoseconds: number): { value: number; unit: TimeUnit } {
-    if (nanoseconds === 0) return { value: 0, unit: "ns" };
-    
-    // Try ms first
-    const msValue = nanoseconds / TIME_FACTORS.ms;
-    if (msValue >= 1 && msValue < 1000) {
-        return { value: msValue, unit: "ms" };
-    }
-    
-    // Try us
-    const usValue = nanoseconds / TIME_FACTORS.us;
-    if (usValue >= 1 && usValue < 1000) {
-        return { value: usValue, unit: "us" };
-    }
-    
-    // Default to ns
-    return { value: nanoseconds, unit: "ns" };
 }
 
 export const VirtualServer = () => {
