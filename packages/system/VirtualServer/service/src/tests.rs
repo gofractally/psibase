@@ -41,18 +41,13 @@ mod tests {
     }
 
     #[derive(Deserialize)]
-    struct ResourceQuantity {
-        value: u64,
-    }
-
-    #[derive(Deserialize)]
     struct ResourcesData {
         userResources: UserResources,
     }
 
     #[derive(Deserialize)]
     struct UserResources {
-        balance: ResourceQuantity,
+        balanceRaw: u64,
     }
 
     // Propose a system action
@@ -121,9 +116,7 @@ mod tests {
                 r#"
                     query {{
                         userResources(user: "{}") {{
-                            balance {{
-                                value
-                            }}
+                            balanceRaw
                         }}
                     }}
                 "#,
@@ -133,7 +126,7 @@ mod tests {
         )?;
 
         let response: Response<ResourcesData> = serde_json::from_value(balance)?;
-        Ok(response.data.userResources.balance.value)
+        Ok(response.data.userResources.balanceRaw)
     }
 
     fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
