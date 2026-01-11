@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <psibase/block.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/time.hpp>
@@ -27,10 +28,12 @@ namespace SystemService
 
       bool isAuthSys(psibase::AccountNumber                             sender,
                      std::vector<psibase::AccountNumber>                authorizers,
+                     std::optional<ServiceMethod>                       method,
                      std::optional<std::vector<psibase::AccountNumber>> auth_set);
 
       bool isRejectSys(psibase::AccountNumber                             sender,
                        std::vector<psibase::AccountNumber>                authorizers,
+                       std::optional<ServiceMethod>                       method,
                        std::optional<std::vector<psibase::AccountNumber>> auth_set);
 
       /// Creates a credential
@@ -72,8 +75,8 @@ namespace SystemService
       method(init),
       method(canAuthUserSys, user),
       method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
-      method(isAuthSys, sender, authorizers, auth_set),
-      method(isRejectSys, sender, authorizers, auth_set),
+      method(isAuthSys, sender, authorizers, method, auth_set),
+      method(isRejectSys, sender, authorizers, method, auth_set),
       method(create, pubkey, expires, allowed_actions),
       method(consume_active),
       method(get_active),
