@@ -247,7 +247,7 @@ pub mod tables {
                 "not enough initial liquidity",
             );
 
-            // Keep a tiny amount of liquidity tokens for the service as dead / stale= tokens
+            // Keep a tiny amount of liquidity tokens for the service as dead / stale tokens
             // so it keeps the pool permanently functional.
             // tokens aren't burned as that will reduce the total supply which negates this intended affect
             let dead_tokens: Quantity = 10.into();
