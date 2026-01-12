@@ -1,5 +1,6 @@
 #include <services/local/XPeers.hpp>
 
+#include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
@@ -22,7 +23,7 @@ namespace
       auto                          url = splitURL(peer);
       HttpRequest                   request{
                             .method = "GET",
-                            .target = "/native/p2p",
+                            .target = "/p2p",
       };
       if (url.scheme == "https" || url.scheme == "wss")
       {
@@ -74,6 +75,21 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
           std::string(request.body.begin(), request.body.end()));
       std::int32_t newSocket = connect(body.url);
       return HttpReply{};
+   }
+   if (target == "/p2p")
+   {
+      if (auto reply = webSocketHandshake(request))
+      {
+         to<XHttp>().accept(*socket, *reply, AccountNumber{"recvP2P"}, AccountNumber{"closeP2P"});
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto  table   = Native::session().open<SocketTable>();
+            auto  row     = table.get(*socket).value();
+            auto& oldInfo = std::get<WebSocketInfo>(row.info);
+            row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
+            table.put(row);
+         }
+      }
    }
    return {};
 }
