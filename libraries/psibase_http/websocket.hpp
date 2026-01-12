@@ -37,6 +37,26 @@ namespace psibase::http
 
    struct WebSocket : AutoCloseSocket, net::connection_base, std::enable_shared_from_this<WebSocket>
    {
+      enum class P2PState : std::uint8_t
+      {
+         off,
+         reading,
+         messageReady,
+         running,
+      };
+
+      enum class StateType : std::uint8_t
+      {
+         normal,
+         closing,
+         error,
+      };
+      struct QueueItem
+      {
+         std::vector<char>                           data;
+         std::function<void(const std::error_code&)> callback;
+      };
+
       explicit WebSocket(server_state& server, SocketInfo&& info);
       template <typename I>
       static void setImpl(std::shared_ptr<WebSocket>&& self, std::unique_ptr<I>&& impl)
@@ -167,6 +187,14 @@ namespace psibase::http
          if (oldState == StateType::normal)
             handleClose();
       }
+      void clearOutbox(std::deque<QueueItem>&& outbox, const std::error_code& ec)
+      {
+         for (auto& item : outbox)
+         {
+            if (item.callback)
+               item.callback(ec);
+         }
+      }
       SocketInfo info() const override { return savedInfo; }
 
       bool supportsP2P() const override { return true; }
@@ -191,18 +219,11 @@ namespace psibase::http
          bool        first;
          std::size_t size;
          {
-            std::unique_lock l{mutex};
-            if (state != StateType::normal)
-            {
-               l.unlock();
-               callback(make_error_code(boost::asio::error::shut_down));
-               return;
-            }
+            std::lock_guard l{mutex};
             first = impl && outbox.empty();
             size  = data.size();
             outbox.push_back({std::move(data), std::move(callback)});
          }
-         PSIBASE_LOG(logger, debug) << "Sending native message: " << size << " bytes";
          if (first)
          {
             impl->startWrite(shared_from_this());
@@ -277,25 +298,6 @@ namespace psibase::http
          }
       }
 
-      enum class P2PState : std::uint8_t
-      {
-         off,
-         reading,
-         messageReady,
-         running,
-      };
-
-      enum class StateType : std::uint8_t
-      {
-         normal,
-         closing,
-         error,
-      };
-      struct QueueItem
-      {
-         std::vector<char>                           data;
-         std::function<void(const std::error_code&)> callback;
-      };
       server_state&                      server;
       WebSocketInfo                      savedInfo;
       std::mutex                         mutex;
@@ -352,10 +354,13 @@ namespace psibase::http
       {
          const std::vector<char>* data;
          {
-            std::lock_guard l{self->mutex};
+            std::unique_lock l{self->mutex};
             if (self->state != WebSocket::StateType::normal)
             {
-               self->outbox.clear();
+               auto outbox = std::move(self->outbox);
+               l.unlock();
+               self->clearOutbox(std::move(outbox),
+                                 make_error_code(boost::beast::websocket::error::closed));
                return;
             }
             else
@@ -373,14 +378,18 @@ namespace psibase::http
                 bool                                        last;
                 std::function<void(const std::error_code&)> callback;
                 {
-                   std::lock_guard l{self->mutex};
+                   std::unique_lock l{self->mutex};
                    if (ec)
                    {
                       if (ec != make_error_code(boost::asio::error::operation_aborted))
                       {
+                         // FIXME: recursive lock
                          self->error(ec);
                       }
-                      self->outbox.clear();
+                      auto outbox = std::move(self->outbox);
+                      l.unlock();
+                      self->clearOutbox(std::move(outbox), ec);
+                      return;
                    }
                    else
                    {
