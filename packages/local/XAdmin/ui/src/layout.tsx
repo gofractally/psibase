@@ -1,12 +1,13 @@
 import { Outlet } from "react-router-dom";
 
-import { AppSidebar } from "./components/app-sidebar";
+import { Separator } from "@shared/shadcn/ui/separator";
 import {
     SidebarInset,
     SidebarProvider,
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
-import { Separator } from "@shared/shadcn/ui/separator";
+
+import { AppSidebar } from "./components/app-sidebar";
 
 export const Layout = () => {
     return (
@@ -27,4 +28,3 @@ export const Layout = () => {
         </SidebarProvider>
     );
 };
-
