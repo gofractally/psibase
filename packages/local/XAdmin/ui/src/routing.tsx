@@ -1,3 +1,10 @@
+import {
+    FileText,
+    Key,
+    LayoutDashboard,
+    Network,
+    Settings,
+} from "lucide-react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import App from "./App";
@@ -11,6 +18,40 @@ import { JoinPage } from "./pages/join-page";
 import { KeysPage } from "./pages/keys-page";
 import { SetupPage } from "./pages/setup-page";
 import { PeersPage } from "./peers/peers-page";
+
+export const routes = [
+    {
+        name: "Dashboard",
+        icon: LayoutDashboard,
+        path: "dashboard",
+        element: <DashboardPage />,
+    },
+    {
+        name: "Configuration",
+        icon: Settings,
+        path: "configuration",
+        element: <ConfigurationPage />,
+    },
+    {
+        name: "Peers",
+        icon: Network,
+        path: "peers",
+        element: <PeersPage />,
+    },
+    {
+        name: "Logs",
+        icon: FileText,
+        path: "logs",
+        element: <LogsPage />,
+    },
+    {
+        name: "Keys & Devices",
+        icon: Key,
+        path: "keys-and-devices",
+        element: <KeysPage />,
+        secureOnly: true,
+    },
+];
 
 export const Routing = () => {
     const { data: status, isLoading } = useStatuses();
@@ -34,14 +75,13 @@ export const Routing = () => {
             ) : (
                 <Route path="" element={<Layout />}>
                     <Route path="" element={<App />}>
-                        <Route path="dashboard" element={<DashboardPage />} />
-                        <Route
-                            path="configuration"
-                            element={<ConfigurationPage />}
-                        />
-                        <Route path="peers" element={<PeersPage />} />
-                        <Route path="logs" element={<LogsPage />} />
-                        <Route path="keys-and-devices" element={<KeysPage />} />
+                        {routes.map((route) => (
+                            <Route
+                                key={route.path}
+                                path={route.path}
+                                element={route.element}
+                            />
+                        ))}
                         <Route
                             path=""
                             element={

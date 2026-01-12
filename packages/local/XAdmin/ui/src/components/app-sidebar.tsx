@@ -1,10 +1,3 @@
-import {
-    FileText,
-    Key,
-    LayoutDashboard,
-    Network,
-    Settings,
-} from "lucide-react";
 import * as React from "react";
 import { NavLink } from "react-router-dom";
 
@@ -25,6 +18,7 @@ import {
 
 import { useKeyDevices } from "../hooks/useKeyDevices";
 import { useStatuses } from "../hooks/useStatuses";
+import { routes } from "../routing";
 import { MenuContent } from "./menu-content";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -56,75 +50,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+                    <SidebarGroupLabel>Admin</SidebarGroupLabel>
                     <SidebarMenu>
-                        <SidebarMenuItem>
-                            <NavLink to="/dashboard">
-                                {({ isActive }) => (
-                                    <SidebarMenuButton
-                                        data-active={isActive}
-                                        className="data-[active=true]:bg-accent"
-                                    >
-                                        <LayoutDashboard />
-                                        <span>Dashboard</span>
-                                    </SidebarMenuButton>
-                                )}
-                            </NavLink>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <NavLink to="/peers">
-                                {({ isActive }) => (
-                                    <SidebarMenuButton
-                                        data-active={isActive}
-                                        className="data-[active=true]:bg-accent"
-                                    >
-                                        <Network />
-                                        <span>Peers</span>
-                                    </SidebarMenuButton>
-                                )}
-                            </NavLink>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <NavLink to="/logs">
-                                {({ isActive }) => (
-                                    <SidebarMenuButton
-                                        data-active={isActive}
-                                        className="data-[active=true]:bg-accent"
-                                    >
-                                        <FileText />
-                                        <span>Logs</span>
-                                    </SidebarMenuButton>
-                                )}
-                            </NavLink>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <NavLink to="/configuration">
-                                {({ isActive }) => (
-                                    <SidebarMenuButton
-                                        data-active={isActive}
-                                        className="data-[active=true]:bg-accent"
-                                    >
-                                        <Settings />
-                                        <span>Configuration</span>
-                                    </SidebarMenuButton>
-                                )}
-                            </NavLink>
-                        </SidebarMenuItem>
-                        {hasKeyDevices && (
-                            <SidebarMenuItem>
-                                <NavLink to="/keys-and-devices">
-                                    {({ isActive }) => (
-                                        <SidebarMenuButton
-                                            data-active={isActive}
-                                            className="data-[active=true]:bg-accent"
-                                        >
-                                            <Key />
-                                            <span>Keys and devices</span>
-                                        </SidebarMenuButton>
-                                    )}
-                                </NavLink>
-                            </SidebarMenuItem>
-                        )}
+                        {routes.map((route) => {
+                            if (route.secureOnly && !hasKeyDevices) {
+                                return null;
+                            }
+
+                            return (
+                                <SidebarMenuItem key={route.path}>
+                                    <NavLink to={route.path}>
+                                        {({ isActive }) => (
+                                            <SidebarMenuButton
+                                                data-active={isActive}
+                                                className="data-[active=true]:bg-accent"
+                                            >
+                                                <route.icon />
+                                                <span>{route.name}</span>
+                                            </SidebarMenuButton>
+                                        )}
+                                    </NavLink>
+                                </SidebarMenuItem>
+                            );
+                        })}
                     </SidebarMenu>
                 </SidebarGroup>
             </SidebarContent>
