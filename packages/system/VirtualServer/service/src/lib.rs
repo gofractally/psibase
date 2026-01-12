@@ -56,6 +56,9 @@ mod service {
     };
     use psibase::*;
 
+    // A small amount of CPU leeway given to transactions
+    const CPU_LEEWAY: u64 = 1_000_000u64; // 1 ms
+
     #[action]
     fn init() {
         if InitRow::is_init() {
@@ -373,6 +376,7 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
+        let amount_ns = amount_ns.saturating_sub(CPU_LEEWAY);
         let mut cost = CpuPricing::consume(amount_ns);
 
         if isBillingDisabled() {
@@ -420,7 +424,13 @@ mod service {
             return None;
         }
 
-        Some(CpuPricing::get_cpu_limit(account))
+        let mut limit = UserReserve::reserve_cpu_limit(account);
+
+        limit = limit.saturating_add(CPU_LEEWAY);
+
+        // CPU is not billed just-in-time, it's reserved in advance and then the actual amount
+        // is billed from the reserve at the end of the tx
+        Some(limit)
     }
 
     #[action]
