@@ -139,7 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XProxy XSocketListService WSEcho)
+        XPackages XPeers XProxy XSocketListService WSEcho)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1000,6 +1000,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XPeers.psi
+    NAME XPeers
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Mangages p2p connections"
+    SERVICE x-peers
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XPeers.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPeers-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XRun.psi
     NAME XRun
     VERSION ${PSIBASE_VERSION}.0
@@ -1097,7 +1109,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
-    XAdmin XDb XDefault XHttp XPackages XRun XSites XTransact)
+    XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1159,6 +1171,7 @@ install(
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XPackages.psi
+          ${SERVICE_DIR}/XPeers.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
           ${SERVICE_DIR}/XTransact.psi

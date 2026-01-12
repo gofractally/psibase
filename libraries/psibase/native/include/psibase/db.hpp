@@ -18,6 +18,11 @@ namespace triedent
    struct database_config;
 }  // namespace triedent
 
+namespace psibase::net
+{
+   struct connection_base;
+}
+
 namespace psibase
 {
    struct Socket;
@@ -73,7 +78,8 @@ namespace psibase
       // place to put it.
       std::function<void(std::span<const char>,
                          const std::function<void(const std::shared_ptr<Socket>&)>&)>
-          socketOpen;
+                                                                        socketOpen;
+      std::function<void(const std::shared_ptr<net::connection_base>&)> socketP2P;
 
       static const unsigned nextTransactionFlag = 1;
       static const unsigned runQueueFlag        = 2;
@@ -235,6 +241,9 @@ namespace psibase
       // be exposed in a table.
       std::int32_t socketAutoClose(std::int32_t        socket,
                                    bool                value,
+                                   Sockets&            sockets,
+                                   SocketAutoCloseSet& closing);
+      std::int32_t socketEnableP2P(std::int32_t        socket,
                                    Sockets&            sockets,
                                    SocketAutoCloseSet& closing);
       // Used to ensure that checkout and commit are run in the same action

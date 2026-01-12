@@ -315,6 +315,10 @@ std::int32_t XHttp::websocket(HttpRequest                   request,
    {
       request.headers.push_back({"Sec-WebSocket-Key", randomWebSocketKey()});
    }
+   if (!request.getHeader("Sec-WebSocket-Version"))
+   {
+      request.headers.push_back({"Sec-WebSocket-Version", "13"});
+   }
    PSIBASE_SUBJECTIVE_TX
    {
       if (!codeTable.get(sender))

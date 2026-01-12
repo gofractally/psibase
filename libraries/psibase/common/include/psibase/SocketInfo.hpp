@@ -153,8 +153,19 @@ namespace psibase
       friend bool operator==(const HttpClientSocketInfo&, const HttpClientSocketInfo&) = default;
    };
 
-   using SocketInfo = std::
-       variant<ProducerMulticastSocketInfo, HttpSocketInfo, HttpClientSocketInfo, WebSocketInfo>;
+   struct P2PSocketInfo
+   {
+      std::optional<SocketEndpoint> endpoint;
+      std::optional<TLSInfo>        tls;
+      PSIO_REFLECT(P2PSocketInfo, endpoint, tls)
+      friend bool operator==(const P2PSocketInfo&, const P2PSocketInfo&) = default;
+   };
+
+   using SocketInfo = std::variant<ProducerMulticastSocketInfo,
+                                   HttpSocketInfo,
+                                   HttpClientSocketInfo,
+                                   WebSocketInfo,
+                                   P2PSocketInfo>;
 
    inline auto get_gql_name(SocketInfo*)
    {

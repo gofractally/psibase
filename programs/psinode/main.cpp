@@ -2155,6 +2155,8 @@ void run(const std::string&              db_path,
       auto& service =
           boost::asio::make_service<http::server_service>(chainContext, http_config, sharedState);
       node.chain().onSocketOpen(service.get_connector());
+      node.chain().onSocketP2P([&node](const std::shared_ptr<psibase::net::connection_base>& conn)
+                               { node.add_connection(conn); });
 
       // This starts threads that can run wasm, so it isn't safe to run
       // until after all the node.chain().onXXX callbacks are set up.

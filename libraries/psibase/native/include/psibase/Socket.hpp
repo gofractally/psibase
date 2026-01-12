@@ -19,6 +19,7 @@ namespace psibase
       ~Socket();
       virtual void       send(Writer&, std::span<const char>) = 0;
       virtual bool       canAutoClose() const;
+      virtual bool       supportsP2P() const;
       virtual SocketInfo info() const = 0;
 
       void replace(Writer& writer, std::shared_ptr<Socket>&& other);
@@ -36,6 +37,7 @@ namespace psibase
    {
       virtual bool canAutoClose() const override;
       virtual void autoClose(const std::optional<std::string>& message) noexcept = 0;
+      virtual void enableP2P(std::function<void(const std::shared_ptr<net::connection_base>&)>);
       virtual void onLock();
       // owner can be non-null if either autoClosing or autoCloseLocked is true
       // If autoCloseLocked is true, then only the context that holds the lock
@@ -50,6 +52,9 @@ namespace psibase
    {
       std::shared_ptr<AutoCloseSocket> socket;
       SocketAutoCloseSet*              owner;
+      std::uint32_t                    flags;
+
+      static const std::uint32_t setP2PFlag = 1;
    };
 
    struct SocketAutoCloseSet
@@ -80,6 +85,10 @@ namespace psibase
                              bool                       value,
                              SocketAutoCloseSet*        owner,
                              std::vector<SocketChange>* diff = nullptr);
+      std::int32_t enableP2P(std::int32_t               socket,
+                             SocketAutoCloseSet*        owner,
+                             std::vector<SocketChange>* diff,
+                             std::function<void(const std::shared_ptr<net::connection_base>&)>);
       /// Returns true if autoClose was locked immediately for the socket.
       /// If the socket currently has autoClose enabled, the lock will be
       /// acquired when autoClose is disabled, and AutoCloseSocket::onLock
@@ -87,7 +96,9 @@ namespace psibase
       bool lockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket);
       void unlockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket);
       void setOwner(const std::shared_ptr<AutoCloseSocket>& socket, SocketAutoCloseSet* owner);
-      bool applyChanges(const std::vector<SocketChange>& diff, SocketAutoCloseSet* owner);
+      bool applyChanges(const std::vector<SocketChange>& diff,
+                        SocketAutoCloseSet*              owner,
+                        const DatabaseCallbacks*         callbacks);
    };
 
 }  // namespace psibase

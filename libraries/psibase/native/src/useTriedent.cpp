@@ -433,7 +433,7 @@ namespace psibase
                }
             }
          }
-         if (!sockets.applyChanges(socketChanges, &closing))
+         if (!sockets.applyChanges(socketChanges, &closing, impl->callbacks))
          {
             original = impl->subjective;
             return false;
@@ -730,6 +730,17 @@ namespace psibase
          return sockets.autoClose(socket, value, &closing,
                                   subjectiveRevisions.empty() ? nullptr : &socketChanges);
       }
+      std::int32_t socketEnableP2P(std::int32_t        socket,
+                                   Sockets&            sockets,
+                                   SocketAutoCloseSet& closing)
+      {
+         const auto* callbacks = shared.getCallbacks();
+         if (!callbacks || !callbacks->socketP2P)
+            abortMessage("P2P not supported");
+         return sockets.enableP2P(socket, &closing,
+                                  subjectiveRevisions.empty() ? nullptr : &socketChanges,
+                                  callbacks->socketP2P);
+      }
       std::size_t saveSubjective()
       {
          auto result     = subjectiveLimit;
@@ -880,6 +891,12 @@ namespace psibase
                                           SocketAutoCloseSet& closing)
    {
       return impl->socketAutoClose(socket, value, sockets, closing);
+   }
+   std::int32_t Database::socketEnableP2P(std::int32_t        socket,
+                                          Sockets&            sockets,
+                                          SocketAutoCloseSet& closing)
+   {
+      return impl->socketEnableP2P(socket, sockets, closing);
    }
    std::size_t Database::saveSubjective()
    {
