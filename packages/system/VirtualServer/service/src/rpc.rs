@@ -140,6 +140,9 @@ pub struct UserResources {
 
     /// Unformatted (integer)capacity of the user's resource buffer
     buffer_capacity_raw: u64,
+
+    /// Whether the user is configured for auto-filling of the resource buffer
+    auto_fill: bool,
 }
 
 //  Derived from expected 80% of reads/writes in 20% of the total storage, targeting
@@ -235,13 +238,15 @@ impl Query {
             .precision;
 
         let balance = crate::Wrapper::call().get_resources(user);
-        let capacity = UserSettings::get(user).buffer_capacity.into();
+        let settings = UserSettings::get(user);
+        let capacity = settings.buffer_capacity.into();
 
         Ok(UserResources {
             balance: Decimal::new(balance, p),
             buffer_capacity: Decimal::new(capacity, p),
             balance_raw: balance.value,
             buffer_capacity_raw: capacity.value,
+            auto_fill: settings.auto_fill,
         })
     }
 

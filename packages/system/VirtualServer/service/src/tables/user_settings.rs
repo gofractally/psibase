@@ -9,6 +9,22 @@ impl UserSettings {
             .unwrap_or_else(|| UserSettings {
                 user,
                 buffer_capacity: BillingConfig::get_assert().min_resource_buffer,
+                auto_fill: true,
             })
+    }
+
+    pub fn set_auto_fill(self, enabled: bool) {
+        let mut settings = self;
+        settings.auto_fill = enabled;
+        UserSettingsTable::read_write().put(&settings).unwrap();
+    }
+
+    pub fn get_resource_balance(user: AccountNumber) -> Quantity {
+        let config = check_some(BillingConfig::get(), "Billing not initialized");
+
+        let res = config.res;
+        let balance = Tokens::call().getSubBal(res, user.to_string());
+        let balance: Quantity = balance.unwrap_or(0.into());
+        return balance;
     }
 }

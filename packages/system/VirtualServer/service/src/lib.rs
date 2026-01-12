@@ -198,6 +198,13 @@ mod service {
         buy_res_for(amount, get_sender(), None);
     }
 
+    /// Allows the sender to configure whether they would prefer client-side tooling
+    /// to attempt to automatically manage refilling their resource buffer.
+    #[action]
+    fn conf_auto_fill(enabled: bool) {
+        UserSettings::get(get_sender()).set_auto_fill(enabled);
+    }
+
     /// Refills the sender's resource buffer, allowing them to continue to interact with
     /// metered network functionality.
     #[action]
