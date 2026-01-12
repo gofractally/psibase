@@ -48,7 +48,7 @@ const chartConfig = {
 
 const bytesToMb = (bytes: number): number => Math.ceil(bytes / 1024 / 1024);
 
-export function Component() {
+export function DashboardPage() {
     const { data } = usePerformance();
     const { data: txStats } = useTransactStats();
 
@@ -221,13 +221,4 @@ export function Component() {
     );
 }
 
-export const DashboardPage = () => {
-    return (
-        <div>
-            <h2 className="scroll-m-20  pb-2 text-3xl font-semibold tracking-tight ">
-                Dashboard
-            </h2>
-            <Component />
-        </div>
-    );
-};
+export default DashboardPage;
