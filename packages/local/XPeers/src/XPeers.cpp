@@ -44,10 +44,6 @@ namespace
          endpoint     = LocalEndpoint{peer};
       }
       std::int32_t socket = to<XHttp>().websocket(request, std::move(tls), std::move(endpoint));
-      PSIBASE_SUBJECTIVE_TX
-      {
-         to<XHttp>().setCallback(socket, MethodNumber{"onP2P"}, MethodNumber{"errP2P"});
-      }
       return socket;
    }
 }  // namespace
@@ -74,7 +70,15 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       auto body = psio::convert_from_json<ConnectRequest>(
           std::string(request.body.begin(), request.body.end()));
       std::int32_t newSocket = connect(body.url);
-      return HttpReply{};
+
+      auto connectionRequests = open<ConnectionRequestTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().setCallback(newSocket, MethodNumber{"onP2P"}, MethodNumber{"errP2P"});
+         connectionRequests.put({newSocket, *socket});
+         to<XHttp>().autoClose(*socket, false);
+      }
+      return {};
    }
    if (target == "/p2p")
    {
@@ -96,7 +100,9 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
 
 void XPeers::onP2P(std::int32_t socket, HttpReply reply)
 {
+   std::optional<ConnectionRequestRow> request;
    // convert to p2p socket
+   auto connectionRequests = open<ConnectionRequestTable>();
    PSIBASE_SUBJECTIVE_TX
    {
       auto  table   = Native::session().open<SocketTable>();
@@ -105,10 +111,40 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
       row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
       table.put(row);
       to<XHttp>().setCallback(socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
+      request = connectionRequests.get(socket);
+      if (request)
+      {
+         connectionRequests.remove(*request);
+         to<XHttp>().autoClose(request->requestSocket, true);
+      }
+   }
+   if (request)
+   {
+      to<XHttp>().sendReply(request->requestSocket, HttpReply{});
    }
 }
 
-void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply) {}
+void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
+{
+   std::optional<ConnectionRequestRow> request;
+   auto                                connectionRequests = open<ConnectionRequestTable>();
+   PSIBASE_SUBJECTIVE_TX
+   {
+      request = connectionRequests.get(socket);
+      if (request)
+      {
+         connectionRequests.remove(*request);
+         to<XHttp>().autoClose(request->requestSocket, true);
+      }
+   }
+   if (request)
+   {
+      std::string_view msg{"Could not open p2p connection"};
+      to<XHttp>().sendReply(request->requestSocket, HttpReply{.status      = HttpStatus::badRequest,
+                                                              .contentType = "text/html",
+                                                              .body{msg.begin(), msg.end()}});
+   }
+}
 
 void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data) {}
 
