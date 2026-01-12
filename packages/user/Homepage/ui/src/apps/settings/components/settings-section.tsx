@@ -25,7 +25,7 @@ export const SettingsSection = () => {
                     <GasTank fillPercentage={fillPercentage} />
                 </div>
 
-                <div className="flex-1 flex flex-col justify-between">
+                <div className="flex flex-col justify-between">
                     <div className="space-y-2">
                         <Label htmlFor="tank-capacity">Tank capacity</Label>
                         <div className="flex items-center gap-2">
@@ -45,7 +45,7 @@ export const SettingsSection = () => {
                         </div>
                     </div>
 
-                    <Button>Refill</Button>
+                    <Button className="w-full">Refill</Button>
                 </div>
             </div>
         </div>
