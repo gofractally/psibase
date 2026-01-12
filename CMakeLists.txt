@@ -1089,7 +1089,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTransact
 )
 
 function(write_package_index target dir)
