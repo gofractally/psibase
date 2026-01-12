@@ -1,5 +1,5 @@
-import { Settings, Terminal } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { ExternalLink, Settings, Terminal } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
@@ -21,34 +21,28 @@ export function NavAdmin() {
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <NavLink
+                    <Link
                         to={siblingUrl(undefined, "x-admin", undefined, false)}
+                        target="_blank"
                     >
-                        {({ isActive }) => (
-                            <SidebarMenuButton
-                                data-active={isActive}
-                                className="data-[active=true]:bg-accent"
-                            >
-                                <Settings />
-                                <span>X-Admin</span>
-                            </SidebarMenuButton>
-                        )}
-                    </NavLink>
+                        <SidebarMenuButton>
+                            <Settings />
+                            <span>X-Admin</span>
+                            <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
+                        </SidebarMenuButton>
+                    </Link>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                    <NavLink
+                    <Link
                         to={siblingUrl(undefined, "config", undefined, false)}
+                        target="_blank"
                     >
-                        {({ isActive }) => (
-                            <SidebarMenuButton
-                                data-active={isActive}
-                                className="data-[active=true]:bg-accent"
-                            >
-                                <Terminal />
-                                <span>Config</span>
-                            </SidebarMenuButton>
-                        )}
-                    </NavLink>
+                        <SidebarMenuButton>
+                            <Terminal />
+                            <span>Config</span>
+                            <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
+                        </SidebarMenuButton>
+                    </Link>
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarGroup>

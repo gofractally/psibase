@@ -1,5 +1,6 @@
+import { ExternalLink, Terminal } from "lucide-react";
 import * as React from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
@@ -50,7 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                    <SidebarGroupLabel>Node Admin</SidebarGroupLabel>
                     <SidebarMenu>
                         {routes.map((route) => {
                             if (route.secureOnly && !hasKeyDevices) {
@@ -73,6 +74,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 </SidebarMenuItem>
                             );
                         })}
+                    </SidebarMenu>
+                </SidebarGroup>
+                <SidebarGroup>
+                    <SidebarGroupLabel>Network Admin</SidebarGroupLabel>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <Link
+                                to={siblingUrl(undefined, "config")}
+                                target="_blank"
+                            >
+                                <SidebarMenuButton>
+                                    <Terminal />
+                                    <span>Config</span>
+                                    <ExternalLink className="scale-70 -translate-x-1.5 -translate-y-1" />
+                                </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarGroup>
             </SidebarContent>

@@ -27,7 +27,7 @@ export const routes = [
         element: <DashboardPage />,
     },
     {
-        name: "Configuration",
+        name: "Setup",
         icon: Settings,
         path: "configuration",
         element: <ConfigurationPage />,
