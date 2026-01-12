@@ -396,6 +396,20 @@ namespace psibase::http
          session->post(
              [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result)]
              {
+                auto& trace      = self->trace;
+                auto& queryTimes = self->queryTimes;
+                auto  endTime    = steady_clock::now();
+                auto& logger     = self->session->logger;
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+
+                // TODO: consider bundling into a single attribute
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "PackTime", queryTimes.packTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ServiceLoadTime", queryTimes.serviceLoadTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "DatabaseTime", queryTimes.databaseTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "WasmExecTime", queryTimes.wasmExecTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseTime",
+                                            std::chrono::duration_cast<std::chrono::microseconds>(
+                                                endTime - queryTimes.startTime));
                 (*self->session)(
                     websocket_upgrade{}, std::move(self->req),
                     [newSocket = std::move(newSocket)](auto&& socket) mutable
