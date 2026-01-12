@@ -7,7 +7,6 @@
 #include <services/system/Spki.hpp>
 #include <services/system/StagedTx.hpp>
 #include <services/system/VerifySig.hpp>
-#include "services/system/Transact.hpp"
 
 using namespace psibase;
 
