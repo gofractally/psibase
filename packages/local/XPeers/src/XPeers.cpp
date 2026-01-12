@@ -84,7 +84,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
    {
       if (auto reply = webSocketHandshake(request))
       {
-         to<XHttp>().accept(*socket, *reply, AccountNumber{"recvP2P"}, AccountNumber{"closeP2P"});
+         to<XHttp>().accept(*socket, *reply, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
          PSIBASE_SUBJECTIVE_TX
          {
             auto  table   = Native::session().open<SocketTable>();
