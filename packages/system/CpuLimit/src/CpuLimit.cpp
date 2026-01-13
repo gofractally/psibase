@@ -10,8 +10,6 @@ using psibase::check;
 
 namespace SystemService
 {
-   static constexpr std::chrono::nanoseconds leeway = std::chrono::milliseconds(1);
-
    std::chrono::nanoseconds CpuLimit::getCpuTime()
    {
       struct timespec result;
@@ -19,26 +17,13 @@ namespace SystemService
       return std::chrono::seconds(result.tv_sec) + std::chrono::nanoseconds(result.tv_nsec);
    }
 
-   void CpuLimit::setCpuLimit(psibase::AccountNumber account)
+   void CpuLimit::setCpuLimit(std::optional<uint64_t> limit_ns)
    {
-      auto cpu_limit = psibase::to<VirtualServer>().getCpuLimit(account);
-
-      if (!cpu_limit.has_value())
+      check(psibase::getSender() == VirtualServer::service, "Unauthorized call to setCpuLimit");
+      if (!limit_ns.has_value())
          return;
 
-      auto limit = std::chrono::nanoseconds(*cpu_limit);
-
-      // add leeway with saturation
-      if (limit <= std::chrono::nanoseconds::max() - leeway)
-      {
-         limit += leeway;
-      }
-      else
-      {
-         limit = std::chrono::nanoseconds::max();
-      }
-
-      psibase::raw::setMaxCpuTime(limit.count());
+      psibase::raw::setMaxCpuTime(*limit_ns);
    }
 }  // namespace SystemService
 

@@ -140,6 +140,10 @@ pub struct UserResources {
 
     /// Unformatted (integer)capacity of the user's resource buffer
     buffer_capacity_raw: u64,
+
+    /// The percentage at which client-side tooling should attempt to refill the user's
+    /// resource buffer. A value of 0 means that the client should not auto refill.
+    auto_fill_threshold_percent: u8,
 }
 
 //  Derived from expected 80% of reads/writes in 20% of the total storage, targeting
@@ -235,13 +239,15 @@ impl Query {
             .precision;
 
         let balance = crate::Wrapper::call().get_resources(user);
-        let capacity = UserSettings::get(user).buffer_capacity.into();
+        let settings = UserSettings::get(user);
+        let capacity = settings.buffer_capacity.into();
 
         Ok(UserResources {
             balance: Decimal::new(balance, p),
             buffer_capacity: Decimal::new(capacity, p),
             balance_raw: balance.value,
             buffer_capacity_raw: capacity.value,
+            auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
         })
     }
 

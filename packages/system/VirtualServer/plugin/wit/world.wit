@@ -58,10 +58,26 @@ interface billing {
     /// 
     /// The user must have a sufficient balance of system tokens to pay for the gas.
     fill-gas-tank: func() -> result<_, error>;
+
+    /// Gets the cost of filling the user's gas tank from empty
+    get-gas-tank-cost: func() -> result<u64, error>;
+}
+
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
 }
 
 world imports {
     import billing;
     import admin;
     import types;
+    import authorized;
 }

@@ -7,10 +7,13 @@ use errors::ErrorType;
 
 use bindings::exports::virtual_server::plugin as Exports;
 use Exports::types::{NetworkVariables, ServerSpecs};
-use Exports::{admin::Guest as Admin, billing::Guest as Billing};
+use Exports::{
+    admin::Guest as Admin, authorized::Guest as Authorized, billing::Guest as Billing,
+    transact::Guest as Transact,
+};
 
 use bindings::accounts::plugin as AccountsPlugin;
-use bindings::host::common::client;
+use bindings::host::common::{client, server};
 use bindings::host::types::types::Error;
 use bindings::tokens::plugin as TokensPlugin;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -88,35 +91,101 @@ impl Admin for VirtualServerPlugin {
 impl Billing for VirtualServerPlugin {
     fn fill_gas_tank() -> Result<(), Error> {
         assert_caller(
-            &["transact", "homepage", "config", &client::get_receiver()],
+            &["homepage", "config", &client::get_receiver()],
             "fill_gas_tank",
         );
 
         let user = AccountsPlugin::api::get_current_user()
             .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
 
-        let (balance, buffer_capacity) = query::get_user_resources(&user)?;
+        let (balance, buffer_capacity, _) = query::get_user_resources(&user)?;
 
         let minimum = buffer_capacity * 20 / 100;
-        if balance < minimum {
-            let amount = buffer_capacity - balance;
 
-            let sys_id = TokensPlugin::helpers::fetch_network_token()?
-                .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
-
-            let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
-            TokensPlugin::user::credit(
-                sys_id,
-                &client::get_receiver(),
-                &amount,
-                "Refilling resource buffer",
-            )?;
+        if balance >= minimum {
+            return Ok(());
         }
+
+        let amount = buffer_capacity - balance;
+
+        let sys_id = TokensPlugin::helpers::fetch_network_token()?
+            .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
+
+        let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
+        TokensPlugin::user::credit(
+            sys_id,
+            &client::get_receiver(),
+            &amount,
+            "Refilling resource buffer",
+        )?;
 
         add_action_to_transaction(
             Actions::refill_res_buf::ACTION_NAME,
             &Actions::refill_res_buf {}.packed(),
         )
+    }
+
+    fn get_gas_tank_cost() -> Result<u64, Error> {
+        assert_caller(&["transact"], "get_gas_tank_cost");
+
+        let user = AccountsPlugin::api::get_current_user()
+            .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
+
+        let (_, buffer_capacity, _) = query::get_user_resources(&user)?;
+        Ok(buffer_capacity)
+    }
+}
+
+impl Transact for VirtualServerPlugin {
+    fn auto_fill_gas_tank() -> Result<(), Error> {
+        assert_caller(&["transact"], "auto_fill_gas_tank");
+
+        if !query::is_billing_enabled()? {
+            return Ok(());
+        }
+
+        let user = AccountsPlugin::api::get_current_user()
+            .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
+
+        let (balance, buffer_capacity, auto_fill_threshold) = query::get_user_resources(&user)?;
+
+        if auto_fill_threshold == 0 {
+            return Ok(());
+        }
+
+        let minimum = buffer_capacity * auto_fill_threshold / 100;
+        if balance >= minimum {
+            return Ok(());
+        }
+
+        let amount = buffer_capacity - balance;
+
+        let sys_id = TokensPlugin::helpers::fetch_network_token()?
+            .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
+
+        let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
+        TokensPlugin::user::credit(
+            sys_id,
+            &client::get_receiver(),
+            &amount,
+            "Refilling resource buffer",
+        )?;
+
+        add_action_to_transaction(
+            Actions::refill_res_buf::ACTION_NAME,
+            &Actions::refill_res_buf {}.packed(),
+        )
+    }
+}
+
+impl Authorized for VirtualServerPlugin {
+    fn graphql(query: String) -> Result<String, Error> {
+        assert_caller(
+            &["homepage", "config", &client::get_receiver()],
+            "authorized::graphql",
+        );
+
+        server::post_graphql_get_json(&query)
     }
 }
 

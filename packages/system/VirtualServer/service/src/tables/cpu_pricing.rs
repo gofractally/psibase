@@ -97,15 +97,6 @@ impl CpuPricing {
         );
     }
 
-    pub fn get_cpu_limit(_account: AccountNumber) -> u64 {
-        // TODO: How to determine the CPU limit for an account, given that we don't know how much
-        // of the resources in the buffer will be consumed by runtime billing (e.g. db writes)
-
-        // TEMPORARY
-        // return the entire block's worth of CPU time
-        NetworkSpecs::get().cpu_ns
-    }
-
     pub fn set_billable_unit(amount_ns: u64) {
         let table = CpuPricingTable::read_write();
         let mut cpu_time = check_some(table.get_index_pk().get(&()), "CPU time not initialized");
@@ -130,5 +121,14 @@ impl CpuPricing {
     /// The price of CPU per billable unit of CPU
     pub async fn price_per_unit(&self) -> u64 {
         DiffAdjust::call().get_diff(self.diff_adjust_id)
+    }
+
+    /// The total number of available units of CPU time
+    ///
+    /// For example, if CPU time is billed in milliseconds, then this returns
+    /// the total number of milliseconds per second that are made available to
+    /// transactions and are therefore billable.
+    pub async fn available_units(&self) -> u64 {
+        NetworkSpecs::get().cpu_ns / self.billable_unit
     }
 }
