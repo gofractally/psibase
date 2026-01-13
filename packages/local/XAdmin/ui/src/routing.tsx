@@ -3,6 +3,7 @@ import {
     Key,
     LayoutDashboard,
     Network,
+    Package,
     Settings,
 } from "lucide-react";
 import { Navigate, Route, Routes } from "react-router-dom";
@@ -16,6 +17,7 @@ import { CreatePage } from "./pages/create-page";
 import { DashboardPage } from "./pages/dashboard-page";
 import { JoinPage } from "./pages/join-page";
 import { KeysPage } from "./pages/keys-page";
+import { NodeLocalPage } from "./pages/node-local-page";
 import { SetupPage } from "./pages/setup-page";
 import { PeersPage } from "./peers/peers-page";
 
@@ -43,6 +45,12 @@ export const routes = [
         icon: FileText,
         path: "logs",
         element: <LogsPage />,
+    },
+    {
+        name: "Packages",
+        icon: Package,
+        path: "packages",
+        element: <NodeLocalPage />,
     },
     {
         name: "Keys & Devices",
