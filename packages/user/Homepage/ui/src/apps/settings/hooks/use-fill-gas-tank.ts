@@ -14,7 +14,7 @@ export const useFillGasTank = () => {
                 service: "virtual-server",
                 plugin: "plugin",
                 intf: "billing",
-                method: "fill-gas-tank",
+                method: "fillGasTank",
                 params: [],
             });
         },

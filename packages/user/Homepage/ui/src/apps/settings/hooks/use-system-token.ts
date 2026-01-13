@@ -53,9 +53,7 @@ export const useSystemToken = () => {
                     query {
                         token(tokenId: "${sysTid}") {
                             id
-                            symbol {
-                                symbolId
-                            }
+                            symbol
                         }
                     }
                 `;

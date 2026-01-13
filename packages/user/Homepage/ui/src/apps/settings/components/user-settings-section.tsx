@@ -21,29 +21,35 @@ export const UserSettingsSection = () => {
 
     const tokenSymbol = systemToken?.symbol || "$SYS";
 
-    // Calculate fill percentage accounting for 20% reserve
-    // When balanceRaw/bufferCapacityRaw = 0.2 (20%), tank should show as 0%
+    // Calculate fill percentage accounting for auto_fill_threshold_percent reserve
+    // When balanceRaw/bufferCapacityRaw = threshold%, tank should show as 0%
     // When balanceRaw/bufferCapacityRaw = 1.0 (100%), tank should show as 100%
-    // Formula: fillPercentage = ((balanceRaw/bufferCapacityRaw) - 0.2) / 0.8 * 100
+    // Formula: fillPercentage = ((balanceRaw/bufferCapacityRaw) - threshold) / (1 - threshold) * 100
     const fillPercentage = useMemo(() => {
         if (!userResources || userResources.bufferCapacityRaw === 0) {
             return 0;
         }
-        console.info("userResources:", userResources);
 
+        // Verify we're using balanceRaw and bufferCapacityRaw for calculations
         const ratio = userResources.balanceRaw / userResources.bufferCapacityRaw;
-        // Scale from 20% to 100% to 0% to 100% display
-        const scaledRatio = (ratio - 0.2) / 0.8;
-        console.info("fillPercentage:", Math.max(0, Math.min(100, scaledRatio * 100)));
+        const thresholdPercent = userResources.autoFillThresholdPercent / 100;
+
+        // If at or below threshold, show as empty
+        if (ratio <= thresholdPercent) {
+            return 0;
+        }
+
+        // Scale from threshold% to 100% to 0% to 100% display
+        const scaledRatio = (ratio - thresholdPercent) / (1 - thresholdPercent);
         return Math.max(0, Math.min(100, scaledRatio * 100));
     }, [userResources]);
 
     // Calculate tank capacity for display (bufferCapacityRaw converted to token amount)
     const tankCapacity = useMemo(() => {
         if (!userResources || !systemToken) {
-            return "10";
+            return "0";
         }
-        return userResources.bufferCapacityRaw;
+        return userResources.bufferCapacity;
     }, [userResources, systemToken]);
 
     const handleRefill = async () => {

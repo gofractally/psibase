@@ -1,18 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { graphql } from "@/lib/graphql";
-import { zAccount } from "@/lib/zod/Account";
+import { supervisor } from "@/supervisor";
 
 interface UserResourcesResponse {
     userResources: {
         balanceRaw: string | number;
         bufferCapacityRaw: string | number;
+        bufferCapacity: string | number;
+        autoFillThresholdPercent: string | number;
     };
 }
 
 export interface UserResources {
     balanceRaw: number;
     bufferCapacityRaw: number;
+    bufferCapacity: number;
+    autoFillThresholdPercent: number;
 }
 
 export const useUserResources = (user: string | null | undefined) => {
@@ -28,29 +31,45 @@ export const useUserResources = (user: string | null | undefined) => {
                         userResources(user: "${user}") {
                             balanceRaw
                             bufferCapacityRaw
+                            bufferCapacity
+                            autoFillThresholdPercent
                         }
                     }
                 `;
 
-                const response = await graphql<UserResourcesResponse>(
-                    query,
-                    zAccount.parse("virtual-server"),
-                );
+                const result = await supervisor.functionCall({
+                    service: "virtual-server",
+                    plugin: "plugin",
+                    intf: "authorized",
+                    method: "graphql",
+                    params: [query],
+                });
 
-                if (!response.userResources) {
-                    return null;
-                }
-                return {
-                    balanceRaw: 50,
-                    bufferCapacityRaw: 100,
+                const response = JSON.parse(result) as {
+                    data: UserResourcesResponse;
+                    errors?: Array<{ message: string }>;
                 };
 
-                // return {
-                //     balanceRaw: Number(response.userResources.balanceRaw),
-                //     bufferCapacityRaw: Number(
-                //         response.userResources.bufferCapacityRaw,
-                //     ),
-                // };
+                if (response.errors) {
+                    throw new Error(response.errors[0].message);
+                }
+
+                if (!response.data.userResources) {
+                    return null;
+                }
+
+                return {
+                    balanceRaw: Number(response.data.userResources.balanceRaw),
+                    bufferCapacityRaw: Number(
+                        response.data.userResources.bufferCapacityRaw,
+                    ),
+                    bufferCapacity: Number(
+                        response.data.userResources.bufferCapacity,
+                    ),
+                    autoFillThresholdPercent: Number(
+                        response.data.userResources.autoFillThresholdPercent,
+                    ),
+                };
             } catch (error) {
                 console.error("Error fetching user resources:", error);
                 return null;
