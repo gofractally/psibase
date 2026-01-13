@@ -14,6 +14,8 @@ namespace SystemService
       void notifyBlock(psibase::BlockNum block_num);
       std::optional<uint64_t> getCpuLimit(psibase::AccountNumber account);
       uint8_t                 getMaxPeers();
+      void                    initUser(psibase::AccountNumber user);
+      void                    setCpuLimit(psibase::AccountNumber account);
    };
 
    PSIO_REFLECT(VirtualServer,
@@ -22,6 +24,9 @@ namespace SystemService
                 method(notifyBlock),
                 method(getCpuLimit, account),
                 method(getMaxPeers),
+                method(initUser, user),
+                method(setCpuLimit, account),
+
                 //
    )
 

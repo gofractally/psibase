@@ -110,7 +110,7 @@ pub mod tables {
     #[table(name = "NetworkSpecsTable", index = 4)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone, Default)]
     pub struct NetworkSpecs {
-        /// Amount of network bandwidth capacity per second
+        /// Amount of network bandwidth capacity per second in bits per second
         pub net_bps: u64,
         /// Amount of network compute nanoseconds per second
         pub cpu_ns: u64,
@@ -140,7 +140,35 @@ pub mod tables {
         pub buffer_capacity: u64,
     }
 
-    #[table(name = "NetPricingTable", index = 6)]
+    /// The reserve is a table that holds a u64 representing additional resources that are available
+    /// to the user outside of the normal resource balance. Used to ensure that the just-in-time billing
+    /// (e.g. objective data writes, events) does not exceed the amount of resources that must be
+    /// available to pay for the CPU cost of the executing transaction.
+    //
+    // Design justification:
+    //
+    // The reserve cannot be dynamically constructed, because then writing to it would require a db
+    //   write if it didn't yet exist, and the point of the reserve is that it should happen before
+    //   any writes are allowed so that we know how many resources the user has available for writes.
+    //   user has available for writes.
+    //
+    // Furthermore, we can't use the tokens service subaccounts for reserves, because the API requires
+    //   that we would know the token ID for which to construct the zero-balance. And reserves need to
+    //   be created for all accounts, including those that are created before a resource token exists.
+    //
+    // Therefore, the Accounts service will initialize every new user with this virtual server service,
+    //   which constructs the account's reserve (with a balance of zero) in its own tables. This is
+    //  therefore paid for by the account creator and is part of account initialization, so subsequent
+    //  writes to the reserve do not cost additional storage resources (storage delta always = 0).
+    #[table(name = "UserReserveTable", index = 6)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    pub struct UserReserve {
+        #[primary_key]
+        pub user: AccountNumber,
+        pub reserve: u64,
+    }
+
+    #[table(name = "NetPricingTable", index = 7)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
     pub struct NetPricing {
@@ -177,7 +205,7 @@ pub mod tables {
         fn pk(&self) {}
     }
 
-    #[table(name = "CpuPricingTable", index = 7)]
+    #[table(name = "CpuPricingTable", index = 8)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
     pub struct CpuPricing {
@@ -221,6 +249,7 @@ mod network_specs;
 mod network_variables;
 mod pricing_common;
 mod server_specs;
+mod user_reserve;
 mod user_settings;
 
 pub use pricing_common::*;

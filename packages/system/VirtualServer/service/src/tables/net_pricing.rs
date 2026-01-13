@@ -139,4 +139,13 @@ impl NetPricing {
     pub async fn price_per_unit(&self) -> u64 {
         DiffAdjust::call().get_diff(self.diff_adjust_id)
     }
+
+    /// The total number of available units of network bandwidth
+    ///
+    /// For example, if network bandwidth is billed in bytes per second, then this returns
+    /// the total number of bytes per second that are available to transactions and
+    ///  are therefore billable.
+    pub async fn available_units(&self) -> u64 {
+        NetworkSpecs::get().net_bps / self.billable_unit
+    }
 }

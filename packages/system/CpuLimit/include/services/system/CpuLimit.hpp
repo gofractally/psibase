@@ -17,8 +17,8 @@ namespace SystemService
       static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
       std::chrono::nanoseconds getCpuTime();
-      void                     setCpuLimit(psibase::AccountNumber account);
+      void                     setCpuLimit(std::optional<uint64_t> limit_ns);
    };
-   PSIO_REFLECT(CpuLimit, method(getCpuTime), method(setCpuLimit, account))
+   PSIO_REFLECT(CpuLimit, method(getCpuTime), method(setCpuLimit, limit_ns))
    PSIBASE_REFLECT_TABLES(CpuLimit)
 }  // namespace SystemService

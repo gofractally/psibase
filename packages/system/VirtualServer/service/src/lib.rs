@@ -86,7 +86,7 @@ mod service {
         // (the accounts service init already does such iterating, use as reference.)
     }
 
-    #[pre_action(exclude(init))]
+    #[pre_action(exclude(init, initUser))]
     fn check_init() {
         InitRow::check_init();
     }
@@ -218,7 +218,9 @@ mod service {
         }
 
         let amount = buffer_capacity - balance.value;
-        buy_res(amount.into())
+        buy_res(amount.into());
+
+        UserReserve::reserve_cpu_limit(get_sender());
     }
 
     fn bill(user: AccountNumber, amount: u64) {
@@ -229,15 +231,25 @@ mod service {
         if let Some(config) = BillingConfig::get() {
             let res = config.res;
 
+            let balance = UserSettings::get_resource_balance(user);
             let user_str = user.to_string();
-            let amt: Quantity = amount.into();
-            let balance = Tokens::call().getSubBal(res, user_str.clone());
+            let amt = Quantity::new(amount);
+
             check(
-                balance.is_some() && balance.unwrap() >= amt,
+                balance >= amt,
                 &format!("{} has insufficient resource balance", &user_str),
             );
-
             Tokens::call().fromSub(res, user_str, amt);
+        }
+    }
+
+    fn bill_from_reserve(user: AccountNumber, amount: u64) {
+        if amount == 0 {
+            return;
+        }
+
+        if BillingConfig::get().is_some() {
+            UserReserve::bill(user, amount);
         }
     }
 
@@ -389,7 +401,7 @@ mod service {
         if isBillingDisabled() {
             cost = 0
         }
-        bill(user, cost);
+        bill_from_reserve(user, cost);
 
         Wrapper::emit()
             .history()
@@ -420,24 +432,41 @@ mod service {
         }
     }
 
-    /// Gets the CPU limit (in ns) for the specified account
-    ///
-    /// Returns None if there is no limit for the specified account
     #[action]
-    fn getCpuLimit(account: AccountNumber) -> Option<u64> {
-        check(get_sender() == CpuLimit::SERVICE, "Unauthorized");
+    fn initUser(user: AccountNumber) {
+        check(get_sender() == Accounts::SERVICE, "Unauthorized");
+        UserReserve::init(user);
+    }
 
+    // Gets the CPU limit (in ns) for the specified account
+    //
+    // This will also reserve some resources on behalf of the specified account
+    //   for the purpose of ensuring the account can afford up to CPU-limit nanoseconds
+    //   of CPU time.
+    //
+    // Returns None if there is no limit for the specified account
+    fn getCpuLimit(account: AccountNumber) -> Option<u64> {
         if isBillingDisabled() {
             return None;
         }
 
-        let mut limit = UserReserve::reserve_cpu_limit(account);
-
-        limit = limit.saturating_add(CPU_LEEWAY);
-
         // CPU is not billed just-in-time, it's reserved in advance and then the actual amount
         // is billed from the reserve at the end of the tx
+        let mut limit = UserReserve::reserve_cpu_limit(account);
+
+        // To add some leeway, we simply bump the limit by more CPU than was reserved,
+        //   and before billing, we subtract the leeway from the reported consumed amount.
+        limit = limit.saturating_add(CPU_LEEWAY);
+
         Some(limit)
+    }
+
+    /// This actions sets the CPU limit for the specified account.
+    /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
+    #[action]
+    fn setCpuLimit(account: AccountNumber) {
+        check(get_sender() == Transact::SERVICE, "Unauthorized");
+        CpuLimit::rpc().setCpuLimit(getCpuLimit(account));
     }
 
     #[action]

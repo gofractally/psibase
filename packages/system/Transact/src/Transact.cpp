@@ -494,8 +494,8 @@ namespace SystemService
          if (first && !readOnly)
          {
             flags |= AuthInterface::firstAuthFlag;
-            Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
-            cpuLimit.setCpuLimit(act.sender());
+
+            to<VirtualServer>().setCpuLimit(act.sender());
          }
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;

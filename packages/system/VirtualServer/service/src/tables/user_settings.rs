@@ -1,5 +1,6 @@
 use crate::tables::tables::*;
 use psibase::*;
+use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 
 impl UserSettings {
     pub fn get(user: AccountNumber) -> Self {

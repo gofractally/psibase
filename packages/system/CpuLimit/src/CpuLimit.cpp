@@ -17,14 +17,13 @@ namespace SystemService
       return std::chrono::seconds(result.tv_sec) + std::chrono::nanoseconds(result.tv_nsec);
    }
 
-   void CpuLimit::setCpuLimit(psibase::AccountNumber account)
+   void CpuLimit::setCpuLimit(std::optional<uint64_t> limit_ns)
    {
-      auto limit = psibase::to<VirtualServer>().getCpuLimit(account);
-
-      if (!limit.has_value())
+      check(psibase::getSender() == VirtualServer::service, "Unauthorized call to setCpuLimit");
+      if (!limit_ns.has_value())
          return;
 
-      psibase::raw::setMaxCpuTime(*limit);
+      psibase::raw::setMaxCpuTime(*limit_ns);
    }
 }  // namespace SystemService
 
