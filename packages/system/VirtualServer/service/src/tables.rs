@@ -131,9 +131,11 @@ pub mod tables {
         #[primary_key]
         pub user: AccountNumber,
 
-        /// Whether the user is configured for auto-filling of the resource buffer
-        /// Default: true
-        pub auto_fill: bool,
+        /// The percentage at which client-side tooling should attempt to refill the user's
+        /// resource buffer. A value of 0 means that the client should not auto refill.
+        ///
+        /// Default: 20
+        pub auto_fill_threshold_percent: u8,
 
         /// The capacity of the resource buffer that gets filled when the user
         /// acquires resources.

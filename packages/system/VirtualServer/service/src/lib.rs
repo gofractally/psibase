@@ -54,7 +54,7 @@ mod service {
         tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
-    use psibase::*;
+    use psibase::{abort_message, *};
 
     // A small amount of CPU leeway given to transactions
     const CPU_LEEWAY: u64 = 1_000_000u64; // 1 ms
@@ -198,11 +198,32 @@ mod service {
         buy_res_for(amount, get_sender(), None);
     }
 
-    /// Allows the sender to configure whether they would prefer client-side tooling
-    /// to attempt to automatically manage refilling their resource buffer.
+    /// Allows the sender to request client-side tooling to automatically attempt to
+    /// refill their resource buffer when it is at or below the threshold (specified
+    /// in integer percentage values).
+    ///
+    /// A threshold of 0 means that the client should not attempt to refill the
+    /// resource buffer.
     #[action]
-    fn conf_auto_fill(enabled: bool) {
-        UserSettings::get(get_sender()).set_auto_fill(enabled);
+    fn conf_auto_fill(threshold_percent: u8) {
+        check(
+            threshold_percent <= 100,
+            "Threshold must be between 0 and 100",
+        );
+        UserSettings::get(get_sender()).set_auto_fill(threshold_percent);
+    }
+
+    /// Allows the sender to specify the capacity of their resource buffer. The larger the
+    /// resource buffer, the less often the sender will need to refill it.
+    #[action]
+    fn conf_buffer(capacity: u64) {
+        let config = BillingConfig::get_assert();
+        if capacity < config.min_resource_buffer {
+            let err_msg = format!("Buffer capacity must be >= {}", config.min_resource_buffer);
+            abort_message(&err_msg);
+        }
+
+        UserSettings::get(get_sender()).set_capacity(capacity);
     }
 
     /// Refills the sender's resource buffer, allowing them to continue to interact with

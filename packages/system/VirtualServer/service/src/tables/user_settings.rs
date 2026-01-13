@@ -1,6 +1,6 @@
 use crate::tables::tables::*;
-use psibase::*;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
+use psibase::*;
 
 impl UserSettings {
     pub fn get(user: AccountNumber) -> Self {
@@ -10,13 +10,19 @@ impl UserSettings {
             .unwrap_or_else(|| UserSettings {
                 user,
                 buffer_capacity: BillingConfig::get_assert().min_resource_buffer,
-                auto_fill: true,
+                auto_fill_threshold_percent: 20,
             })
     }
 
-    pub fn set_auto_fill(self, enabled: bool) {
+    pub fn set_auto_fill(self, threshold_percent: u8) {
         let mut settings = self;
-        settings.auto_fill = enabled;
+        settings.auto_fill_threshold_percent = threshold_percent;
+        UserSettingsTable::read_write().put(&settings).unwrap();
+    }
+
+    pub fn set_capacity(self, capacity: u64) {
+        let mut settings = self;
+        settings.buffer_capacity = capacity;
         UserSettingsTable::read_write().put(&settings).unwrap();
     }
 
