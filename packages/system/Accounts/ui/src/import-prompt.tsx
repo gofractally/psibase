@@ -8,6 +8,7 @@ import { prompt } from "@psibase/common-lib";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
+import { b64ToPem, validateB64 } from "@shared/lib/b64-key-utils";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -32,7 +33,6 @@ import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";
-import { b64ToPem, validateB64 } from "./lib/keys";
 import { AuthServices } from "./types";
 
 export const ImportPrompt = () => {

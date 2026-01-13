@@ -12,6 +12,7 @@ psibase - The psibase blockchain command line client
 `psibase` `info` [`-a` *url*] *packages*\.\.\.  
 `psibase` `install` [`-a` *url*] [`-k` *public-key*] *packages*\.\.\.  
 `psibase` `list` [`-a` *url*] [`--all` | `--available` | `--installed` | `--updates`]  
+`psibase` `login` [`-a` *url*] *account*  
 `psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key*] *account*  
 `psibase` `publish` [`-a` *url*] `-S` *sender* *files*\.\.\.  
 `psibase` `push` [`-a` *url*] *files*\.\.\.  
@@ -237,6 +238,16 @@ Prints a list of packages from the chain and/or package repositories
 - `-S`, `--sender` *account*
 
   Account that would install the packages. If this account has configured package sources on-chain, those sources will be used [default: root]
+
+### login
+
+`psibase` `login` [`-a` *url*] *account*  
+
+Get a bearer token that can used to access authenticated APIs. The token can only be used with the host that created it. The request must be signed with the same keys that the account would use for a transaction.
+
+- *account*
+
+  The account logging in
 
 ### modify
 
