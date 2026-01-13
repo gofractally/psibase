@@ -26,6 +26,7 @@ export const NavHeader = ({ title }: { title?: string }) => {
         "Peers",
         "Logs",
         "Configuration",
+        "Packages",
         ...(hasKeyDevices ? ["Keys and devices"] : []),
         ...(isBootable ? ["Boot"] : []),
     ];

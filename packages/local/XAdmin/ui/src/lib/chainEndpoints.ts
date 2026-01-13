@@ -20,6 +20,15 @@ import {
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import { recursiveFetch } from "./recursiveFetch";
+import {
+    extractPackage,
+    buildManifestPayload,
+    installAllServices,
+    installDataFiles,
+    callPreinstall,
+    installManifest,
+    callPostinstall,
+} from "./chainEndpoints/index";
 
 export const Peer = z
     .object({
@@ -243,6 +252,56 @@ class Chain {
     public async getTransactStats(): Promise<TransactStatsType> {
         const url = siblingUrl(null, "transact", "/stats");
         return TransactStats.parse(await getJson(url));
+    }
+
+
+    public async installNodeLocalPackage(file: File): Promise<{
+        success: boolean;
+        installed: string[];
+        failed?: { name: string; error: string };
+        notAttempted: string[];
+    }> {
+        let installed: string[] = [];
+        let allServices: string[] = [];
+
+        try {
+            const { zip, services, meta, sha256 } = await extractPackage(file);
+            allServices = services;
+
+            await callPreinstall(meta);
+
+            const manifestPayload = await buildManifestPayload(zip, services);
+            await installManifest(sha256, manifestPayload);
+
+            installed = await installAllServices(zip, services);
+            await installDataFiles(zip);
+
+            await callPostinstall(meta);
+
+            return {
+                success: true,
+                installed,
+                notAttempted: [],
+            };
+        } catch (error) {
+            // Return partial success with failure information
+            const notAttempted = allServices.filter(
+                (s) => !installed.includes(s),
+            );
+            return {
+                success: false,
+                installed,
+                failed: {
+                    name:
+                        notAttempted.length > 0
+                            ? notAttempted[0]
+                            : "unknown",
+                    error:
+                        error instanceof Error ? error.message : String(error),
+                },
+                notAttempted: notAttempted.slice(1),
+            };
+        }
     }
 }
 
