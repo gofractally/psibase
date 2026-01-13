@@ -10,12 +10,13 @@ import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
-import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useRemoveAvatar } from "../../contacts/hooks/use-remove-avatar";
 import { useSetProfile } from "../../contacts/hooks/use-set-profile";
 import { useUploadAvatar } from "../../contacts/hooks/use-upload-avatar";
+
+import { UserProfileSkeleton } from "./user-profile-skeleton";
 
 export const UserProfileSection = () => {
     const { mutateAsync: setProfile, isPending: isSettingProfile } =
@@ -118,21 +119,7 @@ export const UserProfileSection = () => {
                 </div>
             </div>
 
-            {(isLoading || (profile === undefined)) && (
-                <div className="space-y-6">
-                    <div className="space-y-2">
-                        <Skeleton className="h-4 w-24" />
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-4 w-full max-w-md" />
-                    </div>
-                    <div className="space-y-2">
-                        <Skeleton className="h-4 w-16" />
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-4 w-full max-w-md" />
-                    </div>
-                    <Skeleton className="h-10 w-32" />
-                </div>
-            )}
+            {(isLoading || profile === undefined) && <UserProfileSkeleton />}
             {profile !== undefined && !isFetching && (
                 <FormProfile
                     initialData={profile?.profile || undefined}

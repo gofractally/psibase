@@ -4,6 +4,13 @@ interface GasTankProps {
 
 export const GasTank = ({ fillPercentage }: GasTankProps) => {
     const clampedFill = Math.max(0, Math.min(100, fillPercentage));
+    const percentageText = `${Math.round(clampedFill)}%`;
+
+    // XOR color flip: text is positioned at 50% (middle)
+    // If fill level is above 50%, text is in the filled (light blue) area -> use dark text
+    // If fill level is below 50%, text is in the empty (dark) area -> use light text
+    // This ensures the text is always readable regardless of fill level
+    const textColor = clampedFill >= 50 ? "text-gray-900" : "text-white";
 
     return (
         <div className="relative h-full w-16 rounded-lg border-2 border-gray-700 bg-gray-900 overflow-hidden">
@@ -46,6 +53,18 @@ export const GasTank = ({ fillPercentage }: GasTankProps) => {
                     }}
                 />
             )}
+            {/* Percentage label in the middle with XOR color flip */}
+            <div
+                className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-bold text-sm ${textColor} transition-colors duration-300`}
+                style={{
+                    textShadow:
+                        clampedFill > 50
+                            ? "0 1px 2px rgba(0, 0, 0, 0.3)"
+                            : "0 1px 2px rgba(0, 0, 0, 0.8)",
+                }}
+            >
+                {percentageText}
+            </div>
             <style>{`
                 @keyframes shimmer {
                     0% { transform: translateX(-100%); }
