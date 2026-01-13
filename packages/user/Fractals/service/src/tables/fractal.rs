@@ -2,7 +2,12 @@ use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::{DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION, TOKEN_SUPPLY};
+use crate::constants::token_distributions::consensus_rewards::{
+    INITIAL_REWARD_DISTRIBUTION, REMAINING_REWARD_DISTRIBUTION, REWARD_DISTRIBUTION,
+};
+use crate::constants::{
+    token_distributions::TOKEN_SUPPLY, DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION,
+};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
@@ -133,12 +138,38 @@ impl Fractal {
     pub fn init_token(&self) {
         let legislature_guild = Guild::get_assert(self.legislature);
 
-        check(
-            legislature_guild.active_member_count() >= self.token_init_threshold.into(),
-            "active member count does not meet token init threshold",
-        );
+        let reward_consensus = RewardConsensus::get(self.account);
 
-        RewardConsensus::add(self.account, (TOKEN_SUPPLY / 4).into());
+        let is_first_distribution = reward_consensus.is_none();
+
+        if is_first_distribution {
+            check(
+                legislature_guild.active_member_count() >= self.token_init_threshold.into(),
+                "active member count does not meet token init threshold",
+            );
+            RewardConsensus::add(self.account, INITIAL_REWARD_DISTRIBUTION.into());
+        } else {
+            check(
+                legislature_guild.is_rank_ordering(),
+                "cannot distribute remaining tokens until rank ordering is enabled",
+            );
+
+            let reward_consensus = reward_consensus.unwrap();
+
+            let supply = psibase::services::token_stream::Wrapper::call()
+                .get_stream(reward_consensus.reward_stream_id)
+                .unwrap();
+            let is_second_distrbution = supply.total_deposited < REWARD_DISTRIBUTION.into();
+
+            check(
+                is_second_distrbution,
+                "remaining consensus rewards already distributed",
+            );
+            reward_consensus.deposit(
+                REMAINING_REWARD_DISTRIBUTION.into(),
+                "Consensus rewards for ranked evaluations".into(),
+            );
+        }
     }
 
     pub fn set_token_threshold(&mut self, threshold: u8) {

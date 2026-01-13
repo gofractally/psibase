@@ -7,7 +7,16 @@ pub mod constants {
     pub const ONE_WEEK: u32 = ONE_DAY * 7;
     const ONE_YEAR: u32 = ONE_WEEK * 52;
 
-    pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
+    pub mod token_distributions {
+        pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
+
+        pub mod consensus_rewards {
+            pub const REWARD_DISTRIBUTION: u64 = super::TOKEN_SUPPLY / 4;
+            pub const INITIAL_REWARD_DISTRIBUTION: u64 = REWARD_DISTRIBUTION / 100;
+            pub const REMAINING_REWARD_DISTRIBUTION: u64 =
+                REWARD_DISTRIBUTION - INITIAL_REWARD_DISTRIBUTION;
+        }
+    }
     pub const TOKEN_PRECISION: u8 = 4;
     pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
     pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;

@@ -51,6 +51,9 @@ impl Guild {
     }
 
     pub fn enable_rank_ordering(&mut self) {
+        if self.rep.is_some() {
+            self.remove_representative();
+        }
         self.set_setting(GuildFlags::RANK_ORDERING, true);
     }
 
@@ -217,10 +220,6 @@ impl Guild {
     }
 
     pub fn remove_representative(&mut self) {
-        check_some(
-            self.council_members(),
-            "cannot remove representative without council in place",
-        );
         self.rep = None;
         self.save();
     }

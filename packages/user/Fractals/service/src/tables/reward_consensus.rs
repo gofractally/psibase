@@ -78,7 +78,7 @@ impl RewardConsensus {
         new_instance
     }
 
-    fn deposit(&self, amount: Quantity, memo: Memo) {
+    pub fn deposit(&self, amount: Quantity, memo: Memo) {
         self.reward_stream().deposit(amount, memo);
     }
 
