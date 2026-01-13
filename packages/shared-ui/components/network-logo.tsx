@@ -3,8 +3,19 @@ import { Command } from "lucide-react";
 import { useBranding } from "@shared/hooks/use-branding";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-export const NetworkLogo = (props: React.ComponentProps<"div">) => {
-    const { data: networkName, isLoading } = useBranding();
+interface Props extends React.ComponentProps<"div"> {
+    producerName?: string;
+}
+
+export const NetworkLogo = ({ producerName, ...props }: Props) => {
+    const { data: branding, isLoading } = useBranding();
+
+    let networkName = branding;
+    if (producerName && networkName) {
+        networkName = `${producerName}@${networkName}`;
+    } else if (producerName) {
+        networkName = producerName;
+    }
 
     return (
         <div

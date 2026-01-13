@@ -17,6 +17,7 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
+import { useConfig } from "../hooks/useConfig";
 import { useKeyDevices } from "../hooks/useKeyDevices";
 import { useStatuses } from "../hooks/useStatuses";
 import { routes } from "../routing";
@@ -24,6 +25,7 @@ import { MenuContent } from "./menu-content";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const { data: status, isLoading: isLoadingStatus } = useStatuses();
+    const { data: config } = useConfig();
     const { data: keyDevices } = useKeyDevices();
     const isBootable = status && status.includes("needgenesis");
     const hasKeyDevices = keyDevices && keyDevices.length > 0;
@@ -44,7 +46,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 window.top!.location.href = siblingUrl();
                             }}
                         >
-                            <NetworkLogo />
+                            <NetworkLogo producerName={config?.producer} />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
