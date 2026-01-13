@@ -6,8 +6,7 @@ import { Input } from "@shared/shadcn/ui/input";
 
 import { Nav } from "@/components/nav";
 
-import { getSupervisor } from "@psibase/common-lib";
-const supervisor = getSupervisor();
+import { supervisor } from "@shared/lib/supervisor";
 
 export const App = () => {
     const [changesMade, setChangesMade] = useState<boolean>(false);
@@ -63,9 +62,9 @@ export const App = () => {
     };
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-lg">
+        <div className="mx-auto h-screen w-screen max-w-5xl">
             <Nav title="Example Thing Page" />
-            <form className="mx-auto grid max-w-screen-md grid-cols-6">
+            <form className="mx-auto grid max-w-3xl grid-cols-6">
                 <div className="col-span-6 mt-6 grid grid-cols-6">
                     <Label htmlFor="exampleThing" className="col-span-2">
                         Example Thing
