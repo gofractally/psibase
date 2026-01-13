@@ -16,6 +16,7 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 import { Developers } from "./Developers";
+import { NavAdmin } from "./nav-admin";
 import { NavMain } from "./nav-main";
 import { NavSubNav } from "./nav-sub-nav";
 
@@ -39,6 +40,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarHeader>
             <SidebarContent>
                 <NavMain />
+                <NavAdmin />
                 <NavApps />
                 <NavSubNav />
             </SidebarContent>
