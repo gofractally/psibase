@@ -1,12 +1,11 @@
-import { ArrowDownUp, ChevronDown, Settings } from "lucide-react";
+import { ArrowDownUp, ChevronDown, Minus, Plus, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useBoolean } from "usehooks-ts";
-// import {
-//     Tabs,
-//     TabsContent,
-//     TabsList,
-//     TabsTrigger,
-// } from "@shared/shadcn/ui/tabs";
+import {
+    Tabs,
+    TabsList,
+    TabsTrigger,
+} from "@shared/shadcn/ui/tabs";
 import z from "zod";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -38,6 +37,10 @@ import { useQuote } from "./hooks/use-quote";
 import { useSwap } from "./hooks/use-swap";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
+
+
+
 
 const AmountField = ({
     amount,
@@ -106,17 +109,33 @@ const AmountField = ({
     );
 };
 
-const zSelectionType = z.enum(["From", "To"]);
-type SelectionType = z.infer<typeof zSelectionType>;
+const zSelectedTokenFieldType = z.enum(["One", "Two"]);
+
+const zCurrentTab = z.enum(["Swap", "Liquidity"]);
+
+type SelectionType = z.infer<typeof zSelectedTokenFieldType>;
+
+type Tab = z.infer<typeof zCurrentTab>;
+
+const zLiquidityDirection = z.enum(["Add", "Remove"]);
+
+type LiquidityDirection = z.infer<typeof zLiquidityDirection>;
+
 
 export const SwapPage = () => {
-    const [fromAmount, setFromAmount] = useState("");
-    const [toAmount, setToAmount] = useState("");
-    const [fromTokenId, setFromToken] = useState<number>();
-    const [toTokenId, setToToken] = useState<number>();
+    const [token1Amount, setToken1Amount] = useState("");
+    const [token2Amount, setToken2Amount] = useState("");
+    const [token1Id, setToken1Id] = useState<number>();
+    const [token2Id, setToken2Id] = useState<number>();
+
     const [slippage] = useSlippageTolerance();
 
     const { data: pools, error, refetch } = usePools();
+
+    const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap)
+    const isSwapTab = currentTab == 'Swap';
+
+    const [liquidityDirection, setliquidityDirection] = useState<LiquidityDirection>(zLiquidityDirection.Values.Add)
 
 
     const { data: currentUser } = useCurrentUser()
@@ -125,14 +144,21 @@ export const SwapPage = () => {
 
     const { mutateAsync: swap, isPending: isSwapping } = useSwap();
 
-    const triggerSwap = async () => {
 
-        await swap([Array.from(quotedAmount!.pools).map(String), fromTokenId!, fromAmount, '0.001'])
+    const resetFieldValues = () => {
+        setToken2Amount('');
+        setToken1Amount('');
+    }
+
+    const triggerMain = async () => {
+
+        await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, '0.001'])
+        resetFieldValues()
         refetch()
     }
 
     console.log(pools, "was pools", error);
-    const uniqueTokens = useMemo(() => pools
+    const uniqueTradeableTokens = useMemo(() => pools
         ?.flatMap((pool) => [
             { id: pool.tokenAId, symbol: pool.tokenASymbol },
             { id: pool.tokenBId, symbol: pool.tokenBSymbol },
@@ -142,38 +168,52 @@ export const SwapPage = () => {
                 arr.findIndex((i) => i.id == item.id) == index,
         ) || [], [pools])
 
+    const poolTokens = pools?.map(pool => pool.liquidityToken.id);
+
+    const userDepositLiquidityTokens = useMemo(() => tokenBalances?.filter(balance => !poolTokens?.some(poolToken => poolToken == balance.id)).map(balance => ({
+        id: balance.id,
+        symbol: balance.symbol
+    })), [tokenBalances, poolTokens])
+
+
+    const selectableTokens = (isSwapTab ? uniqueTradeableTokens : userDepositLiquidityTokens) || [];
 
     useEffect(() => {
-        if (!fromTokenId && !toTokenId && uniqueTokens.length >= 2) {
-            const [first, second] = uniqueTokens;
-            setFromToken(first.id);
-            setToToken(second.id);
+        if (!token1Id && !token2Id && selectableTokens.length >= 2) {
+            const [first, second] = selectableTokens;
+            setToken1Id(first.id);
+            setToken2Id(second.id);
         }
-    }, [uniqueTokens, fromTokenId, toTokenId])
+    }, [selectableTokens, token1Id, token2Id])
 
-    const fromToken = uniqueTokens.find((token) => token.id == fromTokenId);
+    const token1 = selectableTokens.find((token) => token.id == token1Id);
 
-    const toToken = uniqueTokens.find((token) => token.id == toTokenId);
+    const token2 = selectableTokens.find((token) => token.id == token2Id);
 
-    const { data: quotedAmount } = useQuote(fromTokenId, fromAmount, toTokenId)
+    const { data: quotedAmount } = useQuote(token1Id, token1Amount, token2Id, isSwapTab)
 
     console.log({ quotedAmount })
 
     useEffect(() => {
-        if (quotedAmount) {
-            setToAmount(quotedAmount.toReturn)
+        if (quotedAmount && isSwapTab) {
+            setToken2Amount(quotedAmount.toReturn)
         }
-    }, [quotedAmount])
+    }, [quotedAmount, isSwapTab])
 
 
     const [selectingToken, setSelectingToken] =
-        useState<z.infer<typeof zSelectionType>>();
+        useState<z.infer<typeof zSelectedTokenFieldType>>();
 
-    const switchTokens = () => {
-        setFromToken(toTokenId);
-        setToToken(fromTokenId);
-        setFromAmount(toAmount);
-        setToAmount(fromAmount);
+    const onCenterClick = () => {
+        if (currentTab == 'Swap') {
+
+            setToken1Id(token2Id);
+            setToken2Id(token1Id);
+            setToken1Amount(token2Amount);
+            setToken2Amount(token1Amount);
+        } else {
+            setliquidityDirection(liquidityDirection == 'Add' ? 'Remove' : 'Add')
+        }
     };
 
 
@@ -184,21 +224,32 @@ export const SwapPage = () => {
     const { value: showSettingsModal, setValue: setShowSettingsModal } =
         useBoolean();
 
-    const selectToken = (selection: SelectionType) => {
+    const selectTradeToken = (selection: SelectionType) => {
         setSelectingToken(selection);
         setPickTokenModal(true);
     };
+
+
+
     const selectedToken = (id: number) => {
-        if (selectingToken == "From") {
-            setFromToken(id);
+        if (selectingToken == "One") {
+            setToken1Id(id);
         } else {
-            setToToken(id);
+            setToken2Id(id);
         }
     };
 
-    const minimumReturn = Number(toAmount) * (1 - slippage / 100);
-    const sameTokensSelected = fromTokenId === toTokenId;
+    const focusedPool = pools?.find(pool => {
+        const tradingTokens = [pool.tokenAId, pool.tokenBId];
+        const selectedTokens = [token1Id || 0, token2Id || 0];
+        // TODO: this assumes theres only one pool per pair.
+        return selectedTokens.every(id => tradingTokens.includes(id))
+    })
+    const minimumReturn = Number(token2Amount) * (1 - slippage / 100);
+    const sameTokensSelected = token1Id === token2Id;
     const isSwapPossible = !sameTokensSelected;
+
+    const description = currentTab == 'Swap' ? 'Trade tokens with best prices' : "Add liquidity to or from pools"
 
 
     return (
@@ -224,7 +275,7 @@ export const SwapPage = () => {
 
             <PickTokenModal
                 onSelectToken={(id) => selectedToken(id)}
-                tokens={uniqueTokens || []}
+                tokens={selectableTokens}
                 openChange={(e) => {
                     setPickTokenModal(e);
                 }}
@@ -233,9 +284,19 @@ export const SwapPage = () => {
 
             <Card className="border-2 shadow-xl">
                 <CardHeader className="pb-4">
+                    <Tabs defaultValue="swap" value={currentTab} onValueChange={(tab) => {
+                        setCurrentTab(tab as Tab)
+                        resetFieldValues()
+                    }} className="w-[400px]">
+                        <TabsList>
+                            <TabsTrigger value={zCurrentTab.Values.Swap}>Swap</TabsTrigger>
+                            <TabsTrigger value={zCurrentTab.Values.Liquidity}>Liquidity</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-2xl font-bold">
-                            Swap
+                            {currentTab}
                         </CardTitle>
                         <TooltipProvider>
                             <Tooltip>
@@ -257,25 +318,25 @@ export const SwapPage = () => {
                         </TooltipProvider>
                     </div>
                     <CardDescription>
-                        Trade tokens with best prices.
+                        {description}
                     </CardDescription>
                 </CardHeader>
 
                 <CardContent className="space-y-6">
                     {/* From */}
                     <AmountField
-                        amount={fromAmount}
-                        label="From"
+                        amount={token1Amount}
+                        label={currentTab == 'Swap' ? 'From' : liquidityDirection == 'Add' ? 'Deposit' : 'Withdraw'}
                         setAmount={(amount) => {
-                            setFromAmount(amount);
+                            setToken1Amount(amount);
                         }}
                         onSelect={() => {
-                            selectToken(zSelectionType.Enum.From);
+                            selectTradeToken(zSelectedTokenFieldType.Enum.One);
                         }}
-                        balance={tokenBalances?.find(balance => balance.id == fromTokenId)?.balance?.format({ includeLabel: false })}
+                        balance={tokenBalances?.find(balance => balance.id == token1Id)?.balance?.format({ includeLabel: false })}
                         name=""
                         symbol={
-                            fromToken?.symbol || fromToken?.id.toString() || ""
+                            token1?.symbol || token1?.id.toString() || ""
                         }
                     />
 
@@ -288,30 +349,30 @@ export const SwapPage = () => {
                             variant="outline"
                             size="icon"
                             className="bg-background hover:bg-muted relative z-10 rounded-full"
-                            onClick={switchTokens}
+                            onClick={onCenterClick}
                         >
-                            <ArrowDownUp className="h-5 w-5" />
+                            {currentTab == 'Swap' ? <ArrowDownUp className="h-5 w-5" /> : liquidityDirection == 'Add' ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
                         </Button>
                     </div>
 
                     {/* To */}
                     <AmountField
-                        disabled
-                        label="To"
-                        amount={toAmount}
+                        disabled={isSwapTab}
+                        label={currentTab == 'Swap' ? 'To' : liquidityDirection == 'Add' ? 'Deposit' : 'Withdraw'}
+                        amount={token2Amount}
                         setAmount={(amount) => {
-                            setToAmount(amount);
+                            setToken2Amount(amount);
                         }}
                         onSelect={() => {
-                            selectToken(zSelectionType.Enum.To);
+                            selectTradeToken(zSelectedTokenFieldType.Enum.Two);
                         }}
-                        balance={tokenBalances?.find(balance => balance.id == toTokenId)?.balance?.format({ includeLabel: false })}
+                        balance={tokenBalances?.find(balance => balance.id == token2Id)?.balance?.format({ includeLabel: false })}
                         name=""
-                        symbol={toToken?.symbol || toToken?.id.toString() || ""}
+                        symbol={token2?.symbol || token2?.id.toString() || ""}
                     />
 
                     {/* Price info */}
-                    {isSwapPossible && (
+                    {isSwapTab && isSwapPossible && (
                         <div className="text-muted-foreground space-y-1 text-sm">
                             <div className="flex justify-between">
                                 <span>Minimum output</span>
@@ -329,6 +390,38 @@ export const SwapPage = () => {
                             </div>
                         </div>
                     )}
+                    {!isSwapTab && (
+                        <div className="text-muted-foreground space-y-1 text-sm">
+
+
+                            {!focusedPool && <><Alert variant="warning">
+                                <AlertTitle>Creating new pool</AlertTitle>
+                                <AlertDescription>
+                                    <p>
+                                        No pool exists between the two tokens selected.
+                                    </p>
+                                    <p>
+                                        By proceeding you will create a new pool of both reserves, ensure you are depositing both tokens of equal market value.
+                                    </p>
+                                </AlertDescription>
+                            </Alert>
+                                <div className="text-muted-foreground space-y-1 text-sm">
+                                    <div className="flex justify-between">
+                                        <span>Token 1 Price</span>
+                                        <span>{(Number(token2Amount) / Number(token1Amount)).toFixed(4)} {token2?.symbol || `(${token2?.id})`}</span>
+                                    </div>
+
+                                    <div className="flex justify-between">
+                                        <span>Token 2 Price</span>
+                                        <span>{(Number(token1Amount) / Number(token2Amount)).toFixed(4)} {token1?.symbol || `(${token1?.id})`}</span>
+                                    </div>
+                                </div>
+                            </>}
+                            {focusedPool ? 'Contributing to existing pool' : "Creating a new pool"}
+
+                        </div>
+                    )}
+
                 </CardContent>
 
                 <CardFooter className="pt-2">
@@ -337,19 +430,18 @@ export const SwapPage = () => {
                         className="h-14 w-full text-lg font-semibold"
                         disabled={!isSwapPossible || isSwapping}
                         onClick={() => {
-                            triggerSwap()
+                            triggerMain()
                         }}
                     >
-                        {fromAmount
+                        {currentTab == 'Swap' ? token1Amount
                             ? sameTokensSelected
                                 ? "Select different tokens"
                                 : "Swap"
-                            : "Enter amount"}
+                            : "Enter amount" : liquidityDirection == 'Add' ? focusedPool ? "Create pool" : 'Add liquidity' : 'Remove liquidity'}
                     </Button>
                 </CardFooter>
             </Card>
 
-            {/* Optional bottom note */}
             <div className="flex w-full justify-center">
                 <Button
                     variant={"link"}

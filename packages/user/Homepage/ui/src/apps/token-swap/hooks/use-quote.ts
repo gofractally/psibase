@@ -5,11 +5,12 @@ export const useQuote = (
     fromToken?: number,
     amount?: string,
     toToken?: number,
+    enabled?: boolean
 ) => {
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
         tokenSwap.api.getAmount,
         [fromToken!, amount!, toToken!, 3],
-        { enabled: !!(fromToken && amount && toToken && isAmountValid) },
+        { enabled: !!(fromToken && amount && toToken && isAmountValid && enabled) },
     );
 };
