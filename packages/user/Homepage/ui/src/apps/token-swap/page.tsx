@@ -40,6 +40,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { useAddLiquidity } from "./hooks/use-add-liquidity";
 import { useCreatePool } from "./hooks/use-create-pool";
+import { PoolPicker } from "./components/pool-picker";
 
 
 
@@ -247,12 +248,6 @@ export const SwapPage = () => {
     const { value: showSettingsModal, setValue: setShowSettingsModal } =
         useBoolean();
 
-    const selectTradeToken = (selection: SelectionType) => {
-        setSelectingToken(selection);
-        setPickTokenModal(true);
-    };
-
-
 
     const selectedToken = (id: number) => {
         if (selectingToken == "One") {
@@ -260,6 +255,7 @@ export const SwapPage = () => {
         } else {
             setToken2Id(id);
         }
+        resetSelections(currentTab)
     };
 
     const [focusedPoolId, setFocusedPoolId] = useState<number | null>();
@@ -270,11 +266,29 @@ export const SwapPage = () => {
         return selectedTokens.every(id => tradingTokens.includes(id))
     });
 
+    const selectToken = (selection: SelectionType) => {
+        setSelectingToken(selection);
+        setPickTokenModal(true);
+    };
+
+
+    const resetSelections = (tab: Tab) => {
+        if (tab == 'Liquidity') {
+            setFocusedPoolId(poolsOfLiquidityPair.length > 0 ? poolsOfLiquidityPair[0].id : null)
+        }
+    }
+
     useEffect(() => {
-        if (poolsOfLiquidityPair.length > 0 && !poolsOfLiquidityPair.some(pool => pool.id == focusedPoolId)) {
-            setFocusedPoolId(poolsOfLiquidityPair[0].id)
+        if (poolsOfLiquidityPair.length == 0) {
+            // setFocusedPoolId(null)
         }
     }, [token1Id, token2Id, poolsOfLiquidityPair, focusedPoolId])
+
+    const onSelectTab = (tab: Tab) => {
+        setCurrentTab(tab as Tab)
+        resetFieldValues()
+        resetSelections(tab)
+    }
 
     const focusedPool = pools?.find(pool => pool.id === focusedPoolId);
     const sameTokensSelected = token1Id === token2Id;
@@ -315,10 +329,7 @@ export const SwapPage = () => {
 
             <Card className="border-2 shadow-xl">
                 <CardHeader className="pb-4">
-                    <Tabs defaultValue="swap" value={currentTab} onValueChange={(tab) => {
-                        setCurrentTab(tab as Tab)
-                        resetFieldValues()
-                    }} className="w-[400px]">
+                    <Tabs defaultValue="swap" value={currentTab} onValueChange={(tab) => onSelectTab(tab as Tab)} className="w-[400px]">
                         <TabsList>
                             <TabsTrigger value={zCurrentTab.Values.Swap}>Swap</TabsTrigger>
                             <TabsTrigger value={zCurrentTab.Values.Liquidity}>Liquidity</TabsTrigger>
@@ -362,7 +373,7 @@ export const SwapPage = () => {
                             setToken1Amount(amount);
                         }}
                         onSelect={() => {
-                            selectTradeToken(zSelectedTokenFieldType.Enum.One);
+                            selectToken(zSelectedTokenFieldType.Enum.One);
                         }}
                         balance={tokenBalances?.find(balance => balance.id == token1Id)?.balance?.format({ includeLabel: false })}
                         name=""
@@ -395,7 +406,7 @@ export const SwapPage = () => {
                             setToken2Amount(amount);
                         }}
                         onSelect={() => {
-                            selectTradeToken(zSelectedTokenFieldType.Enum.Two);
+                            selectToken(zSelectedTokenFieldType.Enum.Two);
                         }}
                         balance={tokenBalances?.find(balance => balance.id == token2Id)?.balance?.format({ includeLabel: false })}
                         name=""
@@ -424,8 +435,12 @@ export const SwapPage = () => {
                     {!isSwapTab && (
                         <div className="text-muted-foreground space-y-1 text-sm">
 
+                            <PoolPicker
+                                setFocusedPoolId={(focusedId) => setFocusedPoolId(focusedId)}
+                                focusedPoolId={focusedPoolId}
+                                pools={(poolsOfLiquidityPair || [])?.map(pool => ({ id: pool.id, tokenAId: pool.tokenAId, tokenBId: pool.tokenBId, tokenASymbol: pool.tokenASymbol || '', tokenBSymbol: pool.tokenBSymbol || '' }))} />
 
-                            {!focusedPool && <><Alert variant="warning">
+                            {poolsOfLiquidityPair.length == 0 && <><Alert variant="warning">
                                 <AlertTitle>Creating new pool</AlertTitle>
                                 <AlertDescription>
                                     <p>
@@ -433,6 +448,30 @@ export const SwapPage = () => {
                                     </p>
                                     <p>
                                         By proceeding you will create a new pool of both reserves, ensure you are depositing both tokens of equal market value.
+                                    </p>
+                                </AlertDescription>
+                            </Alert>
+                                <div className="text-muted-foreground space-y-1 text-sm">
+                                    <div className="flex justify-between">
+                                        <span>Token 1 Price</span>
+                                        <span>{(Number(token2Amount) / Number(token1Amount)).toFixed(4)} {token2?.symbol || `(${token2?.id})`}</span>
+                                    </div>
+
+                                    <div className="flex justify-between">
+                                        <span>Token 2 Price</span>
+                                        <span>{(Number(token1Amount) / Number(token2Amount)).toFixed(4)} {token1?.symbol || `(${token1?.id})`}</span>
+                                    </div>
+                                </div>
+                            </>}
+
+                            {poolsOfLiquidityPair.length > 0 && focusedPoolId === null && <><Alert variant="warning">
+                                <AlertTitle>Pool of trading pair already exists</AlertTitle>
+                                <AlertDescription className="text-sm">
+                                    <p>
+                                        A pool of this trading pair already exists, it is generally better to deposit to existing pools rather than creating another.
+                                    </p>
+                                    <p>
+                                        Pools created with insufficient liquidity are unlikely to receive favourable trading activity.
                                     </p>
                                 </AlertDescription>
                             </Alert>
@@ -463,11 +502,15 @@ export const SwapPage = () => {
                             triggerMain()
                         }}
                     >
-                        {currentTab == 'Swap' ? token1Amount
-                            ? sameTokensSelected
-                                ? "Select different tokens"
-                                : "Swap"
-                            : "Enter amount" : liquidityDirection == 'Add' ? focusedPool ? 'Add liquidity' : "Create pool" : 'Remove liquidity'}
+                        {sameTokensSelected
+                            ? "Select different tokens"
+                            : !token1Amount
+                                ? "Enter amount"
+                                : currentTab === "Swap"
+                                    ? "Swap"
+                                    : liquidityDirection === "Add"
+                                        ? (focusedPool ? "Add liquidity" : "Create pool")
+                                        : "Remove liquidity"}
                     </Button>
                 </CardFooter>
             </Card>
