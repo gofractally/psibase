@@ -133,13 +133,9 @@ impl Guild {
         )
     }
 
-    pub fn rep_role_auth(&self, set_code_staged: bool) -> DynamicAuthPolicy {
+    pub fn rep_role_auth(&self) -> DynamicAuthPolicy {
         self.rep.map_or(DynamicAuthPolicy::impossible(), |rep| {
-            if set_code_staged {
-                self.council_role_auth()
-            } else {
-                DynamicAuthPolicy::from_sole_authorizer(rep)
-            }
+            DynamicAuthPolicy::from_sole_authorizer(rep)
         })
     }
 
