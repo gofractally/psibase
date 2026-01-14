@@ -53,14 +53,22 @@ interface admin {
 interface billing {
     use host:types/types.{error};
 
-    /// Fills the user's gas tank, allowing them to continue to transact
+    /// Fills the user's gas tank to its full capacity, allowing them to continue to transact
     /// on the server.
     /// 
     /// The user must have a sufficient balance of system tokens to pay for the gas.
     fill-gas-tank: func() -> result<_, error>;
 
-    /// Gets the cost of filling the user's gas tank from empty
-    get-gas-tank-cost: func() -> result<u64, error>;
+    /// Resizes the user's gas tank to the specificed capacity (measured in system tokens). 
+    /// Then (atomically) fills the user's gas tank, allowing them to continue to transact
+    /// on the server.
+    /// 
+    /// The specified capacity is a string representation of the system token amount 
+    /// (e.g. "100", "100.5", "100.123", etc.). The precision of the value in the decimal 
+    /// string must not exceed the token's actual precision.
+    /// 
+    /// The user must have a sufficient balance of system tokens to pay for the gas.
+    resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;
 }
 
 interface authorized {
