@@ -16,8 +16,10 @@ namespace
       PSIO_REFLECT(ConnectRequest, url)
    };
 
-   std::int32_t connect(std::string peer)
+   std::int32_t connect(std::string peer, std::optional<std::int32_t> requestSocket = std::nullopt)
    {
+      if (peer.find('/') == std::string::npos)
+         peer = "http://" + peer;
       std::optional<TLSInfo>        tls;
       std::optional<SocketEndpoint> endpoint;
       auto                          url = splitURL(peer);
@@ -25,26 +27,246 @@ namespace
                             .method = "GET",
                             .target = "/p2p",
       };
+      std::vector<std::string> hosts;
+      bool                     secure = false;
+      bool                     local  = false;
       if (url.scheme == "https" || url.scheme == "wss")
       {
+         secure = true;
          tls.emplace();
-         request.host = url.host;
+         request.host = "x-peers." + std::string{url.host};
+         hosts.push_back(std::string{url.domain()});
       }
       else if (url.scheme == "http" || url.scheme == "ws")
       {
-         request.host = url.host;
-      }
-      else if (peer.find('/') == std::string::npos)
-      {
-         request.host = peer;
+         request.host = "x-peers." + std::string{url.host};
+         hosts.push_back(std::string{url.domain()});
       }
       else
       {
+         local        = true;
          request.host = "localhost";
          endpoint     = LocalEndpoint{peer};
       }
       std::int32_t socket = to<XHttp>().websocket(request, std::move(tls), std::move(endpoint));
+
+      auto peers = XPeers{}.open<PeerConnectionTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().setCallback(socket, MethodNumber{"onP2P"}, MethodNumber{"errP2P"});
+         if (requestSocket)
+         {
+            auto connectionRequests = XPeers{}.open<ConnectionRequestTable>();
+            connectionRequests.put({socket, *requestSocket});
+            to<XHttp>().autoClose(*requestSocket, false);
+         }
+
+         peers.put({.socket     = socket,
+                    .peerSocket = -1,
+                    .nodeId     = 0,
+                    .hosts      = std::move(hosts),
+                    .secure     = secure,
+                    .local      = local,
+                    .outgoing   = true});
+      }
       return socket;
+   }
+
+   std::uint64_t myNodeId()
+   {
+      auto          table = XPeers{}.open<NodeIdTable>();
+      std::uint64_t result;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto row = table.get({}))
+         {
+            result = row->nodeId;
+         }
+         else
+         {
+            psibase::raw::getRandom(&result, sizeof(result));
+            table.put({result});
+         }
+      }
+      return result;
+   }
+
+   struct IdMessage
+   {
+      static const std::uint8_t type = 64;
+      std::uint64_t             nodeId;
+      std::int32_t              connectionId;
+      PSIO_REFLECT(IdMessage, nodeId, connectionId)
+   };
+   struct DuplicateConnectionMessage
+   {
+      static const std::uint8_t type = 65;
+      std::int32_t              connectionId;
+      bool                      secure;
+      PSIO_REFLECT(DuplicateConnectionMessage, connectionId, secure)
+   };
+   struct HostnamesMessage
+   {
+      static const std::uint8_t type = 66;
+      std::vector<std::string>  hosts;
+      PSIO_REFLECT(HostnamesMessage, hosts)
+   };
+
+   template <typename T>
+   std::vector<char> serializeMessage(const T& msg)
+   {
+      std::vector<char> result;
+      result.push_back(T::type);
+      psio::vector_stream stream{result};
+      psio::to_frac(psio::nested<const T&>{msg}, stream);
+      return result;
+   }
+
+   template <typename T>
+   T deserializeMessage(std::span<const char> msg)
+   {
+      return psio::from_frac<psio::nested<T>>(msg.subspan(1)).value;
+   }
+
+   bool hasCommonHost(const PeerConnection& lhs, const PeerConnection& rhs)
+   {
+      for (const auto& lhost : lhs.hosts)
+      {
+         for (const auto& rhost : rhs.hosts)
+         {
+            if (lhost == rhost)
+               return true;
+         }
+      }
+      return false;
+   }
+
+   void getDuplicates(PeerConnectionTable&  peers,
+                      HostIdTable&          hostIds,
+                      const PeerConnection& row,
+                      auto&                 result)
+   {
+      if (row.outgoing)
+      {
+         // TODO: find other outgoing connections with the same set of hosts
+         for (const auto& host : row.hosts)
+         {
+            for (const auto& duplicate :
+                 hostIds.getIndex<0>().subindex(std::tuple(false, host, row.nodeId)))
+            {
+               result.push_back(
+                   {duplicate.socket, DuplicateConnectionMessage{row.peerSocket, row.secure}});
+            }
+         }
+      }
+      else
+      {
+         for (const auto& host : row.hosts)
+         {
+            for (const auto& duplicate :
+                 hostIds.getIndex<0>().subindex(std::tuple(true, host, row.nodeId)))
+            {
+               auto out = peers.get(duplicate.socket).value();
+               result.push_back(
+                   {row.socket, DuplicateConnectionMessage{out.peerSocket, out.secure}});
+            }
+         }
+      }
+   }
+
+   void updateHosts(HostIdTable& hostIds, PeerConnection& row, std::vector<std::string>&& hosts)
+   {
+      for (const auto& host : row.hosts)
+      {
+         hostIds.remove({row.outgoing, host, row.nodeId, row.socket});
+      }
+      row.hosts = std::move(hosts);
+      for (const auto& host : row.hosts)
+      {
+         hostIds.put({row.outgoing, host, row.nodeId, row.socket});
+      }
+   }
+
+   void removePeer(std::int32_t socket)
+   {
+      auto table   = XPeers{}.open<PeerConnectionTable>();
+      auto hostIds = XPeers{}.open<HostIdTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto row = table.get(socket).value();
+         updateHosts(hostIds, row, {});
+         table.remove(row);
+      }
+   }
+
+   void recvMessage(std::int32_t socket, IdMessage&& msg)
+   {
+      auto table   = XPeers{}.open<PeerConnectionTable>();
+      auto hostIds = XPeers{}.open<HostIdTable>();
+      std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto row       = table.get(socket).value();
+         row.peerSocket = msg.connectionId;
+         row.nodeId     = msg.nodeId;
+         table.put(row);
+         if (row.fixedHosts())
+         {
+            for (const auto& host : row.hosts)
+            {
+               hostIds.put({row.outgoing, host, row.nodeId, socket});
+            }
+            getDuplicates(table, hostIds, row, messages);
+         }
+      }
+      for (auto&& [peer, msg] : messages)
+      {
+         to<XHttp>().send(peer, serializeMessage(msg));
+      }
+   }
+
+   void recvMessage(std::int32_t socket, HostnamesMessage&& msg)
+   {
+      auto table   = XPeers{}.open<PeerConnectionTable>();
+      auto hostIds = XPeers{}.open<HostIdTable>();
+      std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto row = table.get(socket).value();
+         if (!row.fixedHosts())
+         {
+            updateHosts(hostIds, row, std::move(msg.hosts));
+            table.put(row);
+            getDuplicates(table, hostIds, row, messages);
+         }
+      }
+      for (auto&& [peer, msg] : messages)
+      {
+         to<XHttp>().send(peer, serializeMessage(msg));
+      }
+   }
+   void recvMessage(std::int32_t socket, DuplicateConnectionMessage&& msg)
+   {
+      auto table = XPeers{}.open<PeerConnectionTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto out = table.get(socket);
+         auto in  = table.get(msg.connectionId);
+         if (in && out && out->outgoing)
+         {
+            if (in->nodeId == out->nodeId && hasCommonHost(*in, *out))
+            {
+               if (msg.secure && !out->secure ||
+                   msg.secure == out->secure && out->nodeId < myNodeId())
+               {
+                  auto hostIds = XPeers{}.open<HostIdTable>();
+                  updateHosts(hostIds, *out, {});
+                  table.remove(*out);
+                  to<XHttp>().close(socket);
+               }
+            }
+         }
+      }
    }
 }  // namespace
 
@@ -69,31 +291,50 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          return HttpReply::methodNotAllowed(request);
       auto body = psio::convert_from_json<ConnectRequest>(
           std::string(request.body.begin(), request.body.end()));
-      std::int32_t newSocket = connect(body.url);
+      connect(body.url, socket);
 
-      auto connectionRequests = open<ConnectionRequestTable>();
-      PSIBASE_SUBJECTIVE_TX
-      {
-         to<XHttp>().setCallback(newSocket, MethodNumber{"onP2P"}, MethodNumber{"errP2P"});
-         connectionRequests.put({newSocket, *socket});
-         to<XHttp>().autoClose(*socket, false);
-      }
       return {};
    }
-   if (target == "/p2p")
+   else if (target == "/p2p")
    {
       if (auto reply = webSocketHandshake(request))
       {
          to<XHttp>().accept(*socket, *reply, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
+         auto table = Native::session().open<SocketTable>();
+         auto peers = open<PeerConnectionTable>();
          PSIBASE_SUBJECTIVE_TX
          {
-            auto  table   = Native::session().open<SocketTable>();
             auto  row     = table.get(*socket).value();
             auto& oldInfo = std::get<WebSocketInfo>(row.info);
             row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
             table.put(row);
+            peers.put({.socket     = *socket,
+                       .peerSocket = -1,
+                       .nodeId     = 0,
+                       .secure     = false,
+                       .local      = false,
+                       .outgoing   = false});
+         }
+         to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
+         to<XHttp>().send(*socket,
+                          serializeMessage(HostnamesMessage{to<XAdmin>().options().hosts}));
+      }
+   }
+   else if (target == "/peers")
+   {
+      std::vector<PeerConnection> result;
+      auto                        peers = open<PeerConnectionTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         for (auto row : peers.getIndex<0>())
+         {
+            result.push_back(std::move(row));
          }
       }
+      HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
+      psio::vector_stream stream{reply.body};
+      to_json(result, stream);
+      return reply;
    }
    return {};
 }
@@ -101,16 +342,18 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
 void XPeers::onP2P(std::int32_t socket, HttpReply reply)
 {
    std::optional<ConnectionRequestRow> request;
-   // convert to p2p socket
-   auto connectionRequests = open<ConnectionRequestTable>();
+   auto                                connectionRequests = open<ConnectionRequestTable>();
    PSIBASE_SUBJECTIVE_TX
    {
       auto  table   = Native::session().open<SocketTable>();
       auto  row     = table.get(socket).value();
       auto& oldInfo = std::get<WebSocketInfo>(row.info);
+      bool  secure  = oldInfo.tls.has_value();
+      bool  local   = oldInfo.endpoint && std::holds_alternative<LocalEndpoint>(*oldInfo.endpoint);
       row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
       table.put(row);
       to<XHttp>().setCallback(socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
+
       request = connectionRequests.get(socket);
       if (request)
       {
@@ -122,12 +365,15 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
    {
       to<XHttp>().sendReply(request->requestSocket, HttpReply{});
    }
+   to<XHttp>().send(socket, serializeMessage(IdMessage{myNodeId(), socket}));
+   to<XHttp>().send(socket, serializeMessage(HostnamesMessage{to<XAdmin>().options().hosts}));
 }
 
 void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
 {
    std::optional<ConnectionRequestRow> request;
    auto                                connectionRequests = open<ConnectionRequestTable>();
+   auto                                peers              = open<PeerConnectionTable>();
    PSIBASE_SUBJECTIVE_TX
    {
       request = connectionRequests.get(socket);
@@ -136,6 +382,7 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
          connectionRequests.remove(*request);
          to<XHttp>().autoClose(request->requestSocket, true);
       }
+      peers.erase(socket);
    }
    if (request)
    {
@@ -146,8 +393,23 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
    }
 }
 
-void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data) {}
+void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data)
+{
+   check(!data.empty(), "Invalid message");
+   switch (data[0].unpack())
+   {
+      case IdMessage::type:
+         return recvMessage(socket, deserializeMessage<IdMessage>(data));
+      case HostnamesMessage::type:
+         return recvMessage(socket, deserializeMessage<HostnamesMessage>(data));
+      case DuplicateConnectionMessage::type:
+         return recvMessage(socket, deserializeMessage<DuplicateConnectionMessage>(data));
+   }
+}
 
-void XPeers::closeP2P(std::int32_t socket) {}
+void XPeers::closeP2P(std::int32_t socket)
+{
+   removePeer(socket);
+}
 
 PSIBASE_DISPATCH(XPeers)

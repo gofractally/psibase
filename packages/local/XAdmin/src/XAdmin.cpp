@@ -4,6 +4,7 @@
 #include <psio/json/any.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XPeers.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 
@@ -420,7 +421,8 @@ namespace LocalService
 
    AdminOptionsRow XAdmin::options()
    {
-      check(getSender() == XHttp::service, "Wrong sender");
+      auto sender = getSender();
+      check(sender == XHttp::service || sender == XPeers::service, "Wrong sender");
       PSIBASE_SUBJECTIVE_TX
       {
          return open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});

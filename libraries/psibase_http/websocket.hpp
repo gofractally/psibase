@@ -426,6 +426,7 @@ namespace psibase::http
                 {
                    auto inbuffer = self->input.cdata();
                    auto msg = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
+                   if (!msg.empty() && static_cast<unsigned char>(msg[0]) < 64)
                    {
                       std::unique_lock l{self->mutex};
                       using P2PState = WebSocket::P2PState;

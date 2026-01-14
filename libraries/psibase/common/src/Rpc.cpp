@@ -288,6 +288,18 @@ namespace psibase
       return {scheme, host, path};
    }
 
+   std::string_view SplitURL::domain() const
+   {
+      if (auto pos = host.rfind(':'); pos != std::string::npos)
+      {
+         if (host.find(']', pos) == std::string::npos)
+         {
+            return host.substr(0, pos);
+         }
+      }
+      return host;
+   }
+
    std::vector<HttpHeader> allowCors(std::string_view origin)
    {
       return {

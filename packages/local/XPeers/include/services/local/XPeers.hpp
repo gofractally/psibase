@@ -7,6 +7,14 @@
 
 namespace LocalService
 {
+   struct NodeIdRow
+   {
+      std::uint64_t nodeId;
+      PSIO_REFLECT(NodeIdRow, nodeId);
+   };
+   using NodeIdTable = psibase::Table<NodeIdRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(NodeIdTable)
+
    struct ConnectionRequestRow
    {
       std::int32_t peerSocket;
@@ -17,10 +25,48 @@ namespace LocalService
        psibase::Table<ConnectionRequestRow, &ConnectionRequestRow::peerSocket>;
    PSIO_REFLECT_TYPENAME(ConnectionRequestTable)
 
+   struct PeerConnection
+   {
+      std::int32_t             socket;
+      std::int32_t             peerSocket;
+      std::uint64_t            nodeId;
+      std::vector<std::string> hosts;
+      bool                     secure;
+      bool                     local;
+      bool                     outgoing;
+
+      // Returns true if hosts are determined at connection time
+      // and unchangable, false if the hosts are loaded from a
+      // hostnamesMessage
+      bool fixedHosts() const { return outgoing && !local; }
+      PSIO_REFLECT(PeerConnection, socket, peerSocket, nodeId, hosts, secure, local, outgoing)
+   };
+   using PeerConnectionTable =
+       psibase::Table<PeerConnection,
+                      &PeerConnection::socket,
+                      psibase::CompositeKey<&PeerConnection::outgoing, &PeerConnection::socket>{}>;
+   PSIO_REFLECT_TYPENAME(PeerConnectionTable)
+
+   struct HostIdRow
+   {
+      bool          outgoing;
+      std::string   host;
+      std::uint64_t nodeId;
+      std::int32_t  socket;
+      PSIO_REFLECT(HostIdRow, outgoing, host, nodeId, socket)
+   };
+   using HostIdTable = psibase::Table<HostIdRow,
+                                      psibase::CompositeKey<&HostIdRow::outgoing,
+                                                            &HostIdRow::host,
+                                                            &HostIdRow::nodeId,
+                                                            &HostIdRow::socket>{}>;
+   PSIO_REFLECT_TYPENAME(HostIdTable)
+
    struct XPeers : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-peers"};
-      using Session                 = psibase::SessionTables<ConnectionRequestTable>;
+      using Session                 = psibase::
+          SessionTables<NodeIdTable, ConnectionRequestTable, PeerConnectionTable, HostIdTable>;
       auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> user)
           -> std::optional<psibase::HttpReply>;
 
