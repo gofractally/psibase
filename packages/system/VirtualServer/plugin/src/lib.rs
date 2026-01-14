@@ -6,7 +6,7 @@ mod query;
 use errors::ErrorType;
 
 use bindings::exports::virtual_server::plugin as Exports;
-use Exports::types::{NetworkVariables, ServerSpecs};
+use Exports::types::{CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs};
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, billing::Guest as Billing,
     transact::Guest as Transact,
@@ -86,6 +86,121 @@ impl Admin for VirtualServerPlugin {
             &Actions::enable_billing { enabled }.packed(),
         )
     }
+
+    fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
+        assert_caller(&["config"], "set_cpu_pricing_params");
+
+        add_action_to_transaction(
+            Actions::cpu_thresholds::ACTION_NAME,
+            &Actions::cpu_thresholds {
+                idle_ppm: params.idle_ppm,
+                congested_ppm: params.congested_ppm,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::cpu_rates::ACTION_NAME,
+            &Actions::cpu_rates {
+                doubling_time_sec: params.doubling_time_sec,
+                halving_time_sec: params.halving_time_sec,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::cpu_blocks_avg::ACTION_NAME,
+            &Actions::cpu_blocks_avg {
+                num_blocks: params.num_blocks_to_average,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::cpu_min_unit::ACTION_NAME,
+            &Actions::cpu_min_unit {
+                ns: params.min_billable_unit_ns,
+            }
+            .packed(),
+        )?;
+        Ok(())
+    }
+
+    fn set_net_pricing_params(params: NetPricingParams) -> Result<(), Error> {
+        assert_caller(&["config"], "set_net_pricing_params");
+
+        add_action_to_transaction(
+            Actions::net_thresholds::ACTION_NAME,
+            &Actions::net_thresholds {
+                idle_ppm: params.idle_ppm,
+                congested_ppm: params.congested_ppm,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::net_rates::ACTION_NAME,
+            &Actions::net_rates {
+                doubling_time_sec: params.doubling_time_sec,
+                halving_time_sec: params.halving_time_sec,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::net_blocks_avg::ACTION_NAME,
+            &Actions::net_blocks_avg {
+                num_blocks: params.num_blocks_to_average,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::net_min_unit::ACTION_NAME,
+            &Actions::net_min_unit {
+                bits: params.min_billable_unit_bits,
+            }
+            .packed(),
+        )?;
+        Ok(())
+    }
+}
+
+// Refills to the specified capacity, or if not specified, to the user's current
+// buffer capacity.
+// If `force` is true, the refill will occur regardless of the user's current balance.
+// If `force` is false, the refill will only occur if the user's current resource balance
+//   is less than the minimum threshold (a percentage of their total capacity).
+fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
+    let sys_id = TokensPlugin::helpers::fetch_network_token()?
+        .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
+
+    // Calculate amount to refill
+    let user = AccountsPlugin::api::get_current_user()
+        .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
+    let (balance, current_capacity, auto_fill_threshold) = query::get_user_resources(&user)?;
+    let capacity = capacity.unwrap_or(current_capacity);
+
+    // If not forcing, only refill if the user's current balance is below minimum
+    if !force {
+        if auto_fill_threshold == 0 {
+            return Ok(());
+        }
+
+        let minimum = capacity * auto_fill_threshold / 100;
+        if balance >= minimum {
+            return Ok(());
+        }
+    }
+
+    let amount = capacity - balance;
+    let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
+
+    // Refill
+    TokensPlugin::user::credit(
+        sys_id,
+        &client::get_receiver(),
+        &amount,
+        "Refilling resource buffer",
+    )?;
+    add_action_to_transaction(
+        Actions::refill_res_buf::ACTION_NAME,
+        &Actions::refill_res_buf {}.packed(),
+    )
 }
 
 impl Billing for VirtualServerPlugin {
@@ -95,44 +210,24 @@ impl Billing for VirtualServerPlugin {
             "fill_gas_tank",
         );
 
-        let user = AccountsPlugin::api::get_current_user()
-            .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
+        refill_to_capacity(None, true) // Uses user's current capacity
+    }
 
-        let (balance, buffer_capacity, _) = query::get_user_resources(&user)?;
-
-        let minimum = buffer_capacity * 20 / 100;
-
-        if balance >= minimum {
-            return Ok(());
-        }
-
-        let amount = buffer_capacity - balance;
+    fn resize_and_fill_gas_tank(new_capacity: String) -> Result<(), Error> {
+        assert_caller(
+            &["homepage", &client::get_receiver()],
+            "resize_and_fill_gas_tank",
+        );
 
         let sys_id = TokensPlugin::helpers::fetch_network_token()?
             .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
-
-        let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
-        TokensPlugin::user::credit(
-            sys_id,
-            &client::get_receiver(),
-            &amount,
-            "Refilling resource buffer",
+        let capacity = TokensPlugin::helpers::decimal_to_u64(sys_id, &new_capacity)?;
+        add_action_to_transaction(
+            Actions::conf_buffer::ACTION_NAME,
+            &Actions::conf_buffer { capacity }.packed(),
         )?;
 
-        add_action_to_transaction(
-            Actions::refill_res_buf::ACTION_NAME,
-            &Actions::refill_res_buf {}.packed(),
-        )
-    }
-
-    fn get_gas_tank_cost() -> Result<u64, Error> {
-        assert_caller(&["transact"], "get_gas_tank_cost");
-
-        let user = AccountsPlugin::api::get_current_user()
-            .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
-
-        let (_, buffer_capacity, _) = query::get_user_resources(&user)?;
-        Ok(buffer_capacity)
+        refill_to_capacity(Some(capacity), true)
     }
 }
 
@@ -144,37 +239,7 @@ impl Transact for VirtualServerPlugin {
             return Ok(());
         }
 
-        let user = AccountsPlugin::api::get_current_user()
-            .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
-
-        let (balance, buffer_capacity, auto_fill_threshold) = query::get_user_resources(&user)?;
-
-        if auto_fill_threshold == 0 {
-            return Ok(());
-        }
-
-        let minimum = buffer_capacity * auto_fill_threshold / 100;
-        if balance >= minimum {
-            return Ok(());
-        }
-
-        let amount = buffer_capacity - balance;
-
-        let sys_id = TokensPlugin::helpers::fetch_network_token()?
-            .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
-
-        let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
-        TokensPlugin::user::credit(
-            sys_id,
-            &client::get_receiver(),
-            &amount,
-            "Refilling resource buffer",
-        )?;
-
-        add_action_to_transaction(
-            Actions::refill_res_buf::ACTION_NAME,
-            &Actions::refill_res_buf {}.packed(),
-        )
+        refill_to_capacity(None, false)
     }
 }
 

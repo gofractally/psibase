@@ -138,7 +138,7 @@ pub struct UserResources {
     /// Unformatted (integer) balance of resources owned by the user
     balance_raw: u64,
 
-    /// Unformatted (integer)capacity of the user's resource buffer
+    /// Unformatted (integer) capacity of the user's resource buffer
     buffer_capacity_raw: u64,
 
     /// The percentage at which client-side tooling should attempt to refill the user's

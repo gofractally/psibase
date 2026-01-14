@@ -184,11 +184,11 @@ mod tests {
             .get()?;
 
         tokens::Wrapper::push_from(chain, symbol)
-            .credit(sys, alice, 1_000_0000u64.into(), "".into())
+            .credit(sys, alice, 100_000_0000u64.into(), "".into())
             .get()?;
 
         tokens::Wrapper::push_from(chain, symbol)
-            .credit(sys, bob, 1_000_0000u64.into(), "".into())
+            .credit(sys, bob, 100_000_0000u64.into(), "".into())
             .get()?;
 
         Ok(())
@@ -229,21 +229,21 @@ mod tests {
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
         tokens::Wrapper::push_from(&chain, alice)
-            .credit(sys, PRODUCER_ACCOUNT, 100_0000.into(), "".into())
+            .credit(sys, PRODUCER_ACCOUNT, 10_000_0000.into(), "".into())
             .get()?;
 
-        check_balance(&chain, sys, PRODUCER_ACCOUNT, 100_0000);
+        check_balance(&chain, sys, PRODUCER_ACCOUNT, 10_000_0000);
 
         // Verify filling resource buffer
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 5_0000.into(), "".into())
+            .credit(sys, vserver, 5_000_0000.into(), "".into())
             .get()?;
         assert_error(
             Wrapper::push_from(&chain, PRODUCER_ACCOUNT).refill_res_buf(),
             "Insufficient token balance",
         );
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 5_0000.into(), "".into())
+            .credit(sys, vserver, 5_000_0000.into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .refill_res_buf()
@@ -254,6 +254,11 @@ mod tests {
             config.min_resource_buffer - cpu_pricing.availableUnits // Price is always 1 at the start, so we
                                                                     // can just subtract the available units
         );
+
+        // Send some more tokens to the producer account
+        tokens::Wrapper::push_from(&chain, alice)
+            .credit(sys, PRODUCER_ACCOUNT, 10_000_0000.into(), "".into())
+            .get()?;
 
         // Verify enable billing
         propose_sys_action(
@@ -277,22 +282,22 @@ mod tests {
 
         // Producer can buy her some
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 10_0000.into(), "".into())
+            .credit(sys, vserver, 10_000_0000.into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .buy_res_for(10_0000.into(), alice, Some("".into()))
+            .buy_res_for(10_000_0000.into(), alice, Some("".into()))
             .get()?;
-        assert_eq!(get_resource_balance(&chain, alice, &token_a)?, 10_0000);
+        assert_eq!(get_resource_balance(&chain, alice, &token_a)?, 10_000_0000);
 
         // Now alice can transact
         tokens::Wrapper::push_from(&chain, alice)
-            .credit(sys, vserver, 10_0000.into(), "".into())
+            .credit(sys, vserver, 23_0000.into(), "".into())
             .get()?;
 
         chain.finish_block();
 
         let balance = get_resource_balance(&chain, alice, &token_a)?;
-        assert!(balance < 10_0000);
+        assert!(balance < 10_000_0000);
 
         println!("alice resource balance: {}", balance);
 

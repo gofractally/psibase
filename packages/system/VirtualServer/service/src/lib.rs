@@ -34,7 +34,8 @@ pub mod tables;
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
 /// 3 - Call `enable_billing`: When ready (when existing users have accumulated system tokens),
-///     calling this action will enable the billing system.
+///     calling this action will enable the billing system. To call this, the caller must have
+///     already filled their resource buffer because the action to enable billing is itself billed.
 ///
 /// > Note: typically, step 1 should be called at system boot, and therefore the network should
 /// >       always at least have some server specs and derived network specs.

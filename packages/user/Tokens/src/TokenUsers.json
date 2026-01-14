@@ -75,7 +75,7 @@
         "method": "credit",
         "data": {
             "token_id": 1,
-            "amount": { "value": 10000000 },
+            "amount": { "value": 1000000000 },
             "debitor": "alice",
             "memo": "memo"
         }
@@ -86,7 +86,7 @@
         "method": "credit",
         "data": {
             "token_id": 1,
-            "amount": { "value": 10000000 },
+            "amount": { "value": 1000000000 },
             "debitor": "bob",
             "memo": "memo"
         }    
