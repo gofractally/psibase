@@ -262,12 +262,21 @@ export const SwapPage = () => {
         }
     };
 
-    const focusedPool = pools?.find(pool => {
-        const tradingTokens = [pool.tokenAId, pool.tokenBId];
+    const [focusedPoolId, setFocusedPoolId] = useState<number | null>();
+
+    const poolsOfLiquidityPair = (pools || [])?.filter(pool => {
+        const tradingTokens = [pool?.tokenAId, pool?.tokenBId];
         const selectedTokens = [token1Id || 0, token2Id || 0];
-        // TODO: this assumes theres only one pool per pair.
         return selectedTokens.every(id => tradingTokens.includes(id))
-    })
+    });
+
+    useEffect(() => {
+        if (poolsOfLiquidityPair.length > 0 && !poolsOfLiquidityPair.some(pool => pool.id == focusedPoolId)) {
+            setFocusedPoolId(poolsOfLiquidityPair[0].id)
+        }
+    }, [token1Id, token2Id, poolsOfLiquidityPair, focusedPoolId])
+
+    const focusedPool = pools?.find(pool => pool.id === focusedPoolId);
     const sameTokensSelected = token1Id === token2Id;
     const isSwapPossible = !sameTokensSelected;
 
