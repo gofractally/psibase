@@ -4,7 +4,9 @@ pub mod tables {
     use async_graphql::{ComplexObject, SimpleObject};
     use psibase::services::nft::{Wrapper as Nfts, NID};
     use psibase::services::tokens::{Decimal, Precision, Quantity};
-    use psibase::{check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord};
+    use psibase::{
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Memo, TableRecord,
+    };
     use psibase::{define_flags, Flags};
     use psibase::{Fracpack, Table, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -310,7 +312,18 @@ pub mod tables {
         }
 
         pub fn sub_balance(&mut self, quantity: Quantity) {
-            check(self.balance >= quantity, "Insufficient token balance");
+            if self.balance < quantity {
+                let p = Token::get_assert(self.token_id).precision;
+                let b = Decimal::new(self.balance, p);
+                let q = Decimal::new(quantity, p);
+                abort_message(&format!(
+                    "{} has insufficient balance (tid {}): {} < {}",
+                    self.account.to_string(),
+                    self.token_id,
+                    b,
+                    q
+                ));
+            }
             self.balance = self.balance - quantity;
 
             if self.balance == 0.into() {
@@ -540,7 +553,19 @@ pub mod tables {
         }
 
         fn sub_balance(&mut self, quantity: Quantity) {
-            check(self.balance >= quantity, "Insufficient token balance");
+            if self.balance < quantity {
+                let p = Token::get_assert(self.token_id).precision;
+                let b = Decimal::new(self.balance, p);
+                let q = Decimal::new(quantity, p);
+                abort_message(&format!(
+                    "Insufficient shared balance (tid {}) between {} and {}: {} < {}",
+                    self.token_id,
+                    self.creditor.to_string(),
+                    self.debitor.to_string(),
+                    b,
+                    q
+                ));
+            }
             self.balance = self.balance - quantity;
 
             if self.balance == 0.into() {
