@@ -30,3 +30,30 @@ export const useFillGasTank = () => {
         },
     });
 };
+
+export const useResizeAndFillGasTank = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation<void, Error, string>({
+        mutationKey: ["resizeAndFillGasTank"],
+        mutationFn: async (newCapacity: string) => {
+            await supervisor.functionCall({
+                service: "virtual-server",
+                plugin: "plugin",
+                intf: "billing",
+                method: "resizeAndFillGasTank",
+                params: [newCapacity],
+            });
+        },
+        onSuccess: () => {
+            toast.success("Gas tank resized and refilled");
+            // Invalidate user resources query to refresh the data
+            queryClient.invalidateQueries({
+                queryKey: ["userResources"],
+            });
+        },
+        onError: (error) => {
+            toast.error(error.message || "Failed to resize and refill gas tank");
+        },
+    });
+};

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 
@@ -7,7 +7,10 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { useFillGasTank } from "../hooks/use-fill-gas-tank";
+import {
+    useFillGasTank,
+    useResizeAndFillGasTank,
+} from "../hooks/use-fill-gas-tank";
 import { useSystemToken } from "../hooks/use-system-token";
 import { useUserResources } from "../hooks/use-user-resources";
 import { GasTank } from "./gas-tank";
@@ -18,6 +21,10 @@ export const UserSettingsSection = () => {
         useUserResources(currentUser);
     const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const { mutateAsync: fillGasTank, isPending: isFilling } = useFillGasTank();
+    const {
+        mutateAsync: resizeAndFillGasTank,
+        isPending: isResizingAndFilling,
+    } = useResizeAndFillGasTank();
 
     const tokenSymbol = systemToken?.symbol || "$SYS";
 
@@ -44,17 +51,35 @@ export const UserSettingsSection = () => {
         return Math.max(0, Math.min(100, scaledRatio * 100));
     }, [userResources]);
 
-    // Calculate tank capacity for display (bufferCapacityRaw converted to token amount)
-    const tankCapacity = useMemo(() => {
-        if (!userResources || !systemToken) {
+    // Get the original capacity from userResources
+    const originalCapacity = useMemo(() => {
+        if (!userResources) {
             return "0";
         }
-        return userResources.bufferCapacity;
-    }, [userResources, systemToken]);
+        return String(userResources.bufferCapacity);
+    }, [userResources]);
+
+    // Track the current input value
+    const [tankCapacityInput, setTankCapacityInput] = useState(originalCapacity);
+
+    // Update input when userResources changes
+    useEffect(() => {
+        setTankCapacityInput(originalCapacity);
+    }, [originalCapacity]);
+
+    // Check if capacity has been modified
+    const capacityModified =
+        tankCapacityInput !== originalCapacity && tankCapacityInput !== "";
+
+    const isPending = isFilling || isResizingAndFilling;
 
     const handleRefill = async () => {
         try {
-            await fillGasTank();
+            if (capacityModified) {
+                await resizeAndFillGasTank(tankCapacityInput);
+            } else {
+                await fillGasTank();
+            }
         } catch (error) {
             // Error is already handled by the mutation's onError
         }
@@ -78,10 +103,14 @@ export const UserSettingsSection = () => {
                             <Input
                                 id="tank-capacity"
                                 type="number"
-                                value={tankCapacity}
-                                readOnly
+                                value={tankCapacityInput}
+                                onChange={(e) =>
+                                    setTankCapacityInput(e.target.value)
+                                }
                                 className="w-24"
                                 min="0"
+                                step="any"
+                                disabled={isPending || isLoadingResources}
                             />
                             <span className="text-muted-foreground">
                                 {isLoadingToken ? "..." : tokenSymbol}
@@ -92,9 +121,13 @@ export const UserSettingsSection = () => {
                     <Button
                         className="w-full"
                         onClick={handleRefill}
-                        disabled={isFilling || isLoadingResources}
+                        disabled={isPending || isLoadingResources}
                     >
-                        {isFilling ? "Refilling..." : "Refill"}
+                        {isPending
+                            ? capacityModified
+                                ? "Resizing & Refilling..."
+                                : "Refilling..."
+                            : "Refill"}
                     </Button>
                 </div>
             </div>
