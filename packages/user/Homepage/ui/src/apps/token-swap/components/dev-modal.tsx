@@ -12,6 +12,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useUserTokenBalances } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 
 export const DevModal = ({
     show,
@@ -21,10 +23,18 @@ export const DevModal = ({
     openChange: (show: boolean) => void;
 }) => {
 
+    const { data: currentUser } = useCurrentUser()
+    const { refetch: refetchTokenBalances } = useUserTokenBalances(currentUser)
+
+
     const { mutateAsync: createToken, isPending: isCreatingToken } =
         usePluginFunctionMutation(tokens.issuer.create, {});
     const { mutateAsync: mintToken, isPending: isMintingToken } =
-        usePluginFunctionMutation(tokens.issuer.mint, {});
+        usePluginFunctionMutation(tokens.issuer.mint, {
+            onSuccess: () => {
+                refetchTokenBalances()
+            }
+        });
 
     const createTwoTokens = async () => {
         await createToken([4, "1000000000"]);
