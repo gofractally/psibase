@@ -18,55 +18,53 @@ interface TradeSettingsModalProps {
     openChange: (open: boolean) => void;
 }
 
-const PRESET_SLIPPAGES = [0.5, 1, 3];
+const PRESET_SLIPPAGES = [0.5, 1, 3] as const;
 
 export const TradeSettingsModal = ({
     show,
     openChange,
 }: TradeSettingsModalProps) => {
     const [slippageTolerance, setSlippageTolerance] = useSlippageTolerance();
-    const [customValue, setCustomValue] = useState<string>(
-        PRESET_SLIPPAGES.includes(slippageTolerance)
-            ? ""
-            : slippageTolerance.toString(),
-    );
-    const [activePreset, setActivePreset] = useState<number | "custom">(
-        PRESET_SLIPPAGES.includes(slippageTolerance)
-            ? slippageTolerance
-            : "custom",
-    );
+    // slippageTolerance is stored as decimal (0.01 = 1%)
 
-    // Sync with hook when modal opens
+    const [customValue, setCustomValue] = useState<string>("");
+    const [activePreset, setActivePreset] = useState<number | string>("custom");
+
+    const displayedSlippage = slippageTolerance * 100;
+
     useEffect(() => {
-        if (show) {
-            setCustomValue(
-                PRESET_SLIPPAGES.includes(slippageTolerance)
-                    ? ""
-                    : slippageTolerance.toString(),
-            );
-            setActivePreset(
-                PRESET_SLIPPAGES.includes(slippageTolerance)
-                    ? slippageTolerance
-                    : "custom",
-            );
-        }
-    }, [show, slippageTolerance]);
+        if (!show) return;
 
-    const handlePresetClick = (value: number) => {
-        setSlippageTolerance(value / 100);
-        setActivePreset(value);
+        const presetMatch = PRESET_SLIPPAGES.find(
+            (p) => Math.abs(p - displayedSlippage) < 0.001
+        );
+
+        if (presetMatch !== undefined) {
+            setActivePreset(presetMatch);
+            setCustomValue("");
+        } else {
+            setActivePreset("custom");
+            setCustomValue(displayedSlippage.toFixed(2).replace(/\.?0+$/, ""));
+        }
+    }, [show, displayedSlippage]);
+
+    const handlePresetClick = (preset: number) => {
+        const decimalValue = preset / 100;
+        setSlippageTolerance(decimalValue);
+        setActivePreset(preset);
         setCustomValue("");
     };
 
     const handleCustomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        // Allow only numbers and one decimal point
+        const val = e.target.value.trim();
+
+        // Allow empty, numbers, one decimal point, up to 2 decimal places
         if (val === "" || /^\d*\.?\d{0,2}$/.test(val)) {
             setCustomValue(val);
 
             const num = Number(val);
-            if (!isNaN(num) && num > 0) {
-                setSlippageTolerance(num);
+            if (!isNaN(num) && num >= 0) {
+                setSlippageTolerance(num / 100);
                 setActivePreset("custom");
             }
         }
@@ -87,16 +85,11 @@ export const TradeSettingsModal = ({
                             {PRESET_SLIPPAGES.map((preset) => (
                                 <Button
                                     key={preset}
-                                    variant={
-                                        activePreset === preset
-                                            ? "default"
-                                            : "outline"
-                                    }
+                                    variant={activePreset === preset ? "default" : "outline"}
                                     size="sm"
                                     className={cn(
                                         "flex-1",
-                                        activePreset === preset &&
-                                        "bg-primary text-primary-foreground",
+                                        activePreset === preset && "bg-primary text-primary-foreground"
                                     )}
                                     onClick={() => handlePresetClick(preset)}
                                 >
@@ -113,18 +106,15 @@ export const TradeSettingsModal = ({
                                 placeholder="Custom"
                                 className="max-w-[120px]"
                             />
-                            <span className="text-muted-foreground text-sm">
-                                %
-                            </span>
+                            <span className="text-muted-foreground text-sm">%</span>
                         </div>
 
                         <p className="text-muted-foreground text-xs">
-                            Your transaction may revert if price changes
-                            unfavorably by more than this percentage.
+                            Your transaction may revert if price changes unfavorably by more
+                            than this percentage.
                         </p>
                     </div>
 
-                    {/* You can add more settings here later (e.g. deadline, expert mode, etc.) */}
                 </div>
             </DialogContent>
         </Dialog>
