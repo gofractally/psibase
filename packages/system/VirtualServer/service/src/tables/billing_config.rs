@@ -16,7 +16,20 @@ impl BillingConfig {
         let tok = Tokens::call();
         let sys = check_some(tok.getSysToken(), "System token not found");
 
-        const DEFAULT_RESOURCE_BUFFER_SIZE: u64 = 10;
+        /*
+            Default buffer size is currently set by the following logic:
+             - The refill threshold is (by default) 20% of the buffer capacity
+             - Refill threshold should be set such that a very large transaction would still succeed
+               even if the user was exactly at the refill threshold.
+             - Network bandwidth is billed per byte, minimum cost per billable unit is 1 (ie 0.0001
+               system tokens if the precision is 4)
+             - Current sites plugin enforces max file size upload = 3MB
+             - 3MB = 3,000,000 bytes = 300.0000 resource tokens in network bandwidth cost alone when cost
+               is at minimum
+             - Therefore default capacity of 10,000 resource tokens makes 20% == 2,000, which is
+               plenty to afford a single large transaction
+        */
+        const DEFAULT_RESOURCE_BUFFER_SIZE: u64 = 10_000;
         let config = BillingConfig {
             sys: sys.id,
             res: tok.create(sys.precision, sys.max_issued_supply),

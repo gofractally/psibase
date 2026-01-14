@@ -98,9 +98,9 @@ impl Billing for VirtualServerPlugin {
         let user = AccountsPlugin::api::get_current_user()
             .ok_or_else(|| -> Error { ErrorType::NotLoggedIn.into() })?;
 
-        let (balance, buffer_capacity, _) = query::get_user_resources(&user)?;
+        let (balance, buffer_capacity, auto_fill_threshold) = query::get_user_resources(&user)?;
 
-        let minimum = buffer_capacity * 20 / 100;
+        let minimum = buffer_capacity * auto_fill_threshold / 100;
 
         if balance >= minimum {
             return Ok(());
