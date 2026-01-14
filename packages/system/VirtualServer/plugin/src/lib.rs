@@ -6,7 +6,7 @@ mod query;
 use errors::ErrorType;
 
 use bindings::exports::virtual_server::plugin as Exports;
-use Exports::types::{NetworkVariables, ServerSpecs};
+use Exports::types::{CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs};
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, billing::Guest as Billing,
     transact::Guest as Transact,
@@ -85,6 +85,78 @@ impl Admin for VirtualServerPlugin {
             Actions::enable_billing::ACTION_NAME,
             &Actions::enable_billing { enabled }.packed(),
         )
+    }
+
+    fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
+        assert_caller(&["config"], "set_cpu_pricing_params");
+
+        add_action_to_transaction(
+            Actions::cpu_thresholds::ACTION_NAME,
+            &Actions::cpu_thresholds {
+                idle_ppm: params.idle_ppm,
+                congested_ppm: params.congested_ppm,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::cpu_rates::ACTION_NAME,
+            &Actions::cpu_rates {
+                doubling_time_sec: params.doubling_time_sec,
+                halving_time_sec: params.halving_time_sec,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::cpu_blocks_avg::ACTION_NAME,
+            &Actions::cpu_blocks_avg {
+                num_blocks: params.num_blocks_to_average,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::cpu_min_unit::ACTION_NAME,
+            &Actions::cpu_min_unit {
+                ns: params.min_billable_unit_ns,
+            }
+            .packed(),
+        )?;
+        Ok(())
+    }
+
+    fn set_net_pricing_params(params: NetPricingParams) -> Result<(), Error> {
+        assert_caller(&["config"], "set_net_pricing_params");
+
+        add_action_to_transaction(
+            Actions::net_thresholds::ACTION_NAME,
+            &Actions::net_thresholds {
+                idle_ppm: params.idle_ppm,
+                congested_ppm: params.congested_ppm,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::net_rates::ACTION_NAME,
+            &Actions::net_rates {
+                doubling_time_sec: params.doubling_time_sec,
+                halving_time_sec: params.halving_time_sec,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::net_blocks_avg::ACTION_NAME,
+            &Actions::net_blocks_avg {
+                num_blocks: params.num_blocks_to_average,
+            }
+            .packed(),
+        )?;
+        add_action_to_transaction(
+            Actions::net_min_unit::ACTION_NAME,
+            &Actions::net_min_unit {
+                bits: params.min_billable_unit_bits,
+            }
+            .packed(),
+        )?;
+        Ok(())
     }
 }
 

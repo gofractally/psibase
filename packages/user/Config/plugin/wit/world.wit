@@ -69,7 +69,12 @@ interface symbol {
 
 interface virtual-server {
     use host:types/types.{error};
-    use virtual-server:plugin/types.{server-specs, network-variables};
+    use virtual-server:plugin/types.{
+        server-specs, 
+        network-variables,
+        cpu-pricing-params, 
+        net-pricing-params
+    };
 
     /// Initialize the billing system
     /// A system token must have already been set to enable billing.
@@ -99,6 +104,18 @@ interface virtual-server {
     /// Parameters:
     /// * `specs` - The virtual server specs
     set-specs: func(specs: server-specs) -> result<_, error>;
+
+    /// Set the CPU pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The CPU pricing parameters
+    set-cpu-pricing-params: func(params: cpu-pricing-params) -> result<_, error>;
+
+    /// Set the network pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The network pricing parameters
+    set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
 }
 
 world imports {

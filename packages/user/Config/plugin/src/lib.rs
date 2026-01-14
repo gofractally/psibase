@@ -8,9 +8,12 @@ use exports::config::plugin::{
 };
 use host::types::types::Error;
 
-use exports::config::plugin::virtual_server::{NetworkVariables, ServerSpecs};
+use exports::config::plugin::virtual_server::{
+    CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
+};
 
 use virtual_server::plugin::types::{
+    CpuPricingParams as DestCpuPricingParams, NetPricingParams as DestNetPricingParams,
     NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
 };
 
@@ -144,6 +147,33 @@ impl VirtualServer for ConfigPlugin {
 
         set_propose_latch(Some("virtual-server"))?;
         virtual_server::plugin::admin::enable_billing(enabled)
+    }
+
+    fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {
+        set_propose_latch(Some("virtual-server"))?;
+
+        let params = DestCpuPricingParams {
+            idle_ppm: params.idle_ppm,
+            congested_ppm: params.congested_ppm,
+            doubling_time_sec: params.doubling_time_sec,
+            halving_time_sec: params.halving_time_sec,
+            num_blocks_to_average: params.num_blocks_to_average,
+            min_billable_unit_ns: params.min_billable_unit_ns,
+        };
+        virtual_server::plugin::admin::set_cpu_pricing_params(params)
+    }
+
+    fn set_net_pricing_params(params: NetPricingParams) -> Result<(), Error> {
+        set_propose_latch(Some("virtual-server"))?;
+        let params = DestNetPricingParams {
+            idle_ppm: params.idle_ppm,
+            congested_ppm: params.congested_ppm,
+            doubling_time_sec: params.doubling_time_sec,
+            halving_time_sec: params.halving_time_sec,
+            num_blocks_to_average: params.num_blocks_to_average,
+            min_billable_unit_bits: params.min_billable_unit_bits,
+        };
+        virtual_server::plugin::admin::set_net_pricing_params(params)
     }
 }
 

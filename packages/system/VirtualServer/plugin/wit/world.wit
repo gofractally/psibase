@@ -17,11 +17,49 @@ interface types {
         /// Amount of storage space in bytes allocated to objective state
         obj-storage-bytes: u64,
     }
+
+    record cpu-pricing-params {
+        /// The percentage of average consumption below which the price of the
+        /// resource will decrease
+        idle-ppm: u32, 
+        /// The percentage of average consumption above which the price of the
+        /// resource will increase
+        congested-ppm: u32,
+        /// The approximate amount of time it takes to double the price when congested
+        doubling-time-sec: u32, 
+        /// The approximate amount of time it takes to halve the price when idle
+        halving-time-sec: u32,
+        /// The number of blocks over which to compute the average usage
+        num-blocks-to-average: u8,
+        /// This is some number of nanoseconds that represents the smallest unit of
+        /// billable CPU time. Consumed CPU time is rounded up to the nearest billable 
+        /// unit.
+        min-billable-unit-ns: u64,
+    }
+
+    record net-pricing-params {
+        /// The percentage of average consumption below which the price of the
+        /// resource will decrease
+        idle-ppm: u32, 
+        /// The percentage of average consumption above which the price of the
+        /// resource will increase
+        congested-ppm: u32,
+        /// The approximate amount of time it takes to double the price when congested
+        doubling-time-sec: u32, 
+        /// The approximate amount of time it takes to halve the price when idle
+        halving-time-sec: u32,
+        /// The number of blocks over which to compute the average usage
+        num-blocks-to-average: u8,
+        /// This is some number of bits that represents the smallest unit of
+        /// billable network bandwidth. Consumed network bandwidth is rounded up to 
+        /// the nearest billable unit.
+        min-billable-unit-bits: u64,
+    }
 }
 
 interface admin {
     use host:types/types.{error};
-    use types.{server-specs, network-variables};
+    use types.{server-specs, network-variables, cpu-pricing-params, net-pricing-params};
 
     /// Enable the billing system
     /// A system token must have already been set to enable billing.
@@ -48,6 +86,18 @@ interface admin {
     /// Set virtual server specs
     /// It is from these specs that the pricing for network resources is derived.
     set-specs: func(specs: server-specs) -> result<_, error>;
+
+    /// Set CPU pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The CPU pricing parameters
+    set-cpu-pricing-params: func(params: cpu-pricing-params) -> result<_, error>;
+
+    /// Set network pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The network pricing parameters
+    set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
 }
 
 interface billing {
