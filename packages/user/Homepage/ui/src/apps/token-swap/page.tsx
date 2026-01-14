@@ -163,9 +163,12 @@ export const SwapPage = () => {
         } else {
             if (liquidityDirection == 'Add') {
                 if (focusedPool) {
-                    addLiquidity([focusedPool.id, token1Id!, token2Id!, token1Amount!, token2Amount])
+                    await addLiquidity([focusedPool.id, token1Id!, token2Id!, token1Amount!, token2Amount])
                 } else {
-                    createPool([token1Id!, token2Id!, token1Amount!, token2Amount])
+                    await createPool([token1Id!, token2Id!, token1Amount!, token2Amount])
+                    setCurrentTab('Swap')
+                    setToken1Id(token1Id)
+                    setToken2Id(token2Id)
                 }
             } else {
                 throw new Error('not supported yet')
@@ -210,7 +213,7 @@ export const SwapPage = () => {
 
     const token2 = selectableTokens.find((token) => token.id == token2Id);
 
-    const { data: quotedAmount } = useQuote(token1Id, token1Amount, token2Id, isSwapTab)
+    const { data: quotedAmount } = useQuote(isSwapTab, token1Id, token1Amount, token2Id, slippage)
 
     console.log({ quotedAmount })
 
@@ -397,7 +400,7 @@ export const SwapPage = () => {
                             <div className="flex justify-between">
                                 <span>Minimum output</span>
                                 <span>
-                                    ~{minimumReturn.toFixed(4)}
+                                    ~{quotedAmount?.minimumReturn}
                                 </span>
                             </div>
                             <div className="flex justify-between">

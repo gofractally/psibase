@@ -4,6 +4,7 @@ interface types {
     record path {
         to-return: string,
         pools: list<u32>,
+        minimum-return: string
     }
 }
 
@@ -15,9 +16,10 @@ interface api {
 
     type tid = u32;
 
-    get-amount: func(from-token: tid, amount: string, to-token: tid, max-hops: u8) -> result<path, error>;
+    get-amount: func(from-token: tid, amount: string, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
     new-pool: func(token-a: tid, token-b: tid, amount-a: string, amount-b: string) -> result<_, error>;
     add-liquidity: func(pool-id: u32, token-a: tid, token-b: tid, amount-a: string, amount-b: string) -> result<_, error>;
+    remove-liquidity: func(pool-id: u32, pool-token-id: u32, amount: string) -> result<_, error>;
 
     swap: func(pools: list<string>, token-in: tid, amount-in: string, min-return: string) -> result<_, error>;
 

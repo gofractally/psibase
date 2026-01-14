@@ -9,8 +9,8 @@ class Api extends PluginInterface {
 
     get getAmount() {
         return this._call<
-            [fromToken: TID, amount: Decimal, toToken: TID, maxHops: number],
-            { pools: Uint32Array[]; toReturn: string }
+            [fromToken: TID, amount: Decimal, toToken: TID, slippageTolerancePpm: number, maxHops: number],
+            { pools: Uint32Array[]; toReturn: string, minimumReturn: string }
         >("getAmount");
     }
 

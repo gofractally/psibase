@@ -21,9 +21,14 @@ use psibase::services::tokens::{Quantity, TID};
 
 use crate::{
     bindings::{exports::token_swap::plugin::api::Path, tokens::plugin::helpers::u64_to_decimal},
+    constants::PPM,
     find_path::find_path,
     graphql::fetch_all_pools,
 };
+
+mod constants {
+    pub const PPM: u32 = 1_000_000;
+}
 
 define_trust! {
     descriptions {
@@ -50,8 +55,12 @@ impl Api for TokenSwapPlugin {
         from_token: u32,
         amount: String,
         to_token: u32,
+        slippage: u32,
         max_hops: u8,
     ) -> Result<Path, Error> {
+        if slippage > PPM {
+            return Err(errors::ErrorType::SlippageTooHigh(slippage).into());
+        }
         let pools = fetch_all_pools()?;
 
         let (pools, return_amount) = find_path(
@@ -66,6 +75,10 @@ impl Api for TokenSwapPlugin {
 
         Ok(Path {
             to_return: u64_to_decimal(to_token, return_amount.value)?,
+            minimum_return: u64_to_decimal(
+                to_token,
+                (return_amount.value as u128 * slippage as u128 / PPM as u128) as u64,
+            )?,
             pools: pool_ids,
         })
     }
@@ -92,6 +105,22 @@ impl Api for TokenSwapPlugin {
 
         add_action_to_transaction(
             token_swap::action_structs::add_liquidity::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn remove_liquidity(pool_id: u32, pool_token_id: u32, amount: String) -> Result<(), Error> {
+        credit(pool_token_id, &token_swap::SERVICE.to_string(), &amount, "")?;
+        let amount: Quantity = decimal_to_u64(pool_token_id, &amount)?.into();
+
+        let packed_args = token_swap::action_structs::remove_liquidity {
+            lp_amount: amount,
+            pool_id,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            token_swap::action_structs::remove_liquidity::ACTION_NAME,
             &packed_args,
         )
     }
