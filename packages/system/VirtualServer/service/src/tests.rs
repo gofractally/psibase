@@ -225,6 +225,7 @@ mod tests {
 
         let config = get_billing_config(&chain)?;
         assert!(config.fee_receiver == tokens);
+        let min_resource_buffer = config.min_resource_buffer;
 
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
@@ -239,14 +240,14 @@ mod tests {
             .credit(sys, vserver, 5_000_0000.into(), "".into())
             .get()?;
         assert_error(
-            Wrapper::push_from(&chain, PRODUCER_ACCOUNT).refill_res_buf(),
-            "Insufficient token balance",
+            Wrapper::push_from(&chain, PRODUCER_ACCOUNT).buy_res(min_resource_buffer.into()),
+            "Insufficient shared balance",
         );
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .credit(sys, vserver, 5_000_0000.into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .refill_res_buf()
+            .buy_res(min_resource_buffer.into())
             .get()?;
         let cpu_pricing = get_cpu_pricing(&chain)?;
         assert_eq!(
@@ -282,12 +283,15 @@ mod tests {
 
         // Producer can buy her some
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 10_000_0000.into(), "".into())
+            .credit(sys, vserver, min_resource_buffer.into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .buy_res_for(10_000_0000.into(), alice, Some("".into()))
+            .buy_res_for(min_resource_buffer.into(), alice, Some("".into()))
             .get()?;
-        assert_eq!(get_resource_balance(&chain, alice, &token_a)?, 10_000_0000);
+        assert_eq!(
+            get_resource_balance(&chain, alice, &token_a)?,
+            config.min_resource_buffer - cpu_pricing.availableUnits
+        );
 
         // Now alice can transact
         tokens::Wrapper::push_from(&chain, alice)
@@ -297,7 +301,7 @@ mod tests {
         chain.finish_block();
 
         let balance = get_resource_balance(&chain, alice, &token_a)?;
-        assert!(balance < 10_000_0000);
+        assert!(balance < min_resource_buffer.into());
 
         println!("alice resource balance: {}", balance);
 

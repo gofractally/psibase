@@ -201,18 +201,21 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
     }
 
     let amount = capacity - balance;
-    let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
+    let amount_str = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
 
     // Refill
     TokensPlugin::user::credit(
         sys_id,
         &client::get_receiver(),
-        &amount,
+        &amount_str,
         "Refilling resource buffer",
     )?;
     add_action_to_transaction(
-        Actions::refill_res_buf::ACTION_NAME,
-        &Actions::refill_res_buf {}.packed(),
+        Actions::buy_res::ACTION_NAME,
+        &Actions::buy_res {
+            amount: Quantity::new(amount),
+        }
+        .packed(),
     )
 }
 

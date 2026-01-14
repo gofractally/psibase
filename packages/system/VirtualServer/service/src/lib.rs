@@ -176,6 +176,8 @@ mod service {
         Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
         Tokens::call().toSub(res, for_user.to_string(), amount);
 
+        UserReserve::reserve_cpu_limit(for_user);
+
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
             // can be reconstructed from the user's own token `balChanged` event history.
@@ -225,24 +227,6 @@ mod service {
         }
 
         UserSettings::get(get_sender()).set_capacity(capacity);
-    }
-
-    /// Refills the sender's resource buffer, allowing them to continue to interact with
-    /// metered network functionality.
-    #[action]
-    fn refill_res_buf() {
-        let config: BillingConfig = BillingConfig::get_assert();
-        let balance = Tokens::call().getBalance(config.res, get_sender());
-        let buffer_capacity = UserSettings::get(get_sender()).buffer_capacity;
-
-        if balance.value >= buffer_capacity {
-            return;
-        }
-
-        let amount = buffer_capacity - balance.value;
-        buy_res(amount.into());
-
-        UserReserve::reserve_cpu_limit(get_sender());
     }
 
     fn bill(user: AccountNumber, amount: u64) {
