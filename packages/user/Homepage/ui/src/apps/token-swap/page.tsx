@@ -268,7 +268,6 @@ export const SwapPage = () => {
         // TODO: this assumes theres only one pool per pair.
         return selectedTokens.every(id => tradingTokens.includes(id))
     })
-    const minimumReturn = Number(token2Amount) * (1 - slippage / 100);
     const sameTokensSelected = token1Id === token2Id;
     const isSwapPossible = !sameTokensSelected;
 
