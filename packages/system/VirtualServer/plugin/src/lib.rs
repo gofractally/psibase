@@ -20,6 +20,7 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
 
+use psibase::services::tokens::{Precision, Quantity};
 use virtual_server::action_structs as Actions;
 use virtual_server::tables::tables as ServiceTables;
 
@@ -33,6 +34,18 @@ fn assert_caller(allowed: &[&str], context: &str) {
         context,
         allowed
     );
+}
+
+fn pct_to_ppm(pct: String) -> Result<u32, Error> {
+    let q = Quantity::from_str(&pct, Precision::new(4).unwrap())
+        .map(|amount| amount.value)
+        .map_err(|error| Error::from(ErrorType::ConversionError(error.to_string())))?;
+
+    if q > 100_0000 {
+        return Err(ErrorType::Overflow.into());
+    }
+
+    Ok(q as u32)
 }
 
 impl Admin for VirtualServerPlugin {
@@ -93,8 +106,8 @@ impl Admin for VirtualServerPlugin {
         add_action_to_transaction(
             Actions::cpu_thresholds::ACTION_NAME,
             &Actions::cpu_thresholds {
-                idle_ppm: params.idle_ppm,
-                congested_ppm: params.congested_ppm,
+                idle_ppm: pct_to_ppm(params.idle_pct)?,
+                congested_ppm: pct_to_ppm(params.congested_pct)?,
             }
             .packed(),
         )?;
@@ -129,8 +142,8 @@ impl Admin for VirtualServerPlugin {
         add_action_to_transaction(
             Actions::net_thresholds::ACTION_NAME,
             &Actions::net_thresholds {
-                idle_ppm: params.idle_ppm,
-                congested_ppm: params.congested_ppm,
+                idle_ppm: pct_to_ppm(params.idle_pct)?,
+                congested_ppm: pct_to_ppm(params.congested_pct)?,
             }
             .packed(),
         )?;

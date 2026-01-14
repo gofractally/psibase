@@ -20,11 +20,13 @@ interface types {
 
     record cpu-pricing-params {
         /// The percentage of average consumption below which the price of the
-        /// resource will decrease
-        idle-ppm: u32, 
+        /// resource will decrease. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        idle-pct: string, 
         /// The percentage of average consumption above which the price of the
-        /// resource will increase
-        congested-ppm: u32,
+        /// resource will increase. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        congested-pct: string,
         /// The approximate amount of time it takes to double the price when congested
         doubling-time-sec: u32, 
         /// The approximate amount of time it takes to halve the price when idle
@@ -39,11 +41,13 @@ interface types {
 
     record net-pricing-params {
         /// The percentage of average consumption below which the price of the
-        /// resource will decrease
-        idle-ppm: u32, 
+        /// resource will decrease. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        idle-pct: string, 
         /// The percentage of average consumption above which the price of the
-        /// resource will increase
-        congested-ppm: u32,
+        /// resource will increase. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        congested-pct: string,
         /// The approximate amount of time it takes to double the price when congested
         doubling-time-sec: u32, 
         /// The approximate amount of time it takes to halve the price when idle
