@@ -127,13 +127,7 @@ pub mod tables {
             }
         }
 
-        pub fn add_liquidity(
-            &self,
-            amount_a_desired: Quantity,
-            amount_b_desired: Quantity,
-            amount_a_min: Quantity,
-            amount_b_min: Quantity,
-        ) {
+        pub fn add_liquidity(&self, amount_a_desired: Quantity, amount_b_desired: Quantity) {
             let (reserve_a, reserve_b) = self.get_reserves();
 
             let pool_has_reserves = reserve_a.value > 0 && reserve_b.value > 0;
@@ -147,8 +141,6 @@ pub mod tables {
             } else {
                 (amount_a_optimal, amount_b_desired)
             };
-            check(amount_a_use >= amount_a_min, "amount a below minimum");
-            check(amount_b_use >= amount_b_min, "amount b below minimum");
 
             let total_liquidity = self.get_lp_supply();
 
@@ -451,22 +443,11 @@ pub mod service {
     }
 
     #[action]
-    fn add_liquidity(
-        pool_id: u32,
-        amount_a_desired: Quantity,
-        amount_b_desired: Quantity,
-        amount_a_min: Quantity,
-        amount_b_min: Quantity,
-    ) {
-        check(amount_a_desired.value > 0, "amount a must be non-zero");
-        check(amount_b_desired.value > 0, "amount b must be non-zero");
+    fn add_liquidity(pool_id: u32, amount_a: Quantity, amount_b: Quantity) {
+        check(amount_a.value > 0, "amount a must be non-zero");
+        check(amount_b.value > 0, "amount b must be non-zero");
 
-        Pool::get_assert(pool_id).add_liquidity(
-            amount_a_desired,
-            amount_b_desired,
-            amount_a_min,
-            amount_b_min,
-        );
+        Pool::get_assert(pool_id).add_liquidity(amount_a, amount_b);
     }
 
     #[action]

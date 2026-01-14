@@ -74,36 +74,19 @@ impl Api for TokenSwapPlugin {
         pool_id: u32,
         token_a: TID,
         token_b: TID,
-        amount_a_desired: String,
-        amount_b_desired: String,
-        amount_a_min: String,
-        amount_b_min: String,
+        amount_a: String,
+        amount_b: String,
     ) -> Result<(), Error> {
-        let token_a_amount_desired: Quantity = decimal_to_u64(token_a, &amount_a_desired)?.into();
-        let token_b_amount_desired: Quantity = decimal_to_u64(token_b, &amount_b_desired)?.into();
-        let token_a_amount_min: Quantity = decimal_to_u64(token_a, &amount_a_min)?.into();
-        let token_b_amount_min: Quantity = decimal_to_u64(token_b, &amount_b_min)?.into();
+        let token_a_amount_desired: Quantity = decimal_to_u64(token_a, &amount_a)?.into();
+        let token_b_amount_desired: Quantity = decimal_to_u64(token_b, &amount_b)?.into();
 
-        credit(
-            token_a,
-            &token_swap::SERVICE.to_string(),
-            &amount_a_desired,
-            "",
-        )?;
-
-        credit(
-            token_b,
-            &token_swap::SERVICE.to_string(),
-            &amount_b_desired,
-            "",
-        )?;
+        credit(token_a, &token_swap::SERVICE.to_string(), &amount_a, "")?;
+        credit(token_b, &token_swap::SERVICE.to_string(), &amount_b, "")?;
 
         let packed_args = token_swap::action_structs::add_liquidity {
             pool_id,
-            amount_a_desired: token_a_amount_desired,
-            amount_b_desired: token_b_amount_desired,
-            amount_a_min: token_a_amount_min,
-            amount_b_min: token_b_amount_min,
+            amount_a: token_a_amount_desired,
+            amount_b: token_b_amount_desired,
         }
         .packed();
 

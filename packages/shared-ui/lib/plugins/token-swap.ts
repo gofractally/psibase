@@ -26,10 +26,8 @@ class Api extends PluginInterface {
                 poolId: number,
                 tokenA: TID,
                 tokenB: TID,
-                amountADesired: Decimal,
-                amountBDesired: Decimal,
-                amountAMin: Decimal,
-                amountBMin: Decimal,
+                amountA: Decimal,
+                amountB: Decimal,
             ]
         >("addLiquidity");
     }
