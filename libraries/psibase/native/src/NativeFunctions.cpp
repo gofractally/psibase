@@ -498,9 +498,9 @@ namespace psibase
       std::ranges::generate(dest, [&] { return rng(); });
    }
 
-   void NativeFunctions::setMaxTransactionTime(uint64_t nanoseconds)
+   void NativeFunctions::setMaxCpuTime(uint64_t nanoseconds)
    {
-      check(code.flags & CodeRow::isPrivileged, "setMaxTransactionTime requires privileges");
+      check(code.flags & CodeRow::isPrivileged, "setMaxCpuTime requires privileges");
       clearResult(*this);
       // Ensure no overflow by capping the value. The exact value is not visible to
       // wasm and does not affect consensus and there's no way a transaction can

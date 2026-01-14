@@ -7,7 +7,9 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{native_raw, AccountNumber, DbId, ToKey};
+use crate::{
+    native_raw, AccountNumber, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey,
+};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
@@ -339,6 +341,16 @@ pub fn get_sequential_bytes(db_id: DbId, id: u64) -> Option<Vec<u8>> {
     get_optional_result_bytes(size)
 }
 
+/// Sets the CPU timer to expire after the current transaction/query/callback
+/// context has run for a given time. When the timer
+/// expires, the current context will be terminated. Setting the timeout
+/// replaces any previous timeout.
+pub fn set_max_cpu_time<T: Into<MicroSeconds>>(time: T) {
+    let time: MicroSeconds = time.into();
+    let time = (time.value * 1000) as u64;
+    unsafe { native_raw::setMaxCpuTime(time) }
+}
+
 pub use scopeguard;
 
 pub fn checkout_subjective() {
@@ -379,6 +391,21 @@ macro_rules! subjective_tx {
             }
         };
         r
+    }
+}
+
+/// Starts a new HTTP request and returns the socket
+pub fn socket_open(
+    req: HttpRequest,
+    tls: Option<TLSInfo>,
+    endpoint: Option<SocketEndpoint>,
+) -> Result<i32, anyhow::Error> {
+    let packed = (req, tls, endpoint).packed();
+    let sock = unsafe { native_raw::socketOpen(packed.as_ptr(), packed.len()) };
+    if sock >= 0 {
+        Ok(sock)
+    } else {
+        Err(anyhow!("socket_open: {}", -sock))
     }
 }
 

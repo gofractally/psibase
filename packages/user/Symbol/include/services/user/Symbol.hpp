@@ -25,6 +25,7 @@ namespace UserService
       void init();
 
       void create(SID newSymbol);
+      void admin_create(SID newSymbol, psibase::AccountNumber recipient);
 
       SymbolRecord           getSymbol(SID symbol);
       bool                   exists(SID symbol);
@@ -58,6 +59,7 @@ namespace UserService
    PSIO_REFLECT(Symbol,
       method(init),
       method(create, newSymbol),
+      method(admin_create, newSymbol, recipient),
       method(mapSymbol, tokenId, symbol),
       method(sellLength, length, initial_price, target, floor_price),
       method(getSymbol, symbol),

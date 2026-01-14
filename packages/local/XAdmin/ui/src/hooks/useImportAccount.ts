@@ -1,6 +1,12 @@
 import { useMutation } from "@tanstack/react-query";
+import z from "zod";
 
 import { queryKeys } from "@/lib/queryKeys";
+
+const zCredentialSchema = z.object({
+    account: z.string(),
+    key: z.string(),
+});
 
 type ImportKeyParams = {
     privateKey?: string;
@@ -17,20 +23,15 @@ export const useImportAccount = () =>
             const { getSupervisor } = await import("@psibase/common-lib");
             const supervisor = getSupervisor();
 
-            if (privateKey) {
-                void (await supervisor.functionCall({
-                    method: "importKey",
-                    params: [privateKey],
-                    service: "auth-sig",
-                    intf: "keyvault",
-                }));
-            }
+            const credential = { account, key: privateKey };
+            const validatedCredential = zCredentialSchema.parse(credential);
 
-            void (await supervisor.functionCall({
-                method: "importAccount",
-                params: [account],
+            await supervisor.functionCall({
                 service: "accounts",
-                intf: "admin",
-            }));
+                plugin: "plugin",
+                intf: "prompt",
+                method: "importExisting",
+                params: [[validatedCredential]],
+            });
         },
     });

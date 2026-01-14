@@ -140,7 +140,7 @@ interface helpers {
     use types.{decimal};
 
     /// Fetches network token, returns TID
-    fetch-network-token: func() -> result<u32, error>;
+    fetch-network-token: func() -> result<option<u32>, error>;
 
     /// Uses the precision of the specified token to convert from a token
     ///   decimal (string) to its u64 representation

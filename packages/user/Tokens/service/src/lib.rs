@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 pub mod helpers;
 pub mod tables;
 pub use tables::tables::{BalanceFlags, TokenFlags};
@@ -21,14 +23,8 @@ pub mod service {
 
     #[action]
     fn init() {
-        let table = InitTable::new();
-
-        if table.get_index_pk().get(&()).is_none() {
-            let init_instance = InitRow {
-                last_used_id: 0,
-                last_used_shared_bal_id: 0,
-            };
-            table.put(&init_instance).unwrap();
+        if InitRow::get().is_none() {
+            InitRow::init();
 
             Nfts::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
@@ -93,7 +89,6 @@ pub mod service {
     ///
     /// Returns token information including current, burned supply and precision
     #[action]
-    #[allow(non_snake_case)]
     fn getToken(token_id: TID) -> Token {
         Token::get_assert(token_id)
     }
@@ -115,7 +110,6 @@ pub mod service {
     ///
     /// Returns a `bool` indicating whether the specified configuration flag is enabled.
     #[action]
-    #[allow(non_snake_case)]
     fn getBalConf(account: AccountNumber, token_id: TID, index: u8) -> bool {
         BalanceConfig::get_or_new(account, token_id).get_flag(index.into())
     }
@@ -135,7 +129,6 @@ pub mod service {
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
     #[action]
-    #[allow(non_snake_case)]
     fn setBalConf(token_id: TID, index: u8, enabled: bool) {
         BalanceConfig::get_or_new(get_sender(), token_id).set_flag(index.into(), enabled);
     }
@@ -145,7 +138,6 @@ pub mod service {
     /// # Arguments
     /// * `token_id` - Unique token identifier.
     #[action]
-    #[allow(non_snake_case)]
     fn delBalConf(token_id: TID) {
         BalanceConfig::get_assert(get_sender(), token_id).delete();
     }
@@ -168,7 +160,6 @@ pub mod service {
     ///
     /// Returns a `bool` indicating whether the specified configuration flag is enabled.
     #[action]
-    #[allow(non_snake_case)]
     fn getUserConf(account: AccountNumber, index: u8) -> bool {
         UserConfig::get_or_new(account).get_flag(index.into())
     }
@@ -187,7 +178,6 @@ pub mod service {
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
     #[action]
-    #[allow(non_snake_case)]
     fn setUserConf(index: u8, enabled: bool) {
         UserConfig::get_or_new(get_sender()).set_flag(index.into(), enabled);
     }
@@ -206,7 +196,6 @@ pub mod service {
     ///
     /// Returns a `bool` indicating whether the specified configuration flag is enabled
     #[action]
-    #[allow(non_snake_case)]
     fn getTokenConf(token_id: TID, index: u8) -> bool {
         Token::get_assert(token_id).get_flag(index.into())
     }
@@ -224,7 +213,6 @@ pub mod service {
     /// * 0: Untransferrable - If enabled, the token cannot be transferred
     /// * 1: Unrecallable    - If enabled, the token cannot be recalled
     #[action]
-    #[allow(non_snake_case)]
     fn setTokenConf(token_id: TID, index: u8, enabled: bool) {
         let flag = index.into();
         Token::get_assert(token_id).set_flag(flag, enabled);
@@ -246,7 +234,6 @@ pub mod service {
     ///
     /// Returns quantity of tokens in the user's balance
     #[action]
-    #[allow(non_snake_case)]
     fn getBalance(token_id: TID, user: AccountNumber) -> Quantity {
         Balance::get_or_new(user, token_id).balance
     }
@@ -260,7 +247,6 @@ pub mod service {
     ///
     /// Returns quantity of tokens in the shared balance
     #[action]
-    #[allow(non_snake_case)]
     fn getSharedBal(token_id: TID, creditor: AccountNumber, debitor: AccountNumber) -> Quantity {
         SharedBalance::get_or_new(creditor, debitor, token_id).balance
     }
@@ -461,7 +447,75 @@ pub mod service {
     /// * `memo`     - Memo
     #[action]
     fn reject(token_id: TID, creditor: AccountNumber, memo: Memo) {
-        SharedBalance::get_assert(creditor, get_sender(), token_id).reject(memo);
+        SharedBalance::get_or_new(creditor, get_sender(), token_id).reject(memo);
+    }
+
+    /// Sends tokens from an account's primary balance into a "sub-account" balance
+    ///
+    /// The sub-account will be created if it does not exist.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    /// * `amount`   - Amount of tokens to send
+    #[action]
+    fn toSub(token_id: TID, sub_account: String, amount: Quantity) {
+        let owner = get_sender();
+        SubAccount::get_or_add(owner, sub_account.clone()).add_balance(token_id, amount);
+
+        Wrapper::emit().history().balChanged(
+            token_id,
+            owner,
+            owner,
+            "toSub".to_string(),
+            fmt_amount(token_id, amount),
+            Memo::new(sub_account).unwrap(),
+        );
+    }
+
+    /// Returns tokens from a "sub-account" balance into the account's primary balance
+    ///
+    /// The sub-account will not be deleted if it becomes empty, it must be manually
+    /// deleted with `deleteSub`.
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    /// * `amount`   - Amount of tokens to return
+    #[action]
+    fn fromSub(token_id: TID, sub_account: String, amount: Quantity) {
+        let owner = get_sender();
+
+        SubAccount::get_assert(owner, sub_account.clone()).sub_balance(token_id, amount);
+
+        Wrapper::emit().history().balChanged(
+            token_id,
+            owner,
+            owner,
+            "fromSub".to_string(),
+            fmt_amount(token_id, amount),
+            Memo::new(sub_account).unwrap(),
+        );
+    }
+
+    /// Creates a new "sub-account" with an empty balance
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn createSub(sub_account: String) {
+        SubAccount::get_or_add(get_sender(), sub_account);
+    }
+
+    /// Deletes a "sub-account" balance
+    ///
+    /// All nonzero token balances in the sub-account will be returned to the primary balance.
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn deleteSub(sub_account: String) {
+        SubAccount::get_assert(get_sender(), sub_account).delete();
     }
 
     /// Sets the system token
@@ -473,7 +527,6 @@ pub mod service {
     /// * Only the service account can set the system token
     /// * The system token can only be set once (changing system token is not yet supported)
     #[action]
-    #[allow(non_snake_case)]
     fn setSysToken(tokenId: TID) {
         check(get_sender() == get_service(), "Unauthorized");
         check(Token::get(tokenId).is_some(), "Token DNE");
@@ -488,12 +541,24 @@ pub mod service {
 
     /// Gets the system token details (if set), otherwise returns `None`
     #[action]
-    #[allow(non_snake_case)]
     fn getSysToken() -> Option<Token> {
         ConfigTable::read()
             .get_index_pk()
             .get(&())
             .map(|row| Token::get_assert(row.sys_tid))
+    }
+
+    /// Get the token balance of the sender's specified sub-account
+    ///
+    /// # Arguments
+    /// * `token_id` - Unique token identifier
+    /// * `sub_account` - Sub-account key
+    ///
+    /// Returns the token balance of the sender's specified sub-account
+    /// or `None` if the sub-account does not exist
+    #[action]
+    fn getSubBal(token_id: TID, sub_account: String) -> Option<Quantity> {
+        SubAccount::get(get_sender(), sub_account).map(|sa| sa.get_balance(token_id))
     }
 
     #[event(history)]
