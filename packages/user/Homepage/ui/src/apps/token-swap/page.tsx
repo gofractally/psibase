@@ -38,6 +38,8 @@ import { useSwap } from "./hooks/use-swap";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
+import { useAddLiquidity } from "./hooks/use-add-liquidity";
+import { useCreatePool } from "./hooks/use-create-pool";
 
 
 
@@ -130,7 +132,7 @@ export const SwapPage = () => {
 
     const [slippage] = useSlippageTolerance();
 
-    const { data: pools, error, refetch } = usePools();
+    const { data: pools, error, refetch: refetchPools } = usePools();
 
     const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap)
     const isSwapTab = currentTab == 'Swap';
@@ -139,10 +141,14 @@ export const SwapPage = () => {
 
 
     const { data: currentUser } = useCurrentUser()
-    const { data: tokenBalances } = useUserTokenBalances(currentUser)
+    const { data: tokenBalances, refetch: refetchTokenBalances } = useUserTokenBalances(currentUser)
 
 
     const { mutateAsync: swap, isPending: isSwapping } = useSwap();
+
+    const { mutateAsync: addLiquidity, isPending: isAddingLiquidity } = useAddLiquidity()
+
+    const { mutateAsync: createPool, isPending: isCreatingPool } = useCreatePool()
 
 
     const resetFieldValues = () => {
@@ -152,9 +158,23 @@ export const SwapPage = () => {
 
     const triggerMain = async () => {
 
-        await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, '0.001'])
+        if (isSwapTab) {
+            await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, '0.0001'])
+        } else {
+            if (liquidityDirection == 'Add') {
+                if (focusedPool) {
+                    addLiquidity([focusedPool.id, token1Id!, token2Id!, token1Amount!, token2Amount])
+                } else {
+                    createPool([token1Id!, token2Id!, token1Amount!, token2Amount])
+                }
+            } else {
+                throw new Error('not supported yet')
+            }
+        }
         resetFieldValues()
-        refetch()
+        refetchPools()
+        refetchTokenBalances()
+
     }
 
     console.log(pools, "was pools", error);
@@ -417,7 +437,6 @@ export const SwapPage = () => {
                                     </div>
                                 </div>
                             </>}
-                            {focusedPool ? 'Contributing to existing pool' : "Creating a new pool"}
 
                         </div>
                     )}
@@ -428,7 +447,7 @@ export const SwapPage = () => {
                     <Button
                         size="lg"
                         className="h-14 w-full text-lg font-semibold"
-                        disabled={!isSwapPossible || isSwapping}
+                        disabled={!isSwapPossible || isSwapping || isAddingLiquidity || isCreatingPool}
                         onClick={() => {
                             triggerMain()
                         }}
@@ -437,7 +456,7 @@ export const SwapPage = () => {
                             ? sameTokensSelected
                                 ? "Select different tokens"
                                 : "Swap"
-                            : "Enter amount" : liquidityDirection == 'Add' ? focusedPool ? "Create pool" : 'Add liquidity' : 'Remove liquidity'}
+                            : "Enter amount" : liquidityDirection == 'Add' ? focusedPool ? 'Add liquidity' : "Create pool" : 'Remove liquidity'}
                     </Button>
                 </CardFooter>
             </Card>

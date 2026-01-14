@@ -1,7 +1,6 @@
 import z from "zod";
 
 import {
-    tokenSwap,
     tokens,
     usePluginFunctionMutation,
 } from "@shared/lib/plugins";
@@ -21,10 +20,7 @@ export const DevModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { mutateAsync: createPool } = usePluginFunctionMutation(
-        tokenSwap.api.newPool,
-        {},
-    );
+
     const { mutateAsync: createToken, isPending: isCreatingToken } =
         usePluginFunctionMutation(tokens.issuer.create, {});
     const { mutateAsync: mintToken, isPending: isMintingToken } =
@@ -68,27 +64,6 @@ export const DevModal = ({
                         Mint
                     </Button>
 
-                    <Button
-                        onClick={() => {
-                            const tokenA = z
-                                .number({ coerce: true })
-                                .parse(window.prompt("Token A ID?"));
-                            const tokenAAmount = z
-                                .string()
-                                .parse(window.prompt("Token A amount?"));
-                            const tokenB = z
-                                .number({ coerce: true })
-                                .parse(window.prompt("Token B ID?"));
-
-                            const tokenBAmount = z
-                                .string()
-                                .parse(window.prompt("Token B amount?"))
-                            createPool([tokenA, tokenB, tokenAAmount, tokenBAmount]);
-                        }}
-                        disabled={isMintingToken}
-                    >
-                        Create pool
-                    </Button>
                 </div>
             </DialogContent>
         </Dialog>
