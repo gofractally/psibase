@@ -76,13 +76,7 @@ pub mod Service {
     }
 
     #[action]
-    fn add_liquidity(
-        pool_id: u32,
-        amount_a_desired: Quantity,
-        amount_b_desired: Quantity,
-        amount_a_min: Quantity,
-        amount_b_min: Quantity,
-    ) {
+    fn add_liquidity(pool_id: u32, amount_a: Quantity, amount_b: Quantity) {
         unimplemented!()
     }
 
