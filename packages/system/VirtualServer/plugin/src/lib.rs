@@ -3,6 +3,8 @@ mod bindings;
 
 mod errors;
 mod query;
+use std::str::FromStr;
+
 use errors::ErrorType;
 
 use bindings::exports::virtual_server::plugin as Exports;
@@ -245,13 +247,40 @@ impl Billing for VirtualServerPlugin {
 
         refill_to_capacity(Some(capacity), true)
     }
+
+    fn donate_gas(user: String) -> Result<(), Error> {
+        assert_caller(&["homepage", &client::get_receiver()], "fill_gas_tank_for");
+
+        let sys_id = TokensPlugin::helpers::fetch_network_token()?
+            .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
+
+        let amount = query::billing_config()?.min_resource_buffer;
+        let amount_str = TokensPlugin::helpers::u64_to_decimal(sys_id, amount.clone())?;
+
+        TokensPlugin::user::credit(
+            sys_id,
+            &client::get_receiver(),
+            &amount_str,
+            &format!("Subsidizing resources for {}", user),
+        )?;
+
+        add_action_to_transaction(
+            Actions::buy_res_for::ACTION_NAME,
+            &Actions::buy_res_for {
+                amount: Quantity::new(amount),
+                for_user: AccountNumber::from_str(&user).unwrap(),
+                memo: None,
+            }
+            .packed(),
+        )
+    }
 }
 
 impl Transact for VirtualServerPlugin {
     fn auto_fill_gas_tank() -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 
-        if !query::is_billing_enabled()? {
+        if !query::billing_config()?.enabled || AccountsPlugin::api::get_current_user().is_none() {
             return Ok(());
         }
 
