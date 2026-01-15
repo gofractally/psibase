@@ -17,7 +17,7 @@ export const useSetFeeReceiverAccount = () =>
             loading: "Setting fee receiver account.",
             success: "Set fee receiver account",
             isStagable: true,
-            onSuccess: (feeReceiverAccount, status) => {
+            onSuccess: ([feeReceiverAccount], status) => {
                 if (status.type == "executed") {
                     queryClient.setQueryData(
                         [...QueryKey.virtualServer(), "billingConfig"],

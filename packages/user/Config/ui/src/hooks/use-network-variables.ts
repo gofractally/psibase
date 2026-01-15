@@ -9,7 +9,6 @@ interface NetworkVariables {
     blockReplayFactor: number;
     perBlockSysCpuNs: number;
     objStorageBytes: number;
-    memoryRatio: number;
 }
 
 interface NetworkVariablesResponse {
@@ -26,7 +25,6 @@ export const useNetworkVariables = () => {
                         blockReplayFactor
                         perBlockSysCpuNs
                         objStorageBytes
-                        memoryRatio
                     }
                 }
             `;

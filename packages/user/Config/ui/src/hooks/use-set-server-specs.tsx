@@ -28,9 +28,10 @@ export const useSetServerSpecs = () =>
                         [...QueryKey.virtualServer(), "serverSpecs"],
                         {
                             ...serverSpecs[0],
-                            minMemoryBytes: queryClient.getQueryData<ServerSpecs & { minMemoryBytes?: number }>(
-                                [...QueryKey.virtualServer(), "serverSpecs"]
-                            )?.minMemoryBytes ?? 0,
+                            recommendedMinMemoryBytes: queryClient.getQueryData<
+                                ServerSpecs & { recommendedMinMemoryBytes?: number }
+                            >([...QueryKey.virtualServer(), "serverSpecs"])
+                                ?.recommendedMinMemoryBytes ?? 0,
                         },
                     );
                 }

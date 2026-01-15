@@ -51,7 +51,6 @@ interface VirtualServerFormData {
     perBlockSysCpuUnit: TimeUnit; // Time unit (ns, us, ms)
     objStorageBytes: string; // Obj storage input value
     objStorageUnit: StorageUnit; // Obj storage unit (GB, TB, PB)
-    memoryRatio: string; // u8 (0-255)
 }
 
 export const VirtualServer = () => {
@@ -84,7 +83,6 @@ export const VirtualServer = () => {
                 perBlockSysCpuUnit: timeUnitData.unit,
                 objStorageBytes: objStorageUnitData.value.toString(),
                 objStorageUnit: objStorageUnitData.unit,
-                memoryRatio: networkVariables.memoryRatio.toString(),
             };
         }
         // Return empty values while loading
@@ -97,7 +95,6 @@ export const VirtualServer = () => {
             perBlockSysCpuUnit: "ns",
             objStorageBytes: "",
             objStorageUnit: "GB",
-            memoryRatio: "",
         };
     }, [serverSpecs, networkVariables]);
 
@@ -111,7 +108,6 @@ export const VirtualServer = () => {
         blockReplayFactor: z.coerce.number().int().min(0).max(255, "Block replay factor must be between 0 and 255"),
         perBlockSysCpuNs: z.coerce.number().nonnegative("Per-block system CPU must be a positive number"),
         objStorageBytes: z.coerce.number().nonnegative("Objective storage must be a positive number"),
-        memoryRatio: z.coerce.number().int().min(0).max(255, "Memory ratio must be between 0 and 255"),
     });
 
     const form = useAppForm({
@@ -128,9 +124,7 @@ export const VirtualServer = () => {
                 blockReplayFactor: data.value.blockReplayFactor,
                 perBlockSysCpuNs: data.value.perBlockSysCpuNs,
                 objStorageBytes: data.value.objStorageBytes,
-                memoryRatio: data.value.memoryRatio,
             });
-            console.info("sending parsedVars:", parsedVars);
 
             // Convert Gbps to bytes per second: 1 Gbps = 1,000,000,000 bits/s = 125,000,000 bytes/s
             const netBpsBytes = Math.floor(parsedSpecs.netBps * 125_000_000);
@@ -159,14 +153,13 @@ export const VirtualServer = () => {
             );
 
             // Submit network variables
-            await setNetworkVariables([
-                {
-                    blockReplayFactor: parsedVars.blockReplayFactor,
-                    perBlockSysCpuNs: perBlockSysCpuNsValue,
-                    objStorageBytes: objStorageBytesValue,
-                    memoryRatio: parsedVars.memoryRatio,
-                },
-            ]);
+                await setNetworkVariables([
+                    {
+                        blockReplayFactor: parsedVars.blockReplayFactor,
+                        perBlockSysCpuNs: perBlockSysCpuNsValue,
+                        objStorageBytes: objStorageBytesValue,
+                    },
+                ]);
 
             // Reset form with submitted values (cache updates will keep data in sync)
             form.reset(data.value);
@@ -563,48 +556,6 @@ export const VirtualServer = () => {
                                         )}
                                     </form.Field>
 
-                                    <form.Field
-                            name="memoryRatio"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(
-                                        (val) => {
-                                            if (!val) return true;
-                                            const num = Number(val);
-                                            return !isNaN(num) && Number.isInteger(num) && num >= 0 && num <= 255;
-                                        },
-                                        {
-                                            message: "Memory ratio must be an integer between 0 and 255",
-                                        },
-                                    ),
-                            }}
-                                    >
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(field: any) => (
-                                            <div>
-                                                <Label>Memory Ratio</Label>
-                                                <p className="text-muted-foreground text-sm">
-                                                    Ratio of objective storage to minimum memory, X:1
-                                                </p>
-                                                <Input
-                                                    type="text"
-                                                    value={field.state.value}
-                                                    onChange={(e) => {
-                                                        field.handleChange(e.target.value);
-                                                    }}
-                                                    onBlur={field.handleBlur}
-                                                    placeholder="0-255"
-                                                    className="mt-1 w-36"
-                                                />
-                                                {field.state.meta.errors && (
-                                                    <p className="text-destructive text-sm mt-1">
-                                                        {field.state.meta.errors[0]}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </form.Field>
                                 </div>
                             </AccordionContent>
                         </AccordionItem>

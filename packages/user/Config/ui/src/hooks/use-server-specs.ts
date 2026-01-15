@@ -8,7 +8,7 @@ import QueryKey from "@/lib/queryKeys";
 interface ServerSpecs {
     netBps: number;
     storageBytes: number;
-    minMemoryBytes: number;
+    recommendedMinMemoryBytes: number;
 }
 
 interface ServerSpecsResponse {
@@ -24,7 +24,7 @@ export const useServerSpecs = () => {
                     getServerSpecs {
                         netBps
                         storageBytes
-                        minMemoryBytes
+                        recommendedMinMemoryBytes
                     }
                 }
             `;

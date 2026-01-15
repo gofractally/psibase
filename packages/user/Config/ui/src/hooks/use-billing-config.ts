@@ -7,7 +7,7 @@ import QueryKey from "@/lib/queryKeys";
 
 interface BillingConfigResponse {
     getBillingConfig: {
-        fee_receiver: string;
+        feeReceiver: string;
         enabled: boolean;
     } | null;
 }
@@ -19,7 +19,7 @@ export const useBillingConfig = () => {
             const query = `
                 query {
                     getBillingConfig {
-                        fee_receiver
+                        feeReceiver
                         enabled
                     }
                 }
@@ -35,9 +35,9 @@ export const useBillingConfig = () => {
                     enabled: false,
                 };
             }
-            
+
             return {
-                feeReceiver: res.getBillingConfig.fee_receiver || null,
+                feeReceiver: res.getBillingConfig.feeReceiver || null,
                 enabled: res.getBillingConfig.enabled,
             };
         },
