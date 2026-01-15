@@ -334,6 +334,7 @@ export const SwapPage = () => {
         liquidityTokenSupply: focusedPool.liquidityTokenSupply,
     }, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
 
+    const isProcessing = isSwapping || isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity;
 
     const setAmount = (isTokenOne: boolean, amount: string) => {
         if (isTokenOne) {
@@ -564,7 +565,7 @@ export const SwapPage = () => {
                     <Button
                         size="lg"
                         className="h-14 w-full text-lg font-semibold"
-                        disabled={!isSwapPossible || isSwapping || isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity}
+                        disabled={!isSwapPossible || isProcessing}
                         onClick={() => {
                             triggerMain()
                         }}
@@ -577,7 +578,7 @@ export const SwapPage = () => {
                                     ? "Swap"
                                     : liquidityDirection === "Add"
                                         ? (focusedPool ? "Add liquidity" : "Create pool")
-                                        : "Remove liquidity"}
+                                        : "Remove liquidity"}{isProcessing ? "..." : ''}
                     </Button>
                 </CardFooter>
             </Card>
