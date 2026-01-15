@@ -16,7 +16,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -102,13 +101,12 @@ export function NavUser() {
     };
 
     const [modalType, setModalType] = useState<
-        "editProfile" | "generateInvite"
-    >("editProfile");
+        "generateInvite"
+    >("generateInvite");
     const [showModal, setShowModal] = useState(false);
 
     const onEditProfile = () => {
-        setModalType("editProfile");
-        setShowModal(true);
+        navigate("/settings");
     };
 
     const { setTheme } = useTheme();
@@ -149,13 +147,6 @@ export function NavUser() {
         <Dialog open={showModal} onOpenChange={setShowModal}>
             {modalType == "generateInvite" && (
                 <InviteDialogContent generateInvite={generateInvite} />
-            )}
-            {modalType == "editProfile" && (
-                <EditProfileDialogContent
-                    onClose={() => {
-                        setShowModal(false);
-                    }}
-                />
             )}
             <SidebarMenu>
                 <SidebarMenuItem>
@@ -328,7 +319,7 @@ export function NavUser() {
                                 }}
                             >
                                 <Contact className="mr-2 h-4 w-4" />
-                                Edit profile
+                                User Settings
                             </DropdownMenuItem>
 
                             {currentUser && (
