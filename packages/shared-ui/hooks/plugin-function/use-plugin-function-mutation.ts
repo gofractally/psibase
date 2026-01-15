@@ -27,7 +27,12 @@ export const usePluginFunctionMutation = <TCall extends PluginCall>(
         mutationFn: async (params: Params): Promise<Result> => {
             const parsedParams = z.array(z.unknown()).parse(params);
 
-            console.log("Calling", { params, service, intf, method });
+            console.log("Function call:", {
+                parsedParams,
+                service,
+                intf,
+                method,
+            });
 
             const response = await supervisor.functionCall({
                 service,
