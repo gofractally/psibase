@@ -6,6 +6,7 @@ import {
     Pickaxe,
     Settings,
     Server,
+    DollarSign,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -49,6 +50,11 @@ export const appMenus: Menu[] = [
         title: "Resources",
         icon: Server,
         path: "resources",
+    },
+    {
+        title: "Resource Pricing",
+        icon: DollarSign,
+        path: "resource-pricing",
     },
     {
         title: "Settings",
