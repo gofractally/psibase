@@ -341,10 +341,10 @@ mod service {
         CpuPricing::set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
-    #[action]
     /// Sets the number of blocks over which to compute the average CPU usage.
     /// This average usage is compared to the network capacity (every block) to determine
     /// the price of CPU.
+    #[action]
     fn cpu_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
         CpuPricing::set_num_blocks_to_average(num_blocks);

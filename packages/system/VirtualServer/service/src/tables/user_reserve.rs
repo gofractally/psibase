@@ -37,6 +37,8 @@ impl UserReserve {
 
     /// Reserves resources necessary to afford up to a full block's worth of CPU.
     /// Returns the number of CPU ns reserved.
+    /// 
+    /// This effectively limits the maximum CPU consumption of a single transaction.
     pub fn reserve_cpu_limit(account: AccountNumber) -> u64 {
         // Strategy:
         // Return the entire block's worth of CPU ns or the number of cpu ns the account can
