@@ -120,4 +120,11 @@ namespace psibase
          static_assert(factor::den == 1 || factor::num == 1, "Not implemented");
       }
    }
+
+   template <typename R, typename Clock, typename Duration>
+      requires std::integral<typename Duration::rep> && std::integral<typename R::rep>
+   constexpr R saturatingCast(std::chrono::time_point<Clock, Duration> value)
+   {
+      return R{saturatingCast<typename R::duration>(value.time_since_epoch())};
+   }
 }  // namespace psibase

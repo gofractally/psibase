@@ -73,6 +73,7 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_config)
     add_psinode_test(test_fetch)
     add_psinode_test(test_websocket)
+    add_psinode_test(test_timer)
 endif()
 
 include(GNUInstallDirs)
