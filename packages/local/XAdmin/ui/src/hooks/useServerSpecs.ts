@@ -44,8 +44,6 @@ export const useServerSpecs = () => {
             }`;
             const res = await graphql(query, "virtual-server");
 
-            console.log("useServerSpecs raw response:", res);
-
             if (res && typeof res === "object" && "errors" in res) {
                 console.error("GraphQL errors:", res.errors);
                 throw new Error("GraphQL query failed");

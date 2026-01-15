@@ -19,11 +19,9 @@ export const RATE_TIME_FACTORS: Record<RateTimeUnit, number> = {
     min: 60,
 };
 
-// Helper function to determine the best STORAGE unit for a value (between 1-999)
 export function getBestStorageUnit(bytes: number): { value: number; unit: StorageUnit } {
     if (bytes === 0) return { value: 0, unit: "GB" };
     
-    // Use logarithm to determine the power of 10
     const power = Math.floor(Math.log10(bytes));
     
     if (power >= 15) {
@@ -35,7 +33,6 @@ export function getBestStorageUnit(bytes: number): { value: number; unit: Storag
     }
 }
 
-// Helper function to determine the best TIME unit for a value (between 1-999)
 export function getBestTimeUnit(nanoseconds: number): { value: number; unit: TimeUnit } {
     if (nanoseconds === 0) return { value: 0, unit: "ns" };
     
@@ -50,7 +47,6 @@ export function getBestTimeUnit(nanoseconds: number): { value: number; unit: Tim
     }
 }
 
-// Helper to convert seconds to the best RATE unit (sec or min)
 export function getBestRateTimeUnit(seconds: number): { value: number; unit: RateTimeUnit } {
     if (seconds === 0) return { value: 0, unit: "sec" };
     

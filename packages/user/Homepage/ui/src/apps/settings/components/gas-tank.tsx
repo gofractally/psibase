@@ -53,7 +53,7 @@ export const GasTank = ({ fillPercentage }: GasTankProps) => {
                     }}
                 />
             )}
-            {/* Percentage label in the middle, nudged away from the threshold band */}
+            {/* Percentage label in the middle */}
             <div
                 className={`absolute left-1/2 top-1/2 font-bold text-sm ${textColor} transition-colors duration-300`}
                 style={{
@@ -66,9 +66,9 @@ export const GasTank = ({ fillPercentage }: GasTankProps) => {
                             return "translate(-50%, -50%)";
                         }
 
-                        // Inside the band:
-                        // - below 50 → nudge up
-                        // - above 50 → nudge down
+                        // Inside the "middle" band, avoid percentage right on current level:
+                        // - below 50% → nudge up
+                        // - above 50% → nudge down
                         const offset =
                             clampedFill < 50
                                 ? -fillLevelBufferToMovePercentOffsete
@@ -76,7 +76,6 @@ export const GasTank = ({ fillPercentage }: GasTankProps) => {
 
                         return `translate(-50%, calc(-50% + ${offset}px))`;
                     })(),
-                    // Remove text shadow to avoid blurriness at mid levels
                     textShadow: "none",
                 }}
             >
