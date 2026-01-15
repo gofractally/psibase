@@ -168,7 +168,7 @@ export const SwapPage = () => {
     const triggerMain = async () => {
 
         if (isSwapTab) {
-            await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, '0.0001'])
+            await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, quotedAmount!.minimumReturn])
         } else {
             if (liquidityDirection == 'Add') {
                 if (focusedPool) {

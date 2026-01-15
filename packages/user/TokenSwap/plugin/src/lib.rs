@@ -231,7 +231,7 @@ impl Api for TokenSwapPlugin {
 
         let packed_args = token_swap::action_structs::swap {
             amount_in: decimal_to_u64(token_in, &amount_in)?.into(),
-            min_return: decimal_to_u64(token_in, &min_return)?.into(),
+            min_return: Decimal::from_str(&min_return).unwrap().quantity,
             pools: pools
                 .into_iter()
                 .map(|pool_id| pool_id.parse::<u32>().unwrap())
