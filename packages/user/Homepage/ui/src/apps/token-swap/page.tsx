@@ -41,6 +41,7 @@ import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { useAddLiquidity } from "./hooks/use-add-liquidity";
 import { useCreatePool } from "./hooks/use-create-pool";
 import { PoolPicker } from "./components/pool-picker";
+import { useQuoteAdd } from "./hooks/use-quote-add";
 
 
 
@@ -150,6 +151,9 @@ export const SwapPage = () => {
     const { mutateAsync: addLiquidity, isPending: isAddingLiquidity } = useAddLiquidity()
 
     const { mutateAsync: createPool, isPending: isCreatingPool } = useCreatePool()
+
+
+    const { setValue: setLastTouchedIs1, value: lastTouchedIs1 } = useBoolean()
 
 
     const resetFieldValues = () => {
@@ -291,8 +295,36 @@ export const SwapPage = () => {
     }
 
     const focusedPool = pools?.find(pool => pool.id === focusedPoolId);
+
+    const lastTouchedAmount = lastTouchedIs1 ? token1Amount : token2Amount;
+    const lastTouchedAmountIsNumber = lastTouchedAmount !== '';
+
     const sameTokensSelected = token1Id === token2Id;
     const isSwapPossible = !sameTokensSelected;
+
+    const { data: quotedAdd } = useQuoteAdd(!!(currentTab == 'Liquidity' && focusedPool && lastTouchedAmountIsNumber && !sameTokensSelected), focusedPool && {
+        aBalance: focusedPool.aBalance,
+        bBalance: focusedPool.bBalance,
+        id: focusedPool.id,
+        tokenAId: focusedPool.tokenAId,
+        tokenBId: focusedPool.tokenBId,
+        tokenATariffPpm: focusedPool.tokenATariffPpm,
+        tokenBTariffPpm: focusedPool.tokenBTariffPpm
+    }, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
+
+
+    useEffect(() => {
+        if (quotedAdd) {
+            if (lastTouchedIs1) {
+                setToken2Amount(quotedAdd)
+            } else {
+                setToken1Amount(quotedAdd)
+            }
+        }
+    }, [quotedAdd, lastTouchedIs1])
+
+
+
 
     const description = currentTab == 'Swap' ? 'Trade tokens with best prices' : "Add liquidity to or from pools"
 
@@ -371,6 +403,7 @@ export const SwapPage = () => {
                         label={currentTab == 'Swap' ? 'From' : liquidityDirection == 'Add' ? 'Deposit' : 'Withdraw'}
                         setAmount={(amount) => {
                             setToken1Amount(amount);
+                            setLastTouchedIs1(true);
                         }}
                         onSelect={() => {
                             selectToken(zSelectedTokenFieldType.Enum.One);
@@ -404,6 +437,7 @@ export const SwapPage = () => {
                         amount={token2Amount}
                         setAmount={(amount) => {
                             setToken2Amount(amount);
+                            setLastTouchedIs1(false);
                         }}
                         onSelect={() => {
                             selectToken(zSelectedTokenFieldType.Enum.Two);

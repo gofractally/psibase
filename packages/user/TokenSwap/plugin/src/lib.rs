@@ -20,14 +20,22 @@ use errors::ErrorType;
 use psibase::services::tokens::{Quantity, TID};
 
 use crate::{
-    bindings::{exports::token_swap::plugin::api::Path, tokens::plugin::helpers::u64_to_decimal},
+    bindings::{
+        exports::token_swap::plugin::api::{Path, Pool as WitPool},
+        tokens::plugin::helpers::u64_to_decimal,
+    },
     constants::PPM,
-    find_path::find_path,
+    find_path::{find_path, Pool},
     graphql::fetch_all_pools,
 };
 
 mod constants {
     pub const PPM: u32 = 1_000_000;
+}
+
+pub fn mul_div(a: Quantity, b: Quantity, c: Quantity) -> Quantity {
+    let res = (a.value as u128 * b.value as u128) / (c.value as u128);
+    (res as u64).into()
 }
 
 define_trust! {
@@ -61,10 +69,14 @@ impl Api for TokenSwapPlugin {
         if slippage > PPM {
             return Err(errors::ErrorType::SlippageTooHigh(slippage).into());
         }
-        let pools = fetch_all_pools()?;
+
+        let pools = fetch_all_pools()?
+            .into_iter()
+            .map(|pool| pool.into())
+            .collect();
 
         let (pools, return_amount) = find_path(
-            pools.into_iter().map(|pool| pool.into()).collect(),
+            pools,
             from_token,
             decimal_to_u64(from_token, &amount)?.into(),
             to_token,
@@ -81,6 +93,28 @@ impl Api for TokenSwapPlugin {
             )?,
             pools: pool_ids,
         })
+    }
+
+    fn quote_add_liquidity(pool: WitPool, token_id: TID, amount: String) -> Result<String, Error> {
+        let (incoming_token, opposing_token) = if pool.token_a_id == token_id {
+            (pool.token_a_id, pool.token_b_id)
+        } else {
+            (pool.token_b_id, pool.token_a_id)
+        };
+
+        let quoting_amount: Quantity = decimal_to_u64(incoming_token, &amount)?.into();
+
+        let pool = Pool::from(pool);
+
+        let (incoming_reserve, outgoing_reserve) = if incoming_token == pool.token_a {
+            (pool.reserve_a, pool.reserve_b)
+        } else {
+            (pool.reserve_b, pool.reserve_a)
+        };
+
+        let expected_balance = mul_div(quoting_amount, outgoing_reserve, incoming_reserve);
+
+        Ok(u64_to_decimal(opposing_token, expected_balance.value)?.to_string())
     }
 
     fn add_liquidity(

@@ -1,13 +1,15 @@
 use std::{
     cmp::Ordering,
     collections::{BinaryHeap, HashMap},
+    str::FromStr,
 };
 
 use psibase::services::{
     token_swap::swap,
-    tokens::{Quantity, TID},
+    tokens::{Decimal, Quantity, TID},
 };
 
+use crate::bindings::exports::token_swap::plugin::api::Pool as WitPool;
 use crate::graphql::GraphQLPool;
 
 #[derive(Clone)]
@@ -27,6 +29,20 @@ impl From<GraphQLPool> for Pool {
             id: value.id,
             reserve_a: value.a_balance.quantity,
             reserve_b: value.b_balance.quantity,
+            token_a: value.token_a_id,
+            token_b: value.token_b_id,
+            token_a_tariff_ppm: value.token_a_tariff_ppm,
+            token_b_tariff_ppm: value.token_b_tariff_ppm,
+        }
+    }
+}
+
+impl From<WitPool> for Pool {
+    fn from(value: WitPool) -> Self {
+        Self {
+            id: value.id,
+            reserve_a: Decimal::from_str(&value.a_balance).unwrap().quantity,
+            reserve_b: Decimal::from_str(&value.b_balance).unwrap().quantity,
             token_a: value.token_a_id,
             token_b: value.token_b_id,
             token_a_tariff_ppm: value.token_a_tariff_ppm,

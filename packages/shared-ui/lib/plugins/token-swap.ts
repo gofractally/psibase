@@ -4,13 +4,29 @@ import { Account } from "@shared/lib/schemas/account";
 type TID = number;
 type Decimal = string;
 
+export type Pool = {
+    id: number;
+    tokenAId: number;
+    tokenBId: number;
+    tokenATariffPpm: number;
+    tokenBTariffPpm: number;
+    aBalance: string;
+    bBalance: string;
+};
+
 class Api extends PluginInterface {
     protected override readonly _intf = "api" as const;
 
     get getAmount() {
         return this._call<
-            [fromToken: TID, amount: Decimal, toToken: TID, slippageTolerancePpm: number, maxHops: number],
-            { pools: Uint32Array[]; toReturn: string, minimumReturn: string }
+            [
+                fromToken: TID,
+                amount: Decimal,
+                toToken: TID,
+                slippageTolerancePpm: number,
+                maxHops: number,
+            ],
+            { pools: Uint32Array[]; toReturn: string; minimumReturn: string }
         >("getAmount");
     }
 
@@ -18,6 +34,12 @@ class Api extends PluginInterface {
         return this._call<
             [tokenA: TID, tokenB: TID, amountA: Decimal, amountB: Decimal]
         >("newPool");
+    }
+
+    get quoteAddLiquidity() {
+        return this._call<[pool: Pool, tokenId: TID, amount: string], string>(
+            "quoteAddLiquidity",
+        );
     }
 
     get addLiquidity() {
