@@ -213,7 +213,7 @@ pub mod service {
         let sender = get_sender();
 
         check_none(
-            account_policy(sender, false),
+            account_policy(sender),
             "managed accounts cannot join a fractal",
         );
 
