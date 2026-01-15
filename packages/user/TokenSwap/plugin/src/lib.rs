@@ -12,8 +12,8 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use bindings::tokens::plugin::helpers::decimal_to_u64;
 use bindings::tokens::plugin::user::credit;
+use psibase::define_trust;
 use psibase::fracpack::Pack;
-use psibase::{define_trust, services::tokens::quantity};
 
 mod graphql;
 
