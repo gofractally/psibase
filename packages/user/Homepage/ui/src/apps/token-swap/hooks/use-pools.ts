@@ -30,6 +30,7 @@ export const PoolsResponseSchema = z.object({
 export const usePools = () => {
     return useQuery({
         queryKey: ["pools"],
+        refetchInterval: 10000,
         queryFn: async () => {
             const res = await graphql(
                 `

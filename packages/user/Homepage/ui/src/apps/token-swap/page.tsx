@@ -139,8 +139,8 @@ export const SwapPage = () => {
     const { data: pools, error, refetch: refetchPools } = usePools();
 
     const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap)
-    const isSwapTab = currentTab == 'Swap';
-    const isLiquidityTab = currentTab == 'Liquidity';
+    const isSwapTab = currentTab == zCurrentTab.Values.Swap;
+    const isLiquidityTab = currentTab == zCurrentTab.Values.Liquidity;
 
     const [liquidityDirection, setliquidityDirection] = useState<LiquidityDirection>(zLiquidityDirection.Values.Add)
 
@@ -149,12 +149,8 @@ export const SwapPage = () => {
 
 
     const { mutateAsync: swap, isPending: isSwapping } = useSwap();
-
     const { mutateAsync: addLiquidity, isPending: isAddingLiquidity } = useAddLiquidity()
-
     const { mutateAsync: createPool, isPending: isCreatingPool } = useCreatePool()
-
-
     const { setValue: setLastTouchedIs1, value: lastTouchedIs1 } = useBoolean()
 
 
@@ -192,7 +188,6 @@ export const SwapPage = () => {
         resetFieldValues()
         refetchPools()
         refetchTokenBalances()
-
     }
 
     console.log(pools, "was pools", error);
@@ -225,7 +220,6 @@ export const SwapPage = () => {
     }, [selectableTokens, token1Id, token2Id])
 
     const token1 = selectableTokens.find((token) => token.id == token1Id);
-
     const token2 = selectableTokens.find((token) => token.id == token2Id);
 
     const { data: quotedAmount } = useQuote(isSwapTab, token1Id, token1Amount, token2Id, slippage)
@@ -241,14 +235,14 @@ export const SwapPage = () => {
         useState<z.infer<typeof zSelectedTokenFieldType>>();
 
     const onCenterClick = () => {
-        if (currentTab == 'Swap') {
+        if (currentTab == zCurrentTab.Values.Swap) {
             setToken1Id(token2Id);
             setToken2Id(token1Id);
             setToken1Amount(token2Amount);
             setToken2Amount('');
         } else {
             resetFieldValues();
-            setliquidityDirection(liquidityDirection == 'Add' ? 'Remove' : 'Add')
+            setliquidityDirection(liquidityDirection == zLiquidityDirection.Values.Add ? zLiquidityDirection.Values.Remove : zLiquidityDirection.Values.Add)
         }
     };
 
@@ -285,16 +279,11 @@ export const SwapPage = () => {
 
 
     const resetSelections = (tab: Tab) => {
-        if (tab == 'Liquidity') {
+        if (tab == zCurrentTab.Values.Liquidity) {
             setFocusedPoolId(poolsOfLiquidityPair.length > 0 ? poolsOfLiquidityPair[0].id : null)
         }
     }
 
-    useEffect(() => {
-        if (poolsOfLiquidityPair.length == 0) {
-            // setFocusedPoolId(null)
-        }
-    }, [token1Id, token2Id, poolsOfLiquidityPair, focusedPoolId])
 
     const onSelectTab = (tab: Tab) => {
         setCurrentTab(tab as Tab)
@@ -310,11 +299,11 @@ export const SwapPage = () => {
     const { data: maxWithdrawableLiquidity } = useQuotePoolTokens(!!poolTokenBalance, focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }))
 
 
-    const isLiquidityBeingAdded = isLiquidityTab && liquidityDirection == 'Add';
-    const isLiquidityBeingRemoved = isLiquidityTab && liquidityDirection == 'Remove';
+    const isLiquidityDirectionAdd = isLiquidityTab && liquidityDirection == zLiquidityDirection.Values.Add;
+    const isLiquidityDirectionRemove = isLiquidityTab && liquidityDirection == zLiquidityDirection.Values.Remove;
 
-    const token1Balance = isLiquidityBeingRemoved && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[0] : maxWithdrawableLiquidity[1] : tokenBalances?.find(balance => balance.id == token1Id)?.balance?.format({ includeLabel: false }) || '';
-    const token2Balance = isLiquidityBeingRemoved && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[1] : maxWithdrawableLiquidity[0] : tokenBalances?.find(balance => balance.id == token2Id)?.balance?.format({ includeLabel: false })
+    const token1Balance = isLiquidityDirectionRemove && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[0] : maxWithdrawableLiquidity[1] : tokenBalances?.find(balance => balance.id == token1Id)?.balance?.format({ includeLabel: false }) || '';
+    const token2Balance = isLiquidityDirectionRemove && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[1] : maxWithdrawableLiquidity[0] : tokenBalances?.find(balance => balance.id == token2Id)?.balance?.format({ includeLabel: false })
 
 
 
@@ -324,17 +313,7 @@ export const SwapPage = () => {
     const sameTokensSelected = token1Id === token2Id;
     const isSwapPossible = !sameTokensSelected;
 
-    const { data: quotedAdd } = useQuoteAdd(!!(currentTab == 'Liquidity' && focusedPool && lastTouchedAmountIsNumber && !sameTokensSelected), focusedPool && {
-        aBalance: focusedPool.aBalance,
-        bBalance: focusedPool.bBalance,
-        id: focusedPool.id,
-        tokenAId: focusedPool.tokenAId,
-        tokenBId: focusedPool.tokenBId,
-        tokenATariffPpm: focusedPool.tokenATariffPpm,
-        tokenBTariffPpm: focusedPool.tokenBTariffPpm,
-        liquidityToken: focusedPool.liquidityToken,
-        liquidityTokenSupply: focusedPool.liquidityTokenSupply,
-    }, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
+    const { data: quotedAdd } = useQuoteAdd(!!(isLiquidityTab && focusedPool && lastTouchedAmountIsNumber && !sameTokensSelected), focusedPool, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
 
     const isProcessing = isSwapping || isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity;
 
@@ -349,25 +328,25 @@ export const SwapPage = () => {
 
 
     useEffect(() => {
-        if (quotedAdd && liquidityDirection == 'Add') {
+        if (quotedAdd && isLiquidityDirectionAdd) {
             if (lastTouchedIs1) {
                 setToken2Amount(quotedAdd)
             } else {
                 setToken1Amount(quotedAdd)
             }
-        } else if (quotedAdd && liquidityDirection == 'Remove') {
+        } else if (quotedAdd && isLiquidityDirectionRemove) {
             if (lastTouchedIs1) {
                 setToken2Amount(quotedAdd)
             } else {
                 setToken1Amount(quotedAdd)
             }
         }
-    }, [quotedAdd, lastTouchedIs1, liquidityDirection])
+    }, [quotedAdd, lastTouchedIs1, isLiquidityDirectionAdd, isLiquidityDirectionRemove])
 
 
 
 
-    const description = currentTab == 'Swap' ? 'Trade tokens with best prices' : "Add liquidity to or from pools"
+    const description = isSwapTab ? 'Trade tokens with best prices' : "Add liquidity to or from pools"
 
 
     return (
@@ -441,7 +420,7 @@ export const SwapPage = () => {
                     {/* From */}
                     <AmountField
                         amount={token1Amount}
-                        label={currentTab == 'Swap' ? 'From' : liquidityDirection == 'Add' ? 'Deposit' : 'Withdraw'}
+                        label={isSwapTab ? 'From' : isLiquidityDirectionAdd ? 'Deposit' : 'Withdraw'}
                         setAmount={(amount) => {
                             setAmount(true, amount)
                         }}
@@ -466,14 +445,14 @@ export const SwapPage = () => {
                             className="bg-background hover:bg-muted relative z-10 rounded-full"
                             onClick={onCenterClick}
                         >
-                            {currentTab == 'Swap' ? <ArrowDownUp className="h-5 w-5" /> : liquidityDirection == 'Add' ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
+                            {isSwapTab ? <ArrowDownUp className="h-5 w-5" /> : isLiquidityDirectionAdd ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
                         </Button>
                     </div>
 
                     {/* To */}
                     <AmountField
                         disabled={isSwapTab}
-                        label={currentTab == 'Swap' ? 'To' : liquidityDirection == 'Add' ? 'Deposit' : 'Withdraw'}
+                        label={isSwapTab ? 'To' : isLiquidityDirectionAdd ? 'Deposit' : 'Withdraw'}
                         amount={token2Amount}
                         setAmount={(amount) => {
                             setAmount(false, amount)
@@ -504,7 +483,7 @@ export const SwapPage = () => {
                     {!isSwapTab && (
                         <div className="text-muted-foreground space-y-1 text-sm">
 
-                            {isLiquidityBeingAdded && <PoolPicker
+                            {isLiquidityDirectionAdd && <PoolPicker
                                 setFocusedPoolId={(focusedId) => setFocusedPoolId(focusedId)}
                                 focusedPoolId={focusedPoolId}
                                 pools={(poolsOfLiquidityPair || [])?.map(pool => ({ id: pool.id, tokenAId: pool.tokenAId, tokenBId: pool.tokenBId, tokenASymbol: pool.tokenASymbol || '', tokenBSymbol: pool.tokenBSymbol || '' }))}
