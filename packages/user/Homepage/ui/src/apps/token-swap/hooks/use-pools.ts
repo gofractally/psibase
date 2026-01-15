@@ -15,10 +15,11 @@ export const PoolSchema = z.object({
     bBalance: z.string(),
     tokenASymbol: zAccount.nullable(),
     tokenBSymbol: zAccount.nullable(),
-    liquidityToken: z.object({
-        id: z.number().int().positive()
-    })
+    liquidityToken: z.number().int().positive(),
+    liquidityTokenSupply: z.string(),
 });
+
+export type PoolInstance = z.infer<typeof PoolSchema>;
 
 export const PoolsResponseSchema = z.object({
     allPools: z.object({
@@ -45,9 +46,8 @@ export const usePools = () => {
                                 aBalance
                                 tokenBSymbol
                                 bBalance
-                                liquidityToken {
-                                    id
-                                }
+                                liquidityToken
+                                liquidityTokenSupply
                             }
                         }
                     }

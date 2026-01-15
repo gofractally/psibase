@@ -12,6 +12,8 @@ export type Pool = {
     tokenBTariffPpm: number;
     aBalance: string;
     bBalance: string;
+    liquidityToken: number;
+    liquidityTokenSupply: string;
 };
 
 class Api extends PluginInterface {
@@ -42,6 +44,12 @@ class Api extends PluginInterface {
         );
     }
 
+    get quotePoolTokens() {
+        return this._call<[pool: Pool, amount: string], [string, string]>(
+            "quotePoolTokens",
+        );
+    }
+
     get addLiquidity() {
         return this._call<
             [
@@ -52,6 +60,17 @@ class Api extends PluginInterface {
                 amountB: Decimal,
             ]
         >("addLiquidity");
+    }
+
+    get removeLiquidity() {
+        return this._call<
+            [
+                pool: Pool,
+                userPoolTokenBalance: string,
+                desiredTokenId: number,
+                desiredAmount: Decimal,
+            ]
+        >("removeLiquidity");
     }
 
     get swap() {

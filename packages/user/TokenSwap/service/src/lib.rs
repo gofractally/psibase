@@ -62,7 +62,6 @@ pub mod tables {
     pub struct Pool {
         #[primary_key]
         pub id: u32,
-        #[graphql(skip)]
         pub liquidity_token: TID,
         pub token_a_id: TID,
         pub token_a_tariff_ppm: u32,
@@ -367,8 +366,9 @@ pub mod tables {
             Decimal::new(amount, precision)
         }
 
-        pub async fn liquidity_token(&self) -> TokenRecord {
-            Tokens::call().getToken(self.liquidity_token)
+        pub async fn liquidity_token_supply(&self) -> Decimal {
+            let token = Tokens::call().getToken(self.liquidity_token);
+            Decimal::new(token.issued_supply - token.burned_supply, token.precision)
         }
 
         pub async fn token_a(&self) -> TokenRecord {

@@ -29,6 +29,8 @@ pub struct GraphQLPool {
     pub token_b_tariff_ppm: u32,
     pub a_balance: Decimal,
     pub b_balance: Decimal,
+    pub liquidity_token: u32,
+    pub liquidity_token_supply: Decimal,
 }
 
 pub fn fetch_all_pools() -> Result<Vec<GraphQLPool>, ErrorType> {
@@ -43,6 +45,8 @@ pub fn fetch_all_pools() -> Result<Vec<GraphQLPool>, ErrorType> {
               tokenBTariffPpm
               aBalance
               bBalance
+              liquidityToken
+              liquidityTokenSupply
             }
           }
         }
