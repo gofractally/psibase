@@ -139,7 +139,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XProxy XSocketListService WSEcho)
+        XPackages XProxy XSocketListService WSEcho XDelay)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1295,7 +1295,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XDelay.psi
+    NAME XDelay
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Test for XTimer"
+    SERVICE x-delay
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XDelay.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDelay-schema.json
+        SERVER x-delay
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay)
 
 ExternalProject_Add(
     rust

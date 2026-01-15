@@ -20,9 +20,6 @@ namespace psibase
       std::uint64_t              next = 0;
       std::vector<std::uint64_t> running;
       bool                       timerRunning = false;
-      // The most recent time seen in the TimerRow.
-      // time_point::max() if the timer isn't set.
-      std::chrono::steady_clock::time_point nextExpiration;
 
       std::shared_ptr<SharedState> sharedState;
 
@@ -53,7 +50,7 @@ namespace psibase
          }
          ~Item()
          {
-            if (self && kind == Kind::run)
+            if (self)
             {
                std::lock_guard l{self->mutex};
                if (kind == Kind::run)
@@ -121,7 +118,9 @@ namespace psibase
          }
       }
 
-      Item popTimer(std::unique_lock<std::mutex>&, Database& db)
+      Item popTimer(std::unique_lock<std::mutex>&,
+                    Database&                              db,
+                    std::chrono::steady_clock::time_point& nextExpiration)
       {
          if (timerRunning)
             return {};
@@ -144,7 +143,6 @@ namespace psibase
                }
             }
          }
-         nextExpiration = std::chrono::steady_clock::time_point::max();
          return {};
       }
 
@@ -153,12 +151,13 @@ namespace psibase
          std::unique_lock l{mutex};
          while (!done())
          {
+            auto nextExpiration = std::chrono::steady_clock::time_point::max();
             {
                Database db{systemContext.sharedDatabase,
                            systemContext.sharedDatabase.emptyRevision()};
                auto     session = db.startWrite(writer);
                db.checkoutSubjective();
-               if (auto result = popTimer(l, db))
+               if (auto result = popTimer(l, db, nextExpiration))
                {
                   return result;
                }
