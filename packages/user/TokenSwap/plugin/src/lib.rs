@@ -176,11 +176,10 @@ impl Api for TokenSwapPlugin {
 
         let user_pool_token_balance = Decimal::from_str(&user_pool_token_balance).unwrap();
 
-        let (wanted_reserve, other_reserve, other_token_id) = if desired_token_id == pool.token_a_id
-        {
-            (a_reserve, b_reserve, pool.token_b_id)
+        let wanted_reserve = if desired_token_id == pool.token_a_id {
+            a_reserve
         } else if desired_token_id == pool.token_b_id {
-            (b_reserve, a_reserve, pool.token_a_id)
+            b_reserve
         } else {
             return Err(ErrorType::InvalidTokenForPool.into());
         };
