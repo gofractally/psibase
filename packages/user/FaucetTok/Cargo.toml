@@ -1,0 +1,25 @@
+[package]
+name = "faucet-tok-pkg"
+description = "A test system token with a faucet. Not for production use."
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "FaucetTok"
+services = ["faucet-tok"]
+
+[package.metadata.psibase.dependencies]
+Sites = "0.22.0"
+HttpServer = "0.22.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+faucet-tok = { path = "service", version = "0.22.0" }
+faucet-tok-plugin = { path = "plugin", version = "0.22.0" }
+psibase-user-workspace-hack.workspace = true
