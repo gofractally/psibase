@@ -32,6 +32,7 @@ pub mod token_stream;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;
+pub mod virtual_server;
 pub mod x_admin;
 pub mod x_db;
 pub mod x_http;
