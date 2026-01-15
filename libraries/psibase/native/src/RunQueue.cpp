@@ -7,6 +7,7 @@
 #include <psibase/BlockContext.hpp>
 #include <psibase/SystemContext.hpp>
 #include <psibase/TransactionContext.hpp>
+#include <psibase/saturating.hpp>
 #include <thread>
 #include <vector>
 
@@ -18,35 +19,63 @@ namespace psibase
       std::condition_variable    cond;
       std::uint64_t              next = 0;
       std::vector<std::uint64_t> running;
+      bool                       timerRunning = false;
+      // The most recent time seen in the TimerRow.
+      // time_point::max() if the timer isn't set.
+      std::chrono::steady_clock::time_point nextExpiration;
 
       std::shared_ptr<SharedState> sharedState;
 
       struct Item
       {
+         enum class Kind : std::uint8_t
+         {
+            run,
+            timer
+         };
          Impl*             self;
          std::vector<char> entry;
          std::uint64_t     id;
+         Kind              kind;
          Item() : self(nullptr) {}
          Item(Impl* self, std::vector<char>&& entry, std::uint64_t id)
-             : self(self), entry(std::move(entry)), id(id)
+             : self(self), entry(std::move(entry)), id(id), kind(Kind::run)
          {
          }
-         Item(Item&& other) : self(other.self), entry(std::move(other.entry)), id(other.id)
+         Item(Impl* self, std::vector<char>&& entry, Kind kind)
+             : self(self), entry(std::move(entry)), id(0), kind(kind)
+         {
+         }
+         Item(Item&& other)
+             : self(other.self), entry(std::move(other.entry)), id(other.id), kind(other.kind)
          {
             other.self = nullptr;
          }
          ~Item()
          {
-            if (self)
+            if (self && kind == Kind::run)
             {
                std::lock_guard l{self->mutex};
-               std::erase(self->running, id);
+               if (kind == Kind::run)
+               {
+                  std::erase(self->running, id);
+               }
+               else
+               {
+                  self->timerRunning = false;
+               }
             }
          }
          explicit                 operator bool() const { return self != nullptr; }
-         psio::view<const RunRow> get() const
+         psio::view<const RunRow> getRun() const
          {
+            assert(kind == Kind::run);
             return psio::view<const RunRow>(psio::prevalidated{entry});
+         }
+         psio::view<const TimerRow> getTimer() const
+         {
+            assert(kind == Kind::timer);
+            return psio::view<const TimerRow>(psio::prevalidated{entry});
          }
       };
       Item pop_impl(std::unique_lock<std::mutex>&, Database& db)
@@ -92,6 +121,33 @@ namespace psibase
          }
       }
 
+      Item popTimer(std::unique_lock<std::mutex>&, Database& db)
+      {
+         if (timerRunning)
+            return {};
+         if (auto row = db.kvGetRaw(TimerRow::db, psio::convert_to_key(timerKey())))
+         {
+            if (psio::fracpack_validate<TimerRow>(std::span(row->pos, row->end)))
+            {
+               auto view       = psio::view<const TimerRow>(std::span(row->pos, row->end));
+               auto expiration = saturatingCast<std::chrono::steady_clock::time_point>(
+                   view.expiration().unpack());
+               if (expiration < std::chrono::steady_clock::now())
+               {
+                  timerRunning = true;
+                  return {this, std::vector(row->pos, row->end), Item::Kind::timer};
+               }
+               else
+               {
+                  nextExpiration = expiration;
+                  return {};
+               }
+            }
+         }
+         nextExpiration = std::chrono::steady_clock::time_point::max();
+         return {};
+      }
+
       Item pop(SystemContext& systemContext, const WriterPtr& writer, auto&& done)
       {
          std::unique_lock l{mutex};
@@ -102,12 +158,19 @@ namespace psibase
                            systemContext.sharedDatabase.emptyRevision()};
                auto     session = db.startWrite(writer);
                db.checkoutSubjective();
+               if (auto result = popTimer(l, db))
+               {
+                  return result;
+               }
                if (auto result = pop_impl(l, db))
                {
                   return result;
                }
             }
-            cond.wait(l);
+            if (nextExpiration == std::chrono::steady_clock::time_point::max())
+               cond.wait(l);
+            else
+               cond.wait_until(l, nextExpiration);
          }
          return {};
       }
@@ -172,7 +235,15 @@ namespace psibase
             auto         revision = systemContext->sharedDatabase.getHead();
             BlockContext bc{*systemContext, revision, writer, true};
             bc.start();
-            bc.callRun(item.get());
+            switch (item.kind)
+            {
+               case RunQueue::Impl::Item::Kind::run:
+                  bc.callRun(item.getRun());
+                  break;
+               case RunQueue::Impl::Item::Kind::timer:
+                  bc.callTimer(item.getTimer());
+                  break;
+            }
          }
       }
    };
