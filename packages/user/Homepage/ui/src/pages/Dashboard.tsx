@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Book, Coins, Mail, MoveRight } from "lucide-react";
+import { Book, BookUser, Coins, Mail, MoveRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -34,6 +34,12 @@ const apps: App[] = [
         description: "Send mail between accounts.",
         icon: <Mail className="h-6 w-6" />,
         service: zAccount.parse("chainmail"),
+    },
+    {
+        title: "Contacts",
+        description: "Add and manage contacts.",
+        icon: <BookUser className="h-6 w-6" />,
+        service: zAccount.parse("contacts"),
     },
     {
         title: "Doc",
