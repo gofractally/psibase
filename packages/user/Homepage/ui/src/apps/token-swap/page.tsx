@@ -170,21 +170,23 @@ export const SwapPage = () => {
         if (isSwapTab) {
             await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, quotedAmount!.minimumReturn])
         } else {
-            if (liquidityDirection == 'Add') {
+            if (liquidityDirection == zLiquidityDirection.Values.Add) {
                 if (focusedPool) {
                     await addLiquidity([focusedPool.id, token1Id!, token2Id!, token1Amount!, token2Amount])
                 } else {
                     await createPool([token1Id!, token2Id!, token1Amount!, token2Amount])
-                    setCurrentTab('Swap')
+                    setCurrentTab(zCurrentTab.Values.Swap)
                     setToken1Id(token1Id)
                     setToken2Id(token2Id)
                 }
             } else {
-                if (focusedPool && maxWithdrawableLiquidity && poolTokenBalance) {
-                    const id = lastTouchedIs1 ? token1Id : token2Id;
-                    const amount = lastTouchedIs1 ? token1Amount : token2Amount;
-                    await removeLiquidity([focusedPool, z.string().parse(poolTokenBalance?.balance?.format({ includeLabel: false })), z.number().int().positive().parse(id), amount])
-                }
+                if (!focusedPool || !poolTokenBalance) {
+                    console.error("Failure", focusedPool, poolTokenBalance)
+                    return
+                };
+                const desiredToken = lastTouchedIs1 ? token1Id : token2Id;
+                const desiredAmount = lastTouchedIs1 ? token1Amount : token2Amount;
+                await removeLiquidity([focusedPool, z.string().parse(poolTokenBalance?.balance?.format({ includeLabel: false })), z.number().int().positive().parse(desiredToken), desiredAmount])
             }
         }
         resetFieldValues()
