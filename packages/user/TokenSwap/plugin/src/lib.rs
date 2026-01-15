@@ -87,11 +87,14 @@ impl Api for TokenSwapPlugin {
 
         let pool_ids = pools.into_iter().map(|pool| pool.id).collect();
 
+        let tolerable_slippage_amount =
+            (return_amount.value as u128 * slippage as u128 / PPM as u128) as u64;
+
         Ok(Path {
             to_return: u64_to_decimal(to_token, return_amount.value)?,
             minimum_return: u64_to_decimal(
                 to_token,
-                (return_amount.value as u128 * slippage as u128 / PPM as u128) as u64,
+                return_amount.value - tolerable_slippage_amount,
             )?,
             pools: pool_ids,
         })
