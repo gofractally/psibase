@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -10,6 +11,8 @@ import {
 } from "@shared/shadcn/ui/select";
 import { useCpuPricing, type CpuPricing } from "@/hooks/use-cpu-pricing";
 import { useNetPricing, type NetPricing } from "@/hooks/use-net-pricing";
+import { useSetCpuPricingParams } from "@/hooks/use-set-cpu-pricing-params";
+import { useSetNetPricingParams } from "@/hooks/use-set-net-pricing-params";
 import {
     type RateTimeUnit,
     getBestRateTimeUnit,
@@ -25,63 +28,121 @@ interface PricingSectionProps {
 }
 
 const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: PricingSectionProps) => {
+    const isCpu = title === "CPU Pricing";
+
     const [halvingTimeUnit, setHalvingTimeUnit] = useState<RateTimeUnit>("sec");
     const [doublingTimeUnit, setDoublingTimeUnit] = useState<RateTimeUnit>("sec");
+    const [halvingTimeValue, setHalvingTimeValue] = useState<string>("");
+    const [doublingTimeValue, setDoublingTimeValue] = useState<string>("");
+    const [idleThreshold, setIdleThreshold] = useState<string>("");
+    const [congestedThreshold, setCongestedThreshold] = useState<string>("");
+    const [averageWindowSize, setAverageWindowSize] = useState<string>("");
+    const [billableUnit, setBillableUnit] = useState<string>("");
+
+    const {
+        mutateAsync: setCpuPricingParams,
+        isPending: isSavingCpu,
+    } = useSetCpuPricingParams();
+    const {
+        mutateAsync: setNetPricingParams,
+        isPending: isSavingNet,
+    } = useSetNetPricingParams();
 
     useEffect(() => {
-        if (pricing && halvingTimeUnit === "sec" && doublingTimeUnit === "sec") {
-            const initialHalving = getBestRateTimeUnit(pricing.halvingTimeSec);
-            const initialDoubling = getBestRateTimeUnit(pricing.doublingTimeSec);
-            
-            setHalvingTimeUnit(initialHalving.unit);
-            setDoublingTimeUnit(initialDoubling.unit);
+        if (!pricing) {
+            return;
         }
+
+        const initialHalving = getBestRateTimeUnit(pricing.halvingTimeSec);
+        const initialDoubling = getBestRateTimeUnit(pricing.doublingTimeSec);
+
+        setHalvingTimeUnit(initialHalving.unit);
+        setDoublingTimeUnit(initialDoubling.unit);
+
+        setHalvingTimeValue(
+            convertRateTimeUnit(
+                pricing.halvingTimeSec,
+                "sec",
+                initialHalving.unit,
+            ).toString(),
+        );
+        setDoublingTimeValue(
+            convertRateTimeUnit(
+                pricing.doublingTimeSec,
+                "sec",
+                initialDoubling.unit,
+            ).toString(),
+        );
+
+        setIdleThreshold(
+            Math.round(parseFloat(pricing.thresholds.idlePct)).toString(),
+        );
+        setCongestedThreshold(
+            Math.round(parseFloat(pricing.thresholds.congestedPct)).toString(),
+        );
+        setAverageWindowSize(pricing.numBlocksToAverage.toString());
+
+        const billableUnitValue = isCpu
+            ? pricing.billableUnit / TIME_FACTORS.ms
+            : pricing.billableUnit / 8;
+        setBillableUnit(billableUnitValue.toString());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pricing]);
 
-    const computedValues = useMemo(() => {
-        if (!pricing) {
-            return {
-                halvingTime: { value: 0, unit: "sec" as RateTimeUnit },
-                doublingTime: { value: 0, unit: "sec" as RateTimeUnit },
-                idleThreshold: "",
-                congestedThreshold: "",
-                averageWindowSize: "",
-                billableUnit: "",
-            };
+    const isSaving = isCpu ? isSavingCpu : isSavingNet;
+
+    const handleSave = async () => {
+        if (!pricing) return;
+
+        const halvingTimeSec = convertRateTimeUnit(
+            Number(halvingTimeValue) || 0,
+            halvingTimeUnit,
+            "sec",
+        );
+        const doublingTimeSec = convertRateTimeUnit(
+            Number(doublingTimeValue) || 0,
+            doublingTimeUnit,
+            "sec",
+        );
+
+        const idlePpm = Math.round((Number(idleThreshold) || 0) * 10_000);
+        const congestedPpm = Math.round(
+            (Number(congestedThreshold) || 0) * 10_000,
+        );
+        const numBlocksToAverage = Number(averageWindowSize) || 0;
+
+        if (isCpu) {
+            const minBillableUnitNs = Math.floor(
+                (Number(billableUnit) || 0) * TIME_FACTORS.ms,
+            );
+
+            await setCpuPricingParams([
+                {
+                    idlePpm,
+                    congestedPpm,
+                    halvingTimeSec: Math.round(halvingTimeSec),
+                    doublingTimeSec: Math.round(doublingTimeSec),
+                    numBlocksToAverage,
+                    minBillableUnitNs,
+                },
+            ]);
+        } else {
+            const minBillableUnitBits = Math.floor(
+                (Number(billableUnit) || 0) * 8,
+            );
+
+            await setNetPricingParams([
+                {
+                    idlePpm,
+                    congestedPpm,
+                    halvingTimeSec: Math.round(halvingTimeSec),
+                    doublingTimeSec: Math.round(doublingTimeSec),
+                    numBlocksToAverage,
+                    minBillableUnitBits,
+                },
+            ]);
         }
-
-        const halvingTime = {
-            value: convertRateTimeUnit(
-                pricing.halvingTimeSec,
-                "sec",
-                halvingTimeUnit,
-            ),
-            unit: halvingTimeUnit,
-        };
-        
-        const doublingTime = {
-            value: convertRateTimeUnit(
-                pricing.doublingTimeSec,
-                "sec",
-                doublingTimeUnit,
-            ),
-            unit: doublingTimeUnit,
-        };
-        
-        const billableUnitValue = title === "CPU Pricing" 
-            ? pricing.billableUnit / TIME_FACTORS.ms
-            : pricing.billableUnit / 8;
-
-        return {
-            halvingTime,
-            doublingTime,
-            idleThreshold: Math.round(parseFloat(pricing.thresholds.idlePct)).toString(),
-            congestedThreshold: Math.round(parseFloat(pricing.thresholds.congestedPct)).toString(),
-            averageWindowSize: pricing.numBlocksToAverage.toString(),
-            billableUnit: billableUnitValue.toString(),
-        };
-    }, [pricing, title, halvingTimeUnit, doublingTimeUnit]);
+    };
 
     if (isLoading) {
         return (
@@ -117,13 +178,30 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
                     <div className="mt-1 flex items-center gap-2">
                         <Input
                             type="text"
-                            value={Math.round(computedValues.halvingTime.value).toString()}
-                            readOnly
+                            value={halvingTimeValue}
+                            onChange={(e) => setHalvingTimeValue(e.target.value)}
                             className="w-36"
                         />
                         <Select
-                            value={computedValues.halvingTime.unit}
-                            onValueChange={(value) => setHalvingTimeUnit(value as RateTimeUnit)}
+                            value={halvingTimeUnit}
+                            onValueChange={(value) => {
+                                const newUnit = value as RateTimeUnit;
+                                const currentValue =
+                                    Number(halvingTimeValue) || 0;
+                                const valueInSec = convertRateTimeUnit(
+                                    currentValue,
+                                    halvingTimeUnit,
+                                    "sec",
+                                );
+                                const newValue = convertRateTimeUnit(
+                                    valueInSec,
+                                    "sec",
+                                    newUnit,
+                                );
+
+                                setHalvingTimeUnit(newUnit);
+                                setHalvingTimeValue(newValue.toString());
+                            }}
                         >
                             <SelectTrigger className="w-24">
                                 <SelectValue />
@@ -140,13 +218,32 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
                     <div className="mt-1 flex items-center gap-2">
                         <Input
                             type="text"
-                            value={Math.round(computedValues.doublingTime.value).toString()}
-                            readOnly
+                            value={doublingTimeValue}
+                            onChange={(e) =>
+                                setDoublingTimeValue(e.target.value)
+                            }
                             className="w-36"
                         />
                         <Select
-                            value={computedValues.doublingTime.unit}
-                            onValueChange={(value) => setDoublingTimeUnit(value as RateTimeUnit)}
+                            value={doublingTimeUnit}
+                            onValueChange={(value) => {
+                                const newUnit = value as RateTimeUnit;
+                                const currentValue =
+                                    Number(doublingTimeValue) || 0;
+                                const valueInSec = convertRateTimeUnit(
+                                    currentValue,
+                                    doublingTimeUnit,
+                                    "sec",
+                                );
+                                const newValue = convertRateTimeUnit(
+                                    valueInSec,
+                                    "sec",
+                                    newUnit,
+                                );
+
+                                setDoublingTimeUnit(newUnit);
+                                setDoublingTimeValue(newValue.toString());
+                            }}
                         >
                             <SelectTrigger className="w-24">
                                 <SelectValue />
@@ -163,8 +260,10 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
                     <div className="mt-1 flex items-center gap-2">
                         <Input
                             type="text"
-                            value={computedValues.idleThreshold}
-                            readOnly
+                            value={idleThreshold}
+                            onChange={(e) =>
+                                setIdleThreshold(e.target.value)
+                            }
                             className="w-36"
                         />
                         <span className="text-sm text-muted-foreground">%</span>
@@ -175,8 +274,10 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
                     <div className="mt-1 flex items-center gap-2">
                         <Input
                             type="text"
-                            value={computedValues.congestedThreshold}
-                            readOnly
+                            value={congestedThreshold}
+                            onChange={(e) =>
+                                setCongestedThreshold(e.target.value)
+                            }
                             className="w-36"
                         />
                         <span className="text-sm text-muted-foreground">%</span>
@@ -187,8 +288,10 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
                     <div className="mt-1 flex items-center gap-2">
                         <Input
                             type="text"
-                            value={computedValues.averageWindowSize}
-                            readOnly
+                            value={averageWindowSize}
+                            onChange={(e) =>
+                                setAverageWindowSize(e.target.value)
+                            }
                             className="w-36"
                         />
                         <span className="text-sm text-muted-foreground">blocks</span>
@@ -199,13 +302,22 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
                     <div className="mt-1 flex items-center gap-2">
                         <Input
                             type="text"
-                            value={computedValues.billableUnit}
-                            readOnly
+                            value={billableUnit}
+                            onChange={(e) => setBillableUnit(e.target.value)}
                             className="w-36"
                         />
                         <span className="text-sm text-muted-foreground">{billableUnitLabel}</span>
                     </div>
                 </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+                <Button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isSaving || !pricing}
+                >
+                    Save
+                </Button>
             </div>
         </div>
     );
@@ -220,7 +332,7 @@ export const ResourcePricing = () => {
             <div>
                 <h2 className="text-lg font-medium">Resource Pricing</h2>
                 <p className="text-muted-foreground text-sm">
-                    View CPU and network resource pricing parameters.
+                    View and configure CPU and network resource pricing parameters.
                 </p>
             </div>
 
