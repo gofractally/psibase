@@ -130,6 +130,8 @@ export const Billing = ({
                         {(accountField: any) => {
                             // Check if Save button should be enabled (field has value and is different from initial)
                             const currentValue = (accountField.state.value || "").trim();
+                            console.info("computedInitialValues:", computedInitialValues);
+                            console.info("computedInitialValues.tokenFeeReceiverAccount:", computedInitialValues.tokenFeeReceiverAccount);
                             const initialValue = (computedInitialValues.tokenFeeReceiverAccount || "").trim();
                             const isSaveEnabled = !hasFeeReceiverAccount && currentValue !== "" && currentValue !== initialValue;
                             

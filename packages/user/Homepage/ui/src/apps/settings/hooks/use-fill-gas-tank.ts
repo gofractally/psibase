@@ -20,7 +20,6 @@ export const useFillGasTank = () => {
         },
         onSuccess: () => {
             toast.success("Gas tank refilled");
-            // Invalidate user resources query to refresh the data
             queryClient.invalidateQueries({
                 queryKey: ["userResources"],
             });
@@ -47,7 +46,6 @@ export const useResizeAndFillGasTank = () => {
         },
         onSuccess: () => {
             toast.success("Gas tank resized and refilled");
-            // Invalidate user resources query to refresh the data
             queryClient.invalidateQueries({
                 queryKey: ["userResources"],
             });

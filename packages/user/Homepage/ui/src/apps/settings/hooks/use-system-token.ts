@@ -28,7 +28,7 @@ export const useSystemToken = () => {
         queryKey: ["systemToken"],
         queryFn: async () => {
             try {
-                // First, get the system token ID from config
+                // get system token ID from config
                 const configQuery = `
                     query {
                         config {
@@ -48,7 +48,7 @@ export const useSystemToken = () => {
 
                 const sysTid = configRes.config.sysTid;
 
-                // Then, get the token details
+                // get token details
                 const tokenQuery = `
                     query {
                         token(tokenId: "${sysTid}") {
