@@ -121,6 +121,8 @@ export const Billing = ({
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(accountField: any) => {
                             const currentValue = (accountField.state.value || "").trim();
+                            console.info("computedInitialValues:", computedInitialValues);
+                            console.info("computedInitialValues.tokenFeeReceiverAccount:", computedInitialValues.tokenFeeReceiverAccount);
                             const initialValue = (computedInitialValues.tokenFeeReceiverAccount || "").trim();
                             const isSaveEnabled = !hasFeeReceiverAccount && currentValue !== "" && currentValue !== initialValue;
                             

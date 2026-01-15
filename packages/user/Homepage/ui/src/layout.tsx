@@ -12,13 +12,6 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@shared/shadcn/ui/breadcrumb";
-import {
-    Card,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import {
     SidebarInset,
@@ -27,37 +20,8 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 import { Loading } from "./components/loading";
+import { LoginRequired } from "./components/login-required";
 import { useCurrentUser } from "./hooks/use-current-user";
-import { LoginButton } from "./login-button";
-
-const SplashScreen = () => {
-    const { currentApp } = useNavLocation();
-
-    return (
-        <div className="mx-auto mt-4 w-[350px]">
-            {/* Main app info card */}
-            <Card className="rounded-b-none border-b-0 shadow-sm">
-                <CardHeader>
-                    <div className="mx-auto">{currentApp?.icon}</div>
-                    <CardTitle>{currentApp?.name}</CardTitle>
-                    <CardDescription>{currentApp?.description}</CardDescription>
-                </CardHeader>
-            </Card>
-
-            {/* Login prompt card */}
-            <Card className="bg-muted/50 rounded-t-none border-t-0">
-                <CardHeader className="pb-2 pt-4">
-                    <CardDescription className="text-center font-medium">
-                        {`Please log in to access ${currentApp?.name}`}
-                    </CardDescription>
-                </CardHeader>
-                <CardFooter className="flex justify-center pb-4">
-                    <LoginButton />
-                </CardFooter>
-            </Card>
-        </div>
-    );
-};
 
 export const Layout = () => {
     const navigate = useNavigate();
@@ -114,11 +78,13 @@ export const Layout = () => {
                     </div>
                 </header>
                 {isLoginRequired ? (
-                    <div className="flex flex-1 items-center justify-center">
-                        <div className="w-full max-w-screen-sm px-4">
-                            <SplashScreen />
-                        </div>
-                    </div>
+                    <LoginRequired
+                        appName={currentApp?.name || "App"}
+                        appIcon={currentApp?.icon}
+                        appDescription={currentApp?.description}
+                    >
+                        <Outlet />
+                    </LoginRequired>
                 ) : isPendingCurrentUser &&
                   currentApp?.showLoginLoadingSpinner ? (
                     <div className="flex-1">
