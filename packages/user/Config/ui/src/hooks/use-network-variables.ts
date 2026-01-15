@@ -6,10 +6,10 @@ import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
 interface NetworkVariables {
-    blockReplayFactor: number; // u8
-    perBlockSysCpuNs: number; // u64
-    objStorageBytes: number; // u64
-    memoryRatio: number; // u8
+    blockReplayFactor: number;
+    perBlockSysCpuNs: number;
+    objStorageBytes: number;
+    memoryRatio: number;
 }
 
 interface NetworkVariablesResponse {
@@ -35,8 +35,6 @@ export const useNetworkVariables = () => {
                 query,
                 siblingUrl(null, "virtual-server", "/graphql"),
             );
-
-            console.info("useNetworkVariables res.getNetworkVariables:", res.getNetworkVariables);
 
             return res.getNetworkVariables;
         },

@@ -6,9 +6,9 @@ import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
 interface ServerSpecs {
-    netBps: number; // bytes per second
-    storageBytes: number; // bytes
-    minMemoryBytes: number; // bytes
+    netBps: number;
+    storageBytes: number;
+    minMemoryBytes: number;
 }
 
 interface ServerSpecsResponse {

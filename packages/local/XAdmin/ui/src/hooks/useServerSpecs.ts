@@ -11,7 +11,7 @@ interface ServerSpecs {
 }
 
 const zServerSpecsResponse = z.union([
-    // Standard GraphQL response with data wrapper
+    // Standard GraphQL response structure
     z.object({
         data: z.object({
             getServerSpecs: z.object({
@@ -21,7 +21,7 @@ const zServerSpecsResponse = z.union([
             }),
         }),
     }),
-    // Direct response (unwrapped)
+    // Unwrapped query results
     z.object({
         getServerSpecs: z.object({
             netBps: z.string().or(z.number()),
@@ -46,18 +46,12 @@ export const useServerSpecs = () => {
 
             console.log("useServerSpecs raw response:", res);
 
-            // Check for GraphQL errors
             if (res && typeof res === "object" && "errors" in res) {
                 console.error("GraphQL errors:", res.errors);
                 throw new Error("GraphQL query failed");
             }
 
-            // Handle case where response might already be unwrapped
             const response = zServerSpecsResponse.parse(res);
-
-            console.log("useServerSpecs parsed response:", response);
-
-            // Handle both wrapped and unwrapped responses
             const specs = "data" in response 
                 ? response.data.getServerSpecs 
                 : response.getServerSpecs;

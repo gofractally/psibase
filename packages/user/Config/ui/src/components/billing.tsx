@@ -36,7 +36,6 @@ export const Billing = ({
     // Track the submitted/initial value of enableBilling for comparison
     const [submittedEnableBilling, setSubmittedEnableBilling] = useState<boolean | null>(null);
 
-    // Compute initial values from fetched data
     const computedInitialValues = useMemo<BillingFormData>(() => {
         if (billingConfig) {
             return {
@@ -50,7 +49,6 @@ export const Billing = ({
         };
     }, [billingConfig]);
 
-    // Update submittedEnableBilling when billingConfig changes
     useEffect(() => {
         if (billingConfig) {
             setSubmittedEnableBilling(billingConfig.enabled);
@@ -62,27 +60,21 @@ export const Billing = ({
     const form = useAppForm({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: BillingFormData }) => {
-            // Save only the fee receiver account
             await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount]);
             form.reset(data.value);
         },
     });
 
-    // Check if fee receiver account is set (from query or after successful mutation)
     const hasFeeReceiverAccount = useMemo(() => {
         return billingConfig?.feeReceiver != null && billingConfig.feeReceiver !== "";
     }, [billingConfig?.feeReceiver]);
 
-    // Handle Apply button for enable billing
     const handleApplyEnableBilling = async () => {
         await setEnableBilling([form.state.values.enableBilling]);
-        // Update the submitted value to the new value
         setSubmittedEnableBilling(form.state.values.enableBilling);
-        // Reset form with current values (cache updates will keep data in sync)
         form.reset(form.state.values);
     };
 
-    // Check if Apply button should be enabled (enableBilling differs from initial/submitted value)
     const isApplyEnabled = useMemo(() => {
         if (submittedEnableBilling === null) return false;
         return form.state.values.enableBilling !== submittedEnableBilling;
@@ -128,7 +120,6 @@ export const Billing = ({
                     <form.Field name="tokenFeeReceiverAccount">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(accountField: any) => {
-                            // Check if Save button should be enabled (field has value and is different from initial)
                             const currentValue = (accountField.state.value || "").trim();
                             const initialValue = (computedInitialValues.tokenFeeReceiverAccount || "").trim();
                             const isSaveEnabled = !hasFeeReceiverAccount && currentValue !== "" && currentValue !== initialValue;

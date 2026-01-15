@@ -28,7 +28,6 @@ export const useSetServerSpecs = () =>
                         [...QueryKey.virtualServer(), "serverSpecs"],
                         {
                             ...serverSpecs[0],
-                            // useServerSpecs also returns minMemoryBytes, preserve it if it exists
                             minMemoryBytes: queryClient.getQueryData<ServerSpecs & { minMemoryBytes?: number }>(
                                 [...QueryKey.virtualServer(), "serverSpecs"]
                             )?.minMemoryBytes ?? 0,
