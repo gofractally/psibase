@@ -1,4 +1,4 @@
-import type { TrustLevel } from "./types";
+import type { TrustLevel } from "../types";
 
 import { Badge } from "@shared/shadcn/ui/badge";
 

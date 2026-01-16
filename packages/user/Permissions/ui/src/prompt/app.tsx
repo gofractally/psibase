@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import { ErrorCard } from "./error-card";
-import { LoadingSkeleton } from "./loading-skeleton";
-import { PermissionPrompt } from "./permission-prompt";
+import { ErrorCard } from "./components/error-card";
+import { LoadingSkeleton } from "./components/loading-skeleton";
+import { PermissionPrompt } from "./components/permission-prompt";
 
 export const App = () => {
     const [error, setError] = useState<string | null>(null);

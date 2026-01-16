@@ -1,4 +1,4 @@
-import type { ApprovalDuration, PermissionRequest, TrustLevel } from "./types";
+import type { ApprovalDuration, PermissionRequest, TrustLevel } from "../types";
 
 import { useEffect, useState } from "react";
 

@@ -1,4 +1,4 @@
-import type { TrustLevel } from "./types";
+import type { TrustLevel } from "../types";
 
 import { AlertCircleIcon, InfoIcon } from "lucide-react";
 import { type ComponentProps } from "react";
