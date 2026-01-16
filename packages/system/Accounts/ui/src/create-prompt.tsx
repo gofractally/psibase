@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { prompt } from "@psibase/common-lib";
 
+import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
@@ -23,7 +24,6 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 
-import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { CopyButton } from "./components/copy-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
 import { useConnectAccount } from "./hooks/use-connect-account";
