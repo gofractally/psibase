@@ -48,13 +48,9 @@ interface liquidity {
 
 }
 
-interface queries {
-    use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
-}
+
 
 world imports {
     import swap;
     import liquidity;
-    import queries;
 }

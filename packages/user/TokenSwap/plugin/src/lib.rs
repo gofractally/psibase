@@ -7,8 +7,6 @@ use std::str::FromStr;
 use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
 use bindings::exports::token_swap::plugin::swap::Guest as Swap;
 
-use bindings::exports::token_swap::plugin::queries::Guest as Queries;
-use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
@@ -44,34 +42,21 @@ pub fn mul_div(a: Quantity, b: Quantity, c: Quantity) -> Quantity {
 
 define_trust! {
     descriptions {
-        Low => "
-        Low trust grants these abilities:
-            - Reading the value of the example-thing
-        ",
+        Low => "",
         Medium => "",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
-            - Setting the example thing
+        High trust grants the abilities
+            - Swapping
+            - Adding and removal of liquidity to existing or new pools
         ",
     }
     functions {
-        Low => [get_example_thing],
-        High => [],
+        None => [get_amount, quote_pool_tokens, quote_add_liquidity],
+        High => [swap, new_pool, add_liquidity, remove_liquidity],
     }
 }
 
 struct TokenSwapPlugin;
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
 
 impl Swap for TokenSwapPlugin {
     fn get_amount(
@@ -282,23 +267,6 @@ impl Liquidity for TokenSwapPlugin {
         let expected_balance = mul_div(quoting_amount, outgoing_reserve, incoming_reserve);
 
         Ok(u64_to_decimal(opposing_token, expected_balance.value)?.to_string())
-    }
-}
-
-impl Queries for TokenSwapPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
-
-        let graphql_str = "query { exampleThing }";
-
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let examplething_val =
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(examplething_val.data.example_thing)
     }
 }
 

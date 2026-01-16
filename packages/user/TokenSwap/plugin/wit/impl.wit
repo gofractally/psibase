@@ -6,8 +6,6 @@ world impl {
     include permissions:plugin/imports;
     include tokens:plugin/imports;
 
-    export queries;
-
     export swap;
     export liquidity;
 }
