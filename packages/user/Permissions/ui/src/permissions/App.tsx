@@ -2,7 +2,17 @@ import { useEffect, useState } from "react";
 
 import { getSupervisor, prompt } from "@psibase/common-lib";
 
+import { GlowingCard } from "@shared/components/glowing-card";
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
+import {
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
+import { Label } from "@shared/shadcn/ui/label";
+import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 
 const supervisor = getSupervisor();
 
@@ -75,121 +85,186 @@ export const App = () => {
     };
 
     if (error) {
-        return <div>{error}</div>;
+        return (
+            <div className="flex min-h-screen items-center justify-center p-6">
+                <GlowingCard>
+                    <CardContent>
+                        <Alert variant="destructive">
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    </CardContent>
+                </GlowingCard>
+            </div>
+        );
     } else if (!permissionRequest) {
-        return <div>Loading...</div>;
+        return (
+            <div className="flex min-h-screen items-center justify-center p-6">
+                <GlowingCard>
+                    <CardContent>
+                        <div className="text-muted-foreground text-center">
+                            Loading...
+                        </div>
+                    </CardContent>
+                </GlowingCard>
+            </div>
+        );
     }
 
     return (
-        <div className="mx-auto h-screen w-screen max-w-screen-lg rounded p-6">
-            <h3 className="text-4xl">Authorize application</h3>
-            <p>
-                <b>{permissionRequest.caller}</b> app wants to use the{" "}
-                <b>{permissionRequest.callee}</b> app on behalf of{" "}
-                <b>{permissionRequest.user}</b>.
-            </p>
-
-            <div className="my-4">
-                <p className="mb-2 font-medium">
-                    Requested trust level:{" "}
-                    {permissionRequest.level.charAt(0).toUpperCase() +
-                        permissionRequest.level.slice(1)}
-                </p>
-                <div className="flex gap-2">
-                    {["low", "medium", "high"].map((level, index) => {
-                        const description =
-                            permissionRequest.descriptions[index];
-                        if (!description || description.trim() === "") {
-                            // Only show trust levels that have non-empty descriptions
-                            return null;
-                        }
-
-                        const levelLabel =
-                            level.charAt(0).toUpperCase() + level.slice(1);
-
-                        return (
-                            <button
-                                key={level}
-                                onClick={() =>
-                                    setSelectedTrustLevel(level as TrustLevel)
-                                }
-                                className={`flex h-12 min-w-[60px] cursor-pointer items-center justify-center rounded border px-3 text-sm font-medium ${
-                                    level === selectedTrustLevel
-                                        ? "border-blue-500 bg-blue-100 text-blue-700"
-                                        : "border-gray-300 text-gray-500 hover:border-gray-400 hover:bg-gray-50"
-                                }`}
-                            >
-                                {levelLabel}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {permissionRequest.descriptions && (
-                <div className="my-4 rounded border border-yellow-200 bg-yellow-50 p-3">
-                    <div>
-                        <p className="whitespace-pre-line text-yellow-700">
-                            {selectedTrustLevel === "low"
-                                ? permissionRequest.descriptions[0]
-                                : selectedTrustLevel === "medium"
-                                  ? permissionRequest.descriptions[1]
-                                  : permissionRequest.descriptions[2]}
-                        </p>
+        <div className="flex min-h-screen items-center justify-center p-6">
+            <GlowingCard>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                        <CardTitle className="text-2xl">
+                            Authorize Application
+                        </CardTitle>
+                        <CardDescription className="text-base">
+                            <span className="text-foreground font-semibold">
+                                {permissionRequest.caller}
+                            </span>{" "}
+                            app wants to use the{" "}
+                            <span className="text-foreground font-semibold">
+                                {permissionRequest.callee}
+                            </span>{" "}
+                            app on behalf of{" "}
+                            <span className="text-foreground font-semibold">
+                                {permissionRequest.user}
+                            </span>
+                            .
+                        </CardDescription>
                     </div>
-                </div>
-            )}
 
-            <div className="my-4">
-                <p className="mb-2 font-medium">Duration:</p>
-                <div className="space-y-2">
-                    <label className="flex items-center">
-                        <input
-                            type="radio"
-                            name="duration"
-                            value="session"
-                            checked={duration === "session"}
-                            onChange={(e) =>
-                                setDuration(e.target.value as ApprovalDuration)
+                    <div className="space-y-3">
+                        <Label className="text-base font-medium">
+                            Requested trust level:{" "}
+                            <span className="capitalize">
+                                {permissionRequest.level}
+                            </span>
+                        </Label>
+                        <div className="flex flex-wrap gap-2">
+                            {["low", "medium", "high"].map((level, index) => {
+                                const description =
+                                    permissionRequest.descriptions[index];
+                                // Only show trust levels that have non-empty descriptions
+                                if (!description || description.trim() === "") {
+                                    return null;
+                                }
+
+                                const levelLabel =
+                                    level.charAt(0).toUpperCase() +
+                                    level.slice(1);
+                                const isSelected = level === selectedTrustLevel;
+
+                                return (
+                                    <Button
+                                        key={level}
+                                        onClick={() =>
+                                            setSelectedTrustLevel(
+                                                level as TrustLevel,
+                                            )
+                                        }
+                                        variant={
+                                            isSelected ? "default" : "outline"
+                                        }
+                                        className={`min-w-[80px] ${
+                                            isSelected
+                                                ? "shadow-md"
+                                                : "hover:bg-accent"
+                                        }`}
+                                    >
+                                        {levelLabel}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {permissionRequest.descriptions && (
+                        <Alert className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
+                            <AlertDescription className="whitespace-pre-line text-yellow-800 dark:text-yellow-200">
+                                {selectedTrustLevel === "low"
+                                    ? permissionRequest.descriptions[0]
+                                    : selectedTrustLevel === "medium"
+                                      ? permissionRequest.descriptions[1]
+                                      : permissionRequest.descriptions[2]}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    <div className="space-y-3">
+                        <Label className="text-base font-medium">
+                            Duration
+                        </Label>
+                        <RadioGroup
+                            value={duration}
+                            onValueChange={(value: string) =>
+                                setDuration(value as ApprovalDuration)
                             }
-                            className="mr-2"
-                        />
-                        For this session
-                    </label>
-                    <label className="flex items-center">
-                        <input
-                            type="radio"
-                            name="duration"
-                            value="permanent"
-                            checked={duration === "permanent"}
-                            onChange={(e) =>
-                                setDuration(e.target.value as ApprovalDuration)
-                            }
-                            className="mr-2"
-                        />
-                        Permanently (unless updated/deleted later)
-                    </label>
-                </div>
-            </div>
+                            className="space-y-3"
+                        >
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="session" id="session" />
+                                <Label
+                                    htmlFor="session"
+                                    className="cursor-pointer font-normal"
+                                >
+                                    For this session
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem
+                                    value="permanent"
+                                    id="permanent"
+                                />
+                                <Label
+                                    htmlFor="permanent"
+                                    className="cursor-pointer font-normal"
+                                >
+                                    Permanently (unless updated/deleted later)
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
 
-            {!!error && <div>ERROR: {error}</div>}
+                    {!!error && (
+                        <Alert variant="destructive">
+                            <AlertDescription>ERROR: {error}</AlertDescription>
+                        </Alert>
+                    )}
 
-            <p className="mt-2 text-sm text-gray-500">
-                By clicking 'Allow', you will{" "}
-                {duration === "permanent" ? "permanently grant" : "grant"}{" "}
-                <b>{permissionRequest.caller}</b> permission to perform{" "}
-                <b>{permissionRequest.level}</b> trust operations within the{" "}
-                <b>{permissionRequest.callee}</b> app on your behalf
-                {duration === "session"
-                    ? " for the remainder of this browser session"
-                    : ""}
-                .
-            </p>
+                    <CardDescription className="text-sm">
+                        By clicking 'Allow', you will{" "}
+                        {duration === "permanent"
+                            ? "permanently grant"
+                            : "grant"}{" "}
+                        <span className="text-foreground font-semibold">
+                            {permissionRequest.caller}
+                        </span>{" "}
+                        permission to perform{" "}
+                        <span className="text-foreground font-semibold">
+                            {permissionRequest.level}
+                        </span>{" "}
+                        trust operations within the{" "}
+                        <span className="text-foreground font-semibold">
+                            {permissionRequest.callee}
+                        </span>{" "}
+                        app on your behalf
+                        {duration === "session"
+                            ? " for the remainder of this browser session"
+                            : ""}
+                        .
+                    </CardDescription>
+                </CardContent>
 
-            <div className="mt-4 flex justify-center gap-4">
-                <Button onClick={allow}>Allow</Button>
-                <Button onClick={cancel}>Cancel</Button>
-            </div>
+                <CardFooter className="flex justify-center gap-4">
+                    <Button onClick={allow} size="lg">
+                        Allow
+                    </Button>
+                    <Button onClick={cancel} variant="outline" size="lg">
+                        Cancel
+                    </Button>
+                </CardFooter>
+            </GlowingCard>
         </div>
     );
 };
