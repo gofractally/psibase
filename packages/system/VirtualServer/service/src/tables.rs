@@ -151,7 +151,6 @@ pub mod tables {
     // The reserve cannot be dynamically constructed, because then writing to it would require a db
     //   write if it didn't yet exist, and the point of the reserve is that it should happen before
     //   any writes are allowed so that we know how many resources the user has available for writes.
-    //   user has available for writes.
     //
     // Furthermore, we can't use the tokens service subaccounts for reserves, because the API requires
     //   that we would know the token ID for which to construct the zero-balance. And reserves need to
