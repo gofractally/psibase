@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { AlertCircleIcon, InfoIcon } from "lucide-react";
+import { type ComponentProps, useEffect, useState } from "react";
 
 import { getSupervisor, prompt } from "@psibase/common-lib";
 
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
+import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     CardContent,
     CardDescription,
     CardFooter,
+    CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import { Label } from "@shared/shadcn/ui/label";
@@ -27,6 +30,44 @@ type TrustLevel = "low" | "medium" | "high"; // 'none' and 'max' do not trigger 
 type Descriptions = [string, string, string];
 
 type ApprovalDuration = "session" | "permanent";
+
+const levelStyles: Record<
+    TrustLevel,
+    {
+        badgeVariant: ComponentProps<typeof Badge>["variant"];
+        badgeClassName?: string;
+        alertVariant: ComponentProps<typeof Alert>["variant"];
+        icon: React.ReactNode;
+    }
+> = {
+    low: {
+        badgeVariant: "secondary",
+        badgeClassName: "bg-blue-500 text-white dark:bg-blue-600",
+        alertVariant: "default",
+        icon: <InfoIcon />,
+    },
+    medium: {
+        badgeVariant: "default",
+        alertVariant: "default",
+        icon: <InfoIcon />,
+    },
+    high: {
+        badgeVariant: "destructive",
+        alertVariant: "destructive",
+        icon: <AlertCircleIcon />,
+    },
+};
+
+const LevelBadge = ({ level }: { level: TrustLevel }) => {
+    return (
+        <Badge
+            variant={levelStyles[level].badgeVariant}
+            className={levelStyles[level].badgeClassName}
+        >
+            {level}
+        </Badge>
+    );
+};
 
 interface PermissionRequest {
     user: string;
@@ -119,71 +160,38 @@ export const App = () => {
     return (
         <div className="flex min-h-screen items-center justify-center p-6">
             <BrandedGlowingCard>
+                <CardHeader>
+                    <CardTitle className="text-3xl font-normal">
+                        Authorize Application
+                    </CardTitle>
+                    <CardDescription>
+                        The{" "}
+                        <span className="text-foreground font-medium">
+                            {permissionRequest.caller}
+                        </span>{" "}
+                        app wants to use the{" "}
+                        <span className="text-foreground font-medium">
+                            {permissionRequest.callee}
+                        </span>{" "}
+                        app on behalf of{" "}
+                        <span className="text-foreground font-medium">
+                            {permissionRequest.user}
+                        </span>
+                        .
+                    </CardDescription>
+                </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <CardTitle className="mb-6 text-3xl font-normal">
-                            Authorize Application
-                        </CardTitle>
-                        <CardDescription className="text-base">
-                            The{" "}
-                            <span className="text-foreground">
-                                {permissionRequest.caller}
-                            </span>{" "}
-                            app wants to use the{" "}
-                            <span className="text-foreground">
-                                {permissionRequest.callee}
-                            </span>{" "}
-                            app on behalf of{" "}
-                            <span className="text-foreground">
-                                {permissionRequest.user}
-                            </span>
-                            .
-                        </CardDescription>
-                    </div>
-
-                    <div className="space-y-3">
-                        <Label className="text-base font-medium">
-                            Requested trust level:{" "}
-                            <span className="capitalize">
-                                {permissionRequest.level}
-                            </span>
-                        </Label>
-                        <Tabs
-                            value={selectedTrustLevel}
-                            onValueChange={(value) =>
-                                setSelectedTrustLevel(value as TrustLevel)
-                            }
-                        >
-                            <TabsList>
-                                {["low", "medium", "high"].map(
-                                    (level, index) => {
-                                        const description =
-                                            permissionRequest.descriptions[
-                                                index
-                                            ];
-                                        // Only show trust levels that have non-empty descriptions
-                                        if (
-                                            !description ||
-                                            description.trim() === ""
-                                        ) {
-                                            return null;
-                                        }
-
-                                        const levelLabel =
-                                            level.charAt(0).toUpperCase() +
-                                            level.slice(1);
-
-                                        return (
-                                            <TabsTrigger
-                                                key={level}
-                                                value={level}
-                                            >
-                                                {levelLabel}
-                                            </TabsTrigger>
-                                        );
-                                    },
-                                )}
-                            </TabsList>
+                    <Label>
+                        Requested trust level:{" "}
+                        <LevelBadge level={permissionRequest.level} />
+                    </Label>
+                    <Tabs
+                        value={selectedTrustLevel}
+                        onValueChange={(value) =>
+                            setSelectedTrustLevel(value as TrustLevel)
+                        }
+                    >
+                        <TabsList>
                             {["low", "medium", "high"].map((level, index) => {
                                 const description =
                                     permissionRequest.descriptions[index];
@@ -193,21 +201,42 @@ export const App = () => {
                                 }
 
                                 return (
-                                    <TabsContent
+                                    <TabsTrigger
                                         key={level}
                                         value={level}
-                                        className="mt-3"
+                                        className="capitalize"
                                     >
-                                        <Alert>
+                                        {level}
+                                    </TabsTrigger>
+                                );
+                            })}
+                        </TabsList>
+                        {(["low", "medium", "high"] as TrustLevel[]).map(
+                            (level, index) => {
+                                const description =
+                                    permissionRequest.descriptions[index];
+                                // Only show trust levels that have non-empty descriptions
+                                if (!description || description.trim() === "") {
+                                    return null;
+                                }
+
+                                return (
+                                    <TabsContent key={level} value={level}>
+                                        <Alert
+                                            variant={
+                                                levelStyles[level].alertVariant
+                                            }
+                                        >
+                                            {levelStyles[level].icon}
                                             <AlertDescription className="whitespace-pre-line">
                                                 {description}
                                             </AlertDescription>
                                         </Alert>
                                     </TabsContent>
                                 );
-                            })}
-                        </Tabs>
-                    </div>
+                            },
+                        )}
+                    </Tabs>
 
                     <div className="space-y-3">
                         <Label className="text-base font-medium">
@@ -258,10 +287,8 @@ export const App = () => {
                             {permissionRequest.caller}
                         </span>{" "}
                         permission to perform{" "}
-                        <span className="text-foreground font-semibold">
-                            {permissionRequest.level}
-                        </span>{" "}
-                        trust operations within the{" "}
+                        <LevelBadge level={permissionRequest.level} /> trust
+                        operations within the{" "}
                         <span className="text-foreground font-semibold">
                             {permissionRequest.callee}
                         </span>{" "}
