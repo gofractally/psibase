@@ -13,6 +13,12 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Label } from "@shared/shadcn/ui/label";
 import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@shared/shadcn/ui/tabs";
 
 const supervisor = getSupervisor();
 
@@ -115,19 +121,20 @@ export const App = () => {
             <BrandedGlowingCard>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <CardTitle className="text-2xl">
+                        <CardTitle className="mb-6 text-3xl font-normal">
                             Authorize Application
                         </CardTitle>
                         <CardDescription className="text-base">
-                            <span className="text-foreground font-semibold">
+                            The{" "}
+                            <span className="text-foreground">
                                 {permissionRequest.caller}
                             </span>{" "}
                             app wants to use the{" "}
-                            <span className="text-foreground font-semibold">
+                            <span className="text-foreground">
                                 {permissionRequest.callee}
                             </span>{" "}
                             app on behalf of{" "}
-                            <span className="text-foreground font-semibold">
+                            <span className="text-foreground">
                                 {permissionRequest.user}
                             </span>
                             .
@@ -141,7 +148,42 @@ export const App = () => {
                                 {permissionRequest.level}
                             </span>
                         </Label>
-                        <div className="flex flex-wrap gap-2">
+                        <Tabs
+                            value={selectedTrustLevel}
+                            onValueChange={(value) =>
+                                setSelectedTrustLevel(value as TrustLevel)
+                            }
+                        >
+                            <TabsList>
+                                {["low", "medium", "high"].map(
+                                    (level, index) => {
+                                        const description =
+                                            permissionRequest.descriptions[
+                                                index
+                                            ];
+                                        // Only show trust levels that have non-empty descriptions
+                                        if (
+                                            !description ||
+                                            description.trim() === ""
+                                        ) {
+                                            return null;
+                                        }
+
+                                        const levelLabel =
+                                            level.charAt(0).toUpperCase() +
+                                            level.slice(1);
+
+                                        return (
+                                            <TabsTrigger
+                                                key={level}
+                                                value={level}
+                                            >
+                                                {levelLabel}
+                                            </TabsTrigger>
+                                        );
+                                    },
+                                )}
+                            </TabsList>
                             {["low", "medium", "high"].map((level, index) => {
                                 const description =
                                     permissionRequest.descriptions[index];
@@ -150,46 +192,22 @@ export const App = () => {
                                     return null;
                                 }
 
-                                const levelLabel =
-                                    level.charAt(0).toUpperCase() +
-                                    level.slice(1);
-                                const isSelected = level === selectedTrustLevel;
-
                                 return (
-                                    <Button
+                                    <TabsContent
                                         key={level}
-                                        onClick={() =>
-                                            setSelectedTrustLevel(
-                                                level as TrustLevel,
-                                            )
-                                        }
-                                        variant={
-                                            isSelected ? "default" : "outline"
-                                        }
-                                        className={`min-w-[80px] ${
-                                            isSelected
-                                                ? "shadow-md"
-                                                : "hover:bg-accent"
-                                        }`}
+                                        value={level}
+                                        className="mt-3"
                                     >
-                                        {levelLabel}
-                                    </Button>
+                                        <Alert>
+                                            <AlertDescription className="whitespace-pre-line">
+                                                {description}
+                                            </AlertDescription>
+                                        </Alert>
+                                    </TabsContent>
                                 );
                             })}
-                        </div>
+                        </Tabs>
                     </div>
-
-                    {permissionRequest.descriptions && (
-                        <Alert className="border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/20">
-                            <AlertDescription className="whitespace-pre-line text-yellow-800 dark:text-yellow-200">
-                                {selectedTrustLevel === "low"
-                                    ? permissionRequest.descriptions[0]
-                                    : selectedTrustLevel === "medium"
-                                      ? permissionRequest.descriptions[1]
-                                      : permissionRequest.descriptions[2]}
-                            </AlertDescription>
-                        </Alert>
-                    )}
 
                     <div className="space-y-3">
                         <Label className="text-base font-medium">
@@ -200,9 +218,8 @@ export const App = () => {
                             onValueChange={(value: string) =>
                                 setDuration(value as ApprovalDuration)
                             }
-                            className="space-y-3"
                         >
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-3">
                                 <RadioGroupItem value="session" id="session" />
                                 <Label
                                     htmlFor="session"
@@ -211,7 +228,7 @@ export const App = () => {
                                     For this session
                                 </Label>
                             </div>
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-3">
                                 <RadioGroupItem
                                     value="permanent"
                                     id="permanent"
