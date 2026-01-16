@@ -1,9 +1,7 @@
 package token-swap:plugin;
 
 interface types {
-
     type tid = u32;
-
 
     record path {
         to-return: string,
