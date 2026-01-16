@@ -346,8 +346,14 @@ export const SwapPage = () => {
                 setToken1Amount(quotedAdd)
             }
         }
-    }, [quotedAdd, lastTouchedIs1, isLiquidityDirectionAdd, isLiquidityDirectionRemove])
+    }, [quotedAdd, lastTouchedIs1, isLiquidityDirectionAdd, isLiquidityDirectionRemove, focusedPool])
 
+
+    useEffect(() => {
+        if (poolsOfLiquidityPair.length == 0) {
+            setFocusedPoolId(null)
+        }
+    }, [poolsOfLiquidityPair.length])
 
 
 
