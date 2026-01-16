@@ -10,7 +10,7 @@ export const useQuote = (
 ) => {
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
-        tokenSwap.swap.getAmount,
+        tokenSwap.swap.quote,
         [fromToken!, amount!, toToken!, (slippageTolerance || 0) * 1000000, 3],
         {
             enabled: !!(

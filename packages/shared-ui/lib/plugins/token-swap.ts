@@ -19,7 +19,7 @@ export type Pool = {
 class Swap extends PluginInterface {
     protected override readonly _intf = "swap" as const;
 
-    get getAmount() {
+    get quote() {
         return this._call<
             [
                 fromToken: TID,
@@ -34,7 +34,7 @@ class Swap extends PluginInterface {
                 minimumReturn: string;
                 slippage: number;
             }
-        >("getAmount");
+        >("quote");
     }
 
     get swap() {

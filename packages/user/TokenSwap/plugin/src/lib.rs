@@ -51,7 +51,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [get_amount, quote_pool_tokens, quote_add_liquidity],
+        None => [quote, quote_pool_tokens, quote_add_liquidity],
         High => [swap, new_pool, add_liquidity, remove_liquidity],
     }
 }
@@ -59,7 +59,7 @@ define_trust! {
 struct TokenSwapPlugin;
 
 impl Swap for TokenSwapPlugin {
-    fn get_amount(
+    fn quote(
         from_token: u32,
         amount: String,
         to_token: u32,

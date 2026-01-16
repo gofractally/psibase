@@ -29,7 +29,7 @@ interface swap {
     use types.{path, tid, pool};
 
     swap: func(pools: list<string>, token-in: tid, amount-in: string, min-return: string) -> result<_, error>;
-    get-amount: func(from-token: tid, amount: string, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
+    quote: func(from-token: tid, amount: string, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
 
 }
 
