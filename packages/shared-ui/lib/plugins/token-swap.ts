@@ -34,7 +34,13 @@ class Api extends PluginInterface {
 
     get newPool() {
         return this._call<
-            [tokenA: TID, tokenB: TID, amountA: Decimal, amountB: Decimal]
+            [
+                isManaged: boolean,
+                tokenA: TID,
+                tokenB: TID,
+                amountA: Decimal,
+                amountB: Decimal,
+            ]
         >("newPool");
     }
 

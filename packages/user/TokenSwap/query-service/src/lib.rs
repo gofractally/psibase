@@ -4,7 +4,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::Deserialize;
-    use token_swap::tables::{Config, ConfigTable, Pool, PoolTable};
+    use token_swap::tables::{ConfigTable, Pool, PoolTable};
 
     #[derive(Deserialize, SimpleObject)]
     struct HistoricalUpdate {
