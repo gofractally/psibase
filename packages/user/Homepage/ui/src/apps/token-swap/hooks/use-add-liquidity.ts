@@ -2,7 +2,7 @@ import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plu
 import { tokenSwap } from "@shared/lib/plugins";
 
 export const useAddLiquidity = () =>
-    usePluginFunctionMutation(tokenSwap.api.addLiquidity, {
+    usePluginFunctionMutation(tokenSwap.liquidity.addLiquidity, {
         toast: {
             loading: "Adding liquidity",
             error: "Failed adding liquidity",

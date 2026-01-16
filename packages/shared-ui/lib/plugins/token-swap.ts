@@ -16,8 +16,8 @@ export type Pool = {
     liquidityTokenSupply: string;
 };
 
-class Api extends PluginInterface {
-    protected override readonly _intf = "api" as const;
+class Swap extends PluginInterface {
+    protected override readonly _intf = "swap" as const;
 
     get getAmount() {
         return this._call<
@@ -36,6 +36,21 @@ class Api extends PluginInterface {
             }
         >("getAmount");
     }
+
+    get swap() {
+        return this._call<
+            [
+                pools: string[],
+                tokenIn: TID,
+                amountIn: Decimal,
+                minReturn: Decimal,
+            ]
+        >("swap");
+    }
+}
+
+class Liquidity extends PluginInterface {
+    protected override readonly _intf = "liquidity" as const;
 
     get newPool() {
         return this._call<
@@ -83,29 +98,20 @@ class Api extends PluginInterface {
             ]
         >("removeLiquidity");
     }
-
-    get swap() {
-        return this._call<
-            [
-                pools: string[],
-                tokenIn: TID,
-                amountIn: Decimal,
-                minReturn: Decimal,
-            ]
-        >("swap");
-    }
 }
 
 export class Plugin {
-    readonly api: Api;
+    readonly swap: Swap;
+    readonly liquidity: Liquidity;
 
     constructor(readonly service: Account) {
         // Initialize all interfaces with the correct service
-        this.api = new Api();
+        this.swap = new Swap();
+        this.liquidity = new Liquidity();
 
         // Set the protected _service on each instance
         // This avoids the "used before initialization" error
-        const instances = [this.api] as PluginInterface[];
+        const instances = [this.swap, this.liquidity] as PluginInterface[];
 
         for (const instance of instances) {
             Object.assign(instance, { _service: service });

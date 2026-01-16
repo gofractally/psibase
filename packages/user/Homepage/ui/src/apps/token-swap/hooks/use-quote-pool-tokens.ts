@@ -6,6 +6,10 @@ export const useQuotePoolTokens = (
     pool?: Pool,
     amount?: string,
 ) =>
-    usePluginFunctionQuery(tokenSwap.api.quotePoolTokens, [pool!, amount!], {
-        enabled,
-    });
+    usePluginFunctionQuery(
+        tokenSwap.liquidity.quotePoolTokens,
+        [pool!, amount!],
+        {
+            enabled,
+        },
+    );

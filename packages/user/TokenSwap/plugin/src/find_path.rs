@@ -9,9 +9,10 @@ use psibase::services::{
     tokens::{Decimal, Quantity, TID},
 };
 
+use crate::bindings::exports::token_swap::plugin::liquidity::Pool as WitPool;
 use crate::constants::PPM;
 use crate::graphql::GraphQLPool;
-use crate::{bindings::exports::token_swap::plugin::api::Pool as WitPool, mul_div};
+use crate::mul_div;
 
 #[derive(Clone)]
 pub struct Pool {

@@ -4,7 +4,9 @@ mod bindings;
 mod find_path;
 use std::str::FromStr;
 
-use bindings::exports::token_swap::plugin::api::Guest as Api;
+use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
+use bindings::exports::token_swap::plugin::swap::Guest as Swap;
+
 use bindings::exports::token_swap::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
@@ -23,7 +25,7 @@ use psibase::services::tokens::{Decimal, Quantity, TID};
 
 use crate::{
     bindings::{
-        exports::token_swap::plugin::api::{Path, Pool as WitPool},
+        exports::token_swap::plugin::liquidity::Pool as WitPool, token_swap::plugin::types::Path,
         tokens::plugin::helpers::u64_to_decimal,
     },
     constants::PPM,
@@ -60,7 +62,18 @@ define_trust! {
 
 struct TokenSwapPlugin;
 
-impl Api for TokenSwapPlugin {
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExampleThingData {
+    example_thing: String,
+}
+#[derive(serde::Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ExampleThingResponse {
+    data: ExampleThingData,
+}
+
+impl Swap for TokenSwapPlugin {
     fn get_amount(
         from_token: u32,
         amount: String,
@@ -101,45 +114,58 @@ impl Api for TokenSwapPlugin {
         })
     }
 
-    fn quote_pool_tokens(pool: WitPool, amount: String) -> Result<(String, String), Error> {
-        let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
+    fn swap(
+        pools: Vec<String>,
+        token_in: TID,
+        amount_in: String,
+        min_return: String,
+    ) -> Result<(), Error> {
+        credit(
+            token_in,
+            token_swap::SERVICE.to_string().as_str(),
+            &amount_in,
+            "swap",
+        )?;
 
-        let liquidity_amount = Quantity::from_str(&amount, lp_supply.precision)
-            .map_err(|error| ErrorType::InvalidFormat(error.to_string()))?;
+        let packed_args = token_swap::action_structs::swap {
+            amount_in: decimal_to_u64(token_in, &amount_in)?.into(),
+            min_return: Decimal::from_str(&min_return).unwrap().quantity,
+            pools: pools
+                .into_iter()
+                .map(|pool_id| pool_id.parse::<u32>().unwrap())
+                .collect(),
+            token_in,
+        }
+        .packed();
 
-        let a_reserve = Decimal::from_str(&pool.a_balance).unwrap();
-        let b_reserve = Decimal::from_str(&pool.b_balance).unwrap();
-
-        let a_amount = mul_div(liquidity_amount, a_reserve.quantity, lp_supply.quantity);
-        let b_amount = mul_div(liquidity_amount, b_reserve.quantity, lp_supply.quantity);
-
-        Ok((
-            Decimal::new(a_amount, a_reserve.precision).to_string(),
-            Decimal::new(b_amount, b_reserve.precision).to_string(),
-        ))
+        add_action_to_transaction(token_swap::action_structs::swap::ACTION_NAME, &packed_args)
     }
+}
 
-    fn quote_add_liquidity(pool: WitPool, token_id: TID, amount: String) -> Result<String, Error> {
-        let (incoming_token, opposing_token) = if pool.token_a_id == token_id {
-            (pool.token_a_id, pool.token_b_id)
-        } else {
-            (pool.token_b_id, pool.token_a_id)
-        };
+impl Liquidity for TokenSwapPlugin {
+    fn new_pool(
+        is_managed: bool,
+        token_a: TID,
+        token_b: TID,
+        amount_a: String,
+        amount_b: String,
+    ) -> Result<(), Error> {
+        credit(token_a, "token-swap", &amount_a, "")?;
+        credit(token_b, "token-swap", &amount_b, "")?;
 
-        // TODO: Can also derive the precision from incoming tokens reserve balance string
-        let quoting_amount: Quantity = decimal_to_u64(incoming_token, &amount)?.into();
+        let packed_args = token_swap::action_structs::new_pool {
+            is_managed,
+            token_a,
+            token_b,
+            token_a_amount: decimal_to_u64(token_a, &amount_a)?.into(),
+            token_b_amount: decimal_to_u64(token_b, &amount_b)?.into(),
+        }
+        .packed();
 
-        let pool = Pool::from(pool);
-
-        let (incoming_reserve, outgoing_reserve) = if incoming_token == pool.token_a {
-            (pool.reserve_a, pool.reserve_b)
-        } else {
-            (pool.reserve_b, pool.reserve_a)
-        };
-
-        let expected_balance = mul_div(quoting_amount, outgoing_reserve, incoming_reserve);
-
-        Ok(u64_to_decimal(opposing_token, expected_balance.value)?.to_string())
+        add_action_to_transaction(
+            token_swap::action_structs::new_pool::ACTION_NAME,
+            &packed_args,
+        )
     }
 
     fn add_liquidity(
@@ -217,68 +243,46 @@ impl Api for TokenSwapPlugin {
         )
     }
 
-    fn swap(
-        pools: Vec<String>,
-        token_in: TID,
-        amount_in: String,
-        min_return: String,
-    ) -> Result<(), Error> {
-        credit(
-            token_in,
-            token_swap::SERVICE.to_string().as_str(),
-            &amount_in,
-            "swap",
-        )?;
+    fn quote_pool_tokens(pool: WitPool, amount: String) -> Result<(String, String), Error> {
+        let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
 
-        let packed_args = token_swap::action_structs::swap {
-            amount_in: decimal_to_u64(token_in, &amount_in)?.into(),
-            min_return: Decimal::from_str(&min_return).unwrap().quantity,
-            pools: pools
-                .into_iter()
-                .map(|pool_id| pool_id.parse::<u32>().unwrap())
-                .collect(),
-            token_in,
-        }
-        .packed();
+        let liquidity_amount = Quantity::from_str(&amount, lp_supply.precision)
+            .map_err(|error| ErrorType::InvalidFormat(error.to_string()))?;
 
-        add_action_to_transaction(token_swap::action_structs::swap::ACTION_NAME, &packed_args)
+        let a_reserve = Decimal::from_str(&pool.a_balance).unwrap();
+        let b_reserve = Decimal::from_str(&pool.b_balance).unwrap();
+
+        let a_amount = mul_div(liquidity_amount, a_reserve.quantity, lp_supply.quantity);
+        let b_amount = mul_div(liquidity_amount, b_reserve.quantity, lp_supply.quantity);
+
+        Ok((
+            Decimal::new(a_amount, a_reserve.precision).to_string(),
+            Decimal::new(b_amount, b_reserve.precision).to_string(),
+        ))
     }
 
-    fn new_pool(
-        is_managed: bool,
-        token_a: TID,
-        token_b: TID,
-        amount_a: String,
-        amount_b: String,
-    ) -> Result<(), Error> {
-        credit(token_a, "token-swap", &amount_a, "")?;
-        credit(token_b, "token-swap", &amount_b, "")?;
+    fn quote_add_liquidity(pool: WitPool, token_id: TID, amount: String) -> Result<String, Error> {
+        let (incoming_token, opposing_token) = if pool.token_a_id == token_id {
+            (pool.token_a_id, pool.token_b_id)
+        } else {
+            (pool.token_b_id, pool.token_a_id)
+        };
 
-        let packed_args = token_swap::action_structs::new_pool {
-            is_managed,
-            token_a,
-            token_b,
-            token_a_amount: decimal_to_u64(token_a, &amount_a)?.into(),
-            token_b_amount: decimal_to_u64(token_b, &amount_b)?.into(),
-        }
-        .packed();
+        // TODO: Can also derive the precision from incoming tokens reserve balance string
+        let quoting_amount: Quantity = decimal_to_u64(incoming_token, &amount)?.into();
 
-        add_action_to_transaction(
-            token_swap::action_structs::new_pool::ACTION_NAME,
-            &packed_args,
-        )
+        let pool = Pool::from(pool);
+
+        let (incoming_reserve, outgoing_reserve) = if incoming_token == pool.token_a {
+            (pool.reserve_a, pool.reserve_b)
+        } else {
+            (pool.reserve_b, pool.reserve_a)
+        };
+
+        let expected_balance = mul_div(quoting_amount, outgoing_reserve, incoming_reserve);
+
+        Ok(u64_to_decimal(opposing_token, expected_balance.value)?.to_string())
     }
-}
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
 }
 
 impl Queries for TokenSwapPlugin {

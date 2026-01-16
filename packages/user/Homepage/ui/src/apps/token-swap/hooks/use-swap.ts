@@ -2,7 +2,7 @@ import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plu
 import { tokenSwap } from "@shared/lib/plugins";
 
 export const useSwap = () =>
-    usePluginFunctionMutation(tokenSwap.api.swap, {
+    usePluginFunctionMutation(tokenSwap.swap.swap, {
         toast: {
             loading: "Swapping",
             error: "Failed swap",

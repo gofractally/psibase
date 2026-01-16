@@ -10,8 +10,16 @@ export const useQuote = (
 ) => {
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
-        tokenSwap.api.getAmount,
+        tokenSwap.swap.getAmount,
         [fromToken!, amount!, toToken!, (slippageTolerance || 0) * 1000000, 3],
-        { enabled: !!(fromToken && amount && toToken && isAmountValid && enabled) },
+        {
+            enabled: !!(
+                fromToken &&
+                amount &&
+                toToken &&
+                isAmountValid &&
+                enabled
+            ),
+        },
     );
 };

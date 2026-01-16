@@ -8,7 +8,7 @@ export const useQuoteAdd = (
     amount?: string,
 ) =>
     usePluginFunctionQuery(
-        tokenSwap.api.quoteAddLiquidity,
+        tokenSwap.liquidity.quoteAddLiquidity,
         [pool!, tokenId!, amount!],
         { enabled },
     );
