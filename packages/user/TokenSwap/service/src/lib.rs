@@ -245,6 +245,9 @@ pub mod tables {
             a_amount: Quantity,
             b_amount: Quantity,
         ) -> Self {
+
+            // TODO: If this pool is managed AND there is already a managed pool of this pair, then abort.
+
             let pool = Self::new(is_managed_pool, a_token, b_token);
 
             pool.debit_reserves_from_sender(a_amount, b_amount);
@@ -416,6 +419,10 @@ pub mod tables {
             psibase::services::symbol::Wrapper::call()
                 .getByToken(self.id)
                 .map(|s| s.symbolId)
+        }
+
+        pub async fn is_managed(&self) -> bool {
+            self.token_a_admin == 0
         }
     }
 }

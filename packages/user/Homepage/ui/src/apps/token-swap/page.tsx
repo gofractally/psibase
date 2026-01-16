@@ -272,6 +272,8 @@ export const SwapPage = () => {
         return selectedTokens.every(id => tradingTokens.includes(id))
     });
 
+    const isManagedPoolOfLiquidityPair = poolsOfLiquidityPair.some(pool => pool.isManaged);
+
     const selectToken = (selection: SelectionType) => {
         setSelectingToken(selection);
         setPickTokenModal(true);
@@ -486,6 +488,7 @@ export const SwapPage = () => {
                             {isLiquidityDirectionAdd && <PoolPicker
                                 setFocusedPoolId={(focusedId) => setFocusedPoolId(focusedId)}
                                 focusedPoolId={focusedPoolId}
+                                disableCreate={isManagedPoolOfLiquidityPair}
                                 pools={(poolsOfLiquidityPair || [])?.map(pool => ({ id: pool.id, tokenAId: pool.tokenAId, tokenBId: pool.tokenBId, tokenASymbol: pool.tokenASymbol || '', tokenBSymbol: pool.tokenBSymbol || '' }))}
                             />}
 

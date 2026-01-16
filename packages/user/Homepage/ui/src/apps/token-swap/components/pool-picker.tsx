@@ -18,6 +18,7 @@ type Pool = {
 
 interface PoolPickerProps {
     pools: Pool[];
+    disableCreate?: boolean,
     focusedPoolId: number | null | undefined;
     setFocusedPoolId: (id: number | null) => void;
     className?: string;
@@ -28,8 +29,9 @@ export function PoolPicker({
     focusedPoolId,
     setFocusedPoolId,
     className,
+    disableCreate = false,
 }: PoolPickerProps) {
-    if (pools.length === 0) {
+    if (pools.length === 0 || (pools.length == 1 && disableCreate)) {
         return null;
     }
 
@@ -70,7 +72,7 @@ export function PoolPicker({
                             )}
                         </DropdownMenuItem>
                     ))}
-                    <DropdownMenuItem
+                    {!disableCreate && <DropdownMenuItem
                         onSelect={() => setFocusedPoolId(null)}
                         className="flex justify-between"
                     >
@@ -85,7 +87,7 @@ export function PoolPicker({
                         {focusedPoolId === null && (
                             <Badge variant="secondary">Selected</Badge>
                         )}
-                    </DropdownMenuItem>
+                    </DropdownMenuItem>}
                 </DropdownMenuContent>
             </DropdownMenu>
 

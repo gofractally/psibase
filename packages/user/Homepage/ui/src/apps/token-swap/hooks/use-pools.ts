@@ -5,8 +5,10 @@ import { zAccount } from "@/lib/zod/Account";
 
 import { graphql } from "@shared/lib/graphql";
 
+const zU32 = z.number().int().positive();
+
 export const PoolSchema = z.object({
-    id: z.number().int().positive(),
+    id: zU32,
     tokenAId: z.number().int(),
     tokenBId: z.number().int(),
     tokenATariffPpm: z.number().int(),
@@ -15,8 +17,9 @@ export const PoolSchema = z.object({
     bBalance: z.string(),
     tokenASymbol: zAccount.nullable(),
     tokenBSymbol: zAccount.nullable(),
-    liquidityToken: z.number().int().positive(),
+    liquidityToken: zU32,
     liquidityTokenSupply: z.string(),
+    isManaged: z.boolean(),
 });
 
 export type PoolInstance = z.infer<typeof PoolSchema>;
@@ -49,6 +52,7 @@ export const usePools = () => {
                                 bBalance
                                 liquidityToken
                                 liquidityTokenSupply
+                                isManaged
                             }
                         }
                     }
