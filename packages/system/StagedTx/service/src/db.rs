@@ -121,8 +121,11 @@ pub mod tables {
 }
 
 pub mod impls {
+    use std::collections::HashSet;
+
     use super::tables::*;
     use psibase::fracpack::Pack;
+    use psibase::services::transact::ServiceMethod;
     use psibase::services::{accounts::Wrapper as Accounts, transact::Wrapper as Transact};
     use psibase::{check, get_sender, AccountNumber, Action, Checksum256, Table};
 
@@ -177,16 +180,21 @@ pub mod impls {
             staged_tx
         }
 
-        pub fn parties(&self) -> Vec<AccountNumber> {
-            let mut result: Vec<_> = self
-                .action_list
+        pub fn invocations(&self) -> Vec<(AccountNumber, ServiceMethod)> {
+            let mut seen = HashSet::new();
+
+            self.action_list
                 .actions
                 .iter()
-                .map(|act| act.sender)
-                .collect();
-            result.sort_by_key(|account| account.value);
-            result.dedup();
-            result
+                .filter_map(|act| {
+                    let key = (act.sender.value, act.service.value, act.method.value);
+                    if seen.insert(key) {
+                        Some((act.sender, ServiceMethod::new(act.service, act.method)))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
         }
 
         pub fn accept(&self) {
