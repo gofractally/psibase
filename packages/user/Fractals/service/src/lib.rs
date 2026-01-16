@@ -533,6 +533,10 @@ pub mod service {
                     StagedTx::SERVICE,
                     StagedTx::action_structs::propose::ACTION_NAME.into(),
                 ),
+                ServiceMethod::new(
+                    StagedTx::SERVICE,
+                    StagedTx::action_structs::approve::ACTION_NAME.into(),
+                ),
             ];
 
             banned_service_methods
