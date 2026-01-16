@@ -469,7 +469,6 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenSwap.psi
     PATH packages/user/TokenSwap
     TARGET_DIR ${USER_WORKSPACE_TARGET}
-    DEPENDS ${TokenSwap_js_DEP}
 )
 
 cargo_psibase_package(
