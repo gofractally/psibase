@@ -6,8 +6,9 @@ import {
     getMembership,
 } from "@/lib/graphql/fractals/getMembership";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 const queryFn = async (fractal: string, user: string) => {
     try {

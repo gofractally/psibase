@@ -1,10 +1,13 @@
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
-import { Account, zAccount } from "@/lib/zod/Account";
+import { FRACTALS_SERVICE } from "@/lib/constants";
 import { zDateTime } from "@/lib/zod/DateTime";
 
+import { Account, zAccount } from "@shared/lib/schemas/account";
+
 import { graphql } from "../../graphql";
+
+import { zDateTime } from "@/lib/zod/DateTime";
 
 export const zGuildApplicationListInstance = z.object({
     member: zAccount,
@@ -37,7 +40,7 @@ export const getGuildApplications = async (guildAccount: Account) => {
                 }
             }
         `,
-        fractalsService,
+        FRACTALS_SERVICE,
     );
 
     return z

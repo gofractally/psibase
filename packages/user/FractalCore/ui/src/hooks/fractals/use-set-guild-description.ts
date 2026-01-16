@@ -1,21 +1,12 @@
-import { Account } from "@/lib/zod/Account";
+import { fractalCorePlugin } from "@/lib/plugin";
 
-import { usePluginMutation } from "../use-plugin-mutation";
-import { useFractalAccount } from "./use-fractal-account";
+import { usePluginFunctionCallMutation } from "../use-plugin-function-call-mutation";
 
-export const useSetGuildDescription = () => {
-    const fractal = useFractalAccount();
-
-    return usePluginMutation<[Account, string]>(
-        {
-            intf: "adminGuild",
-            method: "setDescription",
-            service: fractal,
-        },
-        {
+export const useSetGuildDescription = () =>
+    usePluginFunctionCallMutation(fractalCorePlugin.adminGuild.setDescription, {
+        toast: {
             error: "Failed setting description",
             loading: "Setting description",
-            success: "Set description.",
+            success: "Set description",
         },
-    );
-};
+    });

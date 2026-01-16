@@ -1,4 +1,4 @@
-import { Account } from "./zod/Account";
+import { Account } from "@shared/lib/schemas/account";
 
 export const paths = {
     guild: {

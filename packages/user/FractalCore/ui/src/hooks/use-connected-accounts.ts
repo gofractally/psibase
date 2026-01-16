@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey from "@/lib/queryKeys";
+
+import { supervisor } from "@shared/lib/supervisor";
 
 export const useConnectedAccounts = () =>
     useQuery({
