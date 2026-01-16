@@ -535,7 +535,7 @@ pub mod service {
                 ),
                 ServiceMethod::new(
                     StagedTx::SERVICE,
-                    StagedTx::action_structs::approve::ACTION_NAME.into(),
+                    StagedTx::action_structs::accept::ACTION_NAME.into(),
                 ),
             ];
 
