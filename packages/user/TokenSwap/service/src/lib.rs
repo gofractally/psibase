@@ -18,7 +18,9 @@ pub mod tables {
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
     pub struct Config {
         last_used_pool_id: u32,
+        pub global_fee_ppm: u32,
     }
+
     impl Config {
         #[primary_key]
         fn pk(&self) {}
@@ -31,10 +33,11 @@ pub mod tables {
             check_some(Self::get(), "config does not exist")
         }
 
-        pub fn add() -> Self {
+        pub fn add(global_fee_ppm: u32) -> Self {
             check_none(Self::get(), "config row already added");
             let new_instance = Self {
                 last_used_pool_id: 0,
+                global_fee_ppm,
             };
             new_instance.save();
             new_instance
@@ -49,6 +52,12 @@ pub mod tables {
             instance.last_used_pool_id = next_id;
             instance.save();
             next_id
+        }
+
+        pub fn set_global_fee(&mut self, fee_ppm: u32) {
+            check(fee_ppm <= 250000, "fee cannot be greater than 25%");
+            self.global_fee_ppm = fee_ppm;
+            self.save();
         }
 
         fn save(&self) {
@@ -92,7 +101,7 @@ pub mod tables {
             token.issued_supply - token.burned_supply
         }
 
-        fn new(token_a_id: TID, token_b_id: TID) -> Self {
+        fn new(is_managed_pool: bool, token_a_id: TID, token_b_id: TID) -> Self {
             check(
                 token_a_id != token_b_id,
                 "reserve tokens cannot be the same",
@@ -121,8 +130,16 @@ pub mod tables {
                 token_b_id,
                 token_a_tariff_ppm: 0,
                 token_b_tariff_ppm: 0,
-                token_a_admin: mint_and_send_back("Token A administration".into()),
-                token_b_admin: mint_and_send_back("Token B administration".into()),
+                token_a_admin: if is_managed_pool {
+                    0
+                } else {
+                    mint_and_send_back("Token A administration".into())
+                },
+                token_b_admin: if is_managed_pool {
+                    0
+                } else {
+                    mint_and_send_back("Token B administration".into())
+                },
             }
         }
 
@@ -221,8 +238,14 @@ pub mod tables {
             Tokens::call().burn(self.liquidity_token, amount, "Liquidity withdrawal".into());
         }
 
-        pub fn add(a_token: TID, b_token: TID, a_amount: Quantity, b_amount: Quantity) -> Self {
-            let pool = Self::new(a_token, b_token);
+        pub fn add(
+            is_managed_pool: bool,
+            a_token: TID,
+            b_token: TID,
+            a_amount: Quantity,
+            b_amount: Quantity,
+        ) -> Self {
+            let pool = Self::new(is_managed_pool, a_token, b_token);
 
             pool.debit_reserves_from_sender(a_amount, b_amount);
             pool.deposit_into_reserve(a_token, a_amount);
@@ -331,10 +354,14 @@ pub mod tables {
             let incoming_reserve = self.get_reserve(incoming_token);
             let outgoing_reserve = self.get_reserve(outgoing_token);
 
-            let tariff_ppm = if incoming_token == self.token_a_id {
-                self.token_a_tariff_ppm
+            let tariff_ppm = if self.token_a_admin == 0 {
+                Config::get_assert().global_fee_ppm
             } else {
-                self.token_b_tariff_ppm
+                if incoming_token == self.token_a_id {
+                    self.token_a_tariff_ppm
+                } else {
+                    self.token_b_tariff_ppm
+                }
             };
 
             let outgoing_amount = swap(
@@ -407,7 +434,7 @@ pub mod service {
     #[action]
     fn init() {
         if Config::get().is_none() {
-            Config::add();
+            Config::add(3_000); // 0.3%
             use psibase::services::nft as Nft;
             use psibase::services::tokens as Tokens;
 
@@ -422,13 +449,21 @@ pub mod service {
     }
 
     #[action]
+    fn set_global_fee(ppm: u32) {
+        check(get_sender() == get_service(), "only service can update");
+        Config::get_assert().set_global_fee(ppm);
+    }
+
+    #[action]
     fn new_pool(
+        is_managed: bool,
         token_a: TID,
         token_b: TID,
         token_a_amount: Quantity,
         token_b_amount: Quantity,
     ) -> (u32, NID, NID) {
-        let pool = Pool::add(token_a, token_b, token_a_amount, token_b_amount);
+        let pool = Pool::add(is_managed, token_a, token_b, token_a_amount, token_b_amount);
+
         (pool.id, pool.token_a_admin, pool.token_b_admin)
     }
 

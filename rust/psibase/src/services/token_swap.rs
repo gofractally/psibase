@@ -56,7 +56,13 @@ pub mod Service {
     }
 
     #[action]
+    fn set_global_fee(ppm: u32) {
+        unimplemented!()
+    }
+
+    #[action]
     fn new_pool(
+        is_managed: bool,
         token_a: TID,
         token_b: TID,
         token_a_amount: Quantity,
