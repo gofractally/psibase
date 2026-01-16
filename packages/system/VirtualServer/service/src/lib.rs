@@ -220,9 +220,9 @@ mod service {
     /// resource buffer, the less often the sender will need to refill it.
     #[action]
     fn conf_buffer(capacity: u64) {
-        let config = BillingConfig::get_assert();
-        if capacity < config.min_resource_buffer {
-            let err_msg = format!("Buffer capacity must be >= {}", config.min_resource_buffer);
+        let min_buffer_size = BillingConfig::get_min_resource_buffer();
+        if capacity < min_buffer_size {
+            let err_msg = format!("Buffer capacity must be >= {}", min_buffer_size);
             abort_message(&err_msg);
         }
 

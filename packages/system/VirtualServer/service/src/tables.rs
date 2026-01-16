@@ -31,6 +31,7 @@ pub mod tables {
 
     #[table(name = "BillingConfigTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[graphql(complex)]
     #[serde(rename_all = "camelCase")]
     pub struct BillingConfig {
         /// ID of the system token used for resource billing
@@ -41,10 +42,6 @@ pub mod tables {
 
         /// Account number that receives all resource billing fees
         pub fee_receiver: AccountNumber,
-
-        /// The minimum amount of resources to buffer on behalf of a user
-        /// if they don't configure their own larger buffer size.
-        pub min_resource_buffer: u64,
 
         /// Whether the resource billing system is enabled
         pub enabled: bool,
@@ -139,7 +136,9 @@ pub mod tables {
 
         /// The capacity of the resource buffer that gets filled when the user
         /// acquires resources.
-        pub buffer_capacity: u64,
+        ///
+        /// If this is None, a default buffer capacity is used.
+        pub buffer_capacity: Option<u64>,
     }
 
     /// The reserve is a table that holds a u64 representing additional resources that are available

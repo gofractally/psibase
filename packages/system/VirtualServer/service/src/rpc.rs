@@ -240,13 +240,15 @@ impl Query {
 
         let balance = crate::Wrapper::call().get_resources(user);
         let settings = UserSettings::get(user);
-        let capacity = settings.buffer_capacity.into();
+        let capacity = settings
+            .buffer_capacity
+            .unwrap_or(BillingConfig::get_min_resource_buffer());
 
         Ok(UserResources {
             balance: Decimal::new(balance, p),
-            buffer_capacity: Decimal::new(capacity, p),
+            buffer_capacity: Decimal::new(Quantity::from(capacity), p),
             balance_raw: balance.value,
-            buffer_capacity_raw: capacity.value,
+            buffer_capacity_raw: capacity,
             auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
         })
     }

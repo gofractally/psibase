@@ -17,8 +17,8 @@ mod tests {
     use serde::Deserialize;
     use tester::PRODUCER_ACCOUNT;
 
+    use crate::action_structs::*;
     use crate::Wrapper;
-    use crate::{action_structs::*, tables::tables::*};
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
         let err = result.trace.error.unwrap();
@@ -36,8 +36,13 @@ mod tests {
     }
 
     #[derive(Deserialize)]
+    pub struct BillingConfigWithBuffer {
+        pub feeReceiver: String,
+        pub minResourceBuffer: u64,
+    }
+    #[derive(Deserialize)]
     struct BillingConfigData {
-        getBillingConfig: BillingConfig,
+        getBillingConfig: BillingConfigWithBuffer,
     }
 
     #[derive(Deserialize)]
@@ -95,17 +100,16 @@ mod tests {
         assert!(balance.value == expected_value);
     }
 
-    fn get_billing_config(chain: &psibase::Chain) -> Result<BillingConfig, psibase::Error> {
+    fn get_billing_config(
+        chain: &psibase::Chain,
+    ) -> Result<BillingConfigWithBuffer, psibase::Error> {
         let config: serde_json::Value = chain.graphql(
             Wrapper::SERVICE,
             r#"
                 query {
                     getBillingConfig {
-                        sys
-                        res
                         feeReceiver
                         minResourceBuffer
-                        enabled
                     }
                 }
             "#,
@@ -224,8 +228,8 @@ mod tests {
         )?;
 
         let config = get_billing_config(&chain)?;
-        assert!(config.fee_receiver == tokens);
-        let min_resource_buffer = config.min_resource_buffer;
+        assert!(config.feeReceiver == tokens.to_string());
+        let min_resource_buffer = config.minResourceBuffer;
 
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
@@ -252,8 +256,8 @@ mod tests {
         let cpu_pricing = get_cpu_pricing(&chain)?;
         assert_eq!(
             get_resource_balance(&chain, PRODUCER_ACCOUNT, &token_prod)?,
-            config.min_resource_buffer - cpu_pricing.availableUnits // Price is always 1 at the start, so we
-                                                                    // can just subtract the available units
+            min_resource_buffer - cpu_pricing.availableUnits // Price is always 1 at the start, so we
+                                                             // can just subtract the available units
         );
 
         // Send some more tokens to the producer account
@@ -290,7 +294,7 @@ mod tests {
             .get()?;
         assert_eq!(
             get_resource_balance(&chain, alice, &token_a)?,
-            config.min_resource_buffer - cpu_pricing.availableUnits
+            min_resource_buffer - cpu_pricing.availableUnits
         );
 
         // Now alice can transact

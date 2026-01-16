@@ -9,7 +9,7 @@ impl UserSettings {
             .get(&user)
             .unwrap_or_else(|| UserSettings {
                 user,
-                buffer_capacity: BillingConfig::get_assert().min_resource_buffer,
+                buffer_capacity: None,
                 auto_fill_threshold_percent: 20,
             })
     }
@@ -22,7 +22,7 @@ impl UserSettings {
 
     pub fn set_capacity(self, capacity: u64) {
         let mut settings = self;
-        settings.buffer_capacity = capacity;
+        settings.buffer_capacity = Some(capacity);
         UserSettingsTable::read_write().put(&settings).unwrap();
     }
 
