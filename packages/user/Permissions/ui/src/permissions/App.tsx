@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getSupervisor, prompt } from "@psibase/common-lib";
 
-import { GlowingCard } from "@shared/components/glowing-card";
+import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -87,32 +87,32 @@ export const App = () => {
     if (error) {
         return (
             <div className="flex min-h-screen items-center justify-center p-6">
-                <GlowingCard>
+                <BrandedGlowingCard>
                     <CardContent>
                         <Alert variant="destructive">
                             <AlertDescription>{error}</AlertDescription>
                         </Alert>
                     </CardContent>
-                </GlowingCard>
+                </BrandedGlowingCard>
             </div>
         );
     } else if (!permissionRequest) {
         return (
             <div className="flex min-h-screen items-center justify-center p-6">
-                <GlowingCard>
+                <BrandedGlowingCard>
                     <CardContent>
                         <div className="text-muted-foreground text-center">
                             Loading...
                         </div>
                     </CardContent>
-                </GlowingCard>
+                </BrandedGlowingCard>
             </div>
         );
     }
 
     return (
         <div className="flex min-h-screen items-center justify-center p-6">
-            <GlowingCard>
+            <BrandedGlowingCard>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
                         <CardTitle className="text-2xl">
@@ -264,7 +264,7 @@ export const App = () => {
                         Cancel
                     </Button>
                 </CardFooter>
-            </GlowingCard>
+            </BrandedGlowingCard>
         </div>
     );
 };

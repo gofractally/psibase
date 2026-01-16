@@ -1,5 +1,6 @@
 import { LogOut, Moon, Settings, Sun, UserPlus } from "lucide-react";
 
+import { useTheme } from "@shared/components/theme-provider";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -14,8 +15,6 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-
-import { useTheme } from "./theme-provider";
 
 export const SettingsDropdown = () => {
     const { setTheme } = useTheme();
