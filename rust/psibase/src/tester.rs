@@ -700,12 +700,7 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
-            || act.sender == transact::SERVICE
-                && act.service == account!("virtual-server")
-                && act.method == method!("useNetSys")
-            || act.sender == transact::SERVICE
-                && act.service == account!("virtual-server")
-                && act.method == method!("useCpuSys")
+            || act.sender == transact::SERVICE && act.service == account!("virtual-server")
             || act.service == events::SERVICE && act.method == method!("sync"))
     }
 

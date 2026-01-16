@@ -29,19 +29,13 @@ namespace psibase
 
    inline bool isUserAction(const Action& action)
    {
-      if (action.service == AccountNumber{"db"} && action.method == MethodNumber{"open"})
+      if (action.service == "db"_a && action.method == "open"_m)
          return false;
-      if (action.service == AccountNumber{"cpu-limit"})
+      if (action.service == "cpu-limit"_a)
          return false;
-      if (action.sender == AccountNumber{"transact"} &&
-          action.service == AccountNumber{"virtual-server"} &&
-          action.method == MethodNumber{"useNetSys"})
+      if (action.sender == "transact"_a && action.service == "virtual-server"_a)
          return false;
-      if (action.sender == AccountNumber{"transact"} &&
-          action.service == AccountNumber{"virtual-server"} &&
-          action.method == MethodNumber{"useCpuSys"})
-         return false;
-      if (action.service == AccountNumber{"events"} && action.method == MethodNumber{"sync"})
+      if (action.service == "events"_a && action.method == "sync"_m)
          return false;
       return true;
    }
