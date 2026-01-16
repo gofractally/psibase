@@ -6,7 +6,7 @@ import { getSupervisor } from "@psibase/common-lib";
 
 import { ThemeProvider } from "@shared/components/theme-provider";
 
-import { App } from "./App";
+import { App } from "./app";
 
 export const supervisor = getSupervisor();
 const queryClient = new QueryClient();
