@@ -77,7 +77,7 @@ impl Api for TokenSwapPlugin {
             .map(|pool| pool.into())
             .collect();
 
-        let (pools, return_amount) = find_path(
+        let (pools, return_amount, slippage_ppm) = find_path(
             pools,
             from_token,
             decimal_to_u64(from_token, &amount)?.into(),
@@ -97,6 +97,7 @@ impl Api for TokenSwapPlugin {
                 return_amount.value - tolerable_slippage_amount,
             )?,
             pools: pool_ids,
+            slippage: slippage_ppm,
         })
     }
 

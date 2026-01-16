@@ -28,7 +28,12 @@ class Api extends PluginInterface {
                 slippageTolerancePpm: number,
                 maxHops: number,
             ],
-            { pools: Uint32Array[]; toReturn: string; minimumReturn: string }
+            {
+                pools: Uint32Array[];
+                toReturn: string;
+                minimumReturn: string;
+                slippage: number;
+            }
         >("getAmount");
     }
 

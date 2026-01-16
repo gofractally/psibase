@@ -8,7 +8,8 @@ interface types {
     record path {
         to-return: string,
         pools: list<u32>,
-        minimum-return: string
+        minimum-return: string,
+        slippage: u32,
     }
 
     record pool {

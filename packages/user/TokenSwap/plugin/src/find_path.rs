@@ -9,8 +9,9 @@ use psibase::services::{
     tokens::{Decimal, Quantity, TID},
 };
 
-use crate::bindings::exports::token_swap::plugin::api::Pool as WitPool;
+use crate::constants::PPM;
 use crate::graphql::GraphQLPool;
+use crate::{bindings::exports::token_swap::plugin::api::Pool as WitPool, mul_div};
 
 #[derive(Clone)]
 pub struct Pool {
@@ -56,6 +57,7 @@ struct SearchState {
     token: TID,
     amount_out: Quantity,
     path: Vec<Pool>,
+    max_slippage_ppm: u32,
 }
 
 // Max-heap: highest amount_out first
@@ -79,15 +81,33 @@ impl PartialEq for SearchState {
 
 impl Eq for SearchState {}
 
+/// Returns slippage (inc fee) in parts per million (out of 1_000_000)
+fn deviation_from_ideal_ppm(ideal_out: Quantity, actual_out: Quantity) -> u32 {
+    if ideal_out.value == 0 {
+        return PPM; // complete loss
+    }
+
+    if actual_out >= ideal_out {
+        return 0;
+    }
+
+    let loss = ideal_out - actual_out;
+
+    // (loss / expected) * 1_000_000
+    let ppm = ((loss.value as u128) * PPM as u128) / (ideal_out.value as u128);
+
+    ppm.min(PPM as u128) as u32
+}
+
 pub fn find_path(
     all_pools: Vec<Pool>,
     from: TID,
     amount: Quantity,
     to: TID,
     max_hops: u8,
-) -> (Vec<Pool>, Quantity) {
+) -> (Vec<Pool>, Quantity, u32) {
     if from == to {
-        return (vec![], amount);
+        return (vec![], amount, 0);
     }
 
     let mut graph: HashMap<TID, Vec<Pool>> = HashMap::new();
@@ -105,8 +125,8 @@ pub fn find_path(
     }
 
     // Best known output amount reachable to each token
-    let mut best_amount_found_dictionary: HashMap<TID, Quantity> = HashMap::new();
-    best_amount_found_dictionary.insert(from, amount);
+    let mut best_reachable: HashMap<TID, Quantity> = HashMap::new();
+    best_reachable.insert(from, amount);
 
     // Priority queue: explore highest-output paths first
     let mut search_states: BinaryHeap<SearchState> = BinaryHeap::new();
@@ -114,11 +134,13 @@ pub fn find_path(
         token: from,
         amount_out: amount,
         path: vec![],
+        max_slippage_ppm: 0,
     });
 
     // Track best way found to reach target
     let mut best_to_target = Quantity::from(0u64);
     let mut best_path_to_target: Vec<Pool> = vec![];
+    let mut best_max_slippage_ppm: u32 = 0;
 
     // Start from the beginning token, search state is just of
     //
@@ -133,12 +155,13 @@ pub fn find_path(
             if search_state.amount_out > best_to_target {
                 best_to_target = search_state.amount_out;
                 best_path_to_target = search_state.path.clone();
+                best_max_slippage_ppm = search_state.max_slippage_ppm;
             }
             continue; // no need to explore further from target
         }
 
         // Skip if we already have a strictly better way to this token
-        if let Some(&recorded) = best_amount_found_dictionary.get(&search_state.token) {
+        if let Some(&recorded) = best_reachable.get(&search_state.token) {
             if search_state.amount_out < recorded {
                 continue;
             }
@@ -156,50 +179,50 @@ pub fn find_path(
                     continue;
                 };
 
-                let next_amount = swap(
-                    search_state.amount_out,
-                    if input_token == pool.token_a {
-                        pool.reserve_a
-                    } else {
-                        pool.reserve_b
-                    },
-                    if output_token == pool.token_b {
-                        pool.reserve_b
-                    } else {
-                        pool.reserve_a
-                    },
-                    if input_token == pool.token_a {
-                        pool.token_a_tariff_ppm
-                    } else {
-                        pool.token_b_tariff_ppm
-                    },
-                );
+                let (reserve_in, reserve_out) = if input_token == pool.token_a {
+                    (pool.reserve_a, pool.reserve_b)
+                } else {
+                    (pool.reserve_b, pool.reserve_a)
+                };
+
+                let tariff_ppm = if input_token == pool.token_a {
+                    pool.token_a_tariff_ppm
+                } else {
+                    pool.token_b_tariff_ppm
+                };
+
+                let perfect_amount = mul_div(search_state.amount_out, reserve_out, reserve_in);
+                let actual_amount =
+                    swap(search_state.amount_out, reserve_in, reserve_out, tariff_ppm);
 
                 // Skip useless swaps
-                if next_amount.value == 0 {
+                if actual_amount.value == 0 {
                     continue;
                 }
 
+                let this_hop_slippage_ppm = deviation_from_ideal_ppm(perfect_amount, actual_amount);
+
                 // Only continue if this improves the known best for the next token
-                let is_new_best_amount_found = best_amount_found_dictionary
+                let is_new_best_amount_found = best_reachable
                     .get(&output_token)
-                    .map_or(true, |&prev| next_amount > prev);
+                    .map_or(true, |&prev| actual_amount > prev);
 
                 if is_new_best_amount_found {
-                    best_amount_found_dictionary.insert(output_token, next_amount);
+                    best_reachable.insert(output_token, actual_amount);
 
                     let mut new_path = search_state.path.clone();
                     new_path.push(pool.clone());
 
                     search_states.push(SearchState {
                         token: output_token,
-                        amount_out: next_amount,
+                        amount_out: actual_amount,
                         path: new_path,
+                        max_slippage_ppm: search_state.max_slippage_ppm.max(this_hop_slippage_ppm),
                     });
                 }
             }
         }
     }
 
-    (best_path_to_target, best_to_target)
+    (best_path_to_target, best_to_target, best_max_slippage_ppm)
 }

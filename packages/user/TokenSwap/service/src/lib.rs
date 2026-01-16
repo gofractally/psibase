@@ -55,7 +55,7 @@ pub mod tables {
         }
 
         pub fn set_global_fee(&mut self, fee_ppm: u32) {
-            check(fee_ppm <= 250000, "fee cannot be greater than 25%");
+            check(fee_ppm < PPM, "fee must be less than 100% (1,000,000)");
             self.global_fee_ppm = fee_ppm;
             self.save();
         }
@@ -73,9 +73,11 @@ pub mod tables {
         pub id: u32,
         pub liquidity_token: TID,
         pub token_a_id: TID,
+        #[graphql(skip)]
         pub token_a_tariff_ppm: u32,
         pub token_a_admin: NID,
         pub token_b_id: TID,
+        #[graphql(skip)]
         pub token_b_tariff_ppm: u32,
         pub token_b_admin: NID,
     }
@@ -245,7 +247,6 @@ pub mod tables {
             a_amount: Quantity,
             b_amount: Quantity,
         ) -> Self {
-
             // TODO: If this pool is managed AND there is already a managed pool of this pair, then abort.
 
             let pool = Self::new(is_managed_pool, a_token, b_token);
@@ -345,6 +346,10 @@ pub mod tables {
             self.token_a_id == token_id || self.token_b_id == token_id
         }
 
+        pub fn is_managed_pool(&self) -> bool {
+            self.token_a_admin == 0
+        }
+
         pub fn swap(&mut self, incoming_token: TID, incoming_amount: Quantity) -> (TID, Quantity) {
             check(self.includes_token(incoming_token), "path token mismatch");
 
@@ -422,7 +427,22 @@ pub mod tables {
         }
 
         pub async fn is_managed(&self) -> bool {
-            self.token_a_admin == 0
+            self.is_managed_pool()
+        }
+
+        pub async fn token_a_tariff_ppm(&self) -> u32 {
+            if self.is_managed_pool() {
+                Config::get_assert().global_fee_ppm
+            } else {
+                self.token_a_tariff_ppm
+            }
+        }
+        pub async fn token_b_tariff_ppm(&self) -> u32 {
+            if self.is_managed_pool() {
+                Config::get_assert().global_fee_ppm
+            } else {
+                self.token_b_tariff_ppm
+            }
         }
     }
 }

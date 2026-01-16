@@ -224,6 +224,9 @@ export const SwapPage = () => {
 
     const { data: quotedAmount } = useQuote(isSwapTab, token1Id, token1Amount, token2Id, slippage)
 
+    const priceImpact = quotedAmount ? quotedAmount.slippage / 10000 : 0;
+
+
     useEffect(() => {
         if (quotedAmount && isSwapTab) {
             setToken2Amount(quotedAmount.toReturn)
@@ -479,6 +482,10 @@ export const SwapPage = () => {
                             <div className="flex justify-between">
                                 <span>Slippage tolerance</span>
                                 <span>{slippage}%</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>Price impact</span>
+                                <span>{priceImpact.toFixed(2)}%</span>
                             </div>
                         </div>
                     )}
