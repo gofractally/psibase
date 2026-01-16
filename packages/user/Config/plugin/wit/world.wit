@@ -41,6 +41,9 @@ interface producers {
 
     /// Set the producers for the current consensus mode.
     set-producers: func(prods: list<string>) -> result<_, error>;
+
+    /// Sets the maximum number of producers for the network
+    set-max-prods: func(max-prods: u8) -> result<_, error>;
 }
 
 interface symbol {
@@ -64,10 +67,62 @@ interface symbol {
     del-length: func(length: u8) -> result<_, error>;
 }
 
+interface virtual-server {
+    use host:types/types.{error};
+    use virtual-server:plugin/types.{
+        server-specs, 
+        network-variables,
+        cpu-pricing-params, 
+        net-pricing-params
+    };
+
+    /// Initialize the billing system
+    /// A system token must have already been set to enable billing.
+    /// 
+    /// Parameters:
+    /// * `fee-receiver` - The account that will receive the billing fees
+    init-billing: func(fee-receiver: string) -> result<_, error>;
+
+    /// Set network variables
+    /// These variables change how the network specs are derived from the server specs.
+    /// 
+    /// Parameters:
+    /// * `variables` - The network variables
+    set-network-variables: func(variables: network-variables) -> result<_, error>;
+
+    /// Enable the billing system
+    /// This must be called after the billing system has been initialized and the
+    /// system token has been set.
+    /// 
+    /// Parameters:
+    /// * `enabled` - Whether to enable the billing system
+    enable-billing: func(enabled: bool) -> result<_, error>;
+
+    /// Set the virtual server specs
+    /// It is from these specs that the pricing for network resources is derived.
+    /// 
+    /// Parameters:
+    /// * `specs` - The virtual server specs
+    set-specs: func(specs: server-specs) -> result<_, error>;
+
+    /// Set the CPU pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The CPU pricing parameters
+    set-cpu-pricing-params: func(params: cpu-pricing-params) -> result<_, error>;
+
+    /// Set the network pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The network pricing parameters
+    set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
+}
+
 world imports {
     import producers;
     import branding;
     import packaging;
     import settings;
     import symbol;
+    import virtual-server;
 }

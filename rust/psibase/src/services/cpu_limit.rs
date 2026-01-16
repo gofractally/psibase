@@ -1,10 +1,8 @@
 #[crate::service(name = "cpu-limit", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::AccountNumber;
-
     #[action]
-    fn setCpuLimit(name: AccountNumber) {
+    fn setCpuLimit(limit: Option<u64>) {
         unimplemented!()
     }
 

@@ -31,8 +31,8 @@ struct ProducerQuery
    auto allCandidates() const
    {
       return Producers::Tables{Producers::service, KvMode::read}
-                     .open<CandidateInfoTable>()
-                     .getIndex<0>();
+          .open<CandidateInfoTable>()
+          .getIndex<0>();
    }
 
    std::vector<Producer> producers() const
@@ -65,6 +65,15 @@ struct ProducerQuery
       if (!status || !status->consensus.next)
          return {};
       return status->consensus.next->blockNum;
+   }
+
+   uint8_t maxProds() const
+   {
+      auto table  = Producers::Tables{Producers::service, KvMode::read}.open<ProdsConfigTable>();
+      auto config = table.get({});
+      if (!config)
+         return Producers::DEFAULT_MAX_PRODS;
+      return config->maxProds;
    }
 };
 PSIO_REFLECT(ProducerQuery,

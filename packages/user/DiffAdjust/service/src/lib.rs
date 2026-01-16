@@ -24,7 +24,8 @@ pub mod tables {
         pub floor_difficulty: u64,
         pub active_difficulty: u64,
         pub last_update: TimePointSec,
-        pub percent_change: u32,
+        pub percent_increase_ppm: u32,
+        pub percent_decrease_ppm: u32,
         pub consumer: AccountNumber,
     }
 
@@ -38,7 +39,8 @@ pub mod tables {
             target_max: u32,
             floor_difficulty: u64,
             last_update: TimePointSec,
-            percent_change: u32,
+            percent_increase_ppm: u32,
+            percent_decrease_ppm: u32,
         ) -> Self {
             Self {
                 nft_id,
@@ -49,7 +51,8 @@ pub mod tables {
                 target_max,
                 window_seconds,
                 last_update,
-                percent_change,
+                percent_increase_ppm,
+                percent_decrease_ppm,
                 consumer,
             }
         }
@@ -80,16 +83,19 @@ pub mod tables {
             target_min: u32,
             target_max: u32,
             floor_difficulty: u64,
-            percent_change: u32,
+            percent_increase_ppm: u32,
+            percent_decrease_ppm: u32,
         ) -> Self {
             let nft_id = Nft::call().mint();
             let sender = get_sender();
             Nft::call().credit(nft_id, sender, "RateLimit administration NFT".into());
 
-            let last_updated = TransactSvc::call().currentBlock().time.seconds();
+            let last_updated =
+                TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
 
             Self::check_targets(target_min, target_max);
-            Self::check_percent_change(percent_change);
+            Self::check_percent_change(percent_increase_ppm);
+            Self::check_percent_change(percent_decrease_ppm);
             Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
@@ -101,20 +107,25 @@ pub mod tables {
                 target_max,
                 floor_difficulty,
                 last_updated,
-                percent_change,
+                percent_increase_ppm,
+                percent_decrease_ppm,
             );
             new_instance.save();
 
             new_instance
         }
 
-        fn percent(&self) -> f64 {
-            self.percent_change as f64 / ONE_MILLION as f64
+        fn percent_increase(&self) -> f64 {
+            self.percent_increase_ppm as f64 / ONE_MILLION as f64
+        }
+
+        fn percent_decrease(&self) -> f64 {
+            self.percent_decrease_ppm as f64 / ONE_MILLION as f64
         }
 
         pub fn check_difficulty_decrease(&mut self) -> u64 {
             let now = TransactSvc::call().currentBlock().time.seconds();
-            let seconds_elapsed = (now.seconds - self.last_update.seconds) as u32;
+            let seconds_elapsed = (now.seconds - self.last_update.seconds).max(0) as u32;
             let windows_elapsed = seconds_elapsed / self.window_seconds;
             if windows_elapsed > 0 {
                 let below_target = self.counter < self.target_min;
@@ -123,7 +134,7 @@ pub mod tables {
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
                     let mut new_difficulty = self.active_difficulty;
-                    let factor = 1.0 - self.percent();
+                    let factor = 1.0 - self.percent_decrease();
                     for _ in 0..windows_elapsed {
                         let temp = new_difficulty as f64 * factor;
                         new_difficulty = (temp as u64).max(self.floor_difficulty);
@@ -136,7 +147,7 @@ pub mod tables {
 
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
             if self.counter > self.target_max {
-                let percent = 1.0 + self.percent();
+                let percent = 1.0 + self.percent_increase();
                 let mut times_over_target = self.counter / self.target_max;
                 if clamp_increase {
                     times_over_target = times_over_target.min(1);
@@ -147,7 +158,12 @@ pub mod tables {
                 }
                 self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
                 self.counter = 0;
-                self.last_update = TransactSvc::call().currentBlock().time.seconds();
+                // The update is happening "mid block", so we round up to the next second. In other words,
+                // updates happens at the "end" of the block. Without this, a one-second block window would
+                // cause a percent decrease every block, because a percent increase zeroes out the counter,
+                // so each block would consider a window to have elapsed.
+                self.last_update =
+                    TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1);
                 self.save();
             }
             self.active_difficulty
@@ -192,11 +208,13 @@ pub mod tables {
             self.save();
         }
 
-        pub fn set_percent(&mut self, ppm: u32) {
+        pub fn set_percent(&mut self, increase_ppm: u32, decrease_ppm: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
-            Self::check_percent_change(ppm);
-            self.percent_change = ppm;
+            Self::check_percent_change(increase_ppm);
+            Self::check_percent_change(decrease_ppm);
+            self.percent_increase_ppm = increase_ppm;
+            self.percent_decrease_ppm = decrease_ppm;
             self.save();
         }
 
@@ -248,7 +266,10 @@ pub mod service {
     /// * `target_min` - Minimum rate limit target
     /// * `target_max` - Maximum rate limit target
     /// * `floor_difficulty` - Minimum difficulty
-    /// * `percent_change` - Percent to increment / decrement, 50000 = 5%
+    /// * `percent_increase_ppm` - Percent to increment when over target, 50000 = 5%
+    /// * `percent_decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    ///
+    /// Returns the ID of the NFT that can be used for administration of the rate limit.
     #[action]
     fn create(
         initial_difficulty: u64,
@@ -256,7 +277,8 @@ pub mod service {
         target_min: u32,
         target_max: u32,
         floor_difficulty: u64,
-        percent_change: u32,
+        percent_increase_ppm: u32,
+        percent_decrease_ppm: u32,
     ) -> u32 {
         RateLimit::add(
             initial_difficulty,
@@ -264,7 +286,8 @@ pub mod service {
             target_min,
             target_max,
             floor_difficulty,
-            percent_change,
+            percent_increase_ppm,
+            percent_decrease_ppm,
         )
         .nft_id
     }
@@ -338,10 +361,11 @@ pub mod service {
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `ppm` - PPM 50000 = 5%
+    /// * `increase_ppm` - Percent to increment when over target, 50000 = 5%
+    /// * `decrease_ppm` - Percent to decrement when under target, 50000 = 5%
     #[action]
-    fn set_percent(nft_id: u32, ppm: u32) {
-        RateLimit::get_assert(nft_id).set_percent(ppm);
+    fn set_percent(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
+        RateLimit::get_assert(nft_id).set_percent(increase_ppm, decrease_ppm);
     }
 
     /// Delete RateLimit instance
@@ -353,6 +377,17 @@ pub mod service {
     #[action]
     fn delete(nft_id: u32) {
         RateLimit::get_assert(nft_id).delete()
+    }
+
+    /// Get targets
+    ///
+    /// Gets the minimum and maximum targets for the specified DiffAdjust
+    ///
+    /// Returns (target_min, target_max)
+    #[action]
+    fn get_targets(nft_id: u32) -> (u32, u32) {
+        let r = RateLimit::get_assert(nft_id);
+        (r.target_min, r.target_max)
     }
 }
 

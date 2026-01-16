@@ -172,6 +172,7 @@ function(add suffix)
             ../../packages/system/StagedTx/service/cpp/include
             ../../packages/system/Credentials/service/cpp/include
             ../../packages/system/Transact/include
+            ../../packages/system/VirtualServer/service/cpp/include
             ../../packages/user/CommonApi/include
             ../../packages/user/Explorer/include
             ../../packages/user/Invite/include

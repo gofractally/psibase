@@ -335,6 +335,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Enable/disable resource monitoring
+    #[action]
+    fn resMonitoring(enable: bool) {
+        unimplemented!()
+    }
+
     /// Get the currently executing transaction
     #[action]
     fn getTransaction() -> crate::Transaction {

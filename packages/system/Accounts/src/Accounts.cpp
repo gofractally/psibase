@@ -5,6 +5,7 @@
 #include <psibase/nativeTables.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VirtualServer.hpp>
 
 static constexpr bool enable_print = false;
 
@@ -89,6 +90,8 @@ namespace SystemService
 
       ++status->totalAccounts;
       statusTable.put(*status);
+
+      to<VirtualServer>().initUser(name);
    }
 
    void Accounts::setAuthServ(psibase::AccountNumber authService)
@@ -123,21 +126,6 @@ namespace SystemService
    bool Accounts::exists(AccountNumber name)
    {
       return getAccount(name) != std::nullopt;
-   }
-
-   void Accounts::billCpu(AccountNumber name, std::chrono::nanoseconds amount)
-   {
-      Tables tables{getReceiver()};
-
-      auto accountTable = tables.open<AccountTable>();
-      auto accountIndex = accountTable.getIndex<0>();
-      auto row          = accountIndex.get(name);
-      check(!!row, "account " + name.str() + " does not exist");
-      if (row->resourceBalance)
-      {
-         row->resourceBalance->billCpu(amount);
-         accountTable.put(*row);
-      }
    }
 
 }  // namespace SystemService

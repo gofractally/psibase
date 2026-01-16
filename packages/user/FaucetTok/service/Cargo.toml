@@ -1,0 +1,31 @@
+[package]
+name = "faucet-tok"
+version.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+plugin = "faucet-tok-plugin"
+postinstall = [
+    { sender = "tokens", service = "transact", method = "runAs", data = { action = { sender = "tokens", service = "faucet-tok", method = "create_token", rawData = "0000" }, allowedActions = [{service = "", method = ""}] } },
+    { sender = "symbol", service = "transact", method = "runAs", data = { action = { sender = "symbol", service = "faucet-tok", method = "set_symbol", rawData = "0000" }, allowedActions = [{service = "", method = ""}] } }
+]
+
+[dependencies]
+psibase.workspace = true
+psibase-user-workspace-hack.workspace = true
+serde.workspace = true
+
+[package.metadata.psibase.dependencies]
+Sites = "0.22.0"
+HttpServer = "0.22.0"
+Tokens = "0.22.0"
+Symbol = "0.22.0"
+Transact = "0.22.0"
+Nft = "0.22.0"
+
+[dev-dependencies]
+faucet-tok-pkg = { path = "..", version = "0.22.0" }

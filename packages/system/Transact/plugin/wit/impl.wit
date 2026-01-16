@@ -32,6 +32,8 @@ world impl {
     include clientdata:plugin/imports;
     include accounts:plugin/imports;
     include permissions:plugin/imports;
+    
+    import virtual-server:plugin/transact;
 
     export admin;
     export intf;

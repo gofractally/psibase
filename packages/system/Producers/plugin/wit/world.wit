@@ -34,6 +34,8 @@ interface api {
     /// Unregister as a candidate for election to the active set of infrastructure providers
     unregister-candidate: func();
 
+    /// Sets the maximum number of producers for the network
+    set-max-prods: func(max-prods: u8) -> result<_, error>;
 }
 
 world imports {

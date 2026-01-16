@@ -4,14 +4,12 @@
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 
-#include <services/system/Accounts.hpp>
+#include <services/system/VirtualServer.hpp>
 
 using psibase::check;
 
 namespace SystemService
 {
-   static constexpr std::chrono::nanoseconds leeway = std::chrono::milliseconds(1);
-
    std::chrono::nanoseconds CpuLimit::getCpuTime()
    {
       struct timespec result;
@@ -19,26 +17,13 @@ namespace SystemService
       return std::chrono::seconds(result.tv_sec) + std::chrono::nanoseconds(result.tv_nsec);
    }
 
-   void CpuLimit::setCpuLimit(psibase::AccountNumber account)
+   void CpuLimit::setCpuLimit(std::optional<uint64_t> limit_ns)
    {
-      // Look up available CPU balance
-      auto accountIndex = Accounts::Tables(Accounts::service).open<AccountTable>().getIndex<0>();
-      auto row          = accountIndex.get(account);
-      check(!!row, "account does not exist");
-      if (row->resourceBalance)
-      {
-         auto limit = row->resourceBalance->cpuLimit();
-         // add leeway with saturation
-         if (limit <= std::chrono::nanoseconds::max() - leeway)
-         {
-            limit += leeway;
-         }
-         else
-         {
-            limit = std::chrono::nanoseconds::max();
-         }
-         psibase::raw::setMaxCpuTime(limit.count());
-      }
+      check(psibase::getSender() == VirtualServer::service, "Unauthorized call to setCpuLimit");
+      if (!limit_ns.has_value())
+         return;
+
+      psibase::raw::setMaxCpuTime(*limit_ns);
    }
 }  // namespace SystemService
 

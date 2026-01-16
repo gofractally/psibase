@@ -371,7 +371,11 @@ pub mod service {
     pub fn debit(nftId: NID, memo: Memo) {
         let credit_record = check_some(
             CreditRecord::get(nftId),
-            "Nothing to debit. Must first be credited.",
+            &format!(
+                "{} has no pending nft {} to debit.",
+                get_sender().to_string(),
+                nftId.to_string()
+            ),
         );
         check(
             credit_record.debitor == get_sender(),

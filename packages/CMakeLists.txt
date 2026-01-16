@@ -29,6 +29,7 @@ if(DEFINED IS_WASM)
     install(DIRECTORY system/StagedTx/service/cpp/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY system/Transact/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY system/VerifySig/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
+    install(DIRECTORY system/VirtualServer/service/cpp/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     
     install(DIRECTORY user/BrotliCodec/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
     install(DIRECTORY user/CommonApi/include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")

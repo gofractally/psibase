@@ -1,0 +1,14 @@
+package virtual-server:plugin;
+
+world impl {
+    include host:common/imports;
+    include transact:plugin/imports;
+    include tokens:plugin/imports;
+    include accounts:plugin/imports;
+
+    export billing;
+    export admin;
+    export transact;
+    export types;
+    export authorized;
+}

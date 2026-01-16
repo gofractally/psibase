@@ -47,6 +47,16 @@ mod service {
     }
 
     #[action]
+    fn setMaxProds(max_prods: u8) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn getMaxProds() -> u8 {
+        unimplemented!()
+    }
+
+    #[action]
     fn getThreshold(account: AccountNumber) -> u32 {
         unimplemented!();
     }

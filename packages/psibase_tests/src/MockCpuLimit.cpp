@@ -14,9 +14,9 @@ class MockCpuLimit : public psibase::Service
    static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
    std::chrono::nanoseconds getCpuTime() { return std::chrono::microseconds(100); }
-   void                     setCpuLimit(psibase::AccountNumber account) {}
+   void                     setCpuLimit(std::optional<uint64_t> limit_ns) {}
 };
-PSIO_REFLECT(MockCpuLimit, method(getCpuTime), method(setCpuLimit, account))
+PSIO_REFLECT(MockCpuLimit, method(getCpuTime), method(setCpuLimit, limit_ns))
 PSIBASE_REFLECT_TABLES(MockCpuLimit)
 
 PSIBASE_DISPATCH(MockCpuLimit)
