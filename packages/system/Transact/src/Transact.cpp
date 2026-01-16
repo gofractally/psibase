@@ -593,7 +593,7 @@ namespace SystemService
          std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
          if (isResMonitoring())
          {
-            to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage);
+            to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
          }
       }
 

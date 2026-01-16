@@ -179,7 +179,7 @@ namespace SystemService
       ///
       /// If billing is enabled, the user will be billed for the consumption of
       /// this resource.
-      void useCpuSys(psibase::AccountNumber user, std::chrono::nanoseconds amount_ns);
+      void useCpuSys(psibase::AccountNumber user, uint64_t amount_ns);
 
       UserService::Quantity get_resources(psibase::AccountNumber user);
 
@@ -187,17 +187,31 @@ namespace SystemService
 
       void initUser(psibase::AccountNumber user);
 
-      std::optional<uint64_t> getCpuLimit(psibase::AccountNumber account);
-
       /// This actions sets the CPU limit for the specified account.
       /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
       void setCpuLimit(psibase::AccountNumber account);
 
-      uint8_t getMaxPeers();
-
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
                                                  std::optional<psibase::AccountNumber> user);
+
+      struct Events
+      {
+         struct History
+         {
+            void consumed(psibase::AccountNumber account,
+                          uint8_t                resource,
+                          uint64_t               amount,
+                          uint64_t               cost);
+            void subsidized(psibase::AccountNumber purchaser,
+                            psibase::AccountNumber recipient,
+                            uint64_t               amount,
+                            psibase::Memo          memo);
+            void block_summary(psibase::BlockNum block_num,
+                               uint32_t          net_usage_ppm,
+                               uint32_t          cpu_usage_ppm);
+         };
+      };
    };
 
    PSIO_REFLECT(VirtualServer,
@@ -224,9 +238,13 @@ namespace SystemService
                 method(get_resources, user),
                 method(notifyBlock, block_num),
                 method(initUser, user),
-                method(getCpuLimit, account),
                 method(setCpuLimit, account),
-                method(getMaxPeers),
                 method(serveSys, request, socket, user))
+
+   PSIBASE_REFLECT_EVENTS(VirtualServer);
+   PSIBASE_REFLECT_HISTORY_EVENTS(VirtualServer,
+                                  method(consumed, account, resource, amount, cost),
+                                  method(subsidized, purchaser, recipient, amount, memo),
+                                  method(block_summary, block_num, net_usage_ppm, cpu_usage_ppm));
 
 }  // namespace SystemService
