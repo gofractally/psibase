@@ -1,6 +1,9 @@
 use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
-use psibase::services::tokens::Decimal;
+use psibase::services::{
+    nft::NID,
+    tokens::{Decimal, TID},
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -22,15 +25,20 @@ pub struct PoolConnection {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GraphQLPool {
-    pub id: u32,
-    pub token_a_id: u32,
-    pub token_b_id: u32,
-    pub token_a_tariff_ppm: u32,
-    pub token_b_tariff_ppm: u32,
-    pub a_balance: Decimal,
-    pub b_balance: Decimal,
-    pub liquidity_token: u32,
+    pub liquidity_token: TID,
     pub liquidity_token_supply: Decimal,
+    pub reserve_a: Reserve,
+    pub reserve_b: Reserve,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reserve {
+    pub pool_id: TID,
+    pub token_id: TID,
+    pub tariff_ppm: u32,
+    pub admin_nft: NID,
+    pub balance: Decimal,
 }
 
 pub fn fetch_all_pools() -> Result<Vec<GraphQLPool>, ErrorType> {
@@ -38,15 +46,22 @@ pub fn fetch_all_pools() -> Result<Vec<GraphQLPool>, ErrorType> {
         query {
           allPools {
             nodes {
-              id
-              tokenAId
-              tokenBId
-              tokenATariffPpm
-              tokenBTariffPpm
-              aBalance
-              bBalance
               liquidityToken
               liquidityTokenSupply
+              reserveA {
+                poolId
+                tokenId
+                tariffPpm
+                adminNft
+                balance
+              }
+              reserveB {
+                poolId
+                tokenId
+                tariffPpm
+                adminNft
+                balance
+              }
             }
           }
         }

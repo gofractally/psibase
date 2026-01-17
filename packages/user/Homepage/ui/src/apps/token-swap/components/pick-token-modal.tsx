@@ -8,7 +8,7 @@ import {
 
 interface Token {
     id: number;
-    symbol: string | null;
+    symbol: string | null | undefined;
 }
 
 interface PickTokenModalProps {

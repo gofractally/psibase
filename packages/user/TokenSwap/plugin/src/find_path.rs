@@ -28,13 +28,13 @@ pub struct Pool {
 impl From<GraphQLPool> for Pool {
     fn from(value: GraphQLPool) -> Self {
         Self {
-            id: value.id,
-            reserve_a: value.a_balance.quantity,
-            reserve_b: value.b_balance.quantity,
-            token_a: value.token_a_id,
-            token_b: value.token_b_id,
-            token_a_tariff_ppm: value.token_a_tariff_ppm,
-            token_b_tariff_ppm: value.token_b_tariff_ppm,
+            id: value.liquidity_token,
+            reserve_a: value.reserve_a.balance.quantity,
+            reserve_b: value.reserve_a.balance.quantity,
+            token_a: value.reserve_a.token_id,
+            token_b: value.reserve_b.token_id,
+            token_a_tariff_ppm: value.reserve_a.tariff_ppm,
+            token_b_tariff_ppm: value.reserve_b.tariff_ppm,
         }
     }
 }

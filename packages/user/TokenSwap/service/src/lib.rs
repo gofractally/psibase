@@ -149,6 +149,12 @@ pub mod tables {
             let precision = Tokens::call().getToken(self.token_id).precision;
             Decimal::new(amount, precision)
         }
+
+        pub async fn symbol(&self) -> Option<AccountNumber> {
+            psibase::services::symbol::Wrapper::call()
+                .getByToken(self.token_id)
+                .map(|s| s.symbolId)
+        }
     }
 
     impl Pool {
@@ -468,8 +474,8 @@ pub mod service {
     }
 
     #[action]
-    fn get_reserve(pool_id: TID, token_id: TID) -> Option<Quantity> {
-        Reserve::get(pool_id, token_id).map(|reserve| reserve.balance())
+    fn get_reserve(pool_id: TID, token_id: TID) -> Quantity {
+        Reserve::get_assert(pool_id, token_id).balance()
     }
 
     #[action]

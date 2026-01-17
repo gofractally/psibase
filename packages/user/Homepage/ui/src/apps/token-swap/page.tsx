@@ -170,7 +170,7 @@ export const SwapPage = () => {
                 if (focusedPool) {
                     await addLiquidity([focusedPool.id, token1Id!, token2Id!, token1Amount!, token2Amount])
                 } else {
-                    await createPool([true, token1Id!, token2Id!, token1Amount!, token2Amount])
+                    await createPool([token1Id!, token2Id!, token1Amount!, token2Amount])
                     setCurrentTab(zCurrentTab.Values.Swap)
                     setToken1Id(token1Id)
                     setToken2Id(token2Id)
@@ -275,8 +275,6 @@ export const SwapPage = () => {
         return selectedTokens.every(id => tradingTokens.includes(id))
     });
 
-    const isManagedPoolOfLiquidityPair = poolsOfLiquidityPair.some(pool => pool.isManaged);
-
     const selectToken = (selection: SelectionType) => {
         setSelectingToken(selection);
         setPickTokenModal(true);
@@ -298,7 +296,7 @@ export const SwapPage = () => {
 
     const focusedPool = pools?.find(pool => pool.id === focusedPoolId);
 
-    const poolTokenBalance = tokenBalances?.find(balance => balance.id == focusedPool?.liquidityToken);
+    const poolTokenBalance = tokenBalances?.find(balance => balance.id == focusedPool?.id);
 
 
     const { data: maxWithdrawableLiquidity } = useQuotePoolTokens(!!poolTokenBalance, focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }))
@@ -501,7 +499,6 @@ export const SwapPage = () => {
                             {isLiquidityDirectionAdd && <PoolPicker
                                 setFocusedPoolId={(focusedId) => setFocusedPoolId(focusedId)}
                                 focusedPoolId={focusedPoolId}
-                                disableCreate={isManagedPoolOfLiquidityPair}
                                 pools={(poolsOfLiquidityPair || [])?.map(pool => ({ id: pool.id, tokenAId: pool.tokenAId, tokenBId: pool.tokenBId, tokenASymbol: pool.tokenASymbol || '', tokenBSymbol: pool.tokenBSymbol || '' }))}
                             />}
 

@@ -54,13 +54,7 @@ class Liquidity extends PluginInterface {
 
     get newPool() {
         return this._call<
-            [
-                isManaged: boolean,
-                tokenA: TID,
-                tokenB: TID,
-                amountA: Decimal,
-                amountB: Decimal,
-            ]
+            [tokenA: TID, tokenB: TID, amountA: Decimal, amountB: Decimal]
         >("newPool");
     }
 
