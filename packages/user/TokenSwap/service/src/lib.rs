@@ -155,6 +155,10 @@ pub mod tables {
                 .getByToken(self.token_id)
                 .map(|s| s.symbolId)
         }
+
+        pub async fn pool(&self) -> Pool {
+            Pool::get_assert(self.pool_id)
+        }
     }
 
     impl Pool {

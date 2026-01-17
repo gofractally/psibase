@@ -4,7 +4,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use psibase::*;
     use serde::Deserialize;
-    use token_swap::tables::{Pool, PoolTable};
+    use token_swap::tables::{Pool, PoolTable, Reserve, ReserveTable};
 
     #[derive(Deserialize, SimpleObject)]
     struct HistoricalUpdate {
@@ -33,6 +33,24 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn reserves_by_token(
+            &self,
+            token_id: u32,
+        ) -> async_graphql::Result<Connection<RawKey, Reserve>> {
+            TableQuery::subindex::<u32>(
+                ReserveTable::with_service(token_swap::SERVICE).get_index_by_token(),
+                &(token_id),
+            )
+            .query()
+            .await
+        }
+
+        async fn pool(&self, pool_id: u32) -> Option<Pool> {
+            PoolTable::with_service(token_swap::SERVICE)
+                .get_index_pk()
+                .get(&pool_id)
         }
 
         /// This query gets paginated historical updates of the Example Thing.
