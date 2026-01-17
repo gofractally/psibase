@@ -83,6 +83,10 @@ impl Swap for TokenSwapPlugin {
             max_hops,
         );
 
+        if pools.len() == 0 {
+            return Err(ErrorType::NoPathFound.into());
+        }
+
         let pool_ids = pools.into_iter().map(|pool| pool.id).collect();
 
         let tolerable_slippage_amount =
@@ -105,6 +109,9 @@ impl Swap for TokenSwapPlugin {
         amount_in: String,
         min_return: String,
     ) -> Result<(), Error> {
+        if pools.len() == 0 {
+            return Err(ErrorType::InsufficientPools.into());
+        }
         credit(
             token_in,
             token_swap::SERVICE.to_string().as_str(),
@@ -134,8 +141,8 @@ impl Liquidity for TokenSwapPlugin {
         amount_a: String,
         amount_b: String,
     ) -> Result<(), Error> {
-        credit(token_a, "token-swap", &amount_a, "")?;
-        credit(token_b, "token-swap", &amount_b, "")?;
+        credit(token_a, &token_swap::SERVICE.to_string(), &amount_a, "")?;
+        credit(token_b, &token_swap::SERVICE.to_string(), &amount_b, "")?;
 
         let packed_args = token_swap::action_structs::new_pool {
             token_a,
@@ -251,7 +258,6 @@ impl Liquidity for TokenSwapPlugin {
             (pool.token_b_id, pool.token_a_id)
         };
 
-        // TODO: Can also derive the precision from incoming tokens reserve balance string
         let quoting_amount: Quantity = decimal_to_u64(incoming_token, &amount)?.into();
 
         let pool = Pool::from(pool);
