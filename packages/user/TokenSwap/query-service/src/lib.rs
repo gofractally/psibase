@@ -2,14 +2,14 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use psibase::*;
+    use psibase::{services::tokens::TID, *};
     use serde::Deserialize;
     use token_swap::tables::{Pool, PoolTable, Reserve, ReserveTable};
 
     #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
+    struct CreatedPool {
+        token_a: String,
+        token_b: String,
     }
 
     struct Query;
@@ -37,9 +37,9 @@ mod service {
 
         async fn reserves_by_token(
             &self,
-            token_id: u32,
+            token_id: TID,
         ) -> async_graphql::Result<Connection<RawKey, Reserve>> {
-            TableQuery::subindex::<u32>(
+            TableQuery::subindex::<TID>(
                 ReserveTable::with_service(token_swap::SERVICE).get_index_by_token(),
                 &(token_id),
             )
@@ -53,15 +53,14 @@ mod service {
                 .get(&pool_id)
         }
 
-        /// This query gets paginated historical updates of the Example Thing.
-        async fn historical_updates(
+        async fn created_pools(
             &self,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
-            EventQuery::new("history.token-swap.updated")
+        ) -> async_graphql::Result<Connection<u64, CreatedPool>> {
+            EventQuery::new("history.token-swap.created_pool")
                 .first(first)
                 .last(last)
                 .before(before)

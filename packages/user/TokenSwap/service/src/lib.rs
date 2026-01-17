@@ -465,6 +465,8 @@ pub mod service {
 
         let (a_reserve, b_reserve) = pool.get_reserves(Some(token_a));
 
+        Wrapper::emit().history().created_pool(token_a, token_b);
+
         (
             pool.liquidity_token,
             a_reserve.admin_nft,
@@ -515,7 +517,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
+    pub fn created_pool(token_a: TID, token_b: TID) {}
 }
 
 #[cfg(test)]
