@@ -1,0 +1,60 @@
+package token-swap:plugin;
+
+interface types {
+    type tid = u32;
+
+    record path {
+        to-return: string,
+        pools: list<u32>,
+        minimum-return: string,
+        slippage: u32,
+    }
+
+    record pool {
+        id: u32,
+        token-a-id: tid,
+        token-b-id: tid,
+        token-a-tariff-ppm: u32,
+        token-b-tariff-ppm: u32,
+        a-balance: string,
+        b-balance: string,
+        liquidity-token: u32,
+        liquidity-token-supply: string,
+    }
+
+    record deposit {
+        token-id: tid,
+        amount: string
+    }
+}
+
+
+interface swap {
+    use host:types/types.{error};
+    use types.{path, tid, pool};
+
+    swap: func(pools: list<string>, token-in: tid, amount-in: string, min-return: string) -> result<_, error>;
+    quote: func(from-token: tid, amount: string, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
+
+}
+
+interface liquidity {
+
+    use host:types/types.{error};
+    use types.{path, tid, pool, deposit};
+
+    add-liquidity: func(pool-id: u32, first-deposit: deposit, second-deposit: deposit) -> result<_, error>;
+    remove-liquidity: func(pool: pool, user-pool-token-balance: string, desired-token-id: tid, amount-b: string) -> result<_, error>;
+    new-pool: func(first-deposit: deposit, second-deposit: deposit) -> result<_, error>;
+    quote-add-liquidity: func(pool: pool, token-id: tid, amount: string) -> result<string, error>;
+    quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<string, string>, error>;
+
+
+}
+
+
+
+world imports {
+    import swap;
+    import liquidity;
+}
