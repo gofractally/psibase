@@ -129,7 +129,6 @@ impl Swap for TokenSwapPlugin {
 
 impl Liquidity for TokenSwapPlugin {
     fn new_pool(
-        is_managed: bool,
         token_a: TID,
         token_b: TID,
         amount_a: String,
@@ -139,7 +138,6 @@ impl Liquidity for TokenSwapPlugin {
         credit(token_b, "token-swap", &amount_b, "")?;
 
         let packed_args = token_swap::action_structs::new_pool {
-            is_managed,
             token_a,
             token_b,
             token_a_amount: decimal_to_u64(token_a, &amount_a)?.into(),
