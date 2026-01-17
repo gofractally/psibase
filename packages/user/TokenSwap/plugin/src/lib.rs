@@ -23,7 +23,8 @@ use psibase::services::tokens::{Decimal, Quantity, TID};
 
 use crate::{
     bindings::{
-        exports::token_swap::plugin::liquidity::Pool as WitPool, token_swap::plugin::types::Path,
+        exports::token_swap::plugin::liquidity::{Deposit, Pool as WitPool},
+        token_swap::plugin::types::Path,
         tokens::plugin::helpers::u64_to_decimal,
     },
     constants::PPM,
@@ -57,6 +58,17 @@ define_trust! {
 }
 
 struct TokenSwapPlugin;
+
+fn credit_to_service(deposit: Deposit) -> Result<Quantity, Error> {
+    credit(
+        deposit.token_id,
+        &token_swap::SERVICE.to_string(),
+        &deposit.amount,
+        "",
+    )?;
+
+    Ok(decimal_to_u64(deposit.token_id, &deposit.amount)?.into())
+}
 
 impl Swap for TokenSwapPlugin {
     fn quote(
@@ -135,20 +147,12 @@ impl Swap for TokenSwapPlugin {
 }
 
 impl Liquidity for TokenSwapPlugin {
-    fn new_pool(
-        token_a: TID,
-        token_b: TID,
-        amount_a: String,
-        amount_b: String,
-    ) -> Result<(), Error> {
-        credit(token_a, &token_swap::SERVICE.to_string(), &amount_a, "")?;
-        credit(token_b, &token_swap::SERVICE.to_string(), &amount_b, "")?;
-
+    fn new_pool(first_deposit: Deposit, second_deposit: Deposit) -> Result<(), Error> {
         let packed_args = token_swap::action_structs::new_pool {
-            token_a,
-            token_b,
-            token_a_amount: decimal_to_u64(token_a, &amount_a)?.into(),
-            token_b_amount: decimal_to_u64(token_b, &amount_b)?.into(),
+            token_a: first_deposit.token_id,
+            token_b: second_deposit.token_id,
+            token_a_amount: credit_to_service(first_deposit)?,
+            token_b_amount: credit_to_service(second_deposit)?,
         }
         .packed();
 
@@ -160,21 +164,20 @@ impl Liquidity for TokenSwapPlugin {
 
     fn add_liquidity(
         pool_id: u32,
-        token_a: TID,
-        token_b: TID,
-        amount_a: String,
-        amount_b: String,
+        first_deposit: Deposit,
+        second_deposit: Deposit,
     ) -> Result<(), Error> {
-        let token_a_amount_desired: Quantity = decimal_to_u64(token_a, &amount_a)?.into();
-        let token_b_amount_desired: Quantity = decimal_to_u64(token_b, &amount_b)?.into();
-
-        credit(token_a, &token_swap::SERVICE.to_string(), &amount_a, "")?;
-        credit(token_b, &token_swap::SERVICE.to_string(), &amount_b, "")?;
+        let (token_a_deposit, token_b_deposit) = if first_deposit.token_id < second_deposit.token_id
+        {
+            (first_deposit, second_deposit)
+        } else {
+            (second_deposit, first_deposit)
+        };
 
         let packed_args = token_swap::action_structs::add_liquidity {
             pool_id,
-            amount_a: token_a_amount_desired,
-            amount_b: token_b_amount_desired,
+            amount_a: credit_to_service(token_a_deposit)?,
+            amount_b: credit_to_service(token_b_deposit)?,
         }
         .packed();
 
@@ -210,9 +213,8 @@ impl Liquidity for TokenSwapPlugin {
             desired_qty,
             pool_token_supply.quantity,
             wanted_reserve.quantity,
-        );
-
-        let pool_tokens_to_credit = pool_tokens_to_credit.min(user_pool_token_balance.quantity);
+        )
+        .min(user_pool_token_balance.quantity);
 
         credit(
             pool.liquidity_token,

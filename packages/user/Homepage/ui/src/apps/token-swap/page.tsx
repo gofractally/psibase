@@ -168,9 +168,9 @@ export const SwapPage = () => {
         } else {
             if (liquidityDirection == zLiquidityDirection.Values.Add) {
                 if (focusedPool) {
-                    await addLiquidity([focusedPool.id, token1Id!, token2Id!, token1Amount!, token2Amount])
+                    await addLiquidity([focusedPool.id, { tokenId: z.number().parse(token1Id)!, amount: token1Amount! }, { amount: token2Amount, tokenId: z.number().parse(token2Id)! }])
                 } else {
-                    await createPool([token1Id!, token2Id!, token1Amount!, token2Amount])
+                    await createPool([{ tokenId: z.number().parse(token1Id), amount: token1Amount! }, { amount: token2Amount!, tokenId: z.number().parse(token2Id) }])
                     setCurrentTab(zCurrentTab.Values.Swap)
                     setToken1Id(token1Id)
                     setToken2Id(token2Id)

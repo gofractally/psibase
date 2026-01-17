@@ -16,6 +16,11 @@ export type Pool = {
     liquidityTokenSupply: string;
 };
 
+type Deposit = {
+    tokenId: number;
+    amount: string;
+};
+
 class Swap extends PluginInterface {
     protected override readonly _intf = "swap" as const;
 
@@ -53,9 +58,9 @@ class Liquidity extends PluginInterface {
     protected override readonly _intf = "liquidity" as const;
 
     get newPool() {
-        return this._call<
-            [tokenA: TID, tokenB: TID, amountA: Decimal, amountB: Decimal]
-        >("newPool");
+        return this._call<[firstDeposit: Deposit, secondDeposit: Deposit]>(
+            "newPool",
+        );
     }
 
     get quoteAddLiquidity() {
@@ -72,13 +77,7 @@ class Liquidity extends PluginInterface {
 
     get addLiquidity() {
         return this._call<
-            [
-                poolId: number,
-                tokenA: TID,
-                tokenB: TID,
-                amountA: Decimal,
-                amountB: Decimal,
-            ]
+            [poolId: number, firstDeposit: Deposit, secondDeposit: Deposit]
         >("addLiquidity");
     }
 
