@@ -166,7 +166,7 @@ export const SwapPage = () => {
     const triggerMain = async () => {
 
         if (isSwapTab) {
-            await swap([Array.from(quotedAmount!.pools).map(String), token1Id!, token1Amount, quotedAmount!.minimumReturn])
+            await swap([Array.from(quotedAmount!.pools).map(String), { amount: token1Amount, tokenId: token1Id!, }, quotedAmount!.minimumReturn])
         } else {
             if (liquidityDirection == zLiquidityDirection.Values.Add) {
                 if (focusedPool) {
@@ -184,7 +184,7 @@ export const SwapPage = () => {
                 };
                 const desiredToken = lastTouchedIs1 ? token1Id : token2Id;
                 const desiredAmount = lastTouchedIs1 ? token1Amount : token2Amount;
-                const poolTokensQuote = await quoteRemoveLiquidity([focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }), z.number().int().positive().parse(desiredToken), desiredAmount])
+                const poolTokensQuote = await quoteRemoveLiquidity([focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }), { tokenId: z.number().int().positive().parse(desiredToken), amount: desiredAmount }])
                 console.log(poolTokensQuote, 'was quoted before')
                 await removeLiquidity([focusedPool.id, poolTokensQuote])
             }

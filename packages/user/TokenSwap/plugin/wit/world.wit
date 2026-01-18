@@ -22,7 +22,7 @@ interface types {
         liquidity-token-supply: string,
     }
 
-    record deposit {
+    record reserve-amount {
         token-id: tid,
         amount: string
     }
@@ -31,17 +31,17 @@ interface types {
 
 interface swap {
     use host:types/types.{error};
-    use types.{path, tid, pool};
+    use types.{path, tid, pool, reserve-amount};
 
-    swap: func(pools: list<string>, token-in: tid, amount-in: string, min-return: string) -> result<_, error>;
-    quote: func(from-token: tid, amount: string, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
+    swap: func(pools: list<string>, amount-in: reserve-amount, min-return: string) -> result<_, error>;
+    quote: func(from-amount: reserve-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
 
 }
 
 interface liquidity {
 
     use host:types/types.{error};
-    use types.{path, tid, pool, deposit};
+    use types.{path, tid, pool, reserve-amount};
 
     /// Adds liquidity to a pool. Require two deposits of the pool reserves of equal value.
     /// Use `quote-add-liquidity` to determine the neccessary deposit of the other token reserve based on one proposed deposit
@@ -51,21 +51,21 @@ interface liquidity {
     /// * `pool-id` - ID / Liquidity token ID of pool
     /// * `a-deposit` - One of the pool reserves
     /// * `b-deposit` - Corresponding deposit of the pool
-    add-liquidity: func(pool-id: u32, a-deposit: deposit, b-deposit: deposit) -> result<_, error>;
+    add-liquidity: func(pool-id: u32, a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
 
     // this lets the user propose adding 5 token A tokens and will return how many of b tokens are needed
-    quote-add-liquidity: func(pool: pool, token-id: tid, amount: string) -> result<string, error>;
+    quote-add-liquidity: func(pool: pool, deposit: reserve-amount) -> result<string, error>;
 
     // this takes the pool tokens, removes the liquidity and gives to the user his share based on the pool tokens he's sent
     remove-liquidity: func(pool-token-id: tid, amount: string) -> result<_, error>;
     // this lets the user see how many pool tokens is required for liquidation based on how many token a or token b tokens he wants to withdraw
-    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-token-id: tid, desired-amount: string) -> result<string, error>;
+    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: reserve-amount) -> result<string, error>;
 
     // creates a new pool,
-    new-pool: func(a-deposit: deposit, b-deposit: deposit) -> result<_, error>;
+    new-pool: func(a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
 
     // this returns how many
-    quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<deposit, deposit>, error>;
+    quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<reserve-amount, reserve-amount>, error>;
 
 }
 

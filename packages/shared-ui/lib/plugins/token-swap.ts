@@ -16,7 +16,7 @@ export type Pool = {
     liquidityTokenSupply: string;
 };
 
-type Deposit = {
+type ReserveAmount = {
     tokenId: number;
     amount: string;
 };
@@ -27,8 +27,7 @@ class Swap extends PluginInterface {
     get quote() {
         return this._call<
             [
-                fromToken: TID,
-                amount: Decimal,
+                fromAmount: ReserveAmount,
                 toToken: TID,
                 slippageTolerancePpm: number,
                 maxHops: number,
@@ -46,8 +45,7 @@ class Swap extends PluginInterface {
         return this._call<
             [
                 pools: string[],
-                tokenIn: TID,
-                amountIn: Decimal,
+                amountIn: ReserveAmount,
                 minReturn: Decimal,
             ]
         >("swap");
@@ -58,26 +56,26 @@ class Liquidity extends PluginInterface {
     protected override readonly _intf = "liquidity" as const;
 
     get newPool() {
-        return this._call<[firstDeposit: Deposit, secondDeposit: Deposit]>(
+        return this._call<[firstDeposit: ReserveAmount, secondDeposit: ReserveAmount]>(
             "newPool",
         );
     }
 
     get quoteAddLiquidity() {
-        return this._call<[pool: Pool, tokenId: TID, amount: string], string>(
+        return this._call<[pool: Pool, amount: ReserveAmount], string>(
             "quoteAddLiquidity",
         );
     }
 
     get quotePoolTokens() {
-        return this._call<[pool: Pool, amount: string], [Deposit, Deposit]>(
+        return this._call<[pool: Pool, amount: string], [ReserveAmount, ReserveAmount]>(
             "quotePoolTokens",
         );
     }
 
     get addLiquidity() {
         return this._call<
-            [poolId: number, firstDeposit: Deposit, secondDeposit: Deposit]
+            [poolId: number, firstDeposit: ReserveAmount, secondDeposit: ReserveAmount]
         >("addLiquidity");
     }
 
@@ -95,8 +93,7 @@ class Liquidity extends PluginInterface {
             [
                 pool: Pool,
                 userPoolTokenBalance: string | undefined,
-                desiredTokenId: number,
-                desiredAmount: Decimal,
+                desiredAmount: ReserveAmount,
             ], string
         >("quoteRemoveLiquidity");
     }

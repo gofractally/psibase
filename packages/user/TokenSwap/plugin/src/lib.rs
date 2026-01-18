@@ -23,7 +23,7 @@ use psibase::services::tokens::{Decimal, Quantity, TID};
 
 use crate::{
     bindings::{
-        exports::token_swap::plugin::liquidity::{Deposit, Pool as WitPool},
+        exports::token_swap::plugin::liquidity::{Pool as WitPool, ReserveAmount},
         token_swap::plugin::types::Path,
         tokens::plugin::helpers::u64_to_decimal,
     },
@@ -59,21 +59,24 @@ define_trust! {
 
 struct TokenSwapPlugin;
 
-fn credit_to_service(deposit: Deposit) -> Result<Quantity, Error> {
+fn reserve_amount_to_quantity(reserve_amount: ReserveAmount) -> Result<Quantity, Error> {
+    decimal_to_u64(reserve_amount.token_id, &reserve_amount.amount).map(|amount| amount.into())
+}
+
+fn credit_to_service(deposit: ReserveAmount, memo: &str) -> Result<Quantity, Error> {
     credit(
         deposit.token_id,
         &token_swap::SERVICE.to_string(),
         &deposit.amount,
-        "",
+        memo,
     )?;
 
-    Ok(decimal_to_u64(deposit.token_id, &deposit.amount)?.into())
+    reserve_amount_to_quantity(deposit)
 }
 
 impl Swap for TokenSwapPlugin {
     fn quote(
-        from_token: u32,
-        amount: String,
+        from_amount: ReserveAmount,
         to_token: u32,
         slippage: u32,
         max_hops: u8,
@@ -89,8 +92,8 @@ impl Swap for TokenSwapPlugin {
 
         let (pools, return_amount, slippage_ppm) = find_path(
             pools,
-            from_token,
-            decimal_to_u64(from_token, &amount)?.into(),
+            from_amount.token_id,
+            reserve_amount_to_quantity(from_amount)?,
             to_token,
             max_hops,
         );
@@ -115,30 +118,19 @@ impl Swap for TokenSwapPlugin {
         })
     }
 
-    fn swap(
-        pools: Vec<String>,
-        token_in: TID,
-        amount_in: String,
-        min_return: String,
-    ) -> Result<(), Error> {
+    fn swap(pools: Vec<String>, amount_in: ReserveAmount, min_return: String) -> Result<(), Error> {
         if pools.len() == 0 {
             return Err(ErrorType::InsufficientPools.into());
         }
-        credit(
-            token_in,
-            token_swap::SERVICE.to_string().as_str(),
-            &amount_in,
-            "swap",
-        )?;
 
         let packed_args = token_swap::action_structs::swap {
-            amount_in: decimal_to_u64(token_in, &amount_in)?.into(),
+            token_in: amount_in.token_id,
+            amount_in: credit_to_service(amount_in, "Swap")?,
             min_return: Decimal::from_str(&min_return).unwrap().quantity,
             pools: pools
                 .into_iter()
                 .map(|pool_id| pool_id.parse::<u32>().unwrap())
                 .collect(),
-            token_in,
         }
         .packed();
 
@@ -147,12 +139,12 @@ impl Swap for TokenSwapPlugin {
 }
 
 impl Liquidity for TokenSwapPlugin {
-    fn new_pool(a_deposit: Deposit, b_deposit: Deposit) -> Result<(), Error> {
+    fn new_pool(a_deposit: ReserveAmount, b_deposit: ReserveAmount) -> Result<(), Error> {
         let packed_args = token_swap::action_structs::new_pool {
             token_a: a_deposit.token_id,
             token_b: b_deposit.token_id,
-            token_a_amount: credit_to_service(a_deposit)?,
-            token_b_amount: credit_to_service(b_deposit)?,
+            token_a_amount: credit_to_service(a_deposit, "Initial liquidity deposit")?,
+            token_b_amount: credit_to_service(b_deposit, "Initial liquidity deposit")?,
         }
         .packed();
 
@@ -164,8 +156,8 @@ impl Liquidity for TokenSwapPlugin {
 
     fn add_liquidity(
         pool_id: u32,
-        first_deposit: Deposit,
-        second_deposit: Deposit,
+        first_deposit: ReserveAmount,
+        second_deposit: ReserveAmount,
     ) -> Result<(), Error> {
         let (token_a_deposit, token_b_deposit) = if first_deposit.token_id < second_deposit.token_id
         {
@@ -176,8 +168,8 @@ impl Liquidity for TokenSwapPlugin {
 
         let packed_args = token_swap::action_structs::add_liquidity {
             pool_id,
-            amount_a: credit_to_service(token_a_deposit)?,
-            amount_b: credit_to_service(token_b_deposit)?,
+            amount_a: credit_to_service(token_a_deposit, "Liquidity deposit")?,
+            amount_b: credit_to_service(token_b_deposit, "Liquidity deposit")?,
         }
         .packed();
 
@@ -190,23 +182,22 @@ impl Liquidity for TokenSwapPlugin {
     fn quote_remove_liquidity(
         pool: WitPool,
         user_pool_token_balance: Option<String>,
-        desired_token_id: u32,
-        desired_amount: String,
+        desired_amount: ReserveAmount,
     ) -> Result<String, Error> {
         let a_balance = Decimal::from_str(&pool.a_balance).unwrap();
         let b_balance = Decimal::from_str(&pool.b_balance).unwrap();
         let pool_token_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
         let pool_token_precision = pool_token_supply.precision;
 
-        let wanted_reserve = if desired_token_id == pool.token_a_id {
+        let wanted_reserve = if desired_amount.token_id == pool.token_a_id {
             a_balance
-        } else if desired_token_id == pool.token_b_id {
+        } else if desired_amount.token_id == pool.token_b_id {
             b_balance
         } else {
             return Err(ErrorType::InvalidTokenForPool.into());
         };
 
-        let desired_qty: Quantity = decimal_to_u64(desired_token_id, &desired_amount)?.into();
+        let desired_qty = reserve_amount_to_quantity(desired_amount)?;
 
         let mut required_pool_tokens = mul_div(
             desired_qty,
@@ -223,10 +214,14 @@ impl Liquidity for TokenSwapPlugin {
     }
 
     fn remove_liquidity(pool_token_id: TID, amount: String) -> Result<(), Error> {
-        credit(pool_token_id, &token_swap::SERVICE.to_string(), &amount, "")?;
-
         let packed_args = token_swap::action_structs::remove_liquidity {
-            lp_amount: decimal_to_u64(pool_token_id, &amount)?.into(),
+            lp_amount: credit_to_service(
+                ReserveAmount {
+                    amount,
+                    token_id: pool_token_id,
+                },
+                "Liquidity removal",
+            )?,
             pool_id: pool_token_id,
         }
         .packed();
@@ -237,7 +232,10 @@ impl Liquidity for TokenSwapPlugin {
         )
     }
 
-    fn quote_pool_tokens(pool: WitPool, amount: String) -> Result<(Deposit, Deposit), Error> {
+    fn quote_pool_tokens(
+        pool: WitPool,
+        amount: String,
+    ) -> Result<(ReserveAmount, ReserveAmount), Error> {
         let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
 
         let liquidity_amount = Quantity::from_str(&amount, lp_supply.precision)
@@ -250,25 +248,25 @@ impl Liquidity for TokenSwapPlugin {
         let b_amount = mul_div(liquidity_amount, b_reserve.quantity, lp_supply.quantity);
 
         Ok((
-            Deposit {
+            ReserveAmount {
                 amount: Decimal::new(a_amount, a_reserve.precision).to_string(),
                 token_id: pool.token_a_id,
             },
-            Deposit {
+            ReserveAmount {
                 amount: Decimal::new(b_amount, b_reserve.precision).to_string(),
                 token_id: pool.token_b_id,
             },
         ))
     }
 
-    fn quote_add_liquidity(pool: WitPool, token_id: TID, amount: String) -> Result<String, Error> {
-        let (incoming_token, opposing_token) = if pool.token_a_id == token_id {
+    fn quote_add_liquidity(pool: WitPool, amount: ReserveAmount) -> Result<String, Error> {
+        let (incoming_token, opposing_token) = if pool.token_a_id == amount.token_id {
             (pool.token_a_id, pool.token_b_id)
         } else {
             (pool.token_b_id, pool.token_a_id)
         };
 
-        let quoting_amount: Quantity = decimal_to_u64(incoming_token, &amount)?.into();
+        let quoting_amount = reserve_amount_to_quantity(amount)?;
 
         let pool = Pool::from(pool);
 
@@ -280,7 +278,7 @@ impl Liquidity for TokenSwapPlugin {
 
         let expected_balance = mul_div(quoting_amount, outgoing_reserve, incoming_reserve);
 
-        Ok(u64_to_decimal(opposing_token, expected_balance.value)?.to_string())
+        u64_to_decimal(opposing_token, expected_balance.value)
     }
 }
 

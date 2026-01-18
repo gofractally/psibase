@@ -11,7 +11,7 @@ export const useQuote = (
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
         tokenSwap.swap.quote,
-        [fromToken!, amount!, toToken!, (slippageTolerance || 0) * 1000000, 3],
+        [{ amount: amount!, tokenId: fromToken!}, toToken!, (slippageTolerance || 0) * 1000000, 3],
         {
             enabled: !!(
                 fromToken &&
