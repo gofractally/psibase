@@ -5,6 +5,7 @@ mod find_path;
 use std::str::FromStr;
 
 use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
+use bindings::exports::token_swap::plugin::queries::Guest as Queries;
 use bindings::exports::token_swap::plugin::swap::Guest as Swap;
 
 use bindings::host::types::types::Error;
@@ -29,7 +30,7 @@ use crate::{
     },
     constants::PPM,
     find_path::{find_path, Pool},
-    graphql::fetch_all_pools,
+    graphql::{fetch_all_pools, GraphQLPool},
 };
 
 mod constants {
@@ -74,8 +75,34 @@ fn credit_to_service(deposit: ReserveAmount, memo: &str) -> Result<Quantity, Err
     reserve_amount_to_quantity(deposit)
 }
 
+impl From<GraphQLPool> for WitPool {
+    fn from(graph_pool: GraphQLPool) -> Self {
+        Self {
+            id: graph_pool.liquidity_token,
+            liquidity_token: graph_pool.liquidity_token,
+            liquidity_token_supply: graph_pool.liquidity_token_supply.to_string(),
+            token_a_id: graph_pool.reserve_a.token_id,
+            token_a_tariff_ppm: graph_pool.reserve_a.tariff_ppm,
+            a_balance: graph_pool.reserve_a.balance.to_string(),
+            token_b_id: graph_pool.reserve_b.token_id,
+            token_b_tariff_ppm: graph_pool.reserve_b.tariff_ppm,
+            b_balance: graph_pool.reserve_b.balance.to_string(),
+        }
+    }
+}
+
+impl Queries for TokenSwapPlugin {
+    fn fetch_pools() -> Result<Vec<WitPool>, Error> {
+        Ok(fetch_all_pools()?
+            .into_iter()
+            .map(|graph_pool| WitPool::from(graph_pool))
+            .collect())
+    }
+}
+
 impl Swap for TokenSwapPlugin {
     fn quote(
+        pools: Option<Vec<WitPool>>,
         from_amount: ReserveAmount,
         to_token: u32,
         slippage: u32,
@@ -85,10 +112,14 @@ impl Swap for TokenSwapPlugin {
             return Err(errors::ErrorType::SlippageTooHigh(slippage).into());
         }
 
-        let pools = fetch_all_pools()?
-            .into_iter()
-            .map(|pool| pool.into())
-            .collect();
+        let pools = if let Some(pools) = pools {
+            pools.into_iter().map(|pool| Pool::from(pool)).collect()
+        } else {
+            fetch_all_pools()?
+                .into_iter()
+                .map(|pool| Pool::from(pool))
+                .collect()
+        };
 
         let (pools, return_amount, slippage_ppm) = find_path(
             pools,

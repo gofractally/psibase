@@ -27,6 +27,7 @@ class Swap extends PluginInterface {
     get quote() {
         return this._call<
             [
+                pools: Pool[] | undefined,
                 fromAmount: ReserveAmount,
                 toToken: TID,
                 slippageTolerancePpm: number,

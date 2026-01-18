@@ -34,8 +34,16 @@ interface swap {
     use types.{path, tid, pool, reserve-amount};
 
     swap: func(pools: list<string>, amount-in: reserve-amount, min-return: string) -> result<_, error>;
-    quote: func(from-amount: reserve-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
+    quote: func(pools: option<list<pool>>, from-amount: reserve-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
 
+}
+
+interface queries {
+
+    use host:types/types.{error};
+    use types.{path, tid, pool, reserve-amount};
+
+    fetch-pools: func() -> result<list<pool>, error>;
 }
 
 interface liquidity {
@@ -54,7 +62,7 @@ interface liquidity {
     add-liquidity: func(pool-id: u32, a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
 
     // this lets the user propose adding 5 token A tokens and will return how many of b tokens are needed
-    quote-add-liquidity: func(pool: pool, deposit: reserve-amount) -> result<string, error>;
+    quote-add-liquidity: func(pool: pool, amount: reserve-amount) -> result<string, error>;
 
     // this takes the pool tokens, removes the liquidity and gives to the user his share based on the pool tokens he's sent
     remove-liquidity: func(pool-token-id: tid, amount: string) -> result<_, error>;
