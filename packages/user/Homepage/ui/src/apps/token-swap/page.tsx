@@ -44,6 +44,7 @@ import { PoolPicker } from "./components/pool-picker";
 import { useQuoteAdd } from "./hooks/use-quote-add";
 import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
 import { useRemoveLiquidity } from "./hooks/use-remove-liquidity";
+import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
 
 
 
@@ -160,6 +161,7 @@ export const SwapPage = () => {
     }
 
     const { mutateAsync: removeLiquidity, isPending: isPendingRemovingLiquidity } = useRemoveLiquidity()
+    const { mutateAsync: quoteRemoveLiquidity, isPending: isQuoteRemovingLiquidity } = useQuoteRemoveLiquidity()
 
     const triggerMain = async () => {
 
@@ -182,7 +184,9 @@ export const SwapPage = () => {
                 };
                 const desiredToken = lastTouchedIs1 ? token1Id : token2Id;
                 const desiredAmount = lastTouchedIs1 ? token1Amount : token2Amount;
-                await removeLiquidity([focusedPool, z.string().parse(poolTokenBalance?.balance?.format({ includeLabel: false })), z.number().int().positive().parse(desiredToken), desiredAmount])
+                const poolTokensQuote = await quoteRemoveLiquidity([focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }), z.number().int().positive().parse(desiredToken), desiredAmount])
+                console.log(poolTokensQuote, 'was quoted before')
+                await removeLiquidity([focusedPool.id, poolTokensQuote])
             }
         }
         resetFieldValues()
@@ -305,8 +309,8 @@ export const SwapPage = () => {
     const isLiquidityDirectionAdd = isLiquidityTab && liquidityDirection == zLiquidityDirection.Values.Add;
     const isLiquidityDirectionRemove = isLiquidityTab && liquidityDirection == zLiquidityDirection.Values.Remove;
 
-    const token1Balance = isLiquidityDirectionRemove && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[0] : maxWithdrawableLiquidity[1] : tokenBalances?.find(balance => balance.id == token1Id)?.balance?.format({ includeLabel: false }) || '';
-    const token2Balance = isLiquidityDirectionRemove && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[1] : maxWithdrawableLiquidity[0] : tokenBalances?.find(balance => balance.id == token2Id)?.balance?.format({ includeLabel: false })
+    const token1Balance = isLiquidityDirectionRemove && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[0].amount : maxWithdrawableLiquidity[1].amount : tokenBalances?.find(balance => balance.id == token1Id)?.balance?.format({ includeLabel: false }) || '';
+    const token2Balance = isLiquidityDirectionRemove && maxWithdrawableLiquidity ? focusedPool?.tokenAId == token1Id ? maxWithdrawableLiquidity[1].amount : maxWithdrawableLiquidity[0].amount : tokenBalances?.find(balance => balance.id == token2Id)?.balance?.format({ includeLabel: false })
 
 
 
@@ -318,7 +322,7 @@ export const SwapPage = () => {
 
     const { data: quotedAdd } = useQuoteAdd(!!(isLiquidityTab && focusedPool && lastTouchedAmountIsNumber && !sameTokensSelected), focusedPool, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
 
-    const isProcessing = isSwapping || isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity;
+    const isProcessing = isSwapping || isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity || isQuoteRemovingLiquidity;
 
     const setAmount = (isTokenOne: boolean, amount: string) => {
         if (isTokenOne) {

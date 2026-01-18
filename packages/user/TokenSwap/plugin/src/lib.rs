@@ -147,12 +147,12 @@ impl Swap for TokenSwapPlugin {
 }
 
 impl Liquidity for TokenSwapPlugin {
-    fn new_pool(first_deposit: Deposit, second_deposit: Deposit) -> Result<(), Error> {
+    fn new_pool(a_deposit: Deposit, b_deposit: Deposit) -> Result<(), Error> {
         let packed_args = token_swap::action_structs::new_pool {
-            token_a: first_deposit.token_id,
-            token_b: second_deposit.token_id,
-            token_a_amount: credit_to_service(first_deposit)?,
-            token_b_amount: credit_to_service(second_deposit)?,
+            token_a: a_deposit.token_id,
+            token_b: b_deposit.token_id,
+            token_a_amount: credit_to_service(a_deposit)?,
+            token_b_amount: credit_to_service(b_deposit)?,
         }
         .packed();
 
@@ -187,45 +187,47 @@ impl Liquidity for TokenSwapPlugin {
         )
     }
 
-    fn remove_liquidity(
+    fn quote_remove_liquidity(
         pool: WitPool,
-        user_pool_token_balance: String,
+        user_pool_token_balance: Option<String>,
         desired_token_id: u32,
         desired_amount: String,
-    ) -> Result<(), Error> {
-        let a_reserve = Decimal::from_str(&pool.a_balance).unwrap();
-        let b_reserve = Decimal::from_str(&pool.b_balance).unwrap();
+    ) -> Result<String, Error> {
+        let a_balance = Decimal::from_str(&pool.a_balance).unwrap();
+        let b_balance = Decimal::from_str(&pool.b_balance).unwrap();
         let pool_token_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
-
-        let user_pool_token_balance = Decimal::from_str(&user_pool_token_balance).unwrap();
+        let pool_token_precision = pool_token_supply.precision;
 
         let wanted_reserve = if desired_token_id == pool.token_a_id {
-            a_reserve
+            a_balance
         } else if desired_token_id == pool.token_b_id {
-            b_reserve
+            b_balance
         } else {
             return Err(ErrorType::InvalidTokenForPool.into());
         };
 
         let desired_qty: Quantity = decimal_to_u64(desired_token_id, &desired_amount)?.into();
 
-        let pool_tokens_to_credit = mul_div(
+        let mut required_pool_tokens = mul_div(
             desired_qty,
             pool_token_supply.quantity,
             wanted_reserve.quantity,
-        )
-        .min(user_pool_token_balance.quantity);
+        );
 
-        credit(
-            pool.liquidity_token,
-            &token_swap::SERVICE.to_string(),
-            &Decimal::new(pool_tokens_to_credit, user_pool_token_balance.precision).to_string(),
-            "",
-        )?;
+        if let Some(user_pool_token_balance) = user_pool_token_balance {
+            required_pool_tokens = required_pool_tokens
+                .min(decimal_to_u64(pool.liquidity_token, &user_pool_token_balance)?.into())
+        }
+
+        Ok(Decimal::new(required_pool_tokens, pool_token_precision).to_string())
+    }
+
+    fn remove_liquidity(pool_token_id: TID, amount: String) -> Result<(), Error> {
+        credit(pool_token_id, &token_swap::SERVICE.to_string(), &amount, "")?;
 
         let packed_args = token_swap::action_structs::remove_liquidity {
-            lp_amount: pool_tokens_to_credit,
-            pool_id: pool.id,
+            lp_amount: decimal_to_u64(pool_token_id, &amount)?.into(),
+            pool_id: pool_token_id,
         }
         .packed();
 
@@ -235,7 +237,7 @@ impl Liquidity for TokenSwapPlugin {
         )
     }
 
-    fn quote_pool_tokens(pool: WitPool, amount: String) -> Result<(String, String), Error> {
+    fn quote_pool_tokens(pool: WitPool, amount: String) -> Result<(Deposit, Deposit), Error> {
         let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
 
         let liquidity_amount = Quantity::from_str(&amount, lp_supply.precision)
@@ -248,8 +250,14 @@ impl Liquidity for TokenSwapPlugin {
         let b_amount = mul_div(liquidity_amount, b_reserve.quantity, lp_supply.quantity);
 
         Ok((
-            Decimal::new(a_amount, a_reserve.precision).to_string(),
-            Decimal::new(b_amount, b_reserve.precision).to_string(),
+            Deposit {
+                amount: Decimal::new(a_amount, a_reserve.precision).to_string(),
+                token_id: pool.token_a_id,
+            },
+            Deposit {
+                amount: Decimal::new(b_amount, b_reserve.precision).to_string(),
+                token_id: pool.token_b_id,
+            },
         ))
     }
 

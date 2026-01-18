@@ -13,7 +13,7 @@ export const usePluginFunctionMutation = <TCall extends PluginCall>(
     options: MutationOptions<
         TCall extends PluginCall<infer P, unknown> ? P : never,
         TCall extends PluginCall<unknown[], infer R> ? R : never
-    >,
+    > = {},
 ) => {
     const { intf, method, service } = call;
 

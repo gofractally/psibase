@@ -70,7 +70,7 @@ class Liquidity extends PluginInterface {
     }
 
     get quotePoolTokens() {
-        return this._call<[pool: Pool, amount: string], [string, string]>(
+        return this._call<[pool: Pool, amount: string], [Deposit, Deposit]>(
             "quotePoolTokens",
         );
     }
@@ -84,12 +84,21 @@ class Liquidity extends PluginInterface {
     get removeLiquidity() {
         return this._call<
             [
-                pool: Pool,
-                userPoolTokenBalance: string,
-                desiredTokenId: number,
-                desiredAmount: Decimal,
+                poolTokenId: number,
+                amount: string,
             ]
         >("removeLiquidity");
+    }
+
+    get quoteRemoveLiquidity() {
+        return this._call<
+            [
+                pool: Pool,
+                userPoolTokenBalance: string | undefined,
+                desiredTokenId: number,
+                desiredAmount: Decimal,
+            ], string
+        >("quoteRemoveLiquidity");
     }
 }
 
