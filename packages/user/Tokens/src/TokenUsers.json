@@ -20,15 +20,9 @@
         }
     },
     {
-        "sender": "alice",
+        "sender": "faucet-tok",
         "service": "faucet-tok",
-        "method": "dispense",
-        "data": {}
-    },
-    {
-        "sender": "bob",
-        "service": "faucet-tok",
-        "method": "dispense",
+        "method": "tokenUsers",
         "data": {}
     }
 ]
