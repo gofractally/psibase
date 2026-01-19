@@ -33,7 +33,7 @@ import { ConfirmSwapModal } from "./components/swap-modal";
 import { TradeSettingsModal } from "./components/trade-settings-modal";
 import { usePools } from "./hooks/use-pools";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
-import { useQuote } from "./hooks/use-quote";
+import { useQuoteSwap } from "./hooks/use-quote-swap";
 import { useSwap } from "./hooks/use-swap";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -77,7 +77,7 @@ const AmountField = ({
                         <Button
                             className="text-muted-foreground text-sm"
                             variant={"link"}
-                            onClick={() => setAmount(balance)}
+                            onClick={() => setAmount(balance.split('').filter(char => char !== ',').join(''))}
                         >
                             Balance: {balance}
                         </Button>
@@ -226,7 +226,8 @@ export const SwapPage = () => {
     const token1 = selectableTokens.find((token) => token.id == token1Id);
     const token2 = selectableTokens.find((token) => token.id == token2Id);
 
-    const { data: quotedAmount } = useQuote(isSwapTab, token1Id, token1Amount, token2Id, slippage)
+    const { data: quotedAmount, error: quoteError } = useQuoteSwap(isSwapTab, token1Id, token1Amount, token2Id, slippage)
+
 
     const priceImpact = quotedAmount ? quotedAmount.slippage / 10000 : 0;
 
@@ -495,6 +496,12 @@ export const SwapPage = () => {
                                 <span>Price impact</span>
                                 <span>{priceImpact.toFixed(2)}%</span>
                             </div>
+                            {quoteError && <div className="text-muted-foreground space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                    <span>Quote error</span>
+                                    <span className="text-red-800 dark:text-red-500">{quoteError.message}</span>
+                                </div>
+                            </div>}
                         </div>
                     )}
                     {!isSwapTab && (

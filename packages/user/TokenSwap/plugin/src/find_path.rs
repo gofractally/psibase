@@ -14,7 +14,7 @@ use crate::constants::PPM;
 use crate::graphql::GraphQLPool;
 use crate::mul_div;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Pool {
     pub id: u32,
     pub token_a: u32,
@@ -30,7 +30,7 @@ impl From<GraphQLPool> for Pool {
         Self {
             id: value.liquidity_token,
             reserve_a: value.reserve_a.balance.quantity,
-            reserve_b: value.reserve_a.balance.quantity,
+            reserve_b: value.reserve_b.balance.quantity,
             token_a: value.reserve_a.token_id,
             token_b: value.reserve_b.token_id,
             token_a_tariff_ppm: value.reserve_a.tariff_ppm,

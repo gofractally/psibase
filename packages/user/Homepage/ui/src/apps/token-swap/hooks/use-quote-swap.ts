@@ -1,7 +1,7 @@
 import { usePluginFunctionQuery } from "@shared/lib/plugins";
 import { tokenSwap } from "@shared/lib/plugins";
 
-export const useQuote = (
+export const useQuoteSwap = (
     enabled: boolean,
     fromToken?: number,
     amount?: string,

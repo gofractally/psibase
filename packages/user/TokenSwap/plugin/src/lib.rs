@@ -130,7 +130,7 @@ impl Swap for TokenSwapPlugin {
         );
 
         if pools.len() == 0 {
-            return Err(ErrorType::NoPathFound.into());
+            return Err(ErrorType::NoTradeFound.into());
         }
 
         let pool_ids = pools.into_iter().map(|pool| pool.id).collect();

@@ -7,6 +7,6 @@ plugin_error! {
     QueryError(msg: String) => "Query error: {msg}",
     InvalidFormat(msg: String) => "Invalid format: {msg}",
     SlippageTooHigh(slippage: u32) => "Slippage must be in ppm format: received {slippage}, must be between 0 - 1,000,000",
-    NoPathFound => "No path found",
+    NoTradeFound => "No trade found",
     InsufficientPools => "Pools vector is empty"
 }
