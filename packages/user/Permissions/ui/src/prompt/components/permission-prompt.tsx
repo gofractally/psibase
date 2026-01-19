@@ -1,12 +1,12 @@
-import type { ApprovalDuration, PermissionRequest, TrustLevel } from "../types";
+import type { ApprovalDuration, PermissionRequest } from "../types";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { prompt } from "@psibase/common-lib";
 
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { supervisor } from "@shared/lib/supervisor";
-import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     CardContent,
@@ -17,12 +17,6 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Label } from "@shared/shadcn/ui/label";
 import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from "@shared/shadcn/ui/tabs";
 
 import { levelStyles } from "./level-styles";
 import { LevelBadge } from "./permission-level-badge";
@@ -33,17 +27,6 @@ interface Props {
 
 export const PermissionPrompt = ({ permissionRequest }: Props) => {
     const [duration, setDuration] = useState<ApprovalDuration>("session");
-    const [selectedTrustLevel, setSelectedTrustLevel] =
-        useState<TrustLevel>("low");
-
-    useEffect(() => {
-        if (
-            permissionRequest?.level &&
-            ["low", "medium", "high"].includes(permissionRequest.level)
-        ) {
-            setSelectedTrustLevel(permissionRequest.level as TrustLevel);
-        }
-    }, [permissionRequest]);
 
     const allow = async () => {
         await supervisor.functionCall({
@@ -82,62 +65,43 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <Label>
-                    Requested trust level:{" "}
-                    <LevelBadge level={permissionRequest.level} />
-                </Label>
-                <Tabs
-                    value={selectedTrustLevel}
-                    onValueChange={(value) =>
-                        setSelectedTrustLevel(value as TrustLevel)
-                    }
-                >
-                    <TabsList>
-                        {["low", "medium", "high"].map((level, index) => {
+                <div className="space-y-2">
+                    <Label>
+                        {permissionRequest.level === "low" ? "Requested trust level:" : "Requested trust levels:"}
+                        <span className="space-x-1">
+                            {levelStyles[permissionRequest.level].requestedLevels.map((level) => (
+                                <LevelBadge key={level} level={level} />
+                            ))}</span>
+                    </Label>
+                    {levelStyles[permissionRequest.level].requestedLevels.map(
+                        (levelLabel) => {
+                            const level = levelStyles[levelLabel];
                             const description =
-                                permissionRequest.descriptions[index];
+                                permissionRequest.descriptions[level.descriptionIndex];
                             // Only show trust levels that have non-empty descriptions
                             if (!description || description.trim() === "") {
                                 return null;
                             }
 
                             return (
-                                <TabsTrigger
-                                    key={level}
-                                    value={level}
-                                    className="capitalize"
+                                <Alert
+                                    key={`${level}-info-alert`}
+                                    data-level={level}
+                                    variant={
+                                        level.alertVariant
+                                    }
                                 >
-                                    {level}
-                                </TabsTrigger>
-                            );
-                        })}
-                    </TabsList>
-                    {(["low", "medium", "high"] as TrustLevel[]).map(
-                        (level, index) => {
-                            const description =
-                                permissionRequest.descriptions[index];
-                            // Only show trust levels that have non-empty descriptions
-                            if (!description || description.trim() === "") {
-                                return null;
-                            }
-
-                            return (
-                                <TabsContent key={level} value={level}>
-                                    <Alert
-                                        variant={
-                                            levelStyles[level].alertVariant
-                                        }
-                                    >
-                                        {levelStyles[level].icon}
-                                        <AlertDescription className="whitespace-pre-line">
-                                            {description}
-                                        </AlertDescription>
-                                    </Alert>
-                                </TabsContent>
+                                    {level.icon}
+                                    <AlertTitle className="-mt-px mb-0.5">
+                                        <LevelBadge level={levelLabel} />{" "}grants the following abilities:
+                                    </AlertTitle>
+                                    <AlertDescription className="whitespace-pre-line">
+                                        {description}
+                                    </AlertDescription>
+                                </Alert>
                             );
                         },
-                    )}
-                </Tabs>
+                    )}</div>
 
                 <div className="space-y-3">
                     <Label className="text-base font-medium">Duration</Label>
@@ -174,9 +138,7 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
                     <span className="text-foreground font-semibold">
                         {permissionRequest.caller}
                     </span>{" "}
-                    permission to perform{" "}
-                    <LevelBadge level={permissionRequest.level} /> trust
-                    operations within the{" "}
+                    permission to perform these operations within the{" "}
                     <span className="text-foreground font-semibold">
                         {permissionRequest.callee}
                     </span>{" "}
@@ -190,7 +152,7 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
 
             <CardFooter className="flex justify-center gap-4">
                 <Button onClick={allow} size="lg">
-                    Allow
+                    Trust {permissionRequest.caller}
                 </Button>
                 <Button onClick={cancel} variant="outline" size="lg">
                     Cancel

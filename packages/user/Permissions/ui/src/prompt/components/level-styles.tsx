@@ -1,6 +1,6 @@
 import type { TrustLevel } from "../types";
 
-import { AlertCircleIcon, InfoIcon } from "lucide-react";
+import { InfoIcon, TriangleAlertIcon } from "lucide-react";
 import { type ComponentProps } from "react";
 
 import { Alert } from "@shared/shadcn/ui/alert";
@@ -13,6 +13,8 @@ export const levelStyles: Record<
         badgeClassName?: string;
         alertVariant: ComponentProps<typeof Alert>["variant"];
         icon: React.ReactNode;
+        requestedLevels: TrustLevel[];
+        descriptionIndex: 0 | 1 | 2;
     }
 > = {
     low: {
@@ -20,15 +22,21 @@ export const levelStyles: Record<
         badgeClassName: "bg-blue-500 text-white dark:bg-blue-600",
         alertVariant: "default",
         icon: <InfoIcon />,
+        requestedLevels: ["low"],
+        descriptionIndex: 0,
     },
     medium: {
         badgeVariant: "default",
         alertVariant: "default",
         icon: <InfoIcon />,
+        requestedLevels: ["medium", "low"],
+        descriptionIndex: 1,
     },
     high: {
         badgeVariant: "destructive",
         alertVariant: "destructive",
-        icon: <AlertCircleIcon />,
+        icon: <TriangleAlertIcon />,
+        requestedLevels: ["high", "medium", "low"],
+        descriptionIndex: 2,
     },
 };
