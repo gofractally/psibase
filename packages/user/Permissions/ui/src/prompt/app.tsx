@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import { ErrorCard } from "./components/error-card";
+import { ErrorCard } from "@shared/components/error-card";
 import { LoadingSkeleton } from "./components/loading-skeleton";
 import { PermissionPrompt } from "./components/permission-prompt";
 
@@ -39,13 +39,12 @@ export const App = () => {
     return (
         <div className="flex min-h-screen items-center justify-center p-6">
             {error ? (
-                <ErrorCard error={error} />
+                <ErrorCard error={new Error(error)} />
             ) : !permissionRequest ? (
                 <LoadingSkeleton />
             ) : (
                 <PermissionPrompt
                     permissionRequest={permissionRequest}
-                    error={error}
                 />
             )}
         </div>

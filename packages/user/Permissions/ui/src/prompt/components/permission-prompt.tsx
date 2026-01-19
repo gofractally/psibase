@@ -29,10 +29,9 @@ import { LevelBadge } from "./permission-level-badge";
 
 interface Props {
     permissionRequest: PermissionRequest;
-    error: string | null;
 }
 
-export const PermissionPrompt = ({ permissionRequest, error }: Props) => {
+export const PermissionPrompt = ({ permissionRequest }: Props) => {
     const [duration, setDuration] = useState<ApprovalDuration>("session");
     const [selectedTrustLevel, setSelectedTrustLevel] =
         useState<TrustLevel>("low");
@@ -168,12 +167,6 @@ export const PermissionPrompt = ({ permissionRequest, error }: Props) => {
                         </div>
                     </RadioGroup>
                 </div>
-
-                {!!error && (
-                    <Alert variant="destructive">
-                        <AlertDescription>ERROR: {error}</AlertDescription>
-                    </Alert>
-                )}
 
                 <CardDescription className="text-sm">
                     By clicking 'Allow', you will{" "}
