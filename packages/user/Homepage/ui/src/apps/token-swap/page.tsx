@@ -129,11 +129,25 @@ const zLiquidityDirection = z.enum(["Add", "Remove"]);
 type LiquidityDirection = z.infer<typeof zLiquidityDirection>;
 
 
+const useAmount = () => {
+
+    const [tokenId, setTokenId] = useState<number>();
+    const [amount, setAmount] = useState<string>("");
+
+    return {
+        amount,
+        tokenId,
+        setAmount,
+        setTokenId
+    }
+
+}
+
 export const SwapPage = () => {
-    const [token1Amount, setToken1Amount] = useState("");
-    const [token2Amount, setToken2Amount] = useState("");
-    const [token1Id, setToken1Id] = useState<number>();
-    const [token2Id, setToken2Id] = useState<number>();
+
+
+    const { tokenId: token1Id, amount: token1Amount, setAmount: setToken1Amount, setTokenId: setToken1Id } = useAmount();
+    const { tokenId: token2Id, amount: token2Amount, setAmount: setToken2Amount, setTokenId: setToken2Id } = useAmount();
 
     const [slippage] = useSlippageTolerance();
 
