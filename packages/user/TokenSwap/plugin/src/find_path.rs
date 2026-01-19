@@ -106,9 +106,9 @@ pub fn find_path(
     amount: Quantity,
     to: TID,
     max_hops: u8,
-) -> (Vec<Pool>, Quantity, u32) {
+) -> (Vec<Pool>, Quantity, u32, bool) {
     if from == to {
-        return (vec![], amount, 0);
+        return (vec![], amount, 0, false);
     }
 
     let mut graph: HashMap<TID, Vec<Pool>> = HashMap::new();
@@ -142,6 +142,7 @@ pub fn find_path(
     let mut best_to_target = Quantity::from(0u64);
     let mut best_path_to_target: Vec<Pool> = vec![];
     let mut best_max_slippage_ppm: u32 = 0;
+    let mut path_was_found = false;
 
     // Start from the beginning token, search state is just of
     //
@@ -153,6 +154,7 @@ pub fn find_path(
 
         // Found target → update if better
         if search_state.token == to {
+            path_was_found = true;
             if search_state.amount_out > best_to_target {
                 best_to_target = search_state.amount_out;
                 best_path_to_target = search_state.path.clone();
@@ -225,5 +227,10 @@ pub fn find_path(
         }
     }
 
-    (best_path_to_target, best_to_target, best_max_slippage_ppm)
+    (
+        best_path_to_target,
+        best_to_target,
+        best_max_slippage_ppm,
+        path_was_found,
+    )
 }

@@ -20,6 +20,7 @@ export const useQuoteSwap = (
                 isAmountValid &&
                 enabled
             ),
+            retry: false
         },
     );
 };

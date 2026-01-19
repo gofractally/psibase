@@ -33,7 +33,34 @@ interface swap {
     use host:types/types.{error};
     use types.{path, tid, pool, reserve-amount};
 
+    /// Execute a multi-hop swap using the exact path previously returned by `quote`.
+    ///
+    /// This is the function that actually performs the swap on-chain.
+    ///
+    /// Arguments:
+    ///   - `pools`: Ordered list of pool IDs (as strings) – must match `path.pools`
+    ///   - `amount-in`: The exact input amount and token the user is sending
+    ///   - `min-return`: The minimum acceptable output amount (usually from `path.minimum-return`)
     swap: func(pools: list<string>, amount-in: reserve-amount, min-return: string) -> result<_, error>;
+
+
+    /// Get the best swap path from one token to another, respecting slippage and hop limit.
+    ///
+    /// This is the most important function for front-ends and bots.
+    /// It performs a graph search to find the path that gives the highest output amount
+    /// after fees/tariffs, within the given slippage tolerance and maximum hop count.
+    ///
+    /// Arguments:
+    ///   - `pools`: `some(list<pool>)` → use these pools only (offline / cached mode)
+    ///             `none` → automatically fetch current pools via GraphQL / chain query
+    ///   - `from-amount`: token and decimal amount the user wants to sell/spend
+    ///   - `to-token`: desired output token ID
+    ///   - `slippage`: maximum acceptable slippage in parts per million (1_000_000 = 100%)
+    ///                 Example: 5000 = 0.5% slippage tolerance
+    ///   - `max-hops`: maximum number of pools/swaps in the path (usually 2–6)
+    ///
+    /// Returns:
+    /// * Best found `path` record (including recommended `minimum-return`)
     quote: func(pools: option<list<pool>>, from-amount: reserve-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
 
 }
@@ -43,6 +70,7 @@ interface queries {
     use host:types/types.{error};
     use types.{path, tid, pool, reserve-amount};
 
+    /// Fetches all pools in the network
     fetch-pools: func() -> result<list<pool>, error>;
 }
 
@@ -51,30 +79,73 @@ interface liquidity {
     use host:types/types.{error};
     use types.{path, tid, pool, reserve-amount};
 
-    /// Adds liquidity to a pool. Require two deposits of the pool reserves of equal value.
-    /// Use `quote-add-liquidity` to determine the neccessary deposit of the other token reserve based on one proposed deposit
-    /// Ordering of the deposit params is not important
+    /// Adds liquidity to an existing pool by depositing both reserve tokens.
+    ///
+    /// The deposits must represent equal economic value based on the current pool reserves
+    /// and price ratio. Token order does not matter — the function
+    /// automatically matches `a-deposit` and `b-deposit` to the pool's `token-a-id` and `token-b-id`.
     ///
     /// Parameters:
-    /// * `pool-id` - ID / Liquidity token ID of pool
-    /// * `a-deposit` - One of the pool reserves
-    /// * `b-deposit` - Corresponding deposit of the pool
+    /// * `pool-id`     - The ID of the target pool (also the ID of the liquidity token)
+    /// * `a-deposit`   - The amount to deposit of one of the pool's reserve tokens
+    /// * `b-deposit`   - The amount to deposit of the other reserve token
     add-liquidity: func(pool-id: u32, a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
 
-    // this lets the user propose adding 5 token A tokens and will return how many of b tokens are needed
+    /// Calculates the exact amount of the second token required to add liquidity while maintaining
+    /// the current pool price ratio.
+    ///
+    /// Use this when you have decided how much of one token to deposit and want to know precisely
+    /// how much of the other token is needed to receive the maximum possible LP tokens.
+    ///
+    /// Parameters:
+    /// * `pool`    - The current state of the pool (reserves, token IDs, tariffs, etc.)
+    /// * `amount`  - The proposed deposit amount of one of the two reserve tokens
+    ///               (must match either `token-a-id` or `token-b-id`)
+    /// Returns:
+    /// * Exact decimal amount of the **other** token required
     quote-add-liquidity: func(pool: pool, amount: reserve-amount) -> result<string, error>;
 
-    // this takes the pool tokens, removes the liquidity and gives to the user his share based on the pool tokens he's sent
+    /// Removes liquidity by burning the specified amount of pool (LP) tokens.
+    ///
+    /// The caller receives a proportional share of both underlying reserve tokens based on
+    /// the current pool reserves.
+    ///
+    /// Use `quote-remove-liquidity` to determine pool tokens based on desired token withdrawal from of the pool reserves.
+    ///
+    /// Parameters:
+    /// * `pool-token-id` - The token ID of the LP tokens to burn (matches the pool ID)
+    /// * `amount`        - The amount of LP tokens to burn
     remove-liquidity: func(pool-token-id: tid, amount: string) -> result<_, error>;
-    // this lets the user see how many pool tokens is required for liquidation based on how many token a or token b tokens he wants to withdraw
+
+    /// Calculates how many LP tokens must be burned to withdraw a desired amount of one reserve token.
+    ///
+    /// Returns the exact LP token amount needed to receive at least the requested reserve amount
+    /// (the other reserve token is withdrawn proportionally).
+    ///
+    /// Parameters:
+    /// * `pool`                      - The current state of the pool
+    /// * `user-pool-token-balance`   - Optional: the user's current LP token balance
+    ///                                 (may be used for validation or precision)
+    /// * `desired-amount`            - The desired withdrawal amount of one reserve token
+    ///                                 (must match either `token-a-id` or `token-b-id`)
     quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: reserve-amount) -> result<string, error>;
 
-    // creates a new pool,
+    /// Creates a new liquidity pool with the initial deposits of both reserve tokens.
+    ///
+    /// The initial deposits establish the starting price ratio and constant product invariant.
+    ///
+    /// Parameters:
+    /// * `a-deposit` - Initial deposit amount of the first reserve token
+    /// * `b-deposit` - Initial deposit amount of the second reserve token
     new-pool: func(a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
 
-    // this returns how many
+    /// Calculates the required deposit amounts of both reserve tokens needed to mint
+    /// a specific amount of LP tokens at the current pool ratio.
+    ///
+    /// Parameters:
+    /// * `pool`   - The current state of the pool
+    /// * `amount` - The target amount of LP tokens to mint
     quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<reserve-amount, reserve-amount>, error>;
-
 }
 
 

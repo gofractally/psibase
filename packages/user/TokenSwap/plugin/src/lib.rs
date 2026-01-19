@@ -31,6 +31,7 @@ use crate::{
     constants::PPM,
     find_path::{find_path, Pool},
     graphql::{fetch_all_pools, GraphQLPool},
+    trust::{assert_authorized_with_whitelist, FunctionName},
 };
 
 mod constants {
@@ -47,13 +48,14 @@ define_trust! {
         Low => "",
         Medium => "",
         High => "
-        High trust grants the abilities
-            - Swapping
-            - Adding and removal of liquidity to existing or new pools
+        High trust allows:
+            - Performing token swaps
+            - Creating new liquidity pools
+            - Adding and removing liquidity to / from pools
         ",
     }
     functions {
-        None => [quote, quote_pool_tokens, quote_add_liquidity],
+        None => [quote, quote_pool_tokens, quote_add_liquidity, quote_remove_liquidity, fetch_pools],
         High => [swap, new_pool, add_liquidity, remove_liquidity],
     }
 }
@@ -64,15 +66,19 @@ fn reserve_amount_to_quantity(reserve_amount: ReserveAmount) -> Result<Quantity,
     decimal_to_u64(reserve_amount.token_id, &reserve_amount.amount).map(|amount| amount.into())
 }
 
-fn credit_to_service(deposit: ReserveAmount, memo: &str) -> Result<Quantity, Error> {
+fn assert_authed(function: FunctionName) -> Result<(), Error> {
+    assert_authorized_with_whitelist(function, vec!["homepage".into()])
+}
+
+fn credit_to_service(amount: ReserveAmount, memo: &str) -> Result<Quantity, Error> {
     credit(
-        deposit.token_id,
+        amount.token_id,
         &token_swap::SERVICE.to_string(),
-        &deposit.amount,
+        &amount.amount,
         memo,
     )?;
 
-    reserve_amount_to_quantity(deposit)
+    reserve_amount_to_quantity(amount)
 }
 
 impl From<GraphQLPool> for WitPool {
@@ -93,6 +99,7 @@ impl From<GraphQLPool> for WitPool {
 
 impl Queries for TokenSwapPlugin {
     fn fetch_pools() -> Result<Vec<WitPool>, Error> {
+        assert_authed(FunctionName::fetch_pools)?;
         Ok(fetch_all_pools()?
             .into_iter()
             .map(|graph_pool| WitPool::from(graph_pool))
@@ -108,6 +115,7 @@ impl Swap for TokenSwapPlugin {
         slippage: u32,
         max_hops: u8,
     ) -> Result<Path, Error> {
+        assert_authed(FunctionName::quote)?;
         if slippage > PPM {
             return Err(errors::ErrorType::SlippageTooHigh(slippage).into());
         }
@@ -121,7 +129,7 @@ impl Swap for TokenSwapPlugin {
                 .collect()
         };
 
-        let (pools, return_amount, slippage_ppm) = find_path(
+        let (pools, return_amount, slippage_ppm, path_was_found) = find_path(
             pools,
             from_amount.token_id,
             reserve_amount_to_quantity(from_amount)?,
@@ -129,8 +137,10 @@ impl Swap for TokenSwapPlugin {
             max_hops,
         );
 
-        if pools.len() == 0 {
-            return Err(ErrorType::NoTradeFound.into());
+        if path_was_found {
+            return Err(ErrorType::InsffucientLiquidity.into());
+        } else if pools.len() == 0 {
+            return Err(ErrorType::InsufficientPools.into());
         }
 
         let pool_ids = pools.into_iter().map(|pool| pool.id).collect();
@@ -150,6 +160,7 @@ impl Swap for TokenSwapPlugin {
     }
 
     fn swap(pools: Vec<String>, amount_in: ReserveAmount, min_return: String) -> Result<(), Error> {
+        assert_authed(FunctionName::swap)?;
         if pools.len() == 0 {
             return Err(ErrorType::InsufficientPools.into());
         }
@@ -171,6 +182,8 @@ impl Swap for TokenSwapPlugin {
 
 impl Liquidity for TokenSwapPlugin {
     fn new_pool(a_deposit: ReserveAmount, b_deposit: ReserveAmount) -> Result<(), Error> {
+        assert_authed(FunctionName::new_pool)?;
+
         let packed_args = token_swap::action_structs::new_pool {
             token_a: a_deposit.token_id,
             token_b: b_deposit.token_id,
@@ -190,6 +203,7 @@ impl Liquidity for TokenSwapPlugin {
         first_deposit: ReserveAmount,
         second_deposit: ReserveAmount,
     ) -> Result<(), Error> {
+        assert_authed(FunctionName::add_liquidity)?;
         let (token_a_deposit, token_b_deposit) = if first_deposit.token_id < second_deposit.token_id
         {
             (first_deposit, second_deposit)
@@ -215,26 +229,26 @@ impl Liquidity for TokenSwapPlugin {
         user_pool_token_balance: Option<String>,
         desired_amount: ReserveAmount,
     ) -> Result<String, Error> {
+        assert_authed(FunctionName::quote_remove_liquidity)?;
+
         let a_balance = Decimal::from_str(&pool.a_balance).unwrap();
         let b_balance = Decimal::from_str(&pool.b_balance).unwrap();
         let pool_token_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
         let pool_token_precision = pool_token_supply.precision;
+        let pool_token_quantity = pool_token_supply.quantity;
 
         let wanted_reserve = if desired_amount.token_id == pool.token_a_id {
             a_balance
         } else if desired_amount.token_id == pool.token_b_id {
             b_balance
         } else {
-            return Err(ErrorType::InvalidTokenForPool.into());
+            return Err(ErrorType::TokenDoesNotExist.into());
         };
 
         let desired_qty = reserve_amount_to_quantity(desired_amount)?;
 
-        let mut required_pool_tokens = mul_div(
-            desired_qty,
-            pool_token_supply.quantity,
-            wanted_reserve.quantity,
-        );
+        let mut required_pool_tokens =
+            mul_div(desired_qty, pool_token_quantity, wanted_reserve.quantity);
 
         if let Some(user_pool_token_balance) = user_pool_token_balance {
             required_pool_tokens = required_pool_tokens
@@ -245,6 +259,8 @@ impl Liquidity for TokenSwapPlugin {
     }
 
     fn remove_liquidity(pool_token_id: TID, amount: String) -> Result<(), Error> {
+        assert_authed(FunctionName::remove_liquidity)?;
+
         let packed_args = token_swap::action_structs::remove_liquidity {
             lp_amount: credit_to_service(
                 ReserveAmount {
@@ -267,6 +283,8 @@ impl Liquidity for TokenSwapPlugin {
         pool: WitPool,
         amount: String,
     ) -> Result<(ReserveAmount, ReserveAmount), Error> {
+        assert_authed(FunctionName::quote_pool_tokens)?;
+
         let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
 
         let liquidity_amount = Quantity::from_str(&amount, lp_supply.precision)
@@ -291,10 +309,14 @@ impl Liquidity for TokenSwapPlugin {
     }
 
     fn quote_add_liquidity(pool: WitPool, amount: ReserveAmount) -> Result<String, Error> {
+        assert_authed(FunctionName::quote_add_liquidity)?;
+
         let (incoming_token, opposing_token) = if pool.token_a_id == amount.token_id {
             (pool.token_a_id, pool.token_b_id)
-        } else {
+        } else if pool.token_b_id == amount.token_id {
             (pool.token_b_id, pool.token_a_id)
+        } else {
+            return Err(ErrorType::TokenDoesNotExist.into());
         };
 
         let quoting_amount = reserve_amount_to_quantity(amount)?;
