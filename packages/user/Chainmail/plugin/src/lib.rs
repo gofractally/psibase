@@ -27,12 +27,10 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Archive chainmail messages
             - Save chainmail messages
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Send chainmail messages
         ",
     }

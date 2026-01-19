@@ -29,17 +29,14 @@ use contact_table::ContactTable;
 psibase::define_trust! {
     descriptions {
         Low => "
-        Low trust grants these abilities:
             - Manage (add and remove) contacts
         ",
         Medium => "
-        Medium trust grants the abilities of all lower trust levels, plus these abilities:
             - Update your profile
             - Upload your avatar
             - Remove your avatar
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Read all your contacts
         ",
     }

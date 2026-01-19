@@ -16,12 +16,10 @@ use errors::ErrorType;
 define_trust! {
     descriptions {
         Low => "
-        Low trust grants these abilities:
             - Reading the value of the example-thing
         ",
         Medium => "",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Setting the example thing
         ",
     }

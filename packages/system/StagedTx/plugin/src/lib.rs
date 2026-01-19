@@ -28,12 +28,10 @@ psibase::define_trust! {
         Low => "",
         Medium => "",
         High => "
-        🚨 WARNING 🚨 
-        This approval will grant the caller the ability to accept/reject transactions on your behalf! Make sure you completely trust the caller's legitimacy.
-
-        High trust grants these abilities:
             - Accept staged transactions
             - Reject staged transactions
+        
+        Warning: This will grant the caller the ability to accept/reject transactions on your behalf! Make sure you completely trust the caller's legitimacy.
         ",
     }
     functions {
