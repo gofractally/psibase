@@ -140,10 +140,12 @@ impl Swap for TokenSwapPlugin {
             max_hops,
         );
 
-        if path_was_found {
-            return Err(ErrorType::InsffucientLiquidity.into());
-        } else if pools.len() == 0 {
-            return Err(ErrorType::InsufficientPools.into());
+        if pools.len() == 0 {
+            if path_was_found {
+                return Err(ErrorType::InsffucientLiquidity.into());
+            } else {
+                return Err(ErrorType::InsufficientPools.into());
+            }
         }
 
         let pool_ids = pools.into_iter().map(|pool| pool.id).collect();

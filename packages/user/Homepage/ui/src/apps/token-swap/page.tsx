@@ -34,7 +34,6 @@ import { TradeSettingsModal } from "./components/trade-settings-modal";
 import { usePools } from "./hooks/use-pools";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
 import { useQuoteSwap } from "./hooks/use-quote-swap";
-import { useSwap } from "./hooks/use-swap";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
@@ -163,7 +162,6 @@ export const SwapPage = () => {
     const { data: tokenBalances, refetch: refetchTokenBalances } = useUserTokenBalances(currentUser)
 
 
-    const { mutateAsync: swap, isPending: isSwapping } = useSwap();
     const { mutateAsync: addLiquidity, isPending: isAddingLiquidity } = useAddLiquidity()
     const { mutateAsync: createPool, isPending: isCreatingPool } = useCreatePool()
     const { setValue: setLastTouchedIs1, value: lastTouchedIs1 } = useBoolean()
@@ -177,10 +175,13 @@ export const SwapPage = () => {
     const { mutateAsync: removeLiquidity, isPending: isPendingRemovingLiquidity } = useRemoveLiquidity()
     const { mutateAsync: quoteRemoveLiquidity, isPending: isQuoteRemovingLiquidity } = useQuoteRemoveLiquidity()
 
+
+    const { setValue: setShowSwap, value: showSwap } = useBoolean()
+
     const triggerMain = async () => {
 
         if (isSwapTab) {
-            await swap([Array.from(quotedAmount!.pools).map(String), { amount: token1Amount, tokenId: token1Id!, }, quotedAmount!.minimumReturn])
+            setShowSwap(true);
         } else {
             if (liquidityDirection == zLiquidityDirection.Values.Add) {
                 if (focusedPool) {
@@ -201,7 +202,13 @@ export const SwapPage = () => {
                 const poolTokensQuote = await quoteRemoveLiquidity([focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }), { tokenId: z.number().int().positive().parse(desiredToken), amount: desiredAmount }])
                 await removeLiquidity([{ amount: poolTokensQuote, tokenId: focusedPool.id, }])
             }
+
+            onSuccess()
         }
+
+    }
+
+    const onSuccess = () => {
         resetFieldValues()
         refetchPools()
         refetchTokenBalances()
@@ -241,6 +248,7 @@ export const SwapPage = () => {
 
     const { data: quotedAmount, error: quoteError } = useQuoteSwap(isSwapTab, token1Id, token1Amount, token2Id, slippage)
 
+    const swapQuotePoolIds = quotedAmount && Array.from(quotedAmount.pools).map(String)
 
     const priceImpact = quotedAmount ? quotedAmount.slippage / 10000 : 0;
 
@@ -271,7 +279,6 @@ export const SwapPage = () => {
     const { value: showPickTokenModal, setValue: setPickTokenModal } =
         useBoolean();
     const { value: showDevModal, setValue: setShowDevModal } = useBoolean();
-    const { value: showSwapModal, setValue: setShowSwapModal } = useBoolean();
     const { value: showSettingsModal, setValue: setShowSettingsModal } =
         useBoolean();
 
@@ -336,15 +343,20 @@ export const SwapPage = () => {
 
     const { data: quotedAdd } = useQuoteAdd(!!(isLiquidityTab && focusedPool && lastTouchedAmountIsNumber && !sameTokensSelected), focusedPool, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
 
-    const isProcessing = isSwapping || isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity || isQuoteRemovingLiquidity;
+    const isProcessing = isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity || isQuoteRemovingLiquidity;
 
     const setAmount = (isTokenOne: boolean, amount: string) => {
+        setLastTouchedIs1(isTokenOne);
+        if (amount == '') {
+            setToken1Amount('')
+            setToken2Amount('')
+            return;
+        }
         if (isTokenOne) {
             setToken1Amount(amount);
         } else {
             setToken2Amount(amount)
         }
-        setLastTouchedIs1(isTokenOne);
     }
 
 
@@ -380,9 +392,15 @@ export const SwapPage = () => {
         <div className="container mx-auto max-w-lg px-4 py-12">
             <ConfirmSwapModal
                 openChange={(e) => {
-                    setShowSwapModal(e);
+                    setShowSwap(e);
                 }}
-                show={showSwapModal}
+                show={showSwap}
+                minimumReturn={quotedAmount && quotedAmount.minimumReturn}
+                fromAmount={token1Amount}
+                fromToken={token1Id}
+                toToken={token2Id}
+                poolIds={swapQuotePoolIds}
+                onSuccess={onSuccess}
             />
             <DevModal
                 openChange={(e) => {
