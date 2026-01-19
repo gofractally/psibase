@@ -22,7 +22,7 @@ interface types {
         liquidity-token-supply: string,
     }
 
-    record reserve-amount {
+    record token-amount {
         token-id: tid,
         amount: string
     }
@@ -31,7 +31,7 @@ interface types {
 
 interface swap {
     use host:types/types.{error};
-    use types.{path, tid, pool, reserve-amount};
+    use types.{path, tid, pool, token-amount};
 
     /// Execute a multi-hop swap using the exact path previously returned by `quote`.
     ///
@@ -41,7 +41,7 @@ interface swap {
     ///   - `pools`: Ordered list of pool IDs (as strings) – must match `path.pools`
     ///   - `amount-in`: The exact input amount and token the user is sending
     ///   - `min-return`: The minimum acceptable output amount (usually from `path.minimum-return`)
-    swap: func(pools: list<string>, amount-in: reserve-amount, min-return: string) -> result<_, error>;
+    swap: func(pools: list<string>, amount-in: token-amount, min-return: string) -> result<_, error>;
 
 
     /// Get the best swap path from one token to another, respecting slippage and hop limit.
@@ -61,14 +61,14 @@ interface swap {
     ///
     /// Returns:
     /// * Best found `path` record (including recommended `minimum-return`)
-    quote: func(pools: option<list<pool>>, from-amount: reserve-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
+    quote: func(pools: option<list<pool>>, from-amount: token-amount, to-token: tid, slippage: u32, max-hops: u8) -> result<path, error>;
 
 }
 
 interface queries {
 
     use host:types/types.{error};
-    use types.{path, tid, pool, reserve-amount};
+    use types.{path, tid, pool, token-amount};
 
     /// Fetches all pools in the network
     fetch-pools: func() -> result<list<pool>, error>;
@@ -77,7 +77,7 @@ interface queries {
 interface liquidity {
 
     use host:types/types.{error};
-    use types.{path, tid, pool, reserve-amount};
+    use types.{path, tid, pool, token-amount};
 
     /// Adds liquidity to an existing pool by depositing both reserve tokens.
     ///
@@ -89,7 +89,7 @@ interface liquidity {
     /// * `pool-id`     - The ID of the target pool (also the ID of the liquidity token)
     /// * `a-deposit`   - The amount to deposit of one of the pool's reserve tokens
     /// * `b-deposit`   - The amount to deposit of the other reserve token
-    add-liquidity: func(pool-id: u32, a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
+    add-liquidity: func(pool-id: u32, a-deposit: token-amount, b-deposit: token-amount) -> result<_, error>;
 
     /// Calculates the exact amount of the second token required to add liquidity while maintaining
     /// the current pool price ratio.
@@ -103,7 +103,7 @@ interface liquidity {
     ///               (must match either `token-a-id` or `token-b-id`)
     /// Returns:
     /// * Exact decimal amount of the **other** token required
-    quote-add-liquidity: func(pool: pool, amount: reserve-amount) -> result<string, error>;
+    quote-add-liquidity: func(pool: pool, amount: token-amount) -> result<string, error>;
 
     /// Removes liquidity by burning the specified amount of pool (LP) tokens.
     ///
@@ -113,9 +113,8 @@ interface liquidity {
     /// Use `quote-remove-liquidity` to determine pool tokens based on desired token withdrawal from of the pool reserves.
     ///
     /// Parameters:
-    /// * `pool-token-id` - The token ID of the LP tokens to burn (matches the pool ID)
-    /// * `amount`        - The amount of LP tokens to burn
-    remove-liquidity: func(pool-token-id: tid, amount: string) -> result<_, error>;
+    /// * `amount`        - The LP token amount of LP tokens to burn
+    remove-liquidity: func(amount: token-amount) -> result<_, error>;
 
     /// Calculates how many LP tokens must be burned to withdraw a desired amount of one reserve token.
     ///
@@ -128,7 +127,7 @@ interface liquidity {
     ///                                 (may be used for validation or precision)
     /// * `desired-amount`            - The desired withdrawal amount of one reserve token
     ///                                 (must match either `token-a-id` or `token-b-id`)
-    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: reserve-amount) -> result<string, error>;
+    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: token-amount) -> result<string, error>;
 
     /// Creates a new liquidity pool with the initial deposits of both reserve tokens.
     ///
@@ -137,7 +136,7 @@ interface liquidity {
     /// Parameters:
     /// * `a-deposit` - Initial deposit amount of the first reserve token
     /// * `b-deposit` - Initial deposit amount of the second reserve token
-    new-pool: func(a-deposit: reserve-amount, b-deposit: reserve-amount) -> result<_, error>;
+    new-pool: func(a-deposit: token-amount, b-deposit: token-amount) -> result<_, error>;
 
     /// Calculates the required deposit amounts of both reserve tokens needed to mint
     /// a specific amount of LP tokens at the current pool ratio.
@@ -145,7 +144,7 @@ interface liquidity {
     /// Parameters:
     /// * `pool`   - The current state of the pool
     /// * `amount` - The target amount of LP tokens to mint
-    quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<reserve-amount, reserve-amount>, error>;
+    quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<token-amount, token-amount>, error>;
 }
 
 

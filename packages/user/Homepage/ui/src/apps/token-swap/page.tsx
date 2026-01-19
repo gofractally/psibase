@@ -185,8 +185,7 @@ export const SwapPage = () => {
                 const desiredToken = lastTouchedIs1 ? token1Id : token2Id;
                 const desiredAmount = lastTouchedIs1 ? token1Amount : token2Amount;
                 const poolTokensQuote = await quoteRemoveLiquidity([focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }), { tokenId: z.number().int().positive().parse(desiredToken), amount: desiredAmount }])
-                console.log(poolTokensQuote, 'was quoted before')
-                await removeLiquidity([focusedPool.id, poolTokensQuote])
+                await removeLiquidity([{ amount: poolTokensQuote, tokenId: focusedPool.id, }])
             }
         }
         resetFieldValues()

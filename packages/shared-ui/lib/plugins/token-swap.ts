@@ -16,7 +16,7 @@ export type Pool = {
     liquidityTokenSupply: string;
 };
 
-type ReserveAmount = {
+type TokenAmount = {
     tokenId: number;
     amount: string;
 };
@@ -28,7 +28,7 @@ class Swap extends PluginInterface {
         return this._call<
             [
                 pools: Pool[] | undefined,
-                fromAmount: ReserveAmount,
+                fromAmount: TokenAmount,
                 toToken: TID,
                 slippageTolerancePpm: number,
                 maxHops: number,
@@ -46,7 +46,7 @@ class Swap extends PluginInterface {
         return this._call<
             [
                 pools: string[],
-                amountIn: ReserveAmount,
+                amountIn: TokenAmount,
                 minReturn: Decimal,
             ]
         >("swap");
@@ -57,34 +57,33 @@ class Liquidity extends PluginInterface {
     protected override readonly _intf = "liquidity" as const;
 
     get newPool() {
-        return this._call<[firstDeposit: ReserveAmount, secondDeposit: ReserveAmount]>(
+        return this._call<[firstDeposit: TokenAmount, secondDeposit: TokenAmount]>(
             "newPool",
         );
     }
 
     get quoteAddLiquidity() {
-        return this._call<[pool: Pool, amount: ReserveAmount], string>(
+        return this._call<[pool: Pool, amount: TokenAmount], string>(
             "quoteAddLiquidity",
         );
     }
 
     get quotePoolTokens() {
-        return this._call<[pool: Pool, amount: string], [ReserveAmount, ReserveAmount]>(
+        return this._call<[pool: Pool, amount: string], [TokenAmount, TokenAmount]>(
             "quotePoolTokens",
         );
     }
 
     get addLiquidity() {
         return this._call<
-            [poolId: number, firstDeposit: ReserveAmount, secondDeposit: ReserveAmount]
+            [poolId: number, firstDeposit: TokenAmount, secondDeposit: TokenAmount]
         >("addLiquidity");
     }
 
     get removeLiquidity() {
         return this._call<
             [
-                poolTokenId: number,
-                amount: string,
+                amount: TokenAmount,
             ]
         >("removeLiquidity");
     }
@@ -94,7 +93,7 @@ class Liquidity extends PluginInterface {
             [
                 pool: Pool,
                 userPoolTokenBalance: string | undefined,
-                desiredAmount: ReserveAmount,
+                desiredAmount: TokenAmount,
             ], string
         >("quoteRemoveLiquidity");
     }

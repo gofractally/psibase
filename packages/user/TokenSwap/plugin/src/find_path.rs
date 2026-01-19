@@ -15,7 +15,7 @@ use crate::graphql::GraphQLPool;
 use crate::mul_div;
 
 #[derive(Clone, Debug)]
-pub struct Pool {
+pub struct GraphPool {
     pub id: u32,
     pub token_a: u32,
     pub token_b: u32,
@@ -25,7 +25,7 @@ pub struct Pool {
     pub token_b_tariff_ppm: u32,
 }
 
-impl From<GraphQLPool> for Pool {
+impl From<GraphQLPool> for GraphPool {
     fn from(value: GraphQLPool) -> Self {
         Self {
             id: value.liquidity_token,
@@ -39,7 +39,7 @@ impl From<GraphQLPool> for Pool {
     }
 }
 
-impl From<WitPool> for Pool {
+impl From<WitPool> for GraphPool {
     fn from(value: WitPool) -> Self {
         Self {
             id: value.id,
@@ -57,7 +57,7 @@ impl From<WitPool> for Pool {
 struct SearchState {
     token: TID,
     amount_out: Quantity,
-    path: Vec<Pool>,
+    path: Vec<GraphPool>,
     max_slippage_ppm: u32,
 }
 
@@ -101,17 +101,17 @@ fn deviation_from_ideal_ppm(ideal_out: Quantity, actual_out: Quantity) -> u32 {
 }
 
 pub fn find_path(
-    all_pools: Vec<Pool>,
+    all_pools: Vec<GraphPool>,
     from: TID,
     amount: Quantity,
     to: TID,
     max_hops: u8,
-) -> (Vec<Pool>, Quantity, u32, bool) {
+) -> (Vec<GraphPool>, Quantity, u32, bool) {
     if from == to {
         return (vec![], amount, 0, false);
     }
 
-    let mut graph: HashMap<TID, Vec<Pool>> = HashMap::new();
+    let mut graph: HashMap<TID, Vec<GraphPool>> = HashMap::new();
 
     for pool in all_pools {
         graph
@@ -140,7 +140,7 @@ pub fn find_path(
 
     // Track best way found to reach target
     let mut best_to_target = Quantity::from(0u64);
-    let mut best_path_to_target: Vec<Pool> = vec![];
+    let mut best_path_to_target: Vec<GraphPool> = vec![];
     let mut best_max_slippage_ppm: u32 = 0;
     let mut path_was_found = false;
 

@@ -24,12 +24,12 @@ use psibase::services::tokens::{Decimal, Quantity, TID};
 
 use crate::{
     bindings::{
-        exports::token_swap::plugin::liquidity::{Pool as WitPool, ReserveAmount},
+        exports::token_swap::plugin::liquidity::{Pool as WitPool, TokenAmount},
         token_swap::plugin::types::Path,
         tokens::plugin::helpers::u64_to_decimal,
     },
     constants::PPM,
-    find_path::{find_path, Pool},
+    find_path::{find_path, GraphPool},
     graphql::{fetch_all_pools, GraphQLPool},
     trust::{assert_authorized_with_whitelist, FunctionName},
 };
@@ -62,7 +62,7 @@ define_trust! {
 
 struct TokenSwapPlugin;
 
-fn reserve_amount_to_quantity(reserve_amount: ReserveAmount) -> Result<Quantity, Error> {
+fn reserve_amount_to_quantity(reserve_amount: TokenAmount) -> Result<Quantity, Error> {
     decimal_to_u64(reserve_amount.token_id, &reserve_amount.amount).map(|amount| amount.into())
 }
 
@@ -70,7 +70,7 @@ fn assert_authed(function: FunctionName) -> Result<(), Error> {
     assert_authorized_with_whitelist(function, vec!["homepage".into()])
 }
 
-fn credit_to_service(amount: ReserveAmount, memo: &str) -> Result<Quantity, Error> {
+fn credit_to_service(amount: TokenAmount, memo: &str) -> Result<Quantity, Error> {
     credit(
         amount.token_id,
         &token_swap::SERVICE.to_string(),
@@ -110,7 +110,7 @@ impl Queries for TokenSwapPlugin {
 impl Swap for TokenSwapPlugin {
     fn quote(
         pools: Option<Vec<WitPool>>,
-        from_amount: ReserveAmount,
+        from_amount: TokenAmount,
         to_token: u32,
         slippage: u32,
         max_hops: u8,
@@ -121,11 +121,14 @@ impl Swap for TokenSwapPlugin {
         }
 
         let pools = if let Some(pools) = pools {
-            pools.into_iter().map(|pool| Pool::from(pool)).collect()
+            pools
+                .into_iter()
+                .map(|pool| GraphPool::from(pool))
+                .collect()
         } else {
             fetch_all_pools()?
                 .into_iter()
-                .map(|pool| Pool::from(pool))
+                .map(|pool| GraphPool::from(pool))
                 .collect()
         };
 
@@ -159,7 +162,7 @@ impl Swap for TokenSwapPlugin {
         })
     }
 
-    fn swap(pools: Vec<String>, amount_in: ReserveAmount, min_return: String) -> Result<(), Error> {
+    fn swap(pools: Vec<String>, amount_in: TokenAmount, min_return: String) -> Result<(), Error> {
         assert_authed(FunctionName::swap)?;
         if pools.len() == 0 {
             return Err(ErrorType::InsufficientPools.into());
@@ -181,7 +184,7 @@ impl Swap for TokenSwapPlugin {
 }
 
 impl Liquidity for TokenSwapPlugin {
-    fn new_pool(a_deposit: ReserveAmount, b_deposit: ReserveAmount) -> Result<(), Error> {
+    fn new_pool(a_deposit: TokenAmount, b_deposit: TokenAmount) -> Result<(), Error> {
         assert_authed(FunctionName::new_pool)?;
 
         let packed_args = token_swap::action_structs::new_pool {
@@ -200,8 +203,8 @@ impl Liquidity for TokenSwapPlugin {
 
     fn add_liquidity(
         pool_id: u32,
-        first_deposit: ReserveAmount,
-        second_deposit: ReserveAmount,
+        first_deposit: TokenAmount,
+        second_deposit: TokenAmount,
     ) -> Result<(), Error> {
         assert_authed(FunctionName::add_liquidity)?;
         let (token_a_deposit, token_b_deposit) = if first_deposit.token_id < second_deposit.token_id
@@ -227,7 +230,7 @@ impl Liquidity for TokenSwapPlugin {
     fn quote_remove_liquidity(
         pool: WitPool,
         user_pool_token_balance: Option<String>,
-        desired_amount: ReserveAmount,
+        desired_amount: TokenAmount,
     ) -> Result<String, Error> {
         assert_authed(FunctionName::quote_remove_liquidity)?;
 
@@ -258,18 +261,12 @@ impl Liquidity for TokenSwapPlugin {
         Ok(Decimal::new(required_pool_tokens, pool_token_precision).to_string())
     }
 
-    fn remove_liquidity(pool_token_id: TID, amount: String) -> Result<(), Error> {
+    fn remove_liquidity(amount: TokenAmount) -> Result<(), Error> {
         assert_authed(FunctionName::remove_liquidity)?;
 
         let packed_args = token_swap::action_structs::remove_liquidity {
-            lp_amount: credit_to_service(
-                ReserveAmount {
-                    amount,
-                    token_id: pool_token_id,
-                },
-                "Liquidity removal",
-            )?,
-            pool_id: pool_token_id,
+            pool_id: amount.token_id,
+            lp_amount: credit_to_service(amount, "Liquidity removal")?,
         }
         .packed();
 
@@ -282,7 +279,7 @@ impl Liquidity for TokenSwapPlugin {
     fn quote_pool_tokens(
         pool: WitPool,
         amount: String,
-    ) -> Result<(ReserveAmount, ReserveAmount), Error> {
+    ) -> Result<(TokenAmount, TokenAmount), Error> {
         assert_authed(FunctionName::quote_pool_tokens)?;
 
         let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
@@ -297,18 +294,18 @@ impl Liquidity for TokenSwapPlugin {
         let b_amount = mul_div(liquidity_amount, b_reserve.quantity, lp_supply.quantity);
 
         Ok((
-            ReserveAmount {
+            TokenAmount {
                 amount: Decimal::new(a_amount, a_reserve.precision).to_string(),
                 token_id: pool.token_a_id,
             },
-            ReserveAmount {
+            TokenAmount {
                 amount: Decimal::new(b_amount, b_reserve.precision).to_string(),
                 token_id: pool.token_b_id,
             },
         ))
     }
 
-    fn quote_add_liquidity(pool: WitPool, amount: ReserveAmount) -> Result<String, Error> {
+    fn quote_add_liquidity(pool: WitPool, amount: TokenAmount) -> Result<String, Error> {
         assert_authed(FunctionName::quote_add_liquidity)?;
 
         let (incoming_token, opposing_token) = if pool.token_a_id == amount.token_id {
@@ -321,7 +318,7 @@ impl Liquidity for TokenSwapPlugin {
 
         let quoting_amount = reserve_amount_to_quantity(amount)?;
 
-        let pool = Pool::from(pool);
+        let pool = GraphPool::from(pool);
 
         let (incoming_reserve, outgoing_reserve) = if incoming_token == pool.token_a {
             (pool.reserve_a, pool.reserve_b)
