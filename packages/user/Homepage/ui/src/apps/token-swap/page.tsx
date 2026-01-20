@@ -42,6 +42,7 @@ import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
 import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
 import { AmountField } from "./components/amount-field";
 import { useAmount } from "./hooks/use-amount";
+import { DualTokens } from "./components/dual-tokens";
 
 
 const zSelectedTokenFieldType = z.enum(["One", "Two"]);
@@ -57,6 +58,10 @@ const zLiquidityDirection = z.enum(["Add", "Remove"]);
 type LiquidityDirection = z.infer<typeof zLiquidityDirection>;
 
 
+
+const SwapComp = () => {
+
+}
 
 export const SwapPage = () => {
     const {
@@ -496,6 +501,18 @@ export const SwapPage = () => {
                     </div>
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
+
+                <DualTokens
+                    onCenterClick={ }
+                    onTrigger={ }
+                    token1={{
+                        label: "From",
+                        amount: token1Amount,
+                        onMaxBalance: 
+                    }}
+                    token2={ }
+                    triggerLabel=""
+                />
 
                 <CardContent className="space-y-6">
                     {/* Token 1 */}
