@@ -1,4 +1,4 @@
-import { ArrowDownUp, ChevronDown, Minus, Plus, Settings } from "lucide-react";
+import { ArrowDownUp, Minus, Plus, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useBoolean } from "usehooks-ts";
 import z from "zod";
@@ -15,8 +15,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
+
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 import {
@@ -41,80 +40,9 @@ import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
 import { useQuoteSwap } from "./hooks/use-quote-swap";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
 import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
+import { AmountField } from "./components/amount-field";
+import { useAmount } from "./hooks/use-amount";
 
-const AmountField = ({
-    amount,
-    setAmount,
-    balance,
-    symbol,
-    name,
-    onSelect,
-    label,
-    disabled,
-}: {
-    disabled?: boolean;
-    onSelect: () => void;
-    label: string;
-    name?: string;
-    symbol?: string;
-    balance?: string;
-    amount: string;
-    setAmount: (text: string) => void;
-}) => {
-    return (
-        <div className="space-y-2">
-            <div className="text-muted-foreground flex justify-between text-sm">
-                <Label htmlFor="x">{label}</Label>
-                <div>
-                    {balance && (
-                        <Button
-                            className="text-muted-foreground text-sm"
-                            variant={"link"}
-                            onClick={() =>
-                                setAmount(
-                                    balance
-                                        .split("")
-                                        .filter((char) => char !== ",")
-                                        .join(""),
-                                )
-                            }
-                        >
-                            Balance: {balance}
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <div className="relative">
-                <Input
-                    disabled={disabled}
-                    id="x"
-                    type="text"
-                    placeholder="0.0"
-                    value={amount}
-                    onChange={(e) =>
-                        setAmount(e.target.value.replace(/[^0-9.]/g, ""))
-                    }
-                    className="h-16 pr-28 text-lg font-medium"
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Button
-                        variant={"outline"}
-                        onClick={() => {
-                            onSelect();
-                        }}
-                    >
-                        <div className="flex items-center gap-2">
-                            <span>{name}</span>
-                            <span className="font-light">({symbol})</span>
-                            <ChevronDown className="h-4 w-4" />
-                        </div>
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const zSelectedTokenFieldType = z.enum(["One", "Two"]);
 
@@ -128,25 +56,7 @@ const zLiquidityDirection = z.enum(["Add", "Remove"]);
 
 type LiquidityDirection = z.infer<typeof zLiquidityDirection>;
 
-const useAmount = () => {
-    const [tokenId, setTokenId] = useState<number>();
-    const [amount, setAmount] = useState<string>("");
 
-    const obj = tokenId
-        ? {
-            tokenId,
-            amount,
-        }
-        : undefined;
-
-    return {
-        obj,
-        amount,
-        tokenId,
-        setAmount,
-        setTokenId,
-    };
-};
 
 export const SwapPage = () => {
     const {
@@ -360,14 +270,16 @@ export const SwapPage = () => {
         (balance) => balance.id == focusedPool?.id,
     );
 
+    const poolTokenBalanceDec = poolTokenBalance?.balance?.format({ includeLabel: false });
     const { data: maxWithdrawableLiquidity } = useQuotePoolTokens(
         !!poolTokenBalance,
         focusedPool,
-        poolTokenBalance?.balance?.format({ includeLabel: false }),
+        poolTokenBalanceDec,
     );
 
     const isLiquidityDirectionAdd =
         isLiquidityTab && liquidityDirection == zLiquidityDirection.Values.Add;
+
     const isLiquidityDirectionRemove =
         isLiquidityTab &&
         liquidityDirection == zLiquidityDirection.Values.Remove;
@@ -380,6 +292,7 @@ export const SwapPage = () => {
             : tokenBalances
                 ?.find((balance) => balance.id == token1Id)
                 ?.balance?.format({ includeLabel: false }) || "";
+
     const token2Balance =
         isLiquidityDirectionRemove && maxWithdrawableLiquidity
             ? focusedPool?.tokenAId == token1Id
@@ -387,7 +300,7 @@ export const SwapPage = () => {
                 : maxWithdrawableLiquidity[0].amount
             : tokenBalances
                 ?.find((balance) => balance.id == token2Id)
-                ?.balance?.format({ includeLabel: false });
+                ?.balance?.format({ includeLabel: false }) || '';
 
     const lastTouchedAmount = lastTouchedIs1 ? token1Amount : token2Amount;
     const lastTouchedAmountIsNumber = lastTouchedAmount !== "";
@@ -409,7 +322,9 @@ export const SwapPage = () => {
         lastTouchedIs1 ? token1Amount : token2Amount,
     );
 
-    const { data: quotedRemove } = useQuoteRemoveLiquidity(validQuote, focusedPool, undefined, {
+    const { value: isMaxBalance, setValue: setMaxBalance } = useBoolean()
+
+    const { data: quotedRemove } = useQuoteRemoveLiquidity(validQuote, focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false, }), {
         amount: lastTouchedIs1 ? token1Amount : token2Amount,
         tokenId: lastTouchedIs1 ? token1Id! : token2Id!
     })
@@ -418,6 +333,7 @@ export const SwapPage = () => {
 
     const setAmount = (isTokenOne: boolean, amount: string) => {
         setLastTouchedIs1(isTokenOne);
+        setMaxBalance(false);
         if (amount == "") {
             setToken1Amount("");
             setToken2Amount("");
@@ -447,10 +363,15 @@ export const SwapPage = () => {
         }
     }, [
         quotedAdd,
+        quotedRemove,
+        token1Id,
+        token2Id,
         lastTouchedIs1,
         isLiquidityDirectionAdd,
         isLiquidityDirectionRemove,
         focusedPool,
+        setToken2Amount,
+        setToken1Amount
     ]);
 
     useEffect(() => {
@@ -496,8 +417,8 @@ export const SwapPage = () => {
                 }}
                 onSuccess={onSuccess}
                 amount={
-                    quotedRemove && focusedPoolId
-                        ? quotedRemove[0]
+                    quotedRemove && focusedPoolId ? isMaxBalance && poolTokenBalanceDec ? { amount: poolTokenBalanceDec, tokenId: focusedPoolId } :
+                        quotedRemove[0]
                         : undefined
                 }
             />
@@ -577,9 +498,18 @@ export const SwapPage = () => {
                 </CardHeader>
 
                 <CardContent className="space-y-6">
-                    {/* From */}
+                    {/* Token 1 */}
                     <AmountField
                         amount={token1Amount}
+                        onMaxBalance={() => {
+                            setAmount(true,
+                                token1Balance
+                                    .split("")
+                                    .filter((char) => char !== ",")
+                                    .join(""),
+                            )
+                            setMaxBalance(true)
+                        }}
                         label={
                             isSwapTab
                                 ? "From"
@@ -598,7 +528,7 @@ export const SwapPage = () => {
                         symbol={token1?.symbol || token1?.id.toString() || ""}
                     />
 
-                    {/* Switch arrow */}
+                    {/* Center button icon */}
                     <div className="relative flex justify-center">
                         <div className="absolute inset-0 flex items-center">
                             <Separator />
@@ -619,7 +549,7 @@ export const SwapPage = () => {
                         </Button>
                     </div>
 
-                    {/* To */}
+                    {/* Token 2 */}
                     <AmountField
                         disabled={isSwapTab}
                         label={
@@ -630,6 +560,15 @@ export const SwapPage = () => {
                                     : "Withdraw"
                         }
                         amount={token2Amount}
+                        onMaxBalance={() => {
+                            setAmount(false,
+                                token2Balance
+                                    .split("")
+                                    .filter((char) => char !== ",")
+                                    .join(""),
+                            )
+                            setMaxBalance(true)
+                        }}
                         setAmount={(amount) => {
                             setAmount(false, amount);
                         }}
