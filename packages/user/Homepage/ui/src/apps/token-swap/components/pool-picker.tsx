@@ -20,7 +20,7 @@ interface PoolPickerProps {
     pools: Pool[];
     disableCreate?: boolean,
     focusedPoolId: number | null | undefined;
-    setFocusedPoolId: (id: number | null) => void;
+    setFocusedPoolId: (id: number | undefined) => void;
     className?: string;
 }
 
@@ -73,7 +73,7 @@ export function PoolPicker({
                         </DropdownMenuItem>
                     ))}
                     {!disableCreate && <DropdownMenuItem
-                        onSelect={() => setFocusedPoolId(null)}
+                        onSelect={() => setFocusedPoolId(undefined)}
                         className="flex justify-between"
                     >
                         <div className="flex flex-col">

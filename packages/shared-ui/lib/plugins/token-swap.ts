@@ -16,7 +16,7 @@ export type Pool = {
     liquidityTokenSupply: string;
 };
 
-type TokenAmount = {
+export type TokenAmount = {
     tokenId: number;
     amount: string;
 };

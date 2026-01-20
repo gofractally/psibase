@@ -30,6 +30,7 @@ import {
 import { DevModal } from "./components/dev-modal";
 import { PickTokenModal } from "./components/pick-token-modal";
 import { ConfirmSwapModal } from "./components/swap-modal";
+import { AddLiquidityModal } from "./components/add-liquidity-modal";
 import { TradeSettingsModal } from "./components/trade-settings-modal";
 import { usePools } from "./hooks/use-pools";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
@@ -37,13 +38,14 @@ import { useQuoteSwap } from "./hooks/use-quote-swap";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
-import { useAddLiquidity } from "./hooks/use-add-liquidity";
 import { useCreatePool } from "./hooks/use-create-pool";
 import { PoolPicker } from "./components/pool-picker";
 import { useQuoteAdd } from "./hooks/use-quote-add";
 import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
 import { useRemoveLiquidity } from "./hooks/use-remove-liquidity";
 import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
+import { CreatePoolModal } from "./components/create-pool-modal";
+import { RemoveLiquidityModal } from "./components/remove-liquidity-modal";
 
 
 
@@ -133,7 +135,13 @@ const useAmount = () => {
     const [tokenId, setTokenId] = useState<number>();
     const [amount, setAmount] = useState<string>("");
 
+    const obj = tokenId ? {
+        tokenId,
+        amount
+    } : undefined;
+
     return {
+        obj,
         amount,
         tokenId,
         setAmount,
@@ -145,8 +153,8 @@ const useAmount = () => {
 export const SwapPage = () => {
 
 
-    const { tokenId: token1Id, amount: token1Amount, setAmount: setToken1Amount, setTokenId: setToken1Id } = useAmount();
-    const { tokenId: token2Id, amount: token2Amount, setAmount: setToken2Amount, setTokenId: setToken2Id } = useAmount();
+    const { obj: token1Obj, tokenId: token1Id, amount: token1Amount, setAmount: setToken1Amount, setTokenId: setToken1Id } = useAmount();
+    const { obj: token2Obj, tokenId: token2Id, amount: token2Amount, setAmount: setToken2Amount, setTokenId: setToken2Id } = useAmount();
 
     const [slippage] = useSlippageTolerance();
 
@@ -162,9 +170,8 @@ export const SwapPage = () => {
     const { data: tokenBalances, refetch: refetchTokenBalances } = useUserTokenBalances(currentUser)
 
 
-    const { mutateAsync: addLiquidity, isPending: isAddingLiquidity } = useAddLiquidity()
-    const { mutateAsync: createPool, isPending: isCreatingPool } = useCreatePool()
     const { setValue: setLastTouchedIs1, value: lastTouchedIs1 } = useBoolean()
+
 
 
     const resetFieldValues = () => {
@@ -172,46 +179,43 @@ export const SwapPage = () => {
         setToken1Amount('');
     }
 
-    const { mutateAsync: removeLiquidity, isPending: isPendingRemovingLiquidity } = useRemoveLiquidity()
-    const { mutateAsync: quoteRemoveLiquidity, isPending: isQuoteRemovingLiquidity } = useQuoteRemoveLiquidity()
 
 
     const { setValue: setShowSwap, value: showSwap } = useBoolean()
+    const { setValue: setShowAddLiquidity, value: showAddLiquidity } = useBoolean()
+    const { setValue: setShowRemoveLiquidity, value: showRemoveLiquidity } = useBoolean()
+
+    const { setValue: setShowCreatePool, value: showCreatePool } = useBoolean()
+
+
 
     const triggerMain = async () => {
-
         if (isSwapTab) {
             setShowSwap(true);
         } else {
             if (liquidityDirection == zLiquidityDirection.Values.Add) {
                 if (focusedPool) {
-                    await addLiquidity([focusedPool.id, { tokenId: z.number().parse(token1Id)!, amount: token1Amount! }, { amount: token2Amount, tokenId: z.number().parse(token2Id)! }])
+                    setShowAddLiquidity(true)
                 } else {
-                    await createPool([{ tokenId: z.number().parse(token1Id), amount: token1Amount! }, { amount: token2Amount!, tokenId: z.number().parse(token2Id) }])
-                    setCurrentTab(zCurrentTab.Values.Swap)
-                    setToken1Id(token1Id)
-                    setToken2Id(token2Id)
+                    setShowCreatePool(true)
                 }
             } else {
-                if (!focusedPool || !poolTokenBalance) {
-                    console.error("Failure", focusedPool, poolTokenBalance)
-                    return
-                };
-                const desiredToken = lastTouchedIs1 ? token1Id : token2Id;
-                const desiredAmount = lastTouchedIs1 ? token1Amount : token2Amount;
-                const poolTokensQuote = await quoteRemoveLiquidity([focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false }), { tokenId: z.number().int().positive().parse(desiredToken), amount: desiredAmount }])
-                await removeLiquidity([{ amount: poolTokensQuote, tokenId: focusedPool.id, }])
+                setShowRemoveLiquidity(true)
             }
-
-            onSuccess()
         }
-
     }
 
     const onSuccess = () => {
         resetFieldValues()
         refetchPools()
         refetchTokenBalances()
+    }
+
+    const onCreatePoolSuccess = () => {
+        setCurrentTab(zCurrentTab.Values.Swap)
+        setToken1Id(token1Id)
+        setToken2Id(token2Id)
+        onSuccess()
     }
 
     console.log(pools, "was pools", error);
@@ -292,7 +296,7 @@ export const SwapPage = () => {
         resetSelections(currentTab)
     };
 
-    const [focusedPoolId, setFocusedPoolId] = useState<number | null>();
+    const [focusedPoolId, setFocusedPoolId] = useState<number>();
 
     const poolsOfLiquidityPair = (pools || [])?.filter(pool => {
         const tradingTokens = [pool?.tokenAId, pool?.tokenBId];
@@ -308,7 +312,7 @@ export const SwapPage = () => {
 
     const resetSelections = (tab: Tab) => {
         if (tab == zCurrentTab.Values.Liquidity) {
-            setFocusedPoolId(poolsOfLiquidityPair.length > 0 ? poolsOfLiquidityPair[0].id : null)
+            setFocusedPoolId(poolsOfLiquidityPair.length > 0 ? poolsOfLiquidityPair[0].id : undefined)
         }
     }
 
@@ -343,7 +347,6 @@ export const SwapPage = () => {
 
     const { data: quotedAdd } = useQuoteAdd(!!(isLiquidityTab && focusedPool && lastTouchedAmountIsNumber && !sameTokensSelected), focusedPool, lastTouchedIs1 ? token1Id! : token2Id!, lastTouchedIs1 ? token1Amount : token2Amount)
 
-    const isProcessing = isAddingLiquidity || isCreatingPool || isPendingRemovingLiquidity || isQuoteRemovingLiquidity;
 
     const setAmount = (isTokenOne: boolean, amount: string) => {
         setLastTouchedIs1(isTokenOne);
@@ -379,7 +382,7 @@ export const SwapPage = () => {
 
     useEffect(() => {
         if (poolsOfLiquidityPair.length == 0) {
-            setFocusedPoolId(null)
+            setFocusedPoolId(undefined)
         }
     }, [poolsOfLiquidityPair.length])
 
@@ -401,6 +404,33 @@ export const SwapPage = () => {
                 toToken={token2Id}
                 poolIds={swapQuotePoolIds}
                 onSuccess={onSuccess}
+            />
+            <AddLiquidityModal
+                show={showAddLiquidity}
+                openChange={(e) => {
+                    setShowAddLiquidity(e)
+                }}
+                onSuccess={onSuccess}
+                poolId={focusedPoolId}
+                firstDeposit={token1Obj}
+                secondDeposit={token2Obj}
+            />
+            <RemoveLiquidityModal
+                show={showRemoveLiquidity}
+                openChange={(e) => {
+                    setShowRemoveLiquidity(e)
+                }}
+                onSuccess={onSuccess}
+                amount={quotedAdd && focusedPoolId ? { amount: quotedAdd, tokenId: focusedPoolId } : undefined}
+            />
+            <CreatePoolModal
+                show={showCreatePool}
+                openChange={(e) => {
+                    setShowCreatePool(e)
+                }}
+                onSuccess={onCreatePoolSuccess}
+                firstDeposit={token1Obj}
+                secondDeposit={token2Obj}
             />
             <DevModal
                 openChange={(e) => {
@@ -601,7 +631,7 @@ export const SwapPage = () => {
                     <Button
                         size="lg"
                         className="h-14 w-full text-lg font-semibold"
-                        disabled={!isSwapPossible || isProcessing}
+                        disabled={!isSwapPossible}
                         onClick={() => {
                             triggerMain()
                         }}
@@ -614,7 +644,7 @@ export const SwapPage = () => {
                                     ? "Swap"
                                     : liquidityDirection === "Add"
                                         ? (focusedPool ? "Add liquidity" : "Create pool")
-                                        : "Remove liquidity"}{isProcessing ? "..." : ''}
+                                        : "Remove liquidity"}
                     </Button>
                 </CardFooter>
             </Card>
