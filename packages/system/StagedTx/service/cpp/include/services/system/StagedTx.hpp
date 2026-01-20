@@ -1,7 +1,7 @@
 #pragma once
 
-#include <psibase/psibase.hpp>
-#include <services/system/Transact.hpp>
+#include <psibase/Service.hpp>
+#include <psibase/dispatch.hpp>
 
 namespace SystemService
 {
@@ -109,6 +109,7 @@ namespace SystemService
 
    // clang-format off
    PSIO_REFLECT(StagedTxService,
+      allowHashedMethods(),
       method(init),
       method(propose, actions, auto_exec),
       method(remove, id, txid),

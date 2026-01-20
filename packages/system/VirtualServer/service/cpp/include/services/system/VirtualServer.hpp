@@ -1,9 +1,8 @@
 #pragma once
 
 #include <psibase/Memo.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
-#include <psibase/psibase.hpp>
-#include <psio/fracpack.hpp>
 #include <services/user/tokenTypes.hpp>
 
 namespace SystemService
@@ -215,6 +214,7 @@ namespace SystemService
    };
 
    PSIO_REFLECT(VirtualServer,
+                allowHashedMethods(),
                 method(init),
                 method(init_billing, fee_receiver),
                 method(get_fee_receiver),
@@ -243,6 +243,7 @@ namespace SystemService
 
    PSIBASE_REFLECT_EVENTS(VirtualServer);
    PSIBASE_REFLECT_HISTORY_EVENTS(VirtualServer,
+                                  allowHashedMethods(),
                                   method(consumed, account, resource, amount, cost),
                                   method(subsidized, purchaser, recipient, amount, memo),
                                   method(block_summary, block_num, net_usage_ppm, cpu_usage_ppm));
