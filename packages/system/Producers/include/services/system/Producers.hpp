@@ -34,7 +34,7 @@ namespace SystemService
       static constexpr auto service      = psibase::AccountNumber("producers");
       static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
-      static constexpr uint8_t DEFAULT_MAX_PRODS = 9;
+      static constexpr uint8_t DEFAULT_MAX_PRODS = 13;
 
       using Tables = psibase::ServiceTables<CandidateInfoTable, ProdsConfigTable>;
 
