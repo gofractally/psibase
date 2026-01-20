@@ -1,5 +1,6 @@
 import type { ApprovalDuration, PermissionRequest } from "../types";
 
+import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { prompt } from "@psibase/common-lib";
@@ -17,10 +18,12 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Label } from "@shared/shadcn/ui/label";
 import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
+import { ErrorCard } from "@shared/components/error-card";
 
 import { levelStyles } from "./level-styles";
 import { LevelBadge } from "./permission-level-badge";
 import { AccountName } from "./account-name";
+import { zApprovalDuration } from "../types";
 
 interface Props {
     permissionRequest: PermissionRequest;
@@ -29,19 +32,29 @@ interface Props {
 export const PermissionPrompt = ({ permissionRequest }: Props) => {
     const [duration, setDuration] = useState<ApprovalDuration>("session");
 
-    const allow = async () => {
-        await supervisor.functionCall({
-            service: "permissions",
-            intf: "admin",
-            method: "approve",
-            params: [duration],
-        });
-        prompt.finished();
-    };
+    const approveMutation = useMutation({
+        mutationKey: ["permissions", "approve"],
+        mutationFn: async (duration: ApprovalDuration) => {
+            zApprovalDuration.parse(duration);
+            await supervisor.functionCall({
+                service: "permissions",
+                intf: "admin",
+                method: "approve",
+                params: [duration],
+            });
+        },
+        onSuccess: () => {
+            prompt.finished();
+        },
+    });
 
     const cancel = async () => {
         prompt.finished();
     };
+
+    if (approveMutation.isError) {
+        return <ErrorCard error={approveMutation.error} />;
+    }
 
     return (
         <BrandedGlowingCard>
@@ -140,7 +153,11 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
             </CardContent>
 
             <CardFooter className="flex justify-center gap-4">
-                <Button onClick={allow} size="lg">
+                <Button
+                    onClick={() => approveMutation.mutate(duration)}
+                    disabled={approveMutation.isPending}
+                    size="lg"
+                >
                     Trust {permissionRequest.caller} app
                 </Button>
                 <Button onClick={cancel} variant="outline" size="lg">

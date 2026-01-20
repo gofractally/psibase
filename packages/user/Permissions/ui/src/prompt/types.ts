@@ -1,13 +1,20 @@
-export type TrustLevel = "low" | "medium" | "high"; // 'none' and 'max' do not trigger a permissions prompt
+import { z } from "zod";
 
-export type Descriptions = [string, string, string];
+export const zTrustLevel = z.enum(["low", "medium", "high"]); // 'none' and 'max' do not trigger a permissions prompt
+export type TrustLevel = z.infer<typeof zTrustLevel>;
 
-export type ApprovalDuration = "session" | "permanent";
+export const zDescriptions = z.tuple([z.string(), z.string(), z.string()]);
+export type Descriptions = z.infer<typeof zDescriptions>;
 
-export interface PermissionRequest {
-    user: string;
-    caller: string;
-    callee: string;
-    level: TrustLevel;
-    descriptions: Descriptions;
-}
+export const zApprovalDuration = z.enum(["session", "permanent"]);
+export type ApprovalDuration = z.infer<typeof zApprovalDuration>;
+
+export const zPermissionRequest = z.object({
+    user: z.string(),
+    caller: z.string(),
+    callee: z.string(),
+    level: zTrustLevel,
+    descriptions: zDescriptions,
+});
+
+export type PermissionRequest = z.infer<typeof zPermissionRequest>;
