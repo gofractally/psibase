@@ -304,6 +304,8 @@ export const SwapPage = () => {
     const selectToken = (selection: SelectionType) => {
         setSelectingToken(selection);
         setPickTokenModal(true);
+
+        resetFieldValues()
     };
 
 
