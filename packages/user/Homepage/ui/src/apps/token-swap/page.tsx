@@ -584,7 +584,7 @@ export const SwapPage = () => {
                                     </p>
                                 </AlertDescription>
                             </Alert>
-                                <div className="text-muted-foreground space-y-1 text-sm">
+                                {token2Amount && token1Amount && <div className="text-muted-foreground space-y-1 text-sm">
                                     <div className="flex justify-between">
                                         <span>Token 1 Price</span>
                                         <span>{(Number(token2Amount) / Number(token1Amount)).toFixed(4)} {token2?.symbol || `(${token2?.id})`}</span>
@@ -594,7 +594,7 @@ export const SwapPage = () => {
                                         <span>Token 2 Price</span>
                                         <span>{(Number(token1Amount) / Number(token2Amount)).toFixed(4)} {token1?.symbol || `(${token1?.id})`}</span>
                                     </div>
-                                </div>
+                                </div>}
                             </>}
 
                             {poolsOfLiquidityPair.length > 0 && focusedPoolId === null && <><Alert variant="warning">
@@ -608,7 +608,7 @@ export const SwapPage = () => {
                                     </p>
                                 </AlertDescription>
                             </Alert>
-                                <div className="text-muted-foreground space-y-1 text-sm">
+                                {token2Amount && token1Amount && <div className="text-muted-foreground space-y-1 text-sm">
                                     <div className="flex justify-between">
                                         <span>Token 1 Price</span>
                                         <span>{(Number(token2Amount) / Number(token1Amount)).toFixed(4)} {token2?.symbol || `(${token2?.id})`}</span>
@@ -618,7 +618,7 @@ export const SwapPage = () => {
                                         <span>Token 2 Price</span>
                                         <span>{(Number(token1Amount) / Number(token2Amount)).toFixed(4)} {token1?.symbol || `(${token1?.id})`}</span>
                                     </div>
-                                </div>
+                                </div>}
                             </>}
 
                         </div>
