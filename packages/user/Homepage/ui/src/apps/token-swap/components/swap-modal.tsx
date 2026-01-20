@@ -14,35 +14,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-import { Avatar } from "@shared/components/avatar";
 import { ArrowDown } from "lucide-react";
 import { useBoolean } from "usehooks-ts";
+import { AmountSummary } from './amount-summary';
 
 
-const AmountSummary = ({ avatarSeed, label, title, amount }: { avatarSeed: string, label: string, title: string, amount: string }) => {
-    return <div className="flex justify-between items-center  rounded-xl border border-gray-300 bg-gray-100/70 p-4 dark:border-gray-800 dark:bg-gray-900/50">
-        <div className='flex items-center gap-4'>
-            <div className="shrink-0">
-                <Avatar
-                    account={avatarSeed}
-                    className="h-12 w-12"
-                    alt="From account"
-                />
-            </div>
-            <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                    {label}
-                </p>
-                <div className="wrap-break-word text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    {title}
-                </div>
-            </div>
-        </div>
-        <div className="text-2xl font-mono items-center">
-            {amount}
-        </div>
-    </div>
-}
+
 
 export const ConfirmSwapModal = ({
     show,
@@ -56,7 +33,6 @@ export const ConfirmSwapModal = ({
     isHighSlippage = false,
     onSuccess,
 }: {
-
     show: boolean;
     openChange: (show: boolean) => void;
     poolIds?: string[],
@@ -72,7 +48,7 @@ export const ConfirmSwapModal = ({
 
     const { data: pools } = usePools();
 
-    console.log({ poolIds, minimumReturn, fromAmount, fromToken, pools, isPending })
+    console.log({ pools, })
 
 
     const { toggle: toggleUserAcceptsSlippage, value: isUserAcceptingOfSlippage } = useBoolean(false)
@@ -101,7 +77,6 @@ export const ConfirmSwapModal = ({
 
                 <div className="mt-3 space-y-4">
                     {/* From Account */}
-
                     <AmountSummary
                         amount={fromAmount || ''}
                         avatarSeed={fromToken?.toString() ?? '?'}
@@ -124,7 +99,7 @@ export const ConfirmSwapModal = ({
                     />
                 </div>
 
-                {/* Add to contacts section - only show if recipient is not in contacts */}
+                {/* Force user to accept slippage is it is deemed high */}
                 {isHighSlippage && (
                     <div
                         className="cursor-pointer rounded-xl border border-yellow-200 bg-yellow-50 p-4 transition-colors hover:bg-yellow-100 dark:border-yellow-700/30 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30"
