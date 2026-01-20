@@ -203,7 +203,7 @@ export const SwapPage = () => {
         useState<z.infer<typeof zSelectedTokenFieldType>>();
 
     const onCenterClick = () => {
-        if (currentTab == zCurrentTab.Values.Swap) {
+        if (isSwapTab) {
             setToken1Id(token2Id);
             setToken2Id(token1Id);
             setToken1Amount(token2Amount);
@@ -752,9 +752,9 @@ export const SwapPage = () => {
                             ? "Select different tokens"
                             : !token1Amount
                                 ? "Enter amount"
-                                : currentTab === "Swap"
+                                : currentTab === zCurrentTab.Values.Swap
                                     ? "Swap"
-                                    : liquidityDirection === "Add"
+                                    : liquidityDirection === zLiquidityDirection.Values.Add
                                         ? focusedPool
                                             ? "Add liquidity"
                                             : "Create pool"
