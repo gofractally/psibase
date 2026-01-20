@@ -38,12 +38,9 @@ import { useQuoteSwap } from "./hooks/use-quote-swap";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
-import { useCreatePool } from "./hooks/use-create-pool";
 import { PoolPicker } from "./components/pool-picker";
 import { useQuoteAdd } from "./hooks/use-quote-add";
 import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
-import { useRemoveLiquidity } from "./hooks/use-remove-liquidity";
-import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
 import { CreatePoolModal } from "./components/create-pool-modal";
 import { RemoveLiquidityModal } from "./components/remove-liquidity-modal";
 
@@ -250,18 +247,18 @@ export const SwapPage = () => {
     const token1 = selectableTokens.find((token) => token.id == token1Id);
     const token2 = selectableTokens.find((token) => token.id == token2Id);
 
-    const { data: quotedAmount, error: quoteError } = useQuoteSwap(isSwapTab, token1Id, token1Amount, token2Id, slippage)
+    const { data: quotedSwap, error: quoteError } = useQuoteSwap(isSwapTab, token1Id, token1Amount, token2Id, slippage)
 
-    const swapQuotePoolIds = quotedAmount && Array.from(quotedAmount.pools).map(String)
+    const swapQuotePoolIds = quotedSwap && Array.from(quotedSwap.pools).map(String)
 
-    const priceImpact = quotedAmount ? quotedAmount.slippage / 10000 : 0;
+    const priceImpact = quotedSwap ? quotedSwap.slippage / 10000 : 0;
 
 
     useEffect(() => {
-        if (quotedAmount && isSwapTab) {
-            setToken2Amount(quotedAmount.toReturn)
+        if (quotedSwap && isSwapTab) {
+            setToken2Amount(quotedSwap.toReturn)
         }
-    }, [quotedAmount, isSwapTab])
+    }, [quotedSwap, isSwapTab])
 
 
     const [selectingToken, setSelectingToken] =
@@ -398,7 +395,9 @@ export const SwapPage = () => {
                     setShowSwap(e);
                 }}
                 show={showSwap}
-                minimumReturn={quotedAmount && quotedAmount.minimumReturn}
+                minimumReturn={quotedSwap && quotedSwap.minimumReturn}
+                expectedReturn={quotedSwap && quotedSwap.toReturn}
+                isHighSlippage={priceImpact > 10}
                 fromAmount={token1Amount}
                 fromToken={token1Id}
                 toToken={token2Id}
@@ -546,7 +545,7 @@ export const SwapPage = () => {
                             <div className="flex justify-between">
                                 <span>Minimum output</span>
                                 <span>
-                                    ~{quotedAmount?.minimumReturn}
+                                    ~{quotedSwap?.minimumReturn}
                                 </span>
                             </div>
                             <div className="flex justify-between">
