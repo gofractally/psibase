@@ -20,6 +20,7 @@ import { RadioGroup, RadioGroupItem } from "@shared/shadcn/ui/radio-group";
 
 import { levelStyles } from "./level-styles";
 import { LevelBadge } from "./permission-level-badge";
+import { AccountName } from "./account-name";
 
 interface Props {
     permissionRequest: PermissionRequest;
@@ -50,18 +51,11 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
                 </CardTitle>
                 <CardDescription>
                     The{" "}
-                    <span className="text-foreground font-medium">
-                        {permissionRequest.caller}
-                    </span>{" "}
+                    <AccountName type="app">{permissionRequest.caller}</AccountName>{" "}
                     app wants to use the{" "}
-                    <span className="text-foreground font-medium">
-                        {permissionRequest.callee}
-                    </span>{" "}
+                    <AccountName type="app">{permissionRequest.callee}</AccountName>{" "}
                     app on behalf of{" "}
-                    <span className="text-foreground font-medium">
-                        {permissionRequest.user}
-                    </span>
-                    .
+                    <AccountName type="account">{permissionRequest.user}</AccountName>.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -133,26 +127,21 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
                 </div>
 
                 <CardDescription className="text-sm">
-                    By clicking 'Allow', you will{" "}
-                    {duration === "permanent" ? "permanently grant" : "grant"}{" "}
-                    <span className="text-foreground font-semibold">
-                        {permissionRequest.caller}
-                    </span>{" "}
+                    By clicking <span className="italic text-foreground">Trust {permissionRequest.caller}</span>, you will{" "}
+                    {duration === "permanent" ? "permanently grant " : "grant "}
+                    <AccountName type="app">{permissionRequest.caller}</AccountName>{" "}
                     permission to perform these operations within the{" "}
-                    <span className="text-foreground font-semibold">
-                        {permissionRequest.callee}
-                    </span>{" "}
+                    <AccountName type="app">{permissionRequest.callee}</AccountName>{" "}
                     app on your behalf
                     {duration === "session"
-                        ? " for the remainder of this browser session"
-                        : ""}
-                    .
+                        ? " for the remainder of this browser session."
+                        : "."}
                 </CardDescription>
             </CardContent>
 
             <CardFooter className="flex justify-center gap-4">
                 <Button onClick={allow} size="lg">
-                    Trust {permissionRequest.caller}
+                    Trust {permissionRequest.caller} app
                 </Button>
                 <Button onClick={cancel} variant="outline" size="lg">
                     Cancel
