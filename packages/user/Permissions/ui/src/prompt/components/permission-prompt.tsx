@@ -140,7 +140,7 @@ export const PermissionPrompt = ({ permissionRequest }: Props) => {
                 </div>
 
                 <CardDescription className="text-sm">
-                    By clicking <span className="italic text-foreground">Trust {permissionRequest.caller}</span>, you will{" "}
+                    By clicking <span className="italic text-foreground">Trust {permissionRequest.caller} app</span>, you will{" "}
                     {duration === "permanent" ? "permanently grant " : "grant "}
                     <AccountName type="app">{permissionRequest.caller}</AccountName>{" "}
                     permission to perform these operations within the{" "}
