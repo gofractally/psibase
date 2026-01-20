@@ -18,7 +18,6 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium :
             - Set cache mode
         ",
         High => "
