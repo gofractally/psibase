@@ -28,6 +28,7 @@ namespace psibase
    static constexpr NativeTableNum envTable                   = 16;  // subjective
    static constexpr NativeTableNum hostConfigTable            = 17;  // subjective
    static constexpr NativeTableNum pendingShutdownTable       = 18;  // subjective
+   static constexpr NativeTableNum timerTable                 = 19;  // subjective
 
    static constexpr uint8_t nativeTablePrimaryIndex = 0;
 
@@ -451,6 +452,19 @@ namespace psibase
    };
    using PendingShutdownTable = Table<PendingShutdownRow, SingletonKey{}>;
 
+   auto timerKey() -> KeyPrefixType;
+   struct TimerRow
+   {
+      MonotonicTimePointUSec expiration;
+      psibase::AccountNumber service;
+      psibase::MethodNumber  method;
+
+      static const auto db = psibase::DbId::nativeSession;
+      auto              key() const -> KeyPrefixType;
+      PSIO_REFLECT(TimerRow, expiration, service, method)
+   };
+   using TimerTable = Table<TimerRow, SingletonKey{}>;
+
    struct Native
    {
       using Tables = ExternTables<void,
@@ -471,7 +485,8 @@ namespace psibase
                                   RunTable,
                                   EnvTable,
                                   HostConfigTable,
-                                  PendingShutdownTable>;
+                                  PendingShutdownTable,
+                                  TimerTable>;
       static Tables tables(KvMode mode = KvMode::readWrite)
       {
          return Tables{proxyKvOpen(DbId::native, {}, mode), mode};
