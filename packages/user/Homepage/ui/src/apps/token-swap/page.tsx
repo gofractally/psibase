@@ -550,7 +550,7 @@ export const SwapPage = () => {
                             </div>
                             <div className="flex justify-between">
                                 <span>Slippage tolerance</span>
-                                <span>{slippage}%</span>
+                                <span>{slippage * 100}%</span>
                             </div>
                             <div className="flex justify-between">
                                 <span>Price impact</span>
