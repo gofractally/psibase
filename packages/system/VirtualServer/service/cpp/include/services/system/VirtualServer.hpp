@@ -184,6 +184,14 @@ namespace SystemService
 
       void notifyBlock(psibase::BlockNum block_num);
 
+      /// The Accounts service will initialize every new user, which constructs the account's reserve
+      /// (with a balance of zero) in its own tables. This is therefore paid for by the account creator
+      /// and is part of account initialization, so subsequent writes to the reserve do not consume additional
+      /// storage resources (storage delta always = 0).
+      ///
+      /// In other words, this helps break the chicken/egg situation where we would have to allow a db write
+      /// (to init the user reserve) before we know how many resources the user has available for writes (because
+      /// the reserve hasn't been initialized).
       void initUser(psibase::AccountNumber user);
 
       /// This actions sets the CPU limit for the specified account.
