@@ -97,7 +97,7 @@ impl TokensPlugin {
 
 impl Issuer for TokensPlugin {
     fn create(precision: u8, max_supply: Decimal) -> Result<(), Error> {
-        // assert_authorized(FunctionName::create)?;
+        assert_authorized(FunctionName::create)?;
 
         let max_issued_supply =
             Quantity::from_str(&max_supply, precision.try_into().unwrap()).unwrap();
@@ -128,7 +128,7 @@ impl Issuer for TokensPlugin {
     fn mint(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
 
-        // assert_authorized(FunctionName::mint)?;
+        assert_authorized(FunctionName::mint)?;
 
         let packed_args = Actions::mint {
             amount,
