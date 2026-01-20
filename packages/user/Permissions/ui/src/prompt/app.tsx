@@ -24,8 +24,11 @@ export const App = () => {
     return (
         <div className="flex min-h-screen items-center justify-center p-6">
             {error ? (
-                <ErrorCard error={error} title="Error" />
-            ) : isPending ? (
+                <ErrorCard
+                    error={error instanceof Error ? error : new Error(String(error))}
+                    title="Error"
+                />
+            ) : isPending || !data ? (
                 <LoadingSkeleton />
             ) : (
                 <PermissionPrompt permissionRequest={data} />
