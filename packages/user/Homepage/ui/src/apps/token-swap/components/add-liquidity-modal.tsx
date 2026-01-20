@@ -1,3 +1,6 @@
+import { Plus } from "lucide-react";
+
+import { TokenAmount } from "@shared/lib/plugins/token-swap";
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -7,13 +10,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-import { Button } from '@shared/shadcn/ui/button'
+import { Button } from "@shared/shadcn/ui/button";
 
 import { useAddLiquidity } from "../hooks/use-add-liquidity";
-import { TokenAmount } from '@shared/lib/plugins/token-swap'
 import { AmountSummary } from "./amount-summary";
-import { Plus } from "lucide-react";
-
 
 export const AddLiquidityModal = ({
     show,
@@ -25,23 +25,20 @@ export const AddLiquidityModal = ({
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
-    poolId?: number,
-    firstDeposit?: TokenAmount,
-    secondDeposit?: TokenAmount,
-    onSuccess?: () => void,
+    poolId?: number;
+    firstDeposit?: TokenAmount;
+    secondDeposit?: TokenAmount;
+    onSuccess?: () => void;
 }) => {
-
-    const { mutateAsync: addLiquidity, isPending } = useAddLiquidity()
-
-
+    const { mutateAsync: addLiquidity, isPending } = useAddLiquidity();
 
     const trigger = async () => {
-        await addLiquidity([poolId!, firstDeposit!, secondDeposit!])
+        await addLiquidity([poolId!, firstDeposit!, secondDeposit!]);
         if (onSuccess) {
             onSuccess();
         }
-        openChange(false)
-    }
+        openChange(false);
+    };
 
     return (
         <AlertDialog open={show}>
@@ -59,12 +56,11 @@ export const AddLiquidityModal = ({
                 <div className="mt-3 space-y-4">
                     {/* From Account */}
                     <AmountSummary
-                        amount={firstDeposit?.amount || ''}
-                        avatarSeed={firstDeposit?.tokenId?.toString() ?? '?'}
-                        label='Deposit #1'
-                        title={firstDeposit?.tokenId.toString() ?? '?'}
+                        amount={firstDeposit?.amount || ""}
+                        avatarSeed={firstDeposit?.tokenId?.toString() ?? "?"}
+                        label="Deposit #1"
+                        title={firstDeposit?.tokenId.toString() ?? "?"}
                     />
-
 
                     <div className="flex justify-center">
                         <Plus className="text-slate-600 dark:text-slate-400" />
@@ -72,18 +68,18 @@ export const AddLiquidityModal = ({
 
                     {/* To Account */}
                     <AmountSummary
-                        amount={secondDeposit?.amount ?? ''}
-                        avatarSeed={secondDeposit?.tokenId?.toString() ?? '?'}
-                        label='Deposit #2'
-                        title={secondDeposit?.tokenId?.toString() ?? '?'}
+                        amount={secondDeposit?.amount ?? ""}
+                        avatarSeed={secondDeposit?.tokenId?.toString() ?? "?"}
+                        label="Deposit #2"
+                        title={secondDeposit?.tokenId?.toString() ?? "?"}
                     />
                 </div>
 
-
-
                 <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
                     <AlertDialogCancel
-                        onClick={() => { openChange(false) }}
+                        onClick={() => {
+                            openChange(false);
+                        }}
                         className="order-2 w-full sm:order-1 sm:w-auto"
                     >
                         Cancel
@@ -91,7 +87,7 @@ export const AddLiquidityModal = ({
                     <Button
                         type="button"
                         onClick={() => {
-                            trigger()
+                            trigger();
                         }}
                         disabled={isPending}
                         className="order-1 sm:order-2"

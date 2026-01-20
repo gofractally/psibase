@@ -1,9 +1,10 @@
 import z from "zod";
 
-import {
-    tokens,
-    usePluginFunctionMutation,
-} from "@shared/lib/plugins";
+import { useUserTokenBalances } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
+
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+import { tokens, usePluginFunctionMutation } from "@shared/lib/plugins";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -12,8 +13,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { useUserTokenBalances } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
 
 export const DevModal = ({
     show,
@@ -22,18 +21,16 @@ export const DevModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-
-    const { data: currentUser } = useCurrentUser()
-    const { refetch: refetchTokenBalances } = useUserTokenBalances(currentUser)
-
+    const { data: currentUser } = useCurrentUser();
+    const { refetch: refetchTokenBalances } = useUserTokenBalances(currentUser);
 
     const { mutateAsync: createToken, isPending: isCreatingToken } =
         usePluginFunctionMutation(tokens.issuer.create, {});
     const { mutateAsync: mintToken, isPending: isMintingToken } =
         usePluginFunctionMutation(tokens.issuer.mint, {
             onSuccess: () => {
-                refetchTokenBalances()
-            }
+                refetchTokenBalances();
+            },
         });
 
     const createTwoTokens = async () => {
@@ -63,9 +60,7 @@ export const DevModal = ({
                                 z
                                     .number({ coerce: true })
                                     .parse(window.prompt("Token ID?")),
-                                z
-                                    .string()
-                                    .parse(window.prompt("Amount?")),
+                                z.string().parse(window.prompt("Amount?")),
                                 "",
                             ]);
                         }}
@@ -73,7 +68,6 @@ export const DevModal = ({
                     >
                         Mint
                     </Button>
-
                 </div>
             </DialogContent>
         </Dialog>

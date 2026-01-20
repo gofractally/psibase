@@ -1,3 +1,6 @@
+import { Minus } from "lucide-react";
+
+import { TokenAmount } from "@shared/lib/plugins/token-swap";
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -7,15 +10,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-import { Button } from '@shared/shadcn/ui/button'
+import { Button } from "@shared/shadcn/ui/button";
 
-import { TokenAmount } from '@shared/lib/plugins/token-swap'
-import { useRemoveLiquidity } from "../hooks/use-remove-liquidity";
-import { useQuotePoolTokens } from "../hooks/use-quote-pool-tokens";
 import { usePools } from "../hooks/use-pools";
+import { useQuotePoolTokens } from "../hooks/use-quote-pool-tokens";
+import { useRemoveLiquidity } from "../hooks/use-remove-liquidity";
 import { AmountSummary } from "./amount-summary";
-import { Minus } from "lucide-react";
-
 
 export const RemoveLiquidityModal = ({
     show,
@@ -25,25 +25,30 @@ export const RemoveLiquidityModal = ({
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
-    amount?: TokenAmount,
-    onSuccess?: () => void,
+    amount?: TokenAmount;
+    onSuccess?: () => void;
 }) => {
-
     const { data: pools } = usePools(4000);
-    const focusedPool = (pools || []).find(pool => pool.id == amount?.tokenId)
+    const focusedPool = (pools || []).find(
+        (pool) => pool.id == amount?.tokenId,
+    );
 
-    const { data: outputs } = useQuotePoolTokens(!!focusedPool, focusedPool, amount?.amount)
-    const { mutateAsync: removeLiquidity, isPending } = useRemoveLiquidity()
+    const { data: outputs } = useQuotePoolTokens(
+        !!focusedPool,
+        focusedPool,
+        amount?.amount,
+    );
+    const { mutateAsync: removeLiquidity, isPending } = useRemoveLiquidity();
 
     const [firstWithdrawal, secondWithdrawal] = outputs || [];
 
     const trigger = async () => {
-        await removeLiquidity([amount!])
+        await removeLiquidity([amount!]);
         if (onSuccess) {
             onSuccess();
         }
-        openChange(false)
-    }
+        openChange(false);
+    };
 
     return (
         <AlertDialog open={show}>
@@ -53,37 +58,37 @@ export const RemoveLiquidityModal = ({
                         Confirm Swap
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
-                        Please review the details before confirming your
-                        trade.
+                        Please review the details before confirming your trade.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div className="mt-3 space-y-4">
                     <AmountSummary
-                        amount={firstWithdrawal?.amount || ''}
-                        avatarSeed={firstWithdrawal?.tokenId?.toString() ?? '?'}
-                        label='Withdrawal #1'
-                        title={firstWithdrawal?.tokenId.toString() ?? '?'}
+                        amount={firstWithdrawal?.amount || ""}
+                        avatarSeed={firstWithdrawal?.tokenId?.toString() ?? "?"}
+                        label="Withdrawal #1"
+                        title={firstWithdrawal?.tokenId.toString() ?? "?"}
                     />
-
 
                     <div className="flex justify-center">
                         <Minus className="text-slate-600 dark:text-slate-400" />
                     </div>
 
                     <AmountSummary
-                        amount={secondWithdrawal?.amount ?? ''}
-                        avatarSeed={secondWithdrawal?.tokenId?.toString() ?? '?'}
-                        label='Withdrawal #2'
-                        title={secondWithdrawal?.tokenId?.toString() ?? '?'}
+                        amount={secondWithdrawal?.amount ?? ""}
+                        avatarSeed={
+                            secondWithdrawal?.tokenId?.toString() ?? "?"
+                        }
+                        label="Withdrawal #2"
+                        title={secondWithdrawal?.tokenId?.toString() ?? "?"}
                     />
                 </div>
 
-
-
                 <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
                     <AlertDialogCancel
-                        onClick={() => { openChange(false) }}
+                        onClick={() => {
+                            openChange(false);
+                        }}
                         className="order-2 w-full sm:order-1 sm:w-auto"
                     >
                         Cancel
@@ -91,7 +96,7 @@ export const RemoveLiquidityModal = ({
                     <Button
                         type="button"
                         onClick={() => {
-                            trigger()
+                            trigger();
                         }}
                         disabled={isPending}
                         className="order-1 sm:order-2"

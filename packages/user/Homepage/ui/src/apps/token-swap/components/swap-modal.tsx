@@ -1,9 +1,6 @@
-import { Button } from '@shared/shadcn/ui/button'
-
-import { useSwap } from "../hooks/use-swap";
-import { usePools } from "../hooks/use-pools";
+import { ArrowDown } from "lucide-react";
+import { useBoolean } from "usehooks-ts";
 import z from "zod";
-
 
 import {
     AlertDialog,
@@ -14,12 +11,11 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
-import { ArrowDown } from "lucide-react";
-import { useBoolean } from "usehooks-ts";
-import { AmountSummary } from './amount-summary';
+import { Button } from "@shared/shadcn/ui/button";
 
-
-
+import { usePools } from "../hooks/use-pools";
+import { useSwap } from "../hooks/use-swap";
+import { AmountSummary } from "./amount-summary";
 
 export const ConfirmSwapModal = ({
     show,
@@ -35,32 +31,41 @@ export const ConfirmSwapModal = ({
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
-    poolIds?: string[],
-    expectedReturn?: string,
-    isHighSlippage: boolean,
-    minimumReturn?: string
-    fromAmount?: string,
-    fromToken?: number,
-    toToken?: number,
-    onSuccess?: () => void,
+    poolIds?: string[];
+    expectedReturn?: string;
+    isHighSlippage: boolean;
+    minimumReturn?: string;
+    fromAmount?: string;
+    fromToken?: number;
+    toToken?: number;
+    onSuccess?: () => void;
 }) => {
     const { mutateAsync: swap, isPending } = useSwap();
 
     const { data: pools } = usePools();
 
-    console.log({ pools, })
+    console.log({ pools });
 
-
-    const { toggle: toggleUserAcceptsSlippage, value: isUserAcceptingOfSlippage } = useBoolean(false)
+    const {
+        toggle: toggleUserAcceptsSlippage,
+        value: isUserAcceptingOfSlippage,
+    } = useBoolean(false);
     const blockDueToSlippage = isHighSlippage && !isUserAcceptingOfSlippage;
 
     const triggerSwap = async () => {
-        await swap([z.string().array().parse(poolIds), { amount: z.string().parse(fromAmount), tokenId: z.number().parse(fromToken), }, z.string().parse(minimumReturn)])
+        await swap([
+            z.string().array().parse(poolIds),
+            {
+                amount: z.string().parse(fromAmount),
+                tokenId: z.number().parse(fromToken),
+            },
+            z.string().parse(minimumReturn),
+        ]);
         if (onSuccess) {
             onSuccess();
         }
-        openChange(false)
-    }
+        openChange(false);
+    };
 
     return (
         <AlertDialog open={show}>
@@ -70,20 +75,18 @@ export const ConfirmSwapModal = ({
                         Confirm Swap
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
-                        Please review the details before confirming your
-                        trade.
+                        Please review the details before confirming your trade.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div className="mt-3 space-y-4">
                     {/* From Account */}
                     <AmountSummary
-                        amount={fromAmount || ''}
-                        avatarSeed={fromToken?.toString() ?? '?'}
-                        label='From'
-                        title={fromToken?.toString() ?? '?'}
+                        amount={fromAmount || ""}
+                        avatarSeed={fromToken?.toString() ?? "?"}
+                        label="From"
+                        title={fromToken?.toString() ?? "?"}
                     />
-
 
                     {/* Arrow */}
                     <div className="flex justify-center">
@@ -92,10 +95,10 @@ export const ConfirmSwapModal = ({
 
                     {/* To Account */}
                     <AmountSummary
-                        amount={expectedReturn ?? ''}
-                        avatarSeed={toToken?.toString() ?? '?'}
-                        label='To'
-                        title={toToken?.toString() ?? '?'}
+                        amount={expectedReturn ?? ""}
+                        avatarSeed={toToken?.toString() ?? "?"}
+                        label="To"
+                        title={toToken?.toString() ?? "?"}
                     />
                 </div>
 
@@ -124,7 +127,7 @@ export const ConfirmSwapModal = ({
                                         checked={isUserAcceptingOfSlippage}
                                         onChange={(e) => {
                                             e.stopPropagation();
-                                            toggleUserAcceptsSlippage()
+                                            toggleUserAcceptsSlippage();
                                         }}
                                         className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500 dark:border-yellow-600/50 dark:bg-yellow-800/20 dark:ring-yellow-500/50"
                                     />
@@ -142,7 +145,9 @@ export const ConfirmSwapModal = ({
 
                 <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
                     <AlertDialogCancel
-                        onClick={() => { openChange(false) }}
+                        onClick={() => {
+                            openChange(false);
+                        }}
                         className="order-2 w-full sm:order-1 sm:w-auto"
                     >
                         Cancel
@@ -150,7 +155,7 @@ export const ConfirmSwapModal = ({
                     <Button
                         type="button"
                         onClick={() => {
-                            triggerSwap()
+                            triggerSwap();
                         }}
                         disabled={isPending || blockDueToSlippage}
                         className="order-1 sm:order-2"
@@ -169,4 +174,3 @@ export const ConfirmSwapModal = ({
         </AlertDialog>
     );
 };
-

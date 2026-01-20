@@ -36,7 +36,7 @@ export const TradeSettingsModal = ({
         if (!show) return;
 
         const presetMatch = PRESET_SLIPPAGES.find(
-            (p) => Math.abs(p - displayedSlippage) < 0.001
+            (p) => Math.abs(p - displayedSlippage) < 0.001,
         );
 
         if (presetMatch !== undefined) {
@@ -85,11 +85,16 @@ export const TradeSettingsModal = ({
                             {PRESET_SLIPPAGES.map((preset) => (
                                 <Button
                                     key={preset}
-                                    variant={activePreset === preset ? "default" : "outline"}
+                                    variant={
+                                        activePreset === preset
+                                            ? "default"
+                                            : "outline"
+                                    }
                                     size="sm"
                                     className={cn(
                                         "flex-1",
-                                        activePreset === preset && "bg-primary text-primary-foreground"
+                                        activePreset === preset &&
+                                            "bg-primary text-primary-foreground",
                                     )}
                                     onClick={() => handlePresetClick(preset)}
                                 >
@@ -106,15 +111,16 @@ export const TradeSettingsModal = ({
                                 placeholder="Custom"
                                 className="max-w-[120px]"
                             />
-                            <span className="text-muted-foreground text-sm">%</span>
+                            <span className="text-muted-foreground text-sm">
+                                %
+                            </span>
                         </div>
 
                         <p className="text-muted-foreground text-xs">
-                            Your transaction may revert if price changes unfavorably by more
-                            than this percentage.
+                            Your transaction may revert if price changes
+                            unfavorably by more than this percentage.
                         </p>
                     </div>
-
                 </div>
             </DialogContent>
         </Dialog>

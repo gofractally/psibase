@@ -1,4 +1,6 @@
 import { ChevronDown } from "lucide-react";
+
+import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -6,7 +8,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-import { Badge } from "@shared/shadcn/ui/badge";
 
 type Pool = {
     id: number;
@@ -18,7 +19,7 @@ type Pool = {
 
 interface PoolPickerProps {
     pools: Pool[];
-    disableCreate?: boolean,
+    disableCreate?: boolean;
     focusedPoolId: number | null | undefined;
     setFocusedPoolId: (id: number | undefined) => void;
     className?: string;
@@ -37,17 +38,19 @@ export function PoolPicker({
 
     const selectedPool = pools.find((p) => p.id === focusedPoolId);
 
-    const label = selectedPool
-        ? `Pool #${selectedPool.id}`
-        : "Create pool";
-
+    const label = selectedPool ? `Pool #${selectedPool.id}` : "Create pool";
 
     return (
         <div className={`space-y-2 ${className || ""}`}>
-            <label className="text-sm text-muted-foreground">Liquidity Pool</label>
+            <label className="text-muted-foreground text-sm">
+                Liquidity Pool
+            </label>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between">
+                    <Button
+                        variant="outline"
+                        className="w-full justify-between"
+                    >
                         <span>{label}</span>
                         <ChevronDown className="h-4 w-4 opacity-50" />
                     </Button>
@@ -63,8 +66,9 @@ export function PoolPicker({
                                 <span className="font-medium">
                                     Pool #{pool.id}
                                 </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {pool.tokenASymbol || pool.tokenAId} ↔ {pool.tokenBSymbol || pool.tokenBId}
+                                <span className="text-muted-foreground text-xs">
+                                    {pool.tokenASymbol || pool.tokenAId} ↔{" "}
+                                    {pool.tokenBSymbol || pool.tokenBId}
                                 </span>
                             </div>
                             {focusedPoolId === pool.id && (
@@ -72,27 +76,27 @@ export function PoolPicker({
                             )}
                         </DropdownMenuItem>
                     ))}
-                    {!disableCreate && <DropdownMenuItem
-                        onSelect={() => setFocusedPoolId(undefined)}
-                        className="flex justify-between"
-                    >
-                        <div className="flex flex-col">
-                            <span className="font-medium">
-                                New pool
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                {' Add '}
-                            </span>
-                        </div>
-                        {focusedPoolId === null && (
-                            <Badge variant="secondary">Selected</Badge>
-                        )}
-                    </DropdownMenuItem>}
+                    {!disableCreate && (
+                        <DropdownMenuItem
+                            onSelect={() => setFocusedPoolId(undefined)}
+                            className="flex justify-between"
+                        >
+                            <div className="flex flex-col">
+                                <span className="font-medium">New pool</span>
+                                <span className="text-muted-foreground text-xs">
+                                    {" Add "}
+                                </span>
+                            </div>
+                            {focusedPoolId === null && (
+                                <Badge variant="secondary">Selected</Badge>
+                            )}
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
 
             {pools.length > 1 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                     Multiple pools exist for this pair.
                 </p>
             )}

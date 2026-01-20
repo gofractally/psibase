@@ -9,6 +9,6 @@ export const useQuoteAdd = (
 ) =>
     usePluginFunctionQuery(
         tokenSwap.liquidity.quoteAddLiquidity,
-        [pool!, { amount: amount!, tokenId: tokenId!}],
+        [pool!, { amount: amount!, tokenId: tokenId! }],
         { enabled },
     );

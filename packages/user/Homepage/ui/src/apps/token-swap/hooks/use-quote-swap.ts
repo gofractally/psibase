@@ -11,7 +11,13 @@ export const useQuoteSwap = (
     const isAmountValid = !amount?.endsWith(".");
     return usePluginFunctionQuery(
         tokenSwap.swap.quote,
-        [undefined, { amount: amount!, tokenId: fromToken!}, toToken!, (slippageTolerance || 0) * 1000000, 3],
+        [
+            undefined,
+            { amount: amount!, tokenId: fromToken! },
+            toToken!,
+            (slippageTolerance || 0) * 1000000,
+            3,
+        ],
         {
             enabled: !!(
                 fromToken &&
@@ -20,7 +26,7 @@ export const useQuoteSwap = (
                 isAmountValid &&
                 enabled
             ),
-            retry: false
+            retry: false,
         },
     );
 };
