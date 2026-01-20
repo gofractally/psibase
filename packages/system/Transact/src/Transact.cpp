@@ -495,7 +495,11 @@ namespace SystemService
          {
             flags |= AuthInterface::firstAuthFlag;
 
-            to<VirtualServer>().setCpuLimit(act.sender());
+            if (isResMonitoring())
+            {
+               // If resMonitoring is disabled, no CPU limit is set for the transaction
+               to<VirtualServer>().setCpuLimit(act.sender());
+            }
          }
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
