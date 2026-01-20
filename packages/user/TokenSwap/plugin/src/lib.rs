@@ -233,11 +233,12 @@ impl Liquidity for TokenSwapPlugin {
         pool: WitPool,
         user_pool_token_balance: Option<String>,
         desired_amount: TokenAmount,
-    ) -> Result<String, Error> {
+    ) -> Result<(TokenAmount, TokenAmount, TokenAmount), Error> {
         assert_authed(FunctionName::quote_remove_liquidity)?;
 
         let a_balance = Decimal::from_str(&pool.a_balance).unwrap();
         let b_balance = Decimal::from_str(&pool.b_balance).unwrap();
+        let pool_id = pool.id;
         let pool_token_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
         let pool_token_precision = pool_token_supply.precision;
         let pool_token_quantity = pool_token_supply.quantity;
@@ -260,7 +261,16 @@ impl Liquidity for TokenSwapPlugin {
                 .min(decimal_to_u64(pool.liquidity_token, &user_pool_token_balance)?.into())
         }
 
-        Ok(Decimal::new(required_pool_tokens, pool_token_precision).to_string())
+        let pool_tokens_dec = Decimal::new(required_pool_tokens, pool_token_precision).to_string();
+
+        let (a_amount, b_amount) = Self::quote_pool_tokens(pool.into(), pool_tokens_dec.clone())?;
+
+        let pool_token_amount = TokenAmount {
+            amount: pool_tokens_dec,
+            token_id: pool_id,
+        };
+
+        Ok((pool_token_amount, a_amount, b_amount))
     }
 
     fn remove_liquidity(amount: TokenAmount) -> Result<(), Error> {
@@ -310,7 +320,7 @@ impl Liquidity for TokenSwapPlugin {
     fn quote_add_liquidity(pool: WitPool, amount: TokenAmount) -> Result<String, Error> {
         assert_authed(FunctionName::quote_add_liquidity)?;
 
-        let (incoming_token, opposing_token) = if pool.token_a_id == amount.token_id {
+        let (quoting_token, opposing_token) = if pool.token_a_id == amount.token_id {
             (pool.token_a_id, pool.token_b_id)
         } else if pool.token_b_id == amount.token_id {
             (pool.token_b_id, pool.token_a_id)
@@ -322,13 +332,13 @@ impl Liquidity for TokenSwapPlugin {
 
         let pool = GraphPool::from(pool);
 
-        let (incoming_reserve, outgoing_reserve) = if incoming_token == pool.token_a {
+        let (quoting_reserve, opposing_reserve) = if quoting_token == pool.token_a {
             (pool.reserve_a, pool.reserve_b)
         } else {
             (pool.reserve_b, pool.reserve_a)
         };
 
-        let expected_balance = mul_div(quoting_amount, outgoing_reserve, incoming_reserve);
+        let expected_balance = mul_div(quoting_amount, opposing_reserve, quoting_reserve);
 
         u64_to_decimal(opposing_token, expected_balance.value)
     }

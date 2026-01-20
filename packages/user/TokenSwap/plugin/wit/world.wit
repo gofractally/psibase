@@ -118,8 +118,7 @@ interface liquidity {
 
     /// Calculates how many LP tokens must be burned to withdraw a desired amount of one reserve token.
     ///
-    /// Returns the exact LP token amount needed to receive at least the requested reserve amount
-    /// (the other reserve token is withdrawn proportionally).
+    /// Returns a tuple of 3 token amounts, the exact LP token amount needed to receive the subsequent token reserves.
     ///
     /// Parameters:
     /// * `pool`                      - The current state of the pool
@@ -127,7 +126,9 @@ interface liquidity {
     ///                                 (may be used for validation or precision)
     /// * `desired-amount`            - The desired withdrawal amount of one reserve token
     ///                                 (must match either `token-a-id` or `token-b-id`)
-    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: token-amount) -> result<string, error>;
+    /// Returns:
+    /// * (Pool Tokens, First reserve, Second reserve)
+    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: token-amount) -> result<tuple<token-amount, token-amount, token-amount>, error>;
 
     /// Creates a new liquidity pool with the initial deposits of both reserve tokens.
     ///

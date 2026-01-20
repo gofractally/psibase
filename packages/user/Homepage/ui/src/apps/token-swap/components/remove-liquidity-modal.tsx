@@ -55,10 +55,10 @@ export const RemoveLiquidityModal = ({
             <AlertDialogContent className="max-w-md">
                 <AlertDialogHeader className="text-center">
                     <AlertDialogTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                        Confirm Swap
+                        Confirm Liquidity removal
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
-                        Please review the details before confirming your trade.
+                        Please review the details before confirming your liquidity withdrawal.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 

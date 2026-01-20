@@ -1,5 +1,7 @@
-import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plugin-function-mutation";
-import { tokenSwap } from "@shared/lib/plugins";
+import { tokenSwap, usePluginFunctionQuery } from "@shared/lib/plugins";
+import { Pool, TokenAmount } from "@shared/lib/plugins/token-swap";
 
-export const useQuoteRemoveLiquidity = () =>
-    usePluginFunctionMutation(tokenSwap.liquidity.quoteRemoveLiquidity);
+export const useQuoteRemoveLiquidity = (enabled: boolean, pool?: Pool, tokenBalance?: string, desiredAmount?: TokenAmount) =>
+    usePluginFunctionQuery(tokenSwap.liquidity.quoteRemoveLiquidity, [
+        pool!, tokenBalance, desiredAmount!
+    ], { enabled });

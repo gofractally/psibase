@@ -40,6 +40,7 @@ import { useQuoteAdd } from "./hooks/use-quote-add";
 import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
 import { useQuoteSwap } from "./hooks/use-quote-swap";
 import { useSlippageTolerance } from "./hooks/use-slippage-tolerance";
+import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
 
 const AmountField = ({
     amount,
@@ -133,9 +134,9 @@ const useAmount = () => {
 
     const obj = tokenId
         ? {
-              tokenId,
-              amount,
-          }
+            tokenId,
+            amount,
+        }
         : undefined;
 
     return {
@@ -377,16 +378,16 @@ export const SwapPage = () => {
                 ? maxWithdrawableLiquidity[0].amount
                 : maxWithdrawableLiquidity[1].amount
             : tokenBalances
-                  ?.find((balance) => balance.id == token1Id)
-                  ?.balance?.format({ includeLabel: false }) || "";
+                ?.find((balance) => balance.id == token1Id)
+                ?.balance?.format({ includeLabel: false }) || "";
     const token2Balance =
         isLiquidityDirectionRemove && maxWithdrawableLiquidity
             ? focusedPool?.tokenAId == token1Id
                 ? maxWithdrawableLiquidity[1].amount
                 : maxWithdrawableLiquidity[0].amount
             : tokenBalances
-                  ?.find((balance) => balance.id == token2Id)
-                  ?.balance?.format({ includeLabel: false });
+                ?.find((balance) => balance.id == token2Id)
+                ?.balance?.format({ includeLabel: false });
 
     const lastTouchedAmount = lastTouchedIs1 ? token1Amount : token2Amount;
     const lastTouchedAmountIsNumber = lastTouchedAmount !== "";
@@ -394,17 +395,26 @@ export const SwapPage = () => {
     const sameTokensSelected = token1Id === token2Id;
     const isSwapPossible = !sameTokensSelected;
 
+    const validQuote = !!(
+        isLiquidityTab &&
+        focusedPool &&
+        lastTouchedAmountIsNumber &&
+        !sameTokensSelected
+    );
+
     const { data: quotedAdd } = useQuoteAdd(
-        !!(
-            isLiquidityTab &&
-            focusedPool &&
-            lastTouchedAmountIsNumber &&
-            !sameTokensSelected
-        ),
+        validQuote,
         focusedPool,
         lastTouchedIs1 ? token1Id! : token2Id!,
         lastTouchedIs1 ? token1Amount : token2Amount,
     );
+
+    const { data: quotedRemove } = useQuoteRemoveLiquidity(validQuote, focusedPool, undefined, {
+        amount: lastTouchedIs1 ? token1Amount : token2Amount,
+        tokenId: lastTouchedIs1 ? token1Id! : token2Id!
+    })
+
+    console.log(quotedRemove, 'is quoted remove')
 
     const setAmount = (isTokenOne: boolean, amount: string) => {
         setLastTouchedIs1(isTokenOne);
@@ -427,11 +437,12 @@ export const SwapPage = () => {
             } else {
                 setToken1Amount(quotedAdd);
             }
-        } else if (quotedAdd && isLiquidityDirectionRemove) {
+        } else if (quotedRemove && isLiquidityDirectionRemove) {
+            const [_, reserveOne, reserveTwo] = quotedRemove;
             if (lastTouchedIs1) {
-                setToken2Amount(quotedAdd);
+                setToken2Amount(reserveOne.tokenId == token2Id ? reserveOne.amount : reserveTwo.amount);
             } else {
-                setToken1Amount(quotedAdd);
+                setToken1Amount(reserveOne.tokenId == token1Id ? reserveOne.amount : reserveTwo.amount);
             }
         }
     }, [
@@ -485,8 +496,8 @@ export const SwapPage = () => {
                 }}
                 onSuccess={onSuccess}
                 amount={
-                    quotedAdd && focusedPoolId
-                        ? { amount: quotedAdd, tokenId: focusedPoolId }
+                    quotedRemove && focusedPoolId
+                        ? quotedRemove[0]
                         : undefined
                 }
             />
@@ -573,8 +584,8 @@ export const SwapPage = () => {
                             isSwapTab
                                 ? "From"
                                 : isLiquidityDirectionAdd
-                                  ? "Deposit"
-                                  : "Withdraw"
+                                    ? "Deposit"
+                                    : "Withdraw"
                         }
                         setAmount={(amount) => {
                             setAmount(true, amount);
@@ -615,8 +626,8 @@ export const SwapPage = () => {
                             isSwapTab
                                 ? "To"
                                 : isLiquidityDirectionAdd
-                                  ? "Deposit"
-                                  : "Withdraw"
+                                    ? "Deposit"
+                                    : "Withdraw"
                         }
                         amount={token2Amount}
                         setAmount={(amount) => {
@@ -801,14 +812,14 @@ export const SwapPage = () => {
                         {sameTokensSelected
                             ? "Select different tokens"
                             : !token1Amount
-                              ? "Enter amount"
-                              : currentTab === "Swap"
-                                ? "Swap"
-                                : liquidityDirection === "Add"
-                                  ? focusedPool
-                                      ? "Add liquidity"
-                                      : "Create pool"
-                                  : "Remove liquidity"}
+                                ? "Enter amount"
+                                : currentTab === "Swap"
+                                    ? "Swap"
+                                    : liquidityDirection === "Add"
+                                        ? focusedPool
+                                            ? "Add liquidity"
+                                            : "Create pool"
+                                        : "Remove liquidity"}
                     </Button>
                 </CardFooter>
             </Card>
