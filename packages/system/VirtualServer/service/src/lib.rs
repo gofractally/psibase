@@ -373,7 +373,7 @@ mod service {
 
         let mut cost = NetPricing::consume(amount_bytes);
 
-        if isBillingDisabled() {
+        if !isBillingEnabled() {
             cost = 0
         }
         bill(user, cost);
@@ -383,10 +383,8 @@ mod service {
             .consumed(user, resources::NET, amount_bytes, cost);
     }
 
-    fn isBillingDisabled() -> bool {
-        BillingConfig::get()
-            .map(|c| c.enabled == false)
-            .unwrap_or(true)
+    fn isBillingEnabled() -> bool {
+        BillingConfig::get().map(|c| c.enabled).unwrap_or(false)
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -404,7 +402,7 @@ mod service {
         let amount_ns = amount_ns.saturating_sub(CPU_LEEWAY);
         let mut cost = CpuPricing::consume(amount_ns);
 
-        if isBillingDisabled() {
+        if !isBillingEnabled() {
             cost = 0
         }
         bill_from_reserve(user, cost);
@@ -460,7 +458,7 @@ mod service {
     //
     // Returns None if there is no limit for the specified account
     fn getCpuLimit(account: AccountNumber) -> Option<u64> {
-        if isBillingDisabled() {
+        if !isBillingEnabled() {
             return None;
         }
 
