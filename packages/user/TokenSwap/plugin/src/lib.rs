@@ -87,10 +87,10 @@ impl From<GraphQLPool> for WitPool {
             liquidity_token: graph_pool.liquidity_token,
             liquidity_token_supply: graph_pool.liquidity_token_supply.to_string(),
             token_a_id: graph_pool.reserve_a.token_id,
-            token_a_tariff_ppm: graph_pool.reserve_a.tariff_ppm,
+            token_a_fee_ppm: graph_pool.reserve_a.fee_ppm,
             a_balance: graph_pool.reserve_a.balance.to_string(),
             token_b_id: graph_pool.reserve_b.token_id,
-            token_b_tariff_ppm: graph_pool.reserve_b.tariff_ppm,
+            token_b_fee_ppm: graph_pool.reserve_b.fee_ppm,
             b_balance: graph_pool.reserve_b.balance.to_string(),
         }
     }

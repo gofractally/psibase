@@ -9,7 +9,7 @@ const zInt = z.number().int();
 const zReserve = z.object({
     poolId: zInt,
     tokenId: zInt,
-    tariffPpm: zInt,
+    feePpm: zInt,
     adminNft: zInt,
     balance: z.string(),
     symbol: zAccount.nullable(),
@@ -28,8 +28,8 @@ export type EnrichedPool = PoolInstance & {
     id: number;
     tokenAId: number;
     tokenBId: number;
-    tokenATariffPpm: number;
-    tokenBTariffPpm: number;
+    tokenAFeePpm: number;
+    tokenBFeePpm: number;
     aBalance: string;
     bBalance: string;
     tokenASymbol?: Account | null;
@@ -57,7 +57,7 @@ export const usePools = (refetchInterval = 12000) => {
                                 reserveA {
                                     poolId
                                     tokenId
-                                    tariffPpm
+                                    feePpm
                                     adminNft
                                     balance
                                     symbol
@@ -65,7 +65,7 @@ export const usePools = (refetchInterval = 12000) => {
                                 reserveB {
                                     poolId
                                     tokenId
-                                    tariffPpm
+                                    feePpm
                                     adminNft
                                     balance
                                     symbol
@@ -90,8 +90,8 @@ export const usePools = (refetchInterval = 12000) => {
                     id: pool.liquidityToken,
                     tokenAId: resA.tokenId,
                     tokenBId: resB.tokenId,
-                    tokenATariffPpm: resA.tariffPpm,
-                    tokenBTariffPpm: resB.tariffPpm,
+                    tokenAFeePpm: resA.feePpm,
+                    tokenBFeePpm: resB.feePpm,
                     aBalance: resA.balance,
                     bBalance: resB.balance,
                     tokenASymbol: resA.symbol,

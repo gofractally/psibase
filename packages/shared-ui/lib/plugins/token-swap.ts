@@ -8,8 +8,8 @@ export type Pool = {
     id: number;
     tokenAId: number;
     tokenBId: number;
-    tokenATariffPpm: number;
-    tokenBTariffPpm: number;
+    tokenAFeePpm: number;
+    tokenBFeePpm: number;
     aBalance: string;
     bBalance: string;
     liquidityToken: number;
