@@ -20,7 +20,7 @@ mod graphql;
 
 mod errors;
 use errors::ErrorType;
-use psibase::services::tokens::{Decimal, Quantity, TID};
+use psibase::services::tokens::{Decimal, Quantity};
 
 use crate::{
     bindings::{
@@ -48,7 +48,6 @@ define_trust! {
         Low => "",
         Medium => "",
         High => "
-        High trust allows:
             - Performing token swaps
             - Creating new liquidity pools
             - Adding and removing liquidity to / from pools
