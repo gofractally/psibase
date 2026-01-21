@@ -55,16 +55,6 @@ mod tests {
         balanceRaw: u64,
     }
 
-    #[derive(Deserialize)]
-    struct CpuPricingData {
-        cpuPricing: Option<CpuPricing>,
-    }
-
-    #[derive(Deserialize)]
-    struct CpuPricing {
-        availableUnits: u64,
-    }
-
     // Propose a system action
     // Automatically proposed by the producer account on behalf of a system service
     fn propose_sys_action<T: Pack>(
@@ -117,25 +107,6 @@ mod tests {
 
         let response_root: Response<BillingConfigData> = serde_json::from_value(config)?;
         Ok(response_root.data.getBillingConfig)
-    }
-
-    fn get_cpu_pricing(chain: &psibase::Chain) -> Result<CpuPricing, psibase::Error> {
-        let pricing: serde_json::Value = chain.graphql(
-            Wrapper::SERVICE,
-            r#"
-                query {
-                    cpuPricing {
-                        availableUnits
-                    }
-                }
-            "#,
-        )?;
-
-        let response_root: Response<CpuPricingData> = serde_json::from_value(pricing)?;
-        response_root
-            .data
-            .cpuPricing
-            .ok_or_else(|| psibase::anyhow!("CPU pricing not initialized"))
     }
 
     fn get_resource_balance(
@@ -253,11 +224,9 @@ mod tests {
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .buy_res(min_resource_buffer.into())
             .get()?;
-        let cpu_pricing = get_cpu_pricing(&chain)?;
         assert_eq!(
             get_resource_balance(&chain, PRODUCER_ACCOUNT, &token_prod)?,
-            min_resource_buffer - cpu_pricing.availableUnits // Price is always 1 at the start, so we
-                                                             // can just subtract the available units
+            min_resource_buffer
         );
 
         // Send some more tokens to the producer account
@@ -294,7 +263,7 @@ mod tests {
             .get()?;
         assert_eq!(
             get_resource_balance(&chain, alice, &token_a)?,
-            min_resource_buffer - cpu_pricing.availableUnits
+            min_resource_buffer
         );
 
         // Now alice can transact

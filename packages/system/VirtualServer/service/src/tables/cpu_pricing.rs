@@ -22,7 +22,7 @@ impl CpuPricing {
         CpuPricingTable::read_write().put(&cpu_diff).unwrap();
     }
 
-    fn get_check() -> Self {
+    pub fn get_check() -> Self {
         check_some(
             CpuPricingTable::read().get_index_pk().get(&()),
             "CPU time not initialized",
@@ -46,7 +46,7 @@ impl CpuPricing {
         cpu_time.current_usage_ns += amount_ns;
         table.put(&cpu_time).unwrap();
 
-        let price = Self::price();
+        let price = cpu_time.price();
 
         // Round up to the nearest billable unit
         let amount_units = (amount_ns + cpu_time.billable_unit - 1) / cpu_time.billable_unit;
@@ -72,8 +72,8 @@ impl CpuPricing {
         last_block_usage_ppm
     }
 
-    pub fn price() -> u64 {
-        DiffAdjust::call().get_diff(Self::get_check().diff_adjust_id)
+    pub fn price(&self) -> u64 {
+        DiffAdjust::call().get_diff(self.diff_adjust_id)
     }
 
     pub fn set_thresholds(idle_ppm: u32, congested_ppm: u32) {
@@ -120,7 +120,7 @@ impl CpuPricing {
 
     /// The price of CPU per billable unit of CPU
     pub async fn price_per_unit(&self) -> u64 {
-        DiffAdjust::call().get_diff(self.diff_adjust_id)
+        self.price()
     }
 
     /// The total number of available units of CPU time

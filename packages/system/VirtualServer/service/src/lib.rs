@@ -56,6 +56,7 @@ mod service {
         transact::Wrapper as Transact,
     };
     use psibase::{abort_message, *};
+    use std::cmp::min;
 
     // A small amount of CPU leeway given to transactions
     const CPU_LEEWAY: u64 = 1_000_000u64; // 1 ms
@@ -176,8 +177,6 @@ mod service {
         Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
         Tokens::call().toSub(res, for_user.to_string(), amount);
 
-        UserReserve::reserve_cpu_limit(for_user);
-
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
             // can be reconstructed from the user's own token `balChanged` event history.
@@ -238,24 +237,14 @@ mod service {
             let res = config.res;
 
             let balance = UserSettings::get_resource_balance(user);
-            let user_str = user.to_string();
             let amt = Quantity::new(amount);
 
-            check(
-                balance >= amt,
-                &format!("{} has insufficient resource balance", &user_str),
-            );
-            Tokens::call().fromSub(res, user_str, amt);
-        }
-    }
+            if balance < amt {
+                let err = format!("{} has insufficient resource balance", &user.to_string());
+                abort_message(&err);
+            }
 
-    fn bill_from_reserve(user: AccountNumber, amount: u64) {
-        if amount == 0 {
-            return;
-        }
-
-        if BillingConfig::get().is_some() {
-            UserReserve::bill(user, amount);
+            Tokens::call().fromSub(res, user.to_string(), amt);
         }
     }
 
@@ -405,7 +394,7 @@ mod service {
         if !isBillingEnabled() {
             cost = 0
         }
-        bill_from_reserve(user, cost);
+        bill(user, cost);
 
         Wrapper::emit()
             .history()
@@ -436,41 +425,31 @@ mod service {
         }
     }
 
-    /// The Accounts service will initialize every new user, which constructs the account's reserve
-    /// (with a balance of zero) in its own tables. This is therefore paid for by the account creator
-    /// and is part of account initialization, so subsequent writes to the reserve do not consume additional
-    /// storage resources (storage delta always = 0).
-    ///
-    /// In other words, this helps break the chicken/egg situation where we would have to allow a db write
-    /// (to init the user reserve) before we know how many resources the user has available for writes (because
-    /// the reserve hasn't been initialized).
-    #[action]
-    fn initUser(user: AccountNumber) {
-        check(get_sender() == Accounts::SERVICE, "Unauthorized");
-        UserReserve::init(user);
-    }
-
     // Gets the CPU limit (in ns) for the specified account
     //
-    // This will also reserve some resources on behalf of the specified account
-    //   for the purpose of ensuring the account can afford up to CPU-limit nanoseconds
-    //   of CPU time.
-    //
     // Returns None if there is no limit for the specified account
-    fn getCpuLimit(account: AccountNumber) -> Option<u64> {
+    fn get_cpu_limit(account: AccountNumber) -> Option<u64> {
         if !isBillingEnabled() {
             return None;
         }
 
-        // CPU is not billed just-in-time, it's reserved in advance and then the actual amount
-        // is billed from the reserve at the end of the tx
-        let mut limit = UserReserve::reserve_cpu_limit(account);
+        let cpu_pricing = CpuPricing::get_check();
+        let res_balance = UserSettings::get_resource_balance(account).value;
 
-        // To add some leeway, we simply bump the limit by more CPU than was reserved,
+        let price_per_unit = cpu_pricing.price();
+        let ns_per_unit = cpu_pricing.billable_unit;
+
+        let full_block_units = NetworkSpecs::get().cpu_ns / ns_per_unit; // rounded down
+        let affordable_units = res_balance / price_per_unit;
+        let limit_units = min(full_block_units, affordable_units);
+        let mut limit_ns = limit_units * ns_per_unit;
+
+        // To add some leeway, we simply bump the limit by more CPU than the limit allows,
         //   and before billing, we subtract the leeway from the reported consumed amount.
-        limit = limit.saturating_add(CPU_LEEWAY);
+        limit_ns = limit_ns.saturating_add(CPU_LEEWAY);
+        limit_ns = min(limit_ns, NetworkSpecs::get().cpu_ns);
 
-        Some(limit)
+        Some(limit_ns)
     }
 
     /// This actions sets the CPU limit for the specified account.
@@ -478,7 +457,7 @@ mod service {
     #[action]
     fn setCpuLimit(account: AccountNumber) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
-        CpuLimit::rpc().setCpuLimit(getCpuLimit(account));
+        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account));
     }
 
     #[action]
