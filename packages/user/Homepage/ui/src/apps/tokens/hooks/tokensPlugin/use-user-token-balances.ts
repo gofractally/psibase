@@ -4,7 +4,6 @@ import {
 } from "@/apps/tokens/lib/graphql/ui";
 import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
-import { useRef } from "react";
 import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
@@ -12,7 +11,6 @@ import { updateArray } from "@/lib/updateArray";
 import { zAccount } from "@/lib/zod/Account";
 
 import { Quantity } from "@shared/lib/quantity";
-import { toast } from "@shared/shadcn/ui/sonner";
 
 export interface Token {
     id: number;
@@ -26,12 +24,10 @@ export interface Token {
 export const useUserTokenBalances = (
     username: z.infer<typeof zAccount> | undefined | null,
 ) => {
-    const toasted = useRef(false);
     return useQuery<Token[]>({
         queryKey: QueryKey.userTokenBalances(username),
         enabled: !!username,
         queryFn: async () => {
-            if (!toasted.current) toast("Fetching token balances...");
             const res = await fetchUserTokenBalances(zAccount.parse(username));
 
             // TODO: Remove this once token settings comes back from `fetchUserTokenBalances`
@@ -66,10 +62,6 @@ export const useUserTokenBalances = (
                     arr.findIndex((t) => t.id == token.id) == index,
             );
 
-            if (!toasted.current) {
-                toasted.current = true;
-                toast.success("Fetched token balances");
-            }
 
             return tokenBalances;
         },
