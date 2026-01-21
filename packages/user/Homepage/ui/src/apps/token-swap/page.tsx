@@ -624,17 +624,7 @@ export const SwapPage = () => {
                                         setFocusedPoolId(focusedId)
                                     }
                                     focusedPoolId={focusedPoolId}
-                                    pools={(poolsOfLiquidityPair || [])?.map(
-                                        (pool) => ({
-                                            id: pool.id,
-                                            tokenAId: pool.tokenAId,
-                                            tokenBId: pool.tokenBId,
-                                            tokenASymbol:
-                                                pool.tokenASymbol || "",
-                                            tokenBSymbol:
-                                                pool.tokenBSymbol || "",
-                                        }),
-                                    )}
+                                    pools={poolsOfLiquidityPair || []}
                                 />
                             )}
 
