@@ -78,6 +78,7 @@ namespace SystemService
       /// * `false`: If not returning true, or on recursive checks for the same sender
       bool isAuthSys(psibase::AccountNumber                             sender,
                      std::vector<psibase::AccountNumber>                authorizers,
+                     std::optional<ServiceMethod>                       method,
                      std::optional<std::vector<psibase::AccountNumber>> authSet);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
@@ -93,6 +94,7 @@ namespace SystemService
       /// * `false`: If not returning true, or on recursive checks for the same sender
       bool isRejectSys(psibase::AccountNumber                             sender,
                        std::vector<psibase::AccountNumber>                rejecters,
+                       std::optional<ServiceMethod>                       method,
                        std::optional<std::vector<psibase::AccountNumber>> authSet);
    };
    PSIO_REFLECT(Producers,
@@ -105,8 +107,8 @@ namespace SystemService
                 method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers, authSet),
-                method(isRejectSys, sender, rejecters, authSet)
+                method(isAuthSys, sender, authorizers, method, authSet),
+                method(isRejectSys, sender, rejecters, method, authSet)
                 //
    )
 

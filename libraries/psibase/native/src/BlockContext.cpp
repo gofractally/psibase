@@ -536,6 +536,33 @@ namespace psibase
       }
    }
 
+   void BlockContext::callTimer(psio::view<const TimerRow> row)
+   {
+      SignedTransaction trx;
+      TransactionTrace  trace;
+      try
+      {
+         auto               session = db.startWrite(writer);
+         psibase::Action    action{.service = row.service(),
+                                   .method  = row.method(),
+                                   .rawData = psio::to_frac(std::tuple())};
+         TransactionContext tc{*this, trx, trace, DbMode::rpc()};
+         auto&              atrace = trace.actionTraces.emplace_back();
+         tc.execNonTrxAction(0, action, atrace);
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, debug) << "timer callback " << action.service.str()
+                                       << "::" << action.method.str() << " succeeded";
+      }
+      catch (std::exception& e)
+      {
+         trace.error = e.what();
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
+         PSIBASE_LOG(trxLogger, warning)
+             << "timer callback " << row.service().unpack().str()
+             << "::" << row.method().unpack().str() << " failed: " << e.what();
+      }
+   }
+
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
       auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());

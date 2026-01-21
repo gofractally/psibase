@@ -57,12 +57,6 @@ const zLiquidityDirection = z.enum(["Add", "Remove"]);
 
 type LiquidityDirection = z.infer<typeof zLiquidityDirection>;
 
-
-
-const SwapComp = () => {
-
-}
-
 export const SwapPage = () => {
     const {
         obj: token1Obj,
@@ -81,7 +75,7 @@ export const SwapPage = () => {
 
     const [slippage] = useSlippageTolerance();
 
-    const { data: pools, error, refetch: refetchPools } = usePools();
+    const { data: pools, refetch: refetchPools } = usePools();
 
     const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap);
     const isSwapTab = currentTab == zCurrentTab.Values.Swap;
@@ -138,7 +132,6 @@ export const SwapPage = () => {
         onSuccess();
     };
 
-    console.log(pools, "was pools", error);
     const uniqueTradeableTokens = useMemo(
         () =>
             pools
@@ -334,8 +327,6 @@ export const SwapPage = () => {
         tokenId: lastTouchedIs1 ? token1Id! : token2Id!
     })
 
-    console.log(quotedRemove, 'is quoted remove')
-
     const setAmount = (isTokenOne: boolean, amount: string) => {
         setLastTouchedIs1(isTokenOne);
         setMaxBalance(false);
@@ -388,6 +379,20 @@ export const SwapPage = () => {
     const description = isSwapTab
         ? "Trade tokens with best prices"
         : "Add liquidity to or from pools";
+
+    const buttonLabel =
+        sameTokensSelected
+            ? "Select different tokens"
+            : !token1Amount
+                ? "Enter amount"
+                : currentTab === zCurrentTab.Values.Swap
+                    ? "Swap"
+                    : liquidityDirection === zLiquidityDirection.Values.Add
+                        ? focusedPool
+                            ? "Add liquidity"
+                            : "Create pool"
+                        : "Remove liquidity"
+
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12">
@@ -632,17 +637,7 @@ export const SwapPage = () => {
                                         setFocusedPoolId(focusedId)
                                     }
                                     focusedPoolId={focusedPoolId}
-                                    pools={(poolsOfLiquidityPair || [])?.map(
-                                        (pool) => ({
-                                            id: pool.id,
-                                            tokenAId: pool.tokenAId,
-                                            tokenBId: pool.tokenBId,
-                                            tokenASymbol:
-                                                pool.tokenASymbol || "",
-                                            tokenBSymbol:
-                                                pool.tokenBSymbol || "",
-                                        }),
-                                    )}
+                                    pools={poolsOfLiquidityPair || []}
                                 />
                             )}
 
@@ -765,17 +760,7 @@ export const SwapPage = () => {
                             triggerMain();
                         }}
                     >
-                        {sameTokensSelected
-                            ? "Select different tokens"
-                            : !token1Amount
-                                ? "Enter amount"
-                                : currentTab === zCurrentTab.Values.Swap
-                                    ? "Swap"
-                                    : liquidityDirection === zLiquidityDirection.Values.Add
-                                        ? focusedPool
-                                            ? "Add liquidity"
-                                            : "Create pool"
-                                        : "Remove liquidity"}
+                        {buttonLabel}
                     </Button>
                 </CardFooter>
             </Card>

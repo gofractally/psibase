@@ -36,7 +36,7 @@ pub struct GraphQLPool {
 pub struct Reserve {
     pub pool_id: TID,
     pub token_id: TID,
-    pub tariff_ppm: u32,
+    pub fee_ppm: u32,
     pub admin_nft: NID,
     pub balance: Decimal,
 }
@@ -51,14 +51,14 @@ pub fn fetch_all_pools() -> Result<Vec<GraphQLPool>, ErrorType> {
               reserveA {
                 poolId
                 tokenId
-                tariffPpm
+                feePpm
                 adminNft
                 balance
               }
               reserveB {
                 poolId
                 tokenId
-                tariffPpm
+                feePpm
                 adminNft
                 balance
               }

@@ -13,8 +13,8 @@ type Pool = {
     id: number;
     tokenAId: number;
     tokenBId: number;
-    tokenASymbol?: string;
-    tokenBSymbol?: string;
+    tokenASymbol?: string | null;
+    tokenBSymbol?: string | null;
 };
 
 interface PoolPickerProps {

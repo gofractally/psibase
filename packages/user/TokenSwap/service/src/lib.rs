@@ -28,7 +28,7 @@ pub mod tables {
     pub struct Reserve {
         pub pool_id: TID,
         pub token_id: TID,
-        pub tariff_ppm: u32,
+        pub fee_ppm: u32,
         pub admin_nft: NID,
     }
 
@@ -43,10 +43,10 @@ pub mod tables {
             (self.token_id, self.pool_id)
         }
 
-        fn new(pool_id: TID, token_id: TID, tariff_ppm: u32, admin_nft: NID) -> Self {
+        fn new(pool_id: TID, token_id: TID, fee_ppm: u32, admin_nft: NID) -> Self {
             Self {
                 pool_id,
-                tariff_ppm,
+                fee_ppm,
                 token_id,
                 admin_nft,
             }
@@ -82,7 +82,7 @@ pub mod tables {
 
         pub fn set_fee(&mut self, fee_ppm: u32) {
             check(fee_ppm < PPM as u32, "fee too high");
-            self.tariff_ppm = fee_ppm;
+            self.fee_ppm = fee_ppm;
             self.save();
         }
 
@@ -413,7 +413,7 @@ pub mod tables {
                 incoming_amount,
                 incoming_reserve.balance(),
                 outgoing_reserve.balance(),
-                incoming_reserve.tariff_ppm,
+                incoming_reserve.fee_ppm,
             );
             check(outgoing_amount.value > 0, "outgoing amount is 0");
 
@@ -454,6 +454,20 @@ pub mod service {
         *,
     };
 
+    /// Creates a new pool.
+    ///
+    /// Requires two token deposits of equal value as the new pool reserves.
+    /// Mints and credits to the sender administration NFTs of both A reserve and B reserve.
+    /// Administration NFTs can be used to set the fee for each respective reserve.
+    ///
+    /// # Arguments
+    /// * `token_a` - Token ID of the first deposit.
+    /// * `token_b` - Token ID of the second deposit.
+    /// * `token_a_amount` - Amount of the first deposit.
+    /// * `token_b_amount` - Amount of the second deposit.
+    ///
+    /// # Returns
+    /// (TID of Liquidity token / Pool ID, Administration NFT ID of A reserve, Administration NFT ID of B Reserve)
     #[action]
     fn new_pool(
         token_a: TID,
@@ -474,26 +488,74 @@ pub mod service {
         )
     }
 
+    /// Updates the swap fee for one of the tokens in an existing pool.
+    ///
+    /// Only the current owner of the administration NFT for the specified token's reserve
+    /// is allowed to change the fee. The fee is set in parts per million (ppm).
+    /// Maximum allowed value is typically 999_999 (≈99.9999%).
+    ///
+    /// # Arguments
+    /// * `pool_id`  - Liquidity token ID that identifies the pool
+    /// * `token_id`    - Token ID whose fee should be updated (must be one of the two tokens in the pool)
+    /// * `ppm`      - New fee rate in parts per million (e.g. 3000 = 0.3%)
     #[action]
-    fn set_tarriff(pool_id: TID, token: TID, ppm: u32) {
-        Pool::get_assert(pool_id).set_fee(token, ppm)
+    fn set_fee(pool_id: TID, token_id: TID, ppm: u32) {
+        Pool::get_assert(pool_id).set_fee(token_id, ppm)
     }
 
+    /// Queries the current reserve balance of one token in the specified pool.
+    ///
+    /// # Arguments
+    /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `token_id`   - Token ID whose reserve balance should be returned
+    ///
+    /// # Returns
+    /// The current balance held in the pool's reserve sub-account for the given token
     #[action]
     fn get_reserve(pool_id: TID, token_id: TID) -> Quantity {
         Reserve::get_assert(pool_id, token_id).balance()
     }
 
+    /// Adds liquidity to an existing pool.
+    ///
+    /// The caller specifies desired maximum amounts for both tokens.
+    /// The function automatically calculates the optimal amounts to deposit
+    /// (respecting the current pool ratio) and mints the corresponding amount
+    /// of liquidity tokens to the caller.
+    ///
+    /// # Arguments
+    /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `amount_a`   - Maximum amount of token A the caller wishes to add
+    /// * `amount_b`   - Maximum amount of token B the caller wishes to add
     #[action]
     fn add_liquidity(pool_id: TID, amount_a: Quantity, amount_b: Quantity) {
         Pool::get_assert(pool_id).add_liquidity(amount_a, amount_b);
     }
 
+    /// Removes liquidity from a pool and returns the proportional share of both tokens.
+    ///
+    /// Burns the specified amount of liquidity tokens from the caller's account
+    /// and credits the corresponding amounts of the underlying tokens.
+    ///
+    /// # Arguments
+    /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `lp_amount`  - Amount of liquidity tokens to redeem / burn
     #[action]
     fn remove_liquidity(pool_id: TID, lp_amount: Quantity) {
         Pool::get_assert(pool_id).remove_liquidity(lp_amount);
     }
 
+    /// Executes a token swap, potentially through multiple pools (multi-hop).
+    ///
+    /// The input tokens are debited from the caller, routed through the given sequence
+    /// of pools, and the final output token is credited back to the caller.
+    /// Includes basic slippage protection via the `min_return` parameter.
+    ///
+    /// # Arguments
+    /// * `pools`       - Ordered list of pool IDs (liquidity token IDs) defining the swap route
+    /// * `token_in`    - Token ID being sent by the caller
+    /// * `amount_in`   - Exact input amount to swap
+    /// * `min_return`  - Minimum acceptable output amount (reverts if result is lower)
     #[action]
     fn swap(pools: Vec<TID>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
         check(pools.len() > 0, "pools length must be at least 1");

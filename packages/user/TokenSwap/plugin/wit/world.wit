@@ -14,8 +14,8 @@ interface types {
         id: u32,
         token-a-id: tid,
         token-b-id: tid,
-        token-a-tariff-ppm: u32,
-        token-b-tariff-ppm: u32,
+        token-a-fee-ppm: u32,
+        token-b-fee-ppm: u32,
         a-balance: string,
         b-balance: string,
         liquidity-token: u32,
@@ -98,7 +98,7 @@ interface liquidity {
     /// how much of the other token is needed to receive the maximum possible LP tokens.
     ///
     /// Parameters:
-    /// * `pool`    - The current state of the pool (reserves, token IDs, tariffs, etc.)
+    /// * `pool`    - The current state of the pool (reserves, token IDs, fees, etc.)
     /// * `amount`  - The proposed deposit amount of one of the two reserve tokens
     ///               (must match either `token-a-id` or `token-b-id`)
     /// Returns:

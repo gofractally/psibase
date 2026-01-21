@@ -50,19 +50,22 @@ pub mod Service {
     use crate::services::tokens::Quantity;
     use crate::services::tokens::TID;
 
-    #[action]
-    fn init() {
-        unimplemented!()
-    }
-
-    #[action]
-    fn set_global_fee(ppm: u32) {
-        unimplemented!()
-    }
-
+    /// Creates a new pool.
+    ///
+    /// Requires two token deposits of equal value as the new pool reserves.
+    /// Mints and credits to the sender administration NFTs of both A reserve and B reserve.
+    /// Administration NFTs can be used to set the fee for each respective reserve.
+    ///
+    /// # Arguments
+    /// * `token_a` - Token ID of the first deposit.
+    /// * `token_b` - Token ID of the second deposit.
+    /// * `token_a_amount` - Amount of the first deposit.
+    /// * `token_b_amount` - Amount of the second deposit.
+    ///
+    /// # Returns
+    /// (TID of Liquidity token / Pool ID, Administration NFT ID of A reserve, Administration NFT ID of B Reserve)
     #[action]
     fn new_pool(
-        is_managed: bool,
         token_a: TID,
         token_b: TID,
         token_a_amount: Quantity,
@@ -71,33 +74,81 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Updates the swap fee for one of the tokens in an existing pool.
+    ///
+    /// Only the current owner of the administration NFT for the specified token's reserve
+    /// is allowed to change the fee. The fee is set in parts per million (ppm).
+    /// Maximum allowed value is typically 999_999 (≈99.9999%).
+    ///
+    /// # Arguments
+    /// * `pool_id`  - Liquidity token ID that identifies the pool
+    /// * `token_id`    - Token ID whose fee should be updated (must be one of the two tokens in the pool)
+    /// * `ppm`      - New fee rate in parts per million (e.g. 3000 = 0.3%)
     #[action]
-    fn set_tarriff(pool_id: u32, token: TID, ppm: u32) {
+    fn set_fee(pool_id: TID, token_id: TID, ppm: u32) {
         unimplemented!()
     }
 
+    /// Queries the current reserve balance of one token in the specified pool.
+    ///
+    /// # Arguments
+    /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `token_id`   - Token ID whose reserve balance should be returned
+    ///
+    /// # Returns
+    /// The current balance held in the pool's reserve sub-account for the given token
     #[action]
-    fn get_reserve(pool_id: u32, token_id: TID) -> Quantity {
+    fn get_reserve(pool_id: TID, token_id: TID) -> Quantity {
         unimplemented!()
     }
 
+    /// Adds liquidity to an existing pool.
+    ///
+    /// The caller specifies desired maximum amounts for both tokens.
+    /// The function automatically calculates the optimal amounts to deposit
+    /// (respecting the current pool ratio) and mints the corresponding amount
+    /// of liquidity tokens to the caller.
+    ///
+    /// # Arguments
+    /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `amount_a`   - Maximum amount of token A the caller wishes to add
+    /// * `amount_b`   - Maximum amount of token B the caller wishes to add
     #[action]
-    fn add_liquidity(pool_id: u32, amount_a: Quantity, amount_b: Quantity) {
+    fn add_liquidity(pool_id: TID, amount_a: Quantity, amount_b: Quantity) {
         unimplemented!()
     }
 
+    /// Removes liquidity from a pool and returns the proportional share of both tokens.
+    ///
+    /// Burns the specified amount of liquidity tokens from the caller's account
+    /// and credits the corresponding amounts of the underlying tokens.
+    ///
+    /// # Arguments
+    /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `lp_amount`  - Amount of liquidity tokens to redeem / burn
     #[action]
-    fn remove_liquidity(pool_id: u32, lp_amount: Quantity) {
+    fn remove_liquidity(pool_id: TID, lp_amount: Quantity) {
         unimplemented!()
     }
 
+    /// Executes a token swap, potentially through multiple pools (multi-hop).
+    ///
+    /// The input tokens are debited from the caller, routed through the given sequence
+    /// of pools, and the final output token is credited back to the caller.
+    /// Includes basic slippage protection via the `min_return` parameter.
+    ///
+    /// # Arguments
+    /// * `pools`       - Ordered list of pool IDs (liquidity token IDs) defining the swap route
+    /// * `token_in`    - Token ID being sent by the caller
+    /// * `amount_in`   - Exact input amount to swap
+    /// * `min_return`  - Minimum acceptable output amount (reverts if result is lower)
     #[action]
-    fn swap(pools: Vec<u32>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
+    fn swap(pools: Vec<TID>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
         unimplemented!()
     }
 
     #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
+    pub fn created_pool(token_a: TID, token_b: TID) {}
 }
 
 #[test]

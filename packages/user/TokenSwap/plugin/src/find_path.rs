@@ -21,8 +21,8 @@ pub struct GraphPool {
     pub token_b: u32,
     pub reserve_a: Quantity,
     pub reserve_b: Quantity,
-    pub token_a_tariff_ppm: u32,
-    pub token_b_tariff_ppm: u32,
+    pub token_a_fee_ppm: u32,
+    pub token_b_fee_ppm: u32,
 }
 
 impl From<GraphQLPool> for GraphPool {
@@ -33,8 +33,8 @@ impl From<GraphQLPool> for GraphPool {
             reserve_b: value.reserve_b.balance.quantity,
             token_a: value.reserve_a.token_id,
             token_b: value.reserve_b.token_id,
-            token_a_tariff_ppm: value.reserve_a.tariff_ppm,
-            token_b_tariff_ppm: value.reserve_b.tariff_ppm,
+            token_a_fee_ppm: value.reserve_a.fee_ppm,
+            token_b_fee_ppm: value.reserve_b.fee_ppm,
         }
     }
 }
@@ -47,8 +47,8 @@ impl From<WitPool> for GraphPool {
             reserve_b: Decimal::from_str(&value.b_balance).unwrap().quantity,
             token_a: value.token_a_id,
             token_b: value.token_b_id,
-            token_a_tariff_ppm: value.token_a_tariff_ppm,
-            token_b_tariff_ppm: value.token_b_tariff_ppm,
+            token_a_fee_ppm: value.token_a_fee_ppm,
+            token_b_fee_ppm: value.token_b_fee_ppm,
         }
     }
 }
@@ -188,15 +188,14 @@ pub fn find_path(
                     (pool.reserve_b, pool.reserve_a)
                 };
 
-                let tariff_ppm = if input_token == pool.token_a {
-                    pool.token_a_tariff_ppm
+                let fee_ppm = if input_token == pool.token_a {
+                    pool.token_a_fee_ppm
                 } else {
-                    pool.token_b_tariff_ppm
+                    pool.token_b_fee_ppm
                 };
 
                 let perfect_amount = mul_div(search_state.amount_out, reserve_out, reserve_in);
-                let actual_amount =
-                    swap(search_state.amount_out, reserve_in, reserve_out, tariff_ppm);
+                let actual_amount = swap(search_state.amount_out, reserve_in, reserve_out, fee_ppm);
 
                 // Skip useless swaps
                 if actual_amount.value == 0 {
