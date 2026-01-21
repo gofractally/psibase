@@ -51,8 +51,7 @@ impl CpuPricing {
         // Round up to the nearest billable unit
         let amount_units = (amount_ns + cpu_time.billable_unit - 1) / cpu_time.billable_unit;
 
-        let cost = amount_units.saturating_mul(price);
-        check(cost < u64::MAX, "CPU usage overflow");
+        let cost = check_some(amount_units.checked_mul(price), "CPU usage overflow");
         cost
     }
 
