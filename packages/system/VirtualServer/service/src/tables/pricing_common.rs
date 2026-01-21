@@ -10,8 +10,24 @@ pub fn ratio_to_ppm(num: u64, den: u64) -> u128 {
     (num as u128 * PPM) / (den as u128)
 }
 
+// Exponential growth/decay formula relates a total change to a rate of change
+//   over some interval:
+//   ```
+//   F = e ^ (rt)
+//   ```
+//
+// In this case we have a desired total change and a time interval, and are computing the needed
+//   rate:
+//   ```
+//   r = ln(F) / t
+//   ```
+//
+// Precomputed ln(2) therefore encodes the target total change = 2x (rate needed to double a value
+//   over some interval).
+// ln(1/F) == -ln(F), so ln(2) can also be used to compute a halving rate.
 pub const LN2_PPM: u32 = 693_147;
-
+// The equation is therefore: `ln(2) / t`. Using `(ln(2) + t/2) / t` is a small adjustment to
+//   round to the nearest solution instead of just truncation.
 pub fn time_to_rate_ppm(t: u32) -> u32 {
     (LN2_PPM + t / 2) / t
 }
