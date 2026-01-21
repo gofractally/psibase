@@ -74,7 +74,7 @@ export const SwapPage = () => {
 
     const [slippage] = useSlippageTolerance();
 
-    const { data: pools, error, refetch: refetchPools } = usePools();
+    const { data: pools, refetch: refetchPools } = usePools();
 
     const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap);
     const isSwapTab = currentTab == zCurrentTab.Values.Swap;
