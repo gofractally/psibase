@@ -56,8 +56,6 @@ const zLiquidityDirection = z.enum(["Add", "Remove"]);
 
 type LiquidityDirection = z.infer<typeof zLiquidityDirection>;
 
-
-
 export const SwapPage = () => {
     const {
         obj: token1Obj,
@@ -133,7 +131,6 @@ export const SwapPage = () => {
         onSuccess();
     };
 
-    console.log(pools, "was pools", error);
     const uniqueTradeableTokens = useMemo(
         () =>
             pools
@@ -329,8 +326,6 @@ export const SwapPage = () => {
         tokenId: lastTouchedIs1 ? token1Id! : token2Id!
     })
 
-    console.log(quotedRemove, 'is quoted remove')
-
     const setAmount = (isTokenOne: boolean, amount: string) => {
         setLastTouchedIs1(isTokenOne);
         setMaxBalance(false);
@@ -383,6 +378,20 @@ export const SwapPage = () => {
     const description = isSwapTab
         ? "Trade tokens with best prices"
         : "Add liquidity to or from pools";
+
+    const buttonLabel =
+        sameTokensSelected
+            ? "Select different tokens"
+            : !token1Amount
+                ? "Enter amount"
+                : currentTab === zCurrentTab.Values.Swap
+                    ? "Swap"
+                    : liquidityDirection === zLiquidityDirection.Values.Add
+                        ? focusedPool
+                            ? "Add liquidity"
+                            : "Create pool"
+                        : "Remove liquidity"
+
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12">
@@ -748,17 +757,7 @@ export const SwapPage = () => {
                             triggerMain();
                         }}
                     >
-                        {sameTokensSelected
-                            ? "Select different tokens"
-                            : !token1Amount
-                                ? "Enter amount"
-                                : currentTab === zCurrentTab.Values.Swap
-                                    ? "Swap"
-                                    : liquidityDirection === zLiquidityDirection.Values.Add
-                                        ? focusedPool
-                                            ? "Add liquidity"
-                                            : "Create pool"
-                                        : "Remove liquidity"}
+                        {buttonLabel}
                     </Button>
                 </CardFooter>
             </Card>

@@ -17,8 +17,6 @@ export type MutationOptions<TParams, TResult = unknown> = UseMutationOptions<
     toast?: Toast;
 };
 
-// export type QueryOptions<T, Y> = UseQueryOptions<T, Error, Y>;
-
 export type ToastId = number | string;
 
 export type PluginCall<
