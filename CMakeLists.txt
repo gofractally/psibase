@@ -136,10 +136,10 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
+        Transact VerifySig XAdmin XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XProxy XSocketListService WSEcho)
+        XPackages XProxy XSocketListService WSEcho XDelay)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1029,6 +1029,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XTimer.psi
+    NAME XTimer
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Schedules asyncronous tasks"
+    SERVICE x-timer
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XTimer.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XTimer-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XTransact.psi
     NAME XTransact
     VERSION ${PSIBASE_VERSION}.0
@@ -1083,7 +1095,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XRun XSites XTimer XTransact
 )
 
 function(write_package_index target dir)
@@ -1103,7 +1115,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream TokenSwap Transact Homepage WebCrypto Workshop Config
-    XAdmin XDb XDefault XHttp XPackages XRun XSites XTransact)
+    XAdmin XDb XDefault XHttp XPackages XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1168,6 +1180,7 @@ install(
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
+          ${SERVICE_DIR}/XTimer.psi
           ${SERVICE_DIR}/XTransact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
@@ -1289,7 +1302,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XDelay.psi
+    NAME XDelay
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Test for XTimer"
+    SERVICE x-delay
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XDelay.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDelay-schema.json
+        SERVER x-delay
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay)
 
 ExternalProject_Add(
     rust

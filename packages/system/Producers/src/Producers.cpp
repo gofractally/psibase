@@ -3,6 +3,7 @@
 #include <ranges>
 #include <services/system/Accounts.hpp>
 #include <services/system/Producers.hpp>
+#include "services/system/Transact.hpp"
 
 using namespace psibase;
 using namespace SystemService;
@@ -58,6 +59,7 @@ namespace
    using IndirectCheckFunc =
        bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
                                                      std::vector<AccountNumber>,
+                                                     std::optional<ServiceMethod>,
                                                      std::optional<std::vector<AccountNumber>>);
 
    bool checkOverlapping(std::vector<AccountNumber> producers,
@@ -82,7 +84,8 @@ namespace
          auto toAuth = Actor<SystemService::AuthInterface>{
              SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
 
-         if ((toAuth.*indirectCheck)(account, authorizers, std::optional(std::move(authSet))) &&
+         if ((toAuth.*indirectCheck)(account, authorizers, std::nullopt,
+                                     std::optional(std::move(authSet))) &&
              ++numOverlapping >= threshold)
          {
             return true;
@@ -252,6 +255,7 @@ namespace SystemService
 
    bool Producers::isAuthSys(AccountNumber                             sender,
                              std::vector<AccountNumber>                authorizers,
+                             std::optional<ServiceMethod>              method,
                              std::optional<std::vector<AccountNumber>> authSet_opt)
    {
       auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
@@ -275,6 +279,7 @@ namespace SystemService
 
    bool Producers::isRejectSys(AccountNumber                             sender,
                                std::vector<AccountNumber>                rejecters,
+                               std::optional<ServiceMethod>              method,
                                std::optional<std::vector<AccountNumber>> authSet_opt)
    {
       auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
