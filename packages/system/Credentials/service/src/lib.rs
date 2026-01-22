@@ -6,7 +6,6 @@ pub mod tables {
     use psibase::services::{
         nft::{NftHolderFlags, Wrapper as Nft},
         tokens::{BalanceFlags, Wrapper as Tokens},
-        virtual_server::Wrapper as VirtualServer,
     };
     use psibase::{AccountNumber, FlagsType, MethodNumber, ToSchema};
     use psibase::{Table, TimePointSec};
@@ -30,10 +29,6 @@ pub mod tables {
 
             Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
             Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-
-            // Turn off client-side auto-fill for resources when submitting tx
-            // using a credential
-            VirtualServer::call().conf_auto_fill(0);
         }
     }
 
