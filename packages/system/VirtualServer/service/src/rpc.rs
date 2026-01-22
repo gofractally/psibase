@@ -4,8 +4,12 @@ use crate::tables::tables::{
 };
 use async_graphql::{connection::Connection, *};
 use psibase::{
-    services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
-    AccountNumber, EventQuery, Table,
+    is_auth,
+    services::{
+        tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
+        transact::ServiceMethod,
+    },
+    AccountNumber, EventQuery, MethodNumber, Table,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
@@ -154,23 +158,60 @@ pub struct Query {
     pub user: Option<AccountNumber>,
 }
 
+fn auth_err(user: AccountNumber) -> async_graphql::Result<()> {
+    Err(async_graphql::Error::new(format!(
+        "permission denied: '{}' must authorize your app to make this query.",
+        user
+    )))
+}
+
+fn auth_users_err(u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
+    Err(async_graphql::Error::new(format!(
+        "permission denied: either '{}' or '{}' must authorize your app to make this query.",
+        u1, u2
+    )))
+}
+
+fn serve_sys() -> ServiceMethod {
+    ServiceMethod {
+        service: crate::Wrapper::SERVICE,
+        method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),
+    }
+}
+
 impl Query {
     fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
-        if self.user != Some(user) {
-            return Err(async_graphql::Error::new(format!(
-                "permission denied: '{}' must authorize your app to make this query.",
-                user
-            )));
+        if self.user.is_none() {
+            return auth_err(user);
         }
+
+        let logged_in_user = self.user.unwrap();
+        if logged_in_user != user {
+            if is_auth(user, Some(serve_sys()), vec![logged_in_user]) {
+                return Ok(());
+            }
+
+            return auth_err(user);
+        }
+
         Ok(())
     }
 
     fn check_users_auth(&self, u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
-        if self.user != Some(u1) && self.user != Some(u2) {
-            return Err(async_graphql::Error::new(format!(
-                "permission denied: either '{}' or '{}' must authorize your app to make this query.",
-                u1, u2
-            )));
+        if self.user.is_none() {
+            return auth_users_err(u1, u2);
+        }
+        let logged_in_user = self.user.unwrap();
+
+        if logged_in_user != u1 && logged_in_user != u2 {
+            if is_auth(u1, Some(serve_sys()), vec![logged_in_user]) {
+                return Ok(());
+            }
+            if is_auth(u2, Some(serve_sys()), vec![logged_in_user]) {
+                return Ok(());
+            }
+
+            return auth_users_err(u1, u2);
         }
         Ok(())
     }
@@ -304,9 +345,6 @@ impl Query {
             (Some(p), Some(r)) => self.check_users_auth(*p, *r)?,
             (None, None) => unreachable!(),
         }
-
-        // TODO: Consider how to handle the case where the querier is one of n admins on
-        // an app that subsidizes for users and wants to see the subsidy history for the app.
 
         let mut conditions = Vec::new();
         let mut params = Vec::new();
