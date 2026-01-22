@@ -11,6 +11,7 @@ import { updateArray } from "@/lib/updateArray";
 import { zAccount } from "@/lib/zod/Account";
 
 import { Quantity } from "@shared/lib/quantity";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export interface Token {
     id: number;
@@ -22,8 +23,11 @@ export interface Token {
 }
 
 export const useUserTokenBalances = (
-    username: z.infer<typeof zAccount> | undefined | null,
+    optionalUsername?: z.infer<typeof zAccount> | undefined | null,
 ) => {
+    const { data: currentUser} = useCurrentUser();
+    const username = optionalUsername || currentUser;
+    console.log("Now executing: useUserToken.ts  (or whichever file)");
     return useQuery<Token[]>({
         queryKey: QueryKey.userTokenBalances(username),
         enabled: !!username,

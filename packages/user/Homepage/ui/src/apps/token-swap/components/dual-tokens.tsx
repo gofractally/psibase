@@ -8,17 +8,16 @@ import { AmountField } from "../components/amount-field";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Button } from "@shared/shadcn/ui/button";
 import { ReactNode } from "react";
-
-
+import { Quantity } from "@shared/lib/quantity";
 
 
 interface TokenProp {
+    id: number;
     amount: string,
     setAmount: (val: string) => void,
-    onMaxBalance: () => void,
     onSelect: () => void,
-    onTrigger: () => void,
-    balance?: string
+    onMaxBalance?: () => void,
+    balance?: Quantity
     label: string
     symbol?: string
     disabled?: boolean
@@ -35,7 +34,7 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
     triggerLabel: string
 }) => {
 
-
+    const sameTokensSelected = token1.id === token2.id;
 
     return <>
 
@@ -45,7 +44,12 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 disabled={token1.disabled}
                 amount={token1.amount}
                 onMaxBalance={() => {
-                    token1.onMaxBalance()
+                    if (token1.balance) {
+                        token1.setAmount(token1.balance?.format({ includeLabel: false, showThousandsSeparator: false }))
+                    }
+                    if (token1.onMaxBalance) {
+                        token1.onMaxBalance()
+                    }
                 }}
                 label={
                     token1.label
@@ -56,7 +60,7 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 onSelect={() => {
                     token1.onSelect()
                 }}
-                balance={token1.balance}
+                balance={token1?.balance?.format({ includeLabel: false })}
                 name=""
                 symbol={token1.symbol || ""}
             />
@@ -80,9 +84,6 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
             <AmountField
                 disabled={token2.disabled}
                 amount={token2.amount}
-                onMaxBalance={() => {
-                    token2.onMaxBalance()
-                }}
                 label={
                     token2.label
                 }
@@ -92,7 +93,15 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 onSelect={() => {
                     token2.onSelect()
                 }}
-                balance={token2.balance}
+                onMaxBalance={() => {
+                    if (token2?.balance) {
+                        token2.setAmount(token2?.balance?.format({ includeLabel: false, showThousandsSeparator: false }))
+                    }
+                    if (token2.onMaxBalance) {
+                        token2.onMaxBalance()
+                    }
+                }}
+                balance={token2?.balance?.format({ includeLabel: false })}
                 name=""
                 symbol={token2.symbol || ""}
             />
@@ -105,12 +114,12 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
             <Button
                 size="lg"
                 className="h-14 w-full text-lg font-semibold"
-                disabled={disableTrigger}
+                disabled={disableTrigger || sameTokensSelected}
                 onClick={() => {
                     onTrigger();
                 }}
             >
-                {triggerLabel}
+                {sameTokensSelected ? "Select tokens" : triggerLabel}
             </Button>
         </CardFooter>
     </>
