@@ -16,6 +16,7 @@ const QueryKey = {
     contacts: (user: string | undefined | null) => ["contacts", user] as const,
     profile: (account: string | undefined | null) =>
         ["profile", account] as const,
+    connectedAccounts: () => ["connectedAccounts"] as const,
     currentUser: () => ["currentUser"] as const,
     producers: () => ["producers"] as const,
     mailbox: (mailbox: QueryableMailbox, user: string) =>
