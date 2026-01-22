@@ -91,8 +91,6 @@ pub fn update_average_usage(
     //   is over the target, the absolute value is not really relevant.
     let ppm = ppm.min(u32::MAX as u128) as u32;
 
-    // Consider whether we should, in any circumstance (e.g. usage in multiples excess
-    // of capacity), increment multiple times.
     DiffAdjust::call().increment(diff_adjust_id, ppm);
 
     *last_block_usage = 0;

@@ -18,7 +18,8 @@
 //!      difficulty decreases by a configured percentage (subject to a floor value).
 //!    - **Above Target**: If the counter exceeds `target_max` at any point, the difficulty
 //!      immediately increases by a configured percentage, the counter resets, and a new window
-//!      begins.
+//!      begins. If one increment pushes the counter past `target_max` by one or more whole multiples
+//!      of `target_max`, the difficulty is increased by the configured percentage once per multiple.
 //!
 //! 3. **Window-Based Decay**: After each window period (`window_seconds`), if activity was below
 //!    the minimum target, difficulty decays proportionally for each complete window that elapsed.
@@ -74,7 +75,12 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Increment RateLimit instance, potentially increasing RateLimit
+    /// Increment RateLimit instance, potentially increasing the difficulty.
+    ///
+    /// The difficulty may increase multiple times if the counter exceeds `target_max`
+    ///   by more than one multiple of `target_max`.
+    ///
+    /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
     /// * Requires sender to be consumer account.
     ///
