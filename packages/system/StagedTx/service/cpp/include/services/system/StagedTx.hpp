@@ -1,7 +1,6 @@
 #pragma once
 
 #include <psibase/Service.hpp>
-#include <psibase/dispatch.hpp>
 
 namespace SystemService
 {
