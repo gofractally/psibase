@@ -286,6 +286,7 @@ mod service {
     #[action]
     fn net_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
+        check(num_blocks > 0, "Number of blocks must be greater than 0");
         NetPricing::set_num_blocks_to_average(num_blocks);
     }
 
@@ -336,6 +337,7 @@ mod service {
     #[action]
     fn cpu_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
+        check(num_blocks > 0, "Number of blocks must be greater than 0");
         CpuPricing::set_num_blocks_to_average(num_blocks);
     }
 
