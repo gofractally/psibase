@@ -537,6 +537,8 @@ namespace SystemService
       auto trx = psio::view<const Transaction>(psio::prevalidated{t});
       auto id  = sha256(t.data(), t.size());
 
+      check(trx.actions().size() > 0, "transaction has no actions");
+
       if (isResMonitoring())
       {
          uint64_t      netUsage = t.size();
@@ -547,8 +549,6 @@ namespace SystemService
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
-
-      check(trx.actions().size() > 0, "transaction has no actions");
 
       auto tables        = Transact::Tables(Transact::service, KvMode::readWrite);
       auto includedTable = tables.open<IncludedTrxTable>();
