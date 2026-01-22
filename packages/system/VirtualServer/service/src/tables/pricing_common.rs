@@ -80,9 +80,7 @@ pub fn update_average_usage(
     diff_adjust_id: u32,
 ) -> u32 {
     usage_history.insert(0, *last_block_usage);
-    if usage_history.len() > num_blocks_to_average as usize {
-        usage_history.pop();
-    }
+    usage_history.truncate(num_blocks_to_average as usize);
 
     let avg = average(&usage_history);
     let ppm = ratio_to_ppm(avg, capacity);
