@@ -22,11 +22,9 @@ psibase::define_trust! {
     descriptions {
         None => "",
         Low => "
-        Low trust grants these abilities:
             - Import existing keypairs
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Sign transactions on your behalf
         ",
     }

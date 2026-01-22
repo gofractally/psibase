@@ -41,11 +41,9 @@ psibase::define_trust! {
         Low => "",
         Medium => "",
         High => "
-        🚨 WARNING 🚨 
-        This approval will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
-
-        High trust grants these abilities:
             - alter which of your accounts is being used
+        
+        Warning: This will grant the caller the ability to control which of your accounts takes requested actions, including the capability to make unintended use of any of your accounts! Make sure you completely trust the caller's legitimacy.
         ",
     }
     functions {

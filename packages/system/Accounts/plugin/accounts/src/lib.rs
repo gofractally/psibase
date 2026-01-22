@@ -13,12 +13,10 @@ psibase::define_trust! {
         Low => "",
         Medium => "",
         High => "
-        🚨 WARNING 🚨 
-        This approval will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
-
-        In addition, this approval grants the caller the following abilities:
             - Get a list of apps to which your account has been connected
             - Set auth service on an account
+
+        Warning: This will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
         ",
     }
     functions {
