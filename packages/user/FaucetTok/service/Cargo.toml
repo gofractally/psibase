@@ -10,8 +10,8 @@ publish.workspace = true
 [package.metadata.psibase]
 plugin = "faucet-tok-plugin"
 postinstall = [
-    { sender = "tokens", service = "transact", method = "runAs", data = { action = { sender = "tokens", service = "faucet-tok", method = "create_token", rawData = "0000" }, allowedActions = [{service = "", method = ""}] } },
-    { sender = "symbol", service = "transact", method = "runAs", data = { action = { sender = "symbol", service = "faucet-tok", method = "set_symbol", rawData = "0000" }, allowedActions = [{service = "", method = ""}] } }
+    { sender = "tokens", service = "transact", method = "runAs", data = { action = { sender = "tokens", service = "faucet-tok", method = "create_token", rawData = "0000" }, allowedActions = [{service = "tokens", method = "setSysToken"}] } },
+    { sender = "symbol", service = "transact", method = "runAs", data = { action = { sender = "symbol", service = "faucet-tok", method = "set_symbol", rawData = "0000" }, allowedActions = [{service = "symbol", method = "admincreate"}] } }
 ]
 
 [dependencies]
