@@ -9,11 +9,9 @@ impl NetworkVariables {
             .unwrap_or_default()
     }
     pub fn set(vars: &Self) {
-        let table = NetworkVariablesTable::read_write();
-
-        let mut variables = table.get_index_pk().get(&()).unwrap_or_default();
+        let mut variables = Self::get();
         variables.block_replay_factor = vars.block_replay_factor;
         variables.per_block_sys_cpu_ns = vars.per_block_sys_cpu_ns;
-        table.put(&variables).unwrap();
+        NetworkVariablesTable::read_write().put(&variables).unwrap();
     }
 }

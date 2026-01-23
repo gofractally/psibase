@@ -68,7 +68,7 @@ impl NetworkSpecs {
             .unwrap();
     }
 
-    pub fn get() -> Self {
+    pub fn get_assert() -> Self {
         check_some(
             NetworkSpecsTable::read().get_index_pk().get(&()),
             "Network specs not yet initialized",

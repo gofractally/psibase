@@ -431,7 +431,7 @@ mod service {
         let price_per_unit = cpu_pricing.price();
         let ns_per_unit = cpu_pricing.billable_unit;
 
-        let full_block_units = NetworkSpecs::get().cpu_ns / ns_per_unit; // rounded down
+        let full_block_units = NetworkSpecs::get_assert().cpu_ns / ns_per_unit; // rounded down
         let affordable_units = res_balance / price_per_unit;
         let limit_units = min(full_block_units, affordable_units);
         let mut limit_ns = limit_units * ns_per_unit;
@@ -439,7 +439,7 @@ mod service {
         // To add some leeway, we simply bump the limit by more CPU than the limit allows,
         //   and before billing, we subtract the leeway from the reported consumed amount.
         limit_ns = limit_ns.saturating_add(CPU_LEEWAY);
-        limit_ns = min(limit_ns, NetworkSpecs::get().cpu_ns);
+        limit_ns = min(limit_ns, NetworkSpecs::get_assert().cpu_ns);
 
         Some(limit_ns)
     }
