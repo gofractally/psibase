@@ -139,12 +139,6 @@ pub struct UserResources {
     /// resource token precision
     buffer_capacity: Decimal,
 
-    /// Unformatted (integer) balance of resources owned by the user
-    balance_raw: u64,
-
-    /// Unformatted (integer) capacity of the user's resource buffer
-    buffer_capacity_raw: u64,
-
     /// The percentage at which client-side tooling should attempt to refill the user's
     /// resource buffer. A value of 0 means that the client should not auto refill.
     auto_fill_threshold_percent: u8,
@@ -285,8 +279,6 @@ impl Query {
         Ok(UserResources {
             balance: Decimal::new(balance, p),
             buffer_capacity: Decimal::new(Quantity::from(buffer_capacity), p),
-            balance_raw: balance.value,
-            buffer_capacity_raw: buffer_capacity,
             auto_fill_threshold_percent: settings.get_auto_fill_threshold_percent(),
         })
     }
