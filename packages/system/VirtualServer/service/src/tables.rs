@@ -31,7 +31,6 @@ pub mod tables {
 
     #[table(name = "BillingConfigTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
-    #[graphql(complex)]
     #[serde(rename_all = "camelCase")]
     pub struct BillingConfig {
         /// ID of the system token used for resource billing
@@ -131,8 +130,8 @@ pub mod tables {
         /// The percentage at which client-side tooling should attempt to refill the user's
         /// resource buffer. A value of 0 means that the client should not auto refill.
         ///
-        /// Default: 20
-        pub auto_fill_threshold_percent: u8,
+        /// If this is None, a default auto-fill threshold percentage is used.
+        pub auto_fill_threshold_percent: Option<u8>,
 
         /// The capacity of the resource buffer that gets filled when the user
         /// acquires resources.

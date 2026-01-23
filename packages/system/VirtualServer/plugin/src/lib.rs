@@ -248,26 +248,25 @@ impl Billing for VirtualServerPlugin {
         refill_to_capacity(Some(capacity), true)
     }
 
-    fn donate_gas(user: String) -> Result<(), Error> {
+    fn donate_gas(user: String, amount: String) -> Result<(), Error> {
         assert_caller(&["homepage", &client::get_receiver()], "fill_gas_tank_for");
 
         let sys_id = TokensPlugin::helpers::fetch_network_token()?
             .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
 
-        let amount = query::billing_config()?.min_resource_buffer;
-        let amount_str = TokensPlugin::helpers::u64_to_decimal(sys_id, amount.clone())?;
+        let amount_u64 = TokensPlugin::helpers::decimal_to_u64(sys_id, &amount)?;
 
         TokensPlugin::user::credit(
             sys_id,
             &client::get_receiver(),
-            &amount_str,
+            &amount,
             &format!("Subsidizing resources for {}", user),
         )?;
 
         add_action_to_transaction(
             Actions::buy_res_for::ACTION_NAME,
             &Actions::buy_res_for {
-                amount: Quantity::new(amount),
+                amount: Quantity::new(amount_u64),
                 for_user: AccountNumber::from_str(&user).unwrap(),
                 memo: None,
             }

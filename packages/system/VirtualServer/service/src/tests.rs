@@ -36,13 +36,12 @@ mod tests {
     }
 
     #[derive(Deserialize)]
-    pub struct BillingConfigWithBuffer {
+    pub struct BillingConfig {
         pub feeReceiver: String,
-        pub minResourceBuffer: u64,
     }
     #[derive(Deserialize)]
     struct BillingConfigData {
-        getBillingConfig: BillingConfigWithBuffer,
+        getBillingConfig: BillingConfig,
     }
 
     #[derive(Deserialize)]
@@ -53,6 +52,7 @@ mod tests {
     #[derive(Deserialize)]
     struct UserResources {
         balanceRaw: u64,
+        bufferCapacityRaw: u64,
     }
 
     // Propose a system action
@@ -90,16 +90,13 @@ mod tests {
         assert!(balance.value == expected_value);
     }
 
-    fn get_billing_config(
-        chain: &psibase::Chain,
-    ) -> Result<BillingConfigWithBuffer, psibase::Error> {
+    fn get_billing_config(chain: &psibase::Chain) -> Result<BillingConfig, psibase::Error> {
         let config: serde_json::Value = chain.graphql(
             Wrapper::SERVICE,
             r#"
                 query {
                     getBillingConfig {
                         feeReceiver
-                        minResourceBuffer
                     }
                 }
             "#,
@@ -109,11 +106,11 @@ mod tests {
         Ok(response_root.data.getBillingConfig)
     }
 
-    fn get_resource_balance(
+    fn get_user_resources(
         chain: &psibase::Chain,
         user: AccountNumber,
         auth_token: &str,
-    ) -> Result<u64, psibase::Error> {
+    ) -> Result<UserResources, psibase::Error> {
         let balance: serde_json::Value = chain.graphql_auth(
             Wrapper::SERVICE,
             &format!(
@@ -121,6 +118,7 @@ mod tests {
                     query {{
                         userResources(user: "{}") {{
                             balanceRaw
+                            bufferCapacityRaw
                         }}
                     }}
                 "#,
@@ -130,7 +128,7 @@ mod tests {
         )?;
 
         let response: Response<ResourcesData> = serde_json::from_value(balance)?;
-        Ok(response.data.userResources.balanceRaw)
+        Ok(response.data.userResources)
     }
 
     fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
@@ -200,7 +198,9 @@ mod tests {
 
         let config = get_billing_config(&chain)?;
         assert!(config.feeReceiver == tokens.to_string());
-        let min_resource_buffer = config.minResourceBuffer;
+
+        let min_resource_buffer =
+            get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?.bufferCapacityRaw;
 
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
@@ -212,20 +212,20 @@ mod tests {
 
         // Verify filling resource buffer
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 5_000_0000.into(), "".into())
+            .credit(sys, vserver, (min_resource_buffer / 2).into(), "".into())
             .get()?;
         assert_error(
             Wrapper::push_from(&chain, PRODUCER_ACCOUNT).buy_res(min_resource_buffer.into()),
             "Insufficient shared balance",
         );
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 5_000_0000.into(), "".into())
+            .credit(sys, vserver, (min_resource_buffer / 2).into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .buy_res(min_resource_buffer.into())
             .get()?;
         assert_eq!(
-            get_resource_balance(&chain, PRODUCER_ACCOUNT, &token_prod)?,
+            get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?.balanceRaw,
             min_resource_buffer
         );
 
@@ -262,7 +262,7 @@ mod tests {
             .buy_res_for(min_resource_buffer.into(), alice, Some("".into()))
             .get()?;
         assert_eq!(
-            get_resource_balance(&chain, alice, &token_a)?,
+            get_user_resources(&chain, alice, &token_a)?.balanceRaw,
             min_resource_buffer
         );
 
@@ -273,7 +273,7 @@ mod tests {
 
         chain.finish_block();
 
-        let balance = get_resource_balance(&chain, alice, &token_a)?;
+        let balance = get_user_resources(&chain, alice, &token_a)?.balanceRaw;
         assert!(balance < min_resource_buffer.into());
 
         println!("alice resource balance: {}", balance);

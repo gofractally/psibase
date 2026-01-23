@@ -208,10 +208,6 @@ mod service {
     /// resource buffer.
     #[action]
     fn conf_auto_fill(threshold_percent: u8) {
-        check(
-            threshold_percent <= 100,
-            "Threshold must be between 0 and 100",
-        );
         UserSettings::get(get_sender()).set_auto_fill(threshold_percent);
     }
 
@@ -219,12 +215,6 @@ mod service {
     /// resource buffer, the less often the sender will need to refill it.
     #[action]
     fn conf_buffer(capacity: u64) {
-        let min_buffer_size = BillingConfig::get_min_resource_buffer();
-        if capacity < min_buffer_size {
-            let err_msg = format!("Buffer capacity must be >= {}", min_buffer_size);
-            abort_message(&err_msg);
-        }
-
         UserSettings::get(get_sender()).set_capacity(capacity);
     }
 

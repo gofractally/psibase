@@ -124,11 +124,8 @@ interface billing {
     /// The user must have a sufficient balance of system tokens to pay for the gas.
     resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;
 
-    /// Purchases an amount of resources for the specified user.
-    /// 
-    /// The amount of resources is equal to the minimum gas tank capacity configured in 
-    /// the virtual-server service.
-    donate-gas: func(user: string) -> result<_, error>;
+    /// Purchases the specified amount of resources for the specified user.
+    donate-gas: func(user: string, amount: string) -> result<_, error>;
 }
 
 interface authorized {

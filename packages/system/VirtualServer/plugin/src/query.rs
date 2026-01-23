@@ -64,20 +64,17 @@ struct BillingConfigData {
 #[serde(rename_all = "camelCase")]
 struct InternalBillingConfig {
     enabled: bool,
-    min_resource_buffer: i64,
 }
 
 #[derive(Default)]
 pub struct BillingConfig {
     pub enabled: bool,
-    pub min_resource_buffer: u64,
 }
 
 impl From<InternalBillingConfig> for BillingConfig {
     fn from(config: InternalBillingConfig) -> Self {
         Self {
             enabled: config.enabled,
-            min_resource_buffer: config.min_resource_buffer as u64,
         }
     }
 }
@@ -86,7 +83,6 @@ pub fn billing_config() -> Result<BillingConfig, Error> {
     let query = r#"query {
         getBillingConfig {
             enabled
-            minResourceBuffer
         }
     }"#;
 
@@ -99,9 +95,6 @@ pub fn billing_config() -> Result<BillingConfig, Error> {
     Ok(response
         .data
         .get_billing_config
-        .unwrap_or(InternalBillingConfig {
-            enabled: false,
-            min_resource_buffer: 0,
-        })
+        .unwrap_or(InternalBillingConfig { enabled: false })
         .into())
 }

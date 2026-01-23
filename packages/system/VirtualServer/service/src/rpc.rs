@@ -275,22 +275,19 @@ impl Query {
     async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
         self.check_user_auth(user)?;
 
-        let p = Tokens::call()
-            .getToken(BillingConfig::get_assert().res)
-            .precision;
+        let config = BillingConfig::get_assert();
+        let p = Tokens::call().getToken(config.res).precision;
 
         let balance = crate::Wrapper::call().get_resources(user);
         let settings = UserSettings::get(user);
-        let capacity = settings
-            .buffer_capacity
-            .unwrap_or(BillingConfig::get_min_resource_buffer());
+        let buffer_capacity = settings.get_buffer_capacity();
 
         Ok(UserResources {
             balance: Decimal::new(balance, p),
-            buffer_capacity: Decimal::new(Quantity::from(capacity), p),
+            buffer_capacity: Decimal::new(Quantity::from(buffer_capacity), p),
             balance_raw: balance.value,
-            buffer_capacity_raw: capacity,
-            auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
+            buffer_capacity_raw: buffer_capacity,
+            auto_fill_threshold_percent: settings.get_auto_fill_threshold_percent(),
         })
     }
 
