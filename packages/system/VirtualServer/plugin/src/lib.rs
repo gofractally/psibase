@@ -39,15 +39,15 @@ fn assert_caller(allowed: &[&str], context: &str) {
 }
 
 fn pct_to_ppm(pct: String) -> Result<u32, Error> {
-    let q = Quantity::from_str(&pct, Precision::new(4).unwrap())
+    let ppm = Quantity::from_str(&pct, Precision::new(4).unwrap())
         .map(|amount| amount.value)
         .map_err(|error| Error::from(ErrorType::ConversionError(error.to_string())))?;
 
-    if q > 100_0000 {
+    if ppm > 1_000_000 {
         return Err(ErrorType::Overflow.into());
     }
 
-    Ok(q as u32)
+    Ok(ppm as u32)
 }
 
 impl Admin for VirtualServerPlugin {
