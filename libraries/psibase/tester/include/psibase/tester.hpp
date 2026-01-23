@@ -9,6 +9,8 @@
 #include <psio/to_hex.hpp>
 #include <services/system/PrivateKeyInfo.hpp>
 #include <services/system/Spki.hpp>
+#include <services/system/VirtualServer.hpp>
+#include "services/system/Transact.hpp"
 
 #include <fcntl.h>
 
@@ -33,7 +35,8 @@ namespace psibase
          return false;
       if (action.service == "cpu-limit"_a)
          return false;
-      if (action.sender == "transact"_a && action.service == "virtual-server"_a)
+      if (action.sender == SystemService::Transact::service &&
+          action.service == SystemService::VirtualServer::service)
          return false;
       if (action.service == "events"_a && action.method == "sync"_m)
          return false;

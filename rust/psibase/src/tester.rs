@@ -8,6 +8,7 @@
 
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
+use crate::services::virtual_server;
 use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
     get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
@@ -695,12 +696,12 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
 
     fn is_user_action(act: &Action) -> bool {
         use crate::{
-            self as psibase, account, method,
+            self as psibase, method,
             services::{cpu_limit, db, events, transact},
         };
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
-            || act.sender == transact::SERVICE && act.service == account!("virtual-server")
+            || act.sender == transact::SERVICE && act.service == virtual_server::SERVICE
             || act.service == events::SERVICE && act.method == method!("sync"))
     }
 
