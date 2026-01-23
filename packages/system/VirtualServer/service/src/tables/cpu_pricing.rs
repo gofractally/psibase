@@ -22,11 +22,8 @@ impl CpuPricing {
         CpuPricingTable::read_write().put(&cpu_diff).unwrap();
     }
 
-    pub fn get_check() -> Self {
-        check_some(
-            CpuPricingTable::read().get_index_pk().get(&()),
-            "CPU time not initialized",
-        )
+    pub fn get_assert() -> Self {
+        check_some(Self::get(), "CPU time not initialized")
     }
 
     pub fn get() -> Option<Self> {
@@ -77,7 +74,7 @@ impl CpuPricing {
 
     pub fn set_thresholds(idle_ppm: u32, congested_ppm: u32) {
         validate_thresholds(idle_ppm, congested_ppm);
-        DiffAdjust::call().set_targets(Self::get_check().diff_adjust_id, idle_ppm, congested_ppm);
+        DiffAdjust::call().set_targets(Self::get_assert().diff_adjust_id, idle_ppm, congested_ppm);
     }
 
     pub fn set_change_rates(doubling_time_sec: u32, halving_time_sec: u32) {
@@ -90,7 +87,7 @@ impl CpuPricing {
         table.put(&cpu_time).unwrap();
 
         DiffAdjust::call().set_percent(
-            Self::get_check().diff_adjust_id,
+            Self::get_assert().diff_adjust_id,
             time_to_rate_ppm(doubling_time_sec),
             time_to_rate_ppm(halving_time_sec),
         );
@@ -114,7 +111,7 @@ impl CpuPricing {
 
     /// The threshold percentages below/above which the CPU price will decrease/increase
     pub async fn thresholds(&self) -> Thresholds {
-        get_thresholds_pct(Self::get_check().diff_adjust_id)
+        get_thresholds_pct(Self::get_assert().diff_adjust_id)
     }
 
     /// The price of CPU per billable unit of CPU

@@ -425,7 +425,7 @@ mod service {
             return None;
         }
 
-        let cpu_pricing = CpuPricing::get_check();
+        let cpu_pricing = CpuPricing::get_assert();
         let res_balance = UserSettings::get_resource_balance(account).value;
 
         let price_per_unit = cpu_pricing.price();

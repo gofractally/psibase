@@ -22,11 +22,8 @@ impl NetPricing {
         NetPricingTable::read_write().put(&net_diff).unwrap();
     }
 
-    fn get_check() -> Self {
-        check_some(
-            NetPricingTable::read().get_index_pk().get(&()),
-            "Network bandwidth not initialized",
-        )
+    fn get_assert() -> Self {
+        check_some(Self::get(), "Network bandwidth not initialized")
     }
 
     pub fn get() -> Option<Self> {
@@ -83,12 +80,12 @@ impl NetPricing {
     }
 
     pub fn price() -> u64 {
-        DiffAdjust::call().get_diff(Self::get_check().diff_adjust_id)
+        DiffAdjust::call().get_diff(Self::get_assert().diff_adjust_id)
     }
 
     pub fn set_thresholds(idle_ppm: u32, congested_ppm: u32) {
         validate_thresholds(idle_ppm, congested_ppm);
-        DiffAdjust::call().set_targets(Self::get_check().diff_adjust_id, idle_ppm, congested_ppm);
+        DiffAdjust::call().set_targets(Self::get_assert().diff_adjust_id, idle_ppm, congested_ppm);
     }
 
     pub fn set_change_rates(doubling_time_sec: u32, halving_time_sec: u32) {
@@ -104,7 +101,7 @@ impl NetPricing {
         table.put(&bw).unwrap();
 
         DiffAdjust::call().set_percent(
-            Self::get_check().diff_adjust_id,
+            Self::get_assert().diff_adjust_id,
             time_to_rate_ppm(doubling_time_sec),
             time_to_rate_ppm(halving_time_sec),
         );
@@ -132,7 +129,7 @@ impl NetPricing {
     /// The threshold percentages below/above which the network bandwidth price
     /// will decrease/increase
     pub async fn thresholds(&self) -> Thresholds {
-        get_thresholds_pct(Self::get_check().diff_adjust_id)
+        get_thresholds_pct(Self::get_assert().diff_adjust_id)
     }
 
     /// The price of network bandwidth per billable unit of network bandwidth
