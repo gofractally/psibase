@@ -22,7 +22,13 @@
     {
         "sender": "faucet-tok",
         "service": "faucet-tok",
-        "method": "tokenUsers",
-        "data": {}
+        "method": "dispense",
+        "data": { "account": "alice" }
+    },
+    {
+        "sender": "faucet-tok",
+        "service": "faucet-tok",
+        "method": "dispense",
+        "data": { "account": "bob" }
     }
 ]

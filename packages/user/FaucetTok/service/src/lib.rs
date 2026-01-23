@@ -98,28 +98,9 @@ mod service {
     }
 
     #[action]
-    fn dispense() {
+    fn dispense(account: AccountNumber) {
         let tid = ConfigRow::get_sys_tid();
         Tokens::call().mint(tid, 100_000_0000.into(), "".into());
-        Tokens::call().credit(tid, get_sender(), 100_000_0000.into(), "Faucet drip".into());
-    }
-
-    // Assumes alice and bob already exist with auth-any
-    // Can't create them here because they need to be created by Accounts service (or else suffer
-    //   character count name restrictions).
-    #[allow(non_snake_case)]
-    #[action]
-    fn tokenUsers() {
-        check(get_sender() == Wrapper::SERVICE, "Unauthorized");
-
-        let dispense_action = |account: AccountNumber| Action {
-            sender: account,
-            service: SERVICE,
-            method: MethodNumber::from("dispense"),
-            rawData: ().packed().into(),
-        };
-
-        Transact::call().runAs(dispense_action(account!("alice")), vec![]);
-        Transact::call().runAs(dispense_action(account!("bob")), vec![]);
+        Tokens::call().credit(tid, account, 100_000_0000.into(), "Faucet drip".into());
     }
 }
