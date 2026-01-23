@@ -10,7 +10,7 @@ mod tests {
             http_server,
             nft::Wrapper as Nft,
             staged_tx,
-            tokens::{self, Precision, Quantity, Wrapper as Tokens},
+            tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
         },
         tester, AccountNumber, Action, ChainEmptyResult,
     };
@@ -51,8 +51,8 @@ mod tests {
 
     #[derive(Deserialize)]
     struct UserResources {
-        balanceRaw: u64,
-        bufferCapacityRaw: u64,
+        balance: Decimal,
+        bufferCapacity: Decimal,
     }
 
     // Propose a system action
@@ -117,8 +117,8 @@ mod tests {
                 r#"
                     query {{
                         userResources(user: "{}") {{
-                            balanceRaw
-                            bufferCapacityRaw
+                            balance
+                            bufferCapacity
                         }}
                     }}
                 "#,
@@ -199,8 +199,10 @@ mod tests {
         let config = get_billing_config(&chain)?;
         assert!(config.feeReceiver == tokens.to_string());
 
-        let min_resource_buffer =
-            get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?.bufferCapacityRaw;
+        let min_resource_buffer = get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
+            .bufferCapacity
+            .quantity
+            .value;
 
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
@@ -225,7 +227,10 @@ mod tests {
             .buy_res(min_resource_buffer.into())
             .get()?;
         assert_eq!(
-            get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?.balanceRaw,
+            get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
+                .balance
+                .quantity
+                .value,
             min_resource_buffer
         );
 
@@ -262,7 +267,10 @@ mod tests {
             .buy_res_for(min_resource_buffer.into(), alice, Some("".into()))
             .get()?;
         assert_eq!(
-            get_user_resources(&chain, alice, &token_a)?.balanceRaw,
+            get_user_resources(&chain, alice, &token_a)?
+                .balance
+                .quantity
+                .value,
             min_resource_buffer
         );
 
@@ -273,7 +281,10 @@ mod tests {
 
         chain.finish_block();
 
-        let balance = get_user_resources(&chain, alice, &token_a)?.balanceRaw;
+        let balance = get_user_resources(&chain, alice, &token_a)?
+            .balance
+            .quantity
+            .value;
         assert!(balance < min_resource_buffer.into());
 
         println!("alice resource balance: {}", balance);
