@@ -69,7 +69,7 @@ export const AmountField = ({
                     >
                         <div className="flex items-center gap-2">
                             <span>{name}</span>
-                            <span className="font-light">({symbol})</span>
+                            <span className="font-light">({symbol || "?"})</span>
                             <ChevronDown className="h-4 w-4" />
                         </div>
                     </Button>

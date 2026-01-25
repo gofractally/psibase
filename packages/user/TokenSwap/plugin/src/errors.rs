@@ -9,5 +9,6 @@ plugin_error! {
     SlippageTooHigh(slippage: u32) => "Slippage must be in ppm format: received {slippage}, must be between 0 - 1,000,000",
     NoPathFound => "Failed to find pools to fulfil trade of these tokens",
     InsufficientPools => "Pools vector is empty",
-    InsffucientLiquidity => "Insufficient liquidity to perform trade"
+    InsufficientLiquidity => "Insufficient liquidity to perform trade",
+    DesiredHigherThanReserve => "Desired amount is higher than reserve balance"
 }

@@ -56,13 +56,16 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 }
                 setAmount={(amount) => {
                     token1.setAmount(amount)
+                    if (amount == '') {
+                        token2.setAmount('')
+                    }
                 }}
                 onSelect={() => {
                     token1.onSelect()
                 }}
                 balance={token1?.balance?.format({ includeLabel: false })}
                 name=""
-                symbol={token1.symbol || ""}
+                symbol={token1.symbol || token1.id.toString()}
             />
 
             {/* Center button icon */}
@@ -89,6 +92,9 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 }
                 setAmount={(amount) => {
                     token2.setAmount(amount)
+                    if (amount == '') {
+                        token1.setAmount('')
+                    }
                 }}
                 onSelect={() => {
                     token2.onSelect()
@@ -103,7 +109,7 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 }}
                 balance={token2?.balance?.format({ includeLabel: false })}
                 name=""
-                symbol={token2.symbol || ""}
+                symbol={token2.symbol || token2.id.toString()}
             />
 
             {footer}

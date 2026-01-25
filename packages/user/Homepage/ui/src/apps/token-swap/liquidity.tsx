@@ -1,60 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, } from "react";
 import { useBoolean } from "usehooks-ts";
-import { useAmount } from "./hooks/use-amount";
-import { usePools } from "./hooks/use-pools";
-import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
+import { Minus, Plus } from "lucide-react";
+
 import { DualTokens } from "./components/dual-tokens";
-// import { Minus, Plus } from "lucide-react";
 import { CreatePoolModal } from "./components/create-pool-modal";
 import { AddLiquidityModal } from "./components/add-liquidity-modal";
 import { RemoveLiquidityModal } from "./components/remove-liquidity-modal";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { PoolPicker } from "./components/pool-picker";
-import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
-import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
-import { TokenAmount } from "@shared/lib/plugins/token-swap";
-
-import { Quantity } from "@shared/lib/quantity";
 import { PickTokenModal } from "./components/pick-token-modal";
 
-console.log("Liquidity.tsx is starting to execute");
+import { useAmount } from "./hooks/use-amount";
+import { usePools } from "./hooks/use-pools";
+import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
+import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
+import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
+
+import { TokenAmount } from "@shared/lib/plugins/token-swap";
+import { Quantity } from "@shared/lib/quantity";
+import { useQuoteAddLiquidity } from "./hooks/use-quote-add";
 
 const pureDecimalToQuantity = (tokenAmount: TokenAmount): Quantity => {
     const [_, precPart] = tokenAmount.amount.split('.');
-    const precision = precPart.length;
-
-    return new Quantity(tokenAmount.amount, precision, tokenAmount.tokenId)
-}
-
-
-
+    const precision = precPart?.length ?? 0;
+    return new Quantity(tokenAmount.amount, precision, tokenAmount.tokenId);
+};
 
 export const Liquidity = () => {
-    console.log("Now executing: liq)");
-
     const { data: poolsData, refetch: refetchPools } = usePools();
     const pools = poolsData || [];
 
-
-    const poolsOfLiquidityPair = (pools || [])?.filter((pool) => {
-        const tradingTokens = [pool?.tokenAId, pool?.tokenBId];
-        const selectedTokens = [token1Id || 0, token2Id || 0];
-        console.log({ tradingTokens, selectedTokens })
-        return selectedTokens.every((id) => tradingTokens.includes(id));
-    });
-
-
-    const { data: userBalances, refetch: refetchTokenBalances } =
+    const { data: userBalancesData, refetch: refetchTokenBalances } =
         useUserTokenBalances();
-    const poolTokenBalance = userBalances?.find(
-        (balance) => balance.id == focusedPool?.id,
-    );
-    const poolTokenBalanceDec = poolTokenBalance?.balance?.format({ includeLabel: false });
+    const userBalances = userBalancesData || []
 
-    const [focusedPoolId, setFocusedPoolId] = useState<number>();
+    console.log({ userBalances })
 
-    const focusedPool = pools.find(pool => pool.id == focusedPoolId);
+    // ── Core state ──────────────────────────────────────────────────────
+    const [focusedPoolId, setFocusedPoolId] = useState<number | undefined>(undefined);
+    const { value: isAddingLiquidity, toggle } = useBoolean(true);
 
+
+    // ── Token inputs ────────────────────────────────────────────────────
     const {
         obj: token1Obj,
         tokenId: token1Id,
@@ -62,8 +49,9 @@ export const Liquidity = () => {
         setAmount: setToken1Amount,
         setTokenId: setToken1Id,
         balance: token1UserBalance,
-        amountNumber: token1AmountNumber
+        amountNumber: token1AmountNumber,
     } = useAmount();
+
     const {
         obj: token2Obj,
         tokenId: token2Id,
@@ -71,108 +59,66 @@ export const Liquidity = () => {
         setAmount: setToken2Amount,
         setTokenId: setToken2Id,
         balance: token2UserBalance,
-        amountNumber: token2AmountNumber
+        amountNumber: token2AmountNumber,
     } = useAmount();
 
-    const { value: isAddingLiquidity, toggle, } =
-        useBoolean(true);
+    const { value: lastTouchedIs1, setTrue: oneIsLastTouched, setFalse: twoIsLastTouched } = useBoolean(true);
+
+    const lastTouched = lastTouchedIs1 ? token1Obj : token2Obj;
+
+    // ── Derived ─────────────────────────────────────────────────────────
+    const focusedPool = pools.find((pool) => pool.id === focusedPoolId);
+
+    const poolsOfLiquidityPair = pools.filter((pool) => {
+        const tradingTokens = [pool?.tokenAId, pool?.tokenBId];
+        const selectedTokens = [token1Id || 0, token2Id || 0];
+        return selectedTokens.every((id) => tradingTokens.includes(id));
+    });
+
+    const poolTokenBalance = userBalances?.find(
+        (balance) => balance.id == focusedPool?.id
+    );
+    const poolTokenBalanceDec = poolTokenBalance?.balance?.format({ includeLabel: false });
 
     const { data: maxWithdrawableLiquidity } = useQuotePoolTokens(
-        !!poolTokenBalance,
+        !!poolTokenBalance && !isAddingLiquidity,
         focusedPool,
-        poolTokenBalanceDec,
+        poolTokenBalanceDec
     );
 
-    const token1Withdrawable = maxWithdrawableLiquidity && token1Id == maxWithdrawableLiquidity[0].tokenId ? maxWithdrawableLiquidity[0] : maxWithdrawableLiquidity![1];
-    const token2Withdrawable = maxWithdrawableLiquidity && token2Id == maxWithdrawableLiquidity[0].tokenId ? maxWithdrawableLiquidity[0] : maxWithdrawableLiquidity![1];
+    const token1Withdrawable = maxWithdrawableLiquidity?.find(t => t.tokenId === token1Id);
+    const token2Withdrawable = maxWithdrawableLiquidity?.find(t => t.tokenId === token2Id);
 
-    const token1Balance = isAddingLiquidity ? token1UserBalance : maxWithdrawableLiquidity ? pureDecimalToQuantity(token1Withdrawable) : undefined;
-    const token2Balance = isAddingLiquidity ? token2UserBalance : maxWithdrawableLiquidity ? pureDecimalToQuantity(token2Withdrawable) : undefined;
+    const token1Balance = isAddingLiquidity
+        ? token1UserBalance
+        : token1Withdrawable
+            ? pureDecimalToQuantity(token1Withdrawable)
+            : undefined;
+
+    const token2Balance = isAddingLiquidity
+        ? token2UserBalance
+        : token2Withdrawable
+            ? pureDecimalToQuantity(token2Withdrawable)
+            : undefined;
+
+    const { value: isMaxBalance, setValue: setIsMaxBalance } = useBoolean(false);
 
 
-    const { value: isMaxBalance, setValue: setIsMaxBalance } = useBoolean()
-
-
-    const resetFieldValues = () => {
-        setToken2Amount("");
-        setToken1Amount("");
-    };
-
+    // ── Add quote logic ──────────────────────────────────────────────
+    const { data: quotedAdd } = useQuoteAddLiquidity(isAddingLiquidity && !!focusedPool && lastTouched?.amount !== '', focusedPool, lastTouched?.tokenId, lastTouched?.amount)
 
     useEffect(() => {
-        if (!token1Id && !token2Id && pools.length >= 1) {
-            const pool = pools[0]!;
-            setToken1Id(pool.tokenAId);
-            setToken2Id(pool.tokenBId);
-        }
-    }, [pools, token1Id, token2Id, setToken1Id, setToken2Id]);
-
-
-    const { setValue: setShowCreatePool, value: showCreatePool } = useBoolean();
-
-
-    const onSuccess = () => {
-        resetFieldValues();
-        refetchPools();
-        refetchTokenBalances();
-    };
-
-
-    const onCreatePoolSuccess = () => {
-        setToken1Id(token1Id);
-        setToken2Id(token2Id);
-        onSuccess();
-    };
-
-
-
-    const { setValue: setPickTokenModal, value: showPickTokenModal } = useBoolean();
-    const { value: lastTouchedIs1, setFalse: on2Touched, setTrue: on1Touched } = useBoolean();
-    const { value: oneIsBeingSelected, setTrue: on1Select, setFalse: on2Select } = useBoolean(true)
-
-
-
-
-    const { setValue: setShowAddLiquidity, value: showAddLiquidity } =
-        useBoolean();
-    const { setValue: setShowRemoveLiquidity, value: showRemoveLiquidity } =
-        useBoolean();
-
-
-    const trigger = () => {
-        if (isAddingLiquidity) {
-            if (focusedPool) {
-                setShowAddLiquidity(true);
+        if (quotedAdd) {
+            if (lastTouched?.tokenId == token1Id) {
+                setToken2Amount(quotedAdd)
             } else {
-                setShowCreatePool(true);
+                setToken1Amount(quotedAdd)
             }
-        } else {
-            setShowRemoveLiquidity(true);
         }
-    }
-    const poolTokens = pools?.map((pool) => pool.liquidityToken);
+    }, [isAddingLiquidity, quotedAdd, lastTouched, setToken1Amount, setToken2Amount, token1Id])
 
-    // Pool tokens user owns
-    const userLiquidityTokens = (userBalances || [])
-        ?.filter(
-            (balance) =>
-                !poolTokens?.some(
-                    (poolToken) => poolToken == balance.id,
-                ),
-        )
-        .map((balance) => ({
-            id: balance.id,
-            symbol: balance.symbol,
-        }))
 
-    const reserveTokensRedeemable = pools.filter(pool => userLiquidityTokens.some(token => token.id == pool.id)).flatMap(pool => [{ id: pool.reserveA.tokenId, symbol: pool.reserveA.symbol }, { id: pool.reserveB.tokenId, symbol: pool.reserveB.symbol }])
-    const userTokens = (userBalances || [])?.map(balance => ({ id: balance.id, symbol: balance.symbol }))
-
-    const selectableTokens = [...userTokens, ...reserveTokensRedeemable].filter(token => !userLiquidityTokens.some(t => t.id == token.id))
-
-    const token1 = userLiquidityTokens.find((token) => token.id == token1Id);
-    const token2 = userLiquidityTokens.find((token) => token.id == token2Id);
-
+    // ── Remove quote logic ──────────────────────────────────────────────
     const lastTouchedAmount = lastTouchedIs1 ? token1Amount : token2Amount;
     const lastTouchedAmountIsNumber = lastTouchedAmount !== "";
 
@@ -184,223 +130,284 @@ export const Liquidity = () => {
     );
 
 
+    const { data: quotedRemove } = useQuoteRemoveLiquidity(
+        validQuote && !isAddingLiquidity,
+        focusedPool,
+        poolTokenBalance?.balance?.format({ includeLabel: false }),
+        lastTouched
+    );
+
+    const poolTokensToRemove = quotedRemove && focusedPoolId
+        ? isMaxBalance && poolTokenBalanceDec
+            ? { amount: poolTokenBalanceDec, tokenId: focusedPoolId }
+            : quotedRemove[0]
+        : undefined;
+
+    useEffect(() => {
+        if (quotedRemove && lastTouched) {
+            if (lastTouched.tokenId == token1Id) {
+                // change token2 field
+                setToken2Amount(quotedRemove!.find(r => r.tokenId == token2Id)!.amount)
+            } else {
+                setToken1Amount(quotedRemove!.find(r => r.tokenId == token1Id)!.amount)
+            }
+        }
+    }, [isAddingLiquidity, quotedRemove, lastTouched, setToken1Amount, setToken2Amount, token1Id, token2Id])
+
+    const { value: showPickTokenModal, setValue: setShowPickTokenModal } = useBoolean();
+    const { value: oneIsBeingSelected, setTrue: on1Select, setFalse: on2Select } = useBoolean(true);
+
+    const { value: showCreatePool, setValue: setShowCreatePool } = useBoolean();
+    const { value: showAddLiquidity, setValue: setShowAddLiquidity } = useBoolean();
+    const { value: showRemoveLiquidity, setValue: setShowRemoveLiquidity } = useBoolean();
+
+    const resetFieldValues = () => {
+        setToken2Amount("");
+        setToken1Amount("");
+        setIsMaxBalance(false);
+    };
+
+    const onSuccess = () => {
+        resetFieldValues();
+        refetchPools();
+        refetchTokenBalances();
+    };
+
+    const onCreatePoolSuccess = () => {
+        setToken1Id(token1Id);
+        setToken2Id(token2Id);
+        onSuccess();
+    };
+
+    const trigger = () => {
+        if (isAddingLiquidity) {
+            if (focusedPool) {
+                setShowAddLiquidity(true);
+            } else {
+                setShowCreatePool(true);
+            }
+        } else {
+            setShowRemoveLiquidity(true);
+        }
+    };
+
+    useEffect(() => {
+        if (!token1Id && !token2Id && (pools.length > 0 || userBalances?.length > 1)) {
+            const firstTwoTokens = [userBalances[0].id, userBalances[1].id]
+            if (pools.length > 0) {
+                const pool = pools[0];
+                setFocusedPoolId(pool.id);
+                setToken1Id(pool.reserveA.tokenId)
+                setToken2Id(pool.reserveB.tokenId)
+            } else {
+                setToken1Id(firstTwoTokens[0]);
+                setToken2Id(firstTwoTokens[1]);
+            }
 
 
-    const { data: quotedRemove } = useQuoteRemoveLiquidity(validQuote, focusedPool, poolTokenBalance?.balance?.format({ includeLabel: false, }), {
-        amount: lastTouchedIs1 ? token1Amount : token2Amount,
-        tokenId: lastTouchedIs1 ? token1Id! : token2Id!
-    })
+        }
+    }, [pools, token1Id, token2Id, setToken1Id, setToken2Id, userBalances]);
 
-    // If the user hits "max balance" then we're not going to bother with getting a quote on pool tokens
-    // as we'll interpret this as they want to redeem their entire token pool token balance.
-    const poolTokensToRemove = quotedRemove && focusedPoolId ? isMaxBalance && poolTokenBalanceDec ? { amount: poolTokenBalanceDec, tokenId: focusedPoolId } :
-        quotedRemove[0]
-        : undefined
+    const poolTokens = pools?.map((pool) => pool.liquidityToken);
 
-    return <>
+    const userPoolTokens = (userBalances || [])
+        ?.filter((balance) => !poolTokens?.some((poolToken) => poolToken == balance.id))
+        .map((balance) => ({
+            id: balance.id,
+            symbol: balance.symbol,
+        }));
 
-        <PickTokenModal
-            onSelectToken={(id) => {
-                if (oneIsBeingSelected) {
-                    setToken1Id(id)
-                } else {
-                    setToken2Id(id)
-                }
-            }}
-            tokens={selectableTokens}
-            openChange={(e) => {
-                setPickTokenModal(e);
-            }}
-            show={showPickTokenModal}
-        />
+    const reserveTokensRedeemable = pools
+        .filter((pool) => userPoolTokens.some((token) => token.id == pool.id))
+        .flatMap((pool) => [
+            { id: pool.reserveA.tokenId, symbol: pool.reserveA.symbol },
+            { id: pool.reserveB.tokenId, symbol: pool.reserveB.symbol },
+        ]);
 
-        <AddLiquidityModal
-            show={showAddLiquidity}
-            openChange={(e) => {
-                setShowAddLiquidity(e);
-            }}
-            onSuccess={onSuccess}
-            poolId={focusedPoolId}
-            firstDeposit={token1Obj}
-            secondDeposit={token2Obj}
-        />
-        <RemoveLiquidityModal
-            show={showRemoveLiquidity}
-            openChange={(e) => {
-                setShowRemoveLiquidity(e);
-            }}
-            onSuccess={onSuccess}
-            amount={poolTokensToRemove}
-        />
-        <CreatePoolModal
-            show={showCreatePool}
-            openChange={(e) => {
-                setShowCreatePool(e);
-            }}
-            onSuccess={onCreatePoolSuccess}
-            firstDeposit={token1Obj}
-            secondDeposit={token2Obj}
-        />
+    const userTokens = (userBalances || [])?.map((balance) => ({
+        id: balance.id,
+        symbol: balance.symbol,
+    }));
 
-        <DualTokens
-            token1={{
-                label: "Deposit #1",
-                id: token1Id || 0,
-                amount: token1Amount,
-                onMaxBalance: function () {
-                    setIsMaxBalance(true)
-                },
-                onSelect: function () {
-                    on1Select()
-                },
-                setAmount: function (amount) {
-                    on1Touched()
-                    setIsMaxBalance(false)
-                    setToken1Amount(amount)
-                },
-                balance: token1Balance
-            }}
-            token2={{
-                label: "Deposit #2",
-                id: token2Id || 0,
-                amount: token2Amount,
-                onMaxBalance: function () {
-                    setIsMaxBalance(true)
-                },
-                onSelect: function () {
-                    on2Select()
-                },
-                setAmount: function (amount) {
-                    on2Touched()
-                    setIsMaxBalance(false)
-                    setToken2Amount(amount)
-                },
-                balance: token2Balance
-            }}
-            onCenterClick={() => {
-                resetFieldValues();
-                toggle()
-            }}
-            triggerLabel={isAddingLiquidity ? "Add liquidity" : "Remove liquidity"}
-            onTrigger={() => { trigger() }}
-            // center={isAddingLiquidity ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
-            footer={
-                <div className="text-muted-foreground space-y-1 text-sm">
-                    {isAddingLiquidity && (
-                        <PoolPicker
-                            setFocusedPoolId={(focusedId) =>
-                                setFocusedPoolId(focusedId)
-                            }
-                            focusedPoolId={focusedPoolId}
-                            pools={poolsOfLiquidityPair || []}
-                        />
-                    )}
 
-                    {poolsOfLiquidityPair.length == 0 && (
-                        <>
-                            <Alert variant="warning">
-                                <AlertTitle>
-                                    Creating new pool
-                                </AlertTitle>
-                                <AlertDescription>
-                                    <p>
-                                        No pool exists between the two
-                                        tokens selected.
-                                    </p>
-                                    <p>
-                                        By proceeding you will create a
-                                        new pool of both reserves,
-                                        ensure you are depositing both
-                                        tokens of equal market value.
-                                    </p>
-                                </AlertDescription>
-                            </Alert>
-                            {token2Amount && token1Amount && (
-                                <div className="text-muted-foreground space-y-1 text-sm">
-                                    <div className="flex justify-between">
-                                        <span>Token 1 Price</span>
-                                        <span>
-                                            {(
-                                                (token2AmountNumber || 0)
-                                                /
-                                                (token1AmountNumber || 0)
-                                            ).toFixed(4)}{" "}
-                                            {token2?.symbol ||
-                                                `(${token2?.id})`}
-                                        </span>
-                                    </div>
+    const selectableTokens = [...userTokens, ...reserveTokensRedeemable].filter(token => !poolTokens.includes(token.id))
 
-                                    <div className="flex justify-between">
-                                        <span>Token 2 Price</span>
-                                        <span>
-                                            {(
-                                                token1AmountNumber || 0 /
-                                                (token2AmountNumber || 0)
-                                            ).toFixed(4)}{" "}
-                                            {token1?.symbol ||
-                                                `(${token1?.id})`}
-                                        </span>
-                                    </div>
-                                </div>
-                            )}
-                        </>
-                    )}
 
-                    {poolsOfLiquidityPair.length > 0 &&
-                        focusedPoolId === null && (
+    const token1 = selectableTokens.find((token) => token.id == token1Id);
+    const token2 = selectableTokens.find((token) => token.id == token2Id);
+
+    return (
+        <>
+            <PickTokenModal
+                onSelectToken={(id) => {
+                    if (oneIsBeingSelected) {
+                        setToken1Id(id);
+                    } else {
+                        setToken2Id(id);
+                    }
+                }}
+                tokens={selectableTokens}
+                openChange={(e) => setShowPickTokenModal(e)}
+                show={showPickTokenModal}
+            />
+
+            <CreatePoolModal
+                show={showCreatePool}
+                openChange={setShowCreatePool}
+                onSuccess={onCreatePoolSuccess}
+                firstDeposit={token1Obj}
+                secondDeposit={token2Obj}
+            />
+
+            <AddLiquidityModal
+                show={showAddLiquidity}
+                openChange={setShowAddLiquidity}
+                onSuccess={onSuccess}
+                poolId={focusedPoolId}
+                firstDeposit={token1Obj}
+                secondDeposit={token2Obj}
+            />
+
+            <RemoveLiquidityModal
+                show={showRemoveLiquidity}
+                openChange={setShowRemoveLiquidity}
+                onSuccess={onSuccess}
+                amount={poolTokensToRemove}
+            />
+
+            <DualTokens
+                token1={{
+                    label: "Deposit #1",
+                    id: token1Id || 0,
+                    amount: token1Amount,
+                    onMaxBalance: function () {
+                        setIsMaxBalance(true);
+                    },
+                    onSelect: function () {
+                        on1Select();
+                        setShowPickTokenModal(true);
+                    },
+                    setAmount: function (amount) {
+                        setIsMaxBalance(false);
+                        setToken1Amount(amount);
+                        oneIsLastTouched()
+                    },
+                    balance: token1Balance,
+                }}
+                token2={{
+                    label: "Deposit #2",
+                    id: token2Id || 0,
+                    amount: token2Amount,
+                    onMaxBalance: function () {
+                        setIsMaxBalance(true);
+                    },
+                    onSelect: function () {
+                        on2Select();
+                        setShowPickTokenModal(true);
+                    },
+                    setAmount: function (amount) {
+                        setIsMaxBalance(false);
+                        setToken2Amount(amount);
+                        twoIsLastTouched()
+                    },
+                    balance: token2Balance,
+                }}
+                onCenterClick={() => {
+                    resetFieldValues();
+                    toggle();
+                }}
+                triggerLabel={isAddingLiquidity ? "Add liquidity" : "Remove liquidity"}
+                onTrigger={trigger}
+                center={isAddingLiquidity ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
+                footer={
+                    <div className="text-muted-foreground space-y-1 text-sm">
+                        {isAddingLiquidity && (
+                            <PoolPicker
+                                setFocusedPoolId={(focusedId) => setFocusedPoolId(focusedId)}
+                                focusedPoolId={focusedPoolId}
+                                pools={poolsOfLiquidityPair || []}
+                            />
+                        )}
+
+                        {poolsOfLiquidityPair.length == 0 && isAddingLiquidity && (
                             <>
                                 <Alert variant="warning">
-                                    <AlertTitle>
-                                        Pool of trading pair already
-                                        exists
-                                    </AlertTitle>
-                                    <AlertDescription className="text-sm">
+                                    <AlertTitle>Creating new pool</AlertTitle>
+                                    <AlertDescription>
+                                        <p>No pool exists between the two tokens selected.</p>
                                         <p>
-                                            A pool of this trading pair
-                                            already exists, it is
-                                            generally better to deposit
-                                            to existing pools rather
-                                            than creating another.
-                                        </p>
-                                        <p>
-                                            Pools created with
-                                            insufficient liquidity are
-                                            unlikely to receive
-                                            favourable trading activity.
+                                            By proceeding you will create a new pool of both reserves,
+                                            ensure you are depositing both tokens of equal market value.
                                         </p>
                                     </AlertDescription>
                                 </Alert>
-                                {token2AmountNumber && token1AmountNumber && (
+                                {token1Amount && token2Amount && (
                                     <div className="text-muted-foreground space-y-1 text-sm">
                                         <div className="flex justify-between">
                                             <span>Token 1 Price</span>
                                             <span>
-                                                {(
-                                                    token2AmountNumber /
-                                                    token1AmountNumber
-                                                ).toFixed(4)}{" "}
-                                                {token2?.symbol ||
-                                                    `(${token2?.id})`}
+                                                {((token2AmountNumber || 0) / (token1AmountNumber || 0)).toFixed(4)}{" "}
+                                                {token2?.symbol || `(${token2Id})`}
                                             </span>
                                         </div>
 
                                         <div className="flex justify-between">
                                             <span>Token 2 Price</span>
                                             <span>
-                                                {(
-                                                    token1AmountNumber /
-                                                    token2AmountNumber
-                                                ).toFixed(4)}{" "}
-                                                {token1?.symbol ||
-                                                    `(${token1?.id})`}
+                                                {((token1AmountNumber || 0) / (token2AmountNumber || 0)).toFixed(4)}{" "}
+                                                {token1?.symbol || `(${token1Id})`}
                                             </span>
                                         </div>
                                     </div>
                                 )}
                             </>
                         )}
-                </div>
-            }
-        />
-    </>
-}
+
+                        {poolsOfLiquidityPair.length > 0 && !focusedPool && isAddingLiquidity && (
+                            <>
+                                <Alert variant="warning">
+                                    <AlertTitle>Pool of trading pair already exists</AlertTitle>
+                                    <AlertDescription className="text-sm">
+                                        <p>
+                                            A pool of this trading pair already exists, it is generally better to
+                                            deposit to existing pools rather than creating another.
+                                        </p>
+                                        <p>
+                                            Pools created with insufficient liquidity are unlikely to receive
+                                            favourable trading activity.
+                                        </p>
+                                    </AlertDescription>
+                                </Alert>
+                                {token1AmountNumber && token2AmountNumber && (
+                                    <div className="text-muted-foreground space-y-1 text-sm">
+                                        <div className="flex justify-between">
+                                            <span>Token 1 Price</span>
+                                            <span>
+                                                {(token2AmountNumber / token1AmountNumber).toFixed(4)}{" "}
+                                                {token2?.symbol || `(${token2Id})`}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex justify-between">
+                                            <span>Token 2 Price</span>
+                                            <span>
+                                                {(token1AmountNumber / token2AmountNumber).toFixed(4)}{" "}
+                                                {token1?.symbol || `(${token1Id})`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {!isAddingLiquidity && (!poolTokenBalance || !poolTokenBalance.balance) && (
+                            <div className="text-destructive">
+                                You don’t have any LP tokens for this pool
+                            </div>
+                        )}
+                    </div>
+                }
+            />
+        </>
+    );
+};

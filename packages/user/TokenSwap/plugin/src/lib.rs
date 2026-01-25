@@ -141,7 +141,7 @@ impl Swap for TokenSwapPlugin {
 
         if pools.len() == 0 {
             if path_was_found {
-                return Err(ErrorType::InsffucientLiquidity.into());
+                return Err(ErrorType::InsufficientLiquidity.into());
             } else {
                 return Err(ErrorType::InsufficientPools.into());
             }
@@ -251,6 +251,10 @@ impl Liquidity for TokenSwapPlugin {
         };
 
         let desired_qty = reserve_amount_to_quantity(desired_amount)?;
+
+        if desired_qty > wanted_reserve.quantity {
+            return Err(ErrorType::DesiredHigherThanReserve.into());
+        }
 
         let mut required_pool_tokens =
             mul_div(desired_qty, pool_token_quantity, wanted_reserve.quantity);

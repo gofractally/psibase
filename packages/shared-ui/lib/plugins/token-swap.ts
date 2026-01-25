@@ -94,7 +94,7 @@ class Liquidity extends PluginInterface {
                 pool: Pool,
                 userPoolTokenBalance: string | undefined,
                 desiredAmount: TokenAmount,
-            ], [TokenAmount, TokenAmount, TokenAmount]
+            ], [poolTokens: TokenAmount, reserveA: TokenAmount, reserveB: TokenAmount]
         >("quoteRemoveLiquidity");
     }
 }

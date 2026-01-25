@@ -71,6 +71,15 @@ export const Swap = () => {
         }
     }, [quotedSwap, setToAmount])
 
+    useEffect(() => {
+        if (!fromId && !toId && (pools?.length || 0) > 0) {
+            const pool = pools![0];
+            setFromId(pool.tokenAId)
+            setToId(pool.tokenBId)
+        }
+    }, [fromId, toId, pools, setFromId, setToId])
+
+
     const priceImpact = quotedSwap ? quotedSwap.slippage / 10000 : 0;
 
     const uniqueTradeableTokens = useMemo(
