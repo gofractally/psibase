@@ -48,7 +48,11 @@ impl UserSettings {
     }
 
     pub fn get_buffer_capacity(&self) -> u64 {
-        let default_capacity = self.get_min_buffer_capacity() * 5;
+        // This factor is used to set the default buffer capacity to an arbitrary multiple
+        // of the minimum buffer capacity
+        const FACTOR: u64 = 5;
+
+        let default_capacity = self.get_min_buffer_capacity() * FACTOR;
         self.buffer_capacity.unwrap_or(default_capacity)
     }
 
