@@ -10,21 +10,34 @@ pub fn ratio_to_ppm(num: u64, den: u64) -> u128 {
     (num as u128 * PPM) / (den as u128)
 }
 
-// Exponential growth/decay formula relates a total change to a rate of change
-//   over some interval:
+// In DiffAdjust, we use the discrete compounding equation to relate total change to a rate of change
+//   over some interval.
 //   ```
-//   F = e ^ (rt)
+//   F = (1 + r)^t
+//   ```
+// To solve for a rate, therefore, given a total change and a time interval, we find:
+//   ```
+//   r = (F^(1/t)) - 1
 //   ```
 //
-// In this case we have a desired total change and a time interval, and are computing the needed
-//   rate:
+// Using the identity a^x = e^(x * ln(a)), we can rewrite the equation as:
+//   ```
+//   r = e^(ln(F) / t) - 1
+//   ```
+//
+// The first term of the taylor series expansion of e^x -1 gives us the equation:
 //   ```
 //   r = ln(F) / t
 //   ```
 //
+// ...Which is actually the same as the equation for rate of change in continuous compounding (F=e^(rt)).
+//
 // Precomputed ln(2) therefore encodes the target total change = 2x (rate needed to double a value
 //   over some interval).
 // ln(1/F) == -ln(F), so ln(2) can also be used to compute a halving rate.
+//
+// The error for this approximation drops off as t increases, so we can use it here given that we don't
+//   expect to have small time intervals over which to double/halve.
 pub const LN2_PPM: u32 = 693_147;
 // The equation is therefore: `ln(2) / t`. Using `(ln(2) + t/2) / t` is a small adjustment to
 //   round to the nearest solution instead of just truncation.
