@@ -12,6 +12,7 @@ use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
+use psibase::services::invite::SubjectPublicKeyInfo;
 
 define_trust! {
     descriptions {
@@ -42,9 +43,13 @@ impl Api for PremAccountsPlugin {
         Ok(())
     }
 
-    fn claim(account: String) -> Result<(), Error> {
+    fn claim(account: String, pub_key: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::claim)?;
-        let packed_claim_args = prem_accounts::action_structs::claim { account }.packed();
+        let packed_claim_args = prem_accounts::action_structs::claim {
+            account,
+            pub_key: SubjectPublicKeyInfo::from(pub_key.as_bytes().to_vec()),
+        }
+        .packed();
         add_action_to_transaction("claim", &packed_claim_args).unwrap();
         Ok(())
     }

@@ -32,7 +32,7 @@ pub mod tables {
     pub struct PurchasedAccount {
         #[primary_key]
         pub account: AccountNumber,
-        #[secondary_key(1)]
+        //#[secondary_key(1)]
         pub owner: AccountNumber,
     }
 }
@@ -42,10 +42,15 @@ pub mod service {
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
-    use psibase::services::accounts::Wrapper as Accounts;
+    use psibase::fracpack::Pack;
+    use psibase::services::accounts as Accounts;
+    use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+    use psibase::services::auth_sig as AuthSig;
+    use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::tokens::Wrapper as Tokens;
     use psibase::services::tokens::{Quantity, TID};
+    use psibase::services::transact::Wrapper as Transact;
     use psibase::*;
 
     const INIT_DIFFICULTY: u64 = 1000;
@@ -89,10 +94,10 @@ pub mod service {
     fn buy(account: String, max_cost: u64) {
         check_init();
 
-        let account_num = AccountNumber::from_exact(&account).expect("invalid account name");
+        let acct_to_buy = AccountNumber::from_exact(&account).expect("invalid account name");
 
         check(
-            !Accounts::call().exists(account_num),
+            !Accounts::Wrapper::call().exists(acct_to_buy),
             "account already exists",
         );
 
@@ -136,25 +141,25 @@ pub mod service {
             "premium account purchase".to_string().try_into().unwrap(),
         );
 
-        Accounts::call().newAccount(account_num, PremAccounts::SERVICE, true);
+        AuthDelegate::call().newAccount(acct_to_buy, get_service());
 
         PurchasedAccountsTable::new()
             .put(&PurchasedAccount {
-                account: account_num,
+                account: acct_to_buy,
                 owner: sender,
             })
             .unwrap();
     }
 
     #[action]
-    fn claim(account: String) {
+    fn claim(account: String, pub_key: SubjectPublicKeyInfo) {
         check_init();
 
         let purchased_accounts_table = PurchasedAccountsTable::new();
-        let account_num = AccountNumber::from_exact(&account).expect("invalid account name");
+        let acct_to_claim = AccountNumber::from_exact(&account).expect("invalid account name");
 
         let purchased_account = check_some(
-            purchased_accounts_table.get_index_pk().get(&account_num),
+            purchased_accounts_table.get_index_pk().get(&acct_to_claim),
             "account not purchased",
         );
         check(
@@ -162,7 +167,30 @@ pub mod service {
             "account not purchased by sender",
         );
 
-        Accounts::call().setAuthSev(account_num, get_sender());
+        // Every interface assumes the user is trying to do something to themself
+        // "object" being acted on is the calling service (PremAccounts)
+        // AuthSig::call().setKey(pub_key);
+        let set_key_action = Action {
+            sender: acct_to_claim,
+            service: AuthSig::SERVICE,
+            method: AuthSig::action_structs::setKey::ACTION_NAME.into(),
+            rawData: AuthSig::action_structs::setKey { key: pub_key }
+                .packed()
+                .into(),
+        };
+        let set_auth_serv_action = Action {
+            sender: get_service(),
+            service: Accounts::Wrapper::SERVICE,
+            method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+            rawData: Accounts::action_structs::setAuthServ {
+                authService: AuthSig::SERVICE,
+            }
+            .packed()
+            .into(),
+        };
+        Transact::call().runAs(set_key_action, vec![]);
+        Transact::call().runAs(set_auth_serv_action, vec![]);
+
         purchased_accounts_table.remove(&purchased_account);
     }
 }

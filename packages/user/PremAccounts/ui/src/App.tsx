@@ -6,7 +6,7 @@ import { Input } from "@shared/shadcn/ui/input";
 
 import { Nav } from "@/components/nav";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { getSupervisor, siblingUrl } from "@psibase/common-lib";
 const supervisor = getSupervisor();
 
 const doesAccountExist = async (
@@ -56,13 +56,58 @@ export const App = () => {
 
     const loadSystemToken = async () => {
         try {
-            const token = await supervisor.functionCall({
-                service: "tokens",
-                intf: "api",
-                method: "getSysToken",
-                params: [],
-            }) as { precision?: number; symbol?: string } | null;
+            const tokensGraphqlUrl = siblingUrl(null, "tokens", "/graphql");
             
+            // First, get the system token ID from config
+            const configResponse = await fetch(tokensGraphqlUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    query: `
+                        query {
+                            config {
+                                sysTid
+                            }
+                        }
+                    `,
+                }),
+            });
+            const configData = (await configResponse.json()) as {
+                data?: { config?: { sysTid?: number } };
+                errors?: Array<{ message: string }>;
+            };
+            if (configData.errors) {
+                throw new Error(configData.errors[0].message);
+            }
+            const sysTid = configData.data?.config?.sysTid;
+            if (!sysTid) {
+                return;
+            }
+
+            // Then, get the token details
+            const tokenResponse = await fetch(tokensGraphqlUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    query: `
+                        query {
+                            token(tokenId: "${sysTid}") {
+                                precision
+                                symbol
+                            }
+                        }
+                    `,
+                }),
+            });
+            const tokenData = (await tokenResponse.json()) as {
+                data?: { token?: { precision?: number; symbol?: string } };
+                errors?: Array<{ message: string }>;
+            };
+            if (tokenData.errors) {
+                throw new Error(tokenData.errors[0].message);
+            }
+
+            const token = tokenData.data?.token;
             if (token && typeof token.precision === "number") {
                 setSystemToken({
                     precision: token.precision,
@@ -131,18 +176,21 @@ export const App = () => {
         setError("");
 
         try {
+            console.info("calling buy()");
             await supervisor.functionCall({
                 service: thisServiceName,
                 intf: "api",
                 method: "buy",
                 params: [accountName],
             });
+            console.info("buy() returned");
             
             // Reset form and reload prices
             setAccountName("");
             setAccountExists(null);
             setPrice(null);
             await loadPrices();
+            console.info("loadPrices() returned");
         } catch (e) {
             if (e instanceof Error) {
                 setError(e.message);
