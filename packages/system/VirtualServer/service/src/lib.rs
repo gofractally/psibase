@@ -229,7 +229,7 @@ mod service {
             let amt = Quantity::new(amount);
 
             if balance < amt {
-                let err = format!("{} has insufficient resource balance", &user.to_string());
+                let err = format!("{} has insufficient resource balance", user);
                 abort_message(&err);
             }
 
