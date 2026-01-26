@@ -174,7 +174,6 @@ mod service {
         let buyer = get_sender();
 
         Tokens::call().debit(sys, buyer, amount, "".into());
-        Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
         Tokens::call().toSub(res, for_user.to_string(), amount);
 
         if buyer != for_user {
@@ -235,6 +234,7 @@ mod service {
             }
 
             Tokens::call().fromSub(res, user.to_string(), amt);
+            Tokens::call().credit(config.sys, config.fee_receiver, amt, "".into());
         }
     }
 
