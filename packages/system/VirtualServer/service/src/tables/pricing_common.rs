@@ -100,8 +100,7 @@ pub fn update_average_usage(
 
     // We need to clamp this to fit in u32 which is a DiffAdjust constraint.
     // This clamps it at u32 max, which means that if the usage is more than 4,294x over capacity,
-    //   then we lose the real multiple. With this implementation, all that matters is that the PPM
-    //   is over the target, the absolute value is not really relevant.
+    //   then we lose the real multiple.
     let ppm = ppm.min(u32::MAX as u128) as u32;
 
     DiffAdjust::call().increment(diff_adjust_id, ppm);
