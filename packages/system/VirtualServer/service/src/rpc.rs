@@ -175,39 +175,25 @@ fn serve_sys() -> ServiceMethod {
 
 impl Query {
     fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
-        if self.user.is_none() {
-            return auth_err(user);
+        let authorizers = self.user.map(|u| vec![u]).unwrap_or_default();
+        if self.user == Some(user) || is_auth(user, Some(serve_sys()), authorizers) {
+            Ok(())
+        } else {
+            auth_err(user)
         }
-
-        let logged_in_user = self.user.unwrap();
-        if logged_in_user != user {
-            if is_auth(user, Some(serve_sys()), vec![logged_in_user]) {
-                return Ok(());
-            }
-
-            return auth_err(user);
-        }
-
-        Ok(())
     }
 
     fn check_users_auth(&self, u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
-        if self.user.is_none() {
-            return auth_users_err(u1, u2);
+        let authorizers = self.user.map(|u| vec![u]).unwrap_or_default();
+        if self.user == Some(u1) || self.user == Some(u2) {
+            Ok(())
+        } else if is_auth(u1, Some(serve_sys()), authorizers.clone())
+            || is_auth(u2, Some(serve_sys()), authorizers)
+        {
+            Ok(())
+        } else {
+            auth_users_err(u1, u2)
         }
-        let logged_in_user = self.user.unwrap();
-
-        if logged_in_user != u1 && logged_in_user != u2 {
-            if is_auth(u1, Some(serve_sys()), vec![logged_in_user]) {
-                return Ok(());
-            }
-            if is_auth(u2, Some(serve_sys()), vec![logged_in_user]) {
-                return Ok(());
-            }
-
-            return auth_users_err(u1, u2);
-        }
-        Ok(())
     }
 }
 
