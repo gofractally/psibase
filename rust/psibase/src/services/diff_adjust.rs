@@ -129,16 +129,16 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Update percent change
+    /// Update ppm change
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `increase_ppm` - Percent to increment when over target, 50000 = 5%
-    /// * `decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    /// * `increase_ppm` - PPM to increase when over target, e.g. 50000 ppm = 5%
+    /// * `decrease_ppm` - PPM to decrease when under target, e.g. 50000 ppm = 5%
     #[action]
-    fn set_percent(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
+    fn set_ppm(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
         unimplemented!()
     }
 

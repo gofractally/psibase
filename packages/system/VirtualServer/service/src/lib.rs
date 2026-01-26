@@ -88,7 +88,7 @@ mod service {
         // (the accounts service init already does such iterating, use as reference.)
     }
 
-    #[pre_action(exclude(init, initUser))]
+    #[pre_action(exclude(init))]
     fn check_init() {
         InitRow::check_init();
     }

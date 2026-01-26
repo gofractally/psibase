@@ -95,7 +95,7 @@ impl CpuPricing {
             cpu.halving_time_sec = halving_time_sec;
         });
 
-        DiffAdjust::call().set_percent(
+        DiffAdjust::call().set_ppm(
             Self::get_assert().diff_adjust_id,
             time_to_rate_ppm(doubling_time_sec),
             time_to_rate_ppm(halving_time_sec),

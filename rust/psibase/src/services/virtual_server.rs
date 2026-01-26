@@ -38,7 +38,7 @@ mod service {
         unimplemented!()
     }
 
-    #[pre_action(exclude(init, initUser))]
+    #[pre_action(exclude(init))]
     fn check_init() {
         unimplemented!()
     }
@@ -257,19 +257,6 @@ mod service {
 
     #[action]
     fn notifyBlock(block_num: BlockNum) {
-        unimplemented!()
-    }
-
-    /// The Accounts service will initialize every new user, which constructs the account's reserve
-    /// (with a balance of zero) in its own tables. This is therefore paid for by the account creator
-    /// and is part of account initialization, so subsequent writes to the reserve do not consume additional
-    /// storage resources (storage delta always = 0).
-    ///
-    /// In other words, this helps break the chicken/egg situation where we would have to allow a db write
-    /// (to init the user reserve) before we know how many resources the user has available for writes (because
-    /// the reserve hasn't been initialized).
-    #[action]
-    fn initUser(user: AccountNumber) {
         unimplemented!()
     }
 
