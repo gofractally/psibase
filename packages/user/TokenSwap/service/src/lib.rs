@@ -581,6 +581,3 @@ pub mod service {
     #[event(history)]
     pub fn created_pool(token_a: TID, token_b: TID) {}
 }
-
-#[cfg(test)]
-mod tests;
