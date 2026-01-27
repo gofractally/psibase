@@ -15,7 +15,11 @@ impl RollingBitset {
 
     /// Get event from the past (0 = most recent)
     pub fn get(self, events_ago: usize) -> bool {
-        events_ago < 16 && ((self.0 >> events_ago) & 1) != 0
+        psibase::check(
+            events_ago < 16,
+            "events_ago must be in range 0..16 (max 15)",
+        );
+        ((self.0 >> events_ago) & 1) != 0
     }
 
     /// Total trues in entire history
@@ -25,7 +29,7 @@ impl RollingBitset {
 
     /// How many of the last n events were true?
     pub fn count_last_n_set(self, n: usize) -> u16 {
-        let n = n.min(16);
+        psibase::check(n <= 16, "n cannot exceed 16 for a 16-bit rolling bitset");
         if n == 0 {
             return 0;
         }
@@ -44,6 +48,7 @@ impl From<u16> for RollingBitset {
         Self(value)
     }
 }
+
 impl From<RollingBitset> for u16 {
     fn from(b: RollingBitset) -> u16 {
         b.0
