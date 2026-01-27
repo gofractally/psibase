@@ -257,7 +257,7 @@ pub mod service {
 
     /// Set token threshold.
     ///
-    /// Sets the required amount of active members in the legistlature guild before the token can be initialised.  
+    /// Sets the required amount of active members in the legislature guild before the token can be initialised.  
     ///
     /// # Arguments
     /// * `fractal` - Fractal to update.
