@@ -1,44 +1,28 @@
-import { type UseMutationResult } from "@tanstack/react-query";
 import {
     ChevronsUpDown,
     Contact,
-    Copy,
     LogIn,
     LogOut,
     Moon,
-    PlusCircle,
-    RefreshCcw,
     Sun,
-    User,
     UserPlus,
+    Users,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { z } from "zod";
 
 import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
+import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
-import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
 import { useProfile } from "@/hooks/use-profile";
-import { useSelectAccount } from "@/hooks/use-select-account";
-import { zAccount } from "@/lib/zod/Account";
 
 import { Avatar } from "@shared/components/avatar";
+import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
-import { cn } from "@shared/lib/utils";
-import { Button } from "@shared/shadcn/ui/button";
-import {
-    Dialog,
-    DialogClose,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@shared/shadcn/ui/dialog";
+import { Dialog } from "@shared/shadcn/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -52,128 +36,100 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { useTheme } from "./theme-provider";
-
-function AccountMenuItem({
-    account,
-    isConnectingToAccount,
-    connectToAccount,
-}: {
-    account: z.infer<typeof zAccount>;
-    isConnectingToAccount: boolean;
-    connectToAccount: (account: string) => void;
-}) {
-    return (
-        <DropdownMenuItem
-            disabled={isConnectingToAccount}
-            key={account}
-            onClick={() => connectToAccount(account)}
-        >
-            <Avatar account={account} className="mr-2 h-4 w-4" />
-            <span>{account}</span>
-        </DropdownMenuItem>
-    );
-}
-
 export function NavUser() {
+    const navigate = useNavigate();
     const { isMobile } = useSidebar();
+    const { setTheme } = useTheme();
 
-    const { data: currentUser, isFetched: isFetchedLoggedInuser } =
-        useCurrentUser();
+    const { data: user, isPending: isPendingUser } = useCurrentUser();
+    const { data: profile } = useProfile(user);
 
     const { mutateAsync: logout } = useLogout();
-    const navigate = useNavigate();
+    const { mutateAsync: login } = useConnectAccount({
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
 
-    const { data: profile } = useProfile(currentUser);
+    const onSwitchAccounts = async () => {
+        await logout();
+        await login();
+    };
 
     const onLogout = async () => {
         await logout();
         navigate("/");
     };
 
+    const [showModal, setShowModal] = useState(false);
     const [modalType, setModalType] = useState<
         "editProfile" | "generateInvite"
     >("editProfile");
-    const [showModal, setShowModal] = useState(false);
 
     const onEditProfile = () => {
         setModalType("editProfile");
         setShowModal(true);
     };
 
-    const { setTheme } = useTheme();
-
-    const {
-        data: connectedAccountsData,
-        isFetched: isFetchedConnectedAccounts,
-    } = useConnectedAccounts();
-
-    const connectedAccounts = connectedAccountsData.filter(
-        (account) => account.toLowerCase() !== currentUser?.toLowerCase(),
-    );
-
-    const { mutateAsync: login } = useConnectAccount({
-        onError: (error) => {
-            toast.error(error.message);
-        },
-    });
-    const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
-        useSelectAccount();
-
     const generateInvite = useGenerateInvite();
-
     const onGenerateInvite = () => {
         generateInvite.mutate();
         setModalType("generateInvite");
         setShowModal(true);
     };
 
-    const isNoOptions = connectedAccounts.length == 0;
-    const isUsingOnlyOption =
-        connectedAccounts.length == 1 && connectedAccounts[0] === currentUser;
-    const isLoading =
-        !(isFetchedLoggedInuser && isFetchedConnectedAccounts) ||
-        isConnectingToAccount;
+    const displayName = profile?.profile?.displayName;
 
     return (
-        <Dialog open={showModal} onOpenChange={setShowModal}>
-            {modalType == "generateInvite" && (
-                <InviteDialogContent generateInvite={generateInvite} />
-            )}
-            {modalType == "editProfile" && (
-                <EditProfileDialogContent
-                    onClose={() => {
-                        setShowModal(false);
-                    }}
-                />
-            )}
+        <>
+            <Dialog open={showModal} onOpenChange={setShowModal}>
+                {modalType == "generateInvite" && (
+                    <GenerateInviteDialogContent
+                        generateInvite={generateInvite}
+                    />
+                )}
+                {modalType == "editProfile" && (
+                    <EditProfileDialogContent
+                        onClose={() => {
+                            setShowModal(false);
+                        }}
+                    />
+                )}
+            </Dialog>
             <SidebarMenu>
                 <SidebarMenuItem>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <SidebarMenuButton
                                 size="lg"
-                                className="data-[state=open]:bg-sidebar-accent  data-[state=open]:text-sidebar-accent-foreground"
+                                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                             >
-                                <Avatar
-                                    account={currentUser || ""}
-                                    className="h-8 w-8"
-                                />
+                                {isPendingUser ? (
+                                    <Skeleton className="size-8 rounded-full" />
+                                ) : (
+                                    <Avatar
+                                        account={user || ""}
+                                        className="h-8 w-8"
+                                    />
+                                )}
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate ">
-                                        {profile?.profile?.displayName ||
-                                            currentUser ||
-                                            "Not logged in"}
+                                        {isPendingUser ? (
+                                            <Skeleton className="h-4 w-32" />
+                                        ) : !user ? (
+                                            "Not logged in"
+                                        ) : (
+                                            (displayName ?? user)
+                                        )}
                                     </span>
                                 </div>
                                 <ChevronsUpDown className="ml-auto size-4" />
@@ -185,99 +141,30 @@ export function NavUser() {
                             align="end"
                             sideOffset={4}
                         >
-                            <DropdownMenuLabel className="p-0 font-normal">
+                            <DropdownMenuLabel className="cursor-default select-none p-0 font-normal">
                                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                     <Avatar
-                                        account={currentUser || ""}
+                                        account={user || ""}
                                         className="h-8 w-8"
                                     />
                                     <div className="grid flex-1 text-left text-sm leading-tight">
                                         <span className="truncate font-semibold">
-                                            {profile?.profile?.displayName ||
-                                                currentUser ||
+                                            {displayName ??
+                                                user ??
                                                 "Not logged in"}{" "}
-                                            {profile?.profile?.displayName ? (
+                                            {displayName && (
                                                 <span className="text-muted-foreground text-xs">
-                                                    {`(${currentUser})`}
+                                                    {`(${user})`}
                                                 </span>
-                                            ) : (
-                                                ""
                                             )}
                                         </span>
                                     </div>
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            {isNoOptions || isUsingOnlyOption ? (
-                                <DropdownMenuItem
-                                    onClick={() => {
-                                        login();
-                                    }}
-                                    disabled={!isFetchedConnectedAccounts}
-                                >
-                                    <LogIn className="mr-2 h-4 w-4" />
-                                    <span>
-                                        {!isFetchedConnectedAccounts
-                                            ? "Loading..."
-                                            : isUsingOnlyOption
-                                              ? "Switch account"
-                                              : "Login"}
-                                    </span>
-                                </DropdownMenuItem>
-                            ) : (
-                                <DropdownMenuGroup>
-                                    <DropdownMenuSub>
-                                        <DropdownMenuSubTrigger
-                                            disabled={isLoading}
-                                        >
-                                            <UserPlus className="mr-2 h-4 w-4" />
-                                            <span
-                                                className={cn({
-                                                    italic: isLoading,
-                                                })}
-                                            >
-                                                {currentUser
-                                                    ? "Switch account"
-                                                    : "Select account"}
-                                            </span>
-                                        </DropdownMenuSubTrigger>
-                                        <DropdownMenuPortal>
-                                            <DropdownMenuSubContent>
-                                                {connectedAccounts.map(
-                                                    (connectedAccount) => (
-                                                        <AccountMenuItem
-                                                            key={
-                                                                connectedAccount
-                                                            }
-                                                            account={
-                                                                connectedAccount
-                                                            }
-                                                            isConnectingToAccount={
-                                                                isConnectingToAccount
-                                                            }
-                                                            connectToAccount={
-                                                                connectToAccount
-                                                            }
-                                                        />
-                                                    ),
-                                                )}
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => {
-                                                        login();
-                                                    }}
-                                                >
-                                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                                    <span>More...</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuSubContent>
-                                        </DropdownMenuPortal>
-                                    </DropdownMenuSub>
-                                </DropdownMenuGroup>
-                            )}
                             <DropdownMenuGroup>
                                 <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger>
+                                    <DropdownMenuSubTrigger className="[&_svg:not([class*='text-'])]:text-muted-foreground gap-2 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0">
                                         <Moon className="mr-2 h-4 w-4" />
                                         <span>Theme</span>
                                     </DropdownMenuSubTrigger>
@@ -312,17 +199,17 @@ export function NavUser() {
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                disabled={!currentUser}
+                                disabled={!user}
                                 onClick={() => {
                                     onGenerateInvite();
                                 }}
                             >
-                                <User className="mr-2 h-4 w-4" />
+                                <UserPlus className="mr-2 h-4 w-4" />
                                 Create invite
                             </DropdownMenuItem>
 
                             <DropdownMenuItem
-                                disabled={!currentUser}
+                                disabled={!user}
                                 onClick={() => {
                                     onEditProfile();
                                 }}
@@ -330,10 +217,16 @@ export function NavUser() {
                                 <Contact className="mr-2 h-4 w-4" />
                                 Edit profile
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
 
-                            {currentUser && (
+                            {user ? (
                                 <>
-                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onClick={() => onSwitchAccounts()}
+                                    >
+                                        <Users className="mr-2 h-4 w-4" />
+                                        Switch account
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onClick={() => onLogout()}
                                     >
@@ -341,86 +234,19 @@ export function NavUser() {
                                         Log out
                                     </DropdownMenuItem>
                                 </>
+                            ) : (
+                                <DropdownMenuItem
+                                    onClick={() => login()}
+                                    disabled={isPendingUser}
+                                >
+                                    <LogIn className="mr-2 h-4 w-4" />
+                                    Log in
+                                </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </SidebarMenuItem>
             </SidebarMenu>
-        </Dialog>
+        </>
     );
 }
-
-const InviteDialogContent = ({
-    generateInvite,
-}: {
-    generateInvite: UseMutationResult<string, Error, void, unknown>;
-}) => {
-    const onCopyClick = async () => {
-        if (!generateInvite.data) {
-            toast("No invite link.");
-            return;
-        }
-        if ("clipboard" in navigator) {
-            await navigator.clipboard.writeText(generateInvite.data);
-            toast("Copied to clipboard.");
-        } else {
-            toast("Copying failed, not in secure context?");
-            generateInvite.mutate();
-        }
-    };
-
-    return (
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Share link</DialogTitle>
-                <DialogDescription>
-                    Anyone who has this link will be able to create an account.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="flex items-center space-x-2">
-                <div className="grid flex-1 gap-2">
-                    <Label htmlFor="link" className="sr-only">
-                        Link
-                    </Label>
-                    <Input
-                        id="link"
-                        className={cn({ italic: generateInvite.isPending })}
-                        value={generateInvite.data || "Loading"}
-                        readOnly
-                    />
-                </div>
-                <Button
-                    type="submit"
-                    size="sm"
-                    className="px-3"
-                    onClick={() => onCopyClick()}
-                >
-                    <span className="sr-only">Copy</span>
-                    <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                    type="submit"
-                    size="sm"
-                    variant="outline"
-                    className="px-3"
-                    onClick={() => generateInvite.mutate()}
-                >
-                    <span className="sr-only">Refresh</span>
-                    <RefreshCcw className="h-4 w-4" />
-                </Button>
-            </div>
-            <DialogFooter className="sm:justify-start">
-                <DialogClose asChild>
-                    <Button type="button" variant="secondary">
-                        Close
-                    </Button>
-                </DialogClose>
-                {generateInvite.error && (
-                    <div className="text-destructive">
-                        {generateInvite.error.message}
-                    </div>
-                )}
-            </DialogFooter>
-        </DialogContent>
-    );
-};
