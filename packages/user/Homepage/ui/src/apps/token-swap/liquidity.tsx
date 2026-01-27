@@ -27,20 +27,16 @@ const pureDecimalToQuantity = (tokenAmount: TokenAmount): Quantity => {
 };
 
 export const Liquidity = () => {
-    const { data: poolsData, refetch: refetchPools } = usePools();
-    const pools = poolsData || [];
+    const { data: pools = [], refetch: refetchPools } = usePools();
 
-    const { data: userBalancesData, refetch: refetchTokenBalances } =
+    const { data: userBalances = [], refetch: refetchTokenBalances } =
         useUserTokenBalances();
-    const userBalances = userBalancesData || []
 
 
-    // ── Core state ──────────────────────────────────────────────────────
     const [focusedPoolId, setFocusedPoolId] = useState<number | undefined>(undefined);
     const { value: isAddingLiquidity, toggle } = useBoolean(true);
 
 
-    // ── Token inputs ────────────────────────────────────────────────────
     const {
         obj: token1Obj,
         tokenId: token1Id,
@@ -65,7 +61,6 @@ export const Liquidity = () => {
 
     const lastTouched = lastTouchedIs1 ? token1Obj : token2Obj;
 
-    // ── Derived ─────────────────────────────────────────────────────────
     const focusedPool = pools.find((pool) => pool.id === focusedPoolId);
 
     const poolsOfLiquidityPair = pools.filter((pool) => {

@@ -58,7 +58,6 @@ export const useAmount = () => {
         : undefined;
 
 
-        console.log("Now executing some more: useAmount.ts  (or whichever file)");
     return {
         obj,
         amount,
