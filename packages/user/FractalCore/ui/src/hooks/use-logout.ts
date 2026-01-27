@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey from "@/lib/queryKeys";
+
+import { supervisor } from "@shared/lib/supervisor";
 
 import { useExpectCurrentUser } from "./use-expect-current-user";
 

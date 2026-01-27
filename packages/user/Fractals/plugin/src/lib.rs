@@ -53,20 +53,21 @@ define_trust! {
             - Proposing a vote in evaluation cycle
             - Exiling a fractal member
             - Setting the guild evaluation schedule
-            - Setting the guild display name
-            - Setting the guild bio
-            - Setting the guild description
+            - Setting the guild display name, bio and description
             - Attesting in an evaluation
             - Creating a new guild
             - Resign, remove or set a new Guild representative
-        ",
+            - Set ranked guilds
+            - Set minimum scorers required to enable consensus rewards
+            - Conclude membership applications
+            - Set token init and guild ranking threshold
+            ",
     }
     functions {
-        None => [get_group_users, exile_member, set_dist_interval, init_token],
-        Low => [start, close_eval],
-        Medium => [join, register, unregister, apply_guild, attest_membership_app, get_proposal, create_fractal],
-        High => [propose, set_ranked_guild_slots, set_schedule, set_display_name, set_bio, set_description, attest, create_guild, set_guild_rep, resign_guild_rep, remove_guild_rep
-],
+        None => [exile_member, get_group_users, init_token, set_dist_interval],
+        Low => [close_eval, dist_token, start],
+        Medium => [apply_guild, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        High => [attest, con_membership_app, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -97,6 +98,23 @@ impl AdminFractal for FractallyPlugin {
         )
     }
 
+    fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_ranked_guilds)?;
+
+        let packed_args = fractals::action_structs::rank_guilds {
+            fractal: get_sender_app()?,
+            guilds: ranked_guilds
+                .into_iter()
+                .map(|guild| AccountNumber::from(guild.as_str()))
+                .collect(),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::rank_guilds::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_fractal(
         fractal_account: String,
         guild_account: String,
@@ -123,19 +141,6 @@ impl AdminFractal for FractallyPlugin {
         )
     }
 
-    fn exile_member(member: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::exile_member)?;
-        let packed_args = fractals::action_structs::exile_member {
-            fractal: get_sender_app()?,
-            member: member.parse().unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::exile_member::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn init_token() -> Result<(), Error> {
         assert_authorized(FunctionName::init_token)?;
 
@@ -145,6 +150,33 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::init_token::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_token_threshold(threshold: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_token_threshold)?;
+
+        let packed_args = fractals::action_structs::set_tkn_thrs {
+            fractal: get_sender_app()?,
+            threshold,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::set_dist_int::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn exile_member(member: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::exile_member)?;
+        let packed_args = fractals::action_structs::exile_member {
+            fractal: get_sender_app()?,
+            member: member.parse().unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::exile_member::ACTION_NAME,
             &packed_args,
         )
     }
@@ -164,6 +196,21 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl AdminGuild for FractallyPlugin {
+    fn con_membership_app(guild: String, applicant: String, accepted: bool) -> Result<(), Error> {
+        get_guild(guild)?.assert_authorized(FunctionName::con_membership_app)?;
+
+        let packed_args = fractals::action_structs::con_mem_app {
+            accepted,
+            applicant: applicant.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::con_mem_app::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account.clone())?;
 
@@ -184,6 +231,17 @@ impl AdminGuild for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::create_guild::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_rank_ordering_threshold(threshold: u8) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_rank_ordering_threshold)?;
+
+        let packed_args = fractals::action_structs::set_rnk_thrs { threshold }.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_rank_g_s::ACTION_NAME,
             &packed_args,
         )
     }
@@ -320,6 +378,18 @@ impl UserFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
     }
+
+    fn dist_token() -> Result<(), Error> {
+        assert_authorized(FunctionName::dist_token)?;
+        let packed_args = fractals::action_structs::dist_token {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::dist_token::ACTION_NAME,
+            &packed_args,
+        )
+    }
 }
 
 impl UserGuild for FractallyPlugin {
@@ -338,9 +408,21 @@ impl UserGuild for FractallyPlugin {
         )
     }
 
+    fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
+        get_guild(guild_account.clone())?.assert_authorized(FunctionName::register_candidacy)?;
+
+        let packed_args = fractals::action_structs::reg_can {
+            guild: guild_account.as_str().into(),
+            active,
+        }
+        .packed();
+
+        add_action_to_transaction(fractals::action_structs::reg_can::ACTION_NAME, &packed_args)
+    }
+
     fn attest_membership_app(
         guild_account: String,
-        member: String,
+        applicant: String,
         comment: String,
         endorses: bool,
     ) -> Result<(), Error> {
@@ -351,7 +433,7 @@ impl UserGuild for FractallyPlugin {
             comment,
             endorses,
             guild_account: guild_account.as_str().into(),
-            member: member.as_str().into(),
+            applicant: applicant.as_str().into(),
         }
         .packed();
 
@@ -452,6 +534,7 @@ impl Queries for FractallyPlugin {
         let guild = get_guild(guild_account)?;
         Ok(types::Guild {
             fractal: guild.fractal.to_string(),
+            guild: guild.guild.to_string(),
             evaluation_id: guild.evaluation_id,
             council_role: guild.council_role.to_string(),
             rep_role: guild.rep_role.to_string(),

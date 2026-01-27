@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
 use psibase::{check_some, get_service, AccountNumber, Table};
 
@@ -42,18 +44,28 @@ impl EvaluationInstance {
         )
     }
 
+    pub fn finish_evaluation(&self) {
+        let mut guild = Guild::get_assert(self.guild);
+        let equal_levels_for_all_attendees = !guild.is_rank_ordering();
+        self.close_pending_levels(equal_levels_for_all_attendees.then_some(1));
+        if guild.active_member_count() >= guild.rank_ordering_threshold as usize {
+            guild.enable_rank_ordering();
+        }
+    }
+
     fn internal(&self) -> Option<Evaluation> {
         EvaluationTable::with_service(evaluations::SERVICE)
             .get_index_pk()
             .get(&(get_service(), self.evaluation_id))
     }
 
-    pub fn users(&self, group_number: Option<u32>) -> Option<Vec<User>> {
+    pub fn users(&self, group_number: Option<u32>) -> Vec<User> {
         let fractals_service = get_service();
         let evaluation_id = self.evaluation_id;
 
-        let res = match group_number {
-            Some(group_number) => UserTable::with_service(evaluations::SERVICE)
+        let table = UserTable::with_service(evaluations::SERVICE);
+        match group_number {
+            Some(group_number) => table
                 .get_index_by_group()
                 .range(
                     (
@@ -70,7 +82,7 @@ impl EvaluationInstance {
                         ),
                 )
                 .collect(),
-            None => UserTable::with_service(evaluations::SERVICE)
+            None => table
                 .get_index_pk()
                 .range(
                     (fractals_service, evaluation_id, AccountNumber::new(0))
@@ -81,9 +93,7 @@ impl EvaluationInstance {
                         ),
                 )
                 .collect(),
-        };
-
-        Some(res)
+        }
     }
 
     fn create_evaluation(
@@ -168,47 +178,82 @@ impl EvaluationInstance {
         table.put(&self).expect("failed to save");
     }
 
-    fn guild_members(&self) -> Vec<GuildMember> {
-        let table = GuildMemberTable::read();
-
+    pub fn open_pending_levels(&self) {
+        let table = GuildMemberTable::read_write();
         table
             .get_index_pk()
             .range(
                 (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
             )
-            .collect()
+            .for_each(|mut account| {
+                account.open_pending_level();
+                account.save_to(&table);
+            });
     }
 
-    pub fn set_pending_scores(&self, pending_score: u8) {
-        GuildMember::memberships_of_guild(self.guild)
+    pub fn close_pending_levels(&self, forced_pending_level: Option<u8>) {
+        let guild_member_table = GuildMemberTable::read_write();
+
+        let evaluation_participants: HashSet<AccountNumber> = self
+            .users(None)
             .into_iter()
-            .for_each(|mut account| {
-                account.set_pending_score(pending_score);
+            .map(|account| account.user)
+            .collect();
+
+        guild_member_table
+            .get_index_pk()
+            .range(
+                (self.guild, AccountNumber::from(0))..=(self.guild, AccountNumber::from(u64::MAX)),
+            )
+            .filter(|account| {
+                let was_member_at_evaluation_start = account.pending_level.is_some();
+                was_member_at_evaluation_start
+            })
+            .for_each(|mut guild_member| {
+                let attended_evaluation = evaluation_participants.contains(&guild_member.member);
+
+                if attended_evaluation && forced_pending_level.is_some() {
+                    guild_member.update_pending_level(forced_pending_level.unwrap());
+                }
+
+                guild_member.apply_pending_level_to_score(attended_evaluation);
+                guild_member.save_to(&guild_member_table);
             });
     }
 
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
-        let group_members = self.users(Some(group_number)).unwrap();
+        let guild_member_table = GuildMemberTable::read_write();
 
-        let fractal_group_result = parse_rank_to_accounts(
-            vanilla_group_result,
-            group_members.into_iter().map(|user| user.user).collect(),
-        );
+        let group_members: Vec<_> = self
+            .users(Some(group_number))
+            .into_iter()
+            .map(|user| user.user)
+            .collect();
 
-        let guild_member_levels = assign_decreasing_levels(
+        let fractal_group_result =
+            parse_rank_to_accounts(vanilla_group_result, group_members.clone());
+
+        let level_by_account: HashMap<AccountNumber, u8> = assign_decreasing_levels(
             fractal_group_result,
             Some(GUILD_EVALUATION_GROUP_SIZE.into()),
-        );
+        )
+        .into_iter()
+        .map(|(level, member)| (member, level as u8))
+        .collect();
 
-        for (level, account) in guild_member_levels {
-            GuildMember::get_assert(self.guild, account).set_pending_score(level as u8);
+        for account in group_members {
+            // Don't assume the evaluation group member is still a GuildMember,
+            // maybe he was kicked in the mean time.
+            if let Some(mut guild_member) =
+                GuildMember::get_from(&guild_member_table, self.guild, account)
+            {
+                let level_achieved = level_by_account.get(&account).copied();
+                if let Some(new_level) = level_achieved {
+                    guild_member.update_pending_level(new_level);
+                }
+                guild_member.save_to(&guild_member_table);
+            }
         }
-    }
-
-    pub fn save_pending_scores(&self) {
-        self.guild_members().into_iter().for_each(|mut account| {
-            account.save_pending_score();
-        });
     }
 }
 
