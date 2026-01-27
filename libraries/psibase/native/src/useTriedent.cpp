@@ -433,7 +433,7 @@ namespace psibase
                }
             }
          }
-         if (!sockets.applyChanges(socketChanges, &closing))
+         if (!sockets.applyChanges(std::move(socketChanges), &closing))
          {
             original = impl->subjective;
             return false;
@@ -722,13 +722,14 @@ namespace psibase
             socketChanges.clear();
          }
       }
-      std::int32_t socketAutoClose(std::int32_t        socket,
-                                   bool                value,
-                                   Sockets&            sockets,
-                                   SocketAutoCloseSet& closing)
+      std::int32_t socketSetFlags(std::int32_t        socket,
+                                  std::uint32_t       mask,
+                                  std::uint32_t       value,
+                                  Sockets&            sockets,
+                                  SocketAutoCloseSet& closing)
       {
-         return sockets.autoClose(socket, value, &closing,
-                                  subjectiveRevisions.empty() ? nullptr : &socketChanges);
+         return sockets.setFlags(socket, mask, value, &closing,
+                                 subjectiveRevisions.empty() ? nullptr : &socketChanges);
       }
       std::size_t saveSubjective()
       {
@@ -874,12 +875,13 @@ namespace psibase
    {
       impl->abortSubjective();
    }
-   std::int32_t Database::socketAutoClose(std::int32_t        socket,
-                                          bool                value,
-                                          Sockets&            sockets,
-                                          SocketAutoCloseSet& closing)
+   std::int32_t Database::socketSetFlags(std::int32_t        socket,
+                                         std::uint32_t       mask,
+                                         std::uint32_t       value,
+                                         Sockets&            sockets,
+                                         SocketAutoCloseSet& closing)
    {
-      return impl->socketAutoClose(socket, value, sockets, closing);
+      return impl->socketSetFlags(socket, mask, value, sockets, closing);
    }
    std::size_t Database::saveSubjective()
    {

@@ -133,16 +133,14 @@ namespace
                 }
                 else
                 {
-                   if (self->server.sharedState->sockets()->lockAutoClose(self))
-                      do_recv(std::move(self));
+                   if (auto l = self->server.sharedState->sockets()->lockRecv(self))
+                      do_recv(std::move(l), std::move(self));
                 }
              });
       }
       // Must hold the auto close lock before calling this
-      static void do_recv(std::shared_ptr<HttpClientSocket>&& self)
+      static void do_recv(RecvLock&& l, std::shared_ptr<HttpClientSocket>&& self)
       {
-         auto unlock =
-             psio::finally{[&] { self->server.sharedState->sockets()->unlockAutoClose(self); }};
          auto system = self->server.sharedState->getSystemContext();
 
          psio::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
@@ -157,7 +155,7 @@ namespace
 
          TransactionContext tc{bc, trx, trace, DbMode::rpc()};
 
-         system->sockets->setOwner(self, &tc.ownedSockets);
+         system->sockets->setOwner(std::move(l), self, &tc.ownedSockets);
 
          auto breply = self->parser.get();
 
@@ -206,45 +204,22 @@ namespace
                 << action.service.str() << "::recv failed: " << e.what();
          }
       }
-      void do_error(const std::error_code& ec)
-      {
-         auto system = server.sharedState->getSystemContext();
-
-         psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
-         BlockContext  bc{*system, system->sharedDatabase.getHead(),
-                         system->sharedDatabase.createWriter(), true};
-         bc.start();
-
-         TransactionTrace trace;
-
-         Action action{
-             .sender  = AccountNumber(),
-             .service = proxyServiceNum,
-             .rawData = psio::convert_to_frac(std::tuple(this->id)),
-         };
-         try
-         {
-            bc.execAsyncExport("close", std::move(action), trace);
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::close succeeded";
-         }
-         catch (std::exception& e)
-         {
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, warning)
-                << action.service.str() << "::close failed: " << e.what();
-         }
-      }
+      void do_error(const std::error_code& ec) { server.sharedState->sockets()->asyncClose(*this); }
       virtual void send(Writer&, std::span<const char>) override
       {
          abortMessage("Cannot send additional requests through a client socket");
       }
       virtual SocketInfo info() const override { return savedInfo; }
-      virtual void       autoClose(const std::optional<std::string>& message) noexcept override {}
-      virtual void       onLock() override
+      virtual void       onClose(const std::optional<std::string>& message) noexcept override
       {
-         boost::asio::post(stream.get_executor(), [self = this->shared_from_this()]() mutable
-                           { do_recv(std::move(self)); });
+         boost::asio::post(stream.get_executor(), [self = this->shared_from_this()]
+                           { callClose(self->server, self->logger, *self); });
+      }
+      virtual void onLock(RecvLock&& l) override
+      {
+         boost::asio::post(stream.get_executor(),
+                           [l = std::move(l), self = this->shared_from_this()]() mutable
+                           { do_recv(std::move(l), std::move(self)); });
       }
       Stream                                                                     stream;
       server_state&                                                              server;

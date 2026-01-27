@@ -16,6 +16,7 @@
 #include <psio/finally.hpp>
 #include <span>
 #include <string>
+#include "close.hpp"
 #include "server_state.hpp"
 
 namespace psibase::http
@@ -49,19 +50,9 @@ namespace psibase::http
          ptr->readLoop(std::move(self));
       }
 
-      void autoClose(const std::optional<std::string>& message) noexcept override
+      void onClose(const std::optional<std::string>& message) noexcept override
       {
-         bool needClose = false;
-         {
-            std::lock_guard l{mutex};
-            if (state == StateType::normal)
-            {
-               state     = StateType::closing;
-               needClose = true;
-            }
-         }
-         if (needClose)
-            impl->close(shared_from_this());
+         impl->close(shared_from_this());
       }
       void send(Writer&, std::span<const char> data) override
       {
@@ -110,36 +101,6 @@ namespace psibase::http
             PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::recv failed: " << e.what();
          }
       }
-      void handleClose()
-      {
-         auto system = server.sharedState->getSystemContext();
-
-         psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
-         BlockContext  bc{*system, system->sharedDatabase.getHead(),
-                         system->sharedDatabase.createWriter(), true};
-         bc.start();
-
-         SignedTransaction trx;
-         TransactionTrace  trace;
-
-         Action action{
-             .sender  = AccountNumber(),
-             .service = proxyServiceNum,
-             .rawData = psio::convert_to_frac(std::tuple(this->id)),
-         };
-
-         try
-         {
-            auto& atrace = bc.execAsyncExport("close", std::move(action), trace);
-            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, debug) << proxyServiceNum.str() << "::close succeeded";
-         }
-         catch (std::exception& e)
-         {
-            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::close failed: " << e.what();
-         }
-      }
       void error(const std::error_code& ec)
       {
          StateType oldState;
@@ -160,7 +121,7 @@ namespace psibase::http
             }
          }
          if (oldState == StateType::normal)
-            handleClose();
+            server.sharedState->sockets()->asyncClose(*this);
       }
       SocketInfo info() const override { return savedInfo; }
       enum class StateType : std::uint8_t
@@ -197,10 +158,12 @@ namespace psibase::http
              stream.get_executor(),
              [self = std::move(self)]() mutable
              {
+                callClose(self->server, self->logger, *self);
                 {
                    std::lock_guard l{self->mutex};
-                   if (self->state != WebSocket::StateType::closing)
+                   if (self->state != WebSocket::StateType::normal)
                       return;
+                   self->state = WebSocket::StateType::closing;
                 }
                 auto ptr = static_cast<WebSocketImpl*>(self->impl.get());
                 ptr->stream.async_close(

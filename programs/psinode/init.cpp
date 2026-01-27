@@ -18,7 +18,7 @@ namespace
    struct TempSocket : AutoCloseSocket, std::enable_shared_from_this<TempSocket>
    {
       TempSocket() {}
-      void autoClose(const std::optional<std::string>&) noexcept override {}
+      void onClose(const std::optional<std::string>&) noexcept override {}
       void send(Writer&, std::span<const char> data) override
       {
          auto reply = psio::from_frac<HttpReply>(data);
@@ -127,7 +127,21 @@ void load_local_packages(TransactionContext&             tc,
                                   "::serve did not return a synchronous response");
       }
       tc.transactionTrace.actionTraces.clear();
+      tc.ownedSockets.close(*tc.blockContext.writer, *tc.blockContext.systemContext.sockets,
+                            std::nullopt);
+      if (!socket->closed)
+         throw std::runtime_error("Socket was not closed");
+      if (socket->notifyClose)
+         throw std::runtime_error(
+             "Not implemented: socket notifyClose during initial service load");
+      socket->closed = false;
+      tc.ownedSockets.sockets.insert(socket);
+      socket->closeLocks  = 1;
+      socket->autoClosing = true;
    }
+   socket->forceClose = true;
+   tc.ownedSockets.close(*tc.blockContext.writer, *tc.blockContext.systemContext.sockets,
+                         std::nullopt);
    tc.blockContext.systemContext.sockets->remove(*tc.blockContext.writer, socket,
                                                  &tc.blockContext.db);
 }

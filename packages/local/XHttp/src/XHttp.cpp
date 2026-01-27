@@ -163,7 +163,9 @@ extern "C" [[clang::export_name("recv")]] void recv()
          if (row->type == SocketType::http)
          {
             requests.remove(*row);
-            check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
+            check(socketSetFlags(socket, SocketFlags::autoClose | SocketFlags::notifyClose,
+                                 SocketFlags::autoClose) == 0,
+                  "Failed to set auto-close");
          }
          else if (row->type == SocketType::handshake)
          {
@@ -180,7 +182,9 @@ extern "C" [[clang::export_name("recv")]] void recv()
             else
             {
                requests.remove(*row);
-               check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
+               check(socketSetFlags(socket, SocketFlags::autoClose | SocketFlags::notifyClose,
+                                    SocketFlags::autoClose) == 0,
+                     "Failed to set auto-close");
             }
          }
       }
@@ -236,7 +240,6 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
       {
          requests.remove(*row);
       }
-      check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
    }
 
    if (row)
@@ -273,7 +276,7 @@ void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
       if (!row || row->service != getSender() || row->type != SocketType::websocket)
          abortMessage("Wrong sender");
    }
-   psibase::socketSend(socket, data);
+   check(psibase::socketSend(socket, data) == 0, "socketSend failed");
 }
 
 std::int32_t XHttp::sendRequest(HttpRequest                   request,
@@ -352,7 +355,9 @@ void XHttp::autoClose(std::int32_t socket, bool value)
             abortMessage(sender.str() + " cannot send a response on socket " +
                          std::to_string(socket));
       }
-      check(socketAutoClose(socket, value) == 0, "Failed to change auto-close");
+      auto mask = SocketFlags::autoClose | SocketFlags::lockClose;
+      check(socketSetFlags(socket, mask, value ? mask : SocketFlags{}) == 0,
+            "Failed to change auto-close");
    }
 }
 
@@ -366,7 +371,8 @@ void XHttp::close(std::int32_t socket)
       if (!row || row->service != sender)
          abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
       requests.remove(*row);
-      check(socketAutoClose(socket, true) == 0, "Failed to set auto-close");
+      check(socketSetFlags(socket, SocketFlags::autoClose, SocketFlags::autoClose) == 0,
+            "Failed to set auto-close");
    }
 }
 
@@ -386,7 +392,12 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    {
       abortMessage("Must set autoClose before sending a response");
    }
-   socketSend(socket, psio::to_frac(result));
+   check(socketSend(socket, psio::to_frac(result)) == 0, "socketSend failed");
+   PSIBASE_SUBJECTIVE_TX
+   {
+      check(socketSetFlags(socket, SocketFlags::lockClose, SocketFlags{}) == 0,
+            "Failed to set auto-close");
+   }
 }
 
 void XHttp::accept(std::int32_t              socket,
@@ -438,7 +449,11 @@ void XHttp::setCallback(std::int32_t          socket,
          {
             row = {tempRow->socket, tempRow->type, tempRow->service, callback, err};
             temp.remove(*tempRow);
-            check(socketAutoClose(socket, false) == 0, "Failed to disable auto-close");
+            check(socketSetFlags(socket,
+                                 SocketFlags::autoClose | SocketFlags::notifyClose |
+                                     SocketFlags::lockClose | SocketFlags::recv,
+                                 SocketFlags::notifyClose | SocketFlags::recv) == 0,
+                  "Failed to disable auto-close");
          }
       }
       if (!row || row->service != sender)

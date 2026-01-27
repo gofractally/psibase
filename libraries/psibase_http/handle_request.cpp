@@ -293,43 +293,53 @@ namespace psibase::http
             err(std::forward<E>(err))
       {
          this->session->pause_read = true;
-         this->once                = true;
       }
       void autoCloseImpl(std::string message)
       {
          sendImpl([message = std::move(message)](HttpSocket* self) mutable
                   { return self->err(message); });
       }
-      void autoClose(const std::optional<std::string>& message) noexcept override
+      void autoReply(std::optional<std::string>&& message) noexcept
       {
          if (!message && parse_request_target(req).second.starts_with("/native/"))
          {
-            session->post(
-                [self = this->shared_from_this()]
-                {
-                   try
-                   {
-                      self->handleNativeRequest();
-                      if (self->session && self->session->can_read())
-                         self->session->do_read();
-                   }
-                   catch (std::exception& e)
-                   {
-                      self->autoCloseImpl("exception: " + std::string(e.what()));
-                   }
-                   catch (...)
-                   {
-                      self->autoCloseImpl("query failed: unknown exception\n");
-                   }
-                });
+            try
+            {
+               handleNativeRequest();
+               if (session && session->can_read())
+                  session->do_read();
+            }
+            catch (std::exception& e)
+            {
+               autoCloseImpl("exception: " + std::string(e.what()));
+            }
+            catch (...)
+            {
+               autoCloseImpl("query failed: unknown exception\n");
+            }
          }
          else
          {
-            autoCloseImpl(message.value_or("service did not send a response"));
+            autoCloseImpl(std::move(message).value_or("service did not send a response"));
          }
       }
+      void onClose(const std::optional<std::string>& message) noexcept override
+      {
+         session->post(
+             [self = this->shared_from_this(), message = message]() mutable
+             {
+                callClose(self->session->server, self->session->logger, *self);
+                if (!self->replySent.exchange(true))
+                {
+                   self->autoReply(std::move(message));
+                }
+             });
+      }
+      void onLock(RecvLock&&) override { assert(!"Incoming HttpSocket should not call onLock"); }
       void send(Writer& writer, std::span<const char> data) override
       {
+         if (replySent.exchange(true))
+            return;
          auto result = psio::from_frac<HttpReply>(data);
          if (result.status == HttpStatus::switchingProtocols)
          {
@@ -351,42 +361,37 @@ namespace psibase::http
          }
          else
          {
-            sendImpl([result = std::move(result)](HttpSocket* self) mutable
-                     { return self->callback(std::move(result)); });
+            auto self = this->shared_from_this();
+            session->post(
+                [self = std::move(self), result = std::move(result)]() mutable
+                {
+                   self->sendImpl([result = std::move(result)](HttpSocket* self) mutable
+                                  { return self->callback(std::move(result)); });
+                });
          }
       }
-      void sendImpl(auto make_reply)
+      void sendImpl(auto&& make_reply)
       {
-         auto self = this->shared_from_this();
-         session->post(
-             [self = std::move(self), make_reply = std::move(make_reply)]() mutable
-             {
-                auto session = std::move(self->session);
-                if (!session)
-                   return;
-                auto& trace         = self->trace;
-                auto& queryTimes    = self->queryTimes;
-                session->pause_read = false;
-                {
-                   auto  endTime = steady_clock::now();
-                   auto& logger  = session->logger;
-                   BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+         if (!session)
+            return;
+         session->pause_read = false;
+         {
+            auto  endTime = steady_clock::now();
+            auto& logger  = session->logger;
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
 
-                   // TODO: consider bundling into a single attribute
-                   BOOST_LOG_SCOPED_LOGGER_TAG(logger, "PackTime", queryTimes.packTime);
-                   BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ServiceLoadTime",
-                                               queryTimes.serviceLoadTime);
-                   BOOST_LOG_SCOPED_LOGGER_TAG(logger, "DatabaseTime", queryTimes.databaseTime);
-                   BOOST_LOG_SCOPED_LOGGER_TAG(logger, "WasmExecTime", queryTimes.wasmExecTime);
-                   BOOST_LOG_SCOPED_LOGGER_TAG(
-                       logger, "ResponseTime",
-                       std::chrono::duration_cast<std::chrono::microseconds>(endTime -
-                                                                             queryTimes.startTime));
-                   (*session)(make_reply(self.get()));
-                }
-                if (session->can_read())
-                   session->do_read();
-             });
+            // TODO: consider bundling into a single attribute
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "PackTime", queryTimes.packTime);
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ServiceLoadTime", queryTimes.serviceLoadTime);
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "DatabaseTime", queryTimes.databaseTime);
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "WasmExecTime", queryTimes.wasmExecTime);
+            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseTime",
+                                        std::chrono::duration_cast<std::chrono::microseconds>(
+                                            endTime - queryTimes.startTime));
+            (*session)(make_reply(this));
+         }
+         if (session->can_read())
+            session->do_read();
       }
       void acceptWebSocket(Writer& writer, HttpReply&& result)
       {
@@ -439,7 +444,7 @@ namespace psibase::http
       {
          session->pause_read    = true;
          auto post_back_to_http = [callback = static_cast<decltype(callback)>(callback),
-                                   session  = std::move(session)](auto&& result) mutable
+                                   session  = session](auto&& result) mutable
          {
             auto* p = session.get();
             p->post(
@@ -703,7 +708,7 @@ namespace psibase::http
                     auto session =
                         std::make_shared<websocket_log_session<stream_type>>(std::move(stream));
                     server.register_connection(session);
-                    websocket_log_session<stream_type>::run(std::move(session));
+                    websocket_log_session<stream_type>::run(std::shared_ptr{session});
                  });
          }
          else if (req_target == "/native/admin/keys")
@@ -774,6 +779,7 @@ namespace psibase::http
       E                                  err;
       TransactionTrace                   trace;
       QueryTimes                         queryTimes;
+      std::atomic<bool>                  replySent{false};
    };
 
    template <typename F, typename E>
@@ -941,7 +947,7 @@ namespace psibase::http
             {
                // An error will be sent by the transaction context, if needed
             }
-            if (!tc.ownedSockets.owns(*system->sockets, *socket))
+            if (!tc.ownedSockets.owns(*system->sockets, socket))
             {
                trace.error  = atrace.error;
                auto  error  = trace.error;

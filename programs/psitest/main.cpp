@@ -582,9 +582,11 @@ struct QueryTimes
 
 struct HttpSocket : psibase::AutoCloseSocket
 {
-   HttpSocket() { this->once = true; }
-   void autoClose(const std::optional<std::string>& message) noexcept override
+   HttpSocket() {}
+   void onClose(const std::optional<std::string>& message) noexcept override
    {
+      if (!response.empty())
+         return;
       psibase::HttpReply reply{.status      = psibase::HttpStatus::internalServerError,
                                .contentType = "text/html"};
       if (message)
@@ -600,6 +602,8 @@ struct HttpSocket : psibase::AutoCloseSocket
    }
    void send(psibase::Writer&, std::span<const char> data) override
    {
+      if (!response.empty())
+         return;
       auto reply  = psio::view<const psibase::HttpReply>{data};
       auto status = reply.status().unpack();
       auto code   = static_cast<std::uint16_t>(status);
@@ -1429,7 +1433,7 @@ struct callbacks
       {
          socket->logResponse();
       }
-      else if (!tc.ownedSockets.owns(*chain.sys->sockets, *socket))
+      else if (!tc.ownedSockets.owns(*chain.sys->sockets, socket))
       {
          trace.error  = atrace.error;
          auto  error  = trace.error;
