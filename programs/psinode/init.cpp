@@ -135,7 +135,7 @@ void load_local_packages(TransactionContext&             tc,
          throw std::runtime_error(
              "Not implemented: socket notifyClose during initial service load");
       socket->closed = false;
-      tc.ownedSockets.sockets.insert(socket);
+      tc.ownedSockets.sockets.insert(socket->id);
       socket->closeLocks  = 1;
       socket->autoClosing = true;
    }

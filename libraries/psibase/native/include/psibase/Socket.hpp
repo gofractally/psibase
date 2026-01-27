@@ -16,18 +16,19 @@ namespace psibase
    struct Sockets;
    struct AutoCloseSocket;
 
-   struct RecvLock
+   struct CloseLock
    {
      public:
-      RecvLock(RecvLock&&);
-      ~RecvLock();
+      CloseLock(CloseLock&&);
+      CloseLock(const CloseLock&);
+      ~CloseLock();
       explicit operator bool() const;
 
      private:
       friend class Sockets;
-      RecvLock(Sockets* self, AutoCloseSocket* socket);
-      Sockets*         self;
-      AutoCloseSocket* socket;
+      CloseLock(Sockets* self, AutoCloseSocket* socket);
+      Sockets*     self;
+      std::int32_t socket;
    };
 
    struct Socket
@@ -37,7 +38,6 @@ namespace psibase
       virtual bool       canAutoClose() const;
       virtual SocketInfo info() const = 0;
 
-      void replace(Writer& writer, std::shared_ptr<Socket>&& other);
       void remove(Writer& writer);
       void writeInfo(Writer& writer);
 
@@ -69,7 +69,11 @@ namespace psibase
       /// Called when the recv lock is acquired asynchronously. This
       /// should post to an appropriate executor. It MUST NOT run
       /// wasm directly.
-      virtual void  onLock(RecvLock&&);
+      virtual void onLock(CloseLock&&);
+      /// Replaces this socket with another socket, preserving socket flags.
+      /// - Pending asyncClose and lockRecv are not preserved, because
+      ///   they depend on the underlying socket.
+      void          replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&& other);
       bool          forceClose  = false;
       bool          notifyClose = false;
       bool          autoClosing = false;
@@ -87,7 +91,7 @@ namespace psibase
 
    struct SocketAutoCloseSet
    {
-      std::set<std::shared_ptr<AutoCloseSocket>> sockets;
+      std::set<std::int32_t> sockets;
       void close(Writer& writer, Sockets& sockets, const std::optional<std::string>& message = {});
       bool owns(Sockets& sockets, const std::shared_ptr<AutoCloseSocket>& sock);
       ~SocketAutoCloseSet();
@@ -122,14 +126,16 @@ namespace psibase
       /// connection to be closed.
       void asyncClose(AutoCloseSocket& socket);
 
+      /// Prevents the socket from being closed
+      CloseLock lockClose(const std::shared_ptr<AutoCloseSocket>& socket);
       /// This will either return an acquired lock or cause onLock to be
       /// called as soon as the lock can be acquired. If the socket is
       /// closed, onLock might never be called.
-      RecvLock lockRecv(const std::shared_ptr<AutoCloseSocket>& socket);
-      void     setOwner(RecvLock&&                              l,
-                        const std::shared_ptr<AutoCloseSocket>& socket,
-                        SocketAutoCloseSet*                     owner);
-      bool     applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet* owner);
+      CloseLock lockRecv(const std::shared_ptr<AutoCloseSocket>& socket);
+      void      setOwner(CloseLock&&                             l,
+                         const std::shared_ptr<AutoCloseSocket>& socket,
+                         SocketAutoCloseSet*                     owner);
+      bool      applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet* owner);
    };
 
 }  // namespace psibase

@@ -35,7 +35,9 @@ namespace psibase::http
    {
       explicit WebSocket(server_state& server, SocketInfo&& info);
       template <typename I>
-      static void setImpl(std::shared_ptr<WebSocket>&& self, std::unique_ptr<I>&& impl)
+      static void setImpl(CloseLock&                   cl,
+                          std::shared_ptr<WebSocket>&& self,
+                          std::unique_ptr<I>&&         impl)
       {
          I*   ptr = impl.get();
          bool hasMessages;

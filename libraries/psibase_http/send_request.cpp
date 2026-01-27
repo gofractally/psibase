@@ -139,7 +139,7 @@ namespace
              });
       }
       // Must hold the auto close lock before calling this
-      static void do_recv(RecvLock&& l, std::shared_ptr<HttpClientSocket>&& self)
+      static void do_recv(CloseLock&& l, std::shared_ptr<HttpClientSocket>&& self)
       {
          auto system = self->server.sharedState->getSystemContext();
 
@@ -186,8 +186,9 @@ namespace
             auto impl = std::make_unique<WebSocketImpl<boost::beast::websocket::stream<Stream>>>(
                 boost::beast::websocket::stream<Stream>(
                     completed_handshake{}, std::move(self->stream), req, std::move(breply)));
+            auto cl = system->sockets->lockClose(self);
             self->replace(*bc.writer, newSocket);
-            WebSocket::setImpl(std::move(newSocket), std::move(impl));
+            WebSocket::setImpl(cl, std::move(newSocket), std::move(impl));
          }
 
          try
@@ -215,7 +216,7 @@ namespace
          boost::asio::post(stream.get_executor(), [self = this->shared_from_this()]
                            { callClose(self->server, self->logger, *self); });
       }
-      virtual void onLock(RecvLock&& l) override
+      virtual void onLock(CloseLock&& l) override
       {
          boost::asio::post(stream.get_executor(),
                            [l = std::move(l), self = this->shared_from_this()]() mutable

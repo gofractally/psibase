@@ -335,7 +335,7 @@ namespace psibase::http
                 }
              });
       }
-      void onLock(RecvLock&&) override { assert(!"Incoming HttpSocket should not call onLock"); }
+      void onLock(CloseLock&&) override { assert(!"Incoming HttpSocket should not call onLock"); }
       void send(Writer& writer, std::span<const char> data) override
       {
          if (replySent.exchange(true))
@@ -397,16 +397,20 @@ namespace psibase::http
       {
          auto self      = this->shared_from_this();
          auto newSocket = std::make_shared<WebSocket>(session->server, this->info());
-         Socket::replace(writer, newSocket);
+         auto cl        = session->server.sharedState->sockets()->lockClose(self);
+         if (!cl)
+            return;
+         AutoCloseSocket::replace(writer, newSocket);
          session->post(
-             [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result)]
+             [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result),
+              cl = std::move(cl)]() mutable
              {
                 (*self->session)(
                     websocket_upgrade{}, std::move(self->req),
-                    [newSocket = std::move(newSocket)](auto&& socket) mutable
+                    [newSocket = std::move(newSocket), cl = std::move(cl)](auto&& socket) mutable
                     {
                        WebSocket::setImpl(
-                           std::move(newSocket),
+                           cl, std::move(newSocket),
                            std::make_unique<WebSocketImpl<std::remove_cvref_t<decltype(socket)>>>(
                                std::move(socket)));
                     },

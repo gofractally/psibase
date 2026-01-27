@@ -400,14 +400,11 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    }
 }
 
-void XHttp::accept(std::int32_t              socket,
-                   const psibase::HttpReply& reply,
-                   psibase::MethodNumber     callback,
-                   psibase::MethodNumber     err)
+void XHttp::accept(std::int32_t socket, const psibase::HttpReply& reply)
 {
    auto sender   = getSender();
    auto owned    = Temporary{}.open<PendingRequestTable>();
-   auto handlers = open<ResponseHandlerTable>();
+   auto handlers = Temporary{}.open<TempResponseHandlerTable>();
 
    if (auto row = owned.get(socket))
    {
@@ -424,11 +421,7 @@ void XHttp::accept(std::int32_t              socket,
 
    PSIBASE_SUBJECTIVE_TX
    {
-      handlers.put({.socket  = socket,
-                    .type    = SocketType::websocket,
-                    .service = sender,
-                    .method  = callback,
-                    .err     = err});
+      handlers.put({.socket = socket, .type = SocketType::websocket, .service = sender});
    }
    socketSend(socket, psio::to_frac(reply));
 }

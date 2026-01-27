@@ -37,6 +37,7 @@ namespace
       {
          socket.receiving   = false;
          socket.pendingRecv = false;
+         ++socket.closeLocks;
          return true;
       }
       else
@@ -73,7 +74,7 @@ bool Socket::canAutoClose() const
    return false;
 }
 
-void Socket::replace(Writer& writer, std::shared_ptr<Socket>&& other)
+void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&& other)
 {
    if (auto sockets = weak_sockets.lock())
    {
@@ -82,6 +83,10 @@ void Socket::replace(Writer& writer, std::shared_ptr<Socket>&& other)
       {
          std::lock_guard l{sockets->mutex};
          other->weak_sockets  = std::move(weak_sockets);
+         other->notifyClose   = notifyClose;
+         other->autoClosing   = autoClosing;
+         other->receiving     = receiving;
+         other->closeLocks    = closeLocks;
          sockets->sockets[id] = std::move(other);
       }
       sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
@@ -120,7 +125,7 @@ bool AutoCloseSocket::canAutoClose() const
    return true;
 }
 
-void AutoCloseSocket::onLock(RecvLock&&)
+void AutoCloseSocket::onLock(CloseLock&&)
 {
    assert(!"onLock must be implemented if a socket calls Sockets::lockRecv");
 }
@@ -129,23 +134,25 @@ void SocketAutoCloseSet::close(Writer&                           writer,
                                Sockets&                          parent,
                                const std::optional<std::string>& message)
 {
+   std::vector<std::shared_ptr<AutoCloseSocket>> toClose;
    {
       std::lock_guard l{parent.mutex};
-      for (auto iter = sockets.begin(), end = sockets.end(); iter != end;)
+      if (parent.stopped)
+         return;
+      for (std::int32_t id : sockets)
       {
-         auto& socket = *iter;
+         auto& base = parent.sockets[static_cast<std::size_t>(id)];
+         assert(base->canAutoClose());
+         auto socket = std::static_pointer_cast<AutoCloseSocket>(base);
+         assert(socket->closeLocks != 0);
          --socket->closeLocks;
          if (tryClose(*socket, parent))
          {
-            ++iter;
-         }
-         else
-         {
-            iter = sockets.erase(iter);
+            toClose.push_back(std::move(socket));
          }
       }
    }
-   for (const auto& socket : sockets)
+   for (const auto& socket : toClose)
    {
       socket->onClose(message);
    }
@@ -158,10 +165,10 @@ SocketAutoCloseSet::~SocketAutoCloseSet()
 
 bool SocketAutoCloseSet::owns(Sockets& parent, const std::shared_ptr<AutoCloseSocket>& sock)
 {
-   if (sockets.find(sock) == sockets.end())
+   if (sockets.find(sock->id) == sockets.end())
       return false;
    std::lock_guard l{parent.mutex};
-   return sock->autoClosing;
+   return sock->autoClosing && parent.sockets[static_cast<std::size_t>(sock->id)] == sock;
 }
 
 namespace
@@ -175,12 +182,13 @@ namespace
       {
          if (value & SocketFlags::lockClose)
          {
-            if (owner->sockets.insert(sockptr).second)
+            if (owner->sockets.insert(sockptr->id).second)
                ++sockptr->closeLocks;
          }
          else
          {
-            if (owner->sockets.erase(sockptr))
+            assert(sockptr->closeLocks != 0);
+            if (owner->sockets.erase(sockptr->id))
                --sockptr->closeLocks;
          }
       }
@@ -276,10 +284,11 @@ void Sockets::add(Writer&                        writer,
       if (owner)
       {
          assert(socket->canAutoClose());
-         auto sockptr         = std::static_pointer_cast<AutoCloseSocket>(socket);
+         auto sockptr = std::static_pointer_cast<AutoCloseSocket>(socket);
+         assert(sockptr->closeLocks == 0);
          sockptr->autoClosing = true;
          sockptr->closeLocks  = 1;
-         owner->sockets.insert(sockptr);
+         owner->sockets.insert(sockptr->id);
       }
       socket->weak_sockets = shared_from_this();
    }
@@ -391,7 +400,7 @@ std::int32_t Sockets::setFlags(std::int32_t               fd,
       bool close       = tryClose(*sockptr, *this);
       l.unlock();
       if (acquireLock)
-         sockptr->onLock(RecvLock{this, sockptr.get()});
+         sockptr->onLock(CloseLock{this, sockptr.get()});
       if (close)
          sockptr->onClose(std::nullopt);
    }
@@ -410,7 +419,7 @@ void Sockets::asyncClose(AutoCloseSocket& socket)
       socket.onClose(std::nullopt);
 }
 
-RecvLock Sockets::lockRecv(const std::shared_ptr<AutoCloseSocket>& socket)
+CloseLock Sockets::lockRecv(const std::shared_ptr<AutoCloseSocket>& socket)
 {
    bool            okay = false;
    std::lock_guard l{mutex};
@@ -419,26 +428,61 @@ RecvLock Sockets::lockRecv(const std::shared_ptr<AutoCloseSocket>& socket)
    {
       socket->receiving = false;
       ++socket->closeLocks;
-      return RecvLock{this, socket.get()};
+      return CloseLock{this, socket.get()};
    }
    else
    {
       socket->pendingRecv = true;
-      return RecvLock{nullptr, nullptr};
+      return CloseLock{nullptr, nullptr};
    }
 }
 
-RecvLock::RecvLock(RecvLock&& other) : self(other.self), socket(other.socket)
+CloseLock Sockets::lockClose(const std::shared_ptr<AutoCloseSocket>& socket)
 {
-   other.self   = nullptr;
-   other.socket = nullptr;
+   assert(socket->weak_sockets.lock().get() == this);
+   std::lock_guard l{mutex};
+   if (!socket->closed)
+   {
+      ++socket->closeLocks;
+      return CloseLock{this, socket.get()};
+   }
+   else
+   {
+      return CloseLock{nullptr, nullptr};
+   }
 }
 
-RecvLock::~RecvLock()
+CloseLock::CloseLock(CloseLock&& other) : self(other.self), socket(other.socket)
+{
+   other.self   = nullptr;
+   other.socket = -1;
+}
+
+CloseLock::CloseLock(const CloseLock& other) : self(other.self), socket(other.socket)
+{
+   assert(!"CloseLock should not be copied, but type erasure requires a copy constructor even when it isn't actually used.");
+   if (self)
+   {
+      std::lock_guard l{self->mutex};
+      auto&           base{self->sockets[static_cast<std::size_t>(this->socket)]};
+      assert(base->canAutoClose());
+      auto* socket = static_cast<AutoCloseSocket*>(base.get());
+      assert(socket->closeLocks != 0);
+      ++socket->closeLocks;
+   }
+}
+
+CloseLock::~CloseLock()
 {
    if (self)
    {
       std::unique_lock l{self->mutex};
+      if (self->stopped)
+         return;
+      auto& base{self->sockets[static_cast<std::size_t>(this->socket)]};
+      assert(base->canAutoClose());
+      auto* socket = static_cast<AutoCloseSocket*>(base.get());
+      assert(socket->closeLocks != 0);
       --socket->closeLocks;
       l.unlock();
       if (tryClose(*socket, *self))
@@ -446,21 +490,22 @@ RecvLock::~RecvLock()
    }
 }
 
-RecvLock::operator bool() const
+CloseLock::operator bool() const
 {
    return self != nullptr;
 }
 
-RecvLock::RecvLock(Sockets* self, AutoCloseSocket* socket) : self(self), socket(socket) {}
+CloseLock::CloseLock(Sockets* self, AutoCloseSocket* socket) : self(self), socket(socket->id) {}
 
-void Sockets::setOwner(RecvLock&&                              rl,
+void Sockets::setOwner(CloseLock&&                             rl,
                        const std::shared_ptr<AutoCloseSocket>& socket,
                        SocketAutoCloseSet*                     owner)
 {
    assert(rl.self);
-   owner->sockets.insert(socket);
+   assert(rl.socket == socket->id);
+   owner->sockets.insert(socket->id);
    rl.self   = nullptr;
-   rl.socket = nullptr;
+   rl.socket = -1;
 }
 
 bool Sockets::applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet* owner)
@@ -495,7 +540,7 @@ bool Sockets::applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet*
    for (const auto& change : diff)
    {
       if (change.value & SocketFlags::recv)
-         change.socket->onLock(RecvLock{this, change.socket.get()});
+         change.socket->onLock(CloseLock{this, change.socket.get()});
       if (change.value & SocketFlags::lockClose)
          change.socket->onClose(std::nullopt);
    }
