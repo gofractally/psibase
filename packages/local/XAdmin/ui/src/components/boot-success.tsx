@@ -1,6 +1,6 @@
 import { CircleCheck } from "lucide-react";
 import ConfettiExplosion from "react-confetti-explosion";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
@@ -14,6 +14,13 @@ import {
 } from "@shared/shadcn/ui/card";
 
 export const BootSuccess = () => {
+    const navigate = useNavigate();
+
+    const onClickDashboard = () => {
+        navigate("/dashboard");
+        window.location.reload(); // fixes issue where the dashboard branding is not updated
+    };
+
     return (
         <div className="flex h-full items-center">
             <Card className="mx-auto mt-4 w-[350px]">
@@ -33,8 +40,8 @@ export const BootSuccess = () => {
                     <Button asChild variant="link">
                         <a href={siblingUrl("")}>Home</a>
                     </Button>
-                    <Button asChild variant="link">
-                        <Link to="/dashboard">Admin Dashboard</Link>
+                    <Button variant="link" onClick={onClickDashboard}>
+                        Admin Dashboard
                     </Button>
                 </CardFooter>
             </Card>

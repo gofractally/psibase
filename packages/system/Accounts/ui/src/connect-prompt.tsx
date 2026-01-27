@@ -5,11 +5,11 @@ import { useNavigate } from "react-router-dom";
 import { prompt } from "@psibase/common-lib";
 
 import { Avatar } from "@shared/components/avatar";
+import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { ErrorCard } from "@shared/components/error-card";
 import { CardContent, CardTitle } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 

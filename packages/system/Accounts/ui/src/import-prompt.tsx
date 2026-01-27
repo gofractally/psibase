@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { prompt } from "@psibase/common-lib";
 
+import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
@@ -29,7 +30,6 @@ import {
 } from "@shared/shadcn/ui/dialog";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-import { BrandedGlowingCard } from "./components/branded-glowing-card";
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";

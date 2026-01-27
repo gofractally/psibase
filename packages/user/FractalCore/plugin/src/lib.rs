@@ -21,23 +21,20 @@ use trust::{assert_authorized, FunctionName};
 define_trust! {
     descriptions {
         Low => "
-        Low trust grants these abilities:
             - Starting an evaluation cycle
             - Closing an evaluation cycle
             - Trigger a fractal wide token distribution
             - Initialise fractal token
         ",
         Medium => "
-        Medium trust grants the abilities of the Low trust level, plus these abilities:
             - Joining the fractal
             - Registering for a guild evaluation
             - Unregistering from guild evaluation
             - Applying to join a guild
             - Attesting guild membership for a fractal member
             - Retrieving a proposal in evaluation
-            ",
-            High => "
-            High trust grants the abilities of all lower trust levels, plus these abilities:
+        ",
+        High => "
             - Proposing a vote in evaluation cycle
             - Exiling a member from a fractal
             - Set the fractal token distribution schedule

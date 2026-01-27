@@ -37,12 +37,10 @@ use trust::FunctionName;
 define_trust! {
     descriptions {
         Low => "
-        Low trust grants these abilities:
             - Unregistering from guild evaluation
             - Closing an evaluation cycle
         ",
         Medium => "
-        Medium trust grants the abilities of the Low trust level, plus these abilities:
             - Joining the fractal
             - Registering for a guild evaluation
             - Unregistering from guild evaluation
@@ -50,9 +48,8 @@ define_trust! {
             - Attesting guild membership for a fractal member
             - Retrieving a proposal in evaluation
             - Creating a new fractal
-            ",
-            High => "
-            High trust grants the abilities of all lower trust levels, plus these abilities:
+        ",
+        High => "
             - Proposing a vote in evaluation cycle
             - Exiling a fractal member
             - Setting the guild evaluation schedule

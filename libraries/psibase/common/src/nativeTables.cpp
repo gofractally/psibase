@@ -193,4 +193,13 @@ namespace psibase
    {
       return pendingShutdownKey();
    }
+
+   auto timerKey() -> KeyPrefixType
+   {
+      return std::tuple{timerTable, nativeTablePrimaryIndex};
+   }
+   auto TimerRow::key() const -> KeyPrefixType
+   {
+      return timerKey();
+   }
 }  // namespace psibase

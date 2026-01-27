@@ -1,3 +1,4 @@
+import * as React from "react";
 import { Label, Pie, PieChart } from "recharts";
 
 import {
@@ -12,7 +13,6 @@ import {
     ChartContainer,
     ChartTooltip,
     ChartTooltipContent,
-    type CustomTooltipProps,
 } from "@shared/shadcn/ui/chart";
 import { Separator } from "@shared/shadcn/ui/separator";
 
@@ -22,72 +22,75 @@ import { useTransactStats } from "../hooks/useTransactStats";
 const chartConfig = {
     database: {
         label: "Database",
-        color: "hsl(var(--chart-1))",
+        color: "var(--chart-1)",
     },
     code: {
         label: "Code",
-        color: "hsl(var(--chart-2))",
+        color: "var(--chart-2)",
     },
     data: {
         label: "Data",
-        color: "hsl(var(--chart-5))",
+        color: "var(--chart-5)",
     },
     wasmMemory: {
         label: "WASM Memory",
-        color: "hsl(var(--chart-3))",
+        color: "var(--chart-3)",
     },
     wasmCode: {
         label: "WASM Code",
-        color: "hsl(var(--chart-4))",
+        color: "var(--chart-4)",
     },
     unclassified: {
         label: "Unclassified",
-        color: "hsl(var(--chart-5))",
+        color: "var(--chart-5)",
     },
 } satisfies ChartConfig;
 
 const bytesToMb = (bytes: number): number => Math.ceil(bytes / 1024 / 1024);
 
-export function Component() {
+export function DashboardPage() {
     const { data } = usePerformance();
     const { data: txStats } = useTransactStats();
 
-    const chartData = [
-        {
-            memType: "database",
-            usage: bytesToMb(data?.memory.database || 0),
-            fill: "var(--color-database)",
-        },
-        {
-            memType: "code",
-            usage: bytesToMb(data?.memory.code || 0),
-            fill: "var(--color-code)",
-        },
-        {
-            memType: "data",
-            usage: bytesToMb(data?.memory.data || 0),
-            fill: "var(--color-data)",
-        },
-        {
-            memType: "wasmMemory",
-            usage: bytesToMb(data?.memory.wasmMemory || 0),
-            fill: "var(--color-wasmMemory)",
-        },
-        {
-            memType: "wasmCode",
-            usage: bytesToMb(data?.memory.wasmCode || 0),
-            fill: "var(--color-wasmCode)",
-        },
-        {
-            memType: "unclassified",
-            usage: bytesToMb(data?.memory.unclassified || 0),
-            fill: "var(--color-unclassified)",
-        },
-    ];
+    const chartData = React.useMemo(
+        () => [
+            {
+                memType: "database",
+                usage: bytesToMb(data?.memory.database || 0),
+                fill: "var(--color-database)",
+            },
+            {
+                memType: "code",
+                usage: bytesToMb(data?.memory.code || 0),
+                fill: "var(--color-code)",
+            },
+            {
+                memType: "data",
+                usage: bytesToMb(data?.memory.data || 0),
+                fill: "var(--color-data)",
+            },
+            {
+                memType: "wasmMemory",
+                usage: bytesToMb(data?.memory.wasmMemory || 0),
+                fill: "var(--color-wasmMemory)",
+            },
+            {
+                memType: "wasmCode",
+                usage: bytesToMb(data?.memory.wasmCode || 0),
+                fill: "var(--color-wasmCode)",
+            },
+            {
+                memType: "unclassified",
+                usage: bytesToMb(data?.memory.unclassified || 0),
+                fill: "var(--color-unclassified)",
+            },
+        ],
+        [data],
+    );
 
-    const totalVisitorsBytes = chartData
-        ? chartData.reduce((acc, curr) => acc + curr.usage, 0)
-        : 0;
+    const totalVisitorsBytes = React.useMemo(() => {
+        return chartData.reduce((acc, curr) => acc + curr.usage, 0);
+    }, [chartData]);
 
     if (!chartData) return <div>Loading...</div>;
 
@@ -96,17 +99,19 @@ export function Component() {
             <CardHeader className="items-center pb-0">
                 <CardTitle>RAM Usage</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 pb-0">
+            <CardContent className="flex flex-1 items-center justify-center pb-0">
                 <ChartContainer
                     config={chartConfig}
-                    className="mx-auto aspect-square max-h-[250px]"
+                    style={{ width: "250px", height: "250px" }}
                 >
                     <PieChart>
                         <ChartTooltip
-                            cursor={false}
-                            content={(props: CustomTooltipProps) => (
-                                <ChartTooltipContent {...props} hideLabel />
-                            )}
+                            content={
+                                <ChartTooltipContent
+                                    hideLabel
+                                    indicator="dashed"
+                                />
+                            }
                         />
                         <Pie
                             data={chartData}
@@ -216,13 +221,4 @@ export function Component() {
     );
 }
 
-export const DashboardPage = () => {
-    return (
-        <div>
-            <h2 className="scroll-m-20  pb-2 text-3xl font-semibold tracking-tight ">
-                Dashboard
-            </h2>
-            <Component />
-        </div>
-    );
-};
+export default DashboardPage;

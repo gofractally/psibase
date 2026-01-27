@@ -19,13 +19,11 @@
 /// psibase::define_trust! {
 ///     descriptions {
 ///         Low => "
-///         Low trust grants these abilities:
 ///             - Create new keypairs
 ///             - Import existing keypairs
 ///         ",
 ///         Medium => "",
 ///         High => "
-///         High trust grants the abilities of all lower trust levels, plus these abilities:
 ///             - Set the public key for your account
 ///             - Sign transactions on your behalf
 ///         ",

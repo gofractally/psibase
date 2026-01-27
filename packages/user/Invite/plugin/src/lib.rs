@@ -45,11 +45,10 @@ use crate::{
 define_trust! {
     descriptions {
         Low => "
-        Low trust grants these abilities:
             - Delete previously created invites
             - Reject active invites
         ",
-        Medium => "Medium trust grants all the abilities of low trust, plus these abilities:
+        Medium => "
             - Generate new invites
         ",
         High => "",

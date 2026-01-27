@@ -2,6 +2,7 @@
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::services::auth_dyn::policy::DynamicAuthPolicy;
+    use crate::services::transact::ServiceMethod;
     use crate::AccountNumber;
     use crate::Memo;
 
@@ -271,7 +272,7 @@ pub mod Service {
     /// # Arguments
     /// * `account` - Account being checked.
     #[action]
-    fn get_policy(account: AccountNumber) -> DynamicAuthPolicy {
+    fn get_policy(account: AccountNumber, method: Option<ServiceMethod>) -> DynamicAuthPolicy {
         unimplemented!()
     }
 
