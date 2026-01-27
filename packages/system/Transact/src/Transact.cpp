@@ -594,9 +594,9 @@ namespace SystemService
       check(!trx.actions().empty(), "transaction must have at least one action");
       if (enforceAuth)
       {
-         std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
          if (isResMonitoring())
          {
+            std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
             to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
          }
       }
