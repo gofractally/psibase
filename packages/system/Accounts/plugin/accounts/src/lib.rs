@@ -22,7 +22,7 @@ psibase::define_trust! {
     functions {
         None => [is_logged_in, get_account, get_current_user, gen_rand_account],
         High => [set_auth_service, get_connected_apps],
-        Max => [import_account, get_all_accounts, get_auth_services],
+        Max => [import_account, remove_account, get_all_accounts, get_auth_services],
     }
 }
 
