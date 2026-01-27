@@ -34,7 +34,6 @@ export const Liquidity = () => {
         useUserTokenBalances();
     const userBalances = userBalancesData || []
 
-    console.log({ userBalances })
 
     // ── Core state ──────────────────────────────────────────────────────
     const [focusedPoolId, setFocusedPoolId] = useState<number | undefined>(undefined);
@@ -146,7 +145,6 @@ export const Liquidity = () => {
     useEffect(() => {
         if (quotedRemove && lastTouched) {
             if (lastTouched.tokenId == token1Id) {
-                // change token2 field
                 setToken2Amount(quotedRemove!.find(r => r.tokenId == token2Id)!.amount)
             } else {
                 setToken1Amount(quotedRemove!.find(r => r.tokenId == token1Id)!.amount)
@@ -173,9 +171,14 @@ export const Liquidity = () => {
         refetchTokenBalances();
     };
 
+
+    const { value: userIsCreatingPool, setValue: setUserIsCreatingPool } = useBoolean();
+
+
     const onCreatePoolSuccess = () => {
         setToken1Id(token1Id);
         setToken2Id(token2Id);
+        setUserIsCreatingPool(false)
         onSuccess();
     };
 
@@ -191,15 +194,33 @@ export const Liquidity = () => {
         }
     };
 
+
+
+    // This detects the absense of a focused pool while there is a pool which contains the reserves of token1 and token2.
+    // Helpful just after the creation of a pool
+    useEffect(() => {
+        const relevantPool = poolsOfLiquidityPair[0];
+        if (relevantPool && !focusedPoolId && !userIsCreatingPool) {
+            console.log('setting focused', relevantPool)
+            setFocusedPoolId(relevantPool.id)
+        } else if ((!relevantPool && focusedPoolId) || (userIsCreatingPool && focusedPoolId)) {
+            setFocusedPoolId(undefined)
+            console.log('unsetting')
+        } else {
+            console.log('didnt do shit')
+        }
+    }, [focusedPoolId, token1Id, token2Id, poolsOfLiquidityPair, userIsCreatingPool])
+
     useEffect(() => {
         if (!token1Id && !token2Id && (pools.length > 0 || userBalances?.length > 1)) {
-            const firstTwoTokens = [userBalances[0].id, userBalances[1].id]
+            console.log(userBalances, 'are the user balances')
             if (pools.length > 0) {
                 const pool = pools[0];
                 setFocusedPoolId(pool.id);
                 setToken1Id(pool.reserveA.tokenId)
                 setToken2Id(pool.reserveB.tokenId)
             } else {
+                const firstTwoTokens = [userBalances[0].id, userBalances[1].id]
                 setToken1Id(firstTwoTokens[0]);
                 setToken2Id(firstTwoTokens[1]);
             }
@@ -323,7 +344,10 @@ export const Liquidity = () => {
                     <div className="text-muted-foreground space-y-1 text-sm">
                         {isAddingLiquidity && (
                             <PoolPicker
-                                setFocusedPoolId={(focusedId) => setFocusedPoolId(focusedId)}
+                                setFocusedPoolId={(focusedId) => {
+                                    setUserIsCreatingPool(focusedId === undefined)
+                                    setFocusedPoolId(focusedId)
+                                }}
                                 focusedPoolId={focusedPoolId}
                                 pools={poolsOfLiquidityPair || []}
                             />
