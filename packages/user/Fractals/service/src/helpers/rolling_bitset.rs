@@ -1,56 +1,61 @@
-/// A rolling 16-bit activity tracker.
-/// Newest event → LSB. Oldest drops off after 16 events.
+/// Fixed-size 16-bit container that behaves like a left-shifting ring / window.
+/// - New bits are inserted at the LSB (bit 0).
+/// - Existing bits shift left on insertion; oldest bit (bit 15) is discarded.
+/// - Useful for tracking recent boolean states, patterns, or flags in a compact form.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct RollingBitset(u16);
+pub struct RollingBits16(u16);
 
-impl RollingBitset {
+impl RollingBits16 {
+    /// Creates a new empty instance (all bits 0).
     pub const fn new() -> Self {
         Self(0)
     }
 
-    pub fn mark(mut self, value: bool) -> Self {
-        self.0 = (self.0 << 1) | (value as u16);
+    /// Inserts a new bit at the LSB and shifts older bits left.
+    /// Returns `self` for chaining.
+    pub fn push(mut self, bit: bool) -> Self {
+        self.0 = (self.0 << 1) | (bit as u16);
         self
     }
 
-    /// Get event from the past (0 = most recent)
-    pub fn get(self, events_ago: usize) -> bool {
-        psibase::check(
-            events_ago < 16,
-            "events_ago must be in range 0..16 (max 15)",
-        );
-        ((self.0 >> events_ago) & 1) != 0
+    /// Queries the bit from `positions_ago` steps back.
+    /// - `0` = most recently pushed bit (LSB)
+    /// - `15` = oldest bit still in the window
+    pub fn get(self, positions_ago: usize) -> bool {
+        psibase::check(positions_ago < 16, "positions_ago must be in range 0..16");
+        ((self.0 >> positions_ago) & 1) != 0
     }
 
-    /// Total trues in entire history
-    pub fn count_set(self) -> u16 {
+    /// Counts the total number of 1-bits in the current window.
+    pub fn count_ones(self) -> u16 {
         self.0.count_ones() as u16
     }
 
-    /// How many of the last n events were true?
-    pub fn count_last_n_set(self, n: usize) -> u16 {
-        psibase::check(n <= 16, "n cannot exceed 16 for a 16-bit rolling bitset");
+    /// Counts the number of 1-bits among the most recently pushed `n` bits.
+    /// Panics if `n > 16`.
+    pub fn count_recent_ones(self, n: usize) -> u16 {
+        psibase::check(n <= 16, "n cannot exceed 16");
         if n == 0 {
             return 0;
         }
-        let mask = if n == 16 { u16::MAX } else { (1u16 << n) - 1 };
+        let mask = if n == 16 { !0u16 } else { (1u16 << n) - 1 };
         (self.0 & mask).count_ones() as u16
     }
 
-    /// Raw value for DB storage
+    /// Returns the raw underlying 16-bit value (for storage/serialization).
     pub const fn value(self) -> u16 {
         self.0
     }
 }
 
-impl From<u16> for RollingBitset {
+impl From<u16> for RollingBits16 {
     fn from(value: u16) -> Self {
         Self(value)
     }
 }
 
-impl From<RollingBitset> for u16 {
-    fn from(b: RollingBitset) -> u16 {
-        b.0
+impl From<RollingBits16> for u16 {
+    fn from(r: RollingBits16) -> u16 {
+        r.0
     }
 }

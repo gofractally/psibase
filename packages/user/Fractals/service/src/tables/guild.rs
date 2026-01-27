@@ -7,7 +7,7 @@ use crate::constants::{
     COUNCIL_SEATS, DEFAULT_CANDIDACY_COOLDOWN, DEFAULT_RANK_ORDERING_THRESHOLD,
     MAX_CANDIDACY_COOLDOWN, MIN_RANK_ORDERING_THRESHOLD,
 };
-use crate::helpers::{two_thirds_plus_one, RollingBitset};
+use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
     EvaluationInstance, Fractal, FractalMember, Guild, GuildFlags, GuildMember, GuildMemberTable,
     GuildTable,
@@ -159,7 +159,7 @@ impl Guild {
                 (self.account, AccountNumber::from(0))
                     ..=(self.account, AccountNumber::from(u64::MAX)),
             )
-            .filter(|account| RollingBitset::from(account.attendance).count_last_n_set(4) > 1)
+            .filter(|account| RollingBits16::from(account.attendance).count_recent_ones(4) > 1)
             .count()
     }
 

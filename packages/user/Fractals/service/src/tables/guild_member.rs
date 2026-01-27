@@ -2,7 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
-use crate::helpers::RollingBitset;
+use crate::helpers::RollingBits16;
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -19,7 +19,7 @@ impl GuildMember {
             created_at: now,
             is_candidate: false,
             candidacy_eligible_from: now,
-            attendance: RollingBitset::new().value(),
+            attendance: RollingBits16::new().value(),
         }
     }
 
@@ -91,7 +91,8 @@ impl GuildMember {
 
     // 3. Called when finishing an evaluation and taking the pending level to create the new score.
     pub fn apply_pending_level_to_score(&mut self, attended: bool) {
-        self.attendance = RollingBitset::from(self.attendance).mark(attended).value();
+        // Mark the members attendance by adding a bit to their bitset. 
+        self.attendance = RollingBits16::from(self.attendance).push(attended).value();
         let pending_level = self.pending_level.take().unwrap();
 
         self.score = calculate_ema_u32(
