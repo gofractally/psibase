@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
+import { ErrorCard } from "@shared/components/error-card";
 
 const supervisor = getSupervisor();
 
@@ -45,7 +46,7 @@ export const App = () => {
                         (now.getTime() - createdDate.getTime()) / 1000;
 
                     if (diffSec > PROMPT_EXPIRATION_SEC) {
-                        setError("Prompt expired");
+                        setError("This prompt has expired.");
                         return;
                     }
                 }
@@ -97,7 +98,11 @@ export const App = () => {
     }, [iframeUrl, promptFinished]);
 
     if (error) {
-        return <div>{error}</div>;
+        return (
+            <div className="flex min-h-screen items-center justify-center">
+                <ErrorCard error={new Error(error)} title="Error" retryLabel="Go back" retry={() => window.history.back()} />
+            </div>
+        );
     }
 
     return (

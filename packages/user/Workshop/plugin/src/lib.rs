@@ -21,12 +21,10 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Create new apps
             - Configure app cache behavior
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Publish and manage app metadata
             - Upload and manage app assets and service code
         ",

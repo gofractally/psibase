@@ -17,11 +17,9 @@ define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Minting
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Credit, Debit and uncredit.
             - Manual debit toggle
             - Burning

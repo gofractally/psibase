@@ -21,7 +21,6 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Attest to other accounts' identities
         ",
         High => "",

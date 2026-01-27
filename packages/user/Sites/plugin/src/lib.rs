@@ -18,11 +18,9 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Set cache mode
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Upload files
             - Remove files
             - Configure site settings (SPA, CSP, proxy)

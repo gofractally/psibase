@@ -29,12 +29,10 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Create new tokens
             - Configure balance and transfer preferences
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Issue, configure, and manage token and token supply
             - Transfer tokens
             - Configure automatic balance debiting
