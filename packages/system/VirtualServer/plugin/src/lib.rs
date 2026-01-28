@@ -24,7 +24,8 @@ use psibase::AccountNumber;
 
 use psibase::services::tokens::{Precision, Quantity};
 use virtual_server::action_structs as Actions;
-use virtual_server::tables::tables as ServiceTables;
+use virtual_server::tables::tables::{self as ServiceTables};
+use virtual_server::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 struct VirtualServerPlugin;
 
@@ -242,7 +243,13 @@ impl Billing for VirtualServerPlugin {
         let capacity = TokensPlugin::helpers::decimal_to_u64(sys_id, &new_capacity)?;
         add_action_to_transaction(
             Actions::conf_buffer::ACTION_NAME,
-            &Actions::conf_buffer { capacity }.packed(),
+            &Actions::conf_buffer {
+                config: Some(ServiceTables::BufferConfig {
+                    capacity,
+                    threshold_percent: DEFAULT_AUTO_FILL_THRESHOLD_PERCENT,
+                }),
+            }
+            .packed(),
         )?;
 
         refill_to_capacity(Some(capacity), true)

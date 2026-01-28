@@ -26,6 +26,18 @@ pub struct NetworkVariables {
     pub obj_storage_bytes: u64,
 }
 
+/// Parameters related to the automatic management of an account resource buffer.
+#[derive(Debug, Clone, Serialize, Deserialize, Fracpack, ToSchema, SimpleObject)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct BufferConfig {
+    /// A threshold (specified in integer percentage values) at or below which the client should
+    /// attempt to automatically refill the account's resource buffer. A threshold of 0 means
+    /// that the client should not attempt to automatically manage the account's buffer.
+    pub threshold_percent: u8,
+    /// The total capacity of the account's buffer used to reserve system tokens.
+    pub capacity: u64,
+}
+
 /// Virtual Server Service
 ///
 /// This service defines a "virtual server" that represents the "server" with which
@@ -71,7 +83,7 @@ pub struct NetworkVariables {
 #[crate::service(name = "virtual-server", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use super::{NetworkVariables, ServerSpecs};
+    use super::{BufferConfig, NetworkVariables, ServerSpecs};
     use crate::services::tokens::Quantity;
     use crate::*;
 
@@ -161,21 +173,12 @@ mod service {
         unimplemented!()
     }
 
-    /// Allows the sender to request client-side tooling to automatically attempt to
-    /// reserve additional resources when the user is at or below the specified threshold
-    /// (specified in integer percentage values).
+    /// Allows the sender to manage the behavior of client-side tooling with respect to the
+    /// automatic management of the sender's resource buffer.
     ///
-    /// A threshold of 0 means that the client should not attempt to automatically manage
-    /// the user's reserved tokens.
+    /// If `config` is None, the account will use a default configuration
     #[action]
-    fn conf_auto_fill(threshold_percent: u8) {
-        unimplemented!()
-    }
-
-    /// Allows the sender to specify the capacity of their buffer of reserved system tokens.
-    /// The larger the buffer, the less often the sender will need to refill it.
-    #[action]
-    fn conf_buffer(capacity: u64) {
+    fn conf_buffer(config: Option<BufferConfig>) {
         unimplemented!()
     }
 

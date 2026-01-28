@@ -22,6 +22,13 @@ namespace SystemService
       PSIO_REFLECT(NetworkVariables, block_replay_factor, per_block_sys_cpu_ns, obj_storage_bytes);
    };
 
+   struct BufferConfig
+   {
+      uint8_t  threshold_percent;
+      uint64_t capacity;
+      PSIO_REFLECT(BufferConfig, threshold_percent, capacity);
+   };
+
    /// Virtual Server Service
    ///
    /// This service defines a "virtual server" that represents the "server" with which
@@ -127,17 +134,11 @@ namespace SystemService
       /// The sender must have already credited the system tokens to this service.
       void buy_res(UserService::Quantity amount);
 
-      /// Allows the sender to request client-side tooling to automatically attempt to
-      /// reserve additional resources when the user is at or below the specified threshold
-      /// (specified in integer percentage values).
+      /// Allows the sender to manage the behavior of client-side tooling with respect to the
+      /// automatic management of the sender's resource buffer.
       ///
-      /// A threshold of 0 means that the client should not attempt to automatically manage
-      /// the user's reserved tokens.
-      void conf_auto_fill(uint8_t threshold_percent);
-
-      /// Allows the sender to specify the capacity of their buffer of reserved system tokens.
-      /// The larger the buffer, the less often the sender will need to refill it.
-      void conf_buffer(uint64_t capacity);
+      /// If `config` is None, the account will use a default configuration
+      void conf_buffer(std::optional<BufferConfig> config);
 
       /// Set the network bandwidth pricing thresholds
       ///
@@ -262,8 +263,7 @@ namespace SystemService
                 method(enable_billing, enabled),
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res, amount),
-                method(conf_auto_fill, threshold_percent),
-                method(conf_buffer, capacity),
+                method(conf_buffer, config),
                 method(net_thresholds, idle_ppm, congested_ppm),
                 method(net_rates, doubling_time_sec, halving_time_sec),
                 method(net_blocks_avg, num_blocks),
@@ -273,7 +273,7 @@ namespace SystemService
                 method(cpu_blocks_avg, num_blocks),
                 method(cpu_min_unit, ns),
                 method(useNetSys, user, amount_bytes),
-                method(useCpuSys, user, cpuUsage),
+                method(useCpuSys, user, amount_ns),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
                 method(setCpuLimit, account),

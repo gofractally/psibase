@@ -256,14 +256,12 @@ impl Query {
         let config = BillingConfig::get_assert();
         let p = Tokens::call().getToken(config.sys).precision;
 
-        let balance = crate::Wrapper::call().get_resources(user);
         let settings = UserSettings::get(user);
-        let buffer_capacity = settings.get_buffer_capacity();
 
         Ok(UserResources {
-            balance: Decimal::new(balance, p),
-            buffer_capacity: Decimal::new(Quantity::from(buffer_capacity), p),
-            auto_fill_threshold_percent: settings.get_auto_fill_threshold_percent(),
+            balance: Decimal::new(settings.get_resource_balance(), p),
+            buffer_capacity: Decimal::new(Quantity::from(settings.buffer_capacity), p),
+            auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
         })
     }
 

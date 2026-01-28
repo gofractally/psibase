@@ -5,7 +5,7 @@ use psibase::*;
 
 // Relatively arbitrary initial values
 const EXAMPLE_LARGE_TX_COST: u64 = 3_000_000; // e.g. Net cost of a 3MB upload when NET is at minimum cost
-const DEFAULT_AUTO_FILL_THRESHOLD_PERCENT: u8 = 20;
+pub const DEFAULT_AUTO_FILL_THRESHOLD_PERCENT: u8 = 20;
 
 impl UserSettings {
     pub fn get(user: AccountNumber) -> Self {
@@ -14,61 +14,50 @@ impl UserSettings {
             .get(&user)
             .unwrap_or_else(|| UserSettings {
                 user,
-                buffer_capacity: None,
-                auto_fill_threshold_percent: None,
+                buffer_capacity: Self::get_default_buffer_capacity(),
+                auto_fill_threshold_percent: DEFAULT_AUTO_FILL_THRESHOLD_PERCENT,
             })
     }
 
-    pub fn set_auto_fill(self, threshold_percent: u8) {
-        check(
-            threshold_percent <= 100,
-            "Threshold must be between 0 and 100 inclusive",
-        );
+    pub fn configure_buffer(&mut self, config: Option<BufferConfig>) {
+        if let Some(config) = config {
+            check(
+                config.threshold_percent <= 100,
+                "Threshold must be between 0 and 100 inclusive",
+            );
+            if config.threshold_percent != 0 {
+                // If the threshold is 0, capacity isn't used so it can be anything
+                let min_buffer_size = Self::get_min_buffer_capacity();
+                check(
+                    config.capacity > min_buffer_size,
+                    &format!("Capacity must be greater than {} bytes", min_buffer_size),
+                );
+            }
 
-        let mut settings = self;
-        settings.auto_fill_threshold_percent = Some(threshold_percent);
-        UserSettingsTable::read_write().put(&settings).unwrap();
-    }
-
-    pub fn get_auto_fill_threshold_percent(&self) -> u8 {
-        self.auto_fill_threshold_percent
-            .unwrap_or(DEFAULT_AUTO_FILL_THRESHOLD_PERCENT)
-    }
-
-    pub fn set_capacity(self, capacity: u64) {
-        let min_buffer_size = self.get_min_buffer_capacity();
-        if capacity < min_buffer_size {
-            let err_msg = format!("Buffer capacity must be >= {}", min_buffer_size);
-            abort_message(&err_msg);
+            self.buffer_capacity = config.capacity;
+            self.auto_fill_threshold_percent = config.threshold_percent;
+            UserSettingsTable::read_write().put(self).unwrap();
+        } else {
+            UserSettingsTable::read_write().remove(self);
         }
-
-        let mut settings = self;
-        settings.buffer_capacity = Some(capacity);
-        UserSettingsTable::read_write().put(&settings).unwrap();
     }
 
-    pub fn get_buffer_capacity(&self) -> u64 {
+    pub fn get_resource_balance(&self) -> Quantity {
+        Tokens::call()
+            .getSubBal(BillingConfig::get_assert().sys, self.user.to_string())
+            .unwrap_or(0.into())
+    }
+
+    fn get_min_buffer_capacity() -> u64 {
+        // Ensures that the large tx could still be submitted when at the refill threshold
+        EXAMPLE_LARGE_TX_COST * 100 / (DEFAULT_AUTO_FILL_THRESHOLD_PERCENT as u64)
+    }
+
+    fn get_default_buffer_capacity() -> u64 {
         // This factor is used to set the default buffer capacity to an arbitrary multiple
         // of the minimum buffer capacity
         const FACTOR: u64 = 5;
-
-        let default_capacity = self.get_min_buffer_capacity() * FACTOR;
-        self.buffer_capacity.unwrap_or(default_capacity)
-    }
-
-    pub fn get_resource_balance(user: AccountNumber) -> Quantity {
-        let config = check_some(BillingConfig::get(), "Billing not initialized");
-
-        let sys = config.sys;
-        let balance = Tokens::call().getSubBal(sys, user.to_string());
-        let balance: Quantity = balance.unwrap_or(0.into());
-        return balance;
-    }
-
-    pub fn get_min_buffer_capacity(&self) -> u64 {
-        // Ensures that the large tx could still be submitted when at the refill threshold
-        let threshold = std::cmp::max(self.get_auto_fill_threshold_percent(), 1);
-        EXAMPLE_LARGE_TX_COST * 100 / (threshold as u64)
+        Self::get_min_buffer_capacity() * FACTOR
     }
 }
 
@@ -76,6 +65,6 @@ impl UserSettings {
 impl UserSettings {
     /// The minimum capacity of the resource buffer
     pub async fn min_buffer_capacity(&self) -> u64 {
-        self.get_min_buffer_capacity()
+        Self::get_min_buffer_capacity()
     }
 }

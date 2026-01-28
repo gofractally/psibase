@@ -118,6 +118,8 @@ pub mod tables {
         fn pk(&self) {}
     }
 
+    /// Settings related to the automatic management of an account resource buffer.
+    /// If an account has not configured these settings, a default configuration will be used.
     #[table(name = "UserSettingsTable", index = 5)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     pub struct UserSettings {
@@ -126,15 +128,23 @@ pub mod tables {
 
         /// The percentage at which client-side tooling should attempt to refill the user's
         /// resource buffer. A value of 0 means that the client should not auto refill.
-        ///
-        /// If this is None, a default auto-fill threshold percentage is used.
-        pub auto_fill_threshold_percent: Option<u8>,
+        pub auto_fill_threshold_percent: u8,
 
         /// The capacity of the resource buffer that gets filled when the user
         /// acquires resources.
-        ///
-        /// If this is None, a default buffer capacity is used.
-        pub buffer_capacity: Option<u64>,
+        pub buffer_capacity: u64,
+    }
+
+    /// Parameters related to the automatic management of an account resource buffer.
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct BufferConfig {
+        /// A threshold (specified in integer percentage values) at or below which the client should
+        /// attempt to automatically refill the account's resource buffer. A threshold of 0 means
+        /// that the client should not attempt to automatically manage the account's buffer.
+        pub threshold_percent: u8,
+
+        /// The total capacity of the account's buffer used to reserve system tokens.
+        pub capacity: u64,
     }
 
     #[table(name = "NetPricingTable", index = 6)]
@@ -219,5 +229,7 @@ mod network_variables;
 mod pricing_common;
 mod server_specs;
 mod user_settings;
+
+pub use user_settings::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 pub use pricing_common::*;

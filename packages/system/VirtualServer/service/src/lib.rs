@@ -2,6 +2,7 @@
 
 pub mod rpc;
 pub mod tables;
+pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 /// Virtual Server Service
 ///
@@ -198,22 +199,13 @@ mod service {
         buy_res_for(amount, get_sender(), None);
     }
 
-    /// Allows the sender to request client-side tooling to automatically attempt to
-    /// reserve additional resources when the user is at or below the specified threshold
-    /// (specified in integer percentage values).
+    /// Allows the sender to manage the behavior of client-side tooling with respect to the
+    /// automatic management of the sender's resource buffer.
     ///
-    /// A threshold of 0 means that the client should not attempt to automatically manage
-    /// the user's reserved tokens.
+    /// If `config` is None, the account will use a default configuration
     #[action]
-    fn conf_auto_fill(threshold_percent: u8) {
-        UserSettings::get(get_sender()).set_auto_fill(threshold_percent);
-    }
-
-    /// Allows the sender to specify the capacity of their buffer of reserved system tokens.
-    /// The larger the buffer, the less often the sender will need to refill it.
-    #[action]
-    fn conf_buffer(capacity: u64) {
-        UserSettings::get(get_sender()).set_capacity(capacity);
+    fn conf_buffer(config: Option<BufferConfig>) {
+        UserSettings::get(get_sender()).configure_buffer(config);
     }
 
     fn bill(user: AccountNumber, amount: u64) {
@@ -224,7 +216,7 @@ mod service {
         if let Some(config) = BillingConfig::get() {
             let sys = config.sys;
 
-            let balance = UserSettings::get_resource_balance(user);
+            let balance = UserSettings::get(user).get_resource_balance();
             let amt = Quantity::new(amount);
 
             if balance < amt {
@@ -425,7 +417,7 @@ mod service {
         }
 
         let cpu_pricing = CpuPricing::get_assert();
-        let res_balance = UserSettings::get_resource_balance(account).value;
+        let res_balance = UserSettings::get(account).get_resource_balance().value;
 
         let price_per_unit = cpu_pricing.price();
         let ns_per_unit = cpu_pricing.billable_unit;
