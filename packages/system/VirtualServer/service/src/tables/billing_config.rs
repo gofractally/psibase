@@ -1,9 +1,6 @@
 use crate::tables::tables::*;
 
-use psibase::services::{
-    nft::Wrapper as Nft,
-    tokens::{TokenFlags, TokenRecord, Wrapper as Tokens},
-};
+use psibase::services::tokens::{TokenRecord, Wrapper as Tokens};
 use psibase::*;
 
 impl BillingConfig {
@@ -14,21 +11,15 @@ impl BillingConfig {
             "Billing already initialized",
         );
 
-        let tok = Tokens::call();
-        let sys = check_some(tok.getSysToken(), "System token not found");
+        let sys = check_some(Tokens::call().getSysToken(), "System token not found");
 
-        let config = BillingConfig {
-            sys: sys.id,
-            res: tok.create(sys.precision, sys.max_issued_supply),
-            fee_receiver,
-            enabled: false,
-        };
-
-        Nft::call().debit(tok.getToken(config.res).nft_id, "".into());
-        tok.mint(config.res, sys.max_issued_supply, "".into());
-        tok.setTokenConf(config.res, TokenFlags::UNTRANSFERABLE.index(), true);
-
-        table.put(&config).unwrap();
+        table
+            .put(&BillingConfig {
+                sys: sys.id,
+                fee_receiver,
+                enabled: false,
+            })
+            .unwrap();
     }
 
     pub fn get() -> Option<Self> {

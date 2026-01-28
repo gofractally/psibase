@@ -59,8 +59,8 @@ impl UserSettings {
     pub fn get_resource_balance(user: AccountNumber) -> Quantity {
         let config = check_some(BillingConfig::get(), "Billing not initialized");
 
-        let res = config.res;
-        let balance = Tokens::call().getSubBal(res, user.to_string());
+        let sys = config.sys;
+        let balance = Tokens::call().getSubBal(sys, user.to_string());
         let balance: Quantity = balance.unwrap_or(0.into());
         return balance;
     }

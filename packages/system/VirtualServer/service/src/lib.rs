@@ -16,11 +16,13 @@ pub mod tables;
 /// speed, etc).
 ///
 /// This service also defines a billing system that allows for the network to meter
-/// the consumption of resources by users. A user must "buy" resources from this service
-/// by sending in a network token, which is exchanged 1:1 for an internal resource token.
-/// The resource tokens are then exchanged in real-time for the internal tokens that
-/// represent consumption of individual network resources (CPU, network bandwidth, storage,
-/// etc).
+/// the consumption of resources by users. A user must send system tokens to this service,
+/// which are then held in reserve for the user.
+///
+/// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
+/// real-time price of the resource is billed to the user's reserved balance. Reserved system
+/// tokens do not equate to any specific resource amounts, since it's dependent upon the spot
+/// price of the consumed resource at the time of consumption.
 ///
 /// Note that this service is unopinionated about how the user gets the system tokens with
 /// which to pay for the resources. This allows for networks wherein users' system token
@@ -153,28 +155,26 @@ mod service {
         BillingConfig::enable(enabled);
     }
 
-    /// Used to acquire resource tokens for a user.
+    /// Reserves system tokens for future resource consumption by the specified user.
     ///
-    /// The resource tokens are consumed when interacting with metered network functionality.
+    /// The reserve is consumed when interacting with metered network functionality.
     ///
-    /// The sender must have already credited the system token to this service to pay
-    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    /// The sender must have already credited the system tokens to this service.
     ///
     /// # Arguments
-    /// * `amount`   - The amount of resource tokens to buy
-    /// * `for_user` - The user to buy the resource tokens for
-    /// * `memo`     - A memo for the purchase, only used if the sender is not the resource recipient
+    /// * `amount`   - The amount of systems tokens to reserve
+    /// * `for_user` - The user to reserve the system tokens for
+    /// * `memo`     - An optional memo to attach to the reservation, only used if the sender is not
+    ///                the resource recipient
     #[action]
     fn buy_res_for(amount: Quantity, for_user: AccountNumber, memo: Option<psibase::Memo>) {
         let config = check_some(BillingConfig::get(), "Billing not initialized");
 
         let sys = config.sys;
-        let res = config.res;
-
         let buyer = get_sender();
 
         Tokens::call().debit(sys, buyer, amount, "".into());
-        Tokens::call().toSub(res, for_user.to_string(), amount);
+        Tokens::call().toSub(sys, for_user.to_string(), amount);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -188,30 +188,29 @@ mod service {
         }
     }
 
-    /// Used to acquire resource tokens for the sender
+    /// Reserves system tokens for future resource consumption by the sender
     ///
-    /// The resource tokens are consumed when interacting with metered network functionality.
+    /// The reserve is consumed when interacting with metered network functionality.
     ///
-    /// The sender must have already credited the system token to this service to pay
-    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    /// The sender must have already credited the system tokens to this service.
     #[action]
     fn buy_res(amount: Quantity) {
         buy_res_for(amount, get_sender(), None);
     }
 
     /// Allows the sender to request client-side tooling to automatically attempt to
-    /// refill their resource buffer when it is at or below the threshold (specified
-    /// in integer percentage values).
+    /// reserve additional resources when the user is at or below the specified threshold
+    /// (specified in integer percentage values).
     ///
-    /// A threshold of 0 means that the client should not attempt to refill the
-    /// resource buffer.
+    /// A threshold of 0 means that the client should not attempt to automatically manage
+    /// the user's reserved tokens.
     #[action]
     fn conf_auto_fill(threshold_percent: u8) {
         UserSettings::get(get_sender()).set_auto_fill(threshold_percent);
     }
 
-    /// Allows the sender to specify the capacity of their resource buffer. The larger the
-    /// resource buffer, the less often the sender will need to refill it.
+    /// Allows the sender to specify the capacity of their buffer of reserved system tokens.
+    /// The larger the buffer, the less often the sender will need to refill it.
     #[action]
     fn conf_buffer(capacity: u64) {
         UserSettings::get(get_sender()).set_capacity(capacity);
@@ -223,7 +222,7 @@ mod service {
         }
 
         if let Some(config) = BillingConfig::get() {
-            let res = config.res;
+            let sys = config.sys;
 
             let balance = UserSettings::get_resource_balance(user);
             let amt = Quantity::new(amount);
@@ -233,8 +232,8 @@ mod service {
                 abort_message(&err);
             }
 
-            Tokens::call().fromSub(res, user.to_string(), amt);
-            Tokens::call().credit(config.sys, config.fee_receiver, amt, "".into());
+            Tokens::call().fromSub(sys, user.to_string(), amt);
+            Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
         }
     }
 
@@ -398,7 +397,7 @@ mod service {
         let config = BillingConfig::get_assert();
 
         Tokens::call()
-            .getSubBal(config.res, user.to_string())
+            .getSubBal(config.sys, user.to_string())
             .unwrap_or(0.into())
     }
 

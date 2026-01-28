@@ -36,9 +36,6 @@ pub mod tables {
         /// ID of the system token used for resource billing
         pub sys: TID,
 
-        /// ID of the resource token
-        pub res: TID,
-
         /// Account number that receives all resource billing fees
         pub fee_receiver: AccountNumber,
 

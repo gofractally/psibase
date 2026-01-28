@@ -26,6 +26,48 @@ pub struct NetworkVariables {
     pub obj_storage_bytes: u64,
 }
 
+/// Virtual Server Service
+///
+/// This service defines a "virtual server" that represents the "server" with which
+/// a user interacts when they connect to any full node on the network.
+///
+/// This service distinguishes between the specs of the network itself, and
+/// the specs of an individual node that runs the virtual server. The actual node
+/// specs must meet or exceed the specs defined for the virtual server. And the
+/// derived network specs will always be less than the virtual server specs to account
+/// for various overheads (e.g. from running a distributed network, desired replay
+/// speed, etc).
+///
+/// This service also defines a billing system that allows for the network to meter
+/// the consumption of resources by users. A user must send system tokens to this service,
+/// which are then held in reserve for the user.
+///
+/// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
+/// real-time price of the resource is billed to the user's reserved balance. Reserved system
+/// tokens do not equate to any specific resource amounts, since it's dependent upon the spot
+/// price of the consumed resource at the time of consumption.
+///
+/// Note that this service is unopinionated about how the user gets the system tokens with
+/// which to pay for the resources. This allows for networks wherein users' system token
+/// balances are distributed manually by a custodian, as well as networks wherein the system
+/// token is distributed by other means (e.g. proof of work, proof of stake, etc.).
+///
+/// To use:
+/// 1 - Call `init`: Initialize the service. This will derive the network specs using the
+///     default server specs.
+/// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
+///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
+///     receive all of the system token fees paid for resources by users.
+/// 3 - Call `enable_billing`: When ready (when existing users have accumulated system tokens),
+///     calling this action will enable the billing system. To call this, the caller must have
+///     already filled their resource buffer because the action to enable billing is itself billed.
+///
+/// > Note: typically, step 1 should be called at system boot, and therefore the network should
+/// >       always at least have some server specs and derived network specs.
+///
+/// After each of the above steps, the billing service will be enabled, and users will be
+/// required to buy resources to transact with the network. Use the other actions in this
+/// service to manage server specs, network variables, and billing parameters, as needed.
 #[crate::service(name = "virtual-server", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
@@ -93,46 +135,45 @@ mod service {
         unimplemented!()
     }
 
-    /// Used to acquire resource tokens for a user.
+    /// Reserves system tokens for future resource consumption by the specified user.
     ///
-    /// The resource tokens are consumed when interacting with metered network functionality.
+    /// The reserve is consumed when interacting with metered network functionality.
     ///
-    /// The sender must have already credited the system token to this service to pay
-    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    /// The sender must have already credited the system tokens to this service.
     ///
     /// # Arguments
-    /// * `amount`   - The amount of resource tokens to buy
-    /// * `for_user` - The user to buy the resource tokens for
-    /// * `memo`     - A memo for the purchase, only used if the sender is not the resource recipient
+    /// * `amount`   - The amount of systems tokens to reserve
+    /// * `for_user` - The user to reserve the system tokens for
+    /// * `memo`     - An optional memo to attach to the reservation, only used if the sender is not
+    ///                the resource recipient
     #[action]
     fn buy_res_for(amount: Quantity, for_user: AccountNumber, memo: Option<crate::Memo>) {
         unimplemented!()
     }
 
-    /// Used to acquire resource tokens for the sender
+    /// Reserves system tokens for future resource consumption by the sender
     ///
-    /// The resource tokens are consumed when interacting with metered network functionality.
+    /// The reserve is consumed when interacting with metered network functionality.
     ///
-    /// The sender must have already credited the system token to this service to pay
-    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    /// The sender must have already credited the system tokens to this service.
     #[action]
     fn buy_res(amount: Quantity) {
         unimplemented!()
     }
 
     /// Allows the sender to request client-side tooling to automatically attempt to
-    /// refill their resource buffer when it is at or below the threshold (specified
-    /// in integer percentage values).
+    /// reserve additional resources when the user is at or below the specified threshold
+    /// (specified in integer percentage values).
     ///
-    /// A threshold of 0 means that the client should not attempt to refill the
-    /// resource buffer.
+    /// A threshold of 0 means that the client should not attempt to automatically manage
+    /// the user's reserved tokens.
     #[action]
     fn conf_auto_fill(threshold_percent: u8) {
         unimplemented!()
     }
 
-    /// Allows the sender to specify the capacity of their resource buffer. The larger the
-    /// resource buffer, the less often the sender will need to refill it.
+    /// Allows the sender to specify the capacity of their buffer of reserved system tokens.
+    /// The larger the buffer, the less often the sender will need to refill it.
     #[action]
     fn conf_buffer(capacity: u64) {
         unimplemented!()

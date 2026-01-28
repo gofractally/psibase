@@ -131,12 +131,10 @@ pub struct ServerSpecs {
 
 #[derive(SimpleObject)]
 pub struct UserResources {
-    /// Balance of resources owned by the user formatted as a decimal string using
-    /// resource token precision
+    /// Balance of the user's resource buffer
     balance: Decimal,
 
-    /// The capacity of the user's resource buffer formatted as a decimal string using
-    /// resource token precision
+    /// The capacity of the user's resource buffer
     buffer_capacity: Decimal,
 
     /// The percentage at which client-side tooling should attempt to refill the user's
@@ -250,13 +248,13 @@ impl Query {
         CpuPricing::get()
     }
 
-    /// Returns the current amount of resources for the specified user.
+    /// Returns information related to the user's resource buffer.
     /// The specified user must have authorized the query.
     async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
         self.check_user_auth(user)?;
 
         let config = BillingConfig::get_assert();
-        let p = Tokens::call().getToken(config.res).precision;
+        let p = Tokens::call().getToken(config.sys).precision;
 
         let balance = crate::Wrapper::call().get_resources(user);
         let settings = UserSettings::get(user);
@@ -293,8 +291,7 @@ impl Query {
             .query()
     }
 
-    /// Returns the history of events related to the subsidized purchase of resource tokens.
-    ///   where the purchaser is different from the recipient.
+    /// Returns the history of events related to subsidized resource buffering.
     ///
     /// Either 'purchaser' or 'recipient' (or both) must be specified.
     /// If one of 'purchaser' or 'recipient' is set, that account must have authorized the query.
@@ -345,7 +342,7 @@ impl Query {
 
     /// Returns the history of block usage events
     ///
-    /// One block usage event is emitted every 10 blocks. It contains a summary of the
+    /// This event is emitted at some interval (e.g. every 10 blocks). It contains a summary of the
     /// average resource consumption of the network in the latest block.
     async fn block_usage_history(
         &self,
