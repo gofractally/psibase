@@ -8,7 +8,7 @@
   "prettier.prettierPath": "packages/.yarn/sdks/prettier/index.cjs",
   "typescript.tsdk": "packages/.yarn/sdks/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  "rust-analyzer.linkedProjects": ["rust/Cargo.toml"],
+  "rust-analyzer.linkedProjects": ["rust/Cargo.toml", "packages/user/Cargo.toml", "packages/system/Cargo.toml"],
   "[markdown]": {
     "files.trimTrailingWhitespace": false
   },

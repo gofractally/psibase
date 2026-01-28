@@ -187,7 +187,10 @@ impl TokensPlugin {
 impl User for TokensPlugin {
     fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
-        assert_authorized_with_whitelist(FunctionName::credit, vec!["homepage".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::credit,
+            vec!["homepage".into(), "virtual-server".into()],
+        )?;
 
         let packed_args = Actions::credit {
             amount,

@@ -90,7 +90,10 @@ impl Sites for SitesPlugin {
     }
 
     fn upload_encoded(file: File, content_encoding: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::upload_encoded, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::upload_encoded,
+            vec!["workshop".into(), "packages".into()],
+        )?;
 
         let packed = Actions::storeSys {
             path: file.path.clone(),

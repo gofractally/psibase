@@ -1,0 +1,9 @@
+package virtual-server:plugin;
+
+interface transact {
+    use host:types/types.{error};
+
+    /// Fills the user's gas tank, if the user is configured for auto-filling, and if 
+    /// it is low enough to need it.
+    auto-fill-gas-tank: func() -> result<_, error>;
+}

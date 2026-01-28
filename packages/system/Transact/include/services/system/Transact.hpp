@@ -198,6 +198,14 @@ namespace SystemService
    using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(TransactStatusTable)
 
+   struct ResMonitoringConfig
+   {
+      bool enabled = false;
+   };
+   PSIO_REFLECT(ResMonitoringConfig, enabled)
+   using ResMonitoringConfigTable = psibase::Table<ResMonitoringConfig, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(ResMonitoringConfigTable)
+
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
    {
@@ -263,6 +271,7 @@ namespace SystemService
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isPrivileged;
 
       using Tables = psibase::ServiceTables<TransactStatusTable,
+                                            ResMonitoringConfigTable,
                                             BlockSummaryTable,
                                             IncludedTrxTable,
                                             CallbacksTable,
@@ -346,6 +355,9 @@ namespace SystemService
       bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
 
+      /// Enable/disable resource monitoring
+      void resMonitoring(bool enable);
+
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
 
@@ -377,11 +389,14 @@ namespace SystemService
                 method(removeCallback, type, objective, action),
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
+                method(resMonitoring, enable),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
-                method(headBlockTime))
+                method(headBlockTime),
+                //
+   )
 
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
 

@@ -111,7 +111,8 @@ namespace psibase
              psibase::check(psio::fracpack_validate<param_tuple>(param_data),
                             "invalid argument encoding for " + act->method().unpack().str());
 
-             psio::view<const param_tuple> param_view(psio::prevalidated{param_data});
+             psio::view<const param_tuple> param_view(
+                 psio::prevalidated<std::span<const char>>{param_data});
 
              tuple_call(
                  [&](auto... args)

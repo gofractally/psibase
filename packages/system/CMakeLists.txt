@@ -58,6 +58,7 @@ function(add suffix)
         StagedTx/service/cpp/include
         Transact/include
         VerifySig/include
+        VirtualServer/service/cpp/include
     )
 endfunction(add)
 
@@ -79,4 +80,5 @@ if(DEFINED IS_WASM)
 
     add_subdirectory(Credentials/service/cpp/test)
     add_subdirectory(StagedTx/service/cpp/test)
+    add_subdirectory(VirtualServer/service/cpp/test)
 endif()

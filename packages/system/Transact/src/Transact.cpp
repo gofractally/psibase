@@ -1,9 +1,11 @@
+#include <optional>
 #include <psibase/dispatch.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/CpuLimit.hpp>
 #include <services/system/RTransact.hpp>
 #include <services/system/Transact.hpp>
+#include <services/system/VirtualServer.hpp>
 
 #include <boost/container/flat_map.hpp>
 #include <psibase/crypto.hpp>
@@ -20,6 +22,17 @@ static constexpr auto maxTrxLifetime = psibase::Seconds{60 * 60};  // 1 hour
 
 namespace SystemService
 {
+
+   namespace
+   {
+      bool isResMonitoring()
+      {
+         auto table  = Transact::Tables(Transact::service).open<ResMonitoringConfigTable>();
+         auto config = table.get({});
+         return config && config->enabled;
+      }
+   }  // namespace
+
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
       auto statusTable = open<TransactStatusTable>();
@@ -110,6 +123,12 @@ namespace SystemService
       else
       {
          snap.put({stat.head->header.time, psibase::Seconds{0}});
+      }
+
+      if (isResMonitoring())
+      {
+         auto _ = recurse();
+         to<VirtualServer>().notifyBlock(stat.current.blockNum);
       }
    }
 
@@ -475,8 +494,12 @@ namespace SystemService
          if (first && !readOnly)
          {
             flags |= AuthInterface::firstAuthFlag;
-            Actor<CpuLimit> cpuLimit(Transact::service, CpuLimit::service, CallFlags::runModeRpc);
-            cpuLimit.setCpuLimit(act.sender());
+
+            if (isResMonitoring())
+            {
+               // If resMonitoring is disabled, no CPU limit is set for the transaction
+               to<VirtualServer>().setCpuLimit(act.sender());
+            }
          }
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
@@ -495,6 +518,15 @@ namespace SystemService
       return enforceAuth;
    }
 
+   void Transact::resMonitoring(bool enable)
+   {
+      check(getSender() == VirtualServer::service, "Wrong sender");
+
+      Transact::Tables(Transact::service)
+          .open<ResMonitoringConfigTable>()  //
+          .put({.enabled = enable});
+   }
+
    static void processTransactionImpl(
        psio::view<const psio::shared_view_ptr<psibase::Transaction>> arg,
        bool                                                          speculative)
@@ -504,11 +536,19 @@ namespace SystemService
       trxData  = t;
       auto trx = psio::view<const Transaction>(psio::prevalidated{t});
       auto id  = sha256(t.data(), t.size());
+
+      check(trx.actions().size() > 0, "transaction has no actions");
+
+      if (isResMonitoring())
+      {
+         uint64_t      netUsage = t.size();
+         AccountNumber sender   = trx.actions()[0].sender();
+         to<VirtualServer>().useNetSys(sender, netUsage);
+      }
+
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
-
-      check(trx.actions().size() > 0, "transaction has no actions");
 
       auto tables        = Transact::Tables(Transact::service, KvMode::readWrite);
       auto includedTable = tables.open<IncludedTrxTable>();
@@ -554,8 +594,11 @@ namespace SystemService
       check(!trx.actions().empty(), "transaction must have at least one action");
       if (enforceAuth)
       {
-         std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
-         accounts.billCpu(trx.actions()[0].sender(), cpuUsage);
+         if (isResMonitoring())
+         {
+            std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
+            to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
+         }
       }
 
       trxData = std::span<const char>{};

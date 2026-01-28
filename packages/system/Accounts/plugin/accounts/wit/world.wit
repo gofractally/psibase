@@ -6,7 +6,6 @@ interface types {
     record account {
         account-num: string,
         auth-service: string,
-        resource-balance: option<u64>,
     }
 }
 

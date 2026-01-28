@@ -517,6 +517,18 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/FaucetTok.psi
+    PATH packages/user/FaucetTok
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/VirtualServer.psi
+    PATH packages/system/VirtualServer
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Registry.psi
     PATH packages/user/Registry
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -923,8 +935,8 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Initial token users"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
+    DESCRIPTION "Creates accounts alice & bob, and gives each some system tokens. Not for production use."
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" 
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
@@ -1051,9 +1063,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact Homepage WebCrypto Workshop Config
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1061,9 +1073,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
 
@@ -1073,7 +1085,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Minimum packages for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Db Packages Producers HttpServer
-                    SetCode Transact
+                    SetCode Transact VirtualServer
 )
 
 psibase_package(
@@ -1107,8 +1119,8 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XRun XSites XTimer XTransact)
 
 install(
@@ -1135,6 +1147,7 @@ install(
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
+          ${SERVICE_DIR}/FaucetTok.psi
           ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/FractalCore.psi
           ${SERVICE_DIR}/Host.psi
@@ -1163,6 +1176,7 @@ install(
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
