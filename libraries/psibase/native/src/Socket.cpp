@@ -495,7 +495,10 @@ CloseLock::operator bool() const
    return self != nullptr;
 }
 
-CloseLock::CloseLock(Sockets* self, AutoCloseSocket* socket) : self(self), socket(socket->id) {}
+CloseLock::CloseLock(Sockets* self, AutoCloseSocket* socket)
+    : self(self), socket(socket ? socket->id : -1)
+{
+}
 
 void Sockets::setOwner(CloseLock&&                             rl,
                        const std::shared_ptr<AutoCloseSocket>& socket,
