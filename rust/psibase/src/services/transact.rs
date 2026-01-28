@@ -294,6 +294,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Registers an event index service
+    #[action]
+    fn regEvIdx(service: crate::AccountNumber) {
+        unimplemented!()
+    }
+
     /// Run `action` using `action.sender's` authority
     ///
     /// Also adds `allowedActions` to the list of actions that `action.service`
