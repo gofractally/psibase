@@ -82,8 +82,7 @@ interface liquidity {
     /// Adds liquidity to an existing pool by depositing both reserve tokens.
     ///
     /// The deposits must represent equal economic value based on the current pool reserves
-    /// and price ratio. Token order does not matter — the function
-    /// automatically matches `a-deposit` and `b-deposit` to the pool's `token-a-id` and `token-b-id`.
+    /// and price ratio. Token deposit order does not matter.
     ///
     /// Parameters:
     /// * `pool-id`     - The ID of the target pool (also the ID of the liquidity token)
