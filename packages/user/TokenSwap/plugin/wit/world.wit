@@ -139,8 +139,8 @@ interface liquidity {
     /// * `b-deposit` - Initial deposit amount of the second reserve token
     new-pool: func(a-deposit: token-amount, b-deposit: token-amount) -> result<_, error>;
 
-    /// Calculates the required deposit amounts of both reserve tokens needed to mint
-    /// a specific amount of LP tokens at the current pool ratio.
+    /// Calculates the expected returns of pool reserves based on
+    /// a specific amount of LP tokens.
     ///
     /// Parameters:
     /// * `pool`   - The current state of the pool
