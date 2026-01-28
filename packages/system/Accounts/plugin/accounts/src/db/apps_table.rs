@@ -77,8 +77,10 @@ impl AppsTable {
             .unwrap_or_default();
         connected_accounts.remove(user);
 
-        let logged_in_user = self.get_logged_in_user();
-        if logged_in_user.is_some() && logged_in_user.unwrap() == user {
+        if self
+            .get_logged_in_user()
+            .is_some_and(|logged_in_user| logged_in_user == user)
+        {
             self.logout();
         }
 
