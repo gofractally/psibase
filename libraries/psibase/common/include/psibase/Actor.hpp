@@ -70,8 +70,9 @@ namespace psibase
             raw::getResult(result.data(), result_size, 0);
             if (!result.validate())
             {
-               auto action      = psio::from_frac<Action>(psio::prevalidated{packed_action});
-               auto method_name = action.method.str();
+               psio::view<const Action> action(
+                   psio::prevalidated<std::span<const char>>{packed_action});
+               auto method_name = action.method().unpack().str();
                check(false, std::string("value returned from ") + method_name +
                                 " was not serialized as expected");
             }
@@ -86,8 +87,9 @@ namespace psibase
             raw::getResult(result.data(), result_size, 0);
             if (!result.validate())
             {
-               auto action      = psio::from_frac<Action>(psio::prevalidated{packed_action});
-               auto method_name = action.method.str();
+               psio::view<const Action> action(
+                   psio::prevalidated<std::span<const char>>{packed_action});
+               auto method_name = action.method().unpack().str();
                check(false, std::string("value returned from ") + method_name +
                                 " was not serialized as expected");
             }
