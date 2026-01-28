@@ -215,7 +215,7 @@ extern "C" [[clang::export_name("recv")]] void recv()
          act->method()  = row->method;
          psibase::call(act.data(), act.size());
 
-         // FIXME: this doesn't handle close correctly
+         // It's safe to access this, because we still hold a closeLock
          check(socketSetFlags(socket, SocketFlags::recv, SocketFlags::recv) == 0,
                "Next recv failed");
       }
