@@ -1458,6 +1458,15 @@ struct callbacks
       state.result_value = std::move(state.sockets[fd]->response);
       state.result_key.clear();
       *nbytes = state.result_value.size();
+
+      psibase::check(state.sockets[fd]->closed, "Socket is not ready to close");
+      psibase::check(!state.sockets[fd]->notifyClose,
+                     "Not implemented: socket close notifications");
+      if (auto parent = state.sockets[fd]->weak_sockets.lock())
+      {
+         state.sockets[fd]->remove(*parent->sharedDb.createWriter());
+      }
+
       state.sockets[fd].reset();
       return 0;
    }
