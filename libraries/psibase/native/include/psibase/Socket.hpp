@@ -132,9 +132,7 @@ namespace psibase
       /// called as soon as the lock can be acquired. If the socket is
       /// closed, onLock might never be called.
       CloseLock lockRecv(const std::shared_ptr<AutoCloseSocket>& socket);
-      void      setOwner(CloseLock&&                             l,
-                         const std::shared_ptr<AutoCloseSocket>& socket,
-                         SocketAutoCloseSet*                     owner);
+      void      setOwner(CloseLock&& l, SocketAutoCloseSet* owner);
       bool      applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet* owner);
    };
 

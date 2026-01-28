@@ -26,9 +26,10 @@ namespace psibase::http
 
    struct WebSocketImplBase
    {
-      virtual ~WebSocketImplBase()                          = default;
-      virtual void startWrite(std::shared_ptr<WebSocket>&&) = 0;
-      virtual void close(std::shared_ptr<WebSocket>&& self) = 0;
+      virtual ~WebSocketImplBase()                                          = default;
+      virtual void startWrite(std::shared_ptr<WebSocket>&&)                 = 0;
+      virtual void close(std::shared_ptr<WebSocket>&& self)                 = 0;
+      virtual void onLock(CloseLock&& l, std::shared_ptr<WebSocket>&& self) = 0;
    };
 
    struct WebSocket : AutoCloseSocket, std::enable_shared_from_this<WebSocket>
@@ -56,6 +57,7 @@ namespace psibase::http
       {
          impl->close(shared_from_this());
       }
+      void onLock(CloseLock&& l) override { impl->onLock(std::move(l), shared_from_this()); }
       void send(Writer&, std::span<const char> data) override
       {
          std::vector<char> copy(data.begin(), data.end());
@@ -73,36 +75,7 @@ namespace psibase::http
             impl->startWrite(shared_from_this());
          }
       }
-      void handleMessage(std::span<const char> data)
-      {
-         auto system = server.sharedState->getSystemContext();
-
-         psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
-         BlockContext  bc{*system, system->sharedDatabase.getHead(),
-                         system->sharedDatabase.createWriter(), true};
-         bc.start();
-
-         SignedTransaction trx;
-         TransactionTrace  trace;
-
-         Action action{
-             .sender  = AccountNumber(),
-             .service = proxyServiceNum,
-             .rawData = psio::convert_to_frac(std::tuple(this->id, data)),
-         };
-
-         try
-         {
-            auto& atrace = bc.execAsyncExport("recv", std::move(action), trace);
-            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, debug) << proxyServiceNum.str() << "::recv succeeded";
-         }
-         catch (std::exception& e)
-         {
-            BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
-            PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::recv failed: " << e.what();
-         }
-      }
+      void handleMessage(CloseLock&& l);
       void error(const std::error_code& ec)
       {
          StateType oldState;
@@ -240,13 +213,22 @@ namespace psibase::http
                 }
                 else
                 {
-                   auto inbuffer = self->input.cdata();
-                   self->handleMessage(
-                       std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()});
-                   self->input.consume(self->input.size());
-
-                   static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self));
+                   if (auto l = self->server.sharedState->sockets()->lockRecv(self))
+                   {
+                      self->handleMessage(std::move(l));
+                      static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self));
+                   }
                 }
+             });
+      }
+      void onLock(CloseLock&& l, std::shared_ptr<WebSocket>&& self) override
+      {
+         boost::asio::dispatch(
+             stream.get_executor(),
+             [l = std::move(l), self = std::move(self)]() mutable
+             {
+                self->handleMessage(std::move(l));
+                static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self));
              });
       }
       Stream stream;

@@ -214,6 +214,10 @@ extern "C" [[clang::export_name("recv")]] void recv()
          act->service() = row->service;
          act->method()  = row->method;
          psibase::call(act.data(), act.size());
+
+         // FIXME: this doesn't handle close correctly
+         check(socketSetFlags(socket, SocketFlags::recv, SocketFlags::recv) == 0,
+               "Next recv failed");
       }
       return;
    }
@@ -435,7 +439,12 @@ void XHttp::setCallback(std::int32_t          socket,
    PSIBASE_SUBJECTIVE_TX
    {
       auto row = requests.get(socket);
-      if (!row)
+      if (row)
+      {
+         check(socketSetFlags(socket, SocketFlags::recv, SocketFlags::recv) == 0,
+               "Failed to start recv");
+      }
+      else
       {
          auto temp = Temporary{}.open<TempResponseHandlerTable>();
          if (auto tempRow = temp.get(socket))

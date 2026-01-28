@@ -155,7 +155,7 @@ namespace
 
          TransactionContext tc{bc, trx, trace, DbMode::rpc()};
 
-         system->sockets->setOwner(std::move(l), self, &tc.ownedSockets);
+         system->sockets->setOwner(std::move(l), &tc.ownedSockets);
 
          auto breply = self->parser.get();
 

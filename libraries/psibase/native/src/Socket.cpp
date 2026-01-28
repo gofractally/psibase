@@ -500,13 +500,11 @@ CloseLock::CloseLock(Sockets* self, AutoCloseSocket* socket)
 {
 }
 
-void Sockets::setOwner(CloseLock&&                             rl,
-                       const std::shared_ptr<AutoCloseSocket>& socket,
-                       SocketAutoCloseSet*                     owner)
+void Sockets::setOwner(CloseLock&& rl, SocketAutoCloseSet* owner)
 {
    assert(rl.self);
-   assert(rl.socket == socket->id);
-   owner->sockets.insert(socket->id);
+   auto [_, inserted] = owner->sockets.insert(rl.socket);
+   assert(inserted);
    rl.self   = nullptr;
    rl.socket = -1;
 }
