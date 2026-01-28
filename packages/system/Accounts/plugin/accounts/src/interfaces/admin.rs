@@ -9,9 +9,9 @@ use crate::bindings::exports::accounts::plugin::api::*;
 use crate::bindings::host::common::client as Client;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
+use crate::helpers::assert_valid_account;
 use crate::trust::*;
 use std::collections::HashSet;
-use crate::helpers::assert_valid_account;
 
 fn prune_invalid_accounts(accounts: Vec<String>) {
     let app = AppsTable::new(&Client::get_receiver());
@@ -32,6 +32,18 @@ impl Admin for AccountsPlugin {
             .unwrap();
         assert_valid_account(&account);
         AppsTable::new(&Client::get_receiver()).connect(&account);
+    }
+
+    fn remove_account(account: String) {
+        assert_authorized(FunctionName::remove_account).unwrap();
+
+        let connected_apps = UserTable::new(&account).get_connected_apps();
+        for app in connected_apps {
+            let apps_table = AppsTable::new(&app);
+            apps_table.disconnect(&account);
+        }
+
+        AppsTable::new(&Client::get_receiver()).disconnect(&account);
     }
 
     fn get_all_accounts() -> Vec<String> {

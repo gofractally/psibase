@@ -61,7 +61,6 @@ export function NavUser() {
     });
 
     const onSwitchAccounts = async () => {
-        await logout();
         await login();
     };
 

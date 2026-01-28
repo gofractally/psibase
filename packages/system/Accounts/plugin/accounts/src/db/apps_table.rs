@@ -1,4 +1,5 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::host::auth::api as HostAuth;
 use psibase::fracpack::{Pack, Unpack};
 
 use crate::db::keys::DbKeys;
@@ -76,6 +77,13 @@ impl AppsTable {
             .unwrap_or_default();
         connected_accounts.remove(user);
 
+        if self
+            .get_logged_in_user()
+            .is_some_and(|logged_in_user| logged_in_user == user)
+        {
+            self.logout();
+        }
+
         Keyvalue::set(
             &self.prefixed_key(DbKeys::CONNECTED_ACCOUNTS),
             &connected_accounts.packed(),
@@ -83,6 +91,9 @@ impl AppsTable {
     }
 
     pub fn logout(&self) {
+        if let Some(user) = self.get_logged_in_user() {
+            HostAuth::log_out_user(&user, &self.app);
+        }
         Keyvalue::delete(&self.prefixed_key(DbKeys::LOGGED_IN));
     }
 
