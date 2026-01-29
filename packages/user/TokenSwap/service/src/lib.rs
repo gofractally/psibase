@@ -224,23 +224,37 @@ pub mod tables {
             }
         }
 
-        pub fn get_reserves(&self, reserve_token: Option<TID>) -> (Reserve, Reserve) {
+        pub fn reserves(&self) -> (Reserve, Reserve) {
             let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
 
-            if let Some(reserve_token) = reserve_token {
-                if first.token_id == reserve_token {
-                    (first, second)
-                } else if second.token_id == reserve_token {
-                    (second, first)
-                } else {
-                    abort_message("Token does not exist in pool reserve");
-                }
+            if first.token_id < second.token_id {
+                (first, second)
             } else {
-                if first.token_id < second.token_id {
-                    (first, second)
-                } else {
-                    (second, first)
-                }
+                (second, first)
+            }
+        }
+
+        pub fn reserves_in_order(&self, a_token: TID, b_token: TID) -> (Reserve, Reserve) {
+            let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
+
+            if first.token_id == a_token && second.token_id == b_token {
+                (first, second)
+            } else if first.token_id == b_token && second.token_id == a_token {
+                (second, first)
+            } else {
+                abort_message("One or both tokens do not exist in pool reserve");
+            }
+        }
+
+        pub fn reserves_with_first(&self, first_token: TID) -> (Reserve, Reserve) {
+            let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
+
+            if first.token_id == first_token {
+                (first, second)
+            } else if second.token_id == first_token {
+                (second, first)
+            } else {
+                abort_message("Token does not exist in pool reserve");
             }
         }
 
@@ -285,8 +299,7 @@ pub mod tables {
             check(amount_a_deposit.value > 0, "amount a must be non-zero");
             check(amount_b_deposit.value > 0, "amount b must be non-zero");
 
-            let (reserve_a, reserve_b) = self.get_reserves(Some(token_a_id));
-            check(reserve_b.token_id == token_b_id, "invalid token b id");
+            let (reserve_a, reserve_b) = self.reserves_in_order(token_a_id, token_b_id);
 
             let reserve_a_balance = reserve_a.balance();
             let reserve_b_balance = reserve_b.balance();
@@ -330,7 +343,7 @@ pub mod tables {
             self.debit_lp_tokens_from_sender(liquidity_amount);
 
             let pool_token_supply = self.pool_token_supply();
-            let (a_reserve, b_reserve) = self.get_reserves(None);
+            let (a_reserve, b_reserve) = self.reserves();
 
             let a_amount = a_reserve.pool_token_entitlement(liquidity_amount, pool_token_supply);
             let b_amount = b_reserve.pool_token_entitlement(liquidity_amount, pool_token_supply);
@@ -372,7 +385,7 @@ pub mod tables {
         pub fn add(a_token: TID, b_token: TID, a_amount: Quantity, b_amount: Quantity) -> Self {
             let pool = Self::new(a_token, b_token);
 
-            let (reserve_a, reserve_b) = pool.get_reserves(Some(a_token));
+            let (reserve_a, reserve_b) = pool.reserves_in_order(a_token, b_token);
             reserve_a.debit_from_sender(a_amount);
             reserve_a.deposit_into_reserve(a_amount);
 
@@ -409,7 +422,7 @@ pub mod tables {
         }
 
         pub fn swap(&mut self, incoming_token: TID, incoming_amount: Quantity) -> (TID, Quantity) {
-            let (incoming_reserve, outgoing_reserve) = self.get_reserves(Some(incoming_token));
+            let (incoming_reserve, outgoing_reserve) = self.reserves_with_first(incoming_token);
 
             let outgoing_amount = swap(
                 incoming_amount,
@@ -434,12 +447,12 @@ pub mod tables {
         }
 
         pub async fn reserve_a(&self) -> Reserve {
-            let (a, _) = self.get_reserves(None);
+            let (a, _) = self.reserves();
             a
         }
 
         pub async fn reserve_b(&self) -> Reserve {
-            let (_, b) = self.get_reserves(None);
+            let (_, b) = self.reserves();
             b
         }
     }
