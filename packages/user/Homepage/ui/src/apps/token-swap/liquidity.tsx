@@ -34,7 +34,7 @@ export const Liquidity = () => {
 
 
     const [focusedPoolId, setFocusedPoolId] = useState<number | undefined>(undefined);
-    const { value: isAddingLiquidity, toggle } = useBoolean(true);
+    const { value: isAddingLiquidity, toggle, setTrue: setIsAddingLiquidity } = useBoolean(true);
 
 
     const {
@@ -329,21 +329,22 @@ export const Liquidity = () => {
                     resetFieldValues();
                     toggle();
                 }}
-                triggerLabel={isAddingLiquidity ? "Add liquidity" : "Remove liquidity"}
+                triggerLabel={userIsCreatingPool ? "Create Pool" : isAddingLiquidity ? "Add liquidity" : "Remove liquidity"}
                 onTrigger={trigger}
                 center={isAddingLiquidity ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
                 footer={
                     <div className="text-muted-foreground space-y-1 text-sm">
-                        {isAddingLiquidity && (
-                            <PoolPicker
-                                setFocusedPoolId={(focusedId) => {
-                                    setUserIsCreatingPool(focusedId === undefined)
-                                    setFocusedPoolId(focusedId)
-                                }}
-                                focusedPoolId={focusedPoolId}
-                                pools={poolsOfLiquidityPair || []}
-                            />
-                        )}
+                        <PoolPicker
+                            setFocusedPoolId={(focusedId) => {
+                                setUserIsCreatingPool(focusedId === undefined)
+                                if (focusedId == undefined) {
+                                    setIsAddingLiquidity()
+                                }
+                                setFocusedPoolId(focusedId)
+                            }}
+                            focusedPoolId={focusedPoolId}
+                            pools={poolsOfLiquidityPair || []}
+                        />
 
                         {poolsOfLiquidityPair.length == 0 && isAddingLiquidity && (
                             <>

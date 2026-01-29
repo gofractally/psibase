@@ -43,7 +43,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
 
     const [slippage] = useSlippageTolerance();
 
-    const { data: pools, refetch: refetchPools } = usePools();
+    const { data: pools, refetch: refetchPools, isLoading: isLoadingPools } = usePools();
 
     const { value: fromIsBeingSelected, setTrue: onFromSelect, setFalse: onToSelect } = useBoolean(true)
 
@@ -98,7 +98,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
         [pools],
     );
 
-    const isNoTradingNetwork = uniqueTradeableTokens.length < 2;
+    const isNoTradingNetwork = uniqueTradeableTokens.length < 2 && !isLoadingPools;
 
 
     const swapQuotePoolIds =
