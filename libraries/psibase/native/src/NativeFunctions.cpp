@@ -983,15 +983,15 @@ namespace psibase
           *transactionContext.blockContext.writer, fd, msg);
    }
 
-   int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
+   int32_t NativeFunctions::socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
-      return database.socketAutoClose(fd, value,
-                                      *transactionContext.blockContext.systemContext.sockets,
-                                      transactionContext.ownedSockets);
+      return database.socketSetFlags(fd, mask, value,
+                                     *transactionContext.blockContext.systemContext.sockets,
+                                     transactionContext.ownedSockets);
    }
 
 }  // namespace psibase

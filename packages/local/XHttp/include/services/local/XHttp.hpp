@@ -87,11 +87,10 @@ namespace LocalService
       void sendReply(std::int32_t socket, const psibase::HttpReply& response);
 
       /// Accepts a websocket connection. The response must be a
-      /// valid websocket handshake for the request.
-      void accept(std::int32_t              socket,
-                  const psibase::HttpReply& reply,
-                  psibase::MethodNumber     callback,
-                  psibase::MethodNumber     err);
+      /// valid websocket handshake for the request. Must be
+      /// followed by `setCallback(socket, callback, err)`, or the
+      /// socket will be closed when the current context exits.
+      void accept(std::int32_t socket, const psibase::HttpReply& reply);
 
       /// Changes the callbacks for a socket. The sender must be the owner
       /// of the socket.

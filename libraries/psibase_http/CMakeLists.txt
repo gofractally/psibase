@@ -7,6 +7,7 @@ endif()
 
 add_library(psibase_http
     http.cpp
+    close.cpp
     handle_request.cpp
     http_session_base.cpp
     tcp_http_session.cpp

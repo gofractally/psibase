@@ -419,21 +419,16 @@ pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
     }
 }
 
-/// Tells the current transaction/query/callback context to take or release
-/// ownership of a socket.
-///
-/// Any sockets that are owned by a context will be closed when it finishes.
-/// - HTTP socket: send a 500 response with an error message in the body
-/// - Other sockets may not be set to auto-close
+/// Change flags on a socket. The mask determines which flags are set.
 ///
 /// If this function is called within a subjectiveCheckout, it will only take
-/// effect if the top-level commit succeeds. If another context takes ownership
-/// of the socket, subjectiveCommit may fail.
-pub fn socket_auto_close(fd: i32, value: bool) -> Result<(), anyhow::Error> {
-    let err = unsafe { native_raw::socketAutoClose(fd, value) };
+/// effect if the top-level commit succeeds. If another context changes the
+/// flags, subjectiveCommit may fail.
+pub fn socket_set_flags(fd: i32, mask: u32, value: u32) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSetFlags(fd, mask, value) };
     if err == 0 {
         Ok(())
     } else {
-        Err(anyhow!("socket_auto_close: {}", err))
+        Err(anyhow!("socket_set_flags: {}", err))
     }
 }

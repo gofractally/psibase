@@ -209,23 +209,18 @@ extern "C" {
     /// - `ENOTSOCK`: fd is not a socket
     pub fn socketSend(fd: i32, data: *const u8, len: usize) -> i32;
 
-    /// Tells the current transaction/query/callback context to take or release
-    /// ownership of a socket.
-    ///
-    /// Any sockets that are owned by a context will be closed when it finishes.
-    /// - HTTP socket: send a 500 response with an error message in the body
-    /// - Other sockets may not be set to auto-close
+    /// Change flags on a socket. The mask determines which flags are set.
     ///
     /// If this function is called within a subjectiveCheckout, it will only take
-    /// effect if the top-level commit succeeds. If another context takes ownership
-    /// of the socket, subjectiveCommit may fail.
+    /// effect if the top-level commit succeeds. If another context changes the
+    /// flags, subjectiveCommit may fail.
     ///
     /// Returns 0 on success or an error code on failure.
     ///
     /// Errors:
     /// - `EBADF`: fd is not a valid file descriptor
-    /// - `ENOTSUP`: The socket does not support auto-close
+    /// - `ENOTSUP`: The socket does not support the requested flags
     /// - `ENOTSOCK`: fd is not a socket
     /// - `EACCES`: The socket is owned by another context
-    pub fn socketAutoClose(fd: i32, value: bool) -> i32;
+    pub fn socketSetFlags(fd: i32, mask: u32, value: u32) -> i32;
 }

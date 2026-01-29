@@ -57,6 +57,28 @@ namespace psibase
       runModeCallback = 2,
    };
 
+   enum class SocketFlags : std::uint32_t
+   {
+      /// If this flag is set, x-http::close will be called when the
+      /// socket is closed.
+      notifyClose = 1,
+      /// If this flag is set, the socket will be closed as soon as
+      /// all closeLocks are released.
+      autoClose = 2,
+      /// If this flag is set, then a message can be received
+      /// through x-http::recv. This flag is automatically unset
+      /// before x-http::recv is called.
+      recv = 4,
+      /// This flag is context-local. The socket will not be closed
+      /// as long as any context holds a close lock.
+      lockClose = 8,
+   };
+   constexpr SocketFlags operator|(SocketFlags lhs, SocketFlags rhs)
+   {
+      return static_cast<SocketFlags>(static_cast<std::uint32_t>(lhs) |
+                                      static_cast<std::uint32_t>(rhs));
+   }
+
    // These use mangled names instead of extern "C" to prevent collisions
    // with other libraries.
    namespace raw
@@ -308,26 +330,21 @@ namespace psibase
       PSIBASE_NATIVE(socketSend)
       std::int32_t socketSend(std::int32_t fd, const void* data, std::size_t size);
 
-      /// Tells the current transaction/query/callback context to take or release
-      /// ownership of a socket.
-      ///
-      /// Any sockets that are owned by a context will be closed when it finishes.
-      /// - HTTP socket: send a 500 response with an error message in the body
-      /// - Other sockets may not be set to auto-close
+      /// Change flags on a socket. The mask determines which flags are set.
       ///
       /// If this function is called within a subjectiveCheckout, it will only take
-      /// effect if the top-level commit succeeds. If another context takes ownership
-      /// of the socket, subjectiveCommit may fail.
+      /// effect if the top-level commit succeeds. If another context changes the
+      /// flags, subjectiveCommit may fail.
       ///
       /// Returns 0 on success or an error code on failure.
       ///
       /// Errors:
       /// - `EBADF`: fd is not a valid file descriptor
-      /// - `ENOTSUP`: The socket does not support auto-close
+      /// - `ENOTSUP`: The socket does not support the requested flags
       /// - `ENOTSOCK`: fd is not a socket
       /// - `EACCES`: The socket is owned by another context
-      PSIBASE_NATIVE(socketAutoClose)
-      std::int32_t socketAutoClose(std::int32_t fd, bool value);
+      PSIBASE_NATIVE(socketSetFlags)
+      std::int32_t socketSetFlags(std::int32_t fd, SocketFlags mask, SocketFlags value);
    }  // namespace raw
 
    /// Get result
@@ -797,34 +814,28 @@ namespace psibase
    }
    static constexpr int producer_multicast = 0;
 
-   /// Tells the current transaction/query/callback context to take or release
-   /// ownership of a socket.
-   ///
-   /// Any sockets that are owned by a context will be closed when it finishes.
-   /// - HTTP socket: send a 500 response with an error message in the body
-   /// - Other sockets may not be set to auto-close
+   /// Change flags on a socket. The mask determines which flags are set.
    ///
    /// If this function is called within a subjectiveCheckout, it will only take
-   /// effect if the top-level commit succeeds. If another context takes ownership
-   /// of the socket, subjectiveCommit may fail.
+   /// effect if the top-level commit succeeds. If another context changes the
+   /// flags, subjectiveCommit may fail.
    ///
    /// Returns 0 on success. On failure returns -1 and sets errno.
    ///
    /// Errors:
    /// - `EBADF`: fd is not a valid file descriptor
-   /// - `ENOTSUP`: The socket does not support auto-close
+   /// - `ENOTSUP`: The socket does not support the requested flags
    /// - `ENOTSOCK`: fd is not a socket
    /// - `EACCES`: The socket is owned by another context
-   inline int socketAutoClose(std::int32_t fd, bool value)
+   inline std::int32_t socketSetFlags(std::int32_t fd, SocketFlags mask, SocketFlags value)
    {
-      if (auto err = raw::socketAutoClose(fd, value))
+      if (auto err = raw::socketSetFlags(fd, mask, value))
       {
          errno = err;
          return -1;
       }
       return 0;
    }
-
 }  // namespace psibase
 
 #undef PSIBASE_NATIVE

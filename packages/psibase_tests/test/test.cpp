@@ -1,5 +1,6 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <services/system/Transact.hpp>
 #include <services/test/TestExport.hpp>
 #include <services/test/TestImport.hpp>
 #include <services/test/TestKV.hpp>
@@ -7,6 +8,7 @@
 #include <services/test/TestTable.hpp>
 
 using namespace psibase;
+using namespace SystemService;
 using namespace TestService;
 
 TEST_CASE("called entry point")
@@ -77,4 +79,21 @@ TEST_CASE("import/export handles")
    CHECK(imp.testPlain().succeeded());
    CHECK(imp.testRpc().succeeded());
    CHECK(imp.testCallback().succeeded());
+}
+
+TEST_CASE("Tester socket cleanup")
+{
+   DefaultTestChain t;
+   auto             reply  = t.asyncGet(Transact::service, "/stats");
+   auto             len    = psio::convert_to_key(socketPrefix()).size();
+   auto             minKey = socketKey(1);
+   auto             row1   = t.kvGreaterEqual<SocketRow>(DbId::nativeSession, minKey, len);
+   REQUIRE(row1.has_value());
+   reply.get();
+   CHECK(!t.kvGreaterEqual<SocketRow>(DbId::nativeSession, minKey, len).has_value());
+
+   auto reply2 = t.asyncGet(Transact::service, "/stats");
+   auto row2   = t.kvGreaterEqual<SocketRow>(DbId::nativeSession, minKey, len);
+   REQUIRE(row2.has_value());
+   CHECK(row2->fd == row1->fd);
 }

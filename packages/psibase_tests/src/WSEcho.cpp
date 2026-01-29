@@ -27,7 +27,8 @@ std::optional<HttpReply> WSEcho::serveSys(HttpRequest request, std::optional<std
    {
       if (auto reply = webSocketHandshake(request))
       {
-         to<XHttp>().accept(*socket, *reply, MethodNumber{"recv"}, MethodNumber{"close"});
+         to<XHttp>().accept(*socket, *reply);
+         to<XHttp>().setCallback(*socket, MethodNumber{"recv"}, MethodNumber{"close"});
       }
       else
       {
