@@ -44,21 +44,53 @@ pub mod service {
     };
     use psibase::fracpack::Pack;
     use psibase::services::accounts as Accounts;
-    use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+    use psibase::services::auth_any::Wrapper as AuthAny;
+    use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::auth_sig as AuthSig;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
-    use psibase::services::tokens::Wrapper as Tokens;
+    use psibase::services::nft as Nfts;
+    use psibase::services::tokens::{self as Tokens, BalanceFlags};
     use psibase::services::tokens::{Quantity, TID};
     use psibase::services::transact::Wrapper as Transact;
     use psibase::*;
 
     const INIT_DIFFICULTY: u64 = 1000;
 
+    fn new_account(name: AccountNumber) {
+        Accounts::Wrapper::call().newAccount(name, AuthAny::SERVICE, true);
+        let set_owner = Action {
+            sender: name,
+            service: AuthDelegate::Wrapper::SERVICE,
+            method: AuthDelegate::action_structs::setOwner::ACTION_NAME.into(),
+            rawData: AuthDelegate::action_structs::setOwner {
+                owner: get_service(),
+            }
+            .packed()
+            .into(),
+        };
+
+        let set_auth = Action {
+            sender: get_service(),
+            service: Accounts::Wrapper::SERVICE,
+            method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+            rawData: Accounts::action_structs::setAuthServ {
+                authService: AuthDelegate::Wrapper::SERVICE,
+            }
+            .packed()
+            .into(),
+        };
+
+        Transact::call().runAs(set_owner, vec![]);
+        Transact::call().runAs(set_auth, vec![]);
+    }
+
     #[action]
     fn init() {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
+        Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+        Nfts::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
 
         // Create DiffAdjust records for account name lengths 1 through 9
         let auctions_table = AuctionsTable::new();
@@ -70,7 +102,8 @@ pub mod service {
                 1,               // target_min
                 10,              // target_max
                 100,             // floor_difficulty
-                50000,           // percent_change (5% = 50000 ppm)
+                50000,           // inc_ppm (5% = 50000 ppm)
+                50000,           // dec_ppm (5% = 50000 ppm)
             );
 
             auctions_table.put(&Auction { length, nft_id }).unwrap();
@@ -93,6 +126,7 @@ pub mod service {
     #[action]
     fn buy(account: String, max_cost: u64) {
         check_init();
+        println!("PreAccounts.buy().top");
 
         let acct_to_buy = AccountNumber::from_exact(&account).expect("invalid account name");
 
@@ -107,7 +141,10 @@ pub mod service {
             "account name must be 1-9 characters",
         );
 
-        let sys_token = check_some(Tokens::call().getSysToken(), "system token must be defined");
+        let sys_token = check_some(
+            Tokens::Wrapper::call().getSysToken(),
+            "system token must be defined",
+        );
         let sys_token_id: TID = sys_token.id;
 
         let sender = get_sender();
@@ -122,9 +159,18 @@ pub mod service {
 
         let current_price = DiffAdjust::call().get_diff(auction.nft_id);
 
-        let shared_bal = Tokens::call().getSharedBal(sys_token_id, sender, service_account);
+        println!(
+            "3: getting shared_bal from {} to {}",
+            sender, service_account
+        );
+        let shared_bal =
+            Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, service_account);
 
         // Check if user has sufficient balance and max_cost is acceptable
+        println!(
+            "current_price: {}, shared_bal: {}, max_cost: {}",
+            current_price, shared_bal.value, max_cost
+        );
         check(
             current_price <= shared_bal.value && current_price <= max_cost,
             "insufficient balance or max_cost too low",
@@ -134,14 +180,14 @@ pub mod service {
         DiffAdjust::call().increment(auction.nft_id, 1);
 
         let cost = Quantity::from(current_price);
-        Tokens::call().debit(
+        Tokens::Wrapper::call().debit(
             sys_token_id,
             sender,
             cost,
             "premium account purchase".to_string().try_into().unwrap(),
         );
 
-        AuthDelegate::call().newAccount(acct_to_buy, get_service());
+        new_account(acct_to_buy);
 
         PurchasedAccountsTable::new()
             .put(&PurchasedAccount {
@@ -149,6 +195,15 @@ pub mod service {
                 owner: sender,
             })
             .unwrap();
+
+        Tokens::Wrapper::call().reject(
+            sys_token_id,
+            sender,
+            "premium account purchase remainder refund"
+                .to_string()
+                .try_into()
+                .unwrap(),
+        );
     }
 
     #[action]

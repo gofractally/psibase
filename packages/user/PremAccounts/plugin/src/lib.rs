@@ -5,10 +5,13 @@ use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
+use bindings::tokens::plugin::helpers as TokensHelpers;
+use bindings::tokens::plugin::user as TokensUser;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::services::tokens::{Precision, Quantity};
 
 mod errors;
 use errors::ErrorType;
@@ -36,10 +39,34 @@ define_trust! {
 struct PremAccountsPlugin;
 
 impl Api for PremAccountsPlugin {
-    fn buy(account: String, max_cost: u64) -> Result<(), Error> {
+    fn buy(account: String, max_cost: String) -> Result<(), Error> {
+        println!("buy().top w account: {}, max_cost: {}", account, max_cost);
         trust::assert_authorized(trust::FunctionName::buy)?;
-        let packed_buy_args = prem_accounts::action_structs::buy { account, max_cost }.packed();
+
+        let service_account = "prem-accounts";
+
+        println!("1");
+        let sys_token_id = TokensHelpers::fetch_network_token()?.unwrap();
+
+        println!("2: crediting {} {} tokens", service_account, max_cost);
+        TokensUser::credit(
+            sys_token_id,
+            service_account,
+            &max_cost,
+            "premium account purchase",
+        )?;
+
+        println!("3");
+        let packed_buy_args = prem_accounts::action_structs::buy {
+            account,
+            max_cost: Quantity::from_str(&max_cost, Precision::new(4).unwrap())
+                .unwrap()
+                .value,
+        }
+        .packed();
+        println!("buy() packed_buy_args: {:?}", packed_buy_args);
         add_action_to_transaction("buy", &packed_buy_args).unwrap();
+        println!("buy() add_action_to_transaction returned");
         Ok(())
     }
 

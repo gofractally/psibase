@@ -25,13 +25,16 @@ const doesAccountExist = async (
     }
 };
 
-const formatPrice = (difficulty: number, precision?: number, symbol?: string): string => {
+const formatPrice = (difficulty: number | bigint, precision?: number, symbol?: string): string => {
+    // Convert BigInt to number if needed
+    const difficultyNum = typeof difficulty === 'bigint' ? Number(difficulty) : difficulty;
+    
     if (precision !== undefined) {
         const divisor = Math.pow(10, precision);
-        const price = (difficulty / divisor).toFixed(precision);
+        const price = (difficultyNum / divisor).toFixed(precision);
         return symbol ? `${price} ${symbol}` : price;
     }
-    return difficulty.toString();
+    return difficultyNum.toString();
 };
 
 export const App = () => {
@@ -56,35 +59,25 @@ export const App = () => {
 
     const loadSystemToken = async () => {
         try {
-            const tokensGraphqlUrl = siblingUrl(null, "tokens", "/graphql");
-            
-            // First, get the system token ID from config
-            const configResponse = await fetch(tokensGraphqlUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    query: `
-                        query {
-                            config {
-                                sysTid
-                            }
-                        }
-                    `,
-                }),
-            });
-            const configData = (await configResponse.json()) as {
-                data?: { config?: { sysTid?: number } };
-                errors?: Array<{ message: string }>;
-            };
-            if (configData.errors) {
-                throw new Error(configData.errors[0].message);
-            }
-            const sysTid = configData.data?.config?.sysTid;
-            if (!sysTid) {
+            // First, get the system token ID via the tokens plugin helper
+            const sysTidRaw = (await supervisor.functionCall({
+                service: "tokens",
+                plugin: "plugin",
+                intf: "helpers",
+                method: "fetchNetworkToken",
+                params: [],
+            })) as number | bigint | null;
+
+            if (!sysTidRaw) {
                 return;
             }
 
-            // Then, get the token details
+            const sysTid =
+                typeof sysTidRaw === "bigint" ? Number(sysTidRaw) : sysTidRaw;
+
+            const tokensGraphqlUrl = siblingUrl(null, "tokens", "/graphql");
+
+            // Then, get the token details from the tokens GraphQL query service
             const tokenResponse = await fetch(tokensGraphqlUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -126,8 +119,35 @@ export const App = () => {
                 intf: "queries",
                 method: "getPrices",
                 params: [],
-            })) as number[];
-            setPrices(pricesArray);
+            })) as unknown;
+            
+            // The result comes back as a BigUint64Array (typed array) from WASM
+            // Convert it to a regular array of numbers
+            let pricesAsNumbers: number[];
+            if (pricesArray instanceof BigUint64Array) {
+                // Convert BigUint64Array to regular array of numbers
+                // Use a for loop to explicitly convert each BigInt to number
+                pricesAsNumbers = [];
+                for (let i = 0; i < pricesArray.length; i++) {
+                    pricesAsNumbers.push(Number(pricesArray[i]));
+                }
+            } else if (Array.isArray(pricesArray)) {
+                // Fallback: if it's a regular array, convert any BigInt values to numbers
+                pricesAsNumbers = pricesArray.map(price => {
+                    if (typeof price === 'bigint') {
+                        return Number(price);
+                    } else if (typeof price === 'string') {
+                        return Number(price);
+                    } else {
+                        return price as number;
+                    }
+                });
+            } else {
+                console.error("Unexpected prices format:", pricesArray);
+                pricesAsNumbers = [];
+            }
+            
+            setPrices(pricesAsNumbers);
         } catch (e) {
             console.error("Failed to load prices:", e);
         }
@@ -181,7 +201,8 @@ export const App = () => {
                 service: thisServiceName,
                 intf: "api",
                 method: "buy",
-                params: [accountName],
+                // TASK: replace max-cost
+                params: [accountName, "1.0000"],
             });
             console.info("buy() returned");
             

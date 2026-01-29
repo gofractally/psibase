@@ -2,6 +2,7 @@ package prem-accounts:plugin;
 
 world impl {
     include host:common/imports;
+    include tokens:plugin/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
 
