@@ -27,7 +27,6 @@ export const useUserTokenBalances = (
 ) => {
     const { data: currentUser} = useCurrentUser();
     const username = optionalUsername || currentUser;
-    console.log("Now executing: useUserToken.ts  (or whichever file)");
     return useQuery<Token[]>({
         queryKey: QueryKey.userTokenBalances(username),
         enabled: !!username,
