@@ -6,7 +6,6 @@ import z from "zod";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
-    Card,
     CardDescription,
     CardHeader,
     CardTitle,
@@ -25,6 +24,8 @@ import { TradeSettingsModal } from "./components/trade-settings-modal";
 
 import { Liquidity } from "./liquidity";
 import { Swap } from "./swap";
+import { GlowingCard } from "@shared/components/glowing-card";
+
 
 
 
@@ -67,8 +68,7 @@ export const SwapPage = () => {
                 show={showSettingsModal}
             />
 
-
-            <Card className="border-2 shadow-xl relative isolate">
+            <GlowingCard className="relative isolate">
                 <CardHeader className="pb-4">
                     <Tabs
                         defaultValue="swap"
@@ -120,7 +120,7 @@ export const SwapPage = () => {
 
 
 
-            </Card>
+            </GlowingCard>
 
             <div className="flex w-full justify-center">
                 <Button
