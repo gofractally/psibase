@@ -18,6 +18,9 @@ namespace
    struct TempSocket : AutoCloseSocket, std::enable_shared_from_this<TempSocket>
    {
       TempSocket() {}
+      // TempSocket is used synchronously, so instead of posting remove
+      // to an executor in onClose, the creator is responsible for
+      // calling remove.
       void onClose(const std::optional<std::string>&) noexcept override {}
       void send(Writer&, std::span<const char> data) override
       {
@@ -134,6 +137,8 @@ void load_local_packages(TransactionContext&             tc,
       if (socket->notifyClose)
          throw std::runtime_error(
              "Not implemented: socket notifyClose during initial service load");
+      // Mark the socket as open again, so we can re-use it in the
+      // next iteration of the loop.
       socket->closed = false;
       tc.ownedSockets.sockets.insert(socket->id);
       socket->closeLocks  = 1;
