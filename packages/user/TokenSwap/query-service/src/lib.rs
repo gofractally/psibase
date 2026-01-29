@@ -52,21 +52,6 @@ mod service {
                 .get_index_pk()
                 .get(&pool_id)
         }
-
-        async fn created_pools(
-            &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, CreatedPool>> {
-            EventQuery::new("history.token-swap.created_pool")
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-        }
     }
 
     #[action]

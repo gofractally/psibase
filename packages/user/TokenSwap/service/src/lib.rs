@@ -479,8 +479,6 @@ pub mod service {
 
         let (a_reserve, b_reserve) = pool.get_reserves(Some(token_a));
 
-        Wrapper::emit().history().created_pool(token_a, token_b);
-
         (
             pool.liquidity_token,
             a_reserve.admin_nft,
@@ -577,7 +575,4 @@ pub mod service {
         check(current_amount >= min_return, "does not meet minimum return");
         tokens_service.credit(current_token, sender, current_amount, "Token swap".into());
     }
-
-    #[event(history)]
-    pub fn created_pool(token_a: TID, token_b: TID) {}
 }
