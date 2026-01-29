@@ -1,0 +1,25 @@
+[package]
+name = "token-swap"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-token-swap"
+plugin = "token-swap-plugin"
+postinstall = [
+    { sender = "token-swap", service = "tokens", method = "setUserConf", data = { index = 0, enabled = true } },
+    { sender = "token-swap", service = "nft", method = "setUserConf", data = { index = 0, enable = true } },
+]
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+token-swap-pkg = { path = "..", version = "0.22.0" }
