@@ -1,14 +1,18 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::auth_sig::plugin::keyvault as AuthSigKeyVault;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
+use bindings::tokens::plugin::helpers as TokensHelpers;
+use bindings::tokens::plugin::user as TokensUser;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::define_trust;
 use psibase::fracpack::Pack;
+use psibase::services::tokens::{Precision, Quantity};
 
 mod errors;
 use errors::ErrorType;
@@ -36,22 +40,72 @@ define_trust! {
 struct PremAccountsPlugin;
 
 impl Api for PremAccountsPlugin {
-    fn buy(account: String, max_cost: u64) -> Result<(), Error> {
+    fn buy(account: String, max_cost: String) -> Result<(), Error> {
         trust::assert_authorized(trust::FunctionName::buy)?;
-        let packed_buy_args = prem_accounts::action_structs::buy { account, max_cost }.packed();
-        add_action_to_transaction("buy", &packed_buy_args).unwrap();
+
+        let service_account = "prem-accounts";
+
+        let sys_token_id = TokensHelpers::fetch_network_token()?.unwrap();
+
+        TokensUser::credit(
+            sys_token_id,
+            service_account,
+            &max_cost,
+            "premium account purchase",
+        )?;
+
+        let packed_buy_args = prem_accounts::action_structs::buy {
+            account: account.clone(),
+            max_cost: Quantity::from_str(&max_cost, Precision::new(4).unwrap())
+                .unwrap()
+                .value,
+        }
+        .packed();
+
+        let result = add_action_to_transaction("buy", &packed_buy_args);
+        if result.is_err() {
+            // TODO: if tx fails, pull back credit; if succeeds, pull back change
+            TokensUser::uncredit(
+                sys_token_id,
+                service_account,
+                &max_cost,
+                "account purchase failed",
+            )?;
+            return Err(ErrorType::AccountPurchaseFailed(account.to_string()).into());
+        }
         Ok(())
     }
 
-    fn claim(account: String, pub_key: String) -> Result<(), Error> {
+    fn claim(account: String) -> Result<String, Error> {
         trust::assert_authorized(trust::FunctionName::claim)?;
+
+        let keypair = AuthSigKeyVault::generate_unmanaged_keypair()?;
+
+        // The pub_key string is PEM format
+        // SubjectPublicKeyInfo expects DER-encoded bytes
+        let pem_data = pem::parse(keypair.public_key.trim())
+            .map_err(|e| ErrorType::InvalidPublicKey(format!("Failed to parse PEM: {}", e)))?;
+
+        if pem_data.tag() != "PUBLIC KEY" {
+            return Err(ErrorType::InvalidPublicKey(format!(
+                "Expected PUBLIC KEY, got {}",
+                pem_data.tag()
+            ))
+            .into());
+        }
+
+        AuthSigKeyVault::import_key(&keypair.private_key)?;
+
         let packed_claim_args = prem_accounts::action_structs::claim {
-            account,
-            pub_key: SubjectPublicKeyInfo::from(pub_key.as_bytes().to_vec()),
+            account: account.clone(),
+            pub_key: SubjectPublicKeyInfo::from(pem_data.contents().to_vec()),
         }
         .packed();
+
         add_action_to_transaction("claim", &packed_claim_args).unwrap();
-        Ok(())
+
+        // TOOD: error handling: cleanup if something fails
+        Ok(keypair.private_key)
     }
 }
 

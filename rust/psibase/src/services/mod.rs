@@ -1,6 +1,7 @@
 //! Interfaces for standard services
 
 pub mod accounts;
+pub mod auth_any;
 pub mod auth_delegate;
 pub mod auth_dyn;
 pub mod auth_sig;

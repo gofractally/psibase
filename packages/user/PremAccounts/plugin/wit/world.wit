@@ -2,8 +2,8 @@ package prem-accounts:plugin;
 
 interface api {
     use host:types/types.{error};
-    buy: func(account: string, max-cost: u64) -> result<_, error>;
-    claim: func(account: string, pub-key: string) -> result<_, error>;
+    buy: func(account: string, max-cost: string) -> result<_, error>;
+    claim: func(account: string) -> result<string, error>;
 }
 
 interface queries {
