@@ -134,7 +134,9 @@ interface liquidity {
     ///
     /// Parameters:
     /// * `pool`   - The current state of the pool
-    /// * `amount` - The target amount of LP tokens to mint
+    /// * `amount` - The target amount of LP tokens to burn
+    /// Returns:
+    /// * (First reserve amount, Second reserve amount)
     quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<token-amount, token-amount>, error>;
 }
 
