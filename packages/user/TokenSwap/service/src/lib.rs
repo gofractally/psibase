@@ -234,18 +234,6 @@ pub mod tables {
             }
         }
 
-        pub fn reserves_in_order(&self, a_token: TID, b_token: TID) -> (Reserve, Reserve) {
-            let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
-
-            if first.token_id == a_token && second.token_id == b_token {
-                (first, second)
-            } else if first.token_id == b_token && second.token_id == a_token {
-                (second, first)
-            } else {
-                abort_message("One or both tokens do not exist in pool reserve");
-            }
-        }
-
         fn reserves_with_first(&self, first_token: TID) -> (Reserve, Reserve) {
             let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
 
@@ -255,6 +243,18 @@ pub mod tables {
                 (second, first)
             } else {
                 abort_message("Token does not exist in pool reserve");
+            }
+        }
+
+        pub fn reserves_in_order(&self, a_token: TID, b_token: TID) -> (Reserve, Reserve) {
+            let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
+
+            if first.token_id == a_token && second.token_id == b_token {
+                (first, second)
+            } else if first.token_id == b_token && second.token_id == a_token {
+                (second, first)
+            } else {
+                abort_message("One or both tokens do not exist in pool reserve");
             }
         }
 
