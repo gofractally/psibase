@@ -1,23 +1,16 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { ErrorCard } from "@/components/error-card";
+import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { createIdenticon } from "@/lib/createIdenticon";
 
-import { useChainId } from "@shared/hooks/use-chain-id";
+import { ErrorCard } from "@shared/components/error-card";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
+import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const MyGuildMembership = () => {
@@ -43,7 +36,7 @@ export const MyGuildMembership = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">My Guild Membership</h1>
             </div>
@@ -56,59 +49,12 @@ export const MyGuildMembership = () => {
                     </>
                 ) : (
                     <>
-                        <GuildOverviewCard />
+                        <GuildOverviewCard guildAccount={guildAccount} />
                         {!isGuildMember && <ApplyGuildCard />}
                     </>
                 )}
             </div>
         </div>
-    );
-};
-
-const GuildOverviewCard = () => {
-    const { data: guild } = useGuild();
-    const { data: chainId } = useChainId();
-
-    console.log({ guild });
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        {chainId && guild?.account ? (
-                            <img
-                                src={createIdenticon(chainId + guild?.account)}
-                                alt={guild?.displayName || "Guild"}
-                                className="size-5"
-                            />
-                        ) : (
-                            <Skeleton className="size-5 rounded-lg" />
-                        )}
-                    </div>
-                    <div>
-                        <div className="text-xl font-semibold">
-                            {guild?.displayName || "Loading..."}
-                        </div>
-                        <div className="text-muted-foreground text-sm font-normal">
-                            {guild?.bio}
-                        </div>
-                    </div>
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-3">
-                    <div>
-                        <h3 className="text-muted-foreground mb-1 text-sm font-medium">
-                            Mission
-                        </h3>
-                        <p className="text-sm leading-relaxed">
-                            {guild?.description || "No mission available."}
-                        </p>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
     );
 };
 

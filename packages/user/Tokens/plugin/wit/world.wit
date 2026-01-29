@@ -143,8 +143,10 @@ interface helpers {
     fetch-network-token: func() -> result<option<u32>, error>;
 
     /// Uses the precision of the specified token to convert from a token
-    ///   decimal (string) to its u64 representation
-    ///   (e.g. "100.0000" -> 1000000)
+    ///   decimal (string) to its u64 representation.
+    ///   The string precision must not exceed the token's actual precision:
+    ///   - "100" or "100.00" with precision 4 -> 1000000 (automatically padded)
+    ///   - "100.00000" with precision 4 -> error (too many decimal places)
     decimal-to-u64: func(token-id: u32, amount: decimal) -> result<u64, error>;
 
     /// Uses the precision of the specified token to convert from an u64 representation

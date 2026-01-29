@@ -1,0 +1,148 @@
+package virtual-server:plugin;
+
+interface types {
+    record server-specs {
+        /// How much network bandwidth the server can handle
+        net-bps: u64,
+        /// How much storage space on the server
+        storage-bytes: u64,
+    }
+
+    record network-variables {
+        /// How much faster a node replays blocks compared to the live network
+        block-replay-factor: u8,
+        /// Amount of compute nanoseconds per second consumed by system functionality
+        /// that is executed on each block (`on_block` callbacks, native consensus, etc.)
+        per-block-sys-cpu-ns: u64,
+        /// Amount of storage space in bytes allocated to objective state
+        obj-storage-bytes: u64,
+    }
+
+    record cpu-pricing-params {
+        /// The percentage of average consumption below which the price of the
+        /// resource will decrease. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        idle-pct: string, 
+        /// The percentage of average consumption above which the price of the
+        /// resource will increase. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        congested-pct: string,
+        /// The approximate amount of time it takes to double the price when congested
+        doubling-time-sec: u32, 
+        /// The approximate amount of time it takes to halve the price when idle
+        halving-time-sec: u32,
+        /// The number of blocks over which to compute the average usage
+        num-blocks-to-average: u8,
+        /// This is some number of nanoseconds that represents the smallest unit of
+        /// billable CPU time. Consumed CPU time is rounded up to the nearest billable 
+        /// unit.
+        min-billable-unit-ns: u64,
+    }
+
+    record net-pricing-params {
+        /// The percentage of average consumption below which the price of the
+        /// resource will decrease. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        idle-pct: string, 
+        /// The percentage of average consumption above which the price of the
+        /// resource will increase. The percentage is a string representation of a decimal with 
+        /// up to 4 decimal places of precision (e.g. "50.1234" = 50.1234%).
+        congested-pct: string,
+        /// The approximate amount of time it takes to double the price when congested
+        doubling-time-sec: u32, 
+        /// The approximate amount of time it takes to halve the price when idle
+        halving-time-sec: u32,
+        /// The number of blocks over which to compute the average usage
+        num-blocks-to-average: u8,
+        /// This is some number of bits that represents the smallest unit of
+        /// billable network bandwidth. Consumed network bandwidth is rounded up to 
+        /// the nearest billable unit.
+        min-billable-unit-bits: u64,
+    }
+}
+
+interface admin {
+    use host:types/types.{error};
+    use types.{server-specs, network-variables, cpu-pricing-params, net-pricing-params};
+
+    /// Enable the billing system
+    /// A system token must have already been set to enable billing.
+    /// 
+    /// Parameters:
+    /// * `fee-receiver` - The account that will receive the billing fees
+    init-billing: func(fee-receiver: string) -> result<_, error>;
+
+    /// Set network variables
+    /// These variables change how the network specs are derived from the server specs.
+    /// 
+    /// Parameters:
+    /// * `variables` - The network variables
+    set-network-variables: func(variables: network-variables) -> result<_, error>;
+
+    /// Enable the billing system
+    /// This must be called after the billing system has been initialized and the
+    /// system token has been set.
+    /// 
+    /// Parameters:
+    /// * `enabled` - Whether to enable the billing system
+    enable-billing: func(enabled: bool) -> result<_, error>;
+
+    /// Set virtual server specs
+    /// It is from these specs that the pricing for network resources is derived.
+    set-specs: func(specs: server-specs) -> result<_, error>;
+
+    /// Set CPU pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The CPU pricing parameters
+    set-cpu-pricing-params: func(params: cpu-pricing-params) -> result<_, error>;
+
+    /// Set network pricing parameters
+    /// 
+    /// Parameters:
+    /// * `params` - The network pricing parameters
+    set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
+}
+
+interface billing {
+    use host:types/types.{error};
+
+    /// Fills the user's gas tank to its full capacity, allowing them to continue to transact
+    /// on the server.
+    /// 
+    /// The user must have a sufficient balance of system tokens to pay for the gas.
+    fill-gas-tank: func() -> result<_, error>;
+
+    /// Resizes the user's gas tank to the specificed capacity (measured in system tokens). 
+    /// Then (atomically) fills the user's gas tank, allowing them to continue to transact
+    /// on the server.
+    /// 
+    /// The specified capacity is a string representation of the system token amount 
+    /// (e.g. "100", "100.5", "100.123", etc.). The precision of the value in the decimal 
+    /// string must not exceed the token's actual precision.
+    /// 
+    /// The user must have a sufficient balance of system tokens to pay for the gas.
+    resize-and-fill-gas-tank: func(new-capacity: string) -> result<_, error>;
+
+    /// Purchases the specified amount of resources for the specified user.
+    donate-gas: func(user: string, amount: string) -> result<_, error>;
+}
+
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
+
+world imports {
+    import billing;
+    import admin;
+    import types;
+    import authorized;
+}

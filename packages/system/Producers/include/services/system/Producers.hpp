@@ -18,6 +18,14 @@ namespace SystemService
    using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
    PSIO_REFLECT_TYPENAME(CandidateInfoTable)
 
+   struct ProdsConfig
+   {
+      uint8_t maxProds;
+   };
+   PSIO_REFLECT(ProdsConfig, maxProds)
+   using ProdsConfigTable = psibase::Table<ProdsConfig, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(ProdsConfigTable)
+
    // This service manages the active producers.
    // It must have native write permission
    class Producers : public psibase::Service
@@ -26,7 +34,9 @@ namespace SystemService
       static constexpr auto service      = psibase::AccountNumber("producers");
       static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
-      using Tables = psibase::ServiceTables<CandidateInfoTable>;
+      static constexpr uint8_t DEFAULT_MAX_PRODS = 13;
+
+      using Tables = psibase::ServiceTables<CandidateInfoTable, ProdsConfigTable>;
 
       /// `prods-weak` and `prods-strong` are accounts that represent authorization
       /// by the current block producers.  `prods-weak` is a quorum that is sufficient
@@ -52,6 +62,10 @@ namespace SystemService
       void unregCand();
 
       std::vector<psibase::AccountNumber> getProducers();
+
+      /// A maximum size of the producer set producing blocks for the network
+      void    setMaxProds(uint8_t maxProds);
+      uint8_t getMaxProds();
 
       uint32_t getThreshold(psibase::AccountNumber account);
       uint32_t antiThreshold(psibase::AccountNumber account);
@@ -103,6 +117,8 @@ namespace SystemService
                 method(regCandidate, endpoint, claim),
                 method(unregCand),
                 method(getProducers),
+                method(setMaxProds, maxProds),
+                method(getMaxProds),
                 method(getThreshold, account),
                 method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),

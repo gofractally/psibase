@@ -1,0 +1,23 @@
+[package]
+name = "virtual-server"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "virtual-server"
+plugin = "virtual-server-plugin"
+postinstall = [{ sender = "virtual-server", service = "virtual-server", method = "init" }]
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-aux.workspace = true
+async-graphql.workspace = true
+psibase-system-workspace-hack.workspace = true
+
+[dev-dependencies]
+virtual-server-pkg = { path = "..", version = "0.22.0" }

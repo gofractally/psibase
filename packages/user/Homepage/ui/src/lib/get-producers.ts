@@ -30,8 +30,6 @@ export const getProducers = async (): Promise<Producer[]> => {
         "producers",
     );
 
-    console.log("PRODUCERS RES:", producers);
-
     const response = z
         .object({
             producers: z.array(zProducerReturn),

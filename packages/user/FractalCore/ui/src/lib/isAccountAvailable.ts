@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const AccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
 
@@ -8,7 +8,6 @@ const GetAccountReturn = z
     .object({
         accountNum: z.string(),
         authService: z.string(),
-        resourceBalance: z.boolean().or(z.bigint()),
     })
     .optional();
 

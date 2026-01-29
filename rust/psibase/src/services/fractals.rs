@@ -98,8 +98,8 @@ pub mod Service {
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
     /// * `member` - Member to attest.
-    /// * `comment` - Any comment relevant to application.
-    /// * `endorses` - True if in favour of application.
+    /// * `comment` - Any comment relevant to the application.
+    /// * `endorses` - True if in favour of the application.
     #[action]
     fn at_mem_app(
         guild_account: AccountNumber,
@@ -107,6 +107,16 @@ pub mod Service {
         comment: String,
         endorses: bool,
     ) {
+        unimplemented!()
+    }
+
+    /// Conclude Guild Membership application
+    ///
+    /// # Arguments
+    /// * `applicant` - Account of the applicant.
+    /// * `accepted` - True to accept application, False will deny and delete the application.
+    #[action]
+    fn con_mem_app(applicant: AccountNumber, accepted: bool) {
         unimplemented!()
     }
 
@@ -275,6 +285,26 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Distribute token for a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn dist_token(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Set rank ordering threshold.
+    ///
+    /// Amount of active participants a guild must have prior to auto-enabling rank ordering.  
+    ///
+    /// # Arguments
+    /// * `threshold` - The minimum amount of active members required.
+    #[action]
+    fn set_rnk_thrs(threshold: u8) {
+        unimplemented!()
+    }
+
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
@@ -287,12 +317,39 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Distribute token for a fractal.
+    /// Register candidacy.
+    ///
+    /// Register your candidacy to serve on a Guild council.  
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
+    /// * `guild` - Guild candidate is member of
+    /// * `active`- True to become a candidate, False to retire
     #[action]
-    fn dist_token(fractal: AccountNumber) {
+    fn reg_can(guild: AccountNumber, active: bool) {
+        unimplemented!()
+    }
+
+    /// Set the candidacy cooldown period.
+    ///
+    /// This defines how many seconds a guild member must wait after retiring their candidacy
+    /// before they are allowed to become a candidate again.
+    ///
+    /// # Arguments
+    /// * `cooldown_seconds` - The cooldown duration in seconds (0 disables the cooldown).
+    #[action]
+    fn set_can_cool(cooldown_seconds: u32) {
+        unimplemented!()
+    }
+
+    /// Set token threshold.
+    ///
+    /// Sets the required amount of active members in the legislature guild before the token can be initialised.  
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `threshold` - The minimum amount of active members required.
+    #[action]
+    fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
         unimplemented!()
     }
 
@@ -302,11 +359,11 @@ pub mod Service {
     /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
     /// guilds in the vector receive progressively larger shares.
     ///
-    /// Must be called by legislature.  
+    /// Must be called by the legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
-    /// * `guilds` - Ranked guilds, From highest rewarded to lowest.
+    /// * `guilds` - Ranked guilds, from highest rewarded to lowest.
     #[action]
     fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
         unimplemented!()
@@ -319,12 +376,7 @@ pub mod Service {
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 
     #[event(history)]
-    pub fn evaluation_finished(
-        fractal_account: AccountNumber,
-        guild_account: AccountNumber,
-        evaluation_id: u32,
-    ) {
-    }
+    pub fn evaluation_finished(guild_account: AccountNumber, evaluation_id: u32) {}
 
     #[event(history)]
     pub fn scheduled_evaluation(

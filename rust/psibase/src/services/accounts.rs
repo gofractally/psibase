@@ -6,19 +6,10 @@ use serde::{Deserialize, Serialize};
 
 // TODO: tables
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
-#[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
-pub struct ResourceLimit {
-    pub value: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Account {
     pub accountNum: AccountNumber,
     pub authService: AccountNumber,
-
-    // If this is absent, it means resource usage is unlimited
-    pub resourceBalance: Option<ResourceLimit>,
 }
 
 #[crate::service(name = "accounts", dispatch = false, psibase_mod = "crate")]
@@ -54,11 +45,6 @@ mod service {
     #[action]
     fn getAuthOf(account: AccountNumber) -> AccountNumber {
         unimplemented!()
-    }
-
-    #[action]
-    fn billCpu(name: AccountNumber, amount: i64) {
-        unimplemented!();
     }
 }
 

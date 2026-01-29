@@ -1,5 +1,7 @@
+use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
-use psibase::{check_none, check_some, AccountNumber, Table};
+
+use psibase::{check_none, check_some, get_sender, AccountNumber, RawKey, Table, TableQuery};
 
 use crate::tables::tables::{
     Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
@@ -7,12 +9,12 @@ use crate::tables::tables::{
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildApplication {
-    fn new(guild: AccountNumber, member: AccountNumber, extra_info: String) -> Self {
+    fn new(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
             guild,
-            member,
+            applicant,
             extra_info,
             created_at: now,
         }
@@ -27,10 +29,17 @@ impl GuildApplication {
         Self::new(guild, member, extra_info).save();
     }
 
-    pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {
+    pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
         GuildApplicationTable::read()
             .get_index_pk()
-            .get(&(guild, member))
+            .get(&(guild, applicant))
+    }
+
+    pub fn get_assert(guild: AccountNumber, applicant: AccountNumber) -> Self {
+        check_some(
+            Self::get(guild, applicant),
+            "guild application does not exist",
+        )
     }
 
     pub fn applications_by_member(member: AccountNumber) -> Vec<Self> {
@@ -47,16 +56,22 @@ impl GuildApplication {
         }
     }
 
-    pub fn get_assert(guild: AccountNumber, member: AccountNumber) -> Self {
-        check_some(Self::get(guild, member), "guild application does not exist")
-    }
-
     pub fn conclude(&self, accepted: bool) {
         if accepted {
-            GuildMember::add(self.guild, self.member);
+            GuildMember::add(self.guild, self.applicant);
         }
 
         self.remove()
+    }
+
+    pub fn attest(&self, comment: String, endorses: bool) {
+        let attester = get_sender();
+        let guild = Guild::get_assert(self.guild);
+        check_some(
+            GuildMember::get(guild.account, attester),
+            "must be member of the guild to attest",
+        );
+        GuildAttest::set(self.guild, self.applicant, attester, comment, endorses);
     }
 
     pub fn cancel(&self) {
@@ -69,8 +84,8 @@ impl GuildApplication {
         table
             .get_index_pk()
             .range(
-                (self.guild, self.member, AccountNumber::new(0))
-                    ..=(self.guild, self.member, AccountNumber::new(u64::MAX)),
+                (self.guild, self.applicant, AccountNumber::new(0))
+                    ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
             )
             .for_each(|attest| {
                 table.remove(&attest);
@@ -92,13 +107,22 @@ impl GuildApplication {
         Guild::get_assert(self.guild)
     }
 
-    pub async fn attestations(&self) -> Vec<GuildAttest> {
-        GuildAttestTable::read()
-            .get_index_pk()
-            .range(
-                (self.guild, self.member, AccountNumber::new(0))
-                    ..=(self.guild, self.member, AccountNumber::new(u64::MAX)),
-            )
-            .collect()
+    pub async fn attestations(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<RawKey, GuildAttest>> {
+        TableQuery::subindex::<AccountNumber>(
+            GuildAttestTable::read().get_index_pk(),
+            &(self.guild, self.applicant),
+        )
+        .first(first)
+        .last(last)
+        .before(before)
+        .after(after)
+        .query()
+        .await
     }
 }

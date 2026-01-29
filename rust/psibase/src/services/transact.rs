@@ -294,6 +294,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Registers an event index service
+    #[action]
+    fn regEvIdx(service: crate::AccountNumber) {
+        unimplemented!()
+    }
+
     /// Run `action` using `action.sender's` authority
     ///
     /// Also adds `allowedActions` to the list of actions that `action.service`
@@ -332,6 +338,12 @@ mod service {
     /// Checks authorization for the sender of the first action
     #[action]
     fn checkFirstAuth(id: Checksum256, transaction: Transaction) -> bool {
+        unimplemented!()
+    }
+
+    /// Enable/disable resource monitoring
+    #[action]
+    fn resMonitoring(enable: bool) {
         unimplemented!()
     }
 

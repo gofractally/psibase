@@ -1,16 +1,16 @@
 use crate::bindings::exports::accounts::plugin::api::{Guest as API, *};
 use crate::bindings::host::common::{client as Client, server as Server};
 use crate::bindings::transact::plugin::intf as Transact;
+use crate::db::apps_table::*;
 use crate::errors::ErrorType::*;
 use crate::helpers::generate_account;
 use crate::plugin::AccountsPlugin;
-use crate::db::apps_table::*;
 
-use psibase::AccountNumber;
-use psibase::services::accounts as AccountsService;
-use psibase::fracpack::Pack;
-use serde::Deserialize;
 use crate::trust::*;
+use psibase::fracpack::Pack;
+use psibase::services::accounts as AccountsService;
+use psibase::AccountNumber;
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 struct ResponseRoot {
@@ -31,28 +31,25 @@ impl API for AccountsPlugin {
 
     fn get_account(name: String) -> Result<Option<Account>, Error> {
         assert_authorized(FunctionName::get_account)?;
-        let acct_num = AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
+        let acct_num =
+            AccountNumber::from_exact(&name).map_err(|err| InvalidAccountName(err.to_string()))?;
 
         let query = format!(
-            "query {{ getAccount(accountName: \"{}\") {{ accountNum, authService, resourceBalance {{ value }} }} }}",
-            acct_num 
+            "query {{ getAccount(accountName: \"{}\") {{ accountNum, authService }} }}",
+            acct_num
         );
 
-        let response_str = Server::post_graphql_get_json(&query).map_err(|e| QueryError(e.message))?;
-        let response_root = serde_json::from_str::<ResponseRoot>(&response_str).map_err(|e| QueryError(e.to_string()))?;
+        let response_str =
+            Server::post_graphql_get_json(&query).map_err(|e| QueryError(e.message))?;
+        let response_root = serde_json::from_str::<ResponseRoot>(&response_str)
+            .map_err(|e| QueryError(e.to_string()))?;
 
         match response_root.data.getAccount {
-            Some(acct_val) => {
-                Ok(Some(Account {
-                    account_num: acct_val.accountNum.to_string(),
-                    auth_service: acct_val.authService.to_string(),
-                    resource_balance: Some(match acct_val.resourceBalance {
-                        Some(val) => val.value,
-                        None => 0,
-                    }),
-                }))
-            },
-            None => Ok(None)
+            Some(acct_val) => Ok(Some(Account {
+                account_num: acct_val.accountNum.to_string(),
+                auth_service: acct_val.authService.to_string(),
+            })),
+            None => Ok(None),
         }
     }
 

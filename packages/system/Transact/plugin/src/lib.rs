@@ -14,12 +14,12 @@ use db::*;
 use transact::plugin::hook_handlers::*;
 
 // Other plugins
-// Other plugins
 use host::common::{
     self as Host, server as Server,
     store::{self as Store},
 };
 use host::types::types::{self as HostTypes, BodyTypes};
+use virtual_server::plugin::transact as VirtualServer;
 
 // Exported interfaces/types
 use exports::transact::plugin::{
@@ -208,13 +208,21 @@ impl Admin for TransactPlugin {
         ActionSenderHook::clear();
 
         let actions = CurrentActions::get();
+        CurrentActions::clear();
 
         if actions.len() == 0 {
             Store::flush_transactional_data();
             return Ok(());
         }
 
-        let actions = transform_actions(actions)?;
+        let mut actions = transform_actions(actions)?;
+
+        // This will automatically add the actions into the tx to
+        // refill the user's gas tank if it is below some threshold
+        // and the user is configured for auto-filling.
+        VirtualServer::auto_fill_gas_tank()?;
+        actions.extend(CurrentActions::get().into_iter().map(|a| a.action));
+        CurrentActions::clear();
 
         let tx = make_transaction(actions, 3);
 
