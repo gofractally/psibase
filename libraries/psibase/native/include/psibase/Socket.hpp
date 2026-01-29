@@ -85,8 +85,8 @@ namespace psibase
    struct SocketChange
    {
       std::shared_ptr<AutoCloseSocket> socket;
-      std::uint8_t                     mask;
-      std::uint8_t                     value;
+      std::uint32_t                    mask;
+      std::uint32_t                    value;
    };
 
    struct SocketAutoCloseSet
