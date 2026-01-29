@@ -8,5 +8,4 @@ world impl {
 
     export swap;
     export liquidity;
-    export queries;
 }

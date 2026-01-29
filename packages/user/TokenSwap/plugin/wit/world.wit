@@ -65,15 +65,6 @@ interface swap {
 
 }
 
-interface queries {
-
-    use host:types/types.{error};
-    use types.{path, tid, pool, token-amount};
-
-    /// Fetches all pools in the network
-    fetch-pools: func() -> result<list<pool>, error>;
-}
-
 interface liquidity {
 
     use host:types/types.{error};

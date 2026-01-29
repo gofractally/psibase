@@ -5,7 +5,6 @@ mod find_path;
 use std::str::FromStr;
 
 use bindings::exports::token_swap::plugin::liquidity::Guest as Liquidity;
-use bindings::exports::token_swap::plugin::queries::Guest as Queries;
 use bindings::exports::token_swap::plugin::swap::Guest as Swap;
 
 use bindings::host::types::types::Error;
@@ -93,16 +92,6 @@ impl From<GraphQLPool> for WitPool {
             token_b_fee_ppm: graph_pool.reserve_b.fee_ppm,
             b_balance: graph_pool.reserve_b.balance.to_string(),
         }
-    }
-}
-
-impl Queries for TokenSwapPlugin {
-    fn fetch_pools() -> Result<Vec<WitPool>, Error> {
-        assert_authed(FunctionName::fetch_pools)?;
-        Ok(fetch_all_pools()?
-            .into_iter()
-            .map(|graph_pool| WitPool::from(graph_pool))
-            .collect())
     }
 }
 
