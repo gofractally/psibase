@@ -196,13 +196,9 @@ export const Liquidity = () => {
     useEffect(() => {
         const relevantPool = poolsOfLiquidityPair[0];
         if (relevantPool && !focusedPoolId && !userIsCreatingPool) {
-            console.log('setting focused', relevantPool)
             setFocusedPoolId(relevantPool.id)
         } else if ((!relevantPool && focusedPoolId) || (userIsCreatingPool && focusedPoolId)) {
             setFocusedPoolId(undefined)
-            console.log('unsetting')
-        } else {
-            console.log('didnt do shit')
         }
     }, [focusedPoolId, token1Id, token2Id, poolsOfLiquidityPair, userIsCreatingPool])
 
