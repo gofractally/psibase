@@ -14,7 +14,6 @@ mod service {
 
     #[derive(Deserialize, SimpleObject)]
     struct EvaluationFinish {
-        fractal: AccountNumber,
         guild: AccountNumber,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         evaluation_id: u32,
@@ -166,11 +165,11 @@ mod service {
         async fn guild_application(
             &self,
             guild: AccountNumber,
-            member: AccountNumber,
+            applicant: AccountNumber,
         ) -> Option<GuildApplication> {
             GuildApplicationTable::with_service(fractals::SERVICE)
                 .get_index_pk()
-                .get(&(guild, member))
+                .get(&(guild, applicant))
         }
 
         async fn guild_applications(
@@ -330,6 +329,16 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn guild_membership(
+            &self,
+            guild: AccountNumber,
+            member: AccountNumber,
+        ) -> Option<GuildMember> {
+            GuildMemberTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&(guild, member))
         }
 
         async fn members(

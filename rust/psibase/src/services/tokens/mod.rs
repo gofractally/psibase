@@ -36,6 +36,11 @@ pub struct TokenRecord {
     pub max_issued_supply: Quantity,
 }
 
+crate::define_flags!(TokenFlags, u8, {
+    untransferable,
+    unrecallable,
+});
+
 #[derive(
     Debug, Copy, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize, SimpleObject, InputObject,
 )]

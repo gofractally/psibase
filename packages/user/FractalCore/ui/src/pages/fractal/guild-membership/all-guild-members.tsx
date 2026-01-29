@@ -13,17 +13,12 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-const formatScore = (num: number): string => {
-    // Would it be neat to make the score a flat integer out of 100?
-    return Math.floor((num / 6) * 100).toString();
-};
-
 export const AllGuildMembers = () => {
     const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">Guild members</h1>
             </div>
@@ -47,9 +42,7 @@ export const AllGuildMembers = () => {
                                 <TableCell className="font-medium">
                                     {member.member}
                                 </TableCell>
-                                <TableCell>
-                                    {formatScore(member.score)}
-                                </TableCell>
+                                <TableCell>{member.score}</TableCell>
                                 <TableCell>
                                     {dayjs(member.createdAt).format(
                                         "MMMM D, YYYY",

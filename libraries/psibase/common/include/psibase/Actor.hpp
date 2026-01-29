@@ -68,7 +68,14 @@ namespace psibase
          {
             psio::shared_view_ptr<exportType<R>> result(psio::size_tag{result_size});
             raw::getResult(result.data(), result_size, 0);
-            check(result.validate(), "value returned was not serialized as expected");
+            if (!result.validate())
+            {
+               psio::view<const Action> action(
+                   psio::prevalidated<std::span<const char>>{packed_action});
+               auto method_name = action.method().unpack().str();
+               check(false, std::string("value returned from ") + method_name +
+                                " was not serialized as expected");
+            }
             auto                                         handles_size = raw::importHandles();
             psio::shared_view_ptr<std::vector<KvHandle>> handles(psio::size_tag{handles_size});
             raw::getResult(handles.data(), handles_size, 0);
@@ -78,7 +85,14 @@ namespace psibase
          {
             psio::shared_view_ptr<R> result(psio::size_tag{result_size});
             raw::getResult(result.data(), result_size, 0);
-            check(result.validate(), "value returned was not serialized as expected");
+            if (!result.validate())
+            {
+               psio::view<const Action> action(
+                   psio::prevalidated<std::span<const char>>{packed_action});
+               auto method_name = action.method().unpack().str();
+               check(false, std::string("value returned from ") + method_name +
+                                " was not serialized as expected");
+            }
             return result;
          }
       }

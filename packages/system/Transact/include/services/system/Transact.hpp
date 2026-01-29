@@ -153,6 +153,7 @@ namespace SystemService
       /// * `false`: The authorizers are not sufficient to authorize a transaction from the sender.
       bool isAuthSys(psibase::AccountNumber                             sender,
                      std::vector<psibase::AccountNumber>                authorizers,
+                     std::optional<ServiceMethod>                       method,
                      std::optional<std::vector<psibase::AccountNumber>> authSet);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
@@ -168,15 +169,23 @@ namespace SystemService
       /// * `false`: The rejecters are not sufficient to reject a transaction from the sender.
       bool isRejectSys(psibase::AccountNumber                             sender,
                        std::vector<psibase::AccountNumber>                rejecters,
+                       std::optional<ServiceMethod>                       method,
                        std::optional<std::vector<psibase::AccountNumber>> authSet);
    };
    PSIO_REFLECT(AuthInterface,
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers),
-                method(isRejectSys, sender, rejecters)
+                method(isAuthSys, sender, authorizers, method),
+                method(isRejectSys, sender, rejecters, method)
                 //
    )
+
+   struct EventIndexerInterface
+   {
+      /// Indexes all new events. This is run automatically at the end of every transaction.
+      void sync();
+   };
+   PSIO_REFLECT(EventIndexerInterface, method(sync))
 
    struct VerifyInterface
    {
@@ -195,6 +204,14 @@ namespace SystemService
    PSIO_REFLECT(TransactStatus, enforceAuth, bootTransactions)
    using TransactStatusTable = psibase::Table<TransactStatus, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(TransactStatusTable)
+
+   struct ResMonitoringConfig
+   {
+      bool enabled = false;
+   };
+   PSIO_REFLECT(ResMonitoringConfig, enabled)
+   using ResMonitoringConfigTable = psibase::Table<ResMonitoringConfig, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(ResMonitoringConfigTable)
 
    // This table tracks block suffixes to verify TAPOS
    struct BlockSummary
@@ -234,6 +251,14 @@ namespace SystemService
    using CallbacksTable = psibase::Table<Callbacks, &Callbacks::type>;
    PSIO_REFLECT_TYPENAME(CallbacksTable)
 
+   struct EventIndexer
+   {
+      psibase::AccountNumber service;
+   };
+   PSIO_REFLECT(EventIndexer, service)
+   using EventIndexerTable = psibase::Table<EventIndexer, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(EventIndexerTable)
+
    struct SnapshotInfo
    {
       psibase::BlockTime lastSnapshot;
@@ -261,9 +286,11 @@ namespace SystemService
       static constexpr uint64_t serviceFlags = psibase::CodeRow::isPrivileged;
 
       using Tables = psibase::ServiceTables<TransactStatusTable,
+                                            ResMonitoringConfigTable,
                                             BlockSummaryTable,
                                             IncludedTrxTable,
                                             CallbacksTable,
+                                            EventIndexerTable,
                                             SnapshotInfoTable>;
 
       /// This action enables the boot procedure to be split across multiple blocks
@@ -315,6 +342,9 @@ namespace SystemService
       /// Removes an existing callback
       void removeCallback(CallbackType type, bool objective, psibase::Action act);
 
+      /// Registers an event index service
+      void regEvIdx(psibase::AccountNumber service);
+
       /// Run `action` using `action.sender's` authority
       ///
       /// Also adds `allowedActions` to the list of actions that `action.service`
@@ -343,6 +373,9 @@ namespace SystemService
       /// Checks authorization for the sender of the first action
       bool checkFirstAuth(psibase::Checksum256                   id,
                           psio::view<const psibase::Transaction> transaction);
+
+      /// Enable/disable resource monitoring
+      void resMonitoring(bool enable);
 
       /// Get the currently executing transaction
       psio::view<const psibase::Transaction> getTransaction() const;
@@ -373,13 +406,17 @@ namespace SystemService
                 method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
+                method(regEvIdx, service),
                 method(runAs, action, allowedActions),
                 method(checkFirstAuth, id, transaction),
+                method(resMonitoring, enable),
                 method(getTransaction),
                 method(isTransaction),
                 method(currentBlock),
                 method(headBlock),
-                method(headBlockTime))
+                method(headBlockTime),
+                //
+   )
 
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
 

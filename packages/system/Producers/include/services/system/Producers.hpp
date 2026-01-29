@@ -18,6 +18,14 @@ namespace SystemService
    using CandidateInfoTable = psibase::Table<CandidateInfo, &CandidateInfo::account>;
    PSIO_REFLECT_TYPENAME(CandidateInfoTable)
 
+   struct ProdsConfig
+   {
+      uint8_t maxProds;
+   };
+   PSIO_REFLECT(ProdsConfig, maxProds)
+   using ProdsConfigTable = psibase::Table<ProdsConfig, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(ProdsConfigTable)
+
    // This service manages the active producers.
    // It must have native write permission
    class Producers : public psibase::Service
@@ -26,7 +34,9 @@ namespace SystemService
       static constexpr auto service      = psibase::AccountNumber("producers");
       static constexpr auto serviceFlags = psibase::CodeRow::isPrivileged;
 
-      using Tables = psibase::ServiceTables<CandidateInfoTable>;
+      static constexpr uint8_t DEFAULT_MAX_PRODS = 13;
+
+      using Tables = psibase::ServiceTables<CandidateInfoTable, ProdsConfigTable>;
 
       /// `prods-weak` and `prods-strong` are accounts that represent authorization
       /// by the current block producers.  `prods-weak` is a quorum that is sufficient
@@ -53,6 +63,10 @@ namespace SystemService
 
       std::vector<psibase::AccountNumber> getProducers();
 
+      /// A maximum size of the producer set producing blocks for the network
+      void    setMaxProds(uint8_t maxProds);
+      uint8_t getMaxProds();
+
       uint32_t getThreshold(psibase::AccountNumber account);
       uint32_t antiThreshold(psibase::AccountNumber account);
 
@@ -78,6 +92,7 @@ namespace SystemService
       /// * `false`: If not returning true, or on recursive checks for the same sender
       bool isAuthSys(psibase::AccountNumber                             sender,
                      std::vector<psibase::AccountNumber>                authorizers,
+                     std::optional<ServiceMethod>                       method,
                      std::optional<std::vector<psibase::AccountNumber>> authSet);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
@@ -93,6 +108,7 @@ namespace SystemService
       /// * `false`: If not returning true, or on recursive checks for the same sender
       bool isRejectSys(psibase::AccountNumber                             sender,
                        std::vector<psibase::AccountNumber>                rejecters,
+                       std::optional<ServiceMethod>                       method,
                        std::optional<std::vector<psibase::AccountNumber>> authSet);
    };
    PSIO_REFLECT(Producers,
@@ -101,12 +117,14 @@ namespace SystemService
                 method(regCandidate, endpoint, claim),
                 method(unregCand),
                 method(getProducers),
+                method(setMaxProds, maxProds),
+                method(getMaxProds),
                 method(getThreshold, account),
                 method(antiThreshold, account),
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers, authSet),
-                method(isRejectSys, sender, rejecters, authSet)
+                method(isAuthSys, sender, authorizers, method, authSet),
+                method(isRejectSys, sender, rejecters, method, authSet)
                 //
    )
 

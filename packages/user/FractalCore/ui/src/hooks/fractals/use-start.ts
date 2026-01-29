@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { PluginError, getSupervisor } from "@psibase/common-lib";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { useFractalAccount } from "./use-fractal-account";
 

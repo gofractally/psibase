@@ -635,7 +635,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
                }
                AND_THEN("Alice may not debit 26 tokens")
                {
-                  CHECK(a.debit(tokenId, bob, 26e4, memo).failed(insufficientBalance));
+                  CHECK(a.debit(tokenId, bob, 26e4, memo).failed(insufficientSharedBalance));
                }
                AND_THEN("Alice may debit 25 tokens")
                {
@@ -656,7 +656,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
             }
             THEN("Alice may not debit 51 tokens")
             {
-               CHECK(a.debit(tokenId, bob, 51e4, memo).failed(insufficientBalance));
+               CHECK(a.debit(tokenId, bob, 51e4, memo).failed(insufficientSharedBalance));
             }
             THEN("Alice may debit 50 tokens")
             {

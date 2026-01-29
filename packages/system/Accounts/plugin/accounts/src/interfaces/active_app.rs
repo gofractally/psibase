@@ -41,8 +41,7 @@ impl ActiveApp for AccountsPlugin {
         let app = get_assert_top_level_app("logout", &vec!["supervisor"])?;
         let apps_table = AppsTable::new(&app);
 
-        if let Some(user) = apps_table.get_logged_in_user() {
-            HostAuth::log_out_user(&user, &app);
+        if apps_table.get_logged_in_user().is_some() {
             apps_table.logout();
         }
 
@@ -55,13 +54,6 @@ impl ActiveApp for AccountsPlugin {
 
         if !apps_table.get_connected_accounts().contains(&account) {
             return Ok(());
-        }
-
-        if let Some(user) = apps_table.get_logged_in_user() {
-            if user == account {
-                HostAuth::log_out_user(&user, &app);
-                apps_table.logout();
-            }
         }
 
         apps_table.disconnect(&account);

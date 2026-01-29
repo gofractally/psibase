@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -9,14 +8,13 @@ import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-membership
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAccountAvailable } from "@/lib/isAccountAvailable";
 
+import { useAppForm } from "@shared/components/form/app-form";
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-
-import { useAppForm } from "../form/app-form";
 
 export const CreateGuildModal = ({
     show,
@@ -37,25 +35,17 @@ export const CreateGuildModal = ({
             account: "",
             name: "",
         },
-        onSubmit: async ({ value: { name, account } }) => {
-            await createGuild({
-                name,
-                account,
-            });
+        onSubmit: async ({ formApi, value: { name, account } }) => {
+            await createGuild([name, account]);
             openChange(false);
             navigate(`/guild/${account}`);
+            formApi.reset();
             refetch();
         },
         validators: {
             onChange: zCreateGuild,
         },
     });
-
-    useEffect(() => {
-        if (show && form.state.isSubmitSuccessful) {
-            form.reset();
-        }
-    }, [form, show]);
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
@@ -99,11 +89,7 @@ export const CreateGuildModal = ({
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={[
-                                    "Create Guild",
-                                    "Creating Guild...",
-                                    "Created Guild",
-                                ]}
+                                labels={["Create Guild", "Creating Guild..."]}
                             />
                         </form.AppForm>
                     </form>

@@ -10,6 +10,10 @@ interface admin {
     /// Adds an account into the accounts table so that it can be used on this device.
     import-account: func(account: string);
 
+    /// Removes an account from the accounts table and disconnects it from any connected
+    /// apps so that it can no longer be used on this device.
+    remove-account: func(account: string);
+
     /// Gets a list of all accounts that are known by the accounts app on this device.
     get-all-accounts: func() -> list<string>;
 
@@ -19,7 +23,7 @@ interface admin {
 
 interface prompt {
     use host:types/types.{error, pem};
-    
+
     record credential {
         /// The name of the account
         account: string,
@@ -35,15 +39,15 @@ interface prompt {
     can-create-account: func() -> bool;
 
     /// Import a pre-existing account(s) to this device.
-    /// 
-    /// Importing an account requires both the name of the account and its corresponding private 
-    /// key in PEM format. The private key will be verified to ensure that it can be used to 
+    ///
+    /// Importing an account requires both the name of the account and its corresponding private
+    /// key in PEM format. The private key will be verified to ensure that it can be used to
     /// authorize the account.
-    /// 
+    ///
     /// Returns:
     /// * On success, returns nothing,
     /// * If any credentials fail validation, returns a list of the account names that failed validation.
-    /// 
+    ///
     /// Any credentials that fails validation will not be imported.
     import-existing: func(credentials: list<credential>) -> result<_, list<string>>;
 
@@ -52,13 +56,13 @@ interface prompt {
     /// The new account will NOT be automatically imported onto this device. It is required
     ///   to explicitly import the account using the `import-existing` function.
     ///
-    /// If there is already a user logged into the top-level app, then the account will be 
-    ///   created by that user. Otherwise, if there is currently an active invite that can 
-    ///   be redeemed to create an account, then the invite will be used. If neither condition 
+    /// If there is already a user logged into the top-level app, then the account will be
+    ///   created by that user. Otherwise, if there is currently an active invite that can
+    ///   be redeemed to create an account, then the invite will be used. If neither condition
     ///   is met, then the attempt to create an account will fail.
     create-account: func(account-name: string) -> result<string, error>;
 
-    /// Will connect the specified account with the active app, if not already 
+    /// Will connect the specified account with the active app, if not already
     ///   connected, and login.
     /// If there is currently an active invite, calling this will automatically accept it.
     connect-account: func(account: string);

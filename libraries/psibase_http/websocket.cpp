@@ -1,5 +1,7 @@
 #include "websocket.hpp"
 
+#include <psibase/TransactionContext.hpp>
+
 using namespace psibase;
 using namespace psibase::http;
 
@@ -33,4 +35,71 @@ WebSocket::WebSocket(server_state& server, SocketInfo&& info)
       logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
                                                  to_string(*savedInfo.endpoint)));
    }
+}
+
+void WebSocket::handleMessage(CloseLock&& l)
+{
+   auto inbuffer    = input.cdata();
+   auto data        = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
+   auto clearBuffer = psio::finally{[this] { input.consume(input.size()); }};
+
+   auto system = server.sharedState->getSystemContext();
+
+   psio::finally f{[&]() { server.sharedState->addSystemContext(std::move(system)); }};
+   BlockContext bc{*system, system->sharedDatabase.getHead(), system->sharedDatabase.createWriter(),
+                   true};
+   bc.start();
+
+   SignedTransaction trx;
+   TransactionTrace  trace;
+
+   TransactionContext tc{bc, trx, trace, DbMode::rpc()};
+
+   system->sockets->setOwner(std::move(l), &tc.ownedSockets);
+
+   Action action{
+       .sender  = AccountNumber(),
+       .service = proxyServiceNum,
+       .rawData = psio::convert_to_frac(std::tuple(this->Socket::id, data)),
+   };
+
+   try
+   {
+      auto& atrace = trace.actionTraces.emplace_back();
+      tc.execExport("recv", std::move(action), atrace);
+      BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+      PSIBASE_LOG(logger, debug) << proxyServiceNum.str() << "::recv succeeded";
+   }
+   catch (std::exception& e)
+   {
+      BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+      PSIBASE_LOG(logger, warning) << proxyServiceNum.str() << "::recv failed: " << e.what();
+   }
+}
+
+bool WebSocket::handleP2P()
+{
+   auto inbuffer = input.cdata();
+   auto msg      = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
+   if (!msg.empty() && static_cast<unsigned char>(msg[0]) < 64)
+   {
+      std::unique_lock l{mutex};
+      using P2PState = WebSocket::P2PState;
+      if (readCallback)
+      {
+         l.unlock();
+         auto readCallback = std::move(this->readCallback);
+         readCallback      = nullptr;
+         p2pState          = P2PState::running;
+         readCallback(std::error_code{}, std::vector(msg.begin(), msg.end()));
+         input.consume(input.size());
+         return true;
+      }
+      else if (p2pState == P2PState::reading)
+      {
+         p2pState == P2PState::messageReady;
+         return true;
+      }
+   }
+   return false;
 }

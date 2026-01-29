@@ -245,9 +245,11 @@ TestBlock makeBlock(const BlockInfo&                   info,
             newState.next = {*newBlock.block.header.newConsensus, newBlock.block.header.blockNum};
          }
       }
+      // Subjective data in the block provided by the producer is used during replay rather than actually executing
+      // rpc calls.
+      //
+      // Therefore, for any rpc calls made by the system during tx execution, subjective data must be provided here.
       trx.subjectiveData.emplace();
-      trx.subjectiveData->emplace_back();
-      trx.subjectiveData->push_back(psio::to_frac(std::chrono::nanoseconds(100000)));
       m.push(TransactionInfo{trx});
    }
    newBlock.block.header.consensusState  = sha256(newState);

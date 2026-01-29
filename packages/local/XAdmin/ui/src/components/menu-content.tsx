@@ -30,6 +30,25 @@ export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline">
+                        <Power className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                    <DropdownMenuSub>
+                        <DropdownMenuItem onClick={() => void chain.restart()}>
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            <span>Restart</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void chain.shutdown()}>
+                            <Power className="mr-2 h-4 w-4" />
+                            <span>Shutdown</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuSub>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
                         <Moon className="h-4 w-4" />
                     </Button>
                 </DropdownMenuTrigger>
@@ -47,25 +66,6 @@ export const MenuContent = ({ condense = false }: { condense?: boolean }) => {
                         <Sun className="mr-2 h-4 w-4" />
                         <span>System</span>
                     </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                        <Power className="h-4 w-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                    <DropdownMenuSub>
-                        <DropdownMenuItem onClick={() => void chain.restart()}>
-                            <RotateCcw className="mr-2 h-4 w-4" />
-                            <span>Restart</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => void chain.shutdown()}>
-                            <Power className="mr-2 h-4 w-4" />
-                            <span>Shutdown</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuSub>
                 </DropdownMenuContent>
             </DropdownMenu>
         </>

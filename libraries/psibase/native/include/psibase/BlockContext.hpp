@@ -55,6 +55,7 @@ namespace psibase
       // errors) will be set to zero.
       std::vector<Checksum256>                 callPreverify(const SignedTransaction& trx);
       void                                     callRun(psio::view<const RunRow> row);
+      void                                     callTimer(psio::view<const TimerRow> row);
       Checksum256                              makeEventMerkleRoot();
       Checksum256                              makeTransactionMerkle();
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(

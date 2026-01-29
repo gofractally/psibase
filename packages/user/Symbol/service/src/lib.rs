@@ -94,6 +94,7 @@ pub mod tables {
                 target,
                 floor_price,
                 RATE_OF_CHANGE,
+                RATE_OF_CHANGE,
             );
             let new_instance = Self::new(symbol_length, nft_id);
             new_instance.save();

@@ -1,0 +1,13 @@
+package faucet-tok:plugin;
+
+interface faucet {
+    /// Dispenses a fixed amount of the faucet tokens to the caller.
+    dispense: func(account: string);
+}
+
+world impl {
+    include host:types/imports;
+    include transact:plugin/imports;
+    
+    export faucet;
+}

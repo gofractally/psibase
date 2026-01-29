@@ -1,5 +1,6 @@
 #include <psibase/Socket.hpp>
 
+#include <psibase/api.hpp>
 #include <psibase/nativeTables.hpp>
 
 using namespace psibase;
@@ -7,6 +8,57 @@ using namespace psibase;
 static constexpr auto wasi_errno_acces  = 2;
 static constexpr auto wasi_errno_badf   = 8;
 static constexpr auto wasi_errno_notsup = 58;
+
+namespace psibase
+{
+   std::uint32_t operator&(std::uint32_t lhs, SocketFlags rhs)
+   {
+      return lhs & static_cast<std::uint32_t>(rhs);
+   }
+}  // namespace psibase
+
+namespace
+{
+   bool closeRequested(const AutoCloseSocket& socket)
+   {
+      return socket.forceClose || socket.autoClosing;
+   }
+
+   // Once this is true, no reads will happen, writes are forbidden,
+   // and changing flags is forbidden.
+   bool isClosing(const AutoCloseSocket& socket)
+   {
+      return closeRequested(socket) && socket.closeLocks == 0;
+   }
+
+   bool tryConsumeRecv(AutoCloseSocket& socket)
+   {
+      if (socket.receiving && socket.pendingRecv && !closeRequested(socket))
+      {
+         socket.receiving   = false;
+         socket.pendingRecv = false;
+         ++socket.closeLocks;
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+
+   bool tryClose(AutoCloseSocket& socket, Sockets& parent)
+   {
+      if (isClosing(socket) && !socket.closed)
+      {
+         socket.closed = true;
+         return true;
+      }
+      else
+      {
+         return false;
+      }
+   }
+}  // namespace
 
 Socket::~Socket()
 {
@@ -27,7 +79,7 @@ bool Socket::supportsP2P() const
    return false;
 }
 
-void Socket::replace(Writer& writer, std::shared_ptr<Socket>&& other)
+void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&& other)
 {
    if (auto sockets = weak_sockets.lock())
    {
@@ -36,10 +88,30 @@ void Socket::replace(Writer& writer, std::shared_ptr<Socket>&& other)
       {
          std::lock_guard l{sockets->mutex};
          other->weak_sockets  = std::move(weak_sockets);
+         other->notifyClose   = notifyClose;
+         other->autoClosing   = autoClosing;
+         other->receiving     = receiving;
+         other->closeLocks    = closeLocks;
          sockets->sockets[id] = std::move(other);
       }
       sockets->sharedDb.kvPutSubjective(writer, SocketRow::db, psio::convert_to_key(row.key()),
                                         psio::to_frac(row));
+   }
+}
+
+void Socket::remove(Writer& writer)
+{
+   if (auto sockets = weak_sockets.lock())
+   {
+      auto key = socketKey(id);
+      sockets->sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
+      {
+         std::lock_guard l{sockets->mutex};
+         sockets->available.set(id);
+         weak_sockets.reset();
+         if (!sockets->stopped)
+            sockets->sockets[static_cast<std::size_t>(id)].reset();
+      }
    }
 }
 
@@ -64,26 +136,36 @@ void AutoCloseSocket::enableP2P(std::function<void(const std::shared_ptr<net::co
        "Internal error: enableP2P must be implemented if supportsP2P() is true");
 }
 
-void AutoCloseSocket::onLock() {}
+void AutoCloseSocket::onLock(CloseLock&&)
+{
+   assert(!"onLock must be implemented if a socket calls Sockets::lockRecv");
+}
 
 void SocketAutoCloseSet::close(Writer&                           writer,
                                Sockets&                          parent,
                                const std::optional<std::string>& message)
 {
-   for (const auto& socket : sockets)
-   {
-      socket->autoClose(message);
-      auto key = socketKey(socket->id);
-      parent.sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
-   }
+   std::vector<std::shared_ptr<AutoCloseSocket>> toClose;
    {
       std::lock_guard l{parent.mutex};
-      for (const auto& socket : sockets)
+      if (parent.stopped)
+         return;
+      for (std::int32_t id : sockets)
       {
-         socket->closed = true;
-         if (!parent.stopped)
-            parent.sockets[static_cast<std::size_t>(socket->id)].reset();
+         auto& base = parent.sockets[static_cast<std::size_t>(id)];
+         assert(base->canAutoClose());
+         auto socket = std::static_pointer_cast<AutoCloseSocket>(base);
+         assert(socket->closeLocks != 0);
+         --socket->closeLocks;
+         if (tryClose(*socket, parent))
+         {
+            toClose.push_back(std::move(socket));
+         }
       }
+   }
+   for (const auto& socket : toClose)
+   {
+      socket->onClose(message);
    }
    sockets.clear();
 }
@@ -92,25 +174,58 @@ SocketAutoCloseSet::~SocketAutoCloseSet()
    assert(sockets.empty() && "SocketAutoCloseSet must be explicitly closed before being destroyed");
 }
 
-bool SocketAutoCloseSet::owns(Sockets& sockets, const AutoCloseSocket& sock)
+bool SocketAutoCloseSet::owns(Sockets& parent, const std::shared_ptr<AutoCloseSocket>& sock)
 {
-   std::lock_guard l{sockets.mutex};
-   return sock.owner == this;
+   if (sockets.find(sock->id) == sockets.end())
+      return false;
+   std::lock_guard l{parent.mutex};
+   return sock->autoClosing && parent.sockets[static_cast<std::size_t>(sock->id)] == sock;
 }
 
 namespace
 {
-   void doRemoveSocket(std::shared_ptr<Socket>& socket, SharedDatabase& sharedDb)
+   void updateSocketFlags(const std::shared_ptr<AutoCloseSocket>& sockptr,
+                          std::uint32_t                           mask,
+                          std::uint32_t                           value,
+                          SocketAutoCloseSet*                     owner)
    {
-      assert(!socket->closed);
-      if (socket->canAutoClose())
+      if (mask & SocketFlags::lockClose)
       {
-         auto sockptr = std::static_pointer_cast<AutoCloseSocket>(socket);
-         if (sockptr->owner)
-            sockptr->owner->sockets.erase(sockptr);
+         if (value & SocketFlags::lockClose)
+         {
+            if (owner->sockets.insert(sockptr->id).second)
+               ++sockptr->closeLocks;
+         }
+         else
+         {
+            assert(sockptr->closeLocks != 0);
+            if (owner->sockets.erase(sockptr->id))
+               --sockptr->closeLocks;
+         }
       }
-      socket->closed = true;
-      socket.reset();
+      if (mask & SocketFlags::notifyClose)
+      {
+         sockptr->notifyClose = (value & SocketFlags::notifyClose) != 0;
+      }
+      if (mask & SocketFlags::autoClose)
+      {
+         sockptr->autoClosing = (value & SocketFlags::autoClose) != 0;
+      }
+      if (mask & SocketFlags::recv)
+      {
+         sockptr->receiving = (value & SocketFlags::recv) != 0;
+      }
+   }
+
+   std::int32_t checkSocketFlags(const std::shared_ptr<AutoCloseSocket>& sockptr,
+                                 std::uint32_t                           mask,
+                                 std::uint32_t                           value,
+                                 SocketAutoCloseSet*                     owner)
+   {
+      // Once autoClose triggers, it can't be disabled
+      if (isClosing(*sockptr))
+         return wasi_errno_acces;
+      return 0;
    }
 }  // namespace
 
@@ -147,16 +262,6 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
          p = sockets[fd];
       if (!p)
          return wasi_errno_badf;
-      if (p->once)
-      {
-         doRemoveSocket(sockets[fd], sharedDb);
-      }
-   }
-
-   if (p->closed)
-   {
-      auto key = socketKey(p->id);
-      sharedDb.kvRemoveSubjective(writer, SocketRow::db, psio::convert_to_key(key));
    }
 
    p->send(writer, buf);
@@ -190,10 +295,11 @@ void Sockets::add(Writer&                        writer,
       if (owner)
       {
          assert(socket->canAutoClose());
-         auto sockptr         = std::static_pointer_cast<AutoCloseSocket>(socket);
-         sockptr->owner       = owner;
+         auto sockptr = std::static_pointer_cast<AutoCloseSocket>(socket);
+         assert(sockptr->closeLocks == 0);
          sockptr->autoClosing = true;
-         owner->sockets.insert(sockptr);
+         sockptr->closeLocks  = 1;
+         owner->sockets.insert(sockptr->id);
       }
       socket->weak_sockets = shared_from_this();
    }
@@ -255,7 +361,8 @@ void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Data
       std::lock_guard l{mutex};
       if (socket->id >= 0 && socket->id < sockets.size() && sockets[socket->id] == socket)
       {
-         doRemoveSocket(sockets[socket->id], sharedDb);
+         socket->closed = true;
+         sockets[socket->id].reset();
          matched = true;
       }
    }
@@ -272,55 +379,41 @@ void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Data
       }
    }
 }
-std::int32_t Sockets::autoClose(std::int32_t               fd,
-                                bool                       value,
-                                SocketAutoCloseSet*        owner,
-                                std::vector<SocketChange>* diff)
+
+std::int32_t Sockets::setFlags(std::int32_t               fd,
+                               std::uint32_t              mask,
+                               std::uint32_t              value,
+                               SocketAutoCloseSet*        owner,
+                               std::vector<SocketChange>* diff)
 {
-   std::shared_ptr<AutoCloseSocket> sockptr;
-   bool                             acquireLock = false;
-   {
-      std::lock_guard l{mutex};
-      if (fd < 0 || fd >= sockets.size() || !sockets[fd])
-         return wasi_errno_badf;
-      auto p = sockets[fd];
+   std::unique_lock l{mutex};
 
-      if (!p->canAutoClose())
-         return wasi_errno_notsup;
+   if (fd < 0 || fd >= sockets.size() || !sockets[fd])
+      return wasi_errno_badf;
+   auto p = sockets[fd];
 
-      sockptr = std::static_pointer_cast<AutoCloseSocket>(p);
+   if (!p->canAutoClose())
+      return wasi_errno_notsup;
 
-      if ((sockptr->autoClosing || sockptr->autoCloseLocked) && sockptr->owner != owner)
-         return wasi_errno_acces;
+   auto sockptr = std::static_pointer_cast<AutoCloseSocket>(p);
 
-      acquireLock = !value && !diff && sockptr->pendingLock;
-
-      if (!diff && !sockptr->autoCloseLocked)
-      {
-         sockptr->autoClosing = value;
-         sockptr->owner       = value ? owner : nullptr;
-      }
-      if (acquireLock)
-      {
-         sockptr->pendingLock     = false;
-         sockptr->autoCloseLocked = true;
-      }
-   }
+   if (auto err = checkSocketFlags(sockptr, mask, value, owner))
+      return err;
 
    if (diff)
    {
-      diff->push_back({sockptr, value ? owner : nullptr});
+      diff->push_back({sockptr, static_cast<std::uint8_t>(mask), static_cast<std::uint8_t>(value)});
    }
    else
    {
-      if (value)
-         owner->sockets.insert(sockptr);
-      else
-         owner->sockets.erase(sockptr);
-   }
-   if (acquireLock)
-   {
-      sockptr->onLock();
+      updateSocketFlags(sockptr, mask, value, owner);
+      bool acquireLock = tryConsumeRecv(*sockptr);
+      bool close       = tryClose(*sockptr, *this);
+      l.unlock();
+      if (acquireLock)
+         sockptr->onLock(CloseLock{this, sockptr.get()});
+      if (close)
+         sockptr->onClose(std::nullopt);
    }
    return 0;
 }
@@ -343,13 +436,13 @@ std::int32_t Sockets::enableP2P(
 
       sockptr = std::static_pointer_cast<AutoCloseSocket>(p);
 
-      if ((sockptr->autoClosing || sockptr->autoCloseLocked) && sockptr->owner != owner)
+      if (isClosing(*sockptr))
          return wasi_errno_acces;
    }
 
    if (diff)
    {
-      diff->push_back({sockptr, nullptr, SocketChange::setP2PFlag});
+      diff->push_back({sockptr, SocketChange::setP2PFlag});
    }
    else
    {
@@ -358,89 +451,148 @@ std::int32_t Sockets::enableP2P(
    return 0;
 }
 
-bool Sockets::lockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket)
+void Sockets::asyncClose(AutoCloseSocket& socket)
+{
+   bool close;
+   {
+      std::lock_guard l{mutex};
+      socket.forceClose = true;
+      close             = tryClose(socket, *this);
+   }
+   if (close)
+      socket.onClose(std::nullopt);
+}
+
+CloseLock Sockets::lockRecv(const std::shared_ptr<AutoCloseSocket>& socket)
 {
    bool            okay = false;
    std::lock_guard l{mutex};
-   assert(!socket->autoCloseLocked);
-   assert(!socket->pendingLock);
-   if (!socket->autoClosing)
+   assert(!socket->pendingRecv);
+   if (socket->receiving)
    {
-      socket->autoCloseLocked = true;
-      return true;
+      socket->receiving = false;
+      ++socket->closeLocks;
+      return CloseLock{this, socket.get()};
    }
    else
    {
-      socket->pendingLock = true;
-      return false;
+      socket->pendingRecv = true;
+      return CloseLock{nullptr, nullptr};
    }
 }
 
-void Sockets::unlockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket)
+CloseLock Sockets::lockClose(const std::shared_ptr<AutoCloseSocket>& socket)
 {
+   assert(socket->weak_sockets.lock().get() == this);
    std::lock_guard l{mutex};
-   assert(socket->autoCloseLocked);
-   assert(!socket->pendingLock);
-   socket->autoCloseLocked = false;
-   if (!socket->autoClosing)
+   if (!socket->closed)
    {
-      socket->owner = nullptr;
+      ++socket->closeLocks;
+      return CloseLock{this, socket.get()};
+   }
+   else
+   {
+      return CloseLock{nullptr, nullptr};
    }
 }
 
-void Sockets::setOwner(const std::shared_ptr<AutoCloseSocket>& socket, SocketAutoCloseSet* owner)
+CloseLock::CloseLock(CloseLock&& other) : self(other.self), socket(other.socket)
 {
-   std::lock_guard l{mutex};
-   assert(!socket->autoClosing);
-   assert(socket->autoCloseLocked);
-   assert(socket->owner == nullptr);
-   socket->owner = owner;
+   other.self   = nullptr;
+   other.socket = -1;
 }
 
-bool Sockets::applyChanges(const std::vector<SocketChange>& diff,
-                           SocketAutoCloseSet*              owner,
-                           const DatabaseCallbacks*         callbacks)
+CloseLock::CloseLock(const CloseLock& other) : self(other.self), socket(other.socket)
 {
-   std::lock_guard l{mutex};
-   for (const auto& change : diff)
+   assert(!"CloseLock should not be copied, but type erasure requires a copy constructor even when it isn't actually used.");
+   if (self)
    {
-      if (change.socket->closed || (change.socket->autoClosing || change.socket->autoCloseLocked) &&
-                                       change.socket->owner != owner)
-         return false;
+      std::lock_guard l{self->mutex};
+      auto&           base{self->sockets[static_cast<std::size_t>(this->socket)]};
+      assert(base->canAutoClose());
+      auto* socket = static_cast<AutoCloseSocket*>(base.get());
+      assert(socket->closeLocks != 0);
+      ++socket->closeLocks;
    }
-   for (const auto& change : diff)
+}
+
+CloseLock::~CloseLock()
+{
+   if (self)
    {
-      if (change.flags == SocketChange::setP2PFlag)
+      std::unique_lock l{self->mutex};
+      if (self->stopped)
+         return;
+      auto& base{self->sockets[static_cast<std::size_t>(this->socket)]};
+      assert(base->canAutoClose());
+      auto* socket = static_cast<AutoCloseSocket*>(base.get());
+      assert(socket->closeLocks != 0);
+      --socket->closeLocks;
+      l.unlock();
+      if (tryClose(*socket, *self))
+         socket->onClose(std::nullopt);
+   }
+}
+
+CloseLock::operator bool() const
+{
+   return self != nullptr;
+}
+
+CloseLock::CloseLock(Sockets* self, AutoCloseSocket* socket)
+    : self(self), socket(socket ? socket->id : -1)
+{
+}
+
+void Sockets::setOwner(CloseLock&& rl, SocketAutoCloseSet* owner)
+{
+   assert(rl.self);
+   auto [_, inserted] = owner->sockets.insert(rl.socket);
+   assert(inserted);
+   rl.self   = nullptr;
+   rl.socket = -1;
+}
+
+bool Sockets::applyChanges(std::vector<SocketChange>&& diff,
+                           SocketAutoCloseSet*         owner,
+                           const DatabaseCallbacks*    callbacks)
+{
+   {
+      std::lock_guard l{mutex};
+      for (const auto& change : diff)
       {
-         change.socket->enableP2P(callbacks->socketP2P);
+         if (checkSocketFlags(change.socket, change.mask, change.value, owner) != 0)
+            return false;
       }
-      else
+      for (const auto& change : diff)
       {
-         if (change.socket->autoClosing && !change.owner)
+         updateSocketFlags(change.socket, change.mask, change.value, owner);
+      }
+      // Processing pending locks has to come after updating all sockets,
+      // because autoClose might be disabled and then re-enabled again
+      // in the changeset.
+      for (auto& change : diff)
+      {
+         change.value &= ~SocketChange::setP2PFlag;
+         if (tryConsumeRecv(*change.socket))
          {
-            owner->sockets.erase(change.socket);
+            change.value |= static_cast<std::uint32_t>(SocketFlags::recv);
          }
-         else if (!change.socket->autoClosing && change.owner)
+         if (tryClose(*change.socket, *this))
          {
-            owner->sockets.insert(change.socket);
+            change.value |= static_cast<std::uint32_t>(SocketFlags::lockClose);
          }
-         change.socket->autoClosing = change.owner != nullptr;
-         if (!change.socket->autoCloseLocked)
-            change.socket->owner = change.owner;
       }
    }
-   // Processing pending locks has to come after updating all sockets,
-   // because autoClose might be disabled and then re-enabled again
-   // in the changeset.
    for (const auto& change : diff)
    {
-      if (change.socket->pendingLock && !change.socket->autoClosing)
-      {
-         assert(!change.socket->autoCloseLocked);
-         change.socket->autoCloseLocked = true;
-         change.socket->pendingLock     = false;
-         change.socket->onLock();
-      }
+      if (change.value & SocketChange::setP2PFlag)
+         ;
+      change.socket->enableP2P(callbacks->socketP2P);
+      if (change.value & SocketFlags::recv)
+         change.socket->onLock(CloseLock{this, change.socket.get()});
+      if (change.value & SocketFlags::lockClose)
+         change.socket->onClose(std::nullopt);
    }
    return true;
 }

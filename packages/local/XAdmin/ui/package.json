@@ -27,7 +27,7 @@
         "react-dom": "^19.1.0",
         "react-hook-form": "^7.58.1",
         "react-router-dom": "^6.26.1",
-        "recharts": "^2.12.7",
+        "recharts": "2.15.4",
         "vite-plugin-top-level-await": "^1.4.1",
         "vite-plugin-wasm": "^3.3.0",
         "waait": "^1.0.5",

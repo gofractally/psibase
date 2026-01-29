@@ -2,18 +2,35 @@
 
 #include <boost/dynamic_bitset.hpp>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <psibase/SocketInfo.hpp>
 #include <psibase/check.hpp>
 #include <psibase/db.hpp>
-#include <set>
 #include <span>
 #include <vector>
 
 namespace psibase
 {
    struct Sockets;
+   struct AutoCloseSocket;
+
+   struct CloseLock
+   {
+     public:
+      CloseLock(CloseLock&&);
+      CloseLock(const CloseLock&);
+      ~CloseLock();
+      explicit operator bool() const;
+
+     private:
+      friend class Sockets;
+      CloseLock(Sockets* self, AutoCloseSocket* socket);
+      Sockets*     self;
+      std::int32_t socket;
+   };
+
    struct Socket
    {
       ~Socket();
@@ -22,12 +39,11 @@ namespace psibase
       virtual bool       supportsP2P() const;
       virtual SocketInfo info() const = 0;
 
-      void replace(Writer& writer, std::shared_ptr<Socket>&& other);
+      void remove(Writer& writer);
       void writeInfo(Writer& writer);
 
       std::int32_t           id;
       bool                   closed = false;
-      bool                   once   = false;
       std::weak_ptr<Sockets> weak_sockets;
    };
 
@@ -36,32 +52,52 @@ namespace psibase
    struct AutoCloseSocket : Socket
    {
       virtual bool canAutoClose() const override;
-      virtual void autoClose(const std::optional<std::string>& message) noexcept = 0;
+      /// \pre closed is true
+      /// \pre closeLocks == 0
+      /// \pre either forceClose or autoClosing is true
+      ///
+      /// Once this starts, any attempt to acquire a close lock or change
+      /// notifyClose or autoClose will fail
+      ///
+      /// This MUST NOT run wasm directly. It should post its work to
+      /// the execution context associated with the socket:
+      /// - If notifyClose is set, call x-http::recv(id),
+      /// - call this->remove
+      /// - If required by the socket, send an error
+      /// - Shutdown and close the socket
+      /// - Clean up all remaining shared_ptrs
+      virtual void onClose(const std::optional<std::string>& message) noexcept = 0;
       virtual void enableP2P(std::function<void(const std::shared_ptr<net::connection_base>&)>);
-      virtual void onLock();
-      // owner can be non-null if either autoClosing or autoCloseLocked is true
-      // If autoCloseLocked is true, then only the context that holds the lock
-      // can set autoClose.
-      SocketAutoCloseSet* owner           = nullptr;
-      bool                autoCloseLocked = false;
-      bool                autoClosing     = false;
-      bool                pendingLock     = false;
+      /// Called when the recv lock is acquired asynchronously. This
+      /// should post to an appropriate executor. It MUST NOT run
+      /// wasm directly.
+      virtual void onLock(CloseLock&&);
+      /// Replaces this socket with another socket, preserving socket flags.
+      /// - Pending asyncClose and lockRecv are not preserved, because
+      ///   they depend on the underlying socket.
+      void          replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&& other);
+      bool          forceClose  = false;
+      bool          notifyClose = false;
+      bool          autoClosing = false;
+      bool          receiving   = false;
+      std::uint16_t closeLocks  = 0;
+      bool          pendingRecv = false;
    };
 
    struct SocketChange
    {
       std::shared_ptr<AutoCloseSocket> socket;
-      SocketAutoCloseSet*              owner;
-      std::uint32_t                    flags;
+      static const std::uint32_t       setP2PFlag = 16;
 
-      static const std::uint32_t setP2PFlag = 1;
+      std::uint32_t mask;
+      std::uint32_t value;
    };
 
    struct SocketAutoCloseSet
    {
-      std::set<std::shared_ptr<AutoCloseSocket>> sockets;
+      std::set<std::int32_t> sockets;
       void close(Writer& writer, Sockets& sockets, const std::optional<std::string>& message = {});
-      bool owns(Sockets& sockets, const AutoCloseSocket& sock);
+      bool owns(Sockets& sockets, const std::shared_ptr<AutoCloseSocket>& sock);
       ~SocketAutoCloseSet();
    };
 
@@ -80,25 +116,34 @@ namespace psibase
                        SocketAutoCloseSet*            owner = nullptr,
                        Database*                      db    = nullptr);
       void         set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>& socket);
-      void remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db = nullptr);
-      std::int32_t autoClose(std::int32_t               socket,
-                             bool                       value,
-                             SocketAutoCloseSet*        owner,
-                             std::vector<SocketChange>* diff = nullptr);
+      void         remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db);
+      std::int32_t setFlags(std::int32_t               socket,
+                            std::uint32_t              mask,
+                            std::uint32_t              value,
+                            SocketAutoCloseSet*        owner,
+                            std::vector<SocketChange>* diff);
+
       std::int32_t enableP2P(std::int32_t               socket,
                              SocketAutoCloseSet*        owner,
                              std::vector<SocketChange>* diff,
                              std::function<void(const std::shared_ptr<net::connection_base>&)>);
-      /// Returns true if autoClose was locked immediately for the socket.
-      /// If the socket currently has autoClose enabled, the lock will be
-      /// acquired when autoClose is disabled, and AutoCloseSocket::onLock
-      /// will be called.
-      bool lockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket);
-      void unlockAutoClose(const std::shared_ptr<AutoCloseSocket>& socket);
-      void setOwner(const std::shared_ptr<AutoCloseSocket>& socket, SocketAutoCloseSet* owner);
-      bool applyChanges(const std::vector<SocketChange>& diff,
-                        SocketAutoCloseSet*              owner,
-                        const DatabaseCallbacks*         callbacks);
+      /// Marks a socket for closing. This is irreversible and cannot
+      /// be affected directly by WASM. This should be called when
+      /// the socket is closed at the remote end, when there is an
+      /// error, or when other conditions on the host cause the
+      /// connection to be closed.
+      void asyncClose(AutoCloseSocket& socket);
+
+      /// Prevents the socket from being closed
+      CloseLock lockClose(const std::shared_ptr<AutoCloseSocket>& socket);
+      /// This will either return an acquired lock or cause onLock to be
+      /// called as soon as the lock can be acquired. If the socket is
+      /// closed, onLock might never be called.
+      CloseLock lockRecv(const std::shared_ptr<AutoCloseSocket>& socket);
+      void      setOwner(CloseLock&& l, SocketAutoCloseSet* owner);
+      bool      applyChanges(std::vector<SocketChange>&& diff,
+                             SocketAutoCloseSet*         owner,
+                             const DatabaseCallbacks*    callbacks);
    };
 
 }  // namespace psibase

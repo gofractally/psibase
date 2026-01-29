@@ -340,6 +340,14 @@ namespace psibase
          context.blockContext.db.setCallbackFlags(DatabaseCallbacks::shutdownFlag);
       }
 
+      void verifyTimerRow(Database& db, psio::input_stream key, psio::input_stream value)
+      {
+         if (psio::fracpack_validate<TimerRow>({value.pos, value.end}))
+         {
+            db.setCallbackFlags(DatabaseCallbacks::runQueueFlag);
+         }
+      }
+
       void verifyWriteConstrained(TransactionContext&               context,
                                   psio::input_stream                key,
                                   psio::input_stream                value,
@@ -390,7 +398,7 @@ namespace psibase
                               psio::input_stream  value)
       {
          NativeTableNum table;
-         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
+         check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSession");
          memcpy(&table, key.pos, sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == socketTable)
@@ -401,8 +409,10 @@ namespace psibase
             verifyHostConfigRow(context, key, value);
          else if (table == pendingShutdownTable)
             verifyPendingShutdownRow(context, key, value);
+         else if (table == timerTable)
+            verifyTimerRow(context.blockContext.db, key, value);
          else
-            throw std::runtime_error("Unrecognized key in nativeSubjective");
+            throw std::runtime_error("Unrecognized key in nativeSession");
       }
 
       void verifyRemoveConstrained(TransactionContext& context,
@@ -1002,15 +1012,15 @@ namespace psibase
           *transactionContext.blockContext.writer, fd, msg);
    }
 
-   int32_t NativeFunctions::socketAutoClose(int32_t fd, bool value)
+   int32_t NativeFunctions::socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
-      return database.socketAutoClose(fd, value,
-                                      *transactionContext.blockContext.systemContext.sockets,
-                                      transactionContext.ownedSockets);
+      return database.socketSetFlags(fd, mask, value,
+                                     *transactionContext.blockContext.systemContext.sockets,
+                                     transactionContext.ownedSockets);
    }
 
 }  // namespace psibase

@@ -136,10 +136,10 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XDb XHttp XRun XSites XTransact
+        Transact VerifySig XAdmin XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XPeers XProxy XSocketListService WSEcho)
+        XPackages XPeers XProxy XSocketListService WSEcho XDelay)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -514,6 +514,18 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
     PATH packages/user/BrotliCodec
     TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/FaucetTok.psi
+    PATH packages/user/FaucetTok
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/VirtualServer.psi
+    PATH packages/system/VirtualServer
+    TARGET_DIR ${SYSTEM_WORKSPACE_TARGET}
 )
 
 cargo_psibase_package(
@@ -923,8 +935,8 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "Initial token users"
-    PACKAGE_DEPENDS "Tokens(^${PSIBASE_VERSION}.0)" "Symbol(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)"
+    DESCRIPTION "Creates accounts alice & bob, and gives each some system tokens. Not for production use."
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" 
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
@@ -1035,6 +1047,18 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/XTimer.psi
+    NAME XTimer
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Schedules asyncronous tasks"
+    SERVICE x-timer
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XTimer.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XTimer-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/XTransact.psi
     NAME XTransact
     VERSION ${PSIBASE_VERSION}.0
@@ -1051,9 +1075,9 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact Homepage WebCrypto Workshop Config
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1061,9 +1085,9 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact Homepage WebCrypto Workshop Config
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
 
@@ -1073,7 +1097,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Minimum packages for a functional chain"
     PACKAGE_DEPENDS Accounts AuthDelegate AuthAny CpuLimit CommonApi Db Packages Producers HttpServer
-                    SetCode Transact
+                    SetCode Transact VirtualServer
 )
 
 psibase_package(
@@ -1089,7 +1113,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
 )
 
 function(write_package_index target dir)
@@ -1107,9 +1131,9 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage WebCrypto Workshop Config
-    XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTransact)
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
+    XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1135,6 +1159,7 @@ install(
           ${SERVICE_DIR}/Events.psi
           ${SERVICE_DIR}/Evaluations.psi
           ${SERVICE_DIR}/Explorer.psi
+          ${SERVICE_DIR}/FaucetTok.psi
           ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/FractalCore.psi
           ${SERVICE_DIR}/Host.psi
@@ -1163,6 +1188,7 @@ install(
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
@@ -1174,6 +1200,7 @@ install(
           ${SERVICE_DIR}/XPeers.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi
+          ${SERVICE_DIR}/XTimer.psi
           ${SERVICE_DIR}/XTransact.psi
     DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/packages/
     COMPONENT ServerData)
@@ -1295,7 +1322,19 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XDelay.psi
+    NAME XDelay
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Test for XTimer"
+    SERVICE x-delay
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XDelay.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDelay-schema.json
+        SERVER x-delay
+    DEPENDS wasm
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay)
 
 ExternalProject_Add(
     rust

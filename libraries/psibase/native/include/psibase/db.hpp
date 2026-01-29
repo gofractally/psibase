@@ -239,10 +239,11 @@ namespace psibase
       void abortSubjective();
       // sockets options are linked to subjective checkouts. Eventually the state might
       // be exposed in a table.
-      std::int32_t socketAutoClose(std::int32_t        socket,
-                                   bool                value,
-                                   Sockets&            sockets,
-                                   SocketAutoCloseSet& closing);
+      std::int32_t socketSetFlags(std::int32_t        socket,
+                                  std::uint32_t       mask,
+                                  std::uint32_t       value,
+                                  Sockets&            sockets,
+                                  SocketAutoCloseSet& closing);
       std::int32_t socketEnableP2P(std::int32_t        socket,
                                    Sockets&            sockets,
                                    SocketAutoCloseSet& closing);

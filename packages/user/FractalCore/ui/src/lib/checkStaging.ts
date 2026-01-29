@@ -23,7 +23,7 @@ const zAwaiting = z
 export const zTxStatus = z.discriminatedUnion("type", [zExecuted, zAwaiting]);
 export type TxStatus = z.infer<typeof zTxStatus>;
 
-export const checkLastTx = async (): Promise<z.infer<typeof zTxStatus>> => {
+export const checkLastTx = async (): Promise<TxStatus> => {
     const currentUser = getCurrentUser()!;
 
     const actorHistory = await getActorHistory(currentUser);

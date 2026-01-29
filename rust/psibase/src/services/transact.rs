@@ -26,6 +26,12 @@ pub struct ServiceMethod {
     pub method: crate::MethodNumber,
 }
 
+impl ServiceMethod {
+    pub fn new(service: crate::AccountNumber, method: crate::MethodNumber) -> Self {
+        Self { service, method }
+    }
+}
+
 type CallbackType = u32;
 
 /// Authenticate actions
@@ -60,6 +66,8 @@ type CallbackType = u32;
 )]
 #[allow(non_snake_case, unused_variables)]
 pub mod auth_interface {
+    use crate::services::transact::ServiceMethod;
+
     /// The database is in read-only mode. This flag is only
     /// used for `topActionReq`.
     ///
@@ -160,6 +168,7 @@ pub mod auth_interface {
     ///
     /// * `sender`: The sender account for the transaction potentially being authorized.
     /// * `authorizers`: The set of accounts that have already authorized the execution of the transaction.
+    /// * `method`: The service and method being called.
     /// * `authSet`: The set of accounts that are already being checked for authorization.
     ///              If the sender is already in this set, then the function should return false.
     ///
@@ -170,6 +179,7 @@ pub mod auth_interface {
     fn isAuthSys(
         sender: crate::AccountNumber,
         authorizers: Vec<crate::AccountNumber>,
+        method: Option<ServiceMethod>,
         authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
@@ -180,6 +190,7 @@ pub mod auth_interface {
     ///
     /// * `sender`: The sender account for the transaction potentially being rejected.
     /// * `rejecters`: The set of accounts that have already authorized the rejection of the transaction.
+    /// * `method`: The service and method being called.
     /// * `authSet`: The set of accounts that are already being checked for authorization.
     ///              If the sender is already in this set, then the function should return false.
     ///
@@ -190,6 +201,7 @@ pub mod auth_interface {
     fn isRejectSys(
         sender: crate::AccountNumber,
         rejecters: Vec<crate::AccountNumber>,
+        method: Option<ServiceMethod>,
         authSet: Option<Vec<crate::AccountNumber>>,
     ) -> bool {
         unimplemented!()
@@ -282,6 +294,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Registers an event index service
+    #[action]
+    fn regEvIdx(service: crate::AccountNumber) {
+        unimplemented!()
+    }
+
     /// Run `action` using `action.sender's` authority
     ///
     /// Also adds `allowedActions` to the list of actions that `action.service`
@@ -320,6 +338,12 @@ mod service {
     /// Checks authorization for the sender of the first action
     #[action]
     fn checkFirstAuth(id: Checksum256, transaction: Transaction) -> bool {
+        unimplemented!()
+    }
+
+    /// Enable/disable resource monitoring
+    #[action]
+    fn resMonitoring(enable: bool) {
         unimplemented!()
     }
 
