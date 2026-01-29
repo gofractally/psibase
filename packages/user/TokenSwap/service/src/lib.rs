@@ -224,7 +224,7 @@ pub mod tables {
             }
         }
 
-        pub fn reserves(&self) -> (Reserve, Reserve) {
+        fn reserves(&self) -> (Reserve, Reserve) {
             let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
 
             if first.token_id < second.token_id {
@@ -246,7 +246,7 @@ pub mod tables {
             }
         }
 
-        pub fn reserves_with_first(&self, first_token: TID) -> (Reserve, Reserve) {
+        fn reserves_with_first(&self, first_token: TID) -> (Reserve, Reserve) {
             let (first, second) = Reserve::get_reserves_of_pool(self.liquidity_token);
 
             if first.token_id == first_token {
