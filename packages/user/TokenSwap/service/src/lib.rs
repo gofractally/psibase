@@ -1,4 +1,4 @@
-mod uniswap;
+mod helpers;
 
 #[psibase::service_tables]
 pub mod tables {
@@ -11,7 +11,7 @@ pub mod tables {
         abort_message, check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
     };
 
-    use crate::uniswap::{mul_div, sqrt};
+    use crate::helpers::{mul_div, sqrt};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "PoolTable", index = 0)]
