@@ -10,9 +10,11 @@ import { usePools } from "./hooks/use-pools";
 import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
 import { useEffect, useMemo } from "react";
 import { PickTokenModal } from "./components/pick-token-modal";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, ArrowRight } from "lucide-react";
+import { Button } from "@shared/shadcn/ui/button";
 
-export const Swap = () => {
+
+export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
     const { setValue: setShowSwap, value: showSwap } = useBoolean();
     const { setValue: setPickTokenModal, value: showPickTokenModal } = useBoolean();
 
@@ -96,6 +98,8 @@ export const Swap = () => {
         [pools],
     );
 
+    const isNoTradingNetwork = uniqueTradeableTokens.length < 2;
+
 
     const swapQuotePoolIds =
         quotedSwap && Array.from(quotedSwap.pools).map(String);
@@ -146,6 +150,7 @@ export const Swap = () => {
             token1={{
                 id: fromId || 0,
                 label: "From",
+                disabled: isNoTradingNetwork,
                 amount: fromAmount,
                 balance: fromBalance,
                 setAmount: function (amount) {
@@ -196,5 +201,29 @@ export const Swap = () => {
                 )}
             </div>}
         />
+
+        {isNoTradingNetwork && (
+            <div
+                className="absolute p-6 sm:p-8 inset-0 flex flex-col items-center justify-center backdrop-blur-sm z-20 border border-border/50 rounded-sm text-center"
+            >
+                <div className="space-y-4 max-w-sm">
+                    <div className="text-xl font-semibold tracking-tight">
+                        Trading not available yet
+                    </div>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                        No liquidity pools exist on this network.
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                        To enable swapping, a liquidity pool needs to be created first.
+                    </p>
+
+                    <Button onClick={() => { onSwitch() }} variant="outline" size="sm" className="mt-4 gap-1.5">
+                        Create a Pool <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
+            </div>
+        )}
+
+
     </>
 }

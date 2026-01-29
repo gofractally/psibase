@@ -42,10 +42,6 @@ export const ConfirmSwapModal = ({
 }) => {
     const { mutateAsync: swap, isPending } = useSwap();
 
-    const { data: pools } = usePools();
-
-    console.log({ pools });
-
     const {
         toggle: toggleUserAcceptsSlippage,
         value: isUserAcceptingOfSlippage,

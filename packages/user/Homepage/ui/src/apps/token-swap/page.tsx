@@ -52,7 +52,8 @@ export const SwapPage = () => {
 
 
     return (
-        <div className="container mx-auto max-w-lg px-4 py-12">
+        <div className="container mx-auto max-w-lg px-4 py-12 ">
+
             <DevModal
                 openChange={(e) => {
                     setShowDevModal(e);
@@ -67,7 +68,7 @@ export const SwapPage = () => {
             />
 
 
-            <Card className="border-2 shadow-xl">
+            <Card className="border-2 shadow-xl relative isolate">
                 <CardHeader className="pb-4">
                     <Tabs
                         defaultValue="swap"
@@ -111,7 +112,7 @@ export const SwapPage = () => {
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
 
-                {currentTab == zCurrentTab.Values.Swap && <Swap />}
+                {currentTab == zCurrentTab.Values.Swap && <Swap onSwitch={() => { setCurrentTab(zCurrentTab.Values.Liquidity) }} />}
                 {currentTab == zCurrentTab.Values.Liquidity && <Liquidity />}
 
 
