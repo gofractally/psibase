@@ -177,7 +177,7 @@ pub mod tables {
             Tokens::call().getToken(self.liquidity_token)
         }
 
-        pub fn pool_token_supply(&self) -> Quantity {
+        fn pool_token_supply(&self) -> Quantity {
             let token = self.pool_token();
             token.issued_supply - token.burned_supply
         }
@@ -331,7 +331,7 @@ pub mod tables {
             self.burn_lp_tokens(liquidity_amount);
         }
 
-        pub fn debit_lp_tokens_from_sender(&self, liquidity_amount: Quantity) {
+        fn debit_lp_tokens_from_sender(&self, liquidity_amount: Quantity) {
             Tokens::call().debit(
                 self.liquidity_token,
                 get_sender(),
@@ -340,11 +340,11 @@ pub mod tables {
             );
         }
 
-        pub fn mint_pool_tokens(&self, amount: Quantity) {
+        fn mint_pool_tokens(&self, amount: Quantity) {
             Tokens::call().mint(self.liquidity_token, amount, "Pool tokens".into());
         }
 
-        pub fn credit_sender_pool_tokens(&self, amount: Quantity) {
+        fn credit_sender_pool_tokens(&self, amount: Quantity) {
             Tokens::call().credit(
                 self.liquidity_token,
                 get_sender(),
@@ -353,7 +353,7 @@ pub mod tables {
             )
         }
 
-        pub fn burn_lp_tokens(&self, amount: Quantity) {
+        fn burn_lp_tokens(&self, amount: Quantity) {
             Tokens::call().burn(self.liquidity_token, amount, "Liquidity withdrawal".into());
         }
 
