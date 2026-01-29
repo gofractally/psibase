@@ -159,6 +159,7 @@ export const Swap = () => {
             token2={{
                 id: toId || 0,
                 label: "To",
+                disabled: true,
                 amount: toAmount,
                 balance: toBalance,
                 setAmount: function (amount) {

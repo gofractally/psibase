@@ -53,7 +53,7 @@ export const PickTokenModal = ({
                                     )}
                                 >
                                     <div className="font-medium">
-                                        {token.symbol ?? "Unknown"}
+                                        {token.symbol?.toUpperCase() ?? "Unknown"}
                                     </div>
                                     <div className="text-muted-foreground font-mono text-sm">
                                         {token.id}
