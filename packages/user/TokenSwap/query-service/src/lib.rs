@@ -23,16 +23,13 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Pool>> {
-            TableQuery::subindex::<u32>(
-                PoolTable::with_service(token_swap::SERVICE).get_index_pk(),
-                &(),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
+            TableQuery::new(PoolTable::with_service(token_swap::SERVICE).get_index_pk())
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
         }
 
         async fn reserves_by_token(

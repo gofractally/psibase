@@ -75,7 +75,7 @@ pub mod Service {
 
     /// Updates the swap fee for one of the tokens in an existing pool.
     ///
-    /// Only the current owner of the administration NFT for the specified token's reserve
+    /// Only the current owner of the administration NFT for the pool
     /// is allowed to change the fee. The fee is set in parts per million (ppm).
     /// Maximum allowed value is 999_999 (≈99.9999%).
     ///
