@@ -20,6 +20,7 @@ pub mod tables {
     pub struct Pool {
         #[primary_key]
         pub liquidity_token: TID,
+        pub admin_nft: NID,
     }
 
     #[table(name = "ReserveTable", index = 1)]
@@ -29,7 +30,6 @@ pub mod tables {
         pub pool_id: TID,
         pub token_id: TID,
         pub fee_ppm: u32,
-        pub admin_nft: NID,
     }
 
     impl Reserve {
@@ -43,13 +43,16 @@ pub mod tables {
             (self.token_id, self.pool_id)
         }
 
-        fn new(pool_id: TID, token_id: TID, fee_ppm: u32, admin_nft: NID) -> Self {
+        fn new(pool_id: TID, token_id: TID, fee_ppm: u32) -> Self {
             Self {
                 pool_id,
                 fee_ppm,
                 token_id,
-                admin_nft,
             }
+        }
+
+        fn get_pool(&self) -> Pool {
+            Pool::get_assert(self.pool_id)
         }
 
         pub fn get(pool_id: TID, token_id: TID) -> Option<Self> {
@@ -74,20 +77,18 @@ pub mod tables {
             (iter.next().unwrap(), iter.next().unwrap())
         }
 
-        pub fn administration_nft_owner(&self) -> AccountNumber {
-            psibase::services::nft::Wrapper::call()
-                .getNft(self.admin_nft)
-                .owner
-        }
-
         pub fn set_fee(&mut self, fee_ppm: u32) {
+            check(
+                get_sender() == self.get_pool().administration_nft_owner(),
+                "Must own administration NFT to set fee",
+            );
             check(fee_ppm < PPM as u32, "fee too high");
             self.fee_ppm = fee_ppm;
             self.save();
         }
 
-        pub fn add(pool_id: TID, token_id: TID, admin_nft: NID) {
-            Reserve::new(pool_id, token_id, 0, admin_nft).save();
+        pub fn add(pool_id: TID, token_id: TID) {
+            Reserve::new(pool_id, token_id, 0).save();
         }
 
         pub fn balance(&self) -> Quantity {
@@ -173,6 +174,12 @@ pub mod tables {
             )
         }
 
+        pub fn administration_nft_owner(&self) -> AccountNumber {
+            psibase::services::nft::Wrapper::call()
+                .getNft(self.admin_nft)
+                .owner
+        }
+
         fn pool_token(&self) -> TokenRecord {
             Tokens::call().getToken(self.liquidity_token)
         }
@@ -180,6 +187,10 @@ pub mod tables {
         fn pool_token_supply(&self) -> Quantity {
             let token = self.pool_token();
             token.issued_supply - token.burned_supply
+        }
+
+        pub fn get_reserve(&self, token_id: TID) -> Reserve {
+            Reserve::get_assert(self.liquidity_token, token_id)
         }
 
         fn new(token_a_id: TID, token_b_id: TID) -> Self {
@@ -204,19 +215,12 @@ pub mod tables {
                 id
             };
 
-            Reserve::add(
-                liquidity_token,
-                token_a_id,
-                mint_and_send_back("Pool reserve administration".try_into().unwrap()),
-            );
-            Reserve::add(
-                liquidity_token,
-                token_b_id,
-                mint_and_send_back("Pool reserve administration".try_into().unwrap()),
-            );
+            Reserve::add(liquidity_token, token_a_id);
+            Reserve::add(liquidity_token, token_b_id);
 
             Self {
                 liquidity_token: liquidity_token,
+                admin_nft: mint_and_send_back("Pool administration".try_into().unwrap()),
             }
         }
 
@@ -392,16 +396,6 @@ pub mod tables {
             pool
         }
 
-        pub fn set_fee(&mut self, token: TID, fee_ppm: u32) {
-            let mut reserve = Reserve::get_assert(self.liquidity_token, token);
-            check(
-                reserve.administration_nft_owner() == get_sender(),
-                "must own nft to set fee",
-            );
-            reserve.set_fee(fee_ppm);
-            self.save();
-        }
-
         fn save(&self) {
             PoolTable::read_write().put(&self).unwrap();
         }
@@ -457,8 +451,7 @@ pub mod service {
     /// Creates a new pool.
     ///
     /// Requires two token deposits of equal value as the new pool reserves.
-    /// Mints and credits to the sender administration NFTs of both A reserve and B reserve.
-    /// Administration NFTs can be used to set the fee for each respective reserve.
+    /// Mints and credits to the sender administration NFT of pool to set pool fees.
     ///
     /// # Arguments
     /// * `token_a` - Token ID of the first deposit.
@@ -467,23 +460,16 @@ pub mod service {
     /// * `token_b_amount` - Amount of the second deposit.
     ///
     /// # Returns
-    /// (TID of Liquidity token / Pool ID, Administration NFT ID of A reserve, Administration NFT ID of B Reserve)
+    /// (TID of Liquidity token / Pool ID, Administration NFT ID of pool)
     #[action]
     fn new_pool(
         token_a: TID,
         token_b: TID,
         token_a_amount: Quantity,
         token_b_amount: Quantity,
-    ) -> (u32, NID, NID) {
+    ) -> (u32, NID) {
         let pool = Pool::add(token_a, token_b, token_a_amount, token_b_amount);
-
-        let (a_reserve, b_reserve) = pool.get_reserves(Some(token_a));
-
-        (
-            pool.liquidity_token,
-            a_reserve.admin_nft,
-            b_reserve.admin_nft,
-        )
+        (pool.liquidity_token, pool.admin_nft)
     }
 
     /// Updates the swap fee for one of the tokens in an existing pool.
@@ -498,7 +484,7 @@ pub mod service {
     /// * `ppm`      - New fee rate in parts per million (e.g. 3000 = 0.3%)
     #[action]
     fn set_fee(pool_id: TID, token_id: TID, ppm: u32) {
-        Pool::get_assert(pool_id).set_fee(token_id, ppm)
+        Pool::get_assert(pool_id).get_reserve(token_id).set_fee(ppm);
     }
 
     /// Queries the current reserve balance of one token in the specified pool.

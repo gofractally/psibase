@@ -53,8 +53,7 @@ pub mod Service {
     /// Creates a new pool.
     ///
     /// Requires two token deposits of equal value as the new pool reserves.
-    /// Mints and credits to the sender administration NFTs of both A reserve and B reserve.
-    /// Administration NFTs can be used to set the fee for each respective reserve.
+    /// Mints and credits to the sender administration NFT of pool to set pool fees.
     ///
     /// # Arguments
     /// * `token_a` - Token ID of the first deposit.
@@ -63,7 +62,7 @@ pub mod Service {
     /// * `token_b_amount` - Amount of the second deposit.
     ///
     /// # Returns
-    /// (TID of Liquidity token / Pool ID, Administration NFT ID of A reserve, Administration NFT ID of B Reserve)
+    /// (TID of Liquidity token / Pool ID, Administration NFT ID of pool)
     #[action]
     fn new_pool(
         token_a: TID,

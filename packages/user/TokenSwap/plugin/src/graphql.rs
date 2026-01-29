@@ -29,6 +29,7 @@ pub struct GraphQLPool {
     pub liquidity_token_supply: Decimal,
     pub reserve_a: Reserve,
     pub reserve_b: Reserve,
+    pub admin_nft: NID,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -37,7 +38,6 @@ pub struct Reserve {
     pub pool_id: TID,
     pub token_id: TID,
     pub fee_ppm: u32,
-    pub admin_nft: NID,
     pub balance: Decimal,
 }
 
@@ -48,18 +48,17 @@ pub fn fetch_all_pools() -> Result<Vec<GraphQLPool>, ErrorType> {
             nodes {
               liquidityToken
               liquidityTokenSupply
+              adminNft
               reserveA {
                 poolId
                 tokenId
                 feePpm
-                adminNft
                 balance
               }
               reserveB {
                 poolId
                 tokenId
                 feePpm
-                adminNft
                 balance
               }
             }

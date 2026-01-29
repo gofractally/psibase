@@ -10,7 +10,6 @@ const zReserve = z.object({
     poolId: zInt,
     tokenId: zInt,
     feePpm: zInt,
-    adminNft: zInt,
     balance: z.string(),
     symbol: zAccount.nullable(),
 });
@@ -20,6 +19,7 @@ export const PoolSchema = z.object({
     liquidityTokenSupply: z.string(),
     reserveA: zReserve,
     reserveB: zReserve,
+    adminNft: zInt,
 });
 
 export type PoolInstance = z.infer<typeof PoolSchema>;
@@ -54,11 +54,11 @@ export const usePools = (refetchInterval = 12000) => {
                             nodes {
                                 liquidityToken
                                 liquidityTokenSupply
+                                adminNft
                                 reserveA {
                                     poolId
                                     tokenId
                                     feePpm
-                                    adminNft
                                     balance
                                     symbol
                                 }
@@ -66,7 +66,6 @@ export const usePools = (refetchInterval = 12000) => {
                                     poolId
                                     tokenId
                                     feePpm
-                                    adminNft
                                     balance
                                     symbol
                                 }
