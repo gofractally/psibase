@@ -47,7 +47,7 @@ export const CreatePoolModal = ({
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
                         By proceeding you will be creating a pool and adding
-                        your below token amounts. It is import both token
+                        your below token amounts. It is important both token
                         deposits are of equal market value.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
