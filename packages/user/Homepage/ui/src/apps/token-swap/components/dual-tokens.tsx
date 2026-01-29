@@ -23,11 +23,11 @@ interface TokenProp {
     disabled?: boolean
 }
 
-export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center, footer, onTrigger, disableTrigger, onDisableCenter = false }: {
+export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center, footer, onTrigger, disableTrigger, disableCenter = false }: {
     token1: TokenProp,
     token2: TokenProp
     onCenterClick: () => void,
-    onDisableCenter?: boolean,
+    disableCenter?: boolean,
     center?: ReactNode,
     footer?: ReactNode,
     disableTrigger?: boolean,
@@ -76,7 +76,7 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 </div>
                 <Button
                     variant="outline"
-                    disabled={onDisableCenter}
+                    disabled={disableCenter}
                     size="icon"
                     className="bg-background hover:bg-muted relative z-10 rounded-full"
                     onClick={onCenterClick}

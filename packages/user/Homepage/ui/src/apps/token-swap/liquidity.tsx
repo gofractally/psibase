@@ -326,7 +326,7 @@ export const Liquidity = () => {
                     },
                     balance: token2Balance,
                 }}
-                onDisableCenter={userIsCreatingPool || poolsOfLiquidityPair.length == 0}
+                disableCenter={userIsCreatingPool || poolsOfLiquidityPair.length == 0}
                 onCenterClick={() => {
                     resetFieldValues();
                     toggle();

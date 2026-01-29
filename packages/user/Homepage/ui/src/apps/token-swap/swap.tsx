@@ -163,6 +163,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
                 },
                 onSelect: function () {
                     onFromSelect()
+                    setPickTokenModal(true)
                 },
 
             }}
@@ -177,6 +178,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
                 },
                 onSelect: function () {
                     onToSelect()
+                    setPickTokenModal(true)
                 },
             }}
             triggerLabel="Swap"

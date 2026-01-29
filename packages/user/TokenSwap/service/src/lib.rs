@@ -275,11 +275,19 @@ pub mod tables {
             }
         }
 
-        pub fn add_liquidity(&self, amount_a_deposit: Quantity, amount_b_deposit: Quantity) {
+        pub fn add_liquidity(
+            &self,
+            token_a_id: TID,
+            token_b_id: TID,
+            amount_a_deposit: Quantity,
+            amount_b_deposit: Quantity,
+        ) {
             check(amount_a_deposit.value > 0, "amount a must be non-zero");
             check(amount_b_deposit.value > 0, "amount b must be non-zero");
 
-            let (reserve_a, reserve_b) = self.get_reserves(None);
+            let (reserve_a, reserve_b) = self.get_reserves(Some(token_a_id));
+            check(reserve_b.token_id == token_b_id, "invalid token b id");
+
             let reserve_a_balance = reserve_a.balance();
             let reserve_b_balance = reserve_b.balance();
 
@@ -364,7 +372,7 @@ pub mod tables {
         pub fn add(a_token: TID, b_token: TID, a_amount: Quantity, b_amount: Quantity) -> Self {
             let pool = Self::new(a_token, b_token);
 
-            let (reserve_a, reserve_b) = pool.get_reserves(None);
+            let (reserve_a, reserve_b) = pool.get_reserves(Some(a_token));
             reserve_a.debit_from_sender(a_amount);
             reserve_a.deposit_into_reserve(a_amount);
 
@@ -512,8 +520,14 @@ pub mod service {
     /// * `amount_a`   - Maximum amount of token A the caller wishes to add
     /// * `amount_b`   - Maximum amount of token B the caller wishes to add
     #[action]
-    fn add_liquidity(pool_id: TID, amount_a: Quantity, amount_b: Quantity) {
-        Pool::get_assert(pool_id).add_liquidity(amount_a, amount_b);
+    fn add_liquidity(
+        pool_id: TID,
+        token_a: TID,
+        token_b: TID,
+        amount_a: Quantity,
+        amount_b: Quantity,
+    ) {
+        Pool::get_assert(pool_id).add_liquidity(token_a, token_b, amount_a, amount_b);
     }
 
     /// Removes liquidity from a pool and returns the proportional share of both tokens.

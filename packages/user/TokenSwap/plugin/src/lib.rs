@@ -197,17 +197,13 @@ impl Liquidity for TokenSwapPlugin {
         second_deposit: TokenAmount,
     ) -> Result<(), Error> {
         assert_authed(FunctionName::add_liquidity)?;
-        let (token_a_deposit, token_b_deposit) = if first_deposit.token_id < second_deposit.token_id
-        {
-            (first_deposit, second_deposit)
-        } else {
-            (second_deposit, first_deposit)
-        };
 
         let packed_args = token_swap::action_structs::add_liquidity {
             pool_id,
-            amount_a: credit_to_service(token_a_deposit, "Liquidity deposit")?,
-            amount_b: credit_to_service(token_b_deposit, "Liquidity deposit")?,
+            token_a: first_deposit.token_id,
+            token_b: second_deposit.token_id,
+            amount_a: credit_to_service(first_deposit, "Liquidity deposit")?,
+            amount_b: credit_to_service(second_deposit, "Liquidity deposit")?,
         }
         .packed();
 
