@@ -244,6 +244,7 @@ export const Liquidity = () => {
 
     const selectableTokens = [...userTokens, ...reserveTokensRedeemable].filter(token => !poolTokens.includes(token.id))
 
+    const amountsAreValid = !Number.isNaN(token1AmountNumber) && !Number.isNaN(token2AmountNumber)
 
     const token1 = selectableTokens.find((token) => token.id == token1Id);
     const token2 = selectableTokens.find((token) => token.id == token2Id);
@@ -288,6 +289,7 @@ export const Liquidity = () => {
             />
 
             <DualTokens
+                disableTrigger={!amountsAreValid}
                 token1={{
                     label: "Deposit #1",
                     id: token1Id || 0,

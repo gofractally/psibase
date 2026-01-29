@@ -13,7 +13,6 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-import { usePools } from "../hooks/use-pools";
 import { useSwap } from "../hooks/use-swap";
 import { AmountSummary } from "./amount-summary";
 

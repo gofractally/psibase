@@ -28,7 +28,8 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
         amount: fromAmount,
         setAmount: setFromAmount,
         setTokenId: setFromId,
-        balance: fromBalance
+        balance: fromBalance,
+        amountNumber: fromAmountNumber
     } = useAmount();
 
 
@@ -100,6 +101,9 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
 
     const isNoTradingNetwork = uniqueTradeableTokens.length < 2 && !isLoadingPools;
 
+    const fromAmountIsValid = !Number.isNaN(fromAmountNumber) && fromAmountNumber !== undefined;
+
+
 
     const swapQuotePoolIds =
         quotedSwap && Array.from(quotedSwap.pools).map(String);
@@ -138,6 +142,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
             onSuccess={onSuccess}
         />
         <DualTokens
+            disableTrigger={!fromAmountIsValid}
             onCenterClick={() => {
                 setFromId(toId)
                 setToId(fromId)
