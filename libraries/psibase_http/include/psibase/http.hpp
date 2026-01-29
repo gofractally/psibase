@@ -29,14 +29,15 @@ namespace psibase::http
 #endif
    using accept_p2p_websocket3 = boost::beast::websocket::stream<local_stream>;
 
-   using accept_p2p_websocket_t = boost::type_erasure::any<
-       boost::mpl::vector<boost::type_erasure::relaxed,
-                          boost::type_erasure::copy_constructible<>,
-                          boost::type_erasure::callable<void(accept_p2p_websocket1&&)>,
+   using accept_p2p_websocket_t = boost::type_erasure::any<boost::mpl::vector<
+       boost::type_erasure::relaxed,
+       boost::type_erasure::copy_constructible<>,
+       boost::type_erasure::constructible<boost::type_erasure::_self(boost::type_erasure::_self&&)>,
+       boost::type_erasure::callable<void(accept_p2p_websocket1&&)>,
 #ifdef PSIBASE_ENABLE_SSL
-                          boost::type_erasure::callable<void(accept_p2p_websocket2&&)>,
+       boost::type_erasure::callable<void(accept_p2p_websocket2&&)>,
 #endif
-                          boost::type_erasure::callable<void(accept_p2p_websocket3&&)>>>;
+       boost::type_erasure::callable<void(accept_p2p_websocket3&&)>>>;
 
    struct peer_info
    {

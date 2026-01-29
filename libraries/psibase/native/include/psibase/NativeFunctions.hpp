@@ -70,6 +70,6 @@ namespace psibase
 
       int32_t socketOpen(eosio::vm::span<const char> args);
       int32_t socketSend(int32_t fd, eosio::vm::span<const char> msg);
-      int32_t socketAutoClose(int32_t fd, bool value);
+      int32_t socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value);
    };  // NativeFunctions
 }  // namespace psibase
