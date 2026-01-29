@@ -57,7 +57,7 @@ class Liquidity extends PluginInterface {
     protected override readonly _intf = "liquidity" as const;
 
     get newPool() {
-        return this._call<[firstDeposit: TokenAmount, secondDeposit: TokenAmount]>(
+        return this._call<[firstDeposit: TokenAmount, secondDeposit: TokenAmount, nftId: number | undefined]>(
             "newPool",
         );
     }

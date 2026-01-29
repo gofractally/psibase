@@ -31,7 +31,7 @@ export const CreatePoolModal = ({
     const { mutateAsync: createPool, isPending } = useCreatePool();
 
     const trigger = async () => {
-        await createPool([firstDeposit!, secondDeposit!]);
+        await createPool([firstDeposit!, secondDeposit!, undefined]);
         if (onSuccess) {
             onSuccess();
         }

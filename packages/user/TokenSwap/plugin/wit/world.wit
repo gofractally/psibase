@@ -127,7 +127,8 @@ interface liquidity {
     /// Parameters:
     /// * `a-deposit` - Initial deposit amount of the first reserve token
     /// * `b-deposit` - Initial deposit amount of the second reserve token
-    new-pool: func(a-deposit: token-amount, b-deposit: token-amount) -> result<_, error>;
+    /// * `nft-id`    - Optional NFT ID for the pool's administration NFT
+    new-pool: func(a-deposit: token-amount, b-deposit: token-amount, nft-id: option<u32>) -> result<_, error>;
 
     /// Calculates the expected returns of pool reserves based on
     /// a specific amount of LP tokens.
