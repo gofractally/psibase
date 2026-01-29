@@ -1,6 +1,7 @@
-use psibase::services::tokens::Quantity;
+use psibase::{check, services::tokens::Quantity};
 
 pub fn sqrt(n: u128) -> u128 {
+    check(n < u128::MAX, "Input too large for sqrt calculation");
     if n < 2 {
         return n;
     }
