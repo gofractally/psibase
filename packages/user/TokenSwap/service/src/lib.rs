@@ -492,7 +492,7 @@ pub mod service {
     ///
     /// Only the current owner of the administration NFT for the specified token's reserve
     /// is allowed to change the fee. The fee is set in parts per million (ppm).
-    /// Maximum allowed value is typically 999_999 (≈99.9999%).
+    /// Maximum allowed value is 999_999 (≈99.9999%).
     ///
     /// # Arguments
     /// * `pool_id`  - Liquidity token ID that identifies the pool
