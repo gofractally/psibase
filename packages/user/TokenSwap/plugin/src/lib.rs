@@ -174,7 +174,11 @@ impl Swap for TokenSwapPlugin {
 }
 
 impl Liquidity for TokenSwapPlugin {
-    fn new_pool(a_deposit: TokenAmount, b_deposit: TokenAmount) -> Result<(), Error> {
+    fn new_pool(
+        a_deposit: TokenAmount,
+        b_deposit: TokenAmount,
+        nft_id: Option<u32>,
+    ) -> Result<(), Error> {
         assert_authed(FunctionName::new_pool)?;
 
         let packed_args = token_swap::action_structs::new_pool {
@@ -182,6 +186,7 @@ impl Liquidity for TokenSwapPlugin {
             token_b: b_deposit.token_id,
             token_a_amount: credit_to_service(a_deposit, "Initial liquidity deposit")?,
             token_b_amount: credit_to_service(b_deposit, "Initial liquidity deposit")?,
+            nft_id,
         }
         .packed();
 
