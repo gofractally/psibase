@@ -573,7 +573,7 @@ bool Sockets::applyChanges(std::vector<SocketChange>&& diff,
       // in the changeset.
       for (auto& change : diff)
       {
-         change.value &= ~SocketChange::setP2PFlag;
+         change.value &= SocketChange::setP2PFlag;
          if (tryConsumeRecv(*change.socket))
          {
             change.value |= static_cast<std::uint32_t>(SocketFlags::recv);
@@ -587,8 +587,7 @@ bool Sockets::applyChanges(std::vector<SocketChange>&& diff,
    for (const auto& change : diff)
    {
       if (change.value & SocketChange::setP2PFlag)
-         ;
-      change.socket->enableP2P(callbacks->socketP2P);
+         change.socket->enableP2P(callbacks->socketP2P);
       if (change.value & SocketFlags::recv)
          change.socket->onLock(CloseLock{this, change.socket.get()});
       if (change.value & SocketFlags::lockClose)
