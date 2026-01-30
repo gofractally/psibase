@@ -1,6 +1,5 @@
 use std::{
-    cmp::Ordering,
-    collections::{BinaryHeap, HashMap},
+    collections::HashMap,
     str::FromStr,
 };
 
@@ -61,26 +60,7 @@ struct SearchState {
     max_slippage_ppm: u32,
 }
 
-// Max-heap: highest amount_out first
-impl Ord for SearchState {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other.amount_out.cmp(&self.amount_out)
-    }
-}
 
-impl PartialOrd for SearchState {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for SearchState {
-    fn eq(&self, other: &Self) -> bool {
-        self.amount_out == other.amount_out
-    }
-}
-
-impl Eq for SearchState {}
 
 /// Returns slippage (inc fee) in parts per million (out of 1_000_000)
 fn deviation_from_ideal_ppm(ideal_out: Quantity, actual_out: Quantity) -> u32 {
@@ -130,7 +110,7 @@ pub fn find_path(
     best_reachable.insert(from, amount);
 
     // Priority queue: explore highest-output paths first
-    let mut search_states: BinaryHeap<SearchState> = BinaryHeap::new();
+    let mut search_states: Vec<SearchState> = Vec::new();
     search_states.push(SearchState {
         token: from,
         amount_out: amount,
@@ -202,7 +182,6 @@ pub fn find_path(
                     continue;
                 }
 
-                let this_hop_slippage_ppm = deviation_from_ideal_ppm(perfect_amount, actual_amount);
 
                 // Only continue if this improves the known best for the next token
                 let is_new_best_amount_found = best_reachable
@@ -211,6 +190,9 @@ pub fn find_path(
 
                 if is_new_best_amount_found {
                     best_reachable.insert(output_token, actual_amount);
+
+                    let this_hop_slippage_ppm = deviation_from_ideal_ppm(perfect_amount, actual_amount);
+
 
                     let mut new_path = search_state.path.clone();
                     new_path.push(pool.clone());
