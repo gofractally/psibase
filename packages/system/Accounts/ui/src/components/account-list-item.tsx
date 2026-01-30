@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { X } from "lucide-react";
 
 import { Avatar } from "@shared/components/avatar";
 import { cn } from "@shared/lib/utils";
@@ -45,11 +45,11 @@ export const AccountListItem = ({
             <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
                         className="cursor-pointer"
                     >
-                        <LogOut />
+                        <X />
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
