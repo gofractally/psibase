@@ -1,4 +1,4 @@
-import { CircleUserRound } from "lucide-react";
+import { CircleUserRound, LogOut } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -7,11 +7,24 @@ import { prompt } from "@psibase/common-lib";
 import { Avatar } from "@shared/components/avatar";
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { ErrorCard } from "@shared/components/error-card";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@shared/shadcn/ui/alert-dialog";
+import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardTitle } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
+import { useRemoveAccount } from "./hooks/use-remove-account";
 
 export const ConnectPrompt = () => {
     const navigate = useNavigate();
@@ -21,6 +34,7 @@ export const ConnectPrompt = () => {
 
     // mutations
     const connectAccountMutation = useConnectAccount();
+    const removeAccountMutation = useRemoveAccount();
 
     const accountsList = Array.isArray(accounts) ? accounts : [];
 
@@ -40,6 +54,14 @@ export const ConnectPrompt = () => {
         }
     };
 
+    const handleRemoveAccount = async (accountName: string) => {
+        try {
+            await removeAccountMutation.mutateAsync(accountName);
+        } catch (e) {
+            console.error("Remove account failed");
+            console.error(e);
+        }
+    };
     if (error) {
         return (
             <ErrorCard
@@ -89,15 +111,58 @@ export const ConnectPrompt = () => {
                         {accountsList.map((name) => {
                             return (
                                 <div key={`account-${name}`}>
-                                    <li
-                                        onClick={() => handleLogin(name)}
-                                        className="hover:bg-sidebar-accent flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-4"
-                                    >
-                                        <Avatar
-                                            account={name}
-                                            className="size-6"
-                                        />
-                                        <div>{name}</div>
+                                    <li className="hover:bg-sidebar-accent flex select-none items-center rounded-md px-2 py-4">
+                                        <button
+                                            onClick={() => handleLogin(name)}
+                                            className="flex flex-1 items-center gap-2"
+                                        >
+                                            <Avatar
+                                                account={name}
+                                                className="size-6"
+                                            />
+                                            {name}
+                                        </button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="cursor-pointer"
+                                                >
+                                                    <LogOut />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>
+                                                        Remove account?
+                                                    </AlertDialogTitle>
+                                                </AlertDialogHeader>
+                                                <AlertDialogDescription>
+                                                    This will remove the account{" "}
+                                                    <span className="text-primary">
+                                                        {name}
+                                                    </span>{" "}
+                                                    from this browser and will
+                                                    sign it out of any connected
+                                                    apps.
+                                                </AlertDialogDescription>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>
+                                                        Cancel
+                                                    </AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={() => {
+                                                            handleRemoveAccount(
+                                                                name,
+                                                            );
+                                                        }}
+                                                    >
+                                                        Remove
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </li>
                                     <div className="bg-border mx-2 h-px" />
                                 </div>
