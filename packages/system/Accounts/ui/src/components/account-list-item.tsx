@@ -1,6 +1,7 @@
 import { LogOut } from "lucide-react";
 
 import { Avatar } from "@shared/components/avatar";
+import { cn } from "@shared/lib/utils";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -18,11 +19,22 @@ interface Props {
     name: string;
     onLogin: () => void;
     onRemove: () => void;
+    canLogin?: boolean;
 }
 
-export const AccountListItem = ({ name, onLogin, onRemove }: Props) => {
+export const AccountListItem = ({
+    name,
+    onLogin,
+    onRemove,
+    canLogin = false,
+}: Props) => {
     return (
-        <li className="hover:bg-sidebar-accent flex select-none items-center rounded-md px-2 py-4">
+        <li
+            className={cn(
+                "flex select-none items-center rounded-md px-2 py-4",
+                canLogin && "hover:bg-sidebar-accent",
+            )}
+        >
             <button
                 onClick={onLogin}
                 className="flex flex-1 items-center gap-2"

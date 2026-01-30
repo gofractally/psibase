@@ -14,7 +14,7 @@ import { useConnectAccount } from "./hooks/use-connect-account";
 import { useGetAllAccounts } from "./hooks/use-get-all-accounts";
 import { useRemoveAccount } from "./hooks/use-remove-account";
 
-export const ConnectPrompt = () => {
+export const ConnectPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
     const navigate = useNavigate();
 
     // queries
@@ -33,6 +33,7 @@ export const ConnectPrompt = () => {
     }, [accounts, navigate, isSuccess]);
 
     const handleLogin = async (accountName: string) => {
+        if (!isPrompt) return;
         try {
             await connectAccountMutation.mutateAsync(accountName);
             prompt.finished();
@@ -92,7 +93,7 @@ export const ConnectPrompt = () => {
         <BrandedGlowingCard>
             <CardContent className="flex flex-1 flex-col">
                 <CardTitle className="mb-6 text-3xl font-normal">
-                    Choose an account
+                    {isPrompt ? "Choose an account" : "Your accounts"}
                 </CardTitle>
                 <div className="space-y-3">
                     <ul>
@@ -101,6 +102,7 @@ export const ConnectPrompt = () => {
                                 <div key={`account-${name}`}>
                                     <AccountListItem
                                         name={name}
+                                        canLogin={isPrompt}
                                         onLogin={() => handleLogin(name)}
                                         onRemove={() =>
                                             handleRemoveAccount(name)
@@ -114,13 +116,21 @@ export const ConnectPrompt = () => {
                             key="account-use-another"
                             className="hover:bg-sidebar-accent flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-4"
                             onClick={() => {
-                                navigate("/plugin/web/prompt/import");
+                                if (isPrompt) {
+                                    navigate("/plugin/web/prompt/import");
+                                } else {
+                                    navigate("/import");
+                                }
                             }}
                         >
                             <div className="flex size-6 items-center justify-center">
                                 <CircleUserRound className="text-muted-foreground size-5" />
                             </div>
-                            <div>Use another account</div>
+                            <div>
+                                {isPrompt
+                                    ? "Use another account"
+                                    : "Add an account"}
+                            </div>
                         </li>
                     </ul>
                 </div>
