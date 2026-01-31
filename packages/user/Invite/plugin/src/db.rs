@@ -25,7 +25,7 @@ impl InviteTokensTable {
     fn device_history() -> Bucket {
         Bucket::new(
             Database {
-                mode: DbMode::NonTransactional,
+                mode: DbMode::Transactional,
                 duration: StorageDuration::Persistent,
             },
             "device-memory",
