@@ -287,7 +287,7 @@ namespace SystemService
       auto requester = getSender();
 
       auto tables         = Transact::Tables(Transact::service);
-      auto statusTable    = tables.open<TransactStatusTable>();
+      auto statusTable    = open<TransactStatusTable>(KvMode::read);
       auto statusIdx      = statusTable.getIndex<0>();
       auto transactStatus = statusIdx.get(std::tuple{});
 
@@ -305,7 +305,7 @@ namespace SystemService
 
       if (transactStatus && transactStatus->enforceAuth)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service);
+         auto accountsTables = Accounts::Tables(Accounts::service, KvMode::read);
          auto accountTable   = accountsTables.open<AccountTable>();
          auto accountIndex   = accountTable.getIndex<0>();
          auto account        = accountIndex.get(action.sender);
@@ -546,13 +546,6 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
-      if (isResMonitoring())
-      {
-         uint64_t      netUsage = t.size();
-         AccountNumber sender   = trx.actions()[0].sender();
-         to<VirtualServer>().useNetSys(sender, netUsage);
-      }
-
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
@@ -573,7 +566,17 @@ namespace SystemService
       {
          if (enforceAuth)
          {
-            checkAuth(act, claims, get_view_data(act) == get_view_data(trx.actions()[0]), false);
+            auto first = get_view_data(act) == get_view_data(trx.actions()[0]);
+            checkAuth(act, claims, first, false);
+
+            if (first && isResMonitoring())
+            {
+               // Billing network usage *after* first action auth, because first action auth may set
+               //   a billable subaccount on the VirtualServer.
+               uint64_t      netUsage = t.size();
+               AccountNumber sender   = act.sender();
+               to<VirtualServer>().useNetSys(sender, netUsage);
+            }
          }
          if constexpr (enable_print)
             std::printf("call action\n");
