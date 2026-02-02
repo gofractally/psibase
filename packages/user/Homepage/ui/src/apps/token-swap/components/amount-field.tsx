@@ -4,6 +4,7 @@ import { Label } from "@shared/shadcn/ui/label";
 import { Button } from "@shared/shadcn/ui/button";
 
 import { ChevronDown, } from "lucide-react";
+import { cn } from "@shared/lib/utils";
 
 export const AmountField = ({
     amount,
@@ -15,17 +16,22 @@ export const AmountField = ({
     label,
     disabled,
     onMaxBalance
+
 }: {
     disabled?: boolean;
-    onSelect: () => void;
     label: string;
     name?: string;
     symbol?: string;
     balance?: string;
+    onSelect: () => void;
     amount: string;
     setAmount: (text: string) => void;
     onMaxBalance?: () => void;
+
 }) => {
+
+    const isOverMaxBalance = balance ? parseFloat(amount) > parseFloat(balance) : false;
+
     return (
         <div className="space-y-2">
             <div className="text-muted-foreground flex justify-between text-sm">
@@ -58,7 +64,7 @@ export const AmountField = ({
                     onChange={(e) =>
                         setAmount(e.target.value.replace(/[^0-9.]/g, ""))
                     }
-                    className="h-16 pr-28 text-lg font-medium"
+                    className={cn("h-16 pr-28 text-lg font-medium", isOverMaxBalance && "focus-visible:border-red-500 border-red-600")}
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     <Button

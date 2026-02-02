@@ -294,9 +294,6 @@ export const Liquidity = () => {
                     label: "Deposit #1",
                     id: token1Id || 0,
                     amount: isMaxBalance ? token1Withdrawable?.amount || '0' : token1Amount,
-                    onMaxBalance: function () {
-                        setIsMaxBalance(true);
-                    },
                     onSelect: function () {
                         on1Select();
                         setShowPickTokenModal(true);
@@ -312,9 +309,6 @@ export const Liquidity = () => {
                     label: "Deposit #2",
                     id: token2Id || 0,
                     amount: isMaxBalance ? maxWithdrawableLiquidity?.find(t => t.tokenId === token2Id)?.amount || '0' : token2Amount,
-                    onMaxBalance: function () {
-                        setIsMaxBalance(true);
-                    },
                     onSelect: function () {
                         on2Select();
                         setShowPickTokenModal(true);

@@ -16,7 +16,6 @@ interface TokenProp {
     amount: string,
     setAmount: (val: string) => void,
     onSelect: () => void,
-    onMaxBalance?: () => void,
     balance?: Quantity
     label: string
     symbol?: string
@@ -47,9 +46,6 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 onMaxBalance={() => {
                     if (token1.balance) {
                         token1.setAmount(token1.balance?.format({ includeLabel: false, showThousandsSeparator: false }))
-                    }
-                    if (token1.onMaxBalance) {
-                        token1.onMaxBalance()
                     }
                 }}
                 label={
@@ -104,9 +100,6 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 onMaxBalance={() => {
                     if (token2?.balance) {
                         token2.setAmount(token2?.balance?.format({ includeLabel: false, showThousandsSeparator: false }))
-                    }
-                    if (token2.onMaxBalance) {
-                        token2.onMaxBalance()
                     }
                 }}
                 balance={token2?.balance?.format({ includeLabel: false })}
