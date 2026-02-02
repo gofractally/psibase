@@ -293,7 +293,7 @@ export const Liquidity = () => {
                 token1={{
                     label: "Deposit #1",
                     id: token1Id || 0,
-                    amount: token1Amount,
+                    amount: isMaxBalance ? token1Withdrawable?.amount || '0' : token1Amount,
                     onMaxBalance: function () {
                         setIsMaxBalance(true);
                     },
@@ -302,7 +302,7 @@ export const Liquidity = () => {
                         setShowPickTokenModal(true);
                     },
                     setAmount: function (amount) {
-                        setIsMaxBalance(false);
+                        setIsMaxBalance(token1Withdrawable?.amount === amount);
                         setToken1Amount(amount);
                         oneIsLastTouched()
                     },
@@ -311,7 +311,7 @@ export const Liquidity = () => {
                 token2={{
                     label: "Deposit #2",
                     id: token2Id || 0,
-                    amount: token2Amount,
+                    amount: isMaxBalance ? maxWithdrawableLiquidity?.find(t => t.tokenId === token2Id)?.amount || '0' : token2Amount,
                     onMaxBalance: function () {
                         setIsMaxBalance(true);
                     },
@@ -320,7 +320,7 @@ export const Liquidity = () => {
                         setShowPickTokenModal(true);
                     },
                     setAmount: function (amount) {
-                        setIsMaxBalance(false);
+                        setIsMaxBalance(token2Withdrawable?.amount === amount);
                         setToken2Amount(amount);
                         twoIsLastTouched()
                     },
