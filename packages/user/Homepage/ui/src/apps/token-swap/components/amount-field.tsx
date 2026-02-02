@@ -3,7 +3,7 @@ import { Label } from "@shared/shadcn/ui/label";
 
 import { Button } from "@shared/shadcn/ui/button";
 
-import { ChevronDown, } from "lucide-react";
+import { ChevronDown, Info, } from "lucide-react";
 import { cn } from "@shared/lib/utils";
 
 export const AmountField = ({
@@ -38,18 +38,20 @@ export const AmountField = ({
                 <Label htmlFor="x">{label}</Label>
                 <div>
                     {balance && (
-                        <Button
-                            className="text-muted-foreground text-sm"
-                            variant={"link"}
-                            onClick={() => {
-                                if (onMaxBalance) {
-                                    onMaxBalance()
+                        <div className="flex gap-1 items-center">
+                            <Button
+                                className={cn("text-muted-foreground text-sm", isOverMaxBalance && "underline font-semibold")}
+                                variant={"link"}
+                                onClick={() => {
+                                    if (onMaxBalance) {
+                                        onMaxBalance()
+                                    }
                                 }
-                            }
-                            }
-                        >
-                            Balance: {balance}
-                        </Button>
+                                }
+                            >
+                                Balance: {balance}
+                            </Button>
+                        </div >
                     )}
                 </div>
             </div>
