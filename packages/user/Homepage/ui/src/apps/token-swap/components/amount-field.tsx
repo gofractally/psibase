@@ -3,7 +3,7 @@ import { Label } from "@shared/shadcn/ui/label";
 
 import { Button } from "@shared/shadcn/ui/button";
 
-import { ChevronDown, Info, } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@shared/lib/utils";
 
 export const AmountField = ({
