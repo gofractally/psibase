@@ -343,7 +343,7 @@ export const Liquidity = () => {
                         />
 
                         {poolsOfLiquidityPair.length == 0 && isAddingLiquidity && (
-                            <>
+                            <div className="flex flex-col gap-2">
                                 <Alert variant="warning">
                                     <AlertTitle>Creating new pool</AlertTitle>
                                     <AlertDescription>
@@ -373,7 +373,7 @@ export const Liquidity = () => {
                                         </div>
                                     </div>
                                 )}
-                            </>
+                            </div>
                         )}
 
                         {poolsOfLiquidityPair.length > 0 && !focusedPool && isAddingLiquidity && (
