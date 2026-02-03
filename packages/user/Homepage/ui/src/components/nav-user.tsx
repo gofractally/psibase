@@ -17,11 +17,11 @@ import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
-import { useProfile } from "@/hooks/use-profile";
 
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useProfile } from "@shared/hooks/use-profile";
 import { Dialog } from "@shared/shadcn/ui/dialog";
 import {
     DropdownMenu,
@@ -51,7 +51,9 @@ export function NavUser() {
     const { setTheme } = useTheme();
 
     const { data: user, isPending: isPendingUser } = useCurrentUser();
-    const { data: profile } = useProfile(user);
+    const { data: profile } = useProfile(user, true, {
+        baseUrlIncludesSibling: false,
+    });
 
     const { mutateAsync: logout } = useLogout();
     const { mutateAsync: login } = useConnectAccount({
