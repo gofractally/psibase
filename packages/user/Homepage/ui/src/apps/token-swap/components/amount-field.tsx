@@ -15,9 +15,10 @@ export const AmountField = ({
     onSelect,
     label,
     disabled,
-    onMaxBalance
-
+    onMaxBalance,
+    id,
 }: {
+    id?: number;
     disabled?: boolean;
     label: string;
     name?: string;
@@ -77,7 +78,7 @@ export const AmountField = ({
                     >
                         <div className="flex items-center gap-2">
                             <span>{name}</span>
-                            <span className="font-light">({symbol || "?"})</span>
+                            <span className={cn("font-light", !symbol && 'italic')}>{symbol || id}</span>
                             <ChevronDown className="h-4 w-4" />
                         </div>
                     </Button>

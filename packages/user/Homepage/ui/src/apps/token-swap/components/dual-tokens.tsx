@@ -62,7 +62,8 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 }}
                 balance={token1?.balance?.format({ includeLabel: false })}
                 name=""
-                symbol={token1.symbol || token1.id.toString()}
+                symbol={token1.symbol?.toUpperCase()}
+                id={token1.id}
             />
 
             {/* Center button icon */}
@@ -104,7 +105,8 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 }}
                 balance={token2?.balance?.format({ includeLabel: false })}
                 name=""
-                symbol={token2.symbol || token2.id.toString()}
+                id={token2.id}
+                symbol={token2.symbol?.toUpperCase()}
             />
 
             {footer}

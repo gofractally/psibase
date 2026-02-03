@@ -102,6 +102,8 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
     const isNoTradingNetwork = uniqueTradeableTokens.length < 2 && !isLoadingPools;
 
     const fromAmountIsValid = !Number.isNaN(fromAmountNumber) && fromAmountNumber !== undefined;
+    const fromToken = uniqueTradeableTokens.find(t => t.id === fromId);
+    const toToken = uniqueTradeableTokens.find(t => t.id === toId);
 
 
 
@@ -155,6 +157,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
             token1={{
                 id: fromId || 0,
                 label: "From",
+                symbol: fromToken?.symbol || undefined,
                 disabled: isNoTradingNetwork,
                 amount: fromAmount,
                 balance: fromBalance,
@@ -170,6 +173,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
             token2={{
                 id: toId || 0,
                 label: "To",
+                symbol: toToken?.symbol || undefined,
                 disabled: true,
                 amount: toAmount,
                 balance: toBalance,

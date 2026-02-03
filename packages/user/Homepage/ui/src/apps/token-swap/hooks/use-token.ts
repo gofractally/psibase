@@ -1,16 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
-
 import QueryKey from "@/lib/queryKeys";
-
-
-
-import { siblingUrl } from "@psibase/common-lib";
-
 import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@/lib/zod/Account";
 
 export const zToken = z.object({
     precision: z.number().int(),
+    symbol: zAccount.nullable()
 });
 
 export const getToken = async (tokenId: number) => {
@@ -19,10 +15,12 @@ export const getToken = async (tokenId: number) => {
             {
                 token(tokenId: "${tokenId}") {
                     precision
+                    symbol
                 }
             }
         `,
-        siblingUrl(null, "tokens", "/graphql"),
+        "tokens",
+        false
     );
 
     const response = z

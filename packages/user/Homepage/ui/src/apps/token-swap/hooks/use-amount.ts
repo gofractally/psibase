@@ -64,6 +64,8 @@ export const useAmount = () => {
         ? {
             tokenId,
             amount,
+            symbol: tokenConfig?.symbol,
+            precision: precision,
         }
         : undefined;
 
