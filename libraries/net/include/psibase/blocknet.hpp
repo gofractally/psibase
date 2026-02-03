@@ -576,6 +576,7 @@ namespace psibase::net
                    if (auto sig = chain().on_state_checksum(state->blockId(), checksum, self))
                    {
                       network().multicast(
+                          state->blockId(),
                           StateChecksumMessage{state->blockId(), checksum, std::move(*sig)});
                    }
                 }
@@ -1088,7 +1089,7 @@ namespace psibase::net
       {
          if (chain().on_state_signature(msg.blockId, msg.state, msg.signature))
          {
-            network().multicast(msg);
+            network().multicast(msg.blockId, msg);
          }
       }
 
