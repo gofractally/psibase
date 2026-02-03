@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 
 import { useCurrentAccounts, useLoggedInUser, useSelectAccount } from "@/hooks";
 
@@ -33,7 +34,7 @@ export const LoginRequired: React.FC<Props> = ({ children }) => {
     const [isAwaitingLogin, setIsAwaitingLogin] = useState(false);
 
     // Always fetch current user; query is invalidated by account selection/login hooks
-    const { data: loggedInUser, status } = useLoggedInUser(true);
+    const { data: loggedInUser, status, isPending: isPendingUser } = useLoggedInUser(true);
     const { data: currentAccounts = [] } = useCurrentAccounts();
 
     const isNoOptions = currentAccounts.length === 0;
@@ -45,17 +46,25 @@ export const LoginRequired: React.FC<Props> = ({ children }) => {
     const { data: chainId } = useChainId();
 
     useEffect(() => {
-        // Mirror Config behavior: only show the dialog once we definitively know
-        // there is no current user.
+        // Only update modal state when we have a definitive answer (not pending)
+        // Case 1: Query is still pending - don't show modal
+        if (isPendingUser) {
+            setShowModal(false);
+            return;
+        }
+
+        // Case 2: Query completed successfully and user is logged in - hide modal
+        if (status === "success" && loggedInUser) {
+            setShowModal(false);
+            setIsAwaitingLogin(false);
+            return;
+        }
+
+        // Case 3: Query completed successfully and user is NOT logged in - show modal
         if (status === "success" && !loggedInUser) {
             setShowModal(true);
         }
-
-        if (loggedInUser) {
-            setShowModal(false);
-            setIsAwaitingLogin(false);
-        }
-    }, [status, loggedInUser, isAwaitingLogin]);
+    }, [status, loggedInUser, isPendingUser]);
 
     const onSelect = async (account: string): Promise<void> => {
         if (account === Other) {
@@ -66,6 +75,16 @@ export const LoginRequired: React.FC<Props> = ({ children }) => {
             setShowModal(false);
         }
     };
+
+    // Show loading indicator while checking for logged-in user
+    // Distinguish between: 1) query pending, 2) query complete but no user
+    if (isPendingUser) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center">
+                <LoaderCircle size={80} className="animate-spin text-gray-300" />
+            </div>
+        );
+    }
 
     return (
         <Dialog

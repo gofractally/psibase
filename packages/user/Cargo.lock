@@ -2303,6 +2303,7 @@ dependencies = [
 name = "prem-accounts-plugin"
 version = "0.22.0"
 dependencies = [
+ "pem",
  "prem-accounts",
  "psibase",
  "psibase-user-workspace-hack",

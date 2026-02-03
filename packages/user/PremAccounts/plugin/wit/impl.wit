@@ -5,6 +5,7 @@ world impl {
     include tokens:plugin/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
+    include auth-sig:plugin/imports;
 
     export api;
     export queries;

@@ -53,6 +53,7 @@ pub mod service {
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
     use psibase::services::tokens::{Quantity, TID};
     use psibase::services::transact::Wrapper as Transact;
+    use psibase::AccountNumber;
     use psibase::*;
 
     const INIT_DIFFICULTY: u64 = 1000;
@@ -71,7 +72,7 @@ pub mod service {
         };
 
         let set_auth = Action {
-            sender: get_service(),
+            sender: name,
             service: Accounts::Wrapper::SERVICE,
             method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
             rawData: Accounts::action_structs::setAuthServ {
@@ -126,7 +127,6 @@ pub mod service {
     #[action]
     fn buy(account: String, max_cost: u64) {
         check_init();
-        println!("PreAccounts.buy().top");
 
         let acct_to_buy = AccountNumber::from_exact(&account).expect("invalid account name");
 
@@ -150,7 +150,6 @@ pub mod service {
         let sender = get_sender();
         let service_account = get_service();
 
-        // Get the auction for this length
         let auctions_table = AuctionsTable::new();
         let auction = check_some(
             auctions_table.get_index_pk().get(&length),
@@ -159,32 +158,12 @@ pub mod service {
 
         let current_price = DiffAdjust::call().get_diff(auction.nft_id);
 
-        println!(
-            "3: getting shared_bal from {} to {}",
-            sender, service_account
-        );
         let shared_bal =
             Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, service_account);
 
-        // Check if user has sufficient balance and max_cost is acceptable
-        println!(
-            "current_price: {}, shared_bal: {}, max_cost: {}",
-            current_price, shared_bal.value, max_cost
-        );
         check(
             current_price <= shared_bal.value && current_price <= max_cost,
             "insufficient balance or max_cost too low",
-        );
-
-        // Alert the DiffAdjust service to the purchase
-        DiffAdjust::call().increment(auction.nft_id, 1);
-
-        let cost = Quantity::from(current_price);
-        Tokens::Wrapper::call().debit(
-            sys_token_id,
-            sender,
-            cost,
-            "premium account purchase".to_string().try_into().unwrap(),
         );
 
         new_account(acct_to_buy);
@@ -196,14 +175,22 @@ pub mod service {
             })
             .unwrap();
 
+        let cost = Quantity::from(current_price);
+        Tokens::Wrapper::call().debit(
+            sys_token_id,
+            sender,
+            cost,
+            "premium account purchase".to_string().try_into().unwrap(),
+        );
+
         Tokens::Wrapper::call().reject(
             sys_token_id,
             sender,
-            "premium account purchase remainder refund"
-                .to_string()
-                .try_into()
-                .unwrap(),
+            "return change".to_string().try_into().unwrap(),
         );
+
+        // Alert the DiffAdjust service to the purchase
+        DiffAdjust::call().increment(auction.nft_id, 1);
     }
 
     #[action]
@@ -217,33 +204,34 @@ pub mod service {
             purchased_accounts_table.get_index_pk().get(&acct_to_claim),
             "account not purchased",
         );
+
         check(
             purchased_account.owner == get_sender(),
             "account not purchased by sender",
         );
 
-        // Every interface assumes the user is trying to do something to themself
-        // "object" being acted on is the calling service (PremAccounts)
-        // AuthSig::call().setKey(pub_key);
         let set_key_action = Action {
             sender: acct_to_claim,
             service: AuthSig::SERVICE,
             method: AuthSig::action_structs::setKey::ACTION_NAME.into(),
-            rawData: AuthSig::action_structs::setKey { key: pub_key }
-                .packed()
-                .into(),
-        };
-        let set_auth_serv_action = Action {
-            sender: get_service(),
-            service: Accounts::Wrapper::SERVICE,
-            method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: Accounts::action_structs::setAuthServ {
-                authService: AuthSig::SERVICE,
+            rawData: AuthSig::action_structs::setKey {
+                key: pub_key.into(),
             }
             .packed()
             .into(),
         };
         Transact::call().runAs(set_key_action, vec![]);
+
+        let set_auth_serv_action = Action {
+            sender: acct_to_claim,
+            service: Accounts::SERVICE,
+            method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+            rawData: Accounts::action_structs::setAuthServ {
+                authService: AuthSig::Wrapper::SERVICE,
+            }
+            .packed()
+            .into(),
+        };
         Transact::call().runAs(set_auth_serv_action, vec![]);
 
         purchased_accounts_table.remove(&purchased_account);
