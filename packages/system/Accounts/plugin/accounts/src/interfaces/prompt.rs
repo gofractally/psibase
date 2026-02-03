@@ -22,33 +22,48 @@ impl Prompt for AccountsPlugin {
         false
     }
 
-    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<String>> {
+    fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         let mut invalid_accounts = Vec::new();
         for credential in credentials {
             match AccountsPlugin::get_account(credential.account.to_string()) {
-                Ok(Some(account)) => {
-                    let valid = match account.auth_service.as_str() {
-                        "auth-any" => true,
-                        "auth-sig" => {
-                            AuthSig::api::can_authorize(
-                                &credential.key,
-                                &credential.account.to_string(),
-                            ) && AuthSig::keyvault::import_key(&credential.key).is_ok()
-                        }
-                        _ => false,
-                    };
-
-                    if !valid {
-                        invalid_accounts.push(credential.account);
-                        continue;
+                Ok(Some(account)) => match account.auth_service.as_str() {
+                    "auth-any" => {
+                        AppsTable::new(&Client::get_receiver()).connect(&credential.account);
                     }
+                    "auth-sig" => {
+                        let account_str = credential.account.to_string();
+                        if !AuthSig::api::can_authorize(&credential.key, &account_str) {
+                            invalid_accounts.push((
+                                credential.account,
+                                ErrorType::AuthorizationFailed(account_str).into(),
+                            ));
+                            continue;
+                        }
 
-                    AppsTable::new(&Client::get_receiver()).connect(&credential.account);
+                        if let Err(e) = AuthSig::keyvault::import_key(&credential.key) {
+                            invalid_accounts.push((credential.account, e));
+                        } else {
+                            AppsTable::new(&Client::get_receiver()).connect(&credential.account);
+                        }
+                    }
+                    service => {
+                        invalid_accounts.push((
+                            credential.account,
+                            ErrorType::UnsupportedAuthService(service.to_string()).into(),
+                        ));
+                    }
+                },
+                Ok(None) => {
+                    let account_str = credential.account.clone();
+                    invalid_accounts.push((
+                        credential.account,
+                        ErrorType::AccountNotFound(account_str).into(),
+                    ));
                 }
-                _ => {
-                    invalid_accounts.push(credential.account);
+                Err(e) => {
+                    invalid_accounts.push((credential.account, e));
                 }
             }
         }
