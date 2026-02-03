@@ -10,11 +10,11 @@ use Store::*;
 
 pub struct InviteTokensTable {}
 impl InviteTokensTable {
-    // The invite token itself, lasts in local storage only for this session.
+    // The details of imported invite tokens
     fn invite_tokens() -> Bucket {
         Bucket::new(
             Database {
-                mode: DbMode::NonTransactional,
+                mode: DbMode::Transactional,
                 duration: StorageDuration::Session,
             },
             "invites",
@@ -127,10 +127,10 @@ impl InviteTokensTable {
     }
 
     fn is_valid(invite_id: u32, sym_key: &Vec<u8>) -> bool {
-        if let Some(device) = Self::device_history().get(&invite_id.to_string()) {
-            let device = <DeviceDetails>::unpacked(&device).unwrap();
-            if device.accepted {
-                // Already accepted
+        if let Some(invite_local) = Self::device_history().get(&invite_id.to_string()) {
+            let invite_local = <DeviceDetails>::unpacked(&invite_local).unwrap();
+            if invite_local.accepted || invite_local.rejected {
+                // Already accepted or rejected
                 return false;
             }
         }
@@ -147,10 +147,6 @@ impl InviteTokensTable {
 
         // Invite expired
         expiry > Utc::now()
-    }
-
-    fn delete_active() {
-        Self::invite_tokens().delete(&Client::get_active_app());
     }
 
     pub fn decode_invite_token(token: String) -> Result<(u32, Vec<u8>), HostTypes::Error> {
@@ -181,8 +177,6 @@ impl InviteTokensTable {
         }
         let (invite_id, sym_key) = Self::decode_invite_token(token.unwrap()).unwrap();
         if !Self::is_valid(invite_id, &sym_key) {
-            Self::delete_active();
-            Self::delete_fixed_details(invite_id);
             return None;
         }
         Some((invite_id, sym_key))
@@ -236,7 +230,6 @@ impl InviteTokensTable {
             .unwrap_or_default();
         device.accepted = true;
         Self::device_history().set(&invite_id.to_string(), &device.packed());
-        Self::delete_active();
     }
 
     pub fn active_credential_key() -> Option<String> {
@@ -256,6 +249,12 @@ impl InviteTokensTable {
 
         let (invite_id, _) = active_token.unwrap();
         Self::delete_fixed_details(invite_id);
-        Self::delete_active();
+
+        let mut device = Self::device_history()
+            .get(&invite_id.to_string())
+            .map(|d| <DeviceDetails>::unpacked(&d).unwrap())
+            .unwrap_or_default();
+        device.rejected = true;
+        Self::device_history().set(&invite_id.to_string(), &device.packed());
     }
 }

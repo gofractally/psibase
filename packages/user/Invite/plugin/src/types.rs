@@ -41,6 +41,9 @@ pub struct DeviceDetails {
 
     // Whether the invite was accepted on this device
     pub accepted: bool,
+
+    // Whether this invite was rejected on this device
+    pub rejected: bool,
 }
 
 #[allow(non_snake_case)]
