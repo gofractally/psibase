@@ -88,9 +88,9 @@ bool WebSocket::handleP2P()
       if (readCallback)
       {
          l.unlock();
-         auto readCallback = std::move(this->readCallback);
-         readCallback      = nullptr;
-         p2pState          = P2PState::running;
+         auto readCallback  = std::move(this->readCallback);
+         this->readCallback = nullptr;
+         p2pState           = P2PState::running;
          readCallback(std::error_code{}, std::vector(msg.begin(), msg.end()));
          input.consume(input.size());
          return true;

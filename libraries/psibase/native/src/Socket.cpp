@@ -442,7 +442,7 @@ std::int32_t Sockets::enableP2P(
 
    if (diff)
    {
-      diff->push_back({sockptr, SocketChange::setP2PFlag});
+      diff->push_back({sockptr, SocketChange::setP2PFlag, SocketChange::setP2PFlag});
    }
    else
    {
