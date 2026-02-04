@@ -468,7 +468,11 @@ CloseLock Sockets::lockRecv(const std::shared_ptr<AutoCloseSocket>& socket)
    bool            okay = false;
    std::lock_guard l{mutex};
    assert(!socket->pendingRecv);
-   if (socket->receiving)
+   if (socket->closed)
+   {
+      return CloseLock{nullptr, nullptr};
+   }
+   else if (socket->receiving)
    {
       socket->receiving = false;
       ++socket->closeLocks;
