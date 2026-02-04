@@ -1,5 +1,6 @@
 use crate::fracpack::{Pack, UnpackOwned};
 use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
+use crate::services::transact::ServiceMethod;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -174,5 +175,40 @@ impl Caller for ActionPacker {
             method,
             rawData: args.packed().into(),
         }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct RunAsCaller {
+    pub sender: AccountNumber,
+    pub service: AccountNumber,
+    pub allowed_actions: Vec<ServiceMethod>,
+}
+
+impl Caller for RunAsCaller {
+    type ReturnsNothing = ();
+    type ReturnType<T: UnpackOwned> = T;
+
+    fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
+        let action = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed().into(),
+        };
+        crate::services::transact::Wrapper::call()
+            .runAs(action, self.allowed_actions.clone());
+    }
+
+    fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
+        let action = Action {
+            sender: self.sender,
+            service: self.service,
+            method,
+            rawData: args.packed().into(),
+        };
+        let ret = crate::services::transact::Wrapper::call()
+            .runAs(action, self.allowed_actions.clone());
+        Ret::unpacked(&ret.0).unwrap()
     }
 }

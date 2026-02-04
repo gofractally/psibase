@@ -266,6 +266,26 @@ fn process_mod(
             "{} This method defaults `service` to \"{}\".",
             call_from_to_doc, options.name
         );
+        let call_as_doc = format!(
+            "
+            Call another service using [runAs]({psibase}::services::transact::Actions::runAs).
+
+            This method returns an object which has [methods]({actions}#implementations)
+            (one per action) which call another service via `runAs` and return the result from the call.
+            The action will run with `sender` set to the provided account. This method defaults `service` to \"{name}\".
+
+            This will fail unless certain conditions are met. See [runAs]({psibase}::services::transact::Actions::runAs) 
+            documentation for more details.
+
+            ",
+            psibase = options.psibase_mod,
+            actions = options.actions,
+            name = options.name
+        );
+        let call_as_with_doc = format!(
+            "{} This method also accepts `allowedActions` for nested `runAs` calls.",
+            call_as_doc
+        );
 
         let push_from_to_doc = format!(
             "
@@ -380,6 +400,32 @@ fn process_mod(
                 {
                     #psibase_mod::ServiceCaller { sender, service,
                         flags: 0, }.into()
+                }
+
+                #[doc = #call_as_doc]
+                pub fn call_as(sender: #psibase_mod::AccountNumber)
+                -> #actions<#psibase_mod::RunAsCaller>
+                {
+                    #psibase_mod::RunAsCaller {
+                        sender,
+                        service: Self::#constant,
+                        allowed_actions: vec![],
+                    }
+                    .into()
+                }
+
+                #[doc = #call_as_with_doc]
+                pub fn call_as_with(
+                    sender: #psibase_mod::AccountNumber,
+                    allowed_actions: Vec<#psibase_mod::services::transact::ServiceMethod>)
+                -> #actions<#psibase_mod::RunAsCaller>
+                {
+                    #psibase_mod::RunAsCaller {
+                        sender,
+                        service: Self::#constant,
+                        allowed_actions,
+                    }
+                    .into()
                 }
 
                 #[doc = #call_doc]
