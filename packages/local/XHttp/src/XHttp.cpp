@@ -369,7 +369,7 @@ void XHttp::autoClose(std::int32_t socket, bool value)
    }
 }
 
-void XHttp::close(std::int32_t socket)
+void XHttp::asyncClose(std::int32_t socket)
 {
    auto sender   = getSender();
    auto requests = Session{}.open<ResponseHandlerTable>();
@@ -378,9 +378,8 @@ void XHttp::close(std::int32_t socket)
       auto row = requests.get(socket);
       if (!row || row->service != sender)
          abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
-      requests.remove(*row);
-      check(socketSetFlags(socket, SocketFlags::autoClose, SocketFlags::autoClose) == 0,
-            "Failed to set auto-close");
+      auto flags = SocketFlags::autoClose | SocketFlags::notifyClose;
+      check(socketSetFlags(socket, flags, flags) == 0, "Failed to set auto-close");
    }
 }
 

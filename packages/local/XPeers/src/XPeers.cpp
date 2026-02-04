@@ -16,6 +16,12 @@ namespace
       PSIO_REFLECT(ConnectRequest, url)
    };
 
+   struct DisconnectRequest
+   {
+      std::int32_t socket;
+      PSIO_REFLECT(DisconnectRequest, socket)
+   };
+
    std::int32_t connect(std::string peer, std::optional<std::int32_t> requestSocket = std::nullopt)
    {
       if (peer.find('/') == std::string::npos)
@@ -45,7 +51,7 @@ namespace
       else
       {
          local        = true;
-         request.host = "localhost";
+         request.host = "x-peers.psibase.localhost";
          endpoint     = LocalEndpoint{peer};
       }
       std::int32_t socket = to<XHttp>().websocket(request, std::move(tls), std::move(endpoint));
@@ -110,6 +116,11 @@ namespace
       static const std::uint8_t type = 66;
       std::vector<std::string>  hosts;
       PSIO_REFLECT(HostnamesMessage, hosts)
+   };
+   struct CheckDuplicatesMessage
+   {
+      static const std::uint8_t type = 67;
+      PSIO_REFLECT(CheckDuplicatesMessage)
    };
 
    template <typename T>
@@ -230,6 +241,7 @@ namespace
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
+      bool                                                             outgoing;
       PSIBASE_SUBJECTIVE_TX
       {
          auto row = table.get(socket).value();
@@ -239,6 +251,27 @@ namespace
             table.put(row);
             getDuplicates(table, hostIds, row, messages);
          }
+         outgoing = row.outgoing;
+      }
+      for (auto&& [peer, msg] : messages)
+      {
+         to<XHttp>().send(peer, serializeMessage(msg));
+      }
+      if (!outgoing)
+         to<XHttp>().send(socket, serializeMessage(CheckDuplicatesMessage{}));
+   }
+   // After we receive this on an outgoing connection, we know that
+   // the peer has received our hostnames, so sending a DuplicateConnectionMessage
+   // on a different socket will work correctly.
+   void recvMessage(std::int32_t socket, CheckDuplicatesMessage&& msg)
+   {
+      auto table   = XPeers{}.open<PeerConnectionTable>();
+      auto hostIds = XPeers{}.open<HostIdTable>();
+      std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto row = table.get(socket).value();
+         getDuplicates(table, hostIds, row, messages);
       }
       for (auto&& [peer, msg] : messages)
       {
@@ -259,10 +292,7 @@ namespace
                if (msg.secure && !out->secure ||
                    msg.secure == out->secure && out->nodeId < myNodeId())
                {
-                  auto hostIds = XPeers{}.open<HostIdTable>();
-                  updateHosts(hostIds, *out, {});
-                  table.remove(*out);
-                  to<XHttp>().close(socket);
+                  to<XHttp>().asyncClose(socket);
                }
             }
          }
@@ -294,6 +324,43 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       connect(body.url, socket);
 
       return {};
+   }
+   else if (target == "/disconnect")
+   {
+      if (request.contentType != "application/json")
+      {
+         std::string_view msg{"Content-Type must be application/json"};
+         return HttpReply{.status      = HttpStatus::unsupportedMediaType,
+                          .contentType = "application/html",
+                          .body{msg.begin(), msg.end()}};
+      }
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
+
+      auto body = psio::convert_from_json<DisconnectRequest>(
+          std::string(request.body.begin(), request.body.end()));
+
+      auto                          table = XPeers{}.open<PeerConnectionTable>();
+      std::optional<PeerConnection> row;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         row = table.get(*socket).value();
+         if (row)
+         {
+            to<XHttp>().asyncClose(row->socket);
+         }
+      }
+      if (row)
+      {
+         return HttpReply{};
+      }
+      else
+      {
+         std::string_view msg{"Socket not found"};
+         return HttpReply{.status      = HttpStatus::notFound,
+                          .contentType = "application/html",
+                          .body{msg.begin(), msg.end()}};
+      }
    }
    else if (target == "/p2p")
    {
@@ -403,6 +470,8 @@ void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> da
          return recvMessage(socket, deserializeMessage<IdMessage>(data));
       case HostnamesMessage::type:
          return recvMessage(socket, deserializeMessage<HostnamesMessage>(data));
+      case CheckDuplicatesMessage::type:
+         return recvMessage(socket, deserializeMessage<CheckDuplicatesMessage>(data));
       case DuplicateConnectionMessage::type:
          return recvMessage(socket, deserializeMessage<DuplicateConnectionMessage>(data));
    }
