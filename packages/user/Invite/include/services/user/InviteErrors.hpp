@@ -20,5 +20,10 @@ namespace UserService
       constexpr std::string_view inviteHooksRequired =
           "To enable hooks, the invite creator must be a service that implements the 'InviteHooks' "
           "interface";
+      constexpr std::string_view systemTokenDNE = "System token does not exist";
+      constexpr std::string_view notEnoughResources =
+          "Resources provided for the invite are below the required minimum";
+      constexpr std::string_view inviteIdTaken   = "Invite ID already taken";
+      constexpr std::string_view inviteCorrupted = "Invite is corrupted";
    }  // namespace Errors
 }  // namespace UserService
