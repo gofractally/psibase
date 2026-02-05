@@ -19,7 +19,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
     const { setValue: setPickTokenModal, value: showPickTokenModal } = useBoolean();
 
 
-    const { refetch: refetchTokenBalances } =
+    const { refetch: refetchTokenBalances, data: userTokenBalances } =
         useUserTokenBalances();
 
 
@@ -95,8 +95,11 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
                 .filter(
                     (item, index, arr) =>
                         arr.findIndex((i) => i.id == item.id) == index,
-                ) || [],
-        [pools],
+                ).map(token => ({
+                    ...token,
+                    balance: userTokenBalances?.find(balance => balance.id == token.id)?.balance
+                })) || [],
+        [pools, userTokenBalances],
     );
 
     const isNoTradingNetwork = uniqueTradeableTokens.length < 2 && !isLoadingPools;

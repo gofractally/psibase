@@ -239,6 +239,7 @@ export const Liquidity = () => {
     const userTokens = (userBalances || [])?.map((balance) => ({
         id: balance.id,
         symbol: balance.symbol,
+        balance: balance.balance
     }));
 
 
@@ -357,7 +358,7 @@ export const Liquidity = () => {
                                     </AlertDescription>
                                 </Alert>
                                 {token1Amount && token2Amount && (
-                                    <div className="text-muted-foreground space-y-1 text-sm">
+                                    <div className="text-muted-foreground space-y-2 flex flex-col gap-2 text-sm">
                                         <div className="flex justify-between">
                                             <span>Token 1 Price</span>
                                             <span>

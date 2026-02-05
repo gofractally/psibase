@@ -5,10 +5,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+import { Quantity } from "@shared/lib/quantity";
+import { Avatar } from "@shared/components/avatar";
 
 interface Token {
     id: number;
     symbol: string | null | undefined;
+    balance?: Quantity
 }
 
 interface PickTokenModalProps {
@@ -52,11 +55,18 @@ export const PickTokenModal = ({
                                         "transition-colors",
                                     )}
                                 >
-                                    <div className="font-medium">
-                                        {token.symbol?.toUpperCase() ?? "Unknown"}
+                                    <div className="flex items-center gap-2">
+                                        <Avatar
+                                            account={token.id.toString()}
+                                            type="glass"
+                                            className="size-5"
+                                        />
+                                        <span className={cn("font-mono text-lg font-medium", !token.symbol && 'italic')}>
+                                            {token.symbol || token.id}
+                                        </span>
                                     </div>
                                     <div className="text-muted-foreground font-mono text-sm">
-                                        {token.id}
+                                        {token.balance?.format({ includeLabel: false })}
                                     </div>
                                 </button>
                             ))}

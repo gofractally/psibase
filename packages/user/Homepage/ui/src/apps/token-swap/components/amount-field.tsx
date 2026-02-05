@@ -31,7 +31,6 @@ export const AmountField = ({
     onMaxBalance?: () => void;
 
 }) => {
-
     const isOverMaxBalance = balance ? balance.isLessThan(balance.withAmount(amount)) : false;
 
     return (
