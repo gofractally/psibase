@@ -26,7 +26,7 @@ jobs:
         id: ccache_cache_timestamp
         run: echo timestamp=`date -u +"%Y-%m-%d-%H-%M-%S"` >>$GITHUB_OUTPUT
       - name: Maximize build space
-        uses: easimon/maximize-build-space@v10
+        uses: James-Mart/maximize-build-space@master
         with:
           root-reserve-mb: 24576
           temp-reserve-mb: 512
