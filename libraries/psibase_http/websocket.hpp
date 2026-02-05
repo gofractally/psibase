@@ -130,7 +130,7 @@ namespace psibase::http
       void close(std::shared_ptr<WebSocket>&& self) override
       {
          PSIBASE_LOG(self->logger, debug) << "closing websocket";
-         boost::asio::dispatch(
+         boost::asio::post(
              stream.get_executor(),
              [self = std::move(self)]() mutable
              {
