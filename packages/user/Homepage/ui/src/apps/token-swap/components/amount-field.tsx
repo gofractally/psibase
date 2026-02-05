@@ -42,14 +42,14 @@ export const AmountField = ({
                     {balance && (
                         <div className="flex gap-1 items-center">
                             <Button
-                                className={cn("text-muted-foreground text-sm", isOverMaxBalance && "underline font-semibold")}
-                                variant={"link"}
-                                onClick={() => {
-                                    if (onMaxBalance) {
-                                        onMaxBalance()
-                                    }
-                                }
-                                }
+                                variant="link"
+                                className={cn(
+                                    "h-auto p-0 text-sm font-medium transition-all duration-200",
+                                    isOverMaxBalance
+                                        ? "text-orange-500 animate-shake-once dark:text-orange-400 "
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                                onClick={() => onMaxBalance?.()}
                             >
                                 Balance: {balance.format({ includeLabel: false })}
                             </Button>
@@ -68,7 +68,10 @@ export const AmountField = ({
                     onChange={(e) =>
                         setAmount(e.target.value.replace(/[^0-9.]/g, ""))
                     }
-                    className={cn("h-16 pr-28 text-lg font-medium", isOverMaxBalance && "focus-visible:border-red-500 border-red-600")}
+                    className={cn(
+                        "h-16 pr-28 text-lg font-medium transition-all",
+                        isOverMaxBalance && "border-orange-400/60 focus-visible:border-orange-400/90 focus-visible:ring-orange-400/20 bg-orange-400/5"
+                    )}
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     <Button

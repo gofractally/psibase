@@ -332,7 +332,7 @@ export const Liquidity = () => {
                     resetFieldValues();
                     toggle();
                 }}
-                triggerLabel={userIsCreatingPool ? "Create Pool" : isAddingLiquidity ? "Add liquidity" : "Remove liquidity"}
+                triggerLabel={isAboveMaxBalance ? "Insufficient balance" : userIsCreatingPool ? "Create Pool" : isAddingLiquidity ? "Add liquidity" : "Remove liquidity"}
                 onTrigger={trigger}
                 center={isAddingLiquidity ? <Plus className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
                 footer={

@@ -189,7 +189,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
                     setPickTokenModal(true)
                 },
             }}
-            triggerLabel="Swap"
+            triggerLabel={isFromOverMaxBalance ? "Insufficient balance" : "Swap"}
             center={<ArrowDownUp className="h-5 w-5" />}
             footer={<div className="text-muted-foreground space-y-1 text-sm">
                 <div className="flex justify-between">
