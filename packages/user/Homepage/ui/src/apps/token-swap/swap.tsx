@@ -29,7 +29,8 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
         setAmount: setFromAmount,
         setTokenId: setFromId,
         balance: fromBalance,
-        amountNumber: fromAmountNumber
+        amountNumber: fromAmountNumber,
+        isOverBalance: isFromOverMaxBalance
     } = useAmount();
 
 
@@ -147,7 +148,7 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
             onSuccess={onSuccess}
         />
         <DualTokens
-            disableTrigger={!fromAmountIsValid}
+            disableTrigger={!fromAmountIsValid || isFromOverMaxBalance}
             onCenterClick={() => {
                 setFromId(toId)
                 setToId(fromId)

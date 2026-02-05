@@ -45,6 +45,7 @@ export const Liquidity = () => {
         setTokenId: setToken1Id,
         balance: token1UserBalance,
         amountNumber: token1AmountNumber,
+        isOverBalance: isToken1AboveMaxBalance
     } = useAmount();
 
     const {
@@ -55,7 +56,10 @@ export const Liquidity = () => {
         setTokenId: setToken2Id,
         balance: token2UserBalance,
         amountNumber: token2AmountNumber,
+        isOverBalance: isToken2AboveMaxBalance
     } = useAmount();
+
+    const isAboveMaxBalance = isToken1AboveMaxBalance || isToken2AboveMaxBalance;
 
     const { value: lastTouchedIs1, setTrue: oneIsLastTouched, setFalse: twoIsLastTouched } = useBoolean(true);
 
@@ -290,7 +294,7 @@ export const Liquidity = () => {
             />
 
             <DualTokens
-                disableTrigger={!amountsAreValid}
+                disableTrigger={!amountsAreValid || isAboveMaxBalance}
                 token1={{
                     label: "Deposit #1",
                     id: token1Id || 0,
