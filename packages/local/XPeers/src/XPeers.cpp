@@ -436,7 +436,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       std::optional<PeerConnection> row;
       PSIBASE_SUBJECTIVE_TX
       {
-         row = table.get(*socket).value();
+         row = table.get(body.socket);
          if (row)
          {
             to<XHttp>().asyncClose(row->socket);
