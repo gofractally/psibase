@@ -3,14 +3,9 @@ import { useState } from "react";
 import { useBoolean } from "usehooks-ts";
 import z from "zod";
 
-
+import { GlowingCard } from "@shared/components/glowing-card";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
-
+import { CardDescription, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@shared/shadcn/ui/tabs";
 import {
     Tooltip,
@@ -21,40 +16,27 @@ import {
 
 import { DevModal } from "./components/dev-modal";
 import { TradeSettingsModal } from "./components/trade-settings-modal";
-
 import { Liquidity } from "./liquidity";
 import { Swap } from "./swap";
-import { GlowingCard } from "@shared/components/glowing-card";
-
-
-
 
 const zCurrentTab = z.enum(["Swap", "Liquidity"]);
 
-
 type Tab = z.infer<typeof zCurrentTab>;
 
-
-
 export const SwapPage = () => {
-
-
-
     const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap);
 
     const { value: showDevModal, setValue: setShowDevModal } = useBoolean();
     const { value: showSettingsModal, setValue: setShowSettingsModal } =
         useBoolean();
 
-
-    const description = currentTab == zCurrentTab.Values.Swap
-        ? "Trade tokens with best prices"
-        : "Add liquidity to or from pools";
-
+    const description =
+        currentTab == zCurrentTab.Values.Swap
+            ? "Trade tokens with best prices"
+            : "Add liquidity to or from pools";
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12 ">
-
             <DevModal
                 openChange={(e) => {
                     setShowDevModal(e);
@@ -112,14 +94,14 @@ export const SwapPage = () => {
                     <CardDescription>{description}</CardDescription>
                 </CardHeader>
 
-                {currentTab == zCurrentTab.Values.Swap && <Swap onSwitch={() => { setCurrentTab(zCurrentTab.Values.Liquidity) }} />}
+                {currentTab == zCurrentTab.Values.Swap && (
+                    <Swap
+                        onSwitch={() => {
+                            setCurrentTab(zCurrentTab.Values.Liquidity);
+                        }}
+                    />
+                )}
                 {currentTab == zCurrentTab.Values.Liquidity && <Liquidity />}
-
-
-
-
-
-
             </GlowingCard>
 
             <div className="flex w-full justify-center">

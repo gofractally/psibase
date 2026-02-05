@@ -76,7 +76,7 @@ export const usePools = (refetchInterval = 12000) => {
                 {
                     baseUrlIncludesSibling: false,
                     service: "token-swap",
-                }
+                },
             );
 
             const rawPools = PoolsResponseSchema.parse(res).allPools.nodes;

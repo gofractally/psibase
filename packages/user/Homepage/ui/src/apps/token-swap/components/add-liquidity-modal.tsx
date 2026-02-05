@@ -13,8 +13,8 @@ import {
 import { Button } from "@shared/shadcn/ui/button";
 
 import { useAddLiquidity } from "../hooks/use-add-liquidity";
-import { AmountSummary } from "./amount-summary";
 import { useToken } from "../hooks/use-token";
+import { AmountSummary } from "./amount-summary";
 
 export const AddLiquidityModal = ({
     show,
@@ -33,11 +33,9 @@ export const AddLiquidityModal = ({
 }) => {
     const { mutateAsync: addLiquidity, isPending } = useAddLiquidity();
 
+    const { data: firstDepositToken } = useToken(firstDeposit?.tokenId);
 
-    const { data: firstDepositToken } = useToken(firstDeposit?.tokenId)
-
-    const { data: secondDepositToken } = useToken(secondDeposit?.tokenId)
-
+    const { data: secondDepositToken } = useToken(secondDeposit?.tokenId);
 
     const trigger = async () => {
         await addLiquidity([poolId!, firstDeposit!, secondDeposit!]);
@@ -66,7 +64,10 @@ export const AddLiquidityModal = ({
                         amount={Number(firstDeposit?.amount).toString() || ""}
                         avatarSeed={firstDeposit?.tokenId?.toString() ?? "?"}
                         label="Deposit #1"
-                        title={firstDepositToken?.symbol || `ID: ${firstDeposit?.tokenId}`}
+                        title={
+                            firstDepositToken?.symbol ||
+                            `ID: ${firstDeposit?.tokenId}`
+                        }
                     />
 
                     <div className="flex justify-center">
@@ -78,7 +79,10 @@ export const AddLiquidityModal = ({
                         amount={Number(secondDeposit?.amount).toString() ?? ""}
                         avatarSeed={secondDeposit?.tokenId?.toString() ?? "?"}
                         label="Deposit #2"
-                        title={secondDepositToken?.symbol || `ID: ${secondDeposit?.tokenId}`}
+                        title={
+                            secondDepositToken?.symbol ||
+                            `ID: ${secondDeposit?.tokenId}`
+                        }
                     />
                 </div>
 

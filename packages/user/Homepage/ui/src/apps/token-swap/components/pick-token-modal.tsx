@@ -1,3 +1,5 @@
+import { Avatar } from "@shared/components/avatar";
+import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 import {
     Dialog,
@@ -5,13 +7,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { Quantity } from "@shared/lib/quantity";
-import { Avatar } from "@shared/components/avatar";
 
 interface Token {
     id: number;
     symbol: string | null | undefined;
-    balance?: Quantity
+    balance?: Quantity;
 }
 
 interface PickTokenModalProps {
@@ -61,12 +61,19 @@ export const PickTokenModal = ({
                                             type="glass"
                                             className="size-5"
                                         />
-                                        <span className={cn("font-mono text-lg font-medium", !token.symbol && 'italic')}>
+                                        <span
+                                            className={cn(
+                                                "font-mono text-lg font-medium",
+                                                !token.symbol && "italic",
+                                            )}
+                                        >
                                             {token.symbol || token.id}
                                         </span>
                                     </div>
                                     <div className="text-muted-foreground font-mono text-sm">
-                                        {token.balance?.format({ includeLabel: false })}
+                                        {token.balance?.format({
+                                            includeLabel: false,
+                                        })}
                                     </div>
                                 </button>
                             ))}

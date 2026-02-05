@@ -15,8 +15,8 @@ import { Button } from "@shared/shadcn/ui/button";
 import { usePools } from "../hooks/use-pools";
 import { useQuotePoolTokens } from "../hooks/use-quote-pool-tokens";
 import { useRemoveLiquidity } from "../hooks/use-remove-liquidity";
-import { AmountSummary } from "./amount-summary";
 import { useToken } from "../hooks/use-token";
+import { AmountSummary } from "./amount-summary";
 
 export const RemoveLiquidityModal = ({
     show,
@@ -43,8 +43,10 @@ export const RemoveLiquidityModal = ({
 
     const [firstWithdrawal, secondWithdrawal] = outputs || [];
 
-    const { data: firstWithdrawalSymbol } = useToken(firstWithdrawal?.tokenId)
-    const { data: secondWithdrawalSymbol } = useToken(secondWithdrawal?.tokenId)
+    const { data: firstWithdrawalSymbol } = useToken(firstWithdrawal?.tokenId);
+    const { data: secondWithdrawalSymbol } = useToken(
+        secondWithdrawal?.tokenId,
+    );
 
     const trigger = async () => {
         await removeLiquidity([amount!]);
@@ -62,16 +64,22 @@ export const RemoveLiquidityModal = ({
                         Confirm Liquidity removal
                     </AlertDialogTitle>
                     <AlertDialogDescription className="text-slate-600 dark:text-slate-400">
-                        Please review the details before confirming your liquidity withdrawal.
+                        Please review the details before confirming your
+                        liquidity withdrawal.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
 
                 <div className="mt-3 space-y-4">
                     <AmountSummary
-                        amount={Number(firstWithdrawal?.amount).toString() || ""}
+                        amount={
+                            Number(firstWithdrawal?.amount).toString() || ""
+                        }
                         avatarSeed={firstWithdrawal?.tokenId?.toString() ?? "?"}
                         label="Withdrawal #1"
-                        title={firstWithdrawalSymbol?.symbol || `ID: ${firstWithdrawal?.tokenId}`}
+                        title={
+                            firstWithdrawalSymbol?.symbol ||
+                            `ID: ${firstWithdrawal?.tokenId}`
+                        }
                     />
 
                     <div className="flex justify-center">
@@ -79,12 +87,17 @@ export const RemoveLiquidityModal = ({
                     </div>
 
                     <AmountSummary
-                        amount={Number(secondWithdrawal?.amount).toString() ?? ""}
+                        amount={
+                            Number(secondWithdrawal?.amount).toString() ?? ""
+                        }
                         avatarSeed={
                             secondWithdrawal?.tokenId?.toString() ?? "?"
                         }
                         label="Withdrawal #2"
-                        title={secondWithdrawalSymbol?.symbol || `ID: ${secondWithdrawal?.tokenId}`}
+                        title={
+                            secondWithdrawalSymbol?.symbol ||
+                            `ID: ${secondWithdrawal?.tokenId}`
+                        }
                     />
                 </div>
 

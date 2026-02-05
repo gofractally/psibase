@@ -1,6 +1,7 @@
 import { ArrowDown } from "lucide-react";
 import { useBoolean } from "usehooks-ts";
 import z from "zod";
+
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -13,8 +14,8 @@ import {
 import { Button } from "@shared/shadcn/ui/button";
 
 import { useSwap } from "../hooks/use-swap";
-import { AmountSummary } from "./amount-summary";
 import { useToken } from "../hooks/use-token";
+import { AmountSummary } from "./amount-summary";
 
 export const ConfirmSwapModal = ({
     show,
@@ -48,7 +49,7 @@ export const ConfirmSwapModal = ({
     const blockDueToSlippage = isHighSlippage && !isUserAcceptingOfSlippage;
 
     const { data: fromToken } = useToken(fromTokenId);
-    const { data: toToken } = useToken(toTokenId)
+    const { data: toToken } = useToken(toTokenId);
 
     const triggerSwap = async () => {
         await swap([

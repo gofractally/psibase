@@ -38,7 +38,6 @@ export const CreatePoolModal = ({
         openChange(false);
     };
 
-
     return (
         <AlertDialog open={show}>
             <AlertDialogContent className="max-w-md">

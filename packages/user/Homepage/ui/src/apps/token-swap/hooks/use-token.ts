@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+
 import QueryKey from "@/lib/queryKeys";
+
 import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const zToken = z.object({
     precision: z.number().int(),
-    symbol: zAccount.nullable()
+    symbol: zAccount.nullable(),
 });
 
 export const getToken = async (tokenId: number) => {
@@ -21,8 +23,8 @@ export const getToken = async (tokenId: number) => {
         `,
         {
             baseUrlIncludesSibling: false,
-            service: "tokens"
-        }
+            service: "tokens",
+        },
     );
 
     const response = z
@@ -33,7 +35,6 @@ export const getToken = async (tokenId: number) => {
 
     return response.token;
 };
-
 
 export const useToken = (id: number | undefined) =>
     useQuery({
