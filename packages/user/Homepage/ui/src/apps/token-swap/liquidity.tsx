@@ -351,16 +351,7 @@ export const Liquidity = () => {
 
                         {poolsOfLiquidityPair.length == 0 && isAddingLiquidity && (
                             <div className="flex flex-col gap-3">
-                                <Alert variant="warning">
-                                    <AlertTitle>Creating new pool</AlertTitle>
-                                    <AlertDescription>
-                                        <p>No pool exists between the two tokens selected.</p>
-                                        <p>
-                                            By proceeding you will create a new pool of both reserves,
-                                            ensure you are depositing both tokens of equal market value.
-                                        </p>
-                                    </AlertDescription>
-                                </Alert>
+
                                 {token1Amount && token2Amount && (
                                     <div className="text-muted-foreground space-y-2 mt-2  text-sm">
                                         <div className="flex justify-between">
@@ -380,6 +371,16 @@ export const Liquidity = () => {
                                         </div>
                                     </div>
                                 )}
+                                <Alert variant="warning">
+                                    <AlertTitle>Creating new pool</AlertTitle>
+                                    <AlertDescription>
+                                        <p>No pool exists between the two tokens selected.</p>
+                                        <p>
+                                            By proceeding you will create a new pool of both reserves,
+                                            ensure you are depositing both tokens of equal market value.
+                                        </p>
+                                    </AlertDescription>
+                                </Alert>
                             </div>
                         )}
 
