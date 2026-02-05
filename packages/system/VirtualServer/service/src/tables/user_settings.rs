@@ -42,9 +42,19 @@ impl UserSettings {
         }
     }
 
-    pub fn get_resource_balance(&self) -> Quantity {
+    pub fn to_sub_account_key(account: AccountNumber, sub_account: &str) -> String {
+        format!("{}-{}", account, sub_account)
+    }
+
+    pub fn get_resource_balance(account: AccountNumber, sub_account: Option<String>) -> Quantity {
+        let sub_account_key = if let Some(sub_account) = sub_account {
+            Self::to_sub_account_key(account, &sub_account)
+        } else {
+            account.to_string()
+        };
+
         Tokens::call()
-            .getSubBal(BillingConfig::get_assert().sys, self.user.to_string())
+            .getSubBal(BillingConfig::get_assert().sys, sub_account_key)
             .unwrap_or(0.into())
     }
 
@@ -53,7 +63,7 @@ impl UserSettings {
         EXAMPLE_LARGE_TX_COST * 100 / (DEFAULT_AUTO_FILL_THRESHOLD_PERCENT as u64)
     }
 
-    fn get_default_buffer_capacity() -> u64 {
+    pub fn get_default_buffer_capacity() -> u64 {
         // This factor is used to set the default buffer capacity to an arbitrary multiple
         // of the minimum buffer capacity
         const FACTOR: u64 = 5;

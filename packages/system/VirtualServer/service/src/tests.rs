@@ -3,18 +3,27 @@
 #[cfg(test)]
 mod tests {
 
+    use p256::ecdsa::Signature;
+    use p256::ecdsa::{signature::hazmat::PrehashSigner, SigningKey};
+    use p256::pkcs8::DecodePrivateKey;
     use psibase::{
         account,
         fracpack::Pack,
+        method_raw,
         services::{
-            http_server,
+            auth_sig::SubjectPublicKeyInfo,
+            credentials, http_server, invite,
             nft::Wrapper as Nft,
             staged_tx,
             tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
+            verify_sig,
         },
-        tester, AccountNumber, Action, ChainEmptyResult,
+        tester, AccountNumber, Action, ChainEmptyResult, Claim, MethodNumber, SignedTransaction,
+        Transaction,
     };
+    use rand::Rng;
     use serde::Deserialize;
+    use std::str::FromStr;
     use tester::PRODUCER_ACCOUNT;
 
     use crate::action_structs::*;
@@ -131,6 +140,31 @@ mod tests {
         Ok(response.data.userResources)
     }
 
+    #[allow(non_snake_case)]
+    #[derive(Deserialize)]
+    pub struct GetInviteCostResponse {
+        pub getInviteCost: String,
+    }
+
+    fn get_invite_cost(
+        chain: &psibase::Chain,
+        num_accounts: u16,
+        auth_token: &str,
+    ) -> Result<String, psibase::Error> {
+        let invite_cost: serde_json::Value = chain.graphql_auth(
+            psibase::services::invite::SERVICE,
+            &format!(
+                r#"query {{ getInviteCost(numAccounts: {}) }}"#,
+                num_accounts
+            ),
+            auth_token,
+        )?;
+
+        let response: Response<GetInviteCostResponse> = serde_json::from_value(invite_cost)?;
+        Ok(response.data.getInviteCost)
+    }
+
+    // Creates a system token and distributes it to alice and bob
     fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
         let tokens_service = tokens::Wrapper::SERVICE;
         let symbol = account!("symbol");
@@ -288,6 +322,138 @@ mod tests {
         assert!(balance < min_resource_buffer.into());
 
         println!("alice resource balance: {}", balance);
+
+        Ok(())
+    }
+
+    fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init().get()?;
+
+        let sys: tokens::TID = 1;
+        let alice = account!("alice");
+        let vserver = Wrapper::SERVICE;
+        let tokens = tokens::Wrapper::SERVICE;
+        let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
+
+        // This is still needed even though the package config specifies the server...
+        http_server::Wrapper::push_from(&chain, vserver)
+            .registerServer(vserver)
+            .get()?;
+        chain.finish_block();
+
+        propose_sys_action(
+            &chain,
+            vserver,
+            init_billing::ACTION_NAME.into(),
+            init_billing {
+                fee_receiver: tokens,
+            },
+        )?;
+
+        // Alice give prod some tokens
+        tokens::Wrapper::push_from(&chain, alice)
+            .credit(sys, PRODUCER_ACCOUNT, 100_000_0000.into(), "".into())
+            .get()?;
+
+        let min_resource_buffer = get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
+            .bufferCapacity
+            .quantity
+            .value;
+
+        tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .credit(sys, vserver, min_resource_buffer.into(), "".into())
+            .get()?;
+        Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .buy_res(min_resource_buffer.into())
+            .get()?;
+
+        propose_sys_action(
+            &chain,
+            vserver,
+            enable_billing::ACTION_NAME.into(),
+            enable_billing { enabled: true },
+        )?;
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("VirtualServer", "StagedTx", "Invite", "Credentials"))]
+    fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        //let vserver = Wrapper::SERVICE;
+        // let tokens = tokens::Wrapper::SERVICE;
+        let invite = invite::Wrapper::SERVICE;
+        let sys: tokens::TID = 1;
+        // let alice = AccountNumber::from("alice");
+        let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
+
+        initial_setup(&chain)?;
+
+        http_server::Wrapper::push_from(&chain, invite)
+            .registerServer(account!("r-invite"))
+            .get()?;
+        chain.finish_block();
+
+        enable_billing(&chain)?;
+
+        // Create the invite
+        let (public_key, private_key) = psibase::generate_keypair()?;
+        let invite_id: u32 = rand::rng().random();
+        let min_cost = get_invite_cost(&chain, 1, &token_prod)?;
+        let min_cost = Decimal::from_str(&min_cost).unwrap().quantity;
+        assert!(min_cost.value > 0, "Cost of an invite should be > 0");
+
+        tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .credit(sys, invite, min_cost, "".into())
+            .get()?;
+        let inv_pubkey_der = pem::parse(public_key.trim())
+            .map_err(|e| psibase::Error::new(e))?
+            .into_contents();
+
+        let pkh = psibase::Hex(psibase::sha256(&inv_pubkey_der)).to_string();
+        invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
+            .createInvite(invite_id, pkh, 1, false, "".to_string(), min_cost.into())
+            .get()?;
+
+        // Create an account using the invite
+        let (new_public_key, _new_private_key) = psibase::generate_keypair()?;
+        let new_pub_key_der = pem::parse(new_public_key.trim())
+            .map_err(|e| psibase::Error::new(e))?
+            .into_contents();
+
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions: vec![Action {
+                sender: AccountNumber::from(credentials::CREDENTIAL_SENDER),
+                service: invite,
+                method: MethodNumber::new(method_raw!("createAccount")),
+                rawData: (
+                    account!("alicealice"),
+                    SubjectPublicKeyInfo(new_pub_key_der),
+                )
+                    .packed()
+                    .into(),
+            }],
+            claims: vec![Claim {
+                service: verify_sig::Wrapper::SERVICE,
+                rawData: inv_pubkey_der.clone().into(),
+            }],
+        };
+        chain.fill_tapos(&mut trx, 2);
+        let tx_packed = trx.packed();
+        let signing_key =
+            SigningKey::from_pkcs8_pem(&private_key).map_err(|e| psibase::Error::new(e))?;
+        let signature: Signature = signing_key
+            .sign_prehash(&psibase::sha256(&tx_packed))
+            .map_err(|e| psibase::Error::new(e))?;
+        let strx = SignedTransaction {
+            transaction: tx_packed.into(),
+            proofs: vec![signature.to_bytes().to_vec().into()],
+        };
+        let trace = chain.push(&strx);
+        if trace.error.is_some() {
+            println!("{}", trace.error.unwrap());
+            assert!(false, "Invite create acc fail");
+        }
 
         Ok(())
     }

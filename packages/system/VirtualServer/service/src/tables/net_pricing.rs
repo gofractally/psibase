@@ -110,6 +110,10 @@ impl NetPricing {
     pub fn set_billable_unit(amount_bits: u64) {
         Self::update_net(|net| net.billable_unit = amount_bits);
     }
+
+    pub fn get_billable_unit(&self) -> u64 {
+        self.billable_unit
+    }
 }
 
 #[ComplexObject]
