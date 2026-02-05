@@ -286,7 +286,6 @@ namespace SystemService
    {
       auto requester = getSender();
 
-      auto tables         = Transact::Tables(Transact::service);
       auto statusTable    = open<TransactStatusTable>(KvMode::read);
       auto statusIdx      = statusTable.getIndex<0>();
       auto transactStatus = statusIdx.get(std::tuple{});
