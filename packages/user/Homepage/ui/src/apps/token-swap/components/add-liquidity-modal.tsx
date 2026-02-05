@@ -63,7 +63,7 @@ export const AddLiquidityModal = ({
                 <div className="mt-3 space-y-4">
                     {/* From Account */}
                     <AmountSummary
-                        amount={firstDeposit?.amount || ""}
+                        amount={Number(firstDeposit?.amount).toString() || ""}
                         avatarSeed={firstDeposit?.tokenId?.toString() ?? "?"}
                         label="Deposit #1"
                         title={firstDepositToken?.symbol || `ID: ${firstDeposit?.tokenId}`}
@@ -75,7 +75,7 @@ export const AddLiquidityModal = ({
 
                     {/* To Account */}
                     <AmountSummary
-                        amount={secondDeposit?.amount ?? ""}
+                        amount={Number(secondDeposit?.amount).toString() ?? ""}
                         avatarSeed={secondDeposit?.tokenId?.toString() ?? "?"}
                         label="Deposit #2"
                         title={secondDepositToken?.symbol || `ID: ${secondDeposit?.tokenId}`}

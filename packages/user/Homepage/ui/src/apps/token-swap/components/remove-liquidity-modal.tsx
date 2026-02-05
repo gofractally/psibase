@@ -68,7 +68,7 @@ export const RemoveLiquidityModal = ({
 
                 <div className="mt-3 space-y-4">
                     <AmountSummary
-                        amount={firstWithdrawal?.amount || ""}
+                        amount={Number(firstWithdrawal?.amount).toString() || ""}
                         avatarSeed={firstWithdrawal?.tokenId?.toString() ?? "?"}
                         label="Withdrawal #1"
                         title={firstWithdrawalSymbol?.symbol || `ID: ${firstWithdrawal?.tokenId}`}
@@ -79,7 +79,7 @@ export const RemoveLiquidityModal = ({
                     </div>
 
                     <AmountSummary
-                        amount={secondWithdrawal?.amount ?? ""}
+                        amount={Number(secondWithdrawal?.amount).toString() ?? ""}
                         avatarSeed={
                             secondWithdrawal?.tokenId?.toString() ?? "?"
                         }
