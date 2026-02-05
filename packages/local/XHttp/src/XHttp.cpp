@@ -477,7 +477,7 @@ std::string XHttp::rootHost(psio::view<const std::string> host)
 void XHttp::startSession()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   to<XAdmin>().startSession();
+   recurse().to<XAdmin>().startSession();
 }
 
 #ifndef PSIBASE_GENERATE_SCHEMA

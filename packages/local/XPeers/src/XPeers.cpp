@@ -499,6 +499,63 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
    return {};
 }
 
+void XPeers::onConfig()
+{
+   auto                     opts      = open<AdminOptionsTable>();
+   auto                     urls      = open<UrlTable>();
+   auto                     urlTimers = open<UrlTimerTable>();
+   std::vector<std::string> newConnections;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto options    = to<XAdmin>().options();
+      auto oldOptions = opts.get({}).value_or(AdminOptionsRow{});
+      // Unset autoconnect for urls that are no longer in peers
+      for (const auto& peer : oldOptions.peers)
+      {
+         if (!std::ranges::contains(options.peers, peer))
+         {
+            auto url = urls.get(peer);
+            check(url && url->autoconnect, "Url in peers should have autoconnect set");
+            if (url->refcount == 0)
+            {
+               // The timer might not be running, because there's a window
+               // between the timer's expiration and when the new connection
+               // is started.
+               if (url->timerId)
+               {
+                  to<XTimer>().cancel(*url->timerId);
+                  urlTimers.erase(*url->timerId);
+                  url->timerId.reset();
+               }
+               urls.remove(*url);
+            }
+            else
+            {
+               url->autoconnect = false;
+               urls.put(*url);
+            }
+         }
+      }
+      for (const auto& peer : options.peers)
+      {
+         auto url = urls.get(peer);
+         if (!url)
+            url = {peer, 0, false, timeoutBase, MonotonicTimePointUSec::min(), std::nullopt};
+         if (!url->autoconnect)
+         {
+            url->autoconnect = true;
+            urls.put(*url);
+            newConnections.push_back(peer);
+         }
+      }
+      opts.put(options);
+   }
+   for (auto& url : newConnections)
+   {
+      connect(url);
+   }
+}
+
 void XPeers::onP2P(std::int32_t socket, HttpReply reply)
 {
    std::optional<ConnectionRequestRow> request;

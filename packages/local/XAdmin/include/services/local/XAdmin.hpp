@@ -21,7 +21,8 @@ namespace LocalService
    {
       bool                     p2p = false;
       std::vector<std::string> hosts;
-      PSIO_REFLECT(AdminOptionsRow, p2p, hosts)
+      std::vector<std::string> peers;
+      PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
@@ -41,7 +42,8 @@ namespace LocalService
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        req,
                                                  std::optional<std::int32_t> socket);
 
-      void            startSession();
+      void startSession();
+      /// This action can be called inside a subjective tx
       AdminOptionsRow options();
    };
    PSIO_REFLECT(XAdmin,

@@ -4,6 +4,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
+#include <services/local/XAdmin.hpp>
 
 namespace LocalService
 {
@@ -97,10 +98,15 @@ namespace LocalService
                                                              PeerConnectionTable,
                                                              HostIdTable,
                                                              UrlTable,
-                                                             UrlTimerTable>;
+                                                             UrlTimerTable,
+                                                             AdminOptionsTable>;
       auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> user)
           -> std::optional<psibase::HttpReply>;
 
+      // Called by XAdmin to handle config changes (host names/peers)
+      void onConfig();
+
+      // Internal callbacks
       void onP2P(std::int32_t socket, psibase::HttpReply reply);
       void errP2P(std::int32_t socket, std::optional<psibase::HttpReply> reply);
       void recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data);
@@ -109,6 +115,7 @@ namespace LocalService
    };
    PSIO_REFLECT(XPeers,
                 method(serveSys, request, socket),
+                method(onConfig),
                 method(onP2P, socket, reply),
                 method(errP2P, socekt, reply),
                 method(recvP2P, socket, data),

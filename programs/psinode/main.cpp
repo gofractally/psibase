@@ -1469,16 +1469,6 @@ void run(const std::string&              db_path,
    }
    // If this is a new database, initialize subjective services
    initialize_database(*system, db_template);
-   {
-      Action act{.service = proxyServiceNum,
-                 .method  = MethodNumber{"startSession"},
-                 .rawData = psio::to_frac(std::tuple())};
-
-      BlockContext bc{*system, system->sharedDatabase.getHead(),
-                      system->sharedDatabase.createWriter(), true};
-
-      bc.execAsyncAction(std::move(act));
-   }
 
    // Manages the session and and unlinks all keys from prover on destruction
    struct PKCS11SessionManager
@@ -2157,6 +2147,21 @@ void run(const std::string&              db_path,
       node.chain().onSocketOpen(service.get_connector());
       node.chain().onSocketP2P([&node](const std::shared_ptr<psibase::net::connection_base>& conn)
                                { node.add_connection(conn); });
+
+      // startSession should run after all callbacks are set up
+      // so that it can safely call anything, but before any other
+      // threads are started, so that it is guaranteed to happen
+      // before http requests or queued actions.
+      {
+         Action act{.service = proxyServiceNum,
+                    .method  = MethodNumber{"startSession"},
+                    .rawData = psio::to_frac(std::tuple())};
+
+         BlockContext bc{*system, system->sharedDatabase.getHead(),
+                         system->sharedDatabase.createWriter(), true};
+
+         bc.execAsyncAction(std::move(act));
+      }
 
       // This starts threads that can run wasm, so it isn't safe to run
       // until after all the node.chain().onXXX callbacks are set up.

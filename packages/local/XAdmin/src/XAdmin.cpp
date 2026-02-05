@@ -321,7 +321,7 @@ namespace LocalService
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
                // will be round-tripped unmodified.
-               if (entry.key == "hosts")
+               if (entry.key == "hosts" || entry.key == "peers")
                   continue;
                else if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
                         // In the unlikely event that the host has a option that
@@ -334,6 +334,8 @@ namespace LocalService
          result.push_back({"p2p", adminOpts.p2p});
          result.push_back({"hosts", psio::convert_from_json<psio::json::any>(
                                         psio::convert_to_json(adminOpts.hosts))});
+         result.push_back({"peers", psio::convert_from_json<psio::json::any>(
+                                        psio::convert_to_json(adminOpts.peers))});
          return psio::convert_to_json(psio::json::any{std::move(result)});
       }
       void writeConfig(std::string config)
@@ -360,6 +362,12 @@ namespace LocalService
                else if (entry.key == "hosts")
                {
                   adminConfig.hosts = psio::convert_from_json<std::vector<std::string>>(
+                      psio::convert_to_json(entry.value));
+                  host.push_back(std::move(entry));
+               }
+               else if (entry.key == "peers")
+               {
+                  adminConfig.peers = psio::convert_from_json<std::vector<std::string>>(
                       psio::convert_to_json(entry.value));
                   host.push_back(std::move(entry));
                }
@@ -394,6 +402,10 @@ namespace LocalService
          {
             adminOpts.hosts = parseOptionList(*hosts, std::vector<std::string>());
          }
+         if (auto* peers = json.hostOption("peers"))
+         {
+            adminOpts.peers = parseOptionList(*peers, std::vector<std::string>());
+         }
          if (auto* config = json.serviceConfig())
          {
             for (const auto& entry : *config)
@@ -417,17 +429,19 @@ namespace LocalService
          }
          open<AdminOptionsTable>().put(adminOpts);
       }
+      recurse().to<XPeers>().onConfig();
    }
 
    AdminOptionsRow XAdmin::options()
    {
       auto sender = getSender();
       check(sender == XHttp::service || sender == XPeers::service, "Wrong sender");
+      std::optional<AdminOptionsRow> result;
       PSIBASE_SUBJECTIVE_TX
       {
-         return open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
+         result = open<AdminOptionsTable>().get({});
       }
-      __builtin_unreachable();
+      return result.value_or(AdminOptionsRow{});
    }
 
    // Returns nullopt on success, an appropriate error on failure
@@ -509,6 +523,7 @@ namespace LocalService
                };
             }
             writeConfig(std::string(req.body.begin(), req.body.end()));
+            recurse().to<XPeers>().onConfig();
             return HttpReply{
                 .status = HttpStatus::ok,
             };
