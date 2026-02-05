@@ -16,22 +16,25 @@ interface types {
 
     record new-invite-details {
         invite-id: u32,
-        invite-key: list<u8>,
+        fingerprint: string,
         encrypted-secret: string,
     }
     type invite-token = string;
     type pubkey-der = list<u8>;
+    type min-cost = string;
 }
 
 
 /// Functionality exposed for the inviter
 interface inviter {
     use host:types/types.{error};
-    use types.{invite-token, new-invite-details};
+    use types.{invite-token, new-invite-details, min-cost};
 
-    /// Allows a user to generate an invite token that can be used to 
-    /// invite someone (with or without a preexisting account) to an 
-    /// application.
+    /// Allows a user to generate an invite token that can be used to invite someone (with 
+    /// or without a preexisting account) to an application.
+    /// 
+    /// The generator of the invite will be charged the minimum cost of creating the invite, which 
+    /// is used to pay for the resources needed when the recipient responds to the invite.
     /// 
     /// Successful return value:
     ///  * `invite-token` - This token can be imported on another device to redeem the invite.
@@ -41,12 +44,18 @@ interface inviter {
     /// not actually generate it. This is used when an app wants to control the invite 
     /// creation in more detail, for example by creating the invite server-side and 
     /// registering the creator service to receive hooks when the invite gets updated.
+    /// 
+    /// Parameters
+    /// * `num-accounts`: The number of accounts that will be created using the invite
     ///
     /// Returns:
     /// * `invite-token` - should be kept private, can be used to accept the invite
     /// * `new-invite-details` - Contains values that should be used when calling `create-invite`
     ///   on the invite service in order to correctly correspond to the `invite-token`.
-    prepare-new-invite: func() -> result<tuple<invite-token, new-invite-details>, error>;
+    /// * `min-cost` - The minimum cost of creating the invite for the specified number of 
+    ///                accounts. This amount (at minimum) must be credited to the invite service 
+    ///                before creating the invite.
+    prepare-new-invite: func(num-accounts: u16) -> result<tuple<invite-token, new-invite-details, min-cost>, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database.
