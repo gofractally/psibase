@@ -1,12 +1,13 @@
 #pragma once
 
 #include <optional>
+#include <psibase/MethodNumber.hpp>
 #include <psibase/block.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/time.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/Transact.hpp>
-#include "psibase/MethodNumber.hpp"
+#include <services/user/Tokens.hpp>
 
 namespace SystemService
 {
@@ -36,10 +37,10 @@ namespace SystemService
                        std::optional<ServiceMethod>                       method,
                        std::optional<std::vector<psibase::AccountNumber>> auth_set);
 
-      /// Creates a credential
+      /// Issues a credential
       ///
       /// Parameters:
-      /// - `pubkey`: The credential public key
+      /// - `pubkey_hash_hex`: The hexadecimal representation of the credential public key sha256 hash
       /// - `expires`: The number of seconds until the credential expires
       /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
       ///
@@ -48,22 +49,24 @@ namespace SystemService
       ///
       /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
       /// that matches the specified public key.
-      uint32_t create(SystemService::AuthSig::SubjectPublicKeyInfo pubkey,
-                      std::optional<uint32_t>                      expires,
-                      const std::vector<psibase::MethodNumber>&    allowed_actions);
+      uint32_t issue(std::string                               pubkey_hash_hex,
+                     std::optional<uint32_t>                   expires,
+                     const std::vector<psibase::MethodNumber>& allowed_actions);
 
-      /// Looks up the credential used to sign the active transaction, and consumes it.
-      /// Can only be called by the credential's issuer.
-      uint32_t consume_active();
+      /// Notifies the credentials service that tokens have been credited to a credential
+      ///
+      /// This notification must be called after crediting the credential's service, or else
+      /// the credited tokens will not be aplied to a particular credential.
+      void resource(std::string pubkey_hash_hex, UserService::Quantity amount);
 
-      /// Gets the `id` of the active credential
-      std::optional<uint32_t> get_active();
+      /// Gets the hex encoded public key hash of the specified credential
+      std::string get_pkh(uint32_t id);
 
       /// Gets the `expiry_date` of the specified credential
       std::optional<psibase::TimePointSec> get_expiry_date(uint32_t id);
 
-      /// Gets the `pubkey` of the specified credential
-      SystemService::AuthSig::SubjectPublicKeyInfo get_pubkey(uint32_t id);
+      /// Gets the `id` of the active credential
+      std::optional<uint32_t> get_active();
 
       /// Deletes the specified credential.
       /// Can only be called by the credential's issuer.
@@ -77,10 +80,10 @@ namespace SystemService
       method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
       method(isAuthSys, sender, authorizers, method, auth_set),
       method(isRejectSys, sender, authorizers, method, auth_set),
-      method(create, pubkey, expires, allowed_actions),
-      method(consume_active),
+      method(issue, pubkey_hash_hex, expires, allowed_actions),
+      method(resource, pubkey_hash_hex, amount),
       method(get_active),
-      method(get_pubkey, id),
+      method(get_pkh, id),
       method(get_expiry_date, id),
       method(consume, id),
    );
