@@ -141,8 +141,8 @@ export const Swap = ({ onSwitch }: { onSwitch: () => void }) => {
             expectedReturn={quotedSwap && quotedSwap.toReturn}
             isHighSlippage={priceImpact > 10}
             fromAmount={fromAmount}
-            fromToken={fromId}
-            toToken={toId}
+            fromTokenId={fromId}
+            toTokenId={toId}
             poolIds={swapQuotePoolIds}
             onSuccess={onSuccess}
         />

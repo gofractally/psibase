@@ -1,7 +1,6 @@
 import { ArrowDown } from "lucide-react";
 import { useBoolean } from "usehooks-ts";
 import z from "zod";
-
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -15,6 +14,7 @@ import { Button } from "@shared/shadcn/ui/button";
 
 import { useSwap } from "../hooks/use-swap";
 import { AmountSummary } from "./amount-summary";
+import { useToken } from "../hooks/use-token";
 
 export const ConfirmSwapModal = ({
     show,
@@ -22,8 +22,8 @@ export const ConfirmSwapModal = ({
     poolIds,
     minimumReturn,
     fromAmount,
-    fromToken,
-    toToken,
+    fromTokenId,
+    toTokenId,
     expectedReturn,
     isHighSlippage = false,
     onSuccess,
@@ -35,8 +35,8 @@ export const ConfirmSwapModal = ({
     isHighSlippage: boolean;
     minimumReturn?: string;
     fromAmount?: string;
-    fromToken?: number;
-    toToken?: number;
+    fromTokenId?: number;
+    toTokenId?: number;
     onSuccess?: () => void;
 }) => {
     const { mutateAsync: swap, isPending } = useSwap();
@@ -46,6 +46,9 @@ export const ConfirmSwapModal = ({
         value: isUserAcceptingOfSlippage,
     } = useBoolean(false);
     const blockDueToSlippage = isHighSlippage && !isUserAcceptingOfSlippage;
+
+    const { data: fromToken } = useToken(fromTokenId);
+    const { data: toToken } = useToken(toTokenId)
 
     const triggerSwap = async () => {
         await swap([
@@ -77,10 +80,10 @@ export const ConfirmSwapModal = ({
                 <div className="mt-3 space-y-4">
                     {/* From Account */}
                     <AmountSummary
-                        amount={fromAmount || ""}
+                        amount={Number(fromAmount).toString() || ""}
                         avatarSeed={fromToken?.toString() ?? "?"}
                         label="From"
-                        title={fromToken?.toString() ?? "?"}
+                        title={fromToken?.symbol || `ID: ${fromTokenId}`}
                     />
 
                     {/* Arrow */}
@@ -90,10 +93,10 @@ export const ConfirmSwapModal = ({
 
                     {/* To Account */}
                     <AmountSummary
-                        amount={expectedReturn ?? ""}
+                        amount={Number(expectedReturn).toString() ?? ""}
                         avatarSeed={toToken?.toString() ?? "?"}
                         label="To"
-                        title={toToken?.toString() ?? "?"}
+                        title={toToken?.symbol || `ID: ${toTokenId}`}
                     />
                 </div>
 

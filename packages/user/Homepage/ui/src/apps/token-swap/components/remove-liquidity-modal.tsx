@@ -16,6 +16,7 @@ import { usePools } from "../hooks/use-pools";
 import { useQuotePoolTokens } from "../hooks/use-quote-pool-tokens";
 import { useRemoveLiquidity } from "../hooks/use-remove-liquidity";
 import { AmountSummary } from "./amount-summary";
+import { useToken } from "../hooks/use-token";
 
 export const RemoveLiquidityModal = ({
     show,
@@ -42,6 +43,9 @@ export const RemoveLiquidityModal = ({
 
     const [firstWithdrawal, secondWithdrawal] = outputs || [];
 
+    const { data: firstWithdrawalSymbol } = useToken(firstWithdrawal?.tokenId)
+    const { data: secondWithdrawalSymbol } = useToken(secondWithdrawal?.tokenId)
+
     const trigger = async () => {
         await removeLiquidity([amount!]);
         if (onSuccess) {
@@ -67,7 +71,7 @@ export const RemoveLiquidityModal = ({
                         amount={firstWithdrawal?.amount || ""}
                         avatarSeed={firstWithdrawal?.tokenId?.toString() ?? "?"}
                         label="Withdrawal #1"
-                        title={firstWithdrawal?.tokenId.toString() ?? "?"}
+                        title={firstWithdrawalSymbol?.symbol || `ID: ${firstWithdrawal?.tokenId}`}
                     />
 
                     <div className="flex justify-center">
@@ -80,7 +84,7 @@ export const RemoveLiquidityModal = ({
                             secondWithdrawal?.tokenId?.toString() ?? "?"
                         }
                         label="Withdrawal #2"
-                        title={secondWithdrawal?.tokenId?.toString() ?? "?"}
+                        title={secondWithdrawalSymbol?.symbol || `ID: ${secondWithdrawal?.tokenId}`}
                     />
                 </div>
 

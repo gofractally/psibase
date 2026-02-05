@@ -14,6 +14,7 @@ import { Button } from "@shared/shadcn/ui/button";
 
 import { useAddLiquidity } from "../hooks/use-add-liquidity";
 import { AmountSummary } from "./amount-summary";
+import { useToken } from "../hooks/use-token";
 
 export const AddLiquidityModal = ({
     show,
@@ -31,6 +32,12 @@ export const AddLiquidityModal = ({
     onSuccess?: () => void;
 }) => {
     const { mutateAsync: addLiquidity, isPending } = useAddLiquidity();
+
+
+    const { data: firstDepositToken } = useToken(firstDeposit?.tokenId)
+
+    const { data: secondDepositToken } = useToken(secondDeposit?.tokenId)
+
 
     const trigger = async () => {
         await addLiquidity([poolId!, firstDeposit!, secondDeposit!]);
@@ -59,7 +66,7 @@ export const AddLiquidityModal = ({
                         amount={firstDeposit?.amount || ""}
                         avatarSeed={firstDeposit?.tokenId?.toString() ?? "?"}
                         label="Deposit #1"
-                        title={firstDeposit?.tokenId.toString() ?? "?"}
+                        title={firstDepositToken?.symbol || `ID: ${firstDeposit?.tokenId}`}
                     />
 
                     <div className="flex justify-center">
@@ -71,7 +78,7 @@ export const AddLiquidityModal = ({
                         amount={secondDeposit?.amount ?? ""}
                         avatarSeed={secondDeposit?.tokenId?.toString() ?? "?"}
                         label="Deposit #2"
-                        title={secondDeposit?.tokenId?.toString() ?? "?"}
+                        title={secondDepositToken?.symbol || `ID: ${secondDeposit?.tokenId}`}
                     />
                 </div>
 
@@ -95,10 +102,10 @@ export const AddLiquidityModal = ({
                         {isPending ? (
                             <div className="flex items-center gap-2">
                                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-transparent"></div>
-                                Adding...
+                                Depositing...
                             </div>
                         ) : (
-                            "Add deposits"
+                            "Deposit"
                         )}
                     </Button>
                 </AlertDialogFooter>
