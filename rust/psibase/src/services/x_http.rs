@@ -61,8 +61,11 @@ mod service {
 
     /// Accepts a websocket connection. The response must be a
     /// valid websocket handshake for the request.
+    ///
+    /// Must be followed by `setCallback(socket, callback, err)`, or the
+    /// socket will be closed when the current context exits.
     #[action]
-    fn accept(socket: i32, reply: HttpReply, callback: MethodNumber, err: MethodNumber) {
+    fn accept(socket: i32, reply: HttpReply) {
         unimplemented!()
     }
 
