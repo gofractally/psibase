@@ -4,10 +4,10 @@ import { FormProfile } from "@/components/form-profile";
 
 import { useCacheBust } from "@/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useProfile } from "@/hooks/use-profile";
 
 import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";
+import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogDescription } from "@shared/shadcn/ui/dialog";
 import { DialogTitle } from "@shared/shadcn/ui/dialog";
@@ -39,7 +39,9 @@ export const EditProfileDialogContent = ({ onClose }: Props) => {
         isError,
         isLoading,
         error,
-    } = useProfile(currentUser);
+    } = useProfile(currentUser, true, {
+        baseUrlIncludesSibling: false,
+    });
     const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
         useUploadAvatar();
 

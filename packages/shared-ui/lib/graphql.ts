@@ -1,7 +1,5 @@
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Account, zAccount } from "@shared/lib/schemas/account";
-
 interface Error {
     message: string;
     locations: {
@@ -10,8 +8,12 @@ interface Error {
     }[];
 }
 
-const gqlEndpoint = (account: Account, includesSibling: boolean) =>
-    siblingUrl(null, zAccount.parse(account), "/graphql", includesSibling);
+export type GraphQLUrlOptions = {
+    baseUrl?: string | null;
+    service?: string | null;
+    path?: string | null;
+    baseUrlIncludesSibling?: boolean;
+};
 
 interface GraphqlResponse<T> {
     data: T;
@@ -20,10 +22,13 @@ interface GraphqlResponse<T> {
 
 export const graphql = async <T>(
     query: string,
-    service: Account,
-    includesSibling = true,
+    options: GraphQLUrlOptions = {},
 ): Promise<T> => {
-    const response = (await fetch(gqlEndpoint(service, includesSibling), {
+    const { baseUrl, service, path, baseUrlIncludesSibling } = options;
+    const host = service
+        ? siblingUrl(baseUrl, service, path, baseUrlIncludesSibling)
+        : "";
+    const response = (await fetch(`${host}/graphql`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
