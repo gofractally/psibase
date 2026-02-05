@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { Quantity } from "@shared/lib/quantity";
 import { useCurrentUser } from "@/hooks/use-current-user";

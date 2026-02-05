@@ -1,7 +1,7 @@
 import { AppConfigType } from "@/configuredApps";
 import { ArrowRightLeft } from "lucide-react";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { SwapPage } from "./page";
 

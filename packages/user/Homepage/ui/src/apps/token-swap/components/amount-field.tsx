@@ -5,6 +5,7 @@ import { Button } from "@shared/shadcn/ui/button";
 
 import { ChevronDown } from "lucide-react";
 import { cn } from "@shared/lib/utils";
+import { Quantity } from "@shared/lib/quantity";
 
 export const AmountField = ({
     amount,
@@ -23,7 +24,7 @@ export const AmountField = ({
     label: string;
     name?: string;
     symbol?: string;
-    balance?: string;
+    balance?: Quantity;
     onSelect: () => void;
     amount: string;
     setAmount: (text: string) => void;
@@ -31,7 +32,7 @@ export const AmountField = ({
 
 }) => {
 
-    const isOverMaxBalance = balance ? parseFloat(amount) > parseFloat(balance) : false;
+    const isOverMaxBalance = balance ? balance.isLessThan(balance.withAmount(amount)) : false;
 
     return (
         <div className="space-y-2">
@@ -50,7 +51,7 @@ export const AmountField = ({
                                 }
                                 }
                             >
-                                Balance: {balance}
+                                Balance: {balance.format({ includeLabel: false })}
                             </Button>
                         </div >
                     )}

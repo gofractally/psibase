@@ -38,6 +38,7 @@ export const CreatePoolModal = ({
         openChange(false);
     };
 
+
     return (
         <AlertDialog open={show}>
             <AlertDialogContent className="max-w-md">
@@ -54,7 +55,7 @@ export const CreatePoolModal = ({
 
                 <div className="mt-3 space-y-4">
                     <AmountSummary
-                        amount={firstDeposit?.amount || ""}
+                        amount={Number(firstDeposit?.amount).toString() || ""}
                         avatarSeed={firstDeposit?.tokenId?.toString() ?? "?"}
                         label="Founding deposit #1"
                         title={firstDeposit?.tokenId.toString() ?? "?"}
@@ -65,7 +66,7 @@ export const CreatePoolModal = ({
                     </div>
 
                     <AmountSummary
-                        amount={secondDeposit?.amount ?? ""}
+                        amount={Number(secondDeposit?.amount).toString() || ""}
                         avatarSeed={secondDeposit?.tokenId?.toString() ?? "?"}
                         label="Founding deposit #2"
                         title={secondDeposit?.tokenId?.toString() ?? "?"}

@@ -60,7 +60,7 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                 onSelect={() => {
                     token1.onSelect()
                 }}
-                balance={token1?.balance?.format({ includeLabel: false })}
+                balance={token1?.balance}
                 name=""
                 symbol={token1.symbol?.toUpperCase()}
                 id={token1.id}
@@ -103,7 +103,7 @@ export const DualTokens = ({ triggerLabel, token1, token2, onCenterClick, center
                         token2.setAmount(token2?.balance?.format({ includeLabel: false, showThousandsSeparator: false }))
                     }
                 }}
-                balance={token2?.balance?.format({ includeLabel: false })}
+                balance={token2?.balance}
                 name=""
                 id={token2.id}
                 symbol={token2.symbol?.toUpperCase()}
