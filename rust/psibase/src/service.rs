@@ -1,6 +1,6 @@
 use crate::fracpack::{Pack, UnpackOwned};
-use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
 use crate::services::transact::ServiceMethod;
+use crate::{get_result_bytes, native_raw, AccountNumber, Action, MethodNumber};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -196,8 +196,7 @@ impl Caller for RunAsCaller {
             method,
             rawData: args.packed().into(),
         };
-        crate::services::transact::Wrapper::call()
-            .runAs(action, self.allowed_actions.clone());
+        crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
     }
 
     fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) -> Ret {
@@ -207,8 +206,8 @@ impl Caller for RunAsCaller {
             method,
             rawData: args.packed().into(),
         };
-        let ret = crate::services::transact::Wrapper::call()
-            .runAs(action, self.allowed_actions.clone());
+        let ret =
+            crate::services::transact::Wrapper::call().runAs(action, self.allowed_actions.clone());
         Ret::unpacked(&ret.0).unwrap()
     }
 }
