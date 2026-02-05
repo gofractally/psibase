@@ -56,7 +56,7 @@ export const ConfirmSwapModal = ({
             z.string().array().parse(poolIds),
             {
                 amount: z.string().parse(fromAmount),
-                tokenId: z.number().parse(fromToken),
+                tokenId: z.number().parse(fromTokenId),
             },
             z.string().parse(minimumReturn),
         ]);
