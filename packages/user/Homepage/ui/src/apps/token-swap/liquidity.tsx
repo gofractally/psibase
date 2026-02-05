@@ -362,7 +362,7 @@ export const Liquidity = () => {
                                     </AlertDescription>
                                 </Alert>
                                 {token1Amount && token2Amount && (
-                                    <div className="text-muted-foreground space-y-2 flex flex-col gap-2 text-sm">
+                                    <div className="text-muted-foreground space-y-2 mt-2  text-sm">
                                         <div className="flex justify-between">
                                             <span>Token 1 Price</span>
                                             <span>
@@ -399,7 +399,7 @@ export const Liquidity = () => {
                                     </AlertDescription>
                                 </Alert>
                                 {token1AmountNumber && token2AmountNumber && (
-                                    <div className="text-muted-foreground space-y-1 text-sm">
+                                    <div className="text-muted-foreground space-y-2 mt-2  text-sm">
                                         <div className="flex justify-between">
                                             <span>Token 1 Price</span>
                                             <span>
