@@ -4,6 +4,7 @@
 #include <psibase/dispatch.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XTimer.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -21,6 +22,76 @@ namespace
       std::int32_t socket;
       PSIO_REFLECT(DisconnectRequest, socket)
    };
+
+   constexpr MicroSeconds timeoutBase  = std::chrono::seconds(30);
+   constexpr MicroSeconds timeoutDelta = std::chrono::seconds(30);
+   constexpr MicroSeconds timeoutMax   = std::chrono::seconds(300);
+
+   void addUrl(const std::string& url)
+   {
+      auto urls      = XPeers{}.open<UrlTable>();
+      auto urlTimers = XPeers{}.open<UrlTimerTable>();
+      auto row       = urls.get(url);
+      if (!row)
+         row = {url, 0, false, timeoutBase, MonotonicTimePointUSec::min(), std::nullopt};
+      if (row->timerId)
+      {
+         to<XTimer>().cancel(*row->timerId);
+         urlTimers.erase(*row->timerId);
+         row->timerId.reset();
+      }
+      ++row->refcount;
+      check(row->refcount != 0, "Integer overflow");
+      urls.put(*row);
+   }
+
+   bool removeUrl(UrlTable& urls, UrlTimerTable& urlTimers, const std::string& url)
+   {
+      auto row = urls.get(url).value();
+      check(!row.timerId, "Timer should not be running when the url is connected");
+      if (--row.refcount == 0)
+      {
+         if (!row.autoconnect)
+         {
+            urls.remove(row);
+         }
+         else
+         {
+            auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+            if (now < row.retryTime)
+            {
+               auto id = to<XTimer>().runAt(row.retryTime, MethodNumber{"onTimer"});
+               urlTimers.put({id, url});
+               row.timerId = id;
+               urls.put(row);
+            }
+            else
+            {
+               row.currentTimeout = timeoutBase;
+               row.retryTime      = now + row.currentTimeout;
+               urls.put(row);
+               return true;
+            }
+         }
+      }
+      else
+      {
+         urls.put(row);
+      }
+      return false;
+   }
+
+   std::vector<std::string> removeUrls(std::vector<std::string>&& urls)
+   {
+      auto table  = XPeers{}.open<UrlTable>();
+      auto timers = XPeers{}.open<UrlTimerTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         std::erase_if(urls,
+                       [&](const std::string& url) { return !removeUrl(table, timers, url); });
+      }
+      return std::move(urls);
+   }
 
    std::int32_t connect(std::string peer, std::optional<std::int32_t> requestSocket = std::nullopt)
    {
@@ -57,6 +128,7 @@ namespace
       std::int32_t socket = to<XHttp>().websocket(request, std::move(tls), std::move(endpoint));
 
       auto peers = XPeers{}.open<PeerConnectionTable>();
+      auto urls  = XPeers{}.open<UrlTable>();
       PSIBASE_SUBJECTIVE_TX
       {
          to<XHttp>().setCallback(socket, MethodNumber{"onP2P"}, MethodNumber{"errP2P"});
@@ -70,10 +142,12 @@ namespace
          peers.put({.socket     = socket,
                     .peerSocket = -1,
                     .nodeId     = 0,
+                    .urls       = std::vector{peer},
                     .hosts      = std::move(hosts),
                     .secure     = secure,
                     .local      = local,
                     .outgoing   = true});
+         addUrl(std::move(peer));
       }
       return socket;
    }
@@ -202,11 +276,19 @@ namespace
    {
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
+      auto urls    = XPeers{}.open<UrlTable>();
+
+      std::vector<std::string> reconnectNow;
       PSIBASE_SUBJECTIVE_TX
       {
          auto row = table.get(socket).value();
          updateHosts(hostIds, row, {});
          table.remove(row);
+         reconnectNow = removeUrls(std::move(row.urls));
+      }
+      for (auto& url : reconnectNow)
+      {
+         connect(url);
       }
    }
 
@@ -292,6 +374,16 @@ namespace
                if (msg.secure && !out->secure ||
                    msg.secure == out->secure && out->nodeId < myNodeId())
                {
+                  for (auto& url : out->urls)
+                  {
+                     if (!std::ranges::contains(in->urls, url))
+                     {
+                        addUrl(url);
+                        in->urls.push_back(std::move(url));
+                     }
+                  }
+                  out->urls.clear();
+                  table.put(*in);
                   to<XHttp>().asyncClose(socket);
                }
             }
@@ -442,6 +534,8 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
    std::optional<ConnectionRequestRow> request;
    auto                                connectionRequests = open<ConnectionRequestTable>();
    auto                                peers              = open<PeerConnectionTable>();
+   auto                                urls               = open<UrlTable>();
+   std::vector<std::string>            reconnectNow;
    PSIBASE_SUBJECTIVE_TX
    {
       request = connectionRequests.get(socket);
@@ -450,7 +544,10 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
          connectionRequests.remove(*request);
          to<XHttp>().autoClose(request->requestSocket, true);
       }
-      peers.erase(socket);
+      auto conn = peers.get(socket);
+      check(conn.has_value(), "Missing PeerConnection");
+      peers.remove(*conn);
+      reconnectNow = removeUrls(std::move(conn->urls));
    }
    if (request)
    {
@@ -458,6 +555,10 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
       to<XHttp>().sendReply(request->requestSocket, HttpReply{.status      = HttpStatus::badRequest,
                                                               .contentType = "text/html",
                                                               .body{msg.begin(), msg.end()}});
+   }
+   for (auto& url : reconnectNow)
+   {
+      connect(std::move(url));
    }
 }
 
@@ -480,6 +581,31 @@ void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> da
 void XPeers::closeP2P(std::int32_t socket)
 {
    removePeer(socket);
+}
+
+void XPeers::onTimer(std::uint64_t timerId)
+{
+   auto                  timers = open<UrlTimerTable>();
+   auto                  urls   = open<UrlTable>();
+   std::optional<UrlRow> url;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      if (auto row = timers.get(timerId))
+      {
+         timers.remove(*row);
+         url = urls.get(row->url);
+         check(url && url->timerId == timerId,
+               "Invariant failure: UrlTimerRow should be removed when it is cancelled");
+         check(url->autoconnect && url->refcount == 0,
+               "url timer should be cancelled, when not reconnecting");
+         url->currentTimeout = std::min(url->currentTimeout + timeoutDelta, timeoutMax);
+         url->retryTime += url->currentTimeout;
+         url->timerId.reset();
+         urls.put(*url);
+      }
+   }
+   if (url)
+      connect(url->url);
 }
 
 PSIBASE_DISPATCH(XPeers)

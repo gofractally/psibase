@@ -30,6 +30,7 @@ namespace LocalService
       std::int32_t             socket;
       std::int32_t             peerSocket;
       std::uint64_t            nodeId;
+      std::vector<std::string> urls;
       std::vector<std::string> hosts;
       bool                     secure;
       bool                     local;
@@ -39,13 +40,39 @@ namespace LocalService
       // and unchangable, false if the hosts are loaded from a
       // hostnamesMessage
       bool fixedHosts() const { return outgoing && !local; }
-      PSIO_REFLECT(PeerConnection, socket, peerSocket, nodeId, hosts, secure, local, outgoing)
+      PSIO_REFLECT(PeerConnection, socket, peerSocket, nodeId, urls, hosts, secure, local, outgoing)
    };
    using PeerConnectionTable =
        psibase::Table<PeerConnection,
                       &PeerConnection::socket,
                       psibase::CompositeKey<&PeerConnection::outgoing, &PeerConnection::socket>{}>;
    PSIO_REFLECT_TYPENAME(PeerConnectionTable)
+
+   struct UrlRow
+   {
+      std::string   url;
+      std::uint32_t refcount;
+      bool          autoconnect;
+      // Increased whenever the connection times out. Reset to the
+      // base value when retryTime is reached without the connection
+      // failing.
+      psibase::MicroSeconds currentTimeout;
+      // The earliest time that a connection will be retried
+      psibase::MonotonicTimePointUSec retryTime;
+      std::optional<std::uint64_t>    timerId;
+      PSIO_REFLECT(UrlRow, url, refcount, autoconnect, currentTimeout, retryTime, timerId)
+   };
+   using UrlTable = psibase::Table<UrlRow, &UrlRow::url>;
+   PSIO_REFLECT_TYPENAME(UrlTable)
+
+   struct UrlTimerRow
+   {
+      std::uint64_t timerId;
+      std::string   url;
+      PSIO_REFLECT(UrlTimerRow, timerId, url)
+   };
+   using UrlTimerTable = psibase::Table<UrlTimerRow, &UrlTimerRow::timerId>;
+   PSIO_REFLECT_TYPENAME(UrlTimerTable)
 
    struct HostIdRow
    {
@@ -65,8 +92,12 @@ namespace LocalService
    struct XPeers : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-peers"};
-      using Session                 = psibase::
-          SessionTables<NodeIdTable, ConnectionRequestTable, PeerConnectionTable, HostIdTable>;
+      using Session                 = psibase::SessionTables<NodeIdTable,
+                                                             ConnectionRequestTable,
+                                                             PeerConnectionTable,
+                                                             HostIdTable,
+                                                             UrlTable,
+                                                             UrlTimerTable>;
       auto serveSys(const psibase::HttpRequest& request, std::optional<std::int32_t> user)
           -> std::optional<psibase::HttpReply>;
 
@@ -74,12 +105,14 @@ namespace LocalService
       void errP2P(std::int32_t socket, std::optional<psibase::HttpReply> reply);
       void recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data);
       void closeP2P(std::int32_t socket);
+      void onTimer(std::uint64_t timerId);
    };
    PSIO_REFLECT(XPeers,
                 method(serveSys, request, socket),
                 method(onP2P, socket, reply),
                 method(errP2P, socekt, reply),
                 method(recvP2P, socket, data),
-                method(closeP2P, socket))
+                method(closeP2P, socket),
+                method(onTimer, timerId))
    PSIBASE_REFLECT_TABLES(XPeers, XPeers::Session)
 }  // namespace LocalService
