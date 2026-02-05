@@ -73,8 +73,10 @@ export const usePools = (refetchInterval = 12000) => {
                         }
                     }
                 `,
-                "token-swap",
-                false,
+                {
+                    baseUrlIncludesSibling: false,
+                    service: "token-swap",
+                }
             );
 
             const rawPools = PoolsResponseSchema.parse(res).allPools.nodes;
