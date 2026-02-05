@@ -161,15 +161,20 @@ void XProxy::onAccept(std::int32_t socket, psibase::HttpReply reply)
       if (row)
       {
          to<XHttp>().autoClose(row->socket2, true);
-         to<XHttp>().setCallback(row->socket1, MethodNumber{"recv"}, MethodNumber{"close"});
          table.remove(*row);
+      }
+   }
+   if (row)
+   {
+      to<XHttp>().accept(row->socket2, std::move(reply));
+      PSIBASE_SUBJECTIVE_TX
+      {
+         to<XHttp>().setCallback(row->socket1, MethodNumber{"recv"}, MethodNumber{"close"});
+         to<XHttp>().setCallback(row->socket2, MethodNumber{"recv"}, MethodNumber{"close"});
          ws.put({row->socket1, row->socket2});
          ws.put({row->socket2, row->socket1});
       }
    }
-   if (row)
-      to<XHttp>().accept(row->socket2, std::move(reply), MethodNumber{"recv"},
-                         MethodNumber{"close"});
 }
 
 void XProxy::onError(std::int32_t socket, std::optional<psibase::HttpReply> reply)
