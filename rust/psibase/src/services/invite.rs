@@ -42,6 +42,13 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns the current minimum cost of creating an invite that can create the specified number of
+    /// accounts.
+    #[action]
+    fn getInvCost(numAccounts: u16) -> Quantity {
+        unimplemented!()
+    }
+
     /// Creates and stores a new invite object that can be used to create new accounts
     /// Returns the ID of the newly created invite
     ///
@@ -55,13 +62,13 @@ mod service {
     /// - `resources` is the amount of resources stored in the invite (used when creating
     ///               new accounts). The caller must send this amount of system tokens to this
     ///               invite service before calling this action. Use the query interface to check
-    ///               the minimum resources per account created by the invite.
+    ///               the resources required for an invite of the specified number of accounts.
     ///
     /// If `useHooks` is true, the caller must be an account with a service deployed on it
     /// that implements the InviteHooks interface.
     #[action]
     fn createInvite(
-        id: u32,
+        inviteId: u32,
         fingerprint: String,
         numAccounts: u16,
         useHooks: bool,

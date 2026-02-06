@@ -213,7 +213,7 @@ impl Inviter for InvitePlugin {
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
             &createInvite {
-                id: details.invite_id,
+                inviteId: details.invite_id,
                 fingerprint: details.fingerprint,
                 numAccounts: 1,
                 useHooks: false,
