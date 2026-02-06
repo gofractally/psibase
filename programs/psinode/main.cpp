@@ -9,14 +9,11 @@
 #include <psibase/prefix.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psibase/version.hpp>
-#include <psibase/websocket.hpp>
 #include <psio/finally.hpp>
 #include <psio/from_json/map.hpp>
 #include <psio/to_json.hpp>
 #include <psio/to_json/map.hpp>
 
-#include "connect.hpp"
-#include "connection.hpp"
 #include "psinode.hpp"
 
 #include <boost/algorithm/string/replace.hpp>
@@ -1619,7 +1616,6 @@ void run(const std::string&              db_path,
    node_type node(chainContext, system.get(), prover);
    node.set_producer_id(producer);
    node.load_producers();
-   node.set_hostnames(hosts);
 
    // The callback is *not* posted to chainContext. It can run concurrently.
    node.chain().onChangeRunQueue([&] { runQueue.notify(); });
@@ -1634,21 +1630,6 @@ void run(const std::string&              db_path,
    // Used for outgoing connections
    boost::asio::ip::tcp::resolver resolver(chainContext);
 
-   auto connect_one =
-       make_connect_one(resolver, chainContext, http_config,
-                        [&http_config, &node, &runResult](auto&& conn) -> std::error_code
-                        {
-                           if (http_config->status.load().shutdown)
-                           {
-                              conn->close(runResult.args && runResult.args->restart
-                                              ? connection_base::close_code::restart
-                                              : connection_base::close_code::shutdown);
-                              return make_error_code(boost::asio::error::operation_aborted);
-                           }
-                           node.add_connection(std::move(conn));
-                           return {};
-                        });
-
    node.chain().onValidateHostConfig(
        [](std::span<const char> value)
        {
@@ -1658,13 +1639,13 @@ void run(const std::string&              db_path,
    node.chain().onChangeHostConfig(
        [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
         &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
-        &connect_one, &system, setPKCS11Libs]
+        &system, setPKCS11Libs]
        {
           boost::asio::post(
               chainContext,
               [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &services,
                &http_timeout, &service_threads, &tpool, &tls_cert, &tls_key, &root_ca,
-               &pkcs11_modules, &connect_one, &system, setPKCS11Libs]
+               &pkcs11_modules, &system, setPKCS11Libs]
               {
                  auto writer = system->sharedDatabase.createWriter();
                  auto row    = system->sharedDatabase.kvGetSubjective(
@@ -1693,12 +1674,6 @@ void run(const std::string&              db_path,
                  }
                  setPKCS11Libs(config.pkcs11_modules);
                  node.set_producer_id(config.producer);
-                 node.set_hostnames(config.hosts);
-                 if (!http_config->status.load().shutdown)
-                 {
-                    node.autoconnect(std::vector(config.peers), config.autoconnect.value,
-                                     connect_one);
-                 }
                  pkcs11_modules  = config.pkcs11_modules;
                  hosts           = config.hosts;
                  services        = config.services;
@@ -1742,13 +1717,12 @@ void run(const std::string&              db_path,
        });
 
    node.chain().onChangeShutdown(
-       [&chainContext, &node, &system, &connect_one, &http_config, &shutdownTimer, &runResult,
-        &server_work]
+       [&chainContext, &node, &system, &http_config, &shutdownTimer, &runResult, &server_work]
        {
           boost::asio::post(
               chainContext,
-              [&chainContext, &node, &system, &connect_one, &http_config, &shutdownTimer,
-               &runResult, &server_work]
+              [&chainContext, &node, &system, &http_config, &shutdownTimer, &runResult,
+               &server_work]
               {
                  auto writer = system->sharedDatabase.createWriter();
                  auto row    = system->sharedDatabase.kvGetSubjective(
@@ -1771,8 +1745,6 @@ void run(const std::string&              db_path,
                                                        [&server_work]() { server_work.reset(); });
                                   });
                  node.consensus().async_shutdown();
-                 node.peers().autoconnect({}, 0, connect_one);
-                 node.peers().disconnect_all(runResult.args->restart.has_value());
               });
        });
 
@@ -1821,19 +1793,6 @@ void run(const std::string&              db_path,
                            });
       };
 
-      http_config->accept_p2p_websocket = [&chainContext, &node](auto&& stream)
-      {
-         boost::asio::post(
-             chainContext,
-             [&node, stream = std::move(stream)]() mutable
-             {
-                node.add_connection(
-                    std::make_shared<websocket_connection<
-                        typename std::remove_cv_t<decltype(stream)>::next_layer_type>>(
-                        std::move(stream)));
-             });
-      };
-
       http_config->get_perf = [sharedState](auto callback)
       {
          callback(
@@ -1855,65 +1814,6 @@ void run(const std::string&              db_path,
                 psio::vector_stream stream(data);
                 to_openmetrics_text(result, stream);
                 return data;
-             });
-      };
-
-      http_config->get_peers = [&chainContext, &node](http::get_peers_callback callback)
-      {
-         boost::asio::post(
-             chainContext,
-             [&chainContext, &node, callback = std::move(callback)]
-             {
-                http::get_peers_result result;
-                for (const auto& [id, conn] : node.peers().connections())
-                {
-                   result.push_back(
-                       {id, conn->endpoint(),
-                        conn->urls.empty() ? std::nullopt : std::optional{conn->urls.front()}});
-                }
-                callback(std::move(result));
-             });
-      };
-
-      http_config->connect = [&chainContext, &node, &resolver, &connect_one](
-                                 std::vector<char> peer, http::connect_callback callback)
-      {
-         peer.push_back('\0');
-         psio::json_token_stream stream(peer.data());
-
-         boost::asio::post(chainContext,
-                           [&chainContext, &node, &resolver, &connect_one,
-                            peer     = psio::from_json<ConnectRequest>(stream),
-                            callback = std::move(callback)]() mutable
-                           {
-                              // TODO: This is currently fire-and-forget, do we want
-                              // to try to report errors establishing the connection?
-                              // If so, when do we consider it successful? TCP connection?
-                              // websocket handshake? Initial sync negotiation?
-                              node.peers().connect(peer.url, connect_one);
-                              callback(std::nullopt);
-                           });
-      };
-
-      http_config->disconnect =
-          [&chainContext, &node, &resolver](std::vector<char> peer, http::connect_callback callback)
-      {
-         peer.push_back('\0');
-         psio::json_token_stream stream(peer.data());
-
-         boost::asio::post(
-             chainContext,
-             [&chainContext, &node, &resolver, peer = psio::from_json<DisconnectRequest>(stream),
-              callback = std::move(callback)]() mutable
-             {
-                if (!node.peers().disconnect(peer.id, connection_base::close_code::normal))
-                {
-                   callback("Unknown peer");
-                }
-                else
-                {
-                   callback(std::nullopt);
-                }
              });
       };
 
@@ -2192,8 +2092,6 @@ void run(const std::string&              db_path,
    {
       atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
-
-   node.autoconnect(translate_endpoints(peers), autoconnect.value, connect_one);
 
    if (node.chain().get_head_state()->blockId() == Checksum256{} && peers.empty())
    {
