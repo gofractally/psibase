@@ -30,19 +30,16 @@ use crate::errors::ErrorType;
 psibase::define_trust! {
     descriptions {
         Low => "
-        Low trust grants these abilities:
             - Import keypairs
         ",
-        Medium => "Medium trust grants the abilities of all lower trust levels, plus these abilities:
+        Medium => "
             - Create new accounts
         ",
         High => "
-        🚨 WARNING 🚨 
-        This approval will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
-
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Set the public key for your account
             - Sign transactions on your behalf
+
+        Warning: This will grant the caller the ability to control how your account is authorized, including the capability to take control of your account! Make sure you completely trust the caller's legitimacy.
         ",
     }
     functions {

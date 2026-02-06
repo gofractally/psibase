@@ -15,12 +15,10 @@ psibase::define_trust! {
         Low => "",
         Medium => "",
         High => "
-        🚨 WARNING 🚨 
-        This approval grants the caller the ability to publish/update services to your account, which could be used to take control of your account! Make sure you completely trust the caller's legitimacy.
-
-        High trust grants these abilities:
             - Set service code for accounts
             - Stage service code for accounts
+        
+        Warning: This grants the caller the ability to publish/update services to your account, which could be used to take control of your account! Make sure you completely trust the caller's legitimacy.
         ",
     }
     functions {

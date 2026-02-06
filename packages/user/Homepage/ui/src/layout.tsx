@@ -1,7 +1,10 @@
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { AppSplashScreen } from "@/components/app-splash-screen";
+import { Loading } from "@/components/loading";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useNavLocation } from "@/hooks/use-nav-location";
 
 import {
@@ -18,10 +21,6 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
-
-import { Loading } from "./components/loading";
-import { LoginRequired } from "./components/login-required";
-import { useCurrentUser } from "./hooks/use-current-user";
 
 export const Layout = () => {
     const navigate = useNavigate();
@@ -78,13 +77,11 @@ export const Layout = () => {
                     </div>
                 </header>
                 {isLoginRequired ? (
-                    <LoginRequired
-                        appName={currentApp?.name || "App"}
-                        appIcon={currentApp?.icon}
-                        appDescription={currentApp?.description}
-                    >
-                        <Outlet />
-                    </LoginRequired>
+                    <div className="flex flex-1 items-center justify-center">
+                        <div className="w-full max-w-screen-sm px-4">
+                            <AppSplashScreen />
+                        </div>
+                    </div>
                 ) : isPendingCurrentUser &&
                   currentApp?.showLoginLoadingSpinner ? (
                     <div className="flex-1">

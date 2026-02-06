@@ -5,7 +5,6 @@
 #include <psibase/nativeTables.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/Transact.hpp>
-#include <services/system/VirtualServer.hpp>
 
 static constexpr bool enable_print = false;
 
@@ -90,8 +89,6 @@ namespace SystemService
 
       ++status->totalAccounts;
       statusTable.put(*status);
-
-      to<VirtualServer>().initUser(name);
    }
 
    void Accounts::setAuthServ(psibase::AccountNumber authService)

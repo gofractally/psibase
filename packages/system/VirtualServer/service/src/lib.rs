@@ -2,6 +2,7 @@
 
 pub mod rpc;
 pub mod tables;
+pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 /// Virtual Server Service
 ///
@@ -16,11 +17,13 @@ pub mod tables;
 /// speed, etc).
 ///
 /// This service also defines a billing system that allows for the network to meter
-/// the consumption of resources by users. A user must "buy" resources from this service
-/// by sending in a network token, which is exchanged 1:1 for an internal resource token.
-/// The resource tokens are then exchanged in real-time for the internal tokens that
-/// represent consumption of individual network resources (CPU, network bandwidth, storage,
-/// etc).
+/// the consumption of resources by users. A user must send system tokens to this service,
+/// which are then held in reserve for the user.
+///
+/// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
+/// real-time price of the resource is billed to the user's reserved balance. Reserved system
+/// tokens do not equate to any specific resource amounts, since it's dependent upon the spot
+/// price of the consumed resource at the time of consumption.
 ///
 /// Note that this service is unopinionated about how the user gets the system tokens with
 /// which to pay for the resources. This allows for networks wherein users' system token
@@ -56,6 +59,7 @@ mod service {
         transact::Wrapper as Transact,
     };
     use psibase::{abort_message, *};
+    use std::cmp::min;
 
     // A small amount of CPU leeway given to transactions
     const CPU_LEEWAY: u64 = 1_000_000u64; // 1 ms
@@ -87,7 +91,7 @@ mod service {
         // (the accounts service init already does such iterating, use as reference.)
     }
 
-    #[pre_action(exclude(init, initUser))]
+    #[pre_action(exclude(init))]
     fn check_init() {
         InitRow::check_init();
     }
@@ -152,29 +156,26 @@ mod service {
         BillingConfig::enable(enabled);
     }
 
-    /// Used to acquire resource tokens for a user.
+    /// Reserves system tokens for future resource consumption by the specified user.
     ///
-    /// The resource tokens are consumed when interacting with metered network functionality.
+    /// The reserve is consumed when interacting with metered network functionality.
     ///
-    /// The sender must have already credited the system token to this service to pay
-    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    /// The sender must have already credited the system tokens to this service.
     ///
     /// # Arguments
-    /// * `amount`   - The amount of resource tokens to buy
-    /// * `for_user` - The user to buy the resource tokens for
-    /// * `memo`     - A memo for the purchase, only used if the sender is not the resource recipient
+    /// * `amount`   - The amount of systems tokens to reserve
+    /// * `for_user` - The user to reserve the system tokens for
+    /// * `memo`     - An optional memo to attach to the reservation, only used if the sender is not
+    ///                the resource recipient
     #[action]
     fn buy_res_for(amount: Quantity, for_user: AccountNumber, memo: Option<psibase::Memo>) {
         let config = check_some(BillingConfig::get(), "Billing not initialized");
 
         let sys = config.sys;
-        let res = config.res;
-
         let buyer = get_sender();
 
         Tokens::call().debit(sys, buyer, amount, "".into());
-        Tokens::call().credit(sys, config.fee_receiver, amount, "".into());
-        Tokens::call().toSub(res, for_user.to_string(), amount);
+        Tokens::call().toSub(sys, for_user.to_string(), amount);
 
         if buyer != for_user {
             // No need for a subsidy event if user == buyer because it's not a subsidy and the purchase
@@ -188,61 +189,23 @@ mod service {
         }
     }
 
-    /// Used to acquire resource tokens for the sender
+    /// Reserves system tokens for future resource consumption by the sender
     ///
-    /// The resource tokens are consumed when interacting with metered network functionality.
+    /// The reserve is consumed when interacting with metered network functionality.
     ///
-    /// The sender must have already credited the system token to this service to pay
-    /// for the specified amount of resource tokens. The exchange rate is always 1:1.
+    /// The sender must have already credited the system tokens to this service.
     #[action]
     fn buy_res(amount: Quantity) {
         buy_res_for(amount, get_sender(), None);
     }
 
-    /// Allows the sender to request client-side tooling to automatically attempt to
-    /// refill their resource buffer when it is at or below the threshold (specified
-    /// in integer percentage values).
+    /// Allows the sender to manage the behavior of client-side tooling with respect to the
+    /// automatic management of the sender's resource buffer.
     ///
-    /// A threshold of 0 means that the client should not attempt to refill the
-    /// resource buffer.
+    /// If `config` is None, the account will use a default configuration
     #[action]
-    fn conf_auto_fill(threshold_percent: u8) {
-        check(
-            threshold_percent <= 100,
-            "Threshold must be between 0 and 100",
-        );
-        UserSettings::get(get_sender()).set_auto_fill(threshold_percent);
-    }
-
-    /// Allows the sender to specify the capacity of their resource buffer. The larger the
-    /// resource buffer, the less often the sender will need to refill it.
-    #[action]
-    fn conf_buffer(capacity: u64) {
-        let config = BillingConfig::get_assert();
-        if capacity < config.min_resource_buffer {
-            let err_msg = format!("Buffer capacity must be >= {}", config.min_resource_buffer);
-            abort_message(&err_msg);
-        }
-
-        UserSettings::get(get_sender()).set_capacity(capacity);
-    }
-
-    /// Refills the sender's resource buffer, allowing them to continue to interact with
-    /// metered network functionality.
-    #[action]
-    fn refill_res_buf() {
-        let config: BillingConfig = BillingConfig::get_assert();
-        let balance = Tokens::call().getBalance(config.res, get_sender());
-        let buffer_capacity = UserSettings::get(get_sender()).buffer_capacity;
-
-        if balance.value >= buffer_capacity {
-            return;
-        }
-
-        let amount = buffer_capacity - balance.value;
-        buy_res(amount.into());
-
-        UserReserve::reserve_cpu_limit(get_sender());
+    fn conf_buffer(config: Option<BufferConfig>) {
+        UserSettings::get(get_sender()).configure_buffer(config);
     }
 
     fn bill(user: AccountNumber, amount: u64) {
@@ -251,27 +214,18 @@ mod service {
         }
 
         if let Some(config) = BillingConfig::get() {
-            let res = config.res;
+            let sys = config.sys;
 
-            let balance = UserSettings::get_resource_balance(user);
-            let user_str = user.to_string();
+            let balance = UserSettings::get(user).get_resource_balance();
             let amt = Quantity::new(amount);
 
-            check(
-                balance >= amt,
-                &format!("{} has insufficient resource balance", &user_str),
-            );
-            Tokens::call().fromSub(res, user_str, amt);
-        }
-    }
+            if balance < amt {
+                let err = format!("{} has insufficient resource balance", user);
+                abort_message(&err);
+            }
 
-    fn bill_from_reserve(user: AccountNumber, amount: u64) {
-        if amount == 0 {
-            return;
-        }
-
-        if BillingConfig::get().is_some() {
-            UserReserve::bill(user, amount);
+            Tokens::call().fromSub(sys, user.to_string(), amt);
+            Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
         }
     }
 
@@ -313,6 +267,7 @@ mod service {
     #[action]
     fn net_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
+        check(num_blocks > 0, "Number of blocks must be greater than 0");
         NetPricing::set_num_blocks_to_average(num_blocks);
     }
 
@@ -357,12 +312,13 @@ mod service {
         CpuPricing::set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
-    #[action]
     /// Sets the number of blocks over which to compute the average CPU usage.
     /// This average usage is compared to the network capacity (every block) to determine
     /// the price of CPU.
+    #[action]
     fn cpu_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
+        check(num_blocks > 0, "Number of blocks must be greater than 0");
         CpuPricing::set_num_blocks_to_average(num_blocks);
     }
 
@@ -389,7 +345,7 @@ mod service {
 
         let mut cost = NetPricing::consume(amount_bytes);
 
-        if isBillingDisabled() {
+        if !isBillingEnabled() {
             cost = 0
         }
         bill(user, cost);
@@ -399,10 +355,8 @@ mod service {
             .consumed(user, resources::NET, amount_bytes, cost);
     }
 
-    fn isBillingDisabled() -> bool {
-        BillingConfig::get()
-            .map(|c| c.enabled == false)
-            .unwrap_or(true)
+    fn isBillingEnabled() -> bool {
+        BillingConfig::get().map(|c| c.enabled).unwrap_or(false)
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -420,10 +374,10 @@ mod service {
         let amount_ns = amount_ns.saturating_sub(CPU_LEEWAY);
         let mut cost = CpuPricing::consume(amount_ns);
 
-        if isBillingDisabled() {
+        if !isBillingEnabled() {
             cost = 0
         }
-        bill_from_reserve(user, cost);
+        bill(user, cost);
 
         Wrapper::emit()
             .history()
@@ -435,7 +389,7 @@ mod service {
         let config = BillingConfig::get_assert();
 
         Tokens::call()
-            .getSubBal(config.res, user.to_string())
+            .getSubBal(config.sys, user.to_string())
             .unwrap_or(0.into())
     }
 
@@ -454,33 +408,31 @@ mod service {
         }
     }
 
-    #[action]
-    fn initUser(user: AccountNumber) {
-        check(get_sender() == Accounts::SERVICE, "Unauthorized");
-        UserReserve::init(user);
-    }
-
     // Gets the CPU limit (in ns) for the specified account
     //
-    // This will also reserve some resources on behalf of the specified account
-    //   for the purpose of ensuring the account can afford up to CPU-limit nanoseconds
-    //   of CPU time.
-    //
     // Returns None if there is no limit for the specified account
-    fn getCpuLimit(account: AccountNumber) -> Option<u64> {
-        if isBillingDisabled() {
+    fn get_cpu_limit(account: AccountNumber) -> Option<u64> {
+        if !isBillingEnabled() {
             return None;
         }
 
-        // CPU is not billed just-in-time, it's reserved in advance and then the actual amount
-        // is billed from the reserve at the end of the tx
-        let mut limit = UserReserve::reserve_cpu_limit(account);
+        let cpu_pricing = CpuPricing::get_assert();
+        let res_balance = UserSettings::get(account).get_resource_balance().value;
 
-        // To add some leeway, we simply bump the limit by more CPU than was reserved,
+        let price_per_unit = cpu_pricing.price();
+        let ns_per_unit = cpu_pricing.billable_unit;
+
+        let full_block_units = NetworkSpecs::get_assert().cpu_ns / ns_per_unit; // rounded down
+        let affordable_units = res_balance / price_per_unit;
+        let limit_units = min(full_block_units, affordable_units);
+        let mut limit_ns = limit_units * ns_per_unit;
+
+        // To add some leeway, we simply bump the limit by more CPU than the limit allows,
         //   and before billing, we subtract the leeway from the reported consumed amount.
-        limit = limit.saturating_add(CPU_LEEWAY);
+        limit_ns = limit_ns.saturating_add(CPU_LEEWAY);
+        limit_ns = min(limit_ns, NetworkSpecs::get_assert().cpu_ns);
 
-        Some(limit)
+        Some(limit_ns)
     }
 
     /// This actions sets the CPU limit for the specified account.
@@ -488,7 +440,7 @@ mod service {
     #[action]
     fn setCpuLimit(account: AccountNumber) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
-        CpuLimit::rpc().setCpuLimit(getCpuLimit(account));
+        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account));
     }
 
     #[action]

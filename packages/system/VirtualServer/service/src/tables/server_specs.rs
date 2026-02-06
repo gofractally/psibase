@@ -7,21 +7,21 @@ const MAX_SERVER_SPECS: ServerSpecs = ServerSpecs {
 };
 
 impl ServerSpecs {
-    pub fn set(specs: &Self) {
-        specs.validate();
+    pub fn set(new_specs: &Self) {
+        new_specs.validate();
 
-        let net_bps = specs.net_bps;
-        let storage_bytes = specs.storage_bytes;
-
-        let table = ServerSpecsTable::read_write();
-        let mut specs = table.get_index_pk().get(&()).unwrap_or_default();
-        specs.net_bps = net_bps;
-        specs.storage_bytes = storage_bytes;
-        table.put(&specs).unwrap();
+        let mut specs = Self::get_or_new();
+        specs.net_bps = new_specs.net_bps;
+        specs.storage_bytes = new_specs.storage_bytes;
+        ServerSpecsTable::read_write().put(&specs).unwrap();
     }
 
     pub fn get() -> Option<Self> {
         ServerSpecsTable::read().get_index_pk().get(&())
+    }
+
+    fn get_or_new() -> Self {
+        Self::get().unwrap_or_default()
     }
 
     fn validate(&self) {

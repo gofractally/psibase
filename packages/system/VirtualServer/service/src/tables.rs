@@ -36,15 +36,8 @@ pub mod tables {
         /// ID of the system token used for resource billing
         pub sys: TID,
 
-        /// ID of the resource token
-        pub res: TID,
-
         /// Account number that receives all resource billing fees
         pub fee_receiver: AccountNumber,
-
-        /// The minimum amount of resources to buffer on behalf of a user
-        /// if they don't configure their own larger buffer size.
-        pub min_resource_buffer: u64,
 
         /// Whether the resource billing system is enabled
         pub enabled: bool,
@@ -125,6 +118,8 @@ pub mod tables {
         fn pk(&self) {}
     }
 
+    /// Settings related to the automatic management of an account resource buffer.
+    /// If an account has not configured these settings, a default configuration will be used.
     #[table(name = "UserSettingsTable", index = 5)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     pub struct UserSettings {
@@ -133,8 +128,6 @@ pub mod tables {
 
         /// The percentage at which client-side tooling should attempt to refill the user's
         /// resource buffer. A value of 0 means that the client should not auto refill.
-        ///
-        /// Default: 20
         pub auto_fill_threshold_percent: u8,
 
         /// The capacity of the resource buffer that gets filled when the user
@@ -142,35 +135,19 @@ pub mod tables {
         pub buffer_capacity: u64,
     }
 
-    /// The reserve is a table that holds a u64 representing additional resources that are available
-    /// to the user outside of the normal resource balance. Used to ensure that the just-in-time billing
-    /// (e.g. objective data writes, events) does not exceed the amount of resources that must be
-    /// available to pay for the CPU cost of the executing transaction.
-    //
-    // Design justification:
-    //
-    // The reserve cannot be dynamically constructed, because then writing to it would require a db
-    //   write if it didn't yet exist, and the point of the reserve is that it should happen before
-    //   any writes are allowed so that we know how many resources the user has available for writes.
-    //   user has available for writes.
-    //
-    // Furthermore, we can't use the tokens service subaccounts for reserves, because the API requires
-    //   that we would know the token ID for which to construct the zero-balance. And reserves need to
-    //   be created for all accounts, including those that are created before a resource token exists.
-    //
-    // Therefore, the Accounts service will initialize every new user with this virtual server service,
-    //   which constructs the account's reserve (with a balance of zero) in its own tables. This is
-    //  therefore paid for by the account creator and is part of account initialization, so subsequent
-    //  writes to the reserve do not cost additional storage resources (storage delta always = 0).
-    #[table(name = "UserReserveTable", index = 6)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
-    pub struct UserReserve {
-        #[primary_key]
-        pub user: AccountNumber,
-        pub reserve: u64,
+    /// Parameters related to the automatic management of an account resource buffer.
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
+    pub struct BufferConfig {
+        /// A threshold (specified in integer percentage values) at or below which the client should
+        /// attempt to automatically refill the account's resource buffer. A threshold of 0 means
+        /// that the client should not attempt to automatically manage the account's buffer.
+        pub threshold_percent: u8,
+
+        /// The total capacity of the account's buffer used to reserve system tokens.
+        pub capacity: u64,
     }
 
-    #[table(name = "NetPricingTable", index = 7)]
+    #[table(name = "NetPricingTable", index = 6)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
     pub struct NetPricing {
@@ -207,7 +184,7 @@ pub mod tables {
         fn pk(&self) {}
     }
 
-    #[table(name = "CpuPricingTable", index = 8)]
+    #[table(name = "CpuPricingTable", index = 7)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
     pub struct CpuPricing {
@@ -251,7 +228,8 @@ mod network_specs;
 mod network_variables;
 mod pricing_common;
 mod server_specs;
-mod user_reserve;
 mod user_settings;
+
+pub use user_settings::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 pub use pricing_common::*;

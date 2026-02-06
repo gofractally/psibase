@@ -80,4 +80,5 @@ if(DEFINED IS_WASM)
 
     add_subdirectory(Credentials/service/cpp/test)
     add_subdirectory(StagedTx/service/cpp/test)
+    add_subdirectory(VirtualServer/service/cpp/test)
 endif()

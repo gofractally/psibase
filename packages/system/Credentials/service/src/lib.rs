@@ -3,7 +3,11 @@ pub const CREDENTIAL_SENDER: psibase::AccountNumber = psibase::account!("cred-sy
 #[psibase::service_tables]
 pub mod tables {
     use psibase::fracpack::{Pack, Unpack};
-    use psibase::{AccountNumber, MethodNumber, ToSchema};
+    use psibase::services::{
+        nft::{NftHolderFlags, Wrapper as Nft},
+        tokens::{BalanceFlags, Wrapper as Tokens},
+    };
+    use psibase::{AccountNumber, FlagsType, MethodNumber, ToSchema};
     use psibase::{Table, TimePointSec};
     use serde::{Deserialize, Serialize};
 
@@ -13,6 +17,19 @@ pub mod tables {
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
+    }
+
+    impl InitRow {
+        pub fn init() {
+            let table = InitTable::read_write();
+            if table.get_index_pk().get(&()).is_some() {
+                return;
+            }
+            table.put(&InitRow {}).unwrap();
+
+            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+        }
     }
 
     #[table(name = "CredentialIdTable", index = 1)]
@@ -76,7 +93,7 @@ pub mod service {
 
     #[action]
     fn init() {
-        InitTable::new().put(&InitRow {}).unwrap();
+        InitRow::init();
     }
 
     #[pre_action(exclude(init))]
@@ -171,6 +188,7 @@ pub mod service {
     fn isAuthSys(
         _sender: AccountNumber,
         _authorizers: Vec<AccountNumber>,
+        _method: Option<ServiceMethod>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         abort_message("isAuthSys not supported");
@@ -181,11 +199,11 @@ pub mod service {
     fn isRejectSys(
         _sender: AccountNumber,
         _authorizers: Vec<AccountNumber>,
+        _method: Option<ServiceMethod>,
         _auth_set: Option<Vec<AccountNumber>>,
     ) -> bool {
         abort_message("isRejectSys not supported");
     }
-
 
     /// Creates a credential
     ///

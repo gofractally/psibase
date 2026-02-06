@@ -10,15 +10,15 @@ mod tests {
             http_server,
             nft::Wrapper as Nft,
             staged_tx,
-            tokens::{self, Precision, Quantity, Wrapper as Tokens},
+            tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
         },
         tester, AccountNumber, Action, ChainEmptyResult,
     };
     use serde::Deserialize;
     use tester::PRODUCER_ACCOUNT;
 
+    use crate::action_structs::*;
     use crate::Wrapper;
-    use crate::{action_structs::*, tables::tables::*};
 
     fn assert_error(result: ChainEmptyResult, message: &str) {
         let err = result.trace.error.unwrap();
@@ -36,6 +36,10 @@ mod tests {
     }
 
     #[derive(Deserialize)]
+    pub struct BillingConfig {
+        pub feeReceiver: String,
+    }
+    #[derive(Deserialize)]
     struct BillingConfigData {
         getBillingConfig: BillingConfig,
     }
@@ -47,17 +51,8 @@ mod tests {
 
     #[derive(Deserialize)]
     struct UserResources {
-        balanceRaw: u64,
-    }
-
-    #[derive(Deserialize)]
-    struct CpuPricingData {
-        cpuPricing: Option<CpuPricing>,
-    }
-
-    #[derive(Deserialize)]
-    struct CpuPricing {
-        availableUnits: u64,
+        balance: Decimal,
+        bufferCapacity: Decimal,
     }
 
     // Propose a system action
@@ -101,11 +96,7 @@ mod tests {
             r#"
                 query {
                     getBillingConfig {
-                        sys
-                        res
                         feeReceiver
-                        minResourceBuffer
-                        enabled
                     }
                 }
             "#,
@@ -115,37 +106,19 @@ mod tests {
         Ok(response_root.data.getBillingConfig)
     }
 
-    fn get_cpu_pricing(chain: &psibase::Chain) -> Result<CpuPricing, psibase::Error> {
-        let pricing: serde_json::Value = chain.graphql(
-            Wrapper::SERVICE,
-            r#"
-                query {
-                    cpuPricing {
-                        availableUnits
-                    }
-                }
-            "#,
-        )?;
-
-        let response_root: Response<CpuPricingData> = serde_json::from_value(pricing)?;
-        response_root
-            .data
-            .cpuPricing
-            .ok_or_else(|| psibase::anyhow!("CPU pricing not initialized"))
-    }
-
-    fn get_resource_balance(
+    fn get_user_resources(
         chain: &psibase::Chain,
         user: AccountNumber,
         auth_token: &str,
-    ) -> Result<u64, psibase::Error> {
+    ) -> Result<UserResources, psibase::Error> {
         let balance: serde_json::Value = chain.graphql_auth(
             Wrapper::SERVICE,
             &format!(
                 r#"
                     query {{
                         userResources(user: "{}") {{
-                            balanceRaw
+                            balance
+                            bufferCapacity
                         }}
                     }}
                 "#,
@@ -155,7 +128,7 @@ mod tests {
         )?;
 
         let response: Response<ResourcesData> = serde_json::from_value(balance)?;
-        Ok(response.data.userResources.balanceRaw)
+        Ok(response.data.userResources)
     }
 
     fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
@@ -224,7 +197,12 @@ mod tests {
         )?;
 
         let config = get_billing_config(&chain)?;
-        assert!(config.fee_receiver == tokens);
+        assert!(config.feeReceiver == tokens.to_string());
+
+        let min_resource_buffer = get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
+            .bufferCapacity
+            .quantity
+            .value;
 
         check_balance(&chain, sys, PRODUCER_ACCOUNT, 0);
 
@@ -236,23 +214,24 @@ mod tests {
 
         // Verify filling resource buffer
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 5_000_0000.into(), "".into())
+            .credit(sys, vserver, (min_resource_buffer / 2).into(), "".into())
             .get()?;
         assert_error(
-            Wrapper::push_from(&chain, PRODUCER_ACCOUNT).refill_res_buf(),
-            "Insufficient token balance",
+            Wrapper::push_from(&chain, PRODUCER_ACCOUNT).buy_res(min_resource_buffer.into()),
+            "Insufficient shared balance",
         );
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 5_000_0000.into(), "".into())
+            .credit(sys, vserver, (min_resource_buffer / 2).into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .refill_res_buf()
+            .buy_res(min_resource_buffer.into())
             .get()?;
-        let cpu_pricing = get_cpu_pricing(&chain)?;
         assert_eq!(
-            get_resource_balance(&chain, PRODUCER_ACCOUNT, &token_prod)?,
-            config.min_resource_buffer - cpu_pricing.availableUnits // Price is always 1 at the start, so we
-                                                                    // can just subtract the available units
+            get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
+                .balance
+                .quantity
+                .value,
+            min_resource_buffer
         );
 
         // Send some more tokens to the producer account
@@ -282,12 +261,18 @@ mod tests {
 
         // Producer can buy her some
         tokens::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .credit(sys, vserver, 10_000_0000.into(), "".into())
+            .credit(sys, vserver, min_resource_buffer.into(), "".into())
             .get()?;
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .buy_res_for(10_000_0000.into(), alice, Some("".into()))
+            .buy_res_for(min_resource_buffer.into(), alice, Some("".into()))
             .get()?;
-        assert_eq!(get_resource_balance(&chain, alice, &token_a)?, 10_000_0000);
+        assert_eq!(
+            get_user_resources(&chain, alice, &token_a)?
+                .balance
+                .quantity
+                .value,
+            min_resource_buffer
+        );
 
         // Now alice can transact
         tokens::Wrapper::push_from(&chain, alice)
@@ -296,8 +281,11 @@ mod tests {
 
         chain.finish_block();
 
-        let balance = get_resource_balance(&chain, alice, &token_a)?;
-        assert!(balance < 10_000_0000);
+        let balance = get_user_resources(&chain, alice, &token_a)?
+            .balance
+            .quantity
+            .value;
+        assert!(balance < min_resource_buffer.into());
 
         println!("alice resource balance: {}", balance);
 

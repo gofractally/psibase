@@ -1,6 +1,7 @@
 use crate::bindings::host::common::server;
 use crate::bindings::host::types::types::Error;
 use crate::errors::ErrorType;
+use psibase::services::tokens::Decimal;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -18,8 +19,8 @@ struct UserResourcesData {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UserResources {
-    balance_raw: u64,
-    buffer_capacity_raw: u64,
+    balance: Decimal,
+    buffer_capacity: Decimal,
     auto_fill_threshold_percent: u64,
 }
 
@@ -27,8 +28,8 @@ pub fn get_user_resources(user: &str) -> Result<(u64, u64, u64), Error> {
     let query = format!(
         r#"query {{
             userResources(user: "{}") {{
-                balanceRaw
-                bufferCapacityRaw
+                balance
+                bufferCapacity
                 autoFillThresholdPercent
             }}
         }}"#,
@@ -41,8 +42,8 @@ pub fn get_user_resources(user: &str) -> Result<(u64, u64, u64), Error> {
             ErrorType::QueryError(format!("Failed to parse GraphQL response: {}", e)).into()
         })?;
 
-    let balance = response.data.user_resources.balance_raw;
-    let buffer_capacity = response.data.user_resources.buffer_capacity_raw;
+    let balance = response.data.user_resources.balance.quantity.value;
+    let buffer_capacity = response.data.user_resources.buffer_capacity.quantity.value;
     let auto_fill_threshold = response.data.user_resources.auto_fill_threshold_percent;
 
     Ok((balance, buffer_capacity, auto_fill_threshold))
@@ -57,16 +58,29 @@ struct BillingConfigResponse {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BillingConfigData {
-    get_billing_config: Option<BillingConfig>,
+    get_billing_config: Option<InternalBillingConfig>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct BillingConfig {
+struct InternalBillingConfig {
     enabled: bool,
 }
 
-pub fn is_billing_enabled() -> Result<bool, Error> {
+#[derive(Default)]
+pub struct BillingConfig {
+    pub enabled: bool,
+}
+
+impl From<InternalBillingConfig> for BillingConfig {
+    fn from(config: InternalBillingConfig) -> Self {
+        Self {
+            enabled: config.enabled,
+        }
+    }
+}
+
+pub fn billing_config() -> Result<BillingConfig, Error> {
     let query = r#"query {
         getBillingConfig {
             enabled
@@ -82,6 +96,6 @@ pub fn is_billing_enabled() -> Result<bool, Error> {
     Ok(response
         .data
         .get_billing_config
-        .map(|config| config.enabled)
-        .unwrap_or(false))
+        .unwrap_or(InternalBillingConfig { enabled: false })
+        .into())
 }

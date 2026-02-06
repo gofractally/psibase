@@ -292,7 +292,7 @@ namespace psibase
    {
       return {
           {"Access-Control-Allow-Origin", std::string(origin)},
-          {"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD"},
+          {"Access-Control-Allow-Methods", "POST, GET, OPTIONS, HEAD, PUT, DELETE"},
           {"Access-Control-Allow-Headers", "*"},
       };
    }

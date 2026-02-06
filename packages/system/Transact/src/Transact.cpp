@@ -263,6 +263,13 @@ namespace SystemService
       abortMessage("Callback not found");
    }
 
+   void Transact::regEvIdx(psibase::AccountNumber service)
+   {
+      auto me = getReceiver();
+      check(getSender() == me, "Wrong sender");
+      Transact::Tables(Transact::service).open<EventIndexerTable>().put({service});
+   }
+
    struct RunAsKey
    {
       AccountNumber sender;
@@ -495,7 +502,11 @@ namespace SystemService
          {
             flags |= AuthInterface::firstAuthFlag;
 
-            to<VirtualServer>().setCpuLimit(act.sender());
+            if (isResMonitoring())
+            {
+               // If resMonitoring is disabled, no CPU limit is set for the transaction
+               to<VirtualServer>().setCpuLimit(act.sender());
+            }
          }
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
@@ -533,6 +544,8 @@ namespace SystemService
       auto trx = psio::view<const Transaction>(psio::prevalidated{t});
       auto id  = sha256(t.data(), t.size());
 
+      check(trx.actions().size() > 0, "transaction has no actions");
+
       if (isResMonitoring())
       {
          uint64_t      netUsage = t.size();
@@ -543,8 +556,6 @@ namespace SystemService
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
-
-      check(trx.actions().size() > 0, "transaction has no actions");
 
       auto tables        = Transact::Tables(Transact::service, KvMode::readWrite);
       auto includedTable = tables.open<IncludedTrxTable>();
@@ -590,11 +601,22 @@ namespace SystemService
       check(!trx.actions().empty(), "transaction must have at least one action");
       if (enforceAuth)
       {
-         std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
          if (isResMonitoring())
          {
-            to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage);
+            std::chrono::nanoseconds cpuUsage = cpuLimit.getCpuTime();
+            to<VirtualServer>().useCpuSys(trx.actions()[0].sender(), cpuUsage.count());
          }
+      }
+
+      if (auto eventIndexer = tables.open<EventIndexerTable>().get({}))
+      {
+         // Events were already indexed before useCpuSys, which is intentional because we want to bill CPU time for event
+         // indexing. However, if indexing is done before useCpuSys, then the event emitted by useCpuSys that reports
+         // the used CPU doesn't get indexed (or billed).
+         //
+         // Therefore, we do one more event indexer sync after useCpuSys, which will only index the new event (and uses
+         // cached service schemas so isn't as expensive).
+         to<EventIndexerInterface>(eventIndexer->service).sync();
       }
 
       trxData = std::span<const char>{};

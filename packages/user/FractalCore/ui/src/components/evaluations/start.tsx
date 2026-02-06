@@ -2,10 +2,8 @@ import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useStart } from "@/hooks/fractals/use-start";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { Button } from "@shared/shadcn/ui/button";
-
-import { ErrorCard } from "../error-card";
-
 
 export const Start = () => {
     const { data: fractal } = useFractal();
@@ -17,7 +15,6 @@ export const Start = () => {
     } = useStart();
 
     const guildAccount = useGuildAccount();
-
 
     if (!fractal) return null;
 

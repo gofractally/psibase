@@ -3,6 +3,8 @@ mod bindings;
 
 mod errors;
 mod query;
+use std::str::FromStr;
+
 use errors::ErrorType;
 
 use bindings::exports::virtual_server::plugin as Exports;
@@ -20,8 +22,10 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use psibase::fracpack::Pack;
 use psibase::AccountNumber;
 
+use psibase::services::tokens::{Precision, Quantity};
 use virtual_server::action_structs as Actions;
-use virtual_server::tables::tables as ServiceTables;
+use virtual_server::tables::tables::{self as ServiceTables};
+use virtual_server::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
 struct VirtualServerPlugin;
 
@@ -33,6 +37,18 @@ fn assert_caller(allowed: &[&str], context: &str) {
         context,
         allowed
     );
+}
+
+fn pct_to_ppm(pct: String) -> Result<u32, Error> {
+    let ppm = Quantity::from_str(&pct, Precision::new(4).unwrap())
+        .map(|amount| amount.value)
+        .map_err(|error| Error::from(ErrorType::ConversionError(error.to_string())))?;
+
+    if ppm > 1_000_000 {
+        return Err(ErrorType::Overflow.into());
+    }
+
+    Ok(ppm as u32)
 }
 
 impl Admin for VirtualServerPlugin {
@@ -93,8 +109,8 @@ impl Admin for VirtualServerPlugin {
         add_action_to_transaction(
             Actions::cpu_thresholds::ACTION_NAME,
             &Actions::cpu_thresholds {
-                idle_ppm: params.idle_ppm,
-                congested_ppm: params.congested_ppm,
+                idle_ppm: pct_to_ppm(params.idle_pct)?,
+                congested_ppm: pct_to_ppm(params.congested_pct)?,
             }
             .packed(),
         )?;
@@ -129,8 +145,8 @@ impl Admin for VirtualServerPlugin {
         add_action_to_transaction(
             Actions::net_thresholds::ACTION_NAME,
             &Actions::net_thresholds {
-                idle_ppm: params.idle_ppm,
-                congested_ppm: params.congested_ppm,
+                idle_ppm: pct_to_ppm(params.idle_pct)?,
+                congested_ppm: pct_to_ppm(params.congested_pct)?,
             }
             .packed(),
         )?;
@@ -188,18 +204,21 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
     }
 
     let amount = capacity - balance;
-    let amount = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
+    let amount_str = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
 
     // Refill
     TokensPlugin::user::credit(
         sys_id,
         &client::get_receiver(),
-        &amount,
+        &amount_str,
         "Refilling resource buffer",
     )?;
     add_action_to_transaction(
-        Actions::refill_res_buf::ACTION_NAME,
-        &Actions::refill_res_buf {}.packed(),
+        Actions::buy_res::ACTION_NAME,
+        &Actions::buy_res {
+            amount: Quantity::new(amount),
+        }
+        .packed(),
     )
 }
 
@@ -224,10 +243,42 @@ impl Billing for VirtualServerPlugin {
         let capacity = TokensPlugin::helpers::decimal_to_u64(sys_id, &new_capacity)?;
         add_action_to_transaction(
             Actions::conf_buffer::ACTION_NAME,
-            &Actions::conf_buffer { capacity }.packed(),
+            &Actions::conf_buffer {
+                config: Some(ServiceTables::BufferConfig {
+                    capacity,
+                    threshold_percent: DEFAULT_AUTO_FILL_THRESHOLD_PERCENT,
+                }),
+            }
+            .packed(),
         )?;
 
         refill_to_capacity(Some(capacity), true)
+    }
+
+    fn donate_gas(user: String, amount: String) -> Result<(), Error> {
+        assert_caller(&["homepage", &client::get_receiver()], "fill_gas_tank_for");
+
+        let sys_id = TokensPlugin::helpers::fetch_network_token()?
+            .ok_or_else(|| -> Error { ErrorType::NetworkTokenNotFound.into() })?;
+
+        let amount_u64 = TokensPlugin::helpers::decimal_to_u64(sys_id, &amount)?;
+
+        TokensPlugin::user::credit(
+            sys_id,
+            &client::get_receiver(),
+            &amount,
+            &format!("Subsidizing resources for {}", user),
+        )?;
+
+        add_action_to_transaction(
+            Actions::buy_res_for::ACTION_NAME,
+            &Actions::buy_res_for {
+                amount: Quantity::new(amount_u64),
+                for_user: AccountNumber::from_str(&user).unwrap(),
+                memo: None,
+            }
+            .packed(),
+        )
     }
 }
 
@@ -235,7 +286,7 @@ impl Transact for VirtualServerPlugin {
     fn auto_fill_gas_tank() -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 
-        if !query::is_billing_enabled()? {
+        if !query::billing_config()?.enabled || AccountsPlugin::api::get_current_user().is_none() {
             return Ok(());
         }
 

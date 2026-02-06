@@ -40,6 +40,7 @@ function(add suffix)
     service(Loop "${suffix}" src/Loop.cpp)
     service(XProxy "${suffix}" src/XProxy.cpp)
     service(WSEcho "${suffix}" src/WSEcho.cpp)
+    service(XDelay "${suffix}" src/XDelay.cpp)
 endfunction(add)
 
 add_library(services_test INTERFACE)

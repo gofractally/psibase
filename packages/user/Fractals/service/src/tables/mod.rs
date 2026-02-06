@@ -13,7 +13,9 @@ mod reward_stream;
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema};
+    use psibase::{
+        define_flags, services::tokens::TID, AccountNumber, Fracpack, Memo, TimePointSec, ToSchema,
+    };
 
     use serde::{Deserialize, Serialize};
 
@@ -33,6 +35,7 @@ pub mod tables {
         #[graphql(skip)]
         pub judiciary: AccountNumber,
         pub token_id: TID,
+        pub token_init_threshold: u8,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]
@@ -90,7 +93,14 @@ pub mod tables {
         pub rep_role: AccountNumber,
         pub bio: Memo,
         pub description: String,
+        pub rank_ordering_threshold: u8,
+        pub settings: u8,
+        pub candidacy_cooldown: u32,
     }
+
+    define_flags!(GuildFlags, u8, {
+        rank_ordering,
+    });
 
     impl Guild {
         #[secondary_key(1)]
@@ -118,8 +128,11 @@ pub mod tables {
         pub member: AccountNumber,
         #[graphql(skip)]
         pub score: u32,
-        pub pending_score: Option<u8>,
+        pub pending_level: Option<u8>,
         pub created_at: psibase::TimePointSec,
+        pub is_candidate: bool,
+        pub candidacy_eligible_from: psibase::TimePointSec,
+        pub attendance: u16,
     }
 
     impl GuildMember {
@@ -134,8 +147,8 @@ pub mod tables {
         }
 
         #[secondary_key(2)]
-        fn by_score(&self) -> (AccountNumber, u32, AccountNumber) {
-            (self.guild, self.score, self.member)
+        fn by_score(&self) -> (AccountNumber, bool, u32, AccountNumber) {
+            (self.guild, self.is_candidate, self.score, self.member)
         }
     }
 
@@ -145,7 +158,7 @@ pub mod tables {
     pub struct GuildApplication {
         #[graphql(skip)]
         pub guild: AccountNumber,
-        pub member: AccountNumber,
+        pub applicant: AccountNumber,
         pub extra_info: String,
         pub created_at: psibase::TimePointSec,
     }
@@ -153,12 +166,12 @@ pub mod tables {
     impl GuildApplication {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.guild, self.member)
+            (self.guild, self.applicant)
         }
 
         #[secondary_key(1)]
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
-            (self.member, self.guild)
+            (self.applicant, self.guild)
         }
     }
 
@@ -168,8 +181,8 @@ pub mod tables {
     pub struct GuildAttest {
         #[graphql(skip)]
         pub guild: AccountNumber,
-        pub member: AccountNumber,
-        pub attestee: AccountNumber,
+        pub applicant: AccountNumber,
+        pub attester: AccountNumber,
         pub comment: String,
         pub endorses: bool,
     }
@@ -177,17 +190,17 @@ pub mod tables {
     impl GuildAttest {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.guild, self.member, self.attestee)
+            (self.guild, self.applicant, self.attester)
         }
 
         #[secondary_key(1)]
         fn by_guild(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.guild, self.attestee, self.member)
+            (self.guild, self.attester, self.applicant)
         }
 
         #[secondary_key(2)]
-        fn by_attestee(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.attestee, self.guild, self.member)
+        fn by_attester(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
+            (self.attester, self.guild, self.applicant)
         }
     }
 
@@ -231,6 +244,7 @@ pub mod tables {
 
     #[table(name = "RewardConsensusTable", index = 9)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
     pub struct RewardConsensus {
         #[primary_key]
         pub fractal: AccountNumber,

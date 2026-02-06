@@ -160,6 +160,28 @@ extern "C" {
     /// and [getKey] to get found key.
     pub fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32;
 
+    /// Gets the current value of a clock in nanoseconds.
+    ///
+    /// This function is non-deterministic and is only available in subjective services.
+    ///
+    /// The following clocks are supported
+    /// - `__WASI_CLOCKID_REALTIME` returns wall-clock time since the unix epoch.
+    /// - `__WASI_CLOCKID_MONOTONIC` returns monotonic time since an unspecified epoch.
+    ///   All uses of CLOCK_MONOTONIC within the same block use the same epoch.
+    /// - `__WASI_CLOCKID_PROCESS_CPUTIME_ID` measures CPU time spent executing the
+    ///   current transaction.
+    ///
+    /// Returns 0 on success or an error code on failure.
+    ///
+    /// Errors:
+    /// - `EINVAL`: the clock id is not supported
+    pub fn clockTimeGet(id: u32, time: *mut u64) -> i32;
+
+    /// Fills a buffer with random bytes
+    ///
+    /// This function is non-deterministic and is only available in subjective services.
+    pub fn getRandom(buf: *mut u8, len: usize);
+
     /// Sets the CPU timer to expire after the current transaction/query/callback
     /// context has run for a given number of nanoseconds. When the timer
     /// expires, the current context will be terminated. Setting the timeout
@@ -170,6 +192,14 @@ extern "C" {
     pub fn commitSubjective() -> bool;
     pub fn abortSubjective();
 
+    /// Starts a new HTTP request
+    ///
+    /// Returns a socket on success or a negative error code on failure
+    ///
+    /// Errors:
+    /// - `ENOSYS`: the host does not support sockets
+    pub fn socketOpen(data: *const u8, len: usize) -> i32;
+
     /// Send a message to a socket
     ///
     /// Returns 0 on success or an error code on failure
@@ -179,23 +209,18 @@ extern "C" {
     /// - `ENOTSOCK`: fd is not a socket
     pub fn socketSend(fd: i32, data: *const u8, len: usize) -> i32;
 
-    /// Tells the current transaction/query/callback context to take or release
-    /// ownership of a socket.
-    ///
-    /// Any sockets that are owned by a context will be closed when it finishes.
-    /// - HTTP socket: send a 500 response with an error message in the body
-    /// - Other sockets may not be set to auto-close
+    /// Change flags on a socket. The mask determines which flags are set.
     ///
     /// If this function is called within a subjectiveCheckout, it will only take
-    /// effect if the top-level commit succeeds. If another context takes ownership
-    /// of the socket, subjectiveCommit may fail.
+    /// effect if the top-level commit succeeds. If another context changes the
+    /// flags, subjectiveCommit may fail.
     ///
     /// Returns 0 on success or an error code on failure.
     ///
     /// Errors:
     /// - `EBADF`: fd is not a valid file descriptor
-    /// - `ENOTSUP`: The socket does not support auto-close
+    /// - `ENOTSUP`: The socket does not support the requested flags
     /// - `ENOTSOCK`: fd is not a socket
     /// - `EACCES`: The socket is owned by another context
-    pub fn socketAutoClose(fd: i32, value: bool) -> i32;
+    pub fn socketSetFlags(fd: i32, mask: u32, value: u32) -> i32;
 }

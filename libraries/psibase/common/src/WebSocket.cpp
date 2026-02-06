@@ -4,6 +4,7 @@
 
 #include <openssl/sha.h>
 #include <algorithm>
+#include <psibase/api.hpp>
 
 #include "base64.hpp"
 
@@ -301,3 +302,14 @@ std::optional<HttpReply> psibase::webSocketHandshake(const HttpRequest& request)
    }
    return {};
 }
+
+#ifdef __wasm32__
+
+std::string psibase::randomWebSocketKey()
+{
+   char buf[16];
+   raw::getRandom(buf, sizeof(buf));
+   return to_base64(buf);
+}
+
+#endif

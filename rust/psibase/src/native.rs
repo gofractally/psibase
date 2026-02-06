@@ -7,7 +7,9 @@
 //!
 //! These functions wrap the [Raw Native Functions](crate::native_raw).
 
-use crate::{native_raw, AccountNumber, DbId, MicroSeconds, ToKey};
+use crate::{
+    native_raw, AccountNumber, DbId, HttpRequest, MicroSeconds, SocketEndpoint, TLSInfo, ToKey,
+};
 use anyhow::anyhow;
 use fracpack::{Pack, Unpack, UnpackOwned};
 
@@ -392,6 +394,21 @@ macro_rules! subjective_tx {
     }
 }
 
+/// Starts a new HTTP request and returns the socket
+pub fn socket_open(
+    req: HttpRequest,
+    tls: Option<TLSInfo>,
+    endpoint: Option<SocketEndpoint>,
+) -> Result<i32, anyhow::Error> {
+    let packed = (req, tls, endpoint).packed();
+    let sock = unsafe { native_raw::socketOpen(packed.as_ptr(), packed.len()) };
+    if sock >= 0 {
+        Ok(sock)
+    } else {
+        Err(anyhow!("socket_open: {}", -sock))
+    }
+}
+
 /// Send a message to a socket
 pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
     let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len()) };
@@ -402,21 +419,16 @@ pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
     }
 }
 
-/// Tells the current transaction/query/callback context to take or release
-/// ownership of a socket.
-///
-/// Any sockets that are owned by a context will be closed when it finishes.
-/// - HTTP socket: send a 500 response with an error message in the body
-/// - Other sockets may not be set to auto-close
+/// Change flags on a socket. The mask determines which flags are set.
 ///
 /// If this function is called within a subjectiveCheckout, it will only take
-/// effect if the top-level commit succeeds. If another context takes ownership
-/// of the socket, subjectiveCommit may fail.
-pub fn socket_auto_close(fd: i32, value: bool) -> Result<(), anyhow::Error> {
-    let err = unsafe { native_raw::socketAutoClose(fd, value) };
+/// effect if the top-level commit succeeds. If another context changes the
+/// flags, subjectiveCommit may fail.
+pub fn socket_set_flags(fd: i32, mask: u32, value: u32) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSetFlags(fd, mask, value) };
     if err == 0 {
         Ok(())
     } else {
-        Err(anyhow!("socket_auto_close: {}", err))
+        Err(anyhow!("socket_set_flags: {}", err))
     }
 }

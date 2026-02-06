@@ -11,6 +11,7 @@ const POLYFILL_ROOT_DIR_FD: u32 = 3;
 extern "C" {
     pub fn writeConsole(message: *const u8, len: usize);
     pub fn abortMessage(message: *const u8, len: usize) -> !;
+    pub fn clockTimeGet(id: u32, time: *mut u64) -> i32;
 }
 
 #[no_mangle]
@@ -32,8 +33,7 @@ pub unsafe extern "C" fn environ_get(_environ: *mut *mut u8, _environ_buf: *mut 
 
 #[no_mangle]
 pub unsafe extern "C" fn clock_time_get(id: u32, precision: u64, time: *mut u64) -> Errno {
-    *time = 0;
-    0
+    clockTimeGet(id, time) as Errno
 }
 
 // Unfortunately it looks like we have to lie instead of returning an error

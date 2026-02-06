@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useAppForm } from "@/components/form/app-form";
 import { ScheduleDialog } from "@/components/schedule-dialog";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
@@ -14,6 +13,10 @@ import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNowUnix } from "@/hooks/use-now-unix";
 
+import { useAppForm } from "@shared/components/form/app-form";
+
+import { Leadership } from "./leadership";
+
 export const Settings = () => {
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
@@ -21,7 +24,7 @@ export const Settings = () => {
     const status = useEvaluationStatus(now);
     const guildAccount = useGuildAccount();
 
-    const { data: guild, isPending: isGuildPending } = useGuild();
+    const { data: guild, isPending: isGuildPending, refetch } = useGuild();
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
     const { evaluation } = useEvaluationInstance();
@@ -30,50 +33,50 @@ export const Settings = () => {
     const { mutateAsync: setGuildDescription } = useSetGuildDescription();
     const { mutateAsync: setGuildDisplayName } = useSetGuildDisplayName();
 
-    const displayNameForm = useAppForm({
+    const form = useAppForm({
         defaultValues: {
             displayName: guild?.displayName ?? "",
+            bio: guild?.bio ?? "",
+            description: guild?.description ?? "",
         },
-        onSubmit: async ({ value: { displayName } }) => {
-            await setGuildDisplayName([guildAccount!, displayName]);
+        onSubmit: async ({
+            value: { displayName, bio, description },
+            formApi,
+        }) => {
+            try {
+                const promises = [];
+
+                if (!formApi.getFieldMeta("displayName")?.isDefaultValue) {
+                    promises.push(
+                        setGuildDisplayName([guildAccount!, displayName]),
+                    );
+                }
+                if (!formApi.getFieldMeta("bio")?.isDefaultValue) {
+                    promises.push(setGuildBio([guildAccount!, bio]));
+                }
+                if (!formApi.getFieldMeta("description")?.isDefaultValue) {
+                    promises.push(
+                        setGuildDescription([guildAccount!, description]),
+                    );
+                }
+
+                await Promise.all(promises);
+            } catch (e) {
+                refetch();
+                throw e;
+            }
         },
         validators: {
             onChange: z.object({
                 displayName: z.string().min(1),
-            }),
-        },
-    });
-
-    const bioForm = useAppForm({
-        defaultValues: {
-            bio: guild?.bio ?? "",
-        },
-        onSubmit: async ({ value: { bio } }) => {
-            await setGuildBio([guildAccount!, bio]);
-        },
-        validators: {
-            onChange: z.object({
                 bio: z.string(),
-            }),
-        },
-    });
-
-    const descriptonForm = useAppForm({
-        defaultValues: {
-            description: guild?.description ?? "",
-        },
-        onSubmit: async ({ value: { description } }) => {
-            await setGuildDescription([guildAccount!, description]);
-        },
-        validators: {
-            onChange: z.object({
                 description: z.string(),
             }),
         },
     });
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex flex-col gap-3">
                 <div className="flex justify-between rounded-sm border p-4 ">
                     <div>
@@ -102,59 +105,42 @@ export const Settings = () => {
                     <div>
                         <div className="text-xl font-semibold">Metadata</div>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                void displayNameForm.handleSubmit();
-                            }}
-                        >
-                            <displayNameForm.AppField
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            void form.handleSubmit();
+                        }}
+                    >
+                        <div className="my-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <form.AppField
                                 name="displayName"
                                 children={(field) => (
                                     <field.TextField label="Display name" />
                                 )}
                             />
-                            <displayNameForm.AppForm>
-                                <displayNameForm.SubmitButton />
-                            </displayNameForm.AppForm>
-                        </form>
-
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                void bioForm.handleSubmit();
-                            }}
-                        >
-                            <bioForm.AppField
+                            <form.AppField
                                 name="bio"
                                 children={(field) => (
                                     <field.TextField label="Bio" />
                                 )}
                             />
-                            <bioForm.AppForm>
-                                <bioForm.SubmitButton />
-                            </bioForm.AppForm>
-                        </form>
+                            <div className="col-span-2">
+                                <form.AppField
+                                    name="description"
+                                    children={(field) => (
+                                        <field.TextField label="Description" />
+                                    )}
+                                />
+                            </div>
+                        </div>
+                        <form.AppForm>
+                            <form.SubmitButton />
+                        </form.AppForm>
+                    </form>
+                </div>
 
-                        <form
-                            className="col-span-2"
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                void descriptonForm.handleSubmit();
-                            }}
-                        >
-                            <descriptonForm.AppField
-                                name="description"
-                                children={(field) => (
-                                    <field.TextField label="Description" />
-                                )}
-                            />
-                            <descriptonForm.AppForm>
-                                <descriptonForm.SubmitButton />
-                            </descriptonForm.AppForm>
-                        </form>
-                    </div>
+                <div>
+                    <Leadership />
                 </div>
             </div>
         </div>

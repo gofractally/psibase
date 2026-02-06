@@ -28,7 +28,7 @@ impl NetworkSpecs {
         // Reduce cpu ns to account for:
         // - per-block system functionality
         cpu_ns = cpu_ns - vars.per_block_sys_cpu_ns;
-        // - block replay factor
+        // - increased replay speed
         cpu_ns = cpu_ns / vars.block_replay_factor as u64;
 
         cpu_ns
@@ -68,7 +68,7 @@ impl NetworkSpecs {
             .unwrap();
     }
 
-    pub fn get() -> Self {
+    pub fn get_assert() -> Self {
         check_some(
             NetworkSpecsTable::read().get_index_pk().get(&()),
             "Network specs not yet initialized",

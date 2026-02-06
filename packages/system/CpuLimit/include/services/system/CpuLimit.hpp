@@ -8,8 +8,7 @@
 
 namespace SystemService
 {
-   // This service manages the active producers.
-   // It must have native write permission
+   // This service limits CPU consumption during a transaction.
    class CpuLimit : public psibase::Service
    {
      public:

@@ -18,7 +18,8 @@
 //!      difficulty decreases by a configured percentage (subject to a floor value).
 //!    - **Above Target**: If the counter exceeds `target_max` at any point, the difficulty
 //!      immediately increases by a configured percentage, the counter resets, and a new window
-//!      begins.
+//!      begins. If one increment pushes the counter past `target_max` by one or more whole multiples
+//!      of `target_max`, the difficulty is increased by the configured percentage once per multiple.
 //!
 //! 3. **Window-Based Decay**: After each window period (`window_seconds`), if activity was below
 //!    the minimum target, difficulty decays proportionally for each complete window that elapsed.
@@ -47,8 +48,8 @@ pub mod Service {
     /// * `target_min` - Minimum rate limit target
     /// * `target_max` - Maximum rate limit target
     /// * `floor_difficulty` - Minimum difficulty
-    /// * `percent_increase_ppm` - Percent to increment when over target, 50000 = 5%
-    /// * `percent_decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    /// * `increase_ppm` - PPM to increase when over target, e.g. 50000 ppm = 5%
+    /// * `decrease_ppm` - PPM to decrease when under target, e.g. 50000 ppm = 5%
     #[action]
     fn create(
         initial_difficulty: u64,
@@ -56,8 +57,8 @@ pub mod Service {
         target_min: u32,
         target_max: u32,
         floor_difficulty: u64,
-        percent_increase_ppm: u32,
-        percent_decrease_ppm: u32,
+        increase_ppm: u32,
+        decrease_ppm: u32,
     ) -> u32 {
         unimplemented!()
     }
@@ -74,7 +75,12 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Increment RateLimit instance, potentially increasing RateLimit
+    /// Increment RateLimit instance, potentially increasing the difficulty.
+    ///
+    /// The difficulty may increase multiple times if the counter exceeds `target_max`
+    ///   by more than one multiple of `target_max`.
+    ///
+    /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
     /// * Requires sender to be consumer account.
     ///
@@ -123,16 +129,16 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Update percent change
+    /// Update ppm change
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `increase_ppm` - Percent to increment when over target, 50000 = 5%
-    /// * `decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    /// * `increase_ppm` - PPM to increase when over target, e.g. 50000 ppm = 5%
+    /// * `decrease_ppm` - PPM to decrease when under target, e.g. 50000 ppm = 5%
     #[action]
-    fn set_percent(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
+    fn set_ppm(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
         unimplemented!()
     }
 

@@ -88,6 +88,8 @@ pub fn transform_actions(actions: Vec<ActionMetadata>) -> Result<Vec<Action>, Ho
         }
     }
 
+    TxTransformLabel::clear();
+
     Ok(actions)
 }
 

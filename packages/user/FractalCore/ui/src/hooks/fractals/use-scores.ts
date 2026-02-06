@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getScores } from "@/lib/graphql/fractals/getScores";
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const useScores = (guildAccount: OptionalAccount) => {
     return useQuery({

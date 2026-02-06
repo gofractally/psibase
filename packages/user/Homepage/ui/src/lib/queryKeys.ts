@@ -1,6 +1,7 @@
 import { QueryableMailbox } from "@/apps/chainmail/types";
 
 type QueryKeyGenerator<Prefix extends string = string> = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...args: any[]
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
@@ -15,7 +16,9 @@ const QueryKey = {
     contacts: (user: string | undefined | null) => ["contacts", user] as const,
     profile: (account: string | undefined | null) =>
         ["profile", account] as const,
+    connectedAccounts: () => ["connectedAccounts"] as const,
     currentUser: () => ["currentUser"] as const,
+    producers: () => ["producers"] as const,
     mailbox: (mailbox: QueryableMailbox, user: string) =>
         [mailbox, user] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;

@@ -20,75 +20,15 @@
         }
     },
     {
-        "sender": "symbol",
-        "service": "nft",
-        "method": "setUserConf",
-        "data": {
-            "index": 0,
-            "enable": false
-        }
+        "sender": "faucet-tok",
+        "service": "faucet-tok",
+        "method": "dispense",
+        "data": { "account": "alice" }
     },
     {
-        "sender": "symbol",
-        "service": "tokens",
-        "method": "create",
-        "data": {
-            "precision": 4,
-            "max_issued_supply": { "value": 100000000000000000 }
-        }
-    },
-    {
-        "sender": "symbol",
-        "service": "nft",
-        "method": "setUserConf",
-        "data": {
-            "index": 0,
-            "enable": true
-        }
-    },
-    {
-        "sender": "tokens",
-        "service": "tokens",
-        "method": "setSysToken",
-        "data": { "tokenId": 1 }
-    },
-    
-    {
-        "sender": "symbol",
-        "service": "tokens",
-        "method": "settokenconf",
-        "data": { "token_id": 1, "index": 0, "enabled": false }
-    },
-    {
-        "sender": "symbol",
-        "service": "tokens",
-        "method": "mint",
-        "data": {
-            "token_id": 1,
-            "amount": { "value": 100000000000000000 },
-            "memo": "memo"
-        }    
-    },
-    {
-        "sender": "symbol",
-        "service": "tokens",
-        "method": "credit",
-        "data": {
-            "token_id": 1,
-            "amount": { "value": 1000000000 },
-            "debitor": "alice",
-            "memo": "memo"
-        }
-    },
-    {
-        "sender": "symbol",
-        "service": "tokens",
-        "method": "credit",
-        "data": {
-            "token_id": 1,
-            "amount": { "value": 1000000000 },
-            "debitor": "bob",
-            "memo": "memo"
-        }    
+        "sender": "faucet-tok",
+        "service": "faucet-tok",
+        "method": "dispense",
+        "data": { "account": "bob" }
     }
 ]

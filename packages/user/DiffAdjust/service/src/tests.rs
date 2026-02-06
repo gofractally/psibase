@@ -49,7 +49,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("DiffAdjust"))]
-    fn test_asymmetric_percent(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn test_asymmetric_ppm(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
 
         let alice = AccountNumber::from("alice");

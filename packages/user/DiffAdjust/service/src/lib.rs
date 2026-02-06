@@ -24,8 +24,8 @@ pub mod tables {
         pub floor_difficulty: u64,
         pub active_difficulty: u64,
         pub last_update: TimePointSec,
-        pub percent_increase_ppm: u32,
-        pub percent_decrease_ppm: u32,
+        pub increase_ppm: u32,
+        pub decrease_ppm: u32,
         pub consumer: AccountNumber,
     }
 
@@ -39,8 +39,8 @@ pub mod tables {
             target_max: u32,
             floor_difficulty: u64,
             last_update: TimePointSec,
-            percent_increase_ppm: u32,
-            percent_decrease_ppm: u32,
+            increase_ppm: u32,
+            decrease_ppm: u32,
         ) -> Self {
             Self {
                 nft_id,
@@ -51,16 +51,16 @@ pub mod tables {
                 target_max,
                 window_seconds,
                 last_update,
-                percent_increase_ppm,
-                percent_decrease_ppm,
+                increase_ppm,
+                decrease_ppm,
                 consumer,
             }
         }
 
-        fn check_percent_change(ppm: u32) {
+        fn check_ppm_change(ppm: u32) {
             check(
                 ppm > 0 && ppm < ONE_MILLION,
-                "percent must be between 0 - 100%, 500000 = 50%",
+                "ppm must be between 0 - 1,000,000",
             );
         }
 
@@ -83,8 +83,8 @@ pub mod tables {
             target_min: u32,
             target_max: u32,
             floor_difficulty: u64,
-            percent_increase_ppm: u32,
-            percent_decrease_ppm: u32,
+            increase_ppm: u32,
+            decrease_ppm: u32,
         ) -> Self {
             let nft_id = Nft::call().mint();
             let sender = get_sender();
@@ -94,8 +94,8 @@ pub mod tables {
                 TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1); // See comment in check_difficulty_increase
 
             Self::check_targets(target_min, target_max);
-            Self::check_percent_change(percent_increase_ppm);
-            Self::check_percent_change(percent_decrease_ppm);
+            Self::check_ppm_change(increase_ppm);
+            Self::check_ppm_change(decrease_ppm);
             Self::check_window_seconds(window_seconds);
 
             let new_instance = Self::new(
@@ -107,20 +107,20 @@ pub mod tables {
                 target_max,
                 floor_difficulty,
                 last_updated,
-                percent_increase_ppm,
-                percent_decrease_ppm,
+                increase_ppm,
+                decrease_ppm,
             );
             new_instance.save();
 
             new_instance
         }
 
-        fn percent_increase(&self) -> f64 {
-            self.percent_increase_ppm as f64 / ONE_MILLION as f64
+        fn ratio_increase(&self) -> f64 {
+            self.increase_ppm as f64 / ONE_MILLION as f64
         }
 
-        fn percent_decrease(&self) -> f64 {
-            self.percent_decrease_ppm as f64 / ONE_MILLION as f64
+        fn ratio_decrease(&self) -> f64 {
+            self.decrease_ppm as f64 / ONE_MILLION as f64
         }
 
         pub fn check_difficulty_decrease(&mut self) -> u64 {
@@ -134,7 +134,7 @@ pub mod tables {
                 self.last_update = TimePointSec::from(now.seconds - seconds_remainder as i64);
                 if below_target {
                     let mut new_difficulty = self.active_difficulty;
-                    let factor = 1.0 - self.percent_decrease();
+                    let factor = 1.0 - self.ratio_decrease();
                     for _ in 0..windows_elapsed {
                         let temp = new_difficulty as f64 * factor;
                         new_difficulty = (temp as u64).max(self.floor_difficulty);
@@ -147,21 +147,21 @@ pub mod tables {
 
         fn check_difficulty_increase(&mut self, clamp_increase: bool) -> u64 {
             if self.counter > self.target_max {
-                let percent = 1.0 + self.percent_increase();
+                let factor = 1.0 + self.ratio_increase();
                 let mut times_over_target = self.counter / self.target_max;
                 if clamp_increase {
                     times_over_target = times_over_target.min(1);
                 }
                 let mut difficulty = self.active_difficulty as f64;
                 for _ in 0..times_over_target {
-                    difficulty = difficulty * percent;
+                    difficulty = difficulty * factor;
                 }
                 self.active_difficulty = difficulty.min(u64::MAX as f64) as u64;
                 self.counter = 0;
                 // The update is happening "mid block", so we round up to the next second. In other words,
                 // updates happens at the "end" of the block. Without this, a one-second block window would
-                // cause a percent decrease every block, because a percent increase zeroes out the counter,
-                // so each block would consider a window to have elapsed.
+                // cause a decrease every block, because an increase zeroes out the counter, so each block
+                // would consider a window to have elapsed.
                 self.last_update =
                     TransactSvc::call().currentBlock().time.seconds() + psibase::Seconds::new(1);
                 self.save();
@@ -208,13 +208,13 @@ pub mod tables {
             self.save();
         }
 
-        pub fn set_percent(&mut self, increase_ppm: u32, decrease_ppm: u32) {
+        pub fn set_ppm(&mut self, increase_ppm: u32, decrease_ppm: u32) {
             self.check_sender_has_nft();
             self.check_difficulty_decrease();
-            Self::check_percent_change(increase_ppm);
-            Self::check_percent_change(decrease_ppm);
-            self.percent_increase_ppm = increase_ppm;
-            self.percent_decrease_ppm = decrease_ppm;
+            Self::check_ppm_change(increase_ppm);
+            Self::check_ppm_change(decrease_ppm);
+            self.increase_ppm = increase_ppm;
+            self.decrease_ppm = decrease_ppm;
             self.save();
         }
 
@@ -266,8 +266,8 @@ pub mod service {
     /// * `target_min` - Minimum rate limit target
     /// * `target_max` - Maximum rate limit target
     /// * `floor_difficulty` - Minimum difficulty
-    /// * `percent_increase_ppm` - Percent to increment when over target, 50000 = 5%
-    /// * `percent_decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    /// * `increase_ppm` - PPM to increase when over target, e.g. 50000 ppm = 5%
+    /// * `decrease_ppm` - PPM to decrease when under target, e.g. 50000 ppm = 5%
     ///
     /// Returns the ID of the NFT that can be used for administration of the rate limit.
     #[action]
@@ -277,8 +277,8 @@ pub mod service {
         target_min: u32,
         target_max: u32,
         floor_difficulty: u64,
-        percent_increase_ppm: u32,
-        percent_decrease_ppm: u32,
+        increase_ppm: u32,
+        decrease_ppm: u32,
     ) -> u32 {
         RateLimit::add(
             initial_difficulty,
@@ -286,8 +286,8 @@ pub mod service {
             target_min,
             target_max,
             floor_difficulty,
-            percent_increase_ppm,
-            percent_decrease_ppm,
+            increase_ppm,
+            decrease_ppm,
         )
         .nft_id
     }
@@ -304,8 +304,11 @@ pub mod service {
         RateLimit::get_assert(nft_id).check_difficulty_decrease()
     }
 
-    /// Increment RateLimit instance
-    /// 
+    /// Increment RateLimit instance, potentially increasing the difficulty.
+    ///
+    /// The difficulty may increase multiple times if the counter exceeds `target_max`
+    ///   by more than one multiple of `target_max`.
+    ///
     /// Returns the difficulty before any difficulty adjustment due to the increment.
     ///
     /// * Requires sender to be consumer account.
@@ -355,17 +358,17 @@ pub mod service {
         RateLimit::get_assert(nft_id).set_floor(difficulty);
     }
 
-    /// Update percent change
+    /// Update ppm change
     ///
     /// * Requires holding administration NFT.
     ///
     /// # Arguments
     /// * `nft_id` - RateLimit / NFT ID
-    /// * `increase_ppm` - Percent to increment when over target, 50000 = 5%
-    /// * `decrease_ppm` - Percent to decrement when under target, 50000 = 5%
+    /// * `increase_ppm` - PPM to increase when over target, e.g. 50000 ppm = 5%
+    /// * `decrease_ppm` - PPM to decrease when under target, e.g. 50000 ppm = 5%
     #[action]
-    fn set_percent(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
-        RateLimit::get_assert(nft_id).set_percent(increase_ppm, decrease_ppm);
+    fn set_ppm(nft_id: u32, increase_ppm: u32, decrease_ppm: u32) {
+        RateLimit::get_assert(nft_id).set_ppm(increase_ppm, decrease_ppm);
     }
 
     /// Delete RateLimit instance

@@ -1,8 +1,9 @@
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
-import { Account, zAccount } from "@/lib/zod/Account";
+import { FRACTALS_SERVICE } from "@/lib/constants";
 import { zDateTime } from "@/lib/zod/DateTime";
+
+import { Account, zAccount } from "@shared/lib/schemas/account";
 
 import { graphql } from "../../graphql";
 
@@ -44,7 +45,7 @@ export const getGuildApplication = async (
                 }
             }
         `,
-        fractalsService,
+        FRACTALS_SERVICE,
     );
 
     return z

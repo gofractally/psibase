@@ -14,9 +14,7 @@ def is_user_action(action):
         return False
     if action['service'] == 'cpu-limit':
         return False
-    if action['sender'] == 'transact' and action['service'] == 'virtual-server' and action['method'] == 'useNetSys':
-        return False
-    if action['sender'] == 'transact' and action['service'] == 'virtual-server' and action['method'] == 'useCpuSys':
+    if action['sender'] == 'transact' and action['service'] == 'virtual-server':
         return False
     if action['service'] == 'events' and action['method'] == 'sync':
         return False

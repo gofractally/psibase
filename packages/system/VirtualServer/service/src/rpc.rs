@@ -4,8 +4,12 @@ use crate::tables::tables::{
 };
 use async_graphql::{connection::Connection, *};
 use psibase::{
-    services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
-    AccountNumber, EventQuery, Table,
+    is_auth,
+    services::{
+        tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
+        transact::ServiceMethod,
+    },
+    AccountNumber, EventQuery, MethodNumber, Table,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
@@ -127,19 +131,11 @@ pub struct ServerSpecs {
 
 #[derive(SimpleObject)]
 pub struct UserResources {
-    /// Balance of resources owned by the user formatted as a decimal string using
-    /// resource token precision
+    /// Balance of the user's resource buffer
     balance: Decimal,
 
-    /// The capacity of the user's resource buffer formatted as a decimal string using
-    /// resource token precision
+    /// The capacity of the user's resource buffer
     buffer_capacity: Decimal,
-
-    /// Unformatted (integer) balance of resources owned by the user
-    balance_raw: u64,
-
-    /// Unformatted (integer) capacity of the user's resource buffer
-    buffer_capacity_raw: u64,
 
     /// The percentage at which client-side tooling should attempt to refill the user's
     /// resource buffer. A value of 0 means that the client should not auto refill.
@@ -154,25 +150,48 @@ pub struct Query {
     pub user: Option<AccountNumber>,
 }
 
+fn auth_err(user: AccountNumber) -> async_graphql::Result<()> {
+    Err(async_graphql::Error::new(format!(
+        "permission denied: '{}' must authorize your app to make this query.",
+        user
+    )))
+}
+
+fn auth_users_err(u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
+    Err(async_graphql::Error::new(format!(
+        "permission denied: either '{}' or '{}' must authorize your app to make this query.",
+        u1, u2
+    )))
+}
+
+fn serve_sys() -> ServiceMethod {
+    ServiceMethod {
+        service: crate::Wrapper::SERVICE,
+        method: MethodNumber::from(crate::action_structs::serveSys::ACTION_NAME),
+    }
+}
+
 impl Query {
     fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
-        if self.user != Some(user) {
-            return Err(async_graphql::Error::new(format!(
-                "permission denied: '{}' must authorize your app to make this query.",
-                user
-            )));
+        let authorizers = self.user.map(|u| vec![u]).unwrap_or_default();
+        if self.user == Some(user) || is_auth(user, Some(serve_sys()), authorizers) {
+            Ok(())
+        } else {
+            auth_err(user)
         }
-        Ok(())
     }
 
     fn check_users_auth(&self, u1: AccountNumber, u2: AccountNumber) -> async_graphql::Result<()> {
-        if self.user != Some(u1) && self.user != Some(u2) {
-            return Err(async_graphql::Error::new(format!(
-                "permission denied: either '{}' or '{}' must authorize your app to make this query.",
-                u1, u2
-            )));
+        let authorizers = self.user.map(|u| vec![u]).unwrap_or_default();
+        if self.user == Some(u1) || self.user == Some(u2) {
+            Ok(())
+        } else if is_auth(u1, Some(serve_sys()), authorizers.clone())
+            || is_auth(u2, Some(serve_sys()), authorizers)
+        {
+            Ok(())
+        } else {
+            auth_users_err(u1, u2)
         }
-        Ok(())
     }
 }
 
@@ -229,24 +248,19 @@ impl Query {
         CpuPricing::get()
     }
 
-    /// Returns the current amount of resources for the specified user.
+    /// Returns information related to the user's resource buffer.
     /// The specified user must have authorized the query.
     async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
         self.check_user_auth(user)?;
 
-        let p = Tokens::call()
-            .getToken(BillingConfig::get_assert().res)
-            .precision;
+        let config = BillingConfig::get_assert();
+        let p = Tokens::call().getToken(config.sys).precision;
 
-        let balance = crate::Wrapper::call().get_resources(user);
         let settings = UserSettings::get(user);
-        let capacity = settings.buffer_capacity.into();
 
         Ok(UserResources {
-            balance: Decimal::new(balance, p),
-            buffer_capacity: Decimal::new(capacity, p),
-            balance_raw: balance.value,
-            buffer_capacity_raw: capacity.value,
+            balance: Decimal::new(settings.get_resource_balance(), p),
+            buffer_capacity: Decimal::new(Quantity::from(settings.buffer_capacity), p),
             auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
         })
     }
@@ -275,8 +289,7 @@ impl Query {
             .query()
     }
 
-    /// Returns the history of events related to the subsidized purchase of resource tokens.
-    ///   where the purchaser is different from the recipient.
+    /// Returns the history of events related to subsidized resource buffering.
     ///
     /// Either 'purchaser' or 'recipient' (or both) must be specified.
     /// If one of 'purchaser' or 'recipient' is set, that account must have authorized the query.
@@ -303,9 +316,6 @@ impl Query {
             (None, None) => unreachable!(),
         }
 
-        // TODO: Consider how to handle the case where the querier is one of n admins on
-        // an app that subsidizes for users and wants to see the subsidy history for the app.
-
         let mut conditions = Vec::new();
         let mut params = Vec::new();
 
@@ -330,7 +340,7 @@ impl Query {
 
     /// Returns the history of block usage events
     ///
-    /// One block usage event is emitted every 10 blocks. It contains a summary of the
+    /// This event is emitted at some interval (e.g. every 10 blocks). It contains a summary of the
     /// average resource consumption of the network in the latest block.
     async fn block_usage_history(
         &self,

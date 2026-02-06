@@ -18,11 +18,9 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Set cache mode
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Upload files
             - Remove files
             - Configure site settings (SPA, CSP, proxy)
@@ -92,7 +90,10 @@ impl Sites for SitesPlugin {
     }
 
     fn upload_encoded(file: File, content_encoding: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::upload_encoded, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::upload_encoded,
+            vec!["workshop".into(), "packages".into()],
+        )?;
 
         let packed = Actions::storeSys {
             path: file.path.clone(),

@@ -2,14 +2,15 @@ import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { fractalsService } from "@/lib/constants";
+import { FRACTALS_SERVICE } from "@/lib/constants";
 import {
     getUsersAndGroups,
     zUsersAndGroupsResponse,
 } from "@/lib/graphql/evaluations/getUsersAndGroups";
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
-import { Account } from "@/lib/zod/Account";
+
+import { Account } from "@shared/lib/schemas/account";
 
 import { assertUser } from "../use-current-user";
 
@@ -26,7 +27,7 @@ export const useUsersAndGroups = (
         queryFn: async () => {
             try {
                 const res = await getUsersAndGroups(
-                    fractalsService,
+                    FRACTALS_SERVICE,
                     evaluationId!,
                 );
 

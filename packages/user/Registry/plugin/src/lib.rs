@@ -15,11 +15,9 @@ psibase::define_trust! {
     descriptions {
         Low => "",
         Medium => "
-        Medium trust grants these abilities:
             - Set app metadata in registry
         ",
         High => "
-        High trust grants the abilities of all lower trust levels, plus these abilities:
             - Publish apps to registry
             - Unpublish apps from registry
         ",

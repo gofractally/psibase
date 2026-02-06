@@ -10,8 +10,37 @@ pub fn ratio_to_ppm(num: u64, den: u64) -> u128 {
     (num as u128 * PPM) / (den as u128)
 }
 
+// In DiffAdjust, we use the discrete compounding equation to relate total change to a rate of change
+//   over some interval.
+//   ```
+//   F = (1 + r)^t
+//   ```
+// To solve for a rate, therefore, given a total change and a time interval, we find:
+//   ```
+//   r = (F^(1/t)) - 1
+//   ```
+//
+// Using the identity a^x = e^(x * ln(a)), we can rewrite the equation as:
+//   ```
+//   r = e^(ln(F) / t) - 1
+//   ```
+//
+// The first term of the taylor series expansion of e^x -1 gives us the equation:
+//   ```
+//   r = ln(F) / t
+//   ```
+//
+// ...Which is actually the same as the equation for rate of change in continuous compounding (F=e^(rt)).
+//
+// Precomputed ln(2) therefore encodes the target total change = 2x (rate needed to double a value
+//   over some interval).
+// ln(1/F) == -ln(F), so ln(2) can also be used to compute a halving rate.
+//
+// The error for this approximation drops off as t increases, so we can use it here given that we don't
+//   expect to have small time intervals over which to double/halve.
 pub const LN2_PPM: u32 = 693_147;
-
+// The equation is therefore: `ln(2) / t`. Using `(ln(2) + t/2) / t` is a small adjustment to
+//   round to the nearest solution instead of just truncation.
 pub fn time_to_rate_ppm(t: u32) -> u32 {
     (LN2_PPM + t / 2) / t
 }
@@ -64,21 +93,16 @@ pub fn update_average_usage(
     diff_adjust_id: u32,
 ) -> u32 {
     usage_history.insert(0, *last_block_usage);
-    if usage_history.len() > num_blocks_to_average as usize {
-        usage_history.pop();
-    }
+    usage_history.truncate(num_blocks_to_average as usize);
 
     let avg = average(&usage_history);
     let ppm = ratio_to_ppm(avg, capacity);
 
     // We need to clamp this to fit in u32 which is a DiffAdjust constraint.
     // This clamps it at u32 max, which means that if the usage is more than 4,294x over capacity,
-    //   then we lose the real multiple. With this implementation, all that matters is that the PPM
-    //   is over the target, the absolute value is not really relevant.
+    //   then we lose the real multiple.
     let ppm = ppm.min(u32::MAX as u128) as u32;
 
-    // Consider whether we should, in any circumstance (e.g. usage in multiples excess
-    // of capacity), increment multiple times.
     DiffAdjust::call().increment(diff_adjust_id, ppm);
 
     *last_block_usage = 0;
