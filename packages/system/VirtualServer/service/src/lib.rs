@@ -248,7 +248,11 @@ mod service {
     /// resource balance.
     #[action]
     fn del_res_sub(sub_account: String) {
-        let sys = BillingConfig::get_assert().sys;
+        let config = BillingConfig::get();
+        if config.is_none() {
+            return;
+        }
+        let sys = config.unwrap().sys;
 
         let balance = UserSettings::get_resource_balance(get_sender(), Some(sub_account.clone()));
         if balance.value == 0u64 {
