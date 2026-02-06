@@ -2,6 +2,7 @@
 
 #include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XTimer.hpp>
@@ -17,10 +18,17 @@ namespace
       PSIO_REFLECT(ConnectRequest, url)
    };
 
+   struct ConnectReply
+   {
+      std::int32_t id;
+      std::string  endpoint;
+      PSIO_REFLECT(ConnectReply, id, endpoint)
+   };
+
    struct DisconnectRequest
    {
-      std::int32_t socket;
-      PSIO_REFLECT(DisconnectRequest, socket)
+      std::int32_t id;
+      PSIO_REFLECT(DisconnectRequest, id)
    };
 
    constexpr MicroSeconds timeoutBase  = std::chrono::seconds(30);
@@ -93,7 +101,9 @@ namespace
       return std::move(urls);
    }
 
-   std::int32_t connect(std::string peer, std::optional<std::int32_t> requestSocket = std::nullopt)
+   std::int32_t connect(std::string                 peer,
+                        std::optional<std::int32_t> requestSocket   = std::nullopt,
+                        const HttpRequest*          originalRequest = nullptr)
    {
       if (peer.find('/') == std::string::npos)
          peer = "http://" + peer;
@@ -135,7 +145,9 @@ namespace
          if (requestSocket)
          {
             auto connectionRequests = XPeers{}.open<ConnectionRequestTable>();
-            connectionRequests.put({socket, *requestSocket});
+            check(originalRequest != nullptr, "request is required if requestSocket is provided");
+            connectionRequests.put(
+                {socket, *requestSocket, allowCors(*originalRequest, XAdmin::service)});
             to<XHttp>().autoClose(*requestSocket, false);
          }
 
@@ -390,6 +402,46 @@ namespace
          }
       }
    }
+
+   struct GQLPeerConnection
+   {
+      std::int32_t             id;
+      std::vector<std::string> urls;
+      std::vector<std::string> hosts;
+      std::string              endpoint() const
+      {
+         auto table = Native::session(KvMode::read).open<SocketTable>();
+         auto row   = table.get(id);
+         check(row.has_value(), "Missing SocketRow for PeerConnection");
+         return std::visit(
+             [](auto& info)
+             {
+                if constexpr (requires { info.endpoint; })
+                {
+                   if (info.endpoint)
+                      return to_string(*info.endpoint);
+                }
+                return std::string();
+             },
+             row->info);
+      }
+      PSIO_REFLECT(GQLPeerConnection, id, urls, hosts, method(endpoint))
+   };
+
+   struct Query
+   {
+      auto peers() const
+      {
+         return TransformedConnection{
+             XPeers{}.open<PeerConnectionTable>().getIndex<0>(), [](PeerConnection&& row)
+             {
+                return GQLPeerConnection{std::move(row.socket), std::move(row.urls),
+                                         std::move(row.hosts)};
+             }};
+      }
+      PSIO_REFLECT(Query, method(peers))
+   };
+
 }  // namespace
 
 auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> socket)
@@ -400,6 +452,12 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       return reply;
 
    auto target = request.path();
+   if (request.method == "OPTIONS")
+   {
+      HttpReply result{.headers = allowCors(request, XAdmin::service)};
+      result.headers.push_back({"Allow", "GET, POST, PUT, OPTIONS, DELETE"});
+      return result;
+   }
    if (target == "/connect")
    {
       if (request.contentType != "application/json")
@@ -413,7 +471,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
          return HttpReply::methodNotAllowed(request);
       auto body = psio::convert_from_json<ConnectRequest>(
           std::string(request.body.begin(), request.body.end()));
-      connect(body.url, socket);
+      connect(body.url, socket, &request);
 
       return {};
    }
@@ -436,7 +494,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       std::optional<PeerConnection> row;
       PSIBASE_SUBJECTIVE_TX
       {
-         row = table.get(body.socket);
+         row = table.get(body.id);
          if (row)
          {
             to<XHttp>().asyncClose(row->socket);
@@ -444,14 +502,15 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       }
       if (row)
       {
-         return HttpReply{};
+         return HttpReply{.headers = allowCors(request, XAdmin::service)};
       }
       else
       {
          std::string_view msg{"Socket not found"};
          return HttpReply{.status      = HttpStatus::notFound,
                           .contentType = "application/html",
-                          .body{msg.begin(), msg.end()}};
+                          .body{msg.begin(), msg.end()},
+                          .headers = allowCors(request, XAdmin::service)};
       }
    }
    else if (target == "/p2p")
@@ -495,6 +554,13 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       psio::vector_stream stream{reply.body};
       to_json(result, stream);
       return reply;
+   }
+   else if (target == "/graphql")
+   {
+      PSIBASE_SUBJECTIVE_TX
+      {
+         return serveGraphQL(request, Query{});
+      }
    }
    return {};
 }
@@ -545,7 +611,8 @@ void XPeers::onConfig()
          {
             url->autoconnect = true;
             urls.put(*url);
-            newConnections.push_back(peer);
+            if (url->refcount == 0)
+               newConnections.push_back(peer);
          }
       }
       opts.put(options);
@@ -559,28 +626,37 @@ void XPeers::onConfig()
 void XPeers::onP2P(std::int32_t socket, HttpReply reply)
 {
    std::optional<ConnectionRequestRow> request;
+   std::optional<ConnectReply>         replyBody;
    auto                                connectionRequests = open<ConnectionRequestTable>();
    PSIBASE_SUBJECTIVE_TX
    {
-      auto  table   = Native::session().open<SocketTable>();
-      auto  row     = table.get(socket).value();
-      auto& oldInfo = std::get<WebSocketInfo>(row.info);
-      bool  secure  = oldInfo.tls.has_value();
-      bool  local   = oldInfo.endpoint && std::holds_alternative<LocalEndpoint>(*oldInfo.endpoint);
-      row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
-      table.put(row);
-      to<XHttp>().setCallback(socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
-
-      request = connectionRequests.get(socket);
+      auto table = Native::session().open<SocketTable>();
+      auto row   = table.get(socket);
+      check(row.has_value(), "Missing socket row");
+      auto& oldInfo = std::get<WebSocketInfo>(row->info);
+      request       = connectionRequests.get(socket);
       if (request)
       {
          connectionRequests.remove(*request);
          to<XHttp>().autoClose(request->requestSocket, true);
+         replyBody = {socket, oldInfo.endpoint ? to_string(*oldInfo.endpoint) : ""};
       }
+      bool secure = oldInfo.tls.has_value();
+      bool local  = oldInfo.endpoint && std::holds_alternative<LocalEndpoint>(*oldInfo.endpoint);
+      row->info   = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
+      table.put(*row);
+      to<XHttp>().setCallback(socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
    }
    if (request)
    {
-      to<XHttp>().sendReply(request->requestSocket, HttpReply{});
+      HttpReply reply{
+          .status      = HttpStatus::ok,
+          .contentType = "application/json",
+          .headers     = std::move(request->replyHeaders),
+      };
+      psio::vector_stream stream(reply.body);
+      to_json(*replyBody, stream);
+      to<XHttp>().sendReply(request->requestSocket, std::move(reply));
    }
    to<XHttp>().send(socket, serializeMessage(IdMessage{myNodeId(), socket}));
    to<XHttp>().send(socket, serializeMessage(HostnamesMessage{to<XAdmin>().options().hosts}));
@@ -609,9 +685,11 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
    if (request)
    {
       std::string_view msg{"Could not open p2p connection"};
-      to<XHttp>().sendReply(request->requestSocket, HttpReply{.status      = HttpStatus::badRequest,
-                                                              .contentType = "text/html",
-                                                              .body{msg.begin(), msg.end()}});
+      to<XHttp>().sendReply(request->requestSocket,
+                            HttpReply{.status      = HttpStatus::badRequest,
+                                      .contentType = "text/html",
+                                      .body{msg.begin(), msg.end()},
+                                      .headers = std::move(request->replyHeaders)});
    }
    for (auto& url : reconnectNow)
    {

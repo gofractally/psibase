@@ -18,9 +18,10 @@ namespace LocalService
 
    struct ConnectionRequestRow
    {
-      std::int32_t peerSocket;
-      std::int32_t requestSocket;
-      PSIO_REFLECT(ConnectionRequestRow, peerSocket, requestSocket)
+      std::int32_t                     peerSocket;
+      std::int32_t                     requestSocket;
+      std::vector<psibase::HttpHeader> replyHeaders;
+      PSIO_REFLECT(ConnectionRequestRow, peerSocket, requestSocket, replyHeaders)
    };
    using ConnectionRequestTable =
        psibase::Table<ConnectionRequestRow, &ConnectionRequestRow::peerSocket>;
