@@ -42,14 +42,6 @@ namespace
       }
    }
 
-   void hookOnInvDelete(const InviteRecord& invite)
-   {
-      if (invite.useHooks)
-      {
-         Actor<InviteHooks>{Invite::service, invite.inviter}.onInvDelete(invite.id);
-      }
-   }
-
 }  // namespace
 
 Invite::Invite(psio::shared_view_ptr<Action> action)
@@ -288,7 +280,6 @@ void Invite::delInvite(uint32_t inviteId)
    inviteTable.remove(*invite);
    to<Credentials>().consume(invite->cid);
    emit().history().updated(invite->id, getSender(), InviteEventType::deleted);
-   hookOnInvDelete(*invite);
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)

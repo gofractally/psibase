@@ -21,14 +21,8 @@ namespace UserService
       {
          /// Called on the invite creator when the invite is accepted
          void onInvAccept(uint32_t inviteId, psibase::AccountNumber accepter);
-
-         /// Called on the invite creator when the invite is deleted, unless it is
-         /// deleted by the invite creator manually.
-         void onInvDelete(uint32_t inviteId);
       };
-      PSIO_REFLECT(InviteHooks,
-                   method(onInvAccept, inviteId, accepter),
-                   method(onInvDelete, inviteId))
+      PSIO_REFLECT(InviteHooks, method(onInvAccept, inviteId, accepter))
 
       /// This service facilitates the creation and redemption of invites
       ///

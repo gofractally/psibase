@@ -30,6 +30,33 @@ pub struct InviteRecord {
     secret: String,
 }
 
+/// This interface should be implemented by a service that wants to handle hooks from the invite service
+/// to be notified when an event occurs related to an invite.
+#[crate::service(
+    name = "invite-hooks",
+    actions = "hooks_actions",
+    wrapper = "hooks_wrapper",
+    structs = "hooks_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod InviteHooks {
+    use crate::AccountNumber;
+
+    /// Called on the invite creator when the invite is accepted
+    #[action]
+    fn onInvAccept(inviteId: u32, accepter: AccountNumber) {
+        unimplemented!()
+    }
+}
+
+/// This service facilitates the creation and redemption of invites
+///
+/// Invites are generic and their acceptance can, but does not always, result
+/// in the creation of a new account. This service can be used
+/// by third party applications to streamline their user onboarding.
 #[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
