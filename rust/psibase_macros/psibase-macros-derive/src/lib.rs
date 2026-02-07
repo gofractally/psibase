@@ -5,6 +5,7 @@ use component_name_macro::component_name_macro_impl;
 use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
+use plugin_error_macro::plugin_error_derive_impl;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use psibase_macros_lib::service_macro::service_macro_impl;
@@ -17,6 +18,7 @@ mod component_name_macro;
 mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
+mod plugin_error_macro;
 mod schema_macro;
 mod test_case_macro;
 mod to_key_macro;
@@ -46,6 +48,12 @@ pub fn derive_unpack(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(ToKey, attributes(to_key))]
 pub fn derive_to_key(input: TokenStream) -> TokenStream {
     to_key_macro_impl(input)
+}
+
+#[proc_macro_error]
+#[proc_macro_derive(PluginError)]
+pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
+    plugin_error_derive_impl(input)
 }
 
 #[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
