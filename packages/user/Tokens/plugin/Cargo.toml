@@ -11,6 +11,7 @@ psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror = "2.0"
 wit-bindgen-rt.workspace = true
 psibase-user-workspace-hack.workspace = true
 
@@ -24,6 +25,7 @@ package = "tokens:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
+
+[package.metadata.component.bindings.with]
+"host:types/types" = "psibase_plugin::types"

@@ -1,5 +1,5 @@
-use crate::bindings::host::common::server;
 use crate::errors::ErrorType;
+use psibase_plugin::host::server;
 
 use serde::{Deserialize, Serialize};
 

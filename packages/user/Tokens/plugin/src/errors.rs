@@ -1,9 +1,12 @@
-use psibase::plugin_error;
-
-plugin_error! {
-    pub ErrorType
-    AmountIsZero = 1 => "Amount is zero",
-    ConversionError(msg: String) => "Conversion error: {msg}",
-    QueryError(msg: String) => "Query error {msg}",
-    TokenMismatch(msg: String) => "Token does not exist: {msg}",
+#[derive(Debug, psibase::PluginError, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorType {
+    #[error("Amount is zero")]
+    AmountIsZero = 1,
+    #[error("Conversion error: {0}")]
+    ConversionError(String),
+    #[error("Query error {0}")]
+    QueryError(String),
+    #[error("Token does not exist: {0}")]
+    TokenMismatch(String),
 }
