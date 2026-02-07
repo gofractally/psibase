@@ -8,6 +8,7 @@ members = [
     "md2man",
     "psibase",
     "psibase_macros",
+    "psibase_plugin",
     # must be present for `caro hakari` to find the workspace-hack
     "rust-workspace-hack",
     "test_contract",
@@ -54,6 +55,7 @@ serde_json = "1.0.135"
 serde-aux = "4.5"
 psibase = { path = "./psibase" }
 psibase_names = { path = "./psibase_names" }
+psibase_plugin = { path = "./psibase_plugin" }
 psibase_macros = { path = "./psibase_macros" }
 psibase-macros-derive = { path = "./psibase_macros/psibase-macros-derive" }
 url = "2.5.4"

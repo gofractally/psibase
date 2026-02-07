@@ -504,6 +504,16 @@ fn process_mod(
 
         items.push(parse_quote! {
             #[automatically_derived]
+            impl #psibase_mod::ServiceWrapper for #wrapper {
+                type Actions<T: #psibase_mod::Caller> = #actions<T>;
+                fn with_caller<T: #psibase_mod::Caller>(caller: T) -> #actions<T> {
+                    caller.into()
+                }
+            }
+        });
+
+        items.push(parse_quote! {
+            #[automatically_derived]
             pub struct #history_events {
                 event_log: #psibase_mod::DbId,
                 sender: #psibase_mod::AccountNumber,

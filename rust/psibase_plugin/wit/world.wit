@@ -1,0 +1,6 @@
+package psibase:plugin;
+
+world plugin-imports {
+    include host:types/imports;
+    import transact:plugin/intf;
+}

@@ -176,3 +176,8 @@ impl Caller for ActionPacker {
         }
     }
 }
+
+pub trait ServiceWrapper {
+    type Actions<T: Caller>;
+    fn with_caller<T: Caller>(caller: T) -> Self::Actions<T>;
+}
