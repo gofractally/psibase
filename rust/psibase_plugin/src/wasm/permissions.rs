@@ -12,12 +12,8 @@ pub mod api {
     ) -> Result<bool, Error> {
         api::is_authorized(caller, level, descriptions, debug_label, whitelist)
     }
-
-    pub fn set_allowed_callers(callers: &[String]) {
-        api::set_allowed_callers(callers)
-    }
 }
 
 pub mod types {
-    pub use crate::wasm::bindings::permissions::plugin::types::{Descriptions, TrustLevel};
+    pub use crate::wasm::bindings::permissions::plugin::types::TrustLevel;
 }

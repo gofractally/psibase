@@ -1,8 +1,7 @@
-use crate::host;
-use crate::permissions;
 use crate::types::Error;
-
-pub use crate::permissions::types::TrustLevel;
+use crate::wasm::host;
+use crate::wasm::permissions;
+pub use crate::wasm::permissions::types::TrustLevel;
 
 pub struct Capabilities {
     pub low: &'static [&'static str],
