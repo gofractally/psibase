@@ -1,10 +1,12 @@
-use psibase::plugin_error;
-
-plugin_error! {
-    pub ErrorType
-    QueryError(msg: String) => "Query error {msg}",
-    NetworkTokenNotFound => "Network token not found",
-    NotLoggedIn => "No user logged in",
-    ConversionError(msg: String) => "Conversion error: {msg}",
-    Overflow => "Percentage to PPM overflow",
+#[derive(Debug, psibase::PluginError, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorType {
+    #[error("Network token not found")]
+    NetworkTokenNotFound,
+    #[error("No user logged in")]
+    NotLoggedIn,
+    #[error("Conversion error: {0}")]
+    ConversionError(String),
+    #[error("Percentage to PPM overflow")]
+    Overflow,
 }
