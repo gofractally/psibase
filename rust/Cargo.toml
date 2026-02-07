@@ -30,6 +30,7 @@ default-members = [
     "md2man",
     "psibase_macros",
     "psibase",
+    "psibase_plugin",
     "test_fracpack",
     "test_fracpack_macros",
 ]
