@@ -15,6 +15,8 @@ pub use trust::{Capabilities, TrustConfig, TrustLevel};
 
 pub mod permissions;
 
+pub mod graphql;
+
 use bindings::transact;
 use psibase::fracpack::Pack;
 use psibase::fracpack::UnpackOwned;
@@ -61,3 +63,8 @@ pub trait Transact: ServiceWrapper {
 }
 
 impl<T: ServiceWrapper> Transact for T {}
+
+/* TODO: Add modules for:
+ * - host:crypto
+ * - host:prompt
+*/

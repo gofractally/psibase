@@ -54,6 +54,7 @@ publish = false
 async-graphql = "=7.0.17"
 psibase = { path = "../rust/psibase", version = "0.22.0" }
 psibase_plugin = { path = "../rust/psibase_plugin", version = "0.22.0" }
+graphql_client = "0.16"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
 psibase-plugin-workspace-hack = { version = "0.1.0", path = "plugin-workspace-hack" }
