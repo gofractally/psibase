@@ -8,6 +8,7 @@ publish.workspace = true
 [dependencies]
 tokens = { path = "../service/", version = "0.22.0" }
 psibase.workspace = true
+psibase_plugin.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
@@ -25,5 +26,4 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }

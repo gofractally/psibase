@@ -5,7 +5,6 @@ mod errors;
 use errors::ErrorType;
 
 use bindings::exports::tokens::plugin as Exports;
-use Exports::types::Decimal;
 use Exports::{
     admin::Guest as Admin, authorized::Guest as Authorized, helpers::Guest as Helpers,
     issuer::Guest as Issuer, user::Guest as User, user_config::Guest as UserConfig,
@@ -13,11 +12,14 @@ use Exports::{
 
 use bindings::host::common::server;
 use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use ::tokens::{action_structs as Actions, service::BalanceFlags, service::TokenFlags};
-use psibase::services::tokens::Quantity;
-use psibase::{fracpack::Pack, services::tokens, FlagsType};
+use psibase::services::tokens::{Decimal, Precision, Quantity};
+use psibase::FlagsType;
+use psibase_plugin::Transact;
+use std::str::FromStr;
+
+use tokens::{service::BalanceFlags, service::TokenFlags, Wrapper as Tokens};
+
 pub mod query {
     pub mod fetch_network_token;
     pub mod fetch_token;
@@ -50,101 +52,52 @@ psibase::define_trust! {
 
 struct TokensPlugin;
 
-impl TokensPlugin {
-    fn set_balance_flag(token_id: u32, flag: BalanceFlags, enable: bool) -> Result<(), Error> {
-        use Actions::setBalConf;
-
-        add_action_to_transaction(
-            setBalConf::ACTION_NAME,
-            &setBalConf {
-                token_id,
-                index: flag.index(),
-                enabled: enable,
-            }
-            .packed(),
-        )
-    }
-
-    fn set_token_flag(token_id: u32, flag: TokenFlags, enable: bool) -> Result<(), Error> {
-        use Actions::setTokenConf;
-
-        add_action_to_transaction(
-            setTokenConf::ACTION_NAME,
-            &setTokenConf {
-                token_id,
-                index: flag.index(),
-                enabled: enable,
-            }
-            .packed(),
-        )
-    }
-
-    fn set_user_flag(flag: BalanceFlags, enable: bool) -> Result<(), Error> {
-        use Actions::setUserConf;
-
-        add_action_to_transaction(
-            setUserConf::ACTION_NAME,
-            &setUserConf {
-                index: flag.index(),
-                enabled: enable,
-            }
-            .packed(),
-        )
-    }
+fn to_decimal(value: String) -> Decimal {
+    Decimal::from_str(value.as_str()).unwrap()
 }
 
 impl Issuer for TokensPlugin {
-    fn create(precision: u8, max_supply: Decimal) -> Result<(), Error> {
+    fn create(precision: u8, max_supply: String) -> Result<(), Error> {
         assert_authorized(FunctionName::create)?;
 
-        let max_issued_supply =
-            Quantity::from_str(&max_supply, precision.try_into().unwrap()).unwrap();
+        let max_supply = to_decimal(max_supply);
+        let precision = Precision::new(precision).unwrap();
+        Tokens::add_to_tx().create(precision, max_supply.quantity);
 
-        let packed_args = Actions::create {
-            max_issued_supply,
-            precision: precision.try_into().unwrap(),
-        }
-        .packed();
-
-        add_action_to_transaction(Actions::create::ACTION_NAME, &packed_args)
+        Ok(())
     }
 
-    fn recall(token_id: u32, amount: Decimal, memo: String, account: String) -> Result<(), Error> {
+    fn recall(token_id: u32, amount: String, memo: String, account: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         assert_authorized(FunctionName::recall)?;
 
-        let packed_args = Actions::recall {
-            amount,
-            from: account.as_str().into(),
-            memo: memo.try_into().unwrap(),
+        Tokens::add_to_tx().recall(
             token_id,
-        }
-        .packed();
-        add_action_to_transaction(Actions::recall::ACTION_NAME, &packed_args)
+            account.as_str().into(),
+            amount,
+            memo.as_str().into(),
+        );
+        Ok(())
     }
 
-    fn mint(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
-        let amount = Self::non_zero(token_id, amount)?;
-
+    fn mint(token_id: u32, amount: String, memo: String) -> Result<(), Error> {
         assert_authorized(FunctionName::mint)?;
 
-        let packed_args = Actions::mint {
-            amount,
-            memo: memo.try_into().unwrap(),
-            token_id,
-        }
-        .packed();
-        add_action_to_transaction(Actions::mint::ACTION_NAME, &packed_args)
+        let amount = Self::non_zero(token_id, amount)?;
+        Tokens::add_to_tx().mint(token_id, amount, memo.try_into().unwrap());
+        Ok(())
     }
 
     fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {
         assert_authorized(FunctionName::enable_token_untransferable)?;
-        Self::set_token_flag(token_id, TokenFlags::UNTRANSFERABLE, enable)
+        Tokens::add_to_tx().setTokenConf(token_id, TokenFlags::UNTRANSFERABLE.index(), enable);
+        Ok(())
     }
 
     fn enable_token_unrecallable(token_id: u32, enable: bool) -> Result<(), Error> {
         assert_authorized(FunctionName::enable_token_unrecallable)?;
-        Self::set_token_flag(token_id, TokenFlags::UNRECALLABLE, enable)
+        Tokens::add_to_tx().setTokenConf(token_id, TokenFlags::UNRECALLABLE.index(), enable);
+        Ok(())
     }
 }
 
@@ -168,7 +121,7 @@ impl Helpers for TokensPlugin {
         assert_authorized(FunctionName::u64_to_decimal)?;
         let token = query::fetch_token::fetch_token(token_id)?;
 
-        Ok(tokens::Decimal::new(amount.into(), token.precision).to_string())
+        Ok(Decimal::new(amount.into(), token.precision).to_string())
     }
 }
 
@@ -185,84 +138,48 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    fn credit(token_id: u32, debitor: String, amount: Decimal, memo: String) -> Result<(), Error> {
-        let amount = Self::non_zero(token_id, amount)?;
+    fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         assert_authorized_with_whitelist(
             FunctionName::credit,
             vec!["homepage".into(), "virtual-server".into()],
         )?;
 
-        let packed_args = Actions::credit {
-            amount,
-            memo: memo.try_into().unwrap(),
-            debitor: debitor.as_str().into(),
-            token_id,
-        }
-        .packed();
-
-        add_action_to_transaction(Actions::credit::ACTION_NAME, &packed_args)
+        let amount = Self::non_zero(token_id, amount)?;
+        let memo = memo.try_into().unwrap();
+        Tokens::add_to_tx().credit(token_id, debitor.as_str().into(), amount, memo);
+        Ok(())
     }
 
-    fn uncredit(
-        token_id: u32,
-        debitor: String,
-        amount: Decimal,
-        memo: String,
-    ) -> Result<(), Error> {
-        let amount = Self::non_zero(token_id, amount)?;
+    fn uncredit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::uncredit, vec!["homepage".into()])?;
 
-        let packed_args = Actions::uncredit {
-            amount,
-            memo: memo.try_into().unwrap(),
-            debitor: debitor.as_str().into(),
-            token_id,
-        }
-        .packed();
-
-        add_action_to_transaction(Actions::uncredit::ACTION_NAME, &packed_args)
+        let amount = Self::non_zero(token_id, amount)?;
+        let memo = memo.try_into().unwrap();
+        Tokens::add_to_tx().uncredit(token_id, debitor.as_str().into(), amount, memo);
+        Ok(())
     }
 
-    fn debit(token_id: u32, creditor: String, amount: Decimal, memo: String) -> Result<(), Error> {
-        let amount = Self::non_zero(token_id, amount)?;
+    fn debit(token_id: u32, creditor: String, amount: String, memo: String) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::debit, vec!["homepage".into()])?;
 
-        let packed_args = Actions::debit {
-            amount,
-            creditor: creditor.as_str().into(),
-            memo: memo.try_into().unwrap(),
-            token_id,
-        }
-        .packed();
-
-        add_action_to_transaction(Actions::debit::ACTION_NAME, &packed_args)
+        let amount = Self::non_zero(token_id, amount)?;
+        let memo = memo.try_into().unwrap();
+        Tokens::add_to_tx().debit(token_id, creditor.as_str().into(), amount, memo);
+        Ok(())
     }
 
     fn reject(token_id: u32, creditor: String, memo: String) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::reject, vec!["homepage".into()])?;
-
-        let packed_args = Actions::reject {
-            creditor: creditor.as_str().into(),
-            token_id,
-            memo: memo.try_into().unwrap(),
-        }
-        .packed();
-
-        add_action_to_transaction(Actions::reject::ACTION_NAME, &packed_args)
+        Tokens::add_to_tx().reject(token_id, creditor.as_str().into(), memo.try_into().unwrap());
+        Ok(())
     }
 
-    fn burn(token_id: u32, amount: Decimal, memo: String) -> Result<(), Error> {
-        let amount = Self::non_zero(token_id, amount)?;
-
+    fn burn(token_id: u32, amount: String, memo: String) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::burn, vec!["homepage".into()])?;
 
-        let packed_args = Actions::burn {
-            amount,
-            memo: memo.try_into().unwrap(),
-            token_id,
-        }
-        .packed();
-        add_action_to_transaction(Actions::burn::ACTION_NAME, &packed_args)
+        let amount = Self::non_zero(token_id, amount)?;
+        Tokens::add_to_tx().burn(token_id, amount, memo.try_into().unwrap());
+        Ok(())
     }
 }
 
@@ -272,7 +189,8 @@ impl UserConfig for TokensPlugin {
             FunctionName::enable_user_manual_debit,
             vec!["homepage".into()],
         )?;
-        Self::set_user_flag(BalanceFlags::MANUAL_DEBIT, enable)
+        Tokens::add_to_tx().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), enable);
+        Ok(())
     }
 
     fn enable_user_keep_zero_balances(enable: bool) -> Result<(), Error> {
@@ -280,7 +198,8 @@ impl UserConfig for TokensPlugin {
             FunctionName::enable_user_keep_zero_balances,
             vec!["homepage".into()],
         )?;
-        Self::set_user_flag(BalanceFlags::KEEP_ZERO_BALANCES, enable)
+        Tokens::add_to_tx().setUserConf(BalanceFlags::KEEP_ZERO_BALANCES.index(), enable);
+        Ok(())
     }
 
     fn enable_balance_manual_debit(token_id: u32, enable: bool) -> Result<(), Error> {
@@ -288,7 +207,8 @@ impl UserConfig for TokensPlugin {
             FunctionName::enable_balance_manual_debit,
             vec!["homepage".into()],
         )?;
-        Self::set_balance_flag(token_id, BalanceFlags::MANUAL_DEBIT, enable)
+        Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::MANUAL_DEBIT.index(), enable);
+        Ok(())
     }
 
     fn enable_balance_keep_zero_balances(token_id: u32, enable: bool) -> Result<(), Error> {
@@ -296,7 +216,8 @@ impl UserConfig for TokensPlugin {
             FunctionName::enable_balance_keep_zero_balances,
             vec!["homepage".into()],
         )?;
-        Self::set_balance_flag(token_id, BalanceFlags::KEEP_ZERO_BALANCES, enable)
+        Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::KEEP_ZERO_BALANCES.index(), enable);
+        Ok(())
     }
 
     fn del_balance_config(token_id: u32) -> Result<(), Error> {
@@ -304,9 +225,8 @@ impl UserConfig for TokensPlugin {
             FunctionName::del_balance_config,
             vec!["homepage".into()],
         )?;
-        let packed_args = Actions::delBalConf { token_id }.packed();
-
-        add_action_to_transaction(Actions::delBalConf::ACTION_NAME, &packed_args)
+        Tokens::add_to_tx().delBalConf(token_id);
+        Ok(())
     }
 }
 
@@ -315,11 +235,7 @@ impl Admin for TokensPlugin {
         assert_authorized_with_whitelist(FunctionName::set_sys_token, vec!["config".into()])
             .unwrap();
 
-        add_action_to_transaction(
-            Actions::setSysToken::ACTION_NAME,
-            &Actions::setSysToken { tokenId: token_id }.packed(),
-        )
-        .unwrap();
+        Tokens::add_to_tx().setSysToken(token_id);
     }
 }
 
