@@ -1,6 +1,7 @@
 //! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
+use authorized_macro::authorized_attr_impl;
 use component_name_macro::component_name_macro_impl;
 use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
@@ -14,6 +15,7 @@ use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
 
+mod authorized_macro;
 mod component_name_macro;
 mod fracpack_macro;
 mod graphql_macro;
@@ -54,6 +56,12 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(PluginError)]
 pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
     plugin_error_derive_impl(input)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {
+    authorized_attr_impl(attr, item)
 }
 
 #[proc_macro_derive(ToSchema, attributes(schema, fracpack))]
