@@ -1,5 +1,5 @@
 pub mod client {
-    use crate::bindings::host::common::client;
+    use crate::wasm::bindings::host::common::client;
 
     pub fn get_active_app() -> String {
         client::get_active_app()
@@ -19,8 +19,8 @@ pub mod client {
 }
 
 pub mod server {
-    use crate::bindings::host::common::server;
-    use crate::bindings::host::types::types::{BodyTypes, Error, PostRequest};
+    use crate::wasm::bindings::host::common::server;
+    use crate::wasm::bindings::host::types::types::{BodyTypes, Error, PostRequest};
 
     pub fn get_json(endpoint: &str) -> Result<String, Error> {
         server::get_json(endpoint)

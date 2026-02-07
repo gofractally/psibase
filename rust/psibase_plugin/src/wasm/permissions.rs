@@ -1,7 +1,7 @@
 pub mod api {
-    use crate::bindings::permissions::plugin::api;
-    use crate::bindings::permissions::plugin::types::{Descriptions, TrustLevel};
     use crate::types::Error;
+    use crate::wasm::bindings::permissions::plugin::api;
+    use crate::wasm::bindings::permissions::plugin::types::{Descriptions, TrustLevel};
 
     pub fn is_authorized(
         caller: &str,
@@ -19,5 +19,5 @@ pub mod api {
 }
 
 pub mod types {
-    pub use crate::bindings::permissions::plugin::types::{Descriptions, TrustLevel};
+    pub use crate::wasm::bindings::permissions::plugin::types::{Descriptions, TrustLevel};
 }
