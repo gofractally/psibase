@@ -7,13 +7,14 @@ mod bindings {
     });
 }
 
+pub mod host;
+
 use bindings::transact;
 use psibase::fracpack::Pack;
 use psibase::fracpack::UnpackOwned;
 use psibase::{Caller, MethodNumber, ServiceWrapper};
 
 pub use bindings::host::types::types;
-
 
 pub unsafe trait PluginError: std::fmt::Display {}
 
