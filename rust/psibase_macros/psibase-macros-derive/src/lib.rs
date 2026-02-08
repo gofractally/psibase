@@ -52,6 +52,61 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
     to_key_macro_impl(input)
 }
 
+/// # psibase_plugin::Error
+///
+/// Allows psibase plugins to use a standard thiserror::Error enum, making it convertible
+/// to a standardized `host:types/types::Error` plugin error type. Standardizing on the error type
+/// allows chaining errors across plugin boundaries.
+///
+/// ## Usage
+///
+/// ### Step 1
+///
+/// Use the `host:types/types::Error` type as your `Error` variant for fallible plugin functions.
+/// ```wit
+/// # world.wit
+/// interface api {
+///     use host:types/types.{error};
+///     do-something: func() -> result<_, error>;
+/// }
+/// ```
+///
+/// ### Step 2
+///
+/// Tell wit-bindgen in your plugin to map `host:types/types` to `psibase_plugin::types`.
+/// If you're compiling your plugin using cargo-component, this is done via the following
+/// configuration in your `Cargo.toml`:
+///
+/// ```toml
+/// [package.metadata.component.bindings.with]
+/// "host:types/types" = "psibase_plugin::types"
+/// ```
+///
+/// ### Step 3
+///
+/// In your plugin rust code, add the `ErrorType` enum with the necessary macro derives:
+/// ```ignore
+/// #[derive(Debug, psibase_plugin::Error, thiserror::Error)]
+/// #[repr(u32)]
+/// pub enum ErrorType {
+///     #[error("Parameter was invalid")]
+///     InvalidParameter = 1,
+///     #[error("Conversion error: {0}")]
+///     ConversionError(String),
+///     #[error("Custom error: {0}")]
+///     CustomError(String),
+/// ```
+///
+/// ### Step 4
+///
+/// Use the `ErrorType` enum in your plugin code:
+///
+/// ```ignore
+/// if something_is_wrong {
+///     return Err(ErrorType::CustomError("Something went wrong").into());
+/// }
+/// ```
+///
 #[proc_macro_error]
 #[proc_macro_derive(PluginError)]
 pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
