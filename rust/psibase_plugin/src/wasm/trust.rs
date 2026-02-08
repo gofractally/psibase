@@ -83,7 +83,10 @@ impl Capabilities {
 pub trait TrustConfig {
     fn capabilities() -> Capabilities;
 
-    fn assert_authorized(level: TrustLevel, fn_name: &str) -> Result<(), Error> {
+    fn assert_authorized(level: TrustLevel, fn_name: &str) -> Result<(), Error>
+    where
+        Self: Sized,
+    {
         Self::assert_authorized_with_whitelist(level, fn_name, vec![])
     }
 
@@ -91,17 +94,37 @@ pub trait TrustConfig {
         level: TrustLevel,
         fn_name: &str,
         whitelist: Vec<String>,
-    ) -> Result<(), Error> {
-        let authorized = permissions::api::is_authorized(
-            &host::client::get_sender(),
-            level,
-            &Self::capabilities().to_descriptions(),
-            fn_name,
-            &whitelist,
-        )?;
-        if !authorized {
-            panic!("Unauthorized call to: {fn_name}");
-        }
-        Ok(())
+    ) -> Result<(), Error>
+    where
+        Self: Sized,
+    {
+        assert_authorized_with_whitelist::<Self>(level, fn_name, &whitelist)
     }
+
+    fn get_descriptions() -> (String, String, String) {
+        Self::capabilities().to_descriptions()
+    }
+}
+
+pub fn assert_authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Result<(), Error> {
+    assert_authorized_with_whitelist::<T>(level, fn_name, &[])
+}
+
+pub fn assert_authorized_with_whitelist<T: TrustConfig>(
+    level: TrustLevel,
+    fn_name: &str,
+    whitelist: &[String],
+) -> Result<(), Error> {
+    let descriptions = T::get_descriptions();
+    let authorized = permissions::api::is_authorized(
+        &host::client::get_sender(),
+        level,
+        &descriptions,
+        fn_name,
+        &whitelist,
+    )?;
+    if !authorized {
+        panic!("Unauthorized call to: {fn_name}");
+    }
+    Ok(())
 }
