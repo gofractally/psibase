@@ -1,3 +1,57 @@
+//! # psibase_plugin::graphql
+//!
+//! A library that works with the `graphql_client` crate to simplify making GraphQL queries to the
+//! server of the caller plugin.
+//!
+//! ## Usage
+//!
+//! ### Step 1
+//! Add the `graphql_client` crate as a dependency to your plugin crate
+//!
+//! ### Step 2
+//! Save your server's graphql schema as a `.gql` file in your plugin crate
+//!
+//! ### Step 3
+//! Create a `.graphql` file in your plugin crate with the query you want to make
+//!   ```#.graphql
+//!   query UserResources($user: AccountNumber!) {
+//!       userResources(user: $user) {
+//!           balance
+//!           bufferCapacity
+//!           autoFillThresholdPercent
+//!       }
+//!   }
+//!   ```
+//! ### Step 4
+//! In rust:
+//!
+//! - **Add the necessary imports**
+//!   ```
+//!   use graphql_client::GraphQLQuery;
+//!   use psibase_plugin::graphql::{query};
+//!   ```
+//!   [Optional] Add the `scalars` module to your plugin crate if your schema includes custom scalars (e.g. `Decimal`,
+//!   `AccountNumber`, `Memo`, etc.)
+//!   ```
+//!   use psibase_plugin::graphql::scalars::*;
+//!   ```
+//!
+//! - **Create a graphql query struct for your query**
+//!   ```
+//!   #[derive(GraphQLQuery)]
+//!   #[graphql(
+//!       schema_path = "../service/schema.gql",
+//!       query_path = "src/queries/user_resources.graphql"
+//!   )]
+//!   pub struct UserResources;
+//!   ```
+//!
+//! - **Call the `query` function, pass needed variables, and get the typed response**
+//!   ```
+//!   let response = query::<UserResources>(user_resources::Variables { user })?;
+//!   println!("Balance: {:?}", response.user_resources.balance);
+//!   ```
+//!
 use crate::graphql_utils;
 use crate::host::server;
 use crate::types::Error;
@@ -24,8 +78,7 @@ fn query_impl<Q: GraphQLQuery>(
     Ok(parse_response(&json))
 }
 
-/// Builds the query string with inlined variables, posts it via `post_graphql_get_json`, and
-/// deserializes the response into typed `ResponseData`.
+/// Makes the specified query to the app server and deserializes the response into types `ResponseData`.
 pub fn query<Q: GraphQLQuery>(variables: Q::Variables) -> Result<Q::ResponseData, Error> {
     query_impl::<Q>(variables, false)
 }
