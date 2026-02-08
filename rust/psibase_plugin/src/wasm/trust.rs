@@ -1,3 +1,56 @@
+//! # `psibase_plugin::trust`
+//!
+//! This module wraps the `permissions` plugin, adding syntactic sugar to make it
+//! more natural to use in rust.
+//!
+//! The permissions plugin provides a default implementation of an oauth-like
+//! authorization mechanism for client-side inter-app authorization.
+//!
+//! ## Usage
+//!
+//! ### Step 1
+//!
+//! Implement the `TrustConfig` trait for your plugin. The `low`, `medium`, and `high`
+//! arrays contain strings that describe each capability granted by that trust level.
+//!
+//! ```rust
+//! impl TrustConfig for MyPlugin {
+//!     fn capabilities() -> Capabilities {
+//!         Capabilities {
+//!             low: &["Read-only access to my plugin's public data"],
+//!             medium: &["Update user data on the server"],
+//!             high: &["Read/write access to private user data"],
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! To better understand how to categorize functionality into trust levels, see the `permissions`
+//! plugin documentation.
+//!
+//! ### Step 2
+//!
+//! Annotate your plugin functions with the `authorized` macro:
+//!
+//! ```ignore
+//! #[psibase_plugin::authorized(High)]
+//! fn my_high_trust_function() -> Result<(), Error> {
+//!     // ...
+//!     Ok(())
+//! }
+//! ```
+//!
+//! Optionally, you can provide a whitelist of third-party callers that are pre-authorized to call
+//! this function on behalf of the user.
+//!
+//! ```ignore
+//! #[psibase_plugin::authorized(High, whitelist = ["trusted-app"])]
+//! fn my_high_trust_function() -> Result<(), Error> {
+//!     // ...
+//!     Ok(())
+//! }
+//! ```
+
 use crate::types::Error;
 use crate::wasm::host;
 use crate::wasm::permissions;

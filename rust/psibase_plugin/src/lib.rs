@@ -10,28 +10,30 @@ mod wasm {
     }
 
     pub mod host;
-    pub use bindings::host::types::types;
-    pub use bindings::host::types::types::Error;
+    pub mod types;
+    pub use types::Error;
 
     mod permissions;
     pub mod trust;
 
     pub mod graphql;
 
-    pub mod errors;
-    pub use errors::PluginError;
+    pub mod error_trait;
 
-    pub mod transact;
+    mod transact;
     pub use transact::Transact;
 }
 
 #[cfg(target_family = "wasm")]
 pub use wasm::*;
 
+#[cfg(target_family = "wasm")]
 pub use psibase::authorized;
+
+#[cfg(target_family = "wasm")]
 pub use psibase::PluginError as ErrorEnum;
 
-pub mod graphql_utils;
+mod graphql_utils;
 
 /* TODO: Add modules for:
  * - host:crypto

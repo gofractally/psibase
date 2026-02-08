@@ -44,7 +44,7 @@ pub fn plugin_error_derive_impl(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        unsafe impl psibase_plugin::PluginError for #name {}
+        unsafe impl psibase_plugin::error_trait::PluginError for #name {}
     };
 
     TokenStream::from(expanded)

@@ -113,6 +113,10 @@ pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
     plugin_error_derive_impl(input)
 }
 
+/// # psibase_plugin::authorized
+///
+/// Allows psibase plugins to annotate their functions with trust levels and whitelists.
+/// For more information, see the [`psibase_plugin::trust`] documentation.
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {

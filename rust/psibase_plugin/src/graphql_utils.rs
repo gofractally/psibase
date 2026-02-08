@@ -1,3 +1,5 @@
+//! Internal module leveraged by the `psibase_plugin::graphql` module
+#![allow(unused)]
 use serde::Serialize;
 use serde_json::Value;
 
@@ -46,7 +48,7 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
     result
 }
 
-pub fn json_to_graphql_literal(value: &Value) -> String {
+fn json_to_graphql_literal(value: &Value) -> String {
     match value {
         Value::String(s) => {
             format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))

@@ -1,3 +1,4 @@
+//! Internal module leveraged by `psibase_plugin::ErrorEnum``
 use crate::wasm::host;
 use crate::wasm::types;
 
