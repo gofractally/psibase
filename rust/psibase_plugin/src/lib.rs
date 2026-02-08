@@ -28,6 +28,7 @@ mod wasm {
 #[cfg(target_family = "wasm")]
 pub use wasm::*;
 
+pub use psibase::authorized;
 pub use psibase::PluginError as ErrorEnum;
 
 pub mod graphql_utils;

@@ -47,7 +47,7 @@ fn to_decimal(value: String) -> Decimal {
 }
 
 impl Issuer for TokensPlugin {
-    #[psibase::authorized(Medium)]
+    #[psibase_plugin::authorized(Medium)]
     fn create(precision: u8, max_supply: String) -> Result<(), Error> {
         let max_supply = to_decimal(max_supply);
         let precision = Precision::new(precision).unwrap();
@@ -56,7 +56,7 @@ impl Issuer for TokensPlugin {
         Ok(())
     }
 
-    #[psibase::authorized(High)]
+    #[psibase_plugin::authorized(High)]
     fn recall(token_id: u32, amount: String, memo: String, account: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
 
@@ -69,20 +69,20 @@ impl Issuer for TokensPlugin {
         Ok(())
     }
 
-    #[psibase::authorized(High)]
+    #[psibase_plugin::authorized(High)]
     fn mint(token_id: u32, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         Tokens::add_to_tx().mint(token_id, amount, memo.try_into().unwrap());
         Ok(())
     }
 
-    #[psibase::authorized(High)]
+    #[psibase_plugin::authorized(High)]
     fn enable_token_untransferable(token_id: u32, enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setTokenConf(token_id, TokenFlags::UNTRANSFERABLE.index(), enable);
         Ok(())
     }
 
-    #[psibase::authorized(High)]
+    #[psibase_plugin::authorized(High)]
     fn enable_token_unrecallable(token_id: u32, enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setTokenConf(token_id, TokenFlags::UNRECALLABLE.index(), enable);
         Ok(())
@@ -90,12 +90,12 @@ impl Issuer for TokensPlugin {
 }
 
 impl Helpers for TokensPlugin {
-    #[psibase::authorized(None)]
+    #[psibase_plugin::authorized(None)]
     fn fetch_network_token() -> Result<Option<u32>, Error> {
         Ok(query::fetch_network_token::fetch_network_token()?)
     }
 
-    #[psibase::authorized(None)]
+    #[psibase_plugin::authorized(None)]
     fn decimal_to_u64(token_id: u32, amount: String) -> Result<u64, Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
@@ -104,7 +104,7 @@ impl Helpers for TokensPlugin {
             .map_err(|error| Error::from(ErrorType::ConversionError(error.to_string())))
     }
 
-    #[psibase::authorized(None)]
+    #[psibase_plugin::authorized(None)]
     fn u64_to_decimal(token_id: u32, amount: u64) -> Result<String, Error> {
         let token = query::fetch_token::fetch_token(token_id)?;
 
@@ -125,7 +125,7 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    #[psibase::authorized(High, whitelist = ["homepage", "virtual-server"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "virtual-server"])]
     fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -133,7 +133,7 @@ impl User for TokensPlugin {
         Ok(())
     }
 
-    #[psibase::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn uncredit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -141,7 +141,7 @@ impl User for TokensPlugin {
         Ok(())
     }
 
-    #[psibase::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn debit(token_id: u32, creditor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();
@@ -149,13 +149,13 @@ impl User for TokensPlugin {
         Ok(())
     }
 
-    #[psibase::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn reject(token_id: u32, creditor: String, memo: String) -> Result<(), Error> {
         Tokens::add_to_tx().reject(token_id, creditor.as_str().into(), memo.try_into().unwrap());
         Ok(())
     }
 
-    #[psibase::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn burn(token_id: u32, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         Tokens::add_to_tx().burn(token_id, amount, memo.try_into().unwrap());
@@ -164,31 +164,31 @@ impl User for TokensPlugin {
 }
 
 impl UserConfig for TokensPlugin {
-    #[psibase::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), enable);
         Ok(())
     }
 
-    #[psibase::authorized(Medium, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
     fn enable_user_keep_zero_balances(enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setUserConf(BalanceFlags::KEEP_ZERO_BALANCES.index(), enable);
         Ok(())
     }
 
-    #[psibase::authorized(Medium, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
     fn enable_balance_manual_debit(token_id: u32, enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::MANUAL_DEBIT.index(), enable);
         Ok(())
     }
 
-    #[psibase::authorized(Medium, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
     fn enable_balance_keep_zero_balances(token_id: u32, enable: bool) -> Result<(), Error> {
         Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::KEEP_ZERO_BALANCES.index(), enable);
         Ok(())
     }
 
-    #[psibase::authorized(Medium, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
     fn del_balance_config(token_id: u32) -> Result<(), Error> {
         Tokens::add_to_tx().delBalConf(token_id);
         Ok(())
@@ -196,14 +196,14 @@ impl UserConfig for TokensPlugin {
 }
 
 impl Admin for TokensPlugin {
-    #[psibase::authorized(Max, whitelist = ["config"])]
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn set_sys_token(token_id: u32) {
         Tokens::add_to_tx().setSysToken(token_id);
     }
 }
 
 impl Authorized for TokensPlugin {
-    #[psibase::authorized(High, whitelist = ["homepage"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn graphql(query: String) -> Result<String, Error> {
         host::server::post_graphql_get_json(&query)
     }
