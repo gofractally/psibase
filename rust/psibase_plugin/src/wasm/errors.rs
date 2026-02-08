@@ -10,7 +10,7 @@ impl<T: PluginError> From<T> for types::Error {
             code,
             producer: types::PluginId {
                 service: host::client::get_receiver(),
-                plugin: "plugin".to_string(),
+                plugin: "plugin".to_string(), // TODO: I think we should just remove the plugin name from the error type
             },
             message: src.to_string(),
         }

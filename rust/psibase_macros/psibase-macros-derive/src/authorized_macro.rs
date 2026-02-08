@@ -23,8 +23,8 @@ pub fn authorized_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream
     let auth_check = if let Some(whitelist_expr) = whitelist_tokens {
         if returns_result {
             quote! {
-                <Self as psibase_plugin::TrustConfig>::assert_authorized_with_whitelist(
-                    psibase_plugin::TrustLevel::#trust_level,
+                <Self as psibase_plugin::trust::TrustConfig>::assert_authorized_with_whitelist(
+                    psibase_plugin::trust::TrustLevel::#trust_level,
                     #fn_name_lit,
                     {
                         let wl: Vec<String> = #whitelist_expr.iter().map(|s: &str| s.to_string()).collect();
@@ -34,8 +34,8 @@ pub fn authorized_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream
             }
         } else {
             quote! {
-                <Self as psibase_plugin::TrustConfig>::assert_authorized_with_whitelist(
-                    psibase_plugin::TrustLevel::#trust_level,
+                <Self as psibase_plugin::trust::TrustConfig>::assert_authorized_with_whitelist(
+                    psibase_plugin::trust::TrustLevel::#trust_level,
                     #fn_name_lit,
                     {
                         let wl: Vec<String> = #whitelist_expr.iter().map(|s: &str| s.to_string()).collect();
@@ -47,15 +47,15 @@ pub fn authorized_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream
     } else {
         if returns_result {
             quote! {
-                <Self as psibase_plugin::TrustConfig>::assert_authorized(
-                    psibase_plugin::TrustLevel::#trust_level,
+                <Self as psibase_plugin::trust::TrustConfig>::assert_authorized(
+                    psibase_plugin::trust::TrustLevel::#trust_level,
                     #fn_name_lit,
                 )?;
             }
         } else {
             quote! {
-                <Self as psibase_plugin::TrustConfig>::assert_authorized(
-                    psibase_plugin::TrustLevel::#trust_level,
+                <Self as psibase_plugin::trust::TrustConfig>::assert_authorized(
+                    psibase_plugin::trust::TrustLevel::#trust_level,
                     #fn_name_lit,
                 ).unwrap();
             }

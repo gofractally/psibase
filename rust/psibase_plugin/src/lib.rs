@@ -11,23 +11,24 @@ mod wasm {
 
     pub mod host;
     pub use bindings::host::types::types;
+    pub use bindings::host::types::types::Error;
 
     mod permissions;
     pub mod trust;
-    pub use trust::{Capabilities, TrustConfig, TrustLevel};
 
     pub mod graphql;
-    pub use graphql::scalars::*;
 
     pub mod errors;
     pub use errors::PluginError;
 
     pub mod transact;
-    pub use transact::{AddToTxCaller, Transact};
+    pub use transact::Transact;
 }
 
 #[cfg(target_family = "wasm")]
 pub use wasm::*;
+
+pub use psibase::PluginError as Error;
 
 pub mod graphql_utils;
 

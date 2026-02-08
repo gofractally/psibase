@@ -21,6 +21,7 @@ impl Caller for AddToTxCaller {
     }
 }
 
+/// A trait that allows a plugin to add actions to the current transaction.
 pub trait Transact: ServiceWrapper {
     fn add_to_tx() -> Self::Actions<AddToTxCaller> {
         Self::with_caller(AddToTxCaller)
