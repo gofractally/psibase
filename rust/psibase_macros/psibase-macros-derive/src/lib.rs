@@ -52,9 +52,9 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
     to_key_macro_impl(input)
 }
 
-/// # psibase_plugin::Error
+/// # psibase_plugin::ErrorEnum
 ///
-/// Allows psibase plugins to use a standard thiserror::Error enum, making it convertible
+/// Allows psibase plugins to use a standard `thiserror::Error` enum, making it convertible
 /// to a standardized `host:types/types::Error` plugin error type. Standardizing on the error type
 /// allows chaining errors across plugin boundaries.
 ///
@@ -86,7 +86,7 @@ pub fn derive_to_key(input: TokenStream) -> TokenStream {
 ///
 /// In your plugin rust code, add the `ErrorType` enum with the necessary macro derives:
 /// ```ignore
-/// #[derive(Debug, psibase_plugin::Error, thiserror::Error)]
+/// #[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
 /// #[repr(u32)]
 /// pub enum ErrorType {
 ///     #[error("Parameter was invalid")]

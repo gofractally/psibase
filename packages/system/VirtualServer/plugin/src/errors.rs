@@ -1,4 +1,4 @@
-#[derive(Debug, psibase_plugin::Error, thiserror::Error)]
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
 #[repr(u32)]
 pub enum ErrorType {
     #[error("Network token not found")]
