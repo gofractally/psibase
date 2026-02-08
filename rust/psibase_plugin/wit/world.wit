@@ -3,6 +3,8 @@ package psibase:plugin;
 world plugin-imports {
     include host:types/imports;
     include host:common/imports;
+    include host:crypto/imports;
+    
     import permissions:plugin/api;
     import permissions:plugin/types;
     import transact:plugin/intf;

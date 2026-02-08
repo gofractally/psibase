@@ -36,7 +36,5 @@ pub use psibase::PluginError as ErrorEnum;
 mod graphql_utils;
 
 /* TODO: Add modules for:
- * - host:crypto
- * - host:db
  * - host:prompt
 */
