@@ -12,7 +12,7 @@ use Exports::{
 
 use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::FlagsType;
-use psibase_plugin::{host, types::Error, Transact};
+use psibase_plugin::{trust::*, *};
 use std::str::FromStr;
 
 use tokens::{service::BalanceFlags, service::TokenFlags, Wrapper as Tokens};
@@ -21,8 +21,6 @@ pub mod query {
     pub mod fetch_network_token;
     pub mod fetch_token;
 }
-
-use psibase_plugin::trust::TrustConfig;
 
 struct TokensPlugin;
 
@@ -94,8 +92,7 @@ impl Issuer for TokensPlugin {
 impl Helpers for TokensPlugin {
     #[psibase::authorized(None)]
     fn fetch_network_token() -> Result<Option<u32>, Error> {
-        query::fetch_network_token::fetch_network_token()
-            .map_err(|error: ErrorType| Error::from(ErrorType::QueryError(error.to_string())))
+        Ok(query::fetch_network_token::fetch_network_token()?)
     }
 
     #[psibase::authorized(None)]

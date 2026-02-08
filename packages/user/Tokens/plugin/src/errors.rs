@@ -1,4 +1,4 @@
-#[derive(Debug, psibase::PluginError, thiserror::Error)]
+#[derive(Debug, psibase_plugin::Error, thiserror::Error)]
 #[repr(u32)]
 pub enum ErrorType {
     #[error("Amount is zero")]

@@ -17,11 +17,7 @@ use Exports::{
 use bindings::accounts::plugin as AccountsPlugin;
 use bindings::tokens::plugin as TokensPlugin;
 use psibase::AccountNumber;
-use psibase_plugin::types::Error;
-use psibase_plugin::{
-    host::{client, server},
-    Transact,
-};
+use psibase_plugin::*;
 
 use psibase::services::tokens::{Precision, Quantity};
 use virtual_server::tables::tables::{self as ServiceTables};
@@ -31,7 +27,7 @@ use virtual_server::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 struct VirtualServerPlugin;
 
 fn assert_caller(allowed: &[&str], context: &str) {
-    let sender = client::get_sender();
+    let sender = host::client::get_sender();
     assert!(
         allowed.contains(&sender.as_str()),
         "{} can only be called by {:?}",
@@ -149,7 +145,7 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
     // Refill
     TokensPlugin::user::credit(
         sys_id,
-        &client::get_receiver(),
+        &host::client::get_receiver(),
         &amount_str,
         "Refilling resource buffer",
     )?;
@@ -161,7 +157,7 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
 impl Billing for VirtualServerPlugin {
     fn fill_gas_tank() -> Result<(), Error> {
         assert_caller(
-            &["homepage", "config", &client::get_receiver()],
+            &["homepage", "config", &host::client::get_receiver()],
             "fill_gas_tank",
         );
 
@@ -170,7 +166,7 @@ impl Billing for VirtualServerPlugin {
 
     fn resize_and_fill_gas_tank(new_capacity: String) -> Result<(), Error> {
         assert_caller(
-            &["homepage", &client::get_receiver()],
+            &["homepage", &host::client::get_receiver()],
             "resize_and_fill_gas_tank",
         );
 
@@ -185,14 +181,17 @@ impl Billing for VirtualServerPlugin {
     }
 
     fn donate_gas(user: String, amount: String) -> Result<(), Error> {
-        assert_caller(&["homepage", &client::get_receiver()], "fill_gas_tank_for");
+        assert_caller(
+            &["homepage", &host::client::get_receiver()],
+            "fill_gas_tank_for",
+        );
 
         let sys_id = get_sys()?;
         let amount_u64 = TokensPlugin::helpers::decimal_to_u64(sys_id, &amount)?;
 
         TokensPlugin::user::credit(
             sys_id,
-            &client::get_receiver(),
+            &host::client::get_receiver(),
             &amount,
             &format!("Subsidizing resources for {}", user),
         )?;
@@ -226,7 +225,7 @@ impl Authorized for VirtualServerPlugin {
             "authorized::graphql",
         );
 
-        server::post_graphql_get_json(&query)
+        host::server::post_graphql_get_json(&query)
     }
 }
 
