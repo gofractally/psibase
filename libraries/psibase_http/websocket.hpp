@@ -29,11 +29,11 @@ namespace psibase::http
    {
       virtual ~WebSocketImplBase()                                          = default;
       virtual void startWrite(std::shared_ptr<WebSocket>&&)                 = 0;
+      virtual void startRead(std::shared_ptr<WebSocket>&&)                  = 0;
       virtual void close(std::shared_ptr<WebSocket>&&        self,
                          boost::beast::websocket::close_code code =
                              boost::beast::websocket::close_code::normal)   = 0;
       virtual void onLock(CloseLock&& l, std::shared_ptr<WebSocket>&& self) = 0;
-      virtual void readLoop(std::shared_ptr<WebSocket>&& self)              = 0;
    };
 
    struct WebSocket : AutoCloseSocket, net::connection_base, std::enable_shared_from_this<WebSocket>
@@ -200,7 +200,7 @@ namespace psibase::http
          else
          {
             readCallback = std::move(callback);
-            impl->readLoop(shared_from_this());
+            impl->startRead(shared_from_this());
          }
       }
 
@@ -265,6 +265,12 @@ namespace psibase::http
          boost::asio::dispatch(
              stream.get_executor(), [self = std::move(self)]() mutable
              { static_cast<WebSocketImpl*>(self->impl.get())->writeLoop(std::move(self)); });
+      }
+      void startRead(std::shared_ptr<WebSocket>&& self) override
+      {
+         boost::asio::dispatch(
+             stream.get_executor(), [self = std::move(self)]() mutable
+             { static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self)); });
       }
       void close(std::shared_ptr<WebSocket>&&        self,
                  boost::beast::websocket::close_code code) override
