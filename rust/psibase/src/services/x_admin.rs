@@ -36,6 +36,7 @@ mod service {
     struct AdminOptionsRow {
         p2p: bool,
         hosts: Vec<String>,
+        peers: Vec<String>,
     }
 }
 
