@@ -13,12 +13,20 @@ const Router = createBrowserRouter([
         errorElement: <ErrorBoundary />,
         children: [
             {
-                path: "/plugin/web/prompt/connect",
+                path: "/",
                 element: <ConnectPrompt />,
             },
             {
-                path: "/plugin/web/prompt/import",
+                path: "/import",
                 element: <ImportPrompt />,
+            },
+            {
+                path: "/plugin/web/prompt/connect",
+                element: <ConnectPrompt isPrompt />,
+            },
+            {
+                path: "/plugin/web/prompt/import",
+                element: <ImportPrompt isPrompt />,
             },
             {
                 path: "/plugin/web/prompt/create",

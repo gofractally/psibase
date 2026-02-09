@@ -7,9 +7,8 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
+import { ProfileResponse } from "@shared/hooks/use-profile";
 import { toast } from "@shared/shadcn/ui/sonner";
-
-import { ProfileResponse } from "../../../hooks/use-profile";
 
 export const zParams = z.object({
     displayName: z.string(),

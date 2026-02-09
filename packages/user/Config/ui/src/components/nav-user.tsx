@@ -1,24 +1,12 @@
-import {
-    ChevronsUpDown,
-    LogIn,
-    LogOut,
-    Moon,
-    PlusCircle,
-    Sun,
-    UserPlus,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ChevronsUpDown, LogIn, LogOut, Moon, Sun, Users } from "lucide-react";
 
-import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useSelectAccount } from "@/hooks/use-select-account";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLogout } from "@/hooks/useLogout";
-import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 
-import { useChainId } from "@shared/hooks/use-chain-id";
+import { Avatar } from "@shared/components/avatar";
+import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
-import { cn } from "@shared/lib/utils";
-import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useProfile } from "@shared/hooks/use-profile";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -41,41 +29,26 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-import { useTheme } from "@shared/components/theme-provider";
-
 export function NavUser() {
     const { isMobile } = useSidebar();
+    const { setTheme } = useTheme();
 
-    const { data: currentUser, isFetched: isFetchedLoggedInuser } =
-        useCurrentUser();
+    const { data: user, isPending: isPendingUser } = useCurrentUser();
+    const { data: profile } = useProfile(user);
 
-    const { data: chainId, isFetched: isFetchedChainId } = useChainId();
     const { mutateAsync: logout } = useLogout();
-    const navigate = useNavigate();
+    const { mutateAsync: login } = useConnectAccount();
+
+    const onSwitchAccounts = async () => {
+        await login();
+    };
 
     const onLogout = async () => {
         await logout();
-        navigate("/");
+        window.location.replace("/");
     };
 
-    const { setTheme } = useTheme();
-
-    const { data: connectedAccounts, isFetched: isFetchedConnectedAccounts } =
-        useConnectedAccounts();
-
-    const { mutateAsync: login } = useConnectAccount();
-    const { mutateAsync: connectToAccount, isPending: isConnectingToAccount } =
-        useSelectAccount();
-
-    const isNoOptions = connectedAccounts.length == 0;
-    const isUsingOnlyOption =
-        connectedAccounts.length == 1 && connectedAccounts[0] === currentUser;
-    const isLoading =
-        !(
-            isFetchedLoggedInuser &&
-            isFetchedConnectedAccounts &&
-            isFetchedChainId
-        ) || isConnectingToAccount;
+    const displayName = profile?.profile?.displayName;
 
     return (
         <SidebarMenu>
@@ -87,27 +60,24 @@ export function NavUser() {
                             size="lg"
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
-                            {chainId && currentUser ? (
-                                <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage
-                                        src={generateAvatar(
-                                            chainId,
-                                            currentUser,
-                                        )}
-                                        alt={currentUser}
-                                    />
-                                </Avatar>
+                            {isPendingUser ? (
+                                <Skeleton className="size-8 rounded-full" />
                             ) : (
-                                <Skeleton className="h-8 w-8 rounded-lg" />
+                                <Avatar
+                                    account={user || ""}
+                                    className="h-8 w-8"
+                                />
                             )}
                             <div className="grid flex-1 text-left text-sm leading-tight">
-                                {currentUser ? (
-                                    <span className="truncate font-semibold">
-                                        {currentUser}
-                                    </span>
-                                ) : (
-                                    <Skeleton className="h-4 w-32" />
-                                )}
+                                <span className="truncate ">
+                                    {isPendingUser ? (
+                                        <Skeleton className="h-4 w-32" />
+                                    ) : !user ? (
+                                        "Not logged in"
+                                    ) : (
+                                        (displayName ?? user)
+                                    )}
+                                </span>
                             </div>
                             <ChevronsUpDown className="ml-auto size-4" />
                         </SidebarMenuButton>
@@ -118,106 +88,28 @@ export function NavUser() {
                         align="end"
                         sideOffset={4}
                     >
-                        <DropdownMenuLabel className="p-0 font-normal">
+                        <DropdownMenuLabel className="cursor-default select-none p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                                {chainId && currentUser ? (
-                                    <Avatar className="h-8 w-8 rounded-lg">
-                                        <AvatarImage
-                                            src={generateAvatar(
-                                                chainId,
-                                                currentUser || "",
-                                            )}
-                                        />
-                                    </Avatar>
-                                ) : (
-                                    <Skeleton className="h-8 w-8 rounded-lg" />
-                                )}
+                                <Avatar
+                                    account={user || ""}
+                                    className="h-8 w-8"
+                                />
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-semibold">
-                                        {currentUser || ""}
+                                        {displayName ?? user ?? "Not logged in"}{" "}
+                                        {displayName && (
+                                            <span className="text-muted-foreground text-xs">
+                                                {`(${user})`}
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        {isNoOptions || isUsingOnlyOption ? (
-                            <DropdownMenuItem
-                                onClick={() => {
-                                    login();
-                                }}
-                                disabled={!isFetchedConnectedAccounts}
-                            >
-                                <LogIn className="mr-2 h-4 w-4" />
-                                <span>
-                                    {!isFetchedConnectedAccounts
-                                        ? "Loading..."
-                                        : isUsingOnlyOption
-                                          ? "Switch account"
-                                          : "Login"}
-                                </span>
-                            </DropdownMenuItem>
-                        ) : (
-                            <DropdownMenuGroup>
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger
-                                        disabled={isLoading}
-                                    >
-                                        <UserPlus className="mr-2 h-4 w-4" />
-                                        <span
-                                            className={cn({
-                                                italic: isLoading,
-                                            })}
-                                        >
-                                            {currentUser
-                                                ? "Switch account"
-                                                : "Select account"}
-                                        </span>
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuPortal>
-                                        <DropdownMenuSubContent>
-                                            {connectedAccounts.map(
-                                                (connectedAccount) => (
-                                                    <DropdownMenuItem
-                                                        disabled={
-                                                            isConnectingToAccount
-                                                        }
-                                                        key={connectedAccount}
-                                                        onClick={() =>
-                                                            connectToAccount(
-                                                                connectedAccount,
-                                                            )
-                                                        }
-                                                    >
-                                                        <img
-                                                            className="mr-2 h-4 w-4 rounded-none"
-                                                            src={createIdenticon(
-                                                                chainId +
-                                                                    connectedAccount,
-                                                            )}
-                                                        />
-                                                        <span>
-                                                            {connectedAccount}
-                                                        </span>
-                                                    </DropdownMenuItem>
-                                                ),
-                                            )}
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                onClick={() => {
-                                                    login();
-                                                }}
-                                            >
-                                                <PlusCircle className="mr-2 h-4 w-4" />
-                                                <span>More...</span>
-                                            </DropdownMenuItem>
-                                        </DropdownMenuSubContent>
-                                    </DropdownMenuPortal>
-                                </DropdownMenuSub>
-                            </DropdownMenuGroup>
-                        )}
                         <DropdownMenuGroup>
                             <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
+                                <DropdownMenuSubTrigger className="[&_svg:not([class*='text-'])]:text-muted-foreground gap-2 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0">
                                     <Moon className="mr-2 h-4 w-4" />
                                     <span>Theme</span>
                                 </DropdownMenuSubTrigger>
@@ -247,10 +139,26 @@ export function NavUser() {
                             </DropdownMenuSub>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onLogout()}>
-                            <LogOut />
-                            Log out
-                        </DropdownMenuItem>
+                        {user ? (
+                            <>
+                                <DropdownMenuItem onClick={onSwitchAccounts}>
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Switch account
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={onLogout}>
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    Log out
+                                </DropdownMenuItem>
+                            </>
+                        ) : (
+                            <DropdownMenuItem
+                                onClick={() => login()}
+                                disabled={isPendingUser}
+                            >
+                                <LogIn className="mr-2 h-4 w-4" />
+                                Log in
+                            </DropdownMenuItem>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>

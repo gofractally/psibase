@@ -12,9 +12,9 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useProfile } from "@/hooks/use-profile";
 
 import { Avatar } from "@shared/components/avatar";
+import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -58,6 +58,22 @@ export function ContactDetails({
     onChainMailUser,
     onBack,
 }: ContactDetailsProps) {
+    const [modalPage, setModalPage] = useState<z.infer<typeof modalPages>>(
+        modalPages.Values.closed,
+    );
+
+    const { data: currentUser } = useCurrentUser();
+    const { data: profile } = useProfile(contact?.account, true, {
+        baseUrlIncludesSibling: false,
+    });
+
+    const { mutateAsync: updateContact } = useUpdateContact();
+    const { mutateAsync: deleteContact } = useDeleteContact();
+
+    const closeModal = () => {
+        setModalPage(modalPages.Values.closed);
+    };
+    const showModal = modalPage !== modalPages.Values.closed;
     if (!contact) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -66,29 +82,12 @@ export function ContactDetails({
         );
     }
 
-    const { data: currentUser } = useCurrentUser();
-
     const isSelf = contact.account === currentUser;
-    const { data: profile } = useProfile(contact.account);
-
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,
         profile?.profile?.displayName,
         contact.account,
     );
-
-    const { mutateAsync: deleteContact } = useDeleteContact();
-
-    const [modalPage, setModalPage] = useState<z.infer<typeof modalPages>>(
-        modalPages.Values.closed,
-    );
-
-    const closeModal = () => {
-        setModalPage(modalPages.Values.closed);
-    };
-
-    const { mutateAsync: updateContact } = useUpdateContact();
-    const showModal = modalPage !== modalPages.Values.closed;
 
     return (
         <div className="flex h-full w-full flex-col">

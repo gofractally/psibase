@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+import { GraphQLUrlOptions, graphql } from "../lib/graphql";
+import QueryKey from "../lib/query-keys";
+import { zAccount } from "../lib/schemas/account";
 
 export const ProfileResponse = z.object({
     profile: z
@@ -17,11 +17,12 @@ export const ProfileResponse = z.object({
 
 export const useProfile = (
     account: string | undefined | null,
-    lookupProfile = true,
+    enabled = true,
+    options: GraphQLUrlOptions = {},
 ) =>
     useQuery({
         queryKey: QueryKey.profile(account),
-        enabled: !!account && lookupProfile,
+        enabled: !!account && enabled,
         queryFn: async () => {
             const res = await graphql(
                 `
@@ -33,7 +34,10 @@ export const useProfile = (
                     }
                 }
             `,
-                "profiles",
+                {
+                    service: "profiles",
+                    ...options,
+                },
             );
 
             return ProfileResponse.parse(res);
