@@ -1,50 +1,62 @@
 import {
     Calendar,
-    CalendarArrowDownIcon,
+    ChevronRight,
     Contact,
     Gavel,
     Landmark,
     LucideIcon,
-    PlusCircleIcon,
     Scale,
     SettingsIcon,
     Users,
     UsersRound,
 } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
-import { useGuildAccount } from "@/hooks/use-guild-account";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { cn } from "@shared/lib/utils";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@shared/shadcn/ui/collapsible";
 import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubItem,
 } from "@shared/shadcn/ui/sidebar";
 
-interface MenuItem {
-    groupLabel: string;
+interface SubMenuItem {
+    title: string;
+    icon: LucideIcon;
     path: string;
-    menus: {
-        title: string;
-        icon: LucideIcon;
-        path: string;
-    }[];
-    button?: {
-        label: string;
-        onClick: () => void;
-    };
 }
 
-export const staticFractalMenus: MenuItem[] = [
+interface MenuItem {
+    title: string;
+    icon?: LucideIcon;
+    path?: string;
+    subItems?: SubMenuItem[];
+}
+
+interface MenuGroup {
+    groupLabel: string;
+    items: MenuItem[];
+}
+
+// Export menu structure for breadcrumbs (compatible with old structure)
+export const staticFractalMenus = [
     {
         groupLabel: "Fractal",
         path: "",
         menus: [
             {
-                title: "Membership",
+                title: "My membership",
                 icon: Contact,
                 path: "membership",
             },
@@ -53,17 +65,6 @@ export const staticFractalMenus: MenuItem[] = [
                 icon: Users,
                 path: "members",
             },
-            {
-                title: "Guilds",
-                icon: Landmark,
-                path: "guilds",
-            },
-        ],
-    },
-    {
-        groupLabel: "Branches",
-        path: "",
-        menus: [
             {
                 title: "Legislative",
                 icon: Scale,
@@ -74,111 +75,178 @@ export const staticFractalMenus: MenuItem[] = [
                 icon: Gavel,
                 path: "judicial",
             },
+            {
+                title: "Guilds",
+                icon: Landmark,
+                path: "guilds",
+            },
         ],
     },
 ];
 
 export function NavMain() {
-    const location = useLocation();
+    const { data: currentUser } = useCurrentUser();
+    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
 
-    const guildAccount = useGuildAccount();
+    // Fractal group menu structure
+    const fractalGroup: MenuGroup = {
+        groupLabel: "Fractal",
+        items: [
+            {
+                title: "Membership",
+                icon: Contact,
+                subItems: [
+                    {
+                        title: "My membership",
+                        icon: Contact,
+                        path: "/membership",
+                    },
+                    {
+                        title: "Members",
+                        icon: Users,
+                        path: "/members",
+                    },
+                ],
+            },
+            {
+                title: "Governance",
+                icon: Scale,
+                subItems: [
+                    {
+                        title: "Legislative",
+                        icon: Scale,
+                        path: "/legislative",
+                    },
+                    {
+                        title: "Judicial",
+                        icon: Gavel,
+                        path: "/judicial",
+                    },
+                ],
+            },
+            {
+                title: "Guilds",
+                icon: Landmark,
+                path: "/guilds",
+            },
+        ],
+    };
 
-    const guildMenus: MenuItem[] = [
-        {
-            groupLabel: "Membership",
-            path: `/guild/${guildAccount}`,
-            menus: [
-                {
-                    title: "My membership",
-                    icon: Contact,
-                    path: "",
-                },
-                {
-                    title: "Members",
-                    icon: Users,
-                    path: "members",
-                },
-                {
-                    title: "Applications",
-                    icon: PlusCircleIcon,
-                    path: "applications",
-                },
-            ],
-        },
-        {
-            groupLabel: "Evaluations",
-            path: `/guild/${guildAccount}`,
-            menus: [
-                {
-                    title: "Active & Upcoming",
-                    icon: Calendar,
-                    path: "evaluations",
-                },
-                {
-                    title: "Completed",
-                    icon: CalendarArrowDownIcon,
-                    path: "evaluations/completed",
-                },
-            ],
-        },
-        {
-            groupLabel: "Governance",
-            path: `/guild/${guildAccount}`,
-            menus: [
-                {
-                    title: "Leadership",
-                    icon: UsersRound,
-                    path: "leadership",
-                },
-                {
-                    title: "Settings",
-                    icon: SettingsIcon,
-                    path: "settings",
-                },
-            ],
-        },
+    // My Guilds group menu structure
+    const myGuildsGroup: MenuGroup = {
+        groupLabel: "My Guilds",
+        items:
+            memberships?.map((membership) => ({
+                title: membership.guild.displayName,
+                subItems: [
+                    {
+                        title: "Membership",
+                        icon: Contact,
+                        path: `/guild/${membership.guild.account}`,
+                    },
+                    {
+                        title: "Evaluations",
+                        icon: Calendar,
+                        path: `/guild/${membership.guild.account}/evaluations`,
+                    },
+                    {
+                        title: "Leadership",
+                        icon: UsersRound,
+                        path: `/guild/${membership.guild.account}/leadership`,
+                    },
+                    {
+                        title: "Settings",
+                        icon: SettingsIcon,
+                        path: `/guild/${membership.guild.account}/settings`,
+                    },
+                ],
+            })) || [],
+    };
+
+    // Always show Fractal group, and My Guilds group when there are memberships
+    const groups = [
+        fractalGroup,
+        ...(memberships && memberships.length > 0 ? [myGuildsGroup] : []),
     ];
 
-    const isBrowse =
-        !location.pathname.startsWith("/guild") ||
-        location.pathname == "/guilds";
+    const renderMenuItem = (item: MenuItem, basePath: string = "") => {
+        const hasSubItems = item.subItems && item.subItems.length > 0;
+        const itemPath = item.path ? `${basePath}${item.path}` : undefined;
 
-    const menus = isBrowse ? staticFractalMenus : guildMenus;
+        if (hasSubItems) {
+            return (
+                <SidebarMenuItem key={item.title} className="list-none">
+                    <Collapsible className="group/collapsible list-none [&[data-state=open]>button>svg:first-child]:rotate-90">
+                        <CollapsibleTrigger asChild>
+                            <SidebarMenuButton tooltip={item.title}>
+                                <ChevronRight className="transition-transform" />
+                                {item.icon && <item.icon />}
+                                <span>{item.title}</span>
+                            </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <SidebarMenuSub>
+                                {item.subItems?.map((subItem) => (
+                                    <SidebarMenuSubItem key={subItem.path}>
+                                        <NavLink to={subItem.path} end>
+                                            {({ isActive }) => (
+                                                <SidebarMenuButton
+                                                    tooltip={subItem.title}
+                                                    isActive={isActive}
+                                                >
+                                                    {subItem.icon && (
+                                                        <subItem.icon />
+                                                    )}
+                                                    <span>{subItem.title}</span>
+                                                </SidebarMenuButton>
+                                            )}
+                                        </NavLink>
+                                    </SidebarMenuSubItem>
+                                ))}
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </Collapsible>
+                </SidebarMenuItem>
+            );
+        }
+
+        if (itemPath) {
+            return (
+                <NavLink key={item.title} to={itemPath} end>
+                    {({ isActive }) => (
+                        <SidebarMenuItem
+                            className={cn({
+                                "bg-muted/50 rounded-sm font-semibold":
+                                    isActive,
+                            })}
+                        >
+                            <SidebarMenuButton tooltip={item.title}>
+                                {item.icon && <item.icon />}
+                                <span>{item.title}</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    )}
+                </NavLink>
+            );
+        }
+
+        return null;
+    };
 
     return (
         <>
-            {menus.map((item) => (
-                <SidebarGroup>
-                    <SidebarGroupLabel>{item.groupLabel}</SidebarGroupLabel>
-                    <SidebarMenu>
-                        {item.menus?.map((menu) => (
-                            <NavLink to={`${item.path}/${menu.path}`} end>
-                                {({ isActive }) => (
-                                    <SidebarMenuItem
-                                        className={cn({
-                                            "bg-muted/50 rounded-sm font-semibold":
-                                                isActive,
-                                        })}
-                                    >
-                                        <SidebarMenuButton tooltip={menu.title}>
-                                            {menu.icon && <menu.icon />}
-                                            <span>{menu.title}</span>
-                                        </SidebarMenuButton>
-                                    </SidebarMenuItem>
-                                )}
-                            </NavLink>
-                        ))}
-                        {item.button && (
-                            <button
-                                onClick={() => { }}
-                                className="border-muted-foreground/50 hover:border-primary rounded-sm border border-dashed py-3 text-sm"
-                            >
-                                Create Guild
-                            </button>
-                        )}
-                    </SidebarMenu>
-                </SidebarGroup>
-            ))}
+            {groups
+                .filter((group) => group.items.length > 0)
+                .map((group) => (
+                    <SidebarGroup key={group.groupLabel}>
+                        <SidebarGroupLabel>
+                            {group.groupLabel}
+                        </SidebarGroupLabel>
+                        <SidebarMenu>
+                            {group.items.map((item) => renderMenuItem(item))}
+                        </SidebarMenu>
+                    </SidebarGroup>
+                ))}
         </>
     );
 }
