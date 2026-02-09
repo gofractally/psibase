@@ -294,11 +294,8 @@ mod service {
     /// billable account.
     #[action]
     fn bill_to_sub(sub_account: String) {
-        let billable_account = tx_cache::get_billable_account();
-        if billable_account.is_none() {
-            // Only allow overriding billable account after Transact has initialized it
-            return;
-        }
+        let billable_account =
+            check_some(tx_cache::get_billable_account(), "Billable account not set");
 
         check(
             !sub_account.is_empty(),
@@ -308,7 +305,7 @@ mod service {
         let sender = get_sender();
         tx_cache::set_sub(sender, sub_account.clone());
 
-        if sender == billable_account.unwrap() {
+        if sender == billable_account {
             CpuLimit::rpc().setCpuLimit(get_cpu_limit(sender, Some(sub_account.clone())));
         }
 
