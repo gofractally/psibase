@@ -43,7 +43,7 @@ impl UserSettings {
     }
 
     pub fn to_sub_account_key(account: AccountNumber, sub_account: &str) -> String {
-        format!("{}-{}", account, sub_account)
+        format!("{}.{}", account, sub_account)
     }
 
     pub fn get_resource_balance(account: AccountNumber, sub_account: Option<String>) -> Quantity {
