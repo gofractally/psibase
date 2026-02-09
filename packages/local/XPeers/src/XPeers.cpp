@@ -517,6 +517,9 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
    {
       if (auto reply = webSocketHandshake(request))
       {
+         auto options = to<XAdmin>().options();
+         if (!options.p2p)
+            return {};
          to<XHttp>().accept(*socket, *reply);
          auto table = Native::session().open<SocketTable>();
          auto peers = open<PeerConnectionTable>();
@@ -535,8 +538,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
             to<XHttp>().setCallback(*socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
          }
          to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
-         to<XHttp>().send(*socket,
-                          serializeMessage(HostnamesMessage{to<XAdmin>().options().hosts}));
+         to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}));
       }
    }
    else if (target == "/peers")
