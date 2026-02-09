@@ -546,7 +546,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (rootHost != req.host() && std::string_view{req.target()} != "/native/p2p")
+   else if (rootHost != req.host())
    {
       if (!rootHost.empty())
       {
@@ -563,14 +563,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
       return;
    }
 
-   if (std::string_view{req.target()} == "/native/p2p")
-   {
-      auto opts = to<XAdmin>().options();
-      if (!opts.p2p)
-         sendNotFound(sock, req);
-      return;
-   }
-   else if (std::string_view{req.target()}.starts_with("/native/"))
+   if (std::string_view{req.target()}.starts_with("/native/"))
    {
       sendNotFound(sock, req);
       return;
