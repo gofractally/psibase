@@ -254,15 +254,19 @@ mod service {
         }
         let sys = config.unwrap().sys;
 
-        let balance = UserSettings::get_resource_balance(get_sender(), Some(sub_account.clone()));
-        if balance.value == 0u64 {
-            return;
-        }
-
         let sender = get_sender();
+        let Some(balance) =
+            UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone()))
+        else {
+            return;
+        };
+
         let sub_account = UserSettings::to_sub_account_key(sender, &sub_account);
         Tokens::call().deleteSub(sub_account);
-        Tokens::call().toSub(sys, sender.to_string(), balance);
+
+        if balance.value != 0u64 {
+            Tokens::call().toSub(sys, sender.to_string(), balance);
+        }
     }
 
     /// Gets the amount of resources available for the caller

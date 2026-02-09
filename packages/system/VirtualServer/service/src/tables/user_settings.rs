@@ -47,15 +47,20 @@ impl UserSettings {
     }
 
     pub fn get_resource_balance(account: AccountNumber, sub_account: Option<String>) -> Quantity {
+        Self::get_resource_balance_opt(account, sub_account).unwrap_or(0.into())
+    }
+
+    pub fn get_resource_balance_opt(
+        account: AccountNumber,
+        sub_account: Option<String>,
+    ) -> Option<Quantity> {
         let sub_account_key = if let Some(sub_account) = sub_account {
             Self::to_sub_account_key(account, &sub_account)
         } else {
             account.to_string()
         };
 
-        Tokens::call()
-            .getSubBal(BillingConfig::get_assert().sys, sub_account_key)
-            .unwrap_or(0.into())
+        Tokens::call().getSubBal(BillingConfig::get_assert().sys, sub_account_key)
     }
 
     fn get_min_buffer_capacity() -> u64 {
