@@ -42,6 +42,11 @@ struct basic_fuzz_routing : psibase::net::message_serializer<Derived>
       send(msg);
    }
    template <typename Msg>
+   void multicast(const psibase::Checksum256&, const Msg& msg)
+   {
+      send(msg);
+   }
+   template <typename Msg>
    void sendto(psibase::AccountNumber producer, const Msg& msg)
    {
       send(msg);

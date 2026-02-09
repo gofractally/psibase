@@ -217,6 +217,14 @@ namespace psibase::net
          }
       }
       template <typename Msg>
+      void multicast(const Checksum256& id, const Msg& msg)
+      {
+         for (const auto& [peer, _] : neighborTable)
+         {
+            send_after_block(peer, id, msg);
+         }
+      }
+      template <typename Msg>
       void multicast_producers(const Checksum256& id, const Msg& msg)
       {
          for (const auto& [producer, selected] : selectedRoutes)
