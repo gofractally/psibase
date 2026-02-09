@@ -80,23 +80,22 @@ pub mod service {
         check(claims.len() == 1, "Must be exactly one claim");
         let claim = &claims[0];
 
-        // FIRST_AUTH_FLAG is set when this check is running for the top-level action and
-        // we are NOT executing speculatively.
-        if (flags & FIRST_AUTH_FLAG) != 0 && VirtualServer::call().is_billing_enabled() {
-            VirtualServer::call_as(CRED_SYS)
-                .bill_to_sub(psibase::sha256(&claim.rawData).to_string());
-        }
-
-        check(
-            claim.service == psibase::services::verify_sig::SERVICE,
-            "Claim must use verify-sig",
-        );
-
         let credential = check_some(
             CredentialTable::read()
                 .get_index_by_pkh()
                 .get(&psibase::sha256(&claim.rawData)),
             "Claim uses an invalid credential",
+        );
+
+        // FIRST_AUTH_FLAG is set when this check is running for the top-level action and
+        // we are NOT executing speculatively.
+        if (flags & FIRST_AUTH_FLAG) != 0 && VirtualServer::call().is_billing_enabled() {
+            VirtualServer::call_as(CRED_SYS).bill_to_sub(credential.id.to_string());
+        }
+
+        check(
+            claim.service == psibase::services::verify_sig::SERVICE,
+            "Claim must use verify-sig",
         );
 
         check(
@@ -179,8 +178,7 @@ pub mod service {
         Tokens::call().credit(sys, CRED_SYS, amount, "".into());
         Tokens::call_as(CRED_SYS).debit(sys, SERVICE, amount, "".into());
         Tokens::call_as(CRED_SYS).credit(sys, VSERVER, amount, "".into());
-        VirtualServer::call_as(CRED_SYS)
-            .buy_res_sub(amount, credential.pubkey_fingerprint.to_string());
+        VirtualServer::call_as(CRED_SYS).buy_res_sub(amount, id.to_string());
     }
 
     /// Gets the fingerprint of the specified credential pubkey
@@ -239,6 +237,6 @@ pub mod service {
         table.remove(&credential);
 
         // Avoid orphaned resources
-        VirtualServer::call_as(CRED_SYS).del_res_sub(credential.pubkey_fingerprint.to_string());
+        VirtualServer::call_as(CRED_SYS).del_res_sub(id.to_string());
     }
 }
