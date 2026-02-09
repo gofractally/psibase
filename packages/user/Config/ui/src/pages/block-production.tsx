@@ -6,7 +6,7 @@ import { z } from "zod";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { useAppForm } from "@/components/forms/app-form";
-import { FieldErrors } from "@/components/forms/field-errors";
+import { FieldErrors } from "@shared/components/form/internal/field-errors";
 
 import { useCandidates } from "@/hooks/use-candidates";
 import { useConfigPlugin } from "@/hooks/use-config-plugin";

@@ -1,7 +1,7 @@
 import { Ban, Check, Trash } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { ErrorCard } from "@/components/error-card";
+import { ErrorCard } from "@shared/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useAcceptStaged } from "@/hooks/use-accept-staged";

@@ -3,11 +3,11 @@ import type { AnyFieldMeta } from "@tanstack/react-form";
 import { parseError } from "@shared/lib/parseErrorMessage";
 
 type FieldErrorsProps = {
-    meta: AnyFieldMeta;
+    meta: AnyFieldMeta | undefined;
 };
 
 export const FieldErrors = ({ meta }: FieldErrorsProps) => {
-    if (!meta.isTouched) return null;
+    if (!meta || !meta.isTouched) return null;
 
     return meta.errors.map(parseError).map((error, index) => (
         <p key={index} className="text-destructive text-sm">

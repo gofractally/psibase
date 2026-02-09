@@ -9,7 +9,7 @@ import { useAppForm } from "@/components/forms/app-form";
 import { useBillingConfig } from "@/hooks/use-billing-config";
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
-import { parseError } from "@/lib/parseErrorMessage";
+import { parseError } from "@shared/lib/parseErrorMessage";
 
 interface SystemTokenInfo {
     id: string;

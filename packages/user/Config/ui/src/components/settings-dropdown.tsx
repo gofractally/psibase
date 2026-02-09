@@ -19,7 +19,7 @@ import {
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
 
-import { useTheme } from "./theme-provider";
+import { useTheme } from "@shared/components/theme-provider";
 
 export const SettingsDropdown = () => {
     const { setTheme } = useTheme();

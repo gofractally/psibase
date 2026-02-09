@@ -41,7 +41,7 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-import { useTheme } from "./theme-provider";
+import { useTheme } from "@shared/components/theme-provider";
 
 export function NavUser() {
     const { isMobile } = useSidebar();

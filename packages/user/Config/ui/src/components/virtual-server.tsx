@@ -31,7 +31,7 @@ import { useServerSpecs } from "@/hooks/use-server-specs";
 import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
 import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
 
-import { parseError } from "@/lib/parseErrorMessage";
+import { parseError } from "@shared/lib/parseErrorMessage";
 import {
     type StorageUnit,
     type TimeUnit,
