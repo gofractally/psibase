@@ -14,6 +14,7 @@
 
 #include <psibase/Actor.hpp>
 #include <psibase/Bitset.hpp>
+#include "psibase/crypto.hpp"
 #include "psibase/db.hpp"
 #include "psibase/nativeTables.hpp"
 #include "psibase/serviceState.hpp"
@@ -122,7 +123,7 @@ TID getSysToken()
 }
 
 uint32_t Invite::createInvite(uint32_t    inviteId,
-                              std::string fingerprint,
+                              Checksum256 fingerprint,
                               uint16_t    numAccounts,
                               bool        useHooks,
                               std::string secret,
@@ -154,7 +155,7 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
       // which could (via hooks) require more resources than the simple default `createAccount` action.
       auto credential_resources = resources - resource_buffers_reserve;
       to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
-      to<Credentials>().resource(fingerprint, credential_resources);
+      to<Credentials>().resource(cid, credential_resources);
    }
 
    auto inviteTable = open<InviteTable>(KvMode::readWrite);
@@ -193,12 +194,8 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    invite->numAccounts -= 1;
    inviteTable.put(*invite);
 
-   auto credential_key  = to<Credentials>().get_pkh(cid);
-   auto fingerprint     = keyFingerprint(newAccountKey);
-   auto new_account_key = psio::hex(fingerprint.data(), fingerprint.data() + 32);
-
-   psibase::writeConsole(
-       std::format("Checking if {} matches {}", credential_key, new_account_key).c_str());
+   Checksum256 credential_key  = to<Credentials>().get_fingerprint(cid);
+   auto        new_account_key = keyFingerprint(newAccountKey);
 
    check(credential_key != new_account_key, needUniquePubkey.data());
    to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);

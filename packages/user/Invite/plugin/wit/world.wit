@@ -16,7 +16,7 @@ interface types {
 
     record new-invite-details {
         invite-id: u32,
-        fingerprint: string,
+        fingerprint: list<u8>,
         encrypted-secret: string,
     }
     type invite-token = string;

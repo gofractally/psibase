@@ -81,7 +81,7 @@ mod service {
     ///
     /// Parameters:
     /// - `inviteId` is the id of the invite (could be randomly generated)
-    /// - `fingerprint` is the hex encoded public key hash of the invite
+    /// - `fingerprint` is the fingerprint of the invite public key
     /// - `numAccounts` is the number of accounts this invite can be used to create
     /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
     ///    the invite is updated
@@ -96,7 +96,7 @@ mod service {
     #[action]
     fn createInvite(
         inviteId: u32,
-        fingerprint: String,
+        fingerprint: crate::Checksum256,
         numAccounts: u16,
         useHooks: bool,
         secret: String,

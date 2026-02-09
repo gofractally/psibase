@@ -214,7 +214,9 @@ impl Inviter for InvitePlugin {
             createInvite::ACTION_NAME,
             &createInvite {
                 inviteId: details.invite_id,
-                fingerprint: details.fingerprint,
+                fingerprint: psibase::Checksum256::from(
+                    <[u8; 32]>::try_from(details.fingerprint.as_slice()).unwrap(),
+                ),
                 numAccounts: 1,
                 useHooks: false,
                 secret: details.encrypted_secret,
@@ -243,8 +245,9 @@ impl Inviter for InvitePlugin {
             "0".to_string()
         };
 
-        let fingerprint =
-            psibase::Hex(psibase::sha256(&keyvault::to_der(&keypair.public_key)?)).to_string();
+        let fingerprint = psibase::sha256(&keyvault::to_der(&keypair.public_key)?)
+            .0
+            .to_vec();
 
         Ok((
             invite_token,

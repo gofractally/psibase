@@ -8,6 +8,7 @@
 #include <services/system/AuthSig.hpp>
 #include <services/system/Transact.hpp>
 #include <services/user/Tokens.hpp>
+#include "psibase/crypto.hpp"
 
 namespace SystemService
 {
@@ -40,7 +41,7 @@ namespace SystemService
       /// Issues a credential
       ///
       /// Parameters:
-      /// - `pubkey_hash_hex`: The hexadecimal representation of the credential public key sha256 hash
+      /// - `pubkey_fingerprint`: The fingerprint of the credential public key
       /// - `expires`: The number of seconds until the credential expires
       /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
       ///
@@ -49,7 +50,7 @@ namespace SystemService
       ///
       /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
       /// that matches the specified public key.
-      uint32_t issue(std::string                               pubkey_hash_hex,
+      uint32_t issue(psibase::Checksum256                      pubkey_fingerprint,
                      std::optional<uint32_t>                   expires,
                      const std::vector<psibase::MethodNumber>& allowed_actions);
 
@@ -57,10 +58,10 @@ namespace SystemService
       ///
       /// This notification must be called after crediting the credential's service, or else
       /// the credited tokens will not be aplied to a particular credential.
-      void resource(std::string pubkey_hash_hex, UserService::Quantity amount);
+      void resource(uint32_t id, UserService::Quantity amount);
 
-      /// Gets the hex encoded public key hash of the specified credential
-      std::string get_pkh(uint32_t id);
+      /// Gets the fingerprint of the specified credential pubkey
+      psibase::Checksum256 get_fingerprint(uint32_t id);
 
       /// Gets the `expiry_date` of the specified credential
       std::optional<psibase::TimePointSec> get_expiry_date(uint32_t id);
@@ -80,10 +81,10 @@ namespace SystemService
       method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
       method(isAuthSys, sender, authorizers, method, auth_set),
       method(isRejectSys, sender, authorizers, method, auth_set),
-      method(issue, pubkey_hash_hex, expires, allowed_actions),
-      method(resource, pubkey_hash_hex, amount),
+      method(issue, pubkey_fingerprint, expires, allowed_actions),
+      method(resource, id, amount),
       method(get_active),
-      method(get_pkh, id),
+      method(get_fingerprint, id),
       method(get_expiry_date, id),
       method(consume, id),
    );

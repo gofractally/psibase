@@ -49,7 +49,7 @@ namespace UserService
          ///
          /// Parameters:
          /// - `inviteId` is the id of the invite (could be randomly generated)
-         /// - `fingerprint` is the hex encoded public key hash of the invite
+         /// - `fingerprint` is the fingerprint of the invite public key
          /// - `numAccounts` is the number of accounts this invite can be used to create
          /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
          ///    the invite is updated
@@ -62,7 +62,7 @@ namespace UserService
          /// If `useHooks` is true, the caller must be an account with a service deployed on it
          /// that implements the InviteHooks interface.
          uint32_t createInvite(uint32_t              inviteId,
-                               std::string           fingerprint,
+                               psibase::Checksum256  fingerprint,
                                uint16_t              numAccounts,
                                bool                  useHooks,
                                std::string           secret,

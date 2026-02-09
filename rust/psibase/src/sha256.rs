@@ -1,6 +1,6 @@
 use sha2::{Digest, Sha256};
-pub fn sha256(data: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    hasher.finalize().into()
+
+use crate::Checksum256;
+pub fn sha256(data: &[u8]) -> Checksum256 {
+    Checksum256::from(<[u8; 32]>::from(Sha256::digest(data)))
 }

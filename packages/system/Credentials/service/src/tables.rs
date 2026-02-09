@@ -6,7 +6,7 @@ pub mod tables {
         tokens::{BalanceFlags, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
-    use psibase::*;
+    use psibase::{Checksum256, *};
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
@@ -59,7 +59,7 @@ pub mod tables {
     #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Credential {
         pub id: u32,
-        pub pubkey_hash_hex: String,
+        pub pubkey_fingerprint: Checksum256,
         pub creation_date: TimePointSec,
 
         // Optional issuer data
@@ -75,8 +75,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_pkh(&self) -> String {
-            self.pubkey_hash_hex.clone()
+        fn by_pkh(&self) -> Checksum256 {
+            self.pubkey_fingerprint.clone()
         }
 
         #[secondary_key(2)]
@@ -87,7 +87,7 @@ pub mod tables {
 
     impl Credential {
         pub fn add(
-            pubkey_hash_hex: String,
+            pubkey_fingerprint: Checksum256,
             expires: Option<u32>,
             allowed_actions: Vec<MethodNumber>,
         ) -> u32 {
@@ -96,14 +96,14 @@ pub mod tables {
 
             let table = CredentialTable::read_write();
             check(
-                table.get_index_by_pkh().get(&pubkey_hash_hex).is_none(),
+                table.get_index_by_pkh().get(&pubkey_fingerprint).is_none(),
                 "Credential already exists",
             );
 
             table
                 .put(&Credential {
                     id,
-                    pubkey_hash_hex: pubkey_hash_hex.clone(),
+                    pubkey_fingerprint,
                     creation_date: now,
                     issuer: get_sender(),
                     expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),

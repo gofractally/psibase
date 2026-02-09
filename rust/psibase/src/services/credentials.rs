@@ -57,7 +57,7 @@ pub mod service {
     /// Issues a credential
     ///
     /// Parameters:
-    /// - `pubkey_hash_hex`: The hexadecimal representation of the credential public key sha256 hash
+    /// - `pubkey_fingerprint`: The fingerprint of the credential public key
     /// - `expires`: The number of seconds until the credential expires
     /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
     ///
@@ -68,7 +68,7 @@ pub mod service {
     /// that matches the specified public key.
     #[action]
     fn issue(
-        pubkey_hash_hex: String,
+        pubkey_fingerprint: crate::Checksum256,
         expires: Option<u32>,
         allowed_actions: Vec<MethodNumber>,
     ) -> u32 {
@@ -80,13 +80,13 @@ pub mod service {
     /// This notification must be called after crediting the credential's service, or else
     /// the credited tokens will not be aplied to a particular credential.
     #[action]
-    fn resource(pubkey_hash_hex: String, amount: Quantity) {
+    fn resource(id: u32, amount: Quantity) {
         unimplemented!()
     }
 
-    /// Gets the hex encoded public key hash of the specified credential
+    /// Gets the fingerprint of the specified credential pubkey
     #[action]
-    fn get_pkh(id: u32) -> String {
+    fn get_fingerprint(id: u32) -> crate::Checksum256 {
         unimplemented!()
     }
 

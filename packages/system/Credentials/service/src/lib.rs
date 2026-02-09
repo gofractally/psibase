@@ -47,10 +47,6 @@ pub mod service {
         status.current.time.seconds()
     }
 
-    fn get_fingerprint(pubkey: &Vec<u8>) -> String {
-        psibase::Hex(psibase::sha256(&pubkey)).to_string()
-    }
-
     #[action]
     #[allow(non_snake_case)]
     fn checkAuthSys(
@@ -87,7 +83,8 @@ pub mod service {
         // FIRST_AUTH_FLAG is set when this check is running for the top-level action and
         // we are NOT executing speculatively.
         if (flags & FIRST_AUTH_FLAG) != 0 && VirtualServer::call().is_billing_enabled() {
-            VirtualServer::call_as(CRED_SYS).bill_to_sub(get_fingerprint(&claim.rawData));
+            VirtualServer::call_as(CRED_SYS)
+                .bill_to_sub(psibase::sha256(&claim.rawData).to_string());
         }
 
         check(
@@ -98,7 +95,7 @@ pub mod service {
         let credential = check_some(
             CredentialTable::read()
                 .get_index_by_pkh()
-                .get(&get_fingerprint(&claim.rawData)),
+                .get(&psibase::sha256(&claim.rawData)),
             "Claim uses an invalid credential",
         );
 
@@ -142,7 +139,7 @@ pub mod service {
     /// Issues a credential
     ///
     /// Parameters:
-    /// - `pubkey_hash_hex`: The hexadecimal representation of the credential public key sha256 hash
+    /// - `pubkey_fingerprint`: The fingerprint of the credential public key
     /// - `expires`: The number of seconds until the credential expires
     /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
     ///
@@ -153,11 +150,11 @@ pub mod service {
     /// that matches the specified public key.
     #[action]
     fn issue(
-        pubkey_hash_hex: String,
+        pubkey_fingerprint: Checksum256,
         expires: Option<u32>,
         allowed_actions: Vec<MethodNumber>,
     ) -> u32 {
-        Credential::add(pubkey_hash_hex, expires, allowed_actions)
+        Credential::add(pubkey_fingerprint, expires, allowed_actions)
     }
 
     /// Notifies the credentials service that tokens have been credited to a credential
@@ -165,10 +162,8 @@ pub mod service {
     /// This notification must be called after crediting the credential's service, or else
     /// the credited tokens will not be aplied to a particular credential.
     #[action]
-    fn resource(pubkey_hash_hex: String, amount: Quantity) {
-        let credential = CredentialTable::read()
-            .get_index_by_pkh()
-            .get(&pubkey_hash_hex);
+    fn resource(id: u32, amount: Quantity) {
+        let credential = CredentialTable::read().get_index_pk().get(&id);
         let credential = check_some(credential, "Credential not found");
 
         check(
@@ -184,17 +179,18 @@ pub mod service {
         Tokens::call().credit(sys, CRED_SYS, amount, "".into());
         Tokens::call_as(CRED_SYS).debit(sys, SERVICE, amount, "".into());
         Tokens::call_as(CRED_SYS).credit(sys, VSERVER, amount, "".into());
-        VirtualServer::call_as(CRED_SYS).buy_res_sub(amount, pubkey_hash_hex);
+        VirtualServer::call_as(CRED_SYS)
+            .buy_res_sub(amount, credential.pubkey_fingerprint.to_string());
     }
 
-    /// Gets the hex encoded public key hash of the specified credential
+    /// Gets the fingerprint of the specified credential pubkey
     #[action]
-    fn get_pkh(id: u32) -> String {
+    fn get_fingerprint(id: u32) -> Checksum256 {
         CredentialTable::read()
             .get_index_pk()
             .get(&id)
             .expect("Credential DNE")
-            .pubkey_hash_hex
+            .pubkey_fingerprint
     }
 
     /// Gets the `expiry_date` of the specified credential
@@ -216,7 +212,7 @@ pub mod service {
         let mut active_id = None;
         let now = Transact::call().currentBlock().time.seconds();
         for claim in claims {
-            if let Some(credential) = table.get(&get_fingerprint(&claim.rawData)) {
+            if let Some(credential) = table.get(&psibase::sha256(&claim.rawData)) {
                 check(
                     active_id.is_none(),
                     "Only one active credential is supported",
@@ -243,6 +239,6 @@ pub mod service {
         table.remove(&credential);
 
         // Avoid orphaned resources
-        VirtualServer::call_as(CRED_SYS).del_res_sub(credential.pubkey_hash_hex);
+        VirtualServer::call_as(CRED_SYS).del_res_sub(credential.pubkey_fingerprint.to_string());
     }
 }
