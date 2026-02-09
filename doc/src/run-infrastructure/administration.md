@@ -23,9 +23,6 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 |--------|------------------------------|-------------------------------------------------------------------------------|
 | `GET`  | `/native/admin/status`       | Returns status conditions currently affecting the server                      |
 | `POST` | `/shutdown`                  | Stops or restarts the server                                                  |
-| `GET`  | `/native/admin/peers`        | Returns a JSON array of all the peers that the node is currently connected to |
-| `POST` | `/native/admin/connect`      | Connects to another node                                                      |
-| `POST` | `/native/admin/disconnect`   | Disconnects an existing peer connection                                       |
 | `GET`  | `/native/admin/keys`         | Returns a JSON array of the public keys that the server can sign for          |
 | `POST` | `/native/admin/keys`         | Creates or imports a key pair                                                 |
 | `GET`  | `/native/admin/keys/devices` | Lists available cryptographic devices                                         |
@@ -35,6 +32,8 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `PUT`  | `/config`                    | Sets the [server configuration](#server-configuration)                        |
 | `GET`  | `/native/admin/perf`         | Returns [performance monitoring](#performance-monitoring) data                |
 | `GET`  | `/native/admin/log`          | Websocket that provides access to [live server logs](#websocket-logger)       |
+
+The [x-admin](../default-apps/x-admin.md#http-endpoints) and [x-peers](../default-apps/x-peers.md#http-endpoints) services also provide some endpoints for node admins.
 
 ### Server status
 
@@ -53,30 +52,6 @@ The administrator API under `/native/admin` provides tools for monitoring and co
 | `restart` | Boolean | If set to `true`, the server will be restarted                                                                                                                                                                                  |
 | `force`   | Boolean | If set to `true`, the server will close all connections immediately without notifying the remote endpoint. Since this includes the connection used to send the shutdown, a request with `force` set may not receive a response. |
 | `soft`    | Boolean | Applies to restarts only. If set to `true`, `psinode` will keep the current process image.                                                                                                                                      |
-
-### Peer management
-
-`/native/admin/peers` lists the currently connected peers.
-
-Each peer has the following fields:
-
-| Field      | Type   | Description                                 |
-|------------|--------|---------------------------------------------|
-| `id`       | Number | A unique integer identifying the connection |
-| `endpoint` | String | The remote endpoint in the form `host:port` |
-| `url`      | String | (optional) The peer's URL if it is known    |
-
-`/native/admin/connect` creates a new p2p connection to another node. To set up a peer that will automatically connect whenever the server is running, use the [`peers` config field](#server-configuration).
-
-| Field | Type   | Description                                  |
-|-------|--------|----------------------------------------------|
-| `url` | String | The remote server, e.g. `"http://psibase.io/"` |
-
-`/native/admin/disconnect` closes an existing p2p connection. Note that if the server drops below its preferred number of connections, it will attempt to establish a new connection, possibly restoring the same connection that was just disconnected.
-
-| Field | Type   | Description                       |
-|-------|--------|-----------------------------------|
-| `id`  | Number | The id of the connection to close |
 
 ### Key ring
 

@@ -58,7 +58,7 @@ psinode - The psibase blockchain server
 
 - `--p2p`
 
-  allows external nodes to peer to `psinode` it over its http interface at `/native/p2p`.
+  allows external nodes to peer to `psinode` over its http interface at `x-peers.<host>/p2p`.
 
 - `--peer` *url*
 
