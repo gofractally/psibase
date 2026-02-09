@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/asio/dispatch.hpp>
+#include <boost/asio/post.hpp>
 #include <boost/beast/core/flat_buffer.hpp>
 #include <boost/beast/websocket/error.hpp>
 #include <boost/beast/websocket/rfc6455.hpp>
@@ -276,7 +277,7 @@ namespace psibase::http
                  boost::beast::websocket::close_code code) override
       {
          PSIBASE_LOG(self->logger, debug) << "closing websocket";
-         boost::asio::dispatch(
+         boost::asio::post(
              stream.get_executor(),
              [self = std::move(self), code]() mutable
              {
@@ -382,7 +383,7 @@ namespace psibase::http
       }
       void onLock(CloseLock&& l, std::shared_ptr<WebSocket>&& self) override
       {
-         boost::asio::dispatch(
+         boost::asio::post(
              stream.get_executor(),
              [l = std::move(l), self = std::move(self)]() mutable
              {

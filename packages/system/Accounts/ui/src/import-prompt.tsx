@@ -35,7 +35,7 @@ import { useConnectAccount } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { AuthServices } from "./types";
 
-export const ImportPrompt = () => {
+export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
     const navigate = useNavigate();
 
     const [authService, setAuthService] = useState<string>(
@@ -62,8 +62,12 @@ export const ImportPrompt = () => {
                 account: account,
                 key: pemFormatted,
             });
-            await connectAccountMutation.mutateAsync(account);
-            prompt.finished();
+            if (isPrompt) {
+                await connectAccountMutation.mutateAsync(account);
+                prompt.finished();
+            } else {
+                navigate(-1);
+            }
         } catch (e) {
             console.error("Import and login failed");
             console.error(e);
@@ -181,7 +185,16 @@ export const ImportPrompt = () => {
                         </CardContent>
                         <CardFooter className="mt-4 flex flex-1 justify-between">
                             <CardAction>
-                                {isPendingCanCreate ? (
+                                {!isPrompt ? (
+                                    <Button
+                                        type="button"
+                                        variant="link"
+                                        onClick={() => navigate(-1)}
+                                        className="px-0 focus-visible:underline focus-visible:underline-offset-4 focus-visible:ring-0"
+                                    >
+                                        Back
+                                    </Button>
+                                ) : isPendingCanCreate ? (
                                     <Skeleton className="h-5 w-28" />
                                 ) : (
                                     <Button
