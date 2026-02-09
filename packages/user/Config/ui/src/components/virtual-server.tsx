@@ -31,6 +31,7 @@ import { useServerSpecs } from "@/hooks/use-server-specs";
 import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
 import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
 
+import { parseError } from "@/lib/parseErrorMessage";
 import {
     type StorageUnit,
     type TimeUnit,
@@ -40,30 +41,57 @@ import {
     getBestTimeUnit,
 } from "@/lib/unit-conversions";
 
+/** Pattern for partial decimal input (e.g. ".", ".5", "0.") while typing */
+const PARTIAL_DECIMAL = /^\d*\.?\d*$/;
+
+/** Refine for non-negative number that allows partial decimal input */
+const nonNegativeNumberRefine = (val: string) => {
+    if (!val || PARTIAL_DECIMAL.test(val)) return true;
+    const num = Number(val);
+    return !isNaN(num) && num >= 0;
+};
+
+/** Refine for integer in [0,255] that allows partial input */
+const blockReplayFactorRefine = (val: string) => {
+    if (!val || /^\d*$/.test(val)) return true;
+    const num = Number(val);
+    return !isNaN(num) && Number.isInteger(num) && num >= 0 && num <= 255;
+};
+
 interface VirtualServerFormData {
-    // Server Specs
-    netBps: string; // Gbps input, converted to bytes/sec
-    storageBytes: string; // Storage input value
+    // Server Specs (form values in user-chosen units)
+    netGbps: string; // Network bandwidth in Gbps
+    storageAmount: string; // Total storage in storageUnit
     storageUnit: StorageUnit; // Storage unit (GB, TB, PB)
     // Network Variables
     blockReplayFactor: string; // u8 (0-255)
-    perBlockSysCpuNs: string; // Per-block system CPU input value
+    perBlockSysCpu: string; // Per-block system CPU in perBlockSysCpuUnit
     perBlockSysCpuUnit: TimeUnit; // Time unit (ns, us, ms)
-    objStorageBytes: string; // Obj storage input value
+    objStorageAmount: string; // Objective storage in objStorageUnit
     objStorageUnit: StorageUnit; // Obj storage unit (GB, TB, PB)
 }
 
 export const VirtualServer = () => {
-    const { mutateAsync: setServerSpecs } = useSetServerSpecs();
-    const { mutateAsync: setNetworkVariables } = useSetNetworkVariables();
+    const {
+        mutateAsync: setServerSpecs,
+        error: serverSpecsError,
+        isError: serverSpecsIsError,
+        reset: resetServerSpecs,
+    } = useSetServerSpecs();
+    const {
+        mutateAsync: setNetworkVariables,
+        error: networkVarsError,
+        isError: networkVarsIsError,
+        reset: resetNetworkVars,
+    } = useSetNetworkVariables();
     const { data: serverSpecs } = useServerSpecs();
     const { data: networkVariables } = useNetworkVariables();
 
     // Compute initial values from fetched data
     const computedInitialValues = useMemo<VirtualServerFormData>(() => {
         if (serverSpecs && networkVariables) {
-            // Convert bytes/sec to Gbps: divide by 125,000,000
-            const netBpsGbps = (serverSpecs.netBps / 125_000_000).toString();
+            // Convert bits/sec to Gbps: divide by 1e9
+            const netBpsGbps = (serverSpecs.netBps / 1_000_000_000).toString();
             
             // Auto-select best storage unit for storageBytes
             const storageUnitData = getBestStorageUnit(serverSpecs.storageBytes);
@@ -75,91 +103,93 @@ export const VirtualServer = () => {
             const objStorageUnitData = getBestStorageUnit(networkVariables.objStorageBytes);
 
             return {
-                netBps: netBpsGbps,
-                storageBytes: storageUnitData.value.toString(),
+                netGbps: netBpsGbps,
+                storageAmount: storageUnitData.value.toString(),
                 storageUnit: storageUnitData.unit,
                 blockReplayFactor: networkVariables.blockReplayFactor.toString(),
-                perBlockSysCpuNs: timeUnitData.value.toString(),
+                perBlockSysCpu: timeUnitData.value.toString(),
                 perBlockSysCpuUnit: timeUnitData.unit,
-                objStorageBytes: objStorageUnitData.value.toString(),
+                objStorageAmount: objStorageUnitData.value.toString(),
                 objStorageUnit: objStorageUnitData.unit,
             };
         }
         // Return empty values while loading
         return {
-            netBps: "",
-            storageBytes: "",
+            netGbps: "",
+            storageAmount: "",
             storageUnit: "GB",
             blockReplayFactor: "",
-            perBlockSysCpuNs: "",
+            perBlockSysCpu: "",
             perBlockSysCpuUnit: "ns",
-            objStorageBytes: "",
+            objStorageAmount: "",
             objStorageUnit: "GB",
         };
     }, [serverSpecs, networkVariables]);
 
     // Zod schemas for validation
     const serverSpecsSchema = z.object({
-        netBps: z.coerce.number().nonnegative("Net Bandwidth must be a positive number"),
-        storageBytes: z.coerce.number().nonnegative("Storage must be a positive number"),
+        netGbps: z.coerce.number().nonnegative("Net Bandwidth must be a positive number"),
+        storageAmount: z.coerce.number().nonnegative("Storage must be a positive number"),
     });
 
     const networkVariablesSchema = z.object({
         blockReplayFactor: z.coerce.number().int().min(0).max(255, "Block replay factor must be between 0 and 255"),
-        perBlockSysCpuNs: z.coerce.number().nonnegative("Per-block system CPU must be a positive number"),
-        objStorageBytes: z.coerce.number().nonnegative("Objective storage must be a positive number"),
+        perBlockSysCpu: z.coerce.number().nonnegative("Per-block system CPU must be a positive number"),
+        objStorageAmount: z.coerce.number().nonnegative("Objective storage must be a positive number"),
     });
 
     const form = useAppForm({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: VirtualServerFormData }) => {
+            resetServerSpecs();
+            resetNetworkVars();
             // Parse and validate server specs
             const parsedSpecs = serverSpecsSchema.parse({
-                netBps: data.value.netBps,
-                storageBytes: data.value.storageBytes,
+                netGbps: data.value.netGbps,
+                storageAmount: data.value.storageAmount,
             });
 
             // Parse and validate network variables
             const parsedVars = networkVariablesSchema.parse({
                 blockReplayFactor: data.value.blockReplayFactor,
-                perBlockSysCpuNs: data.value.perBlockSysCpuNs,
-                objStorageBytes: data.value.objStorageBytes,
+                perBlockSysCpu: data.value.perBlockSysCpu,
+                objStorageAmount: data.value.objStorageAmount,
             });
 
-            // Convert Gbps to bytes per second: 1 Gbps = 1,000,000,000 bits/s = 125,000,000 bytes/s
-            const netBpsBytes = Math.floor(parsedSpecs.netBps * 125_000_000);
-            
+            // Convert Gbps to bits/sec: 1 Gbps = 1e9 bits/sec
+            const netBps = Math.floor(parsedSpecs.netGbps * 1_000_000_000);
+
             // Convert storage value from selected unit to bytes
             const storageBytesValue = Math.floor(
-                parsedSpecs.storageBytes * STORAGE_FACTORS[data.value.storageUnit]
+                parsedSpecs.storageAmount * STORAGE_FACTORS[data.value.storageUnit]
             );
 
             // Submit server specs
             await setServerSpecs([
                 {
-                    netBps: netBpsBytes,
+                    netBps: netBps,
                     storageBytes: storageBytesValue,
                 },
             ]);
 
             // Convert per-block system CPU from selected unit to nanoseconds
             const perBlockSysCpuNsValue = Math.floor(
-                parsedVars.perBlockSysCpuNs * TIME_FACTORS[data.value.perBlockSysCpuUnit]
+                parsedVars.perBlockSysCpu * TIME_FACTORS[data.value.perBlockSysCpuUnit]
             );
-            
+
             // Convert obj storage value from selected unit to bytes
             const objStorageBytesValue = Math.floor(
-                parsedVars.objStorageBytes * STORAGE_FACTORS[data.value.objStorageUnit]
+                parsedVars.objStorageAmount * STORAGE_FACTORS[data.value.objStorageUnit]
             );
 
             // Submit network variables
-                await setNetworkVariables([
-                    {
-                        blockReplayFactor: parsedVars.blockReplayFactor,
-                        perBlockSysCpuNs: perBlockSysCpuNsValue,
-                        objStorageBytes: objStorageBytesValue,
-                    },
-                ]);
+            await setNetworkVariables([
+                {
+                    blockReplayFactor: parsedVars.blockReplayFactor,
+                    perBlockSysCpuNs: perBlockSysCpuNsValue,
+                    objStorageBytes: objStorageBytesValue,
+                },
+            ]);
 
             // Reset form with submitted values (cache updates will keep data in sync)
             form.reset(data.value);
@@ -186,6 +216,13 @@ export const VirtualServer = () => {
     );
 
     const [advancedOpen, setAdvancedOpen] = useState(false);
+
+    const txError =
+        serverSpecsIsError && serverSpecsError
+            ? parseError(serverSpecsError)
+            : networkVarsIsError && networkVarsError
+              ? parseError(networkVarsError)
+              : null;
 
     const updateButton = (
         <div className="mt-1 flex flex-row font-medium">
@@ -217,20 +254,13 @@ export const VirtualServer = () => {
                 <div className="mb-0 border-b pb-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <form.Field
-                            name="netBps"
+                            name="netGbps"
                             validators={{
                                 onChange: z
                                     .string()
-                                    .refine(
-                                        (val) => {
-                                            if (!val) return true; // Allow empty for optional fields
-                                            const num = Number(val);
-                                            return !isNaN(num) && num >= 0;
-                                        },
-                                        {
-                                            message: "Net Bandwidth must be a positive number",
-                                        },
-                                    ),
+                                    .refine(nonNegativeNumberRefine, {
+                                        message: "Net Bandwidth must be a positive number",
+                                    }),
                             }}
                         >
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -243,7 +273,7 @@ export const VirtualServer = () => {
                                     <div className="mt-1 flex items-center gap-2">
                                         <Input
                                             type="text"
-                                            value={field.state.value}
+                                            value={String(field.state.value ?? "")}
                                             onChange={(e) => {
                                                 field.handleChange(e.target.value);
                                             }}
@@ -270,20 +300,13 @@ export const VirtualServer = () => {
                         </form.Field>
 
                         <form.Field
-                            name="storageBytes"
+                            name="storageAmount"
                             validators={{
                                 onChange: z
                                     .string()
-                                    .refine(
-                                        (val) => {
-                                            if (!val) return true; // Allow empty for optional fields
-                                            const num = Number(val);
-                                            return !isNaN(num) && num >= 0;
-                                        },
-                                        {
-                                            message: "Storage must be a positive number",
-                                        },
-                                    ),
+                                    .refine(nonNegativeNumberRefine, {
+                                        message: "Storage must be a positive number",
+                                    }),
                             }}
                         >
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -296,7 +319,7 @@ export const VirtualServer = () => {
                                     <div className="mt-1 flex gap-2 items-center">
                                         <Input
                                             type="text"
-                                            value={field.state.value}
+                                            value={String(field.state.value ?? "")}
                                             onChange={(e) => {
                                                 field.handleChange(e.target.value);
                                             }}
@@ -337,7 +360,14 @@ export const VirtualServer = () => {
                 </div>
 
                 {/* Update Button position when Advanced is collapsed */}
-                {!advancedOpen && updateButton}
+                {!advancedOpen && (
+                    <>
+                        {txError && (
+                            <p className="text-destructive text-sm mt-2">{txError}</p>
+                        )}
+                        {updateButton}
+                    </>
+                )}
 
                 {/* Network Variables Subsection */}
                 <div>
@@ -370,16 +400,9 @@ export const VirtualServer = () => {
                             validators={{
                                 onChange: z
                                     .string()
-                                    .refine(
-                                        (val) => {
-                                            if (!val) return true;
-                                            const num = Number(val);
-                                            return !isNaN(num) && Number.isInteger(num) && num >= 0 && num <= 255;
-                                        },
-                                        {
-                                            message: "Block replay factor must be an integer between 0 and 255",
-                                        },
-                                    ),
+                                    .refine(blockReplayFactorRefine, {
+                                        message: "Block replay factor must be an integer between 0 and 255",
+                                    }),
                             }}
                                     >
                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -392,7 +415,7 @@ export const VirtualServer = () => {
                                                 </p>
                                                 <Input
                                                     type="text"
-                                                    value={field.state.value}
+                                                    value={String(field.state.value ?? "")}
                                                     onChange={(e) => {
                                                         field.handleChange(e.target.value);
                                                     }}
@@ -410,20 +433,13 @@ export const VirtualServer = () => {
                                     </form.Field>
 
                                     <form.Field
-                            name="perBlockSysCpuNs"
+                            name="perBlockSysCpu"
                             validators={{
                                 onChange: z
                                     .string()
-                                    .refine(
-                                        (val) => {
-                                            if (!val) return true;
-                                            const num = Number(val);
-                                            return !isNaN(num) && num >= 0;
-                                        },
-                                        {
-                                            message: "Per-block system CPU must be a positive number",
-                                        },
-                                    ),
+                                    .refine(nonNegativeNumberRefine, {
+                                        message: "Per-block system CPU must be a positive number",
+                                    }),
                             }}
                                     >
                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -436,7 +452,7 @@ export const VirtualServer = () => {
                                                 <div className="mt-1 flex gap-2 items-center">
                                                     <Input
                                                         type="text"
-                                                        value={field.state.value}
+                                                        value={String(field.state.value ?? "")}
                                                         onChange={(e) => {
                                                             field.handleChange(e.target.value);
                                                         }}
@@ -483,20 +499,13 @@ export const VirtualServer = () => {
                                     </form.Field>
 
                                     <form.Field
-                            name="objStorageBytes"
+                            name="objStorageAmount"
                             validators={{
                                 onChange: z
                                     .string()
-                                    .refine(
-                                        (val) => {
-                                            if (!val) return true;
-                                            const num = Number(val);
-                                            return !isNaN(num) && num >= 0;
-                                        },
-                                        {
-                                            message: "Objective storage must be a positive number",
-                                        },
-                                    ),
+                                    .refine(nonNegativeNumberRefine, {
+                                        message: "Objective storage must be a positive number",
+                                    }),
                             }}
                                     >
                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -510,7 +519,7 @@ export const VirtualServer = () => {
                                                 <div className="mt-1 flex gap-2 items-center">
                                                     <Input
                                                         type="text"
-                                                        value={field.state.value}
+                                                        value={String(field.state.value ?? "")}
                                                         onChange={(e) => {
                                                             field.handleChange(e.target.value);
                                                         }}
@@ -518,7 +527,7 @@ export const VirtualServer = () => {
                                                         placeholder="0"
                                                         className="w-36"
                                                     />
-                                                    <form.Field name="objStorageUnit">
+                                                        <form.Field name="objStorageUnit">
                                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                         {(unitField: any) => (
                                                             <Select
@@ -563,7 +572,14 @@ export const VirtualServer = () => {
                 </div>
 
                 {/* Update Button when Advanced is expanded */}
-                {advancedOpen && updateButton}
+                {advancedOpen && (
+                    <>
+                        {txError && (
+                            <p className="text-destructive text-sm mt-2">{txError}</p>
+                        )}
+                        {updateButton}
+                    </>
+                )}
 
                 {/* Network Resources Display */}
                 <form.Subscribe selector={(state) => state.values}>
@@ -577,21 +593,21 @@ export const VirtualServer = () => {
 
                         // Convert form values to base units (bytes, nanoseconds)
                         const getStorageBytes = (): number => {
-                            const value = parseFloat(formValues.storageBytes || "0");
+                            const value = parseFloat(formValues.storageAmount || "0");
                             if (isNaN(value)) return 0;
                             const unit = (formValues.storageUnit || "GB") as StorageUnit;
                             return value * STORAGE_FACTORS[unit];
                         };
 
                         const getObjStorageBytes = (): number => {
-                            const value = parseFloat(formValues.objStorageBytes || "0");
+                            const value = parseFloat(formValues.objStorageAmount || "0");
                             if (isNaN(value)) return 0;
                             const unit = (formValues.objStorageUnit || "GB") as StorageUnit;
                             return value * STORAGE_FACTORS[unit];
                         };
 
                         const getPerBlockSysCpuNs = (): number => {
-                            const value = parseFloat(formValues.perBlockSysCpuNs || "0");
+                            const value = parseFloat(formValues.perBlockSysCpu || "0");
                             if (isNaN(value)) return 0;
                             const unit = (formValues.perBlockSysCpuUnit || "ns") as TimeUnit;
                             return value * TIME_FACTORS[unit];
@@ -601,13 +617,13 @@ export const VirtualServer = () => {
                             return parseFloat(formValues.blockReplayFactor || "0") || 0;
                         };
 
-                        // Calculate derived values
+                        // Calculate derived values (in base units)
                         const storageBytes = getStorageBytes();
                         const objStorageBytes = getObjStorageBytes();
                         const perBlockSysCpuNs = getPerBlockSysCpuNs();
                         const blockReplayFactor = getBlockReplayFactor();
 
-                        const netBps = parseFloat(formValues.netBps || "0") || 0;
+                        const netGbps = parseFloat(formValues.netGbps || "0") || 0;
 
                         const objStorageDisplay = getBestStorageUnit(objStorageBytes);
                         const subjectiveStorageBytes = Math.max(0, storageBytes - objStorageBytes);
@@ -689,7 +705,7 @@ export const VirtualServer = () => {
                                         <div className="text-sm">
                                             <div>
                                                 <span className="text-muted-foreground">Bandwidth:</span>{" "}
-                                                {`${formatNumber(netBps)} Gbps`}
+                                                {`${formatNumber(netGbps)} Gbps`}
                                             </div>
                                         </div>
                                     </div>

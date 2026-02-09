@@ -6,8 +6,8 @@ import { CONFIG } from "@/lib/services";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 interface CpuPricingParams {
-    idlePpm: number;
-    congestedPpm: number;
+    idlePct: string;
+    congestedPct: string;
     doublingTimeSec: number;
     halvingTimeSec: number;
     numBlocksToAverage: number;

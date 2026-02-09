@@ -6,7 +6,7 @@ import { CONFIG } from "@/lib/services";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 interface ServerSpecs {
-    netBps: number; // bytes per second
+    netBps: number; // bits per second
     storageBytes: number; // bytes
 }
 

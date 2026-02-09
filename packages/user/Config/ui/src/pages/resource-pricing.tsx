@@ -105,10 +105,8 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
             "sec",
         );
 
-        const idlePpm = Math.round((Number(idleThreshold) || 0) * 10_000);
-        const congestedPpm = Math.round(
-            (Number(congestedThreshold) || 0) * 10_000,
-        );
+        const idlePct = (idleThreshold || "0").trim();
+        const congestedPct = (congestedThreshold || "0").trim();
         const numBlocksToAverage = Number(averageWindowSize) || 0;
 
         if (isCpu) {
@@ -118,8 +116,8 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
 
             await setCpuPricingParams([
                 {
-                    idlePpm,
-                    congestedPpm,
+                    idlePct,
+                    congestedPct,
                     halvingTimeSec: Math.round(halvingTimeSec),
                     doublingTimeSec: Math.round(doublingTimeSec),
                     numBlocksToAverage,
@@ -133,8 +131,8 @@ const PricingSection = ({ title, pricing, isLoading, billableUnitLabel }: Pricin
 
             await setNetPricingParams([
                 {
-                    idlePpm,
-                    congestedPpm,
+                    idlePct,
+                    congestedPct,
                     halvingTimeSec: Math.round(halvingTimeSec),
                     doublingTimeSec: Math.round(doublingTimeSec),
                     numBlocksToAverage,

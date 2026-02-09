@@ -9,6 +9,7 @@ import { useAppForm } from "@/components/forms/app-form";
 import { useBillingConfig } from "@/hooks/use-billing-config";
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
+import { parseError } from "@/lib/parseErrorMessage";
 
 interface SystemTokenInfo {
     id: string;
@@ -29,8 +30,18 @@ export const Billing = ({
     systemToken,
     systemTokenLoading,
 }: BillingProps) => {
-    const { mutateAsync: setFeeReceiverAccount } = useSetFeeReceiverAccount();
-    const { mutateAsync: setEnableBilling } = useSetEnableBilling();
+    const {
+        mutateAsync: setFeeReceiverAccount,
+        error: feeReceiverError,
+        isError: feeReceiverIsError,
+        reset: resetFeeReceiver,
+    } = useSetFeeReceiverAccount();
+    const {
+        mutateAsync: setEnableBilling,
+        error: enableBillingError,
+        isError: enableBillingIsError,
+        reset: resetEnableBilling,
+    } = useSetEnableBilling();
     const { data: billingConfig, isLoading: billingConfigLoading } = useBillingConfig();
 
     // Track the submitted/initial value of enableBilling for comparison
@@ -60,26 +71,27 @@ export const Billing = ({
     const form = useAppForm({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: BillingFormData }) => {
+            resetFeeReceiver();
             await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount]);
             form.reset(data.value);
         },
     });
+
+    const feeReceiverTxError =
+        feeReceiverIsError && feeReceiverError ? parseError(feeReceiverError) : null;
+    const enableBillingTxError =
+        enableBillingIsError && enableBillingError ? parseError(enableBillingError) : null;
 
     const hasFeeReceiverAccount = useMemo(() => {
         return billingConfig?.feeReceiver != null && billingConfig.feeReceiver !== "";
     }, [billingConfig?.feeReceiver]);
 
     const handleApplyEnableBilling = async () => {
+        resetEnableBilling();
         await setEnableBilling([form.state.values.enableBilling]);
         setSubmittedEnableBilling(form.state.values.enableBilling);
         form.reset(form.state.values);
     };
-
-    const isApplyEnabled = useMemo(() => {
-        if (submittedEnableBilling === null) return false;
-        return form.state.values.enableBilling !== submittedEnableBilling;
-    }, [form.state.values.enableBilling, submittedEnableBilling]);
-
 
     if (billingConfigLoading) {
         return (
@@ -140,6 +152,11 @@ export const Billing = ({
                                     />
                                     {!hasFeeReceiverAccount && (
                                         <div className="mt-2">
+                                            {feeReceiverTxError && (
+                                                <p className="text-destructive text-sm mb-2">
+                                                    {feeReceiverTxError}
+                                                </p>
+                                            )}
                                             <Button
                                                 type="submit"
                                                 disabled={!isSaveEnabled}
@@ -156,31 +173,48 @@ export const Billing = ({
                     <form.Field name="enableBilling">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(field: any) => (
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <Checkbox
-                                        checked={field.state.value}
-                                        onCheckedChange={(checked) => {
-                                            field.handleChange(!!checked);
-                                        }}
-                                        disabled={!hasFeeReceiverAccount}
-                                    />
-                                    <Label className="cursor-pointer">
-                                        Enable billing (for public networks)
-                                    </Label>
-                                </div>
-                                {hasFeeReceiverAccount && (
-                                    <div className="mt-2">
-                                        <Button
-                                            type="button"
-                                            onClick={handleApplyEnableBilling}
-                                            disabled={!isApplyEnabled}
-                                        >
-                                            Apply
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
+                            <form.Subscribe
+                                selector={(state) => state.values.enableBilling}
+                            >
+                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                {(enableBilling: any) => {
+                                    const isApplyEnabled =
+                                        submittedEnableBilling !== null &&
+                                        enableBilling !== submittedEnableBilling;
+                                    return (
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    checked={field.state.value}
+                                                    onCheckedChange={(checked) => {
+                                                        field.handleChange(!!checked);
+                                                    }}
+                                                    disabled={!hasFeeReceiverAccount}
+                                                />
+                                                <Label className="cursor-pointer">
+                                                    Enable billing (for public networks)
+                                                </Label>
+                                            </div>
+                                            {hasFeeReceiverAccount && (
+                                                <div className="mt-2">
+                                                    {enableBillingTxError && (
+                                                        <p className="text-destructive text-sm mb-2">
+                                                            {enableBillingTxError}
+                                                        </p>
+                                                    )}
+                                                    <Button
+                                                        type="button"
+                                                        onClick={handleApplyEnableBilling}
+                                                        disabled={!isApplyEnabled}
+                                                    >
+                                                        Apply
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }}
+                            </form.Subscribe>
                         )}
                     </form.Field>
                 </div>
