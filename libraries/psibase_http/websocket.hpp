@@ -105,9 +105,16 @@ namespace psibase::http
       {
          StateType oldState;
          {
-            std::lock_guard l{mutex};
+            std::unique_lock l{mutex};
             oldState = state;
             state    = StateType::error;
+            if (readCallback)
+            {
+               l.unlock();
+               auto readCallback  = std::move(this->readCallback);
+               this->readCallback = nullptr;
+               readCallback(ec, std::vector<char>());
+            }
          }
          if (oldState != StateType::error)
          {
@@ -353,10 +360,7 @@ namespace psibase::http
              {
                 if (ec)
                 {
-                   if (ec != make_error_code(boost::asio::error::operation_aborted))
-                   {
-                      self->error(ec);
-                   }
+                   self->error(ec);
                 }
                 else
                 {
