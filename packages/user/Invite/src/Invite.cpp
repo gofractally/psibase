@@ -194,8 +194,8 @@ void Invite::createAccount(AccountNumber newAccount, Spki newAccountKey)
    invite->numAccounts -= 1;
    inviteTable.put(*invite);
 
-   Checksum256 credential_key  = to<Credentials>().get_fingerprint(cid);
-   auto        new_account_key = keyFingerprint(newAccountKey);
+   auto credential_key  = to<Credentials>().getFingerprint(cid);
+   auto new_account_key = keyFingerprint(newAccountKey);
 
    check(credential_key != new_account_key, needUniquePubkey.data());
    to<AuthSig::AuthSig>().newAccount(newAccount, newAccountKey);

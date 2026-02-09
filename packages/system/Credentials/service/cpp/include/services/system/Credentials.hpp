@@ -61,7 +61,7 @@ namespace SystemService
       void resource(uint32_t id, UserService::Quantity amount);
 
       /// Gets the fingerprint of the specified credential pubkey
-      psibase::Checksum256 get_fingerprint(uint32_t id);
+      psibase::Checksum256 getFingerprint(uint32_t id);
 
       /// Gets the `expiry_date` of the specified credential
       std::optional<psibase::TimePointSec> get_expiry_date(uint32_t id);
@@ -84,7 +84,7 @@ namespace SystemService
       method(issue, pubkey_fingerprint, expires, allowed_actions),
       method(resource, id, amount),
       method(get_active),
-      method(get_fingerprint, id),
+      method(getFingerprint, id),
       method(get_expiry_date, id),
       method(consume, id),
    );

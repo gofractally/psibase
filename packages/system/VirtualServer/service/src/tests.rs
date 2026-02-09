@@ -409,9 +409,16 @@ mod tests {
             .map_err(|e| psibase::Error::new(e))?
             .into_contents();
 
-        let pkh = psibase::Hex(psibase::sha256(&inv_pubkey_der)).to_string();
+        let fingerprint = psibase::sha256(&inv_pubkey_der);
         invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .createInvite(invite_id, pkh, 1, false, "".to_string(), min_cost.into())
+            .createInvite(
+                invite_id,
+                fingerprint,
+                1,
+                false,
+                "".to_string(),
+                min_cost.into(),
+            )
             .get()?;
 
         // Create an account using the invite
@@ -443,7 +450,7 @@ mod tests {
         let signing_key =
             SigningKey::from_pkcs8_pem(&private_key).map_err(|e| psibase::Error::new(e))?;
         let signature: Signature = signing_key
-            .sign_prehash(&psibase::sha256(&tx_packed))
+            .sign_prehash(&psibase::sha256(&tx_packed).0)
             .map_err(|e| psibase::Error::new(e))?;
         let strx = SignedTransaction {
             transaction: tx_packed.into(),

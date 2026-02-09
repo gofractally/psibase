@@ -182,8 +182,9 @@ pub mod service {
     }
 
     /// Gets the fingerprint of the specified credential pubkey
+    #[allow(non_snake_case)]
     #[action]
-    fn get_fingerprint(id: u32) -> Checksum256 {
+    fn getFingerprint(id: u32) -> Checksum256 {
         CredentialTable::read()
             .get_index_pk()
             .get(&id)

@@ -71,8 +71,7 @@ namespace
 auto createInvite = [](auto& user, const auto& pubKey)
 {
    Checksum256 fingerprint = psibase::sha256(pubKey.data.data(), pubKey.data.size());
-   auto        hex         = psio::hex(fingerprint.data(), fingerprint.data() + 32);
-   return user.createInvite(++inviteId, hex, 1, false, "", 0);
+   return user.createInvite(++inviteId, fingerprint, 1, false, "", 0);
 };
 
 // - Auth
