@@ -710,6 +710,8 @@ void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> da
          return recvMessage(socket, deserializeMessage<CheckDuplicatesMessage>(data));
       case DuplicateConnectionMessage::type:
          return recvMessage(socket, deserializeMessage<DuplicateConnectionMessage>(data));
+      default:
+         abortMessage(std::format("Unknown message type: {}", static_cast<int>(data[0])));
    }
 }
 

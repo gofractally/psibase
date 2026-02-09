@@ -380,6 +380,8 @@ namespace psibase::http
              stream.get_executor(),
              [l = std::move(l), self = std::move(self)]() mutable
              {
+                if (self->handleP2P())
+                   return;
                 self->handleMessage(std::move(l));
                 static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self));
              });
