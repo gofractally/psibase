@@ -1,12 +1,10 @@
 use crate::*;
 
-use host::common::client as Client;
-use host::common::store as Store;
+use psibase_plugin::host::store::*;
 
 use crate::bindings::base64::plugin as base64;
 use crate::types::CurrentDetailsResponse;
 use psibase::fracpack::Unpack;
-use Store::*;
 
 pub struct InviteTokensTable {}
 impl InviteTokensTable {
@@ -70,7 +68,7 @@ impl InviteTokensTable {
             id = invite_id
         );
         let current_details =
-            CurrentDetailsResponse::from_gql(Server::post_graphql_get_json(&query).unwrap());
+            CurrentDetailsResponse::from_gql(host::server::post_graphql_get_json(&query).unwrap());
         if current_details.is_err() {
             return None;
         }
@@ -96,7 +94,7 @@ impl InviteTokensTable {
         );
 
         let response =
-            FixedDetailsResponse::from_gql(Server::post_graphql_get_json(&query).unwrap());
+            FixedDetailsResponse::from_gql(host::server::post_graphql_get_json(&query).unwrap());
         if response.is_err() {
             return None;
         }
@@ -150,10 +148,10 @@ impl InviteTokensTable {
     }
 
     fn delete_active() {
-        Self::invite_tokens().delete(&Client::get_active_app());
+        Self::invite_tokens().delete(&host::client::get_active_app());
     }
 
-    pub fn decode_invite_token(token: String) -> Result<(u32, Vec<u8>), HostTypes::Error> {
+    pub fn decode_invite_token(token: String) -> Result<(u32, Vec<u8>), Error> {
         let data = base64::url::decode(&token)?;
         assert!(data.len() == 20, "invalid token");
         let invite_id = u32::from_le_bytes(data[..4].try_into().unwrap());
@@ -168,13 +166,13 @@ impl InviteTokensTable {
             Self::delete_fixed_details(invite_id);
             return None;
         }
-        Self::invite_tokens().set(&Client::get_sender(), token.as_bytes());
+        Self::invite_tokens().set(&host::client::get_sender(), token.as_bytes());
         Some(invite_id)
     }
 
     fn get_active_token() -> Option<(u32, Vec<u8>)> {
         let token = Self::invite_tokens()
-            .get(&Client::get_active_app())
+            .get(&host::client::get_active_app())
             .map(|data| String::from_utf8(data).unwrap());
         if token.is_none() {
             return None;
