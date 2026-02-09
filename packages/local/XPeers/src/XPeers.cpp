@@ -555,6 +555,22 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       to_json(result, stream);
       return reply;
    }
+   else if (target == "/urls")
+   {
+      std::vector<UrlRow> result;
+      auto                urls = open<UrlTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         for (auto row : urls.getIndex<0>())
+         {
+            result.push_back(std::move(row));
+         }
+      }
+      HttpReply           reply{.status = HttpStatus::ok, .contentType = "application/json"};
+      psio::vector_stream stream{reply.body};
+      to_json(result, stream);
+      return reply;
+   }
    else if (target == "/graphql")
    {
       PSIBASE_SUBJECTIVE_TX
