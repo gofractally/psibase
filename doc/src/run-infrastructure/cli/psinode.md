@@ -64,10 +64,6 @@ psinode - The psibase blockchain server
 
   tells psinode a peer to sync with. This argument can appear any number of times.
 
-- `--autoconnect` *number*
-
-  limits the number of out-going peer connections. If it is less than the number of `--peer` options, the later peers will be tried after a connection to an earlier peer fails.
-
 ### HTTP Server
 
 - `--service` *host*:*path*

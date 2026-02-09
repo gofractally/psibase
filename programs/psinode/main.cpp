@@ -87,69 +87,6 @@ std::string to_string(const native_service& obj)
    return obj.host + ":" + obj.root.native();
 }
 
-struct autoconnect_t
-{
-   static constexpr std::uint64_t max   = std::numeric_limits<std::size_t>::max();
-   uint64_t                       value = max;
-};
-
-void to_json(const autoconnect_t& obj, auto& stream)
-{
-   if (obj.value == autoconnect_t::max)
-   {
-      to_json(true, stream);
-   }
-   else
-   {
-      to_json(obj.value, stream);
-   }
-}
-
-void from_json(autoconnect_t& obj, auto& stream)
-{
-   auto t = stream.peek_token();
-   if (t.get().type == psio::json_token_type::type_bool)
-   {
-      if (stream.get_bool())
-      {
-         obj.value = autoconnect_t::max;
-      }
-      else
-      {
-         obj.value = 0;
-      }
-   }
-   else
-   {
-      from_json(obj.value, stream);
-   }
-}
-
-void validate(boost::any& v, const std::vector<std::string>& values, autoconnect_t*, int)
-{
-   boost::program_options::validators::check_first_occurrence(v);
-   auto s = boost::program_options::validators::get_single_string(values);
-   if (s == "on" || s == "true")
-   {
-      v = autoconnect_t{};
-   }
-   else if (s == "off" || s == "false")
-   {
-      v = autoconnect_t{0};
-   }
-   else
-   {
-      try
-      {
-         v = autoconnect_t{boost::lexical_cast<std::size_t>(s)};
-      }
-      catch (boost::bad_lexical_cast&)
-      {
-         throw boost::program_options::invalid_option_value(s);
-      }
-   }
-}
-
 struct byte_size
 {
    std::size_t value;
@@ -1172,7 +1109,6 @@ struct PsinodeServiceConfig
 struct PsinodeConfig
 {
    std::vector<std::string>    peers;
-   autoconnect_t               autoconnect;
    AccountNumber               producer;
    std::vector<std::string>    pkcs11_modules;
    std::vector<std::string>    hosts;
@@ -1186,16 +1122,15 @@ struct PsinodeConfig
    static bool isNative(std::string_view name)
    {
       constexpr std::string_view opts[] = {
-          "peers",        "autoconnect",     "producer", "pkcs11-modules",     "host",
-          "listen",       "tls-key",         "tls-cert", "tls-trustfile",      "service",
-          "http-timeout", "service-threads", "key",      "database-cache-size"};
+          "peers",           "producer", "pkcs11-modules",     "host",    "listen",
+          "tls-key",         "tls-cert", "tls-trustfile",      "service", "http-timeout",
+          "service-threads", "key",      "database-cache-size"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
 };
 PSIO_REFLECT(PsinodeConfig,
              peers,
-             autoconnect,
              producer,
              pkcs11_modules,
              hosts,
@@ -1215,11 +1150,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
       file.set(
           "", "peer", config.peers, [](std::string_view text) { return std::string(text); },
           "Peer URL's");
-   }
-   if (config.autoconnect.value != autoconnect_t::max)
-   {
-      file.set("", "autoconnect", std::to_string(config.autoconnect.value),
-               "The preferred number of outgoing peer connections.");
    }
    if (config.producer != AccountNumber())
    {
@@ -1384,7 +1314,6 @@ void run(const std::string&              db_path,
          std::shared_ptr<CompoundProver> prover,
          std::vector<std::string>&       pkcs11_modules,
          const std::vector<std::string>& peers,
-         autoconnect_t                   autoconnect,
          std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
@@ -1439,7 +1368,6 @@ void run(const std::string&              db_path,
       HostConfigRow hostConfig = toHostConfig(
           PsinodeConfig{
               .peers          = peers,
-              .autoconnect    = autoconnect,
               .producer       = producer,
               .pkcs11_modules = pkcs11_modules,
               .hosts          = hosts,
@@ -2166,7 +2094,6 @@ int main(int argc, char* argv[])
    std::vector<std::string>    hosts = {};
    std::vector<listen_spec>    listen;
    std::vector<std::string>    peers;
-   autoconnect_t               autoconnect;
    std::vector<native_service> services;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
@@ -2191,8 +2118,6 @@ int main(int argc, char* argv[])
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
    opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
-   opt("autoconnect", po::value(&autoconnect)->default_value({}, "")->value_name("num"),
-       "Limits the number of peers to be connected automatically");
    opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
        "Serve static content from directory using the specified virtual host name");
    opt("database-template", po::value(&db_template)->default_value("XDefault", ""),
@@ -2319,8 +2244,8 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, peers, autoconnect, hosts, listen, services, http_timeout,
-             service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
+             pkcs11_modules, peers, hosts, listen, services, http_timeout, service_threads, root_ca,
+             tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
