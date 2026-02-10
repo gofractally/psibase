@@ -4,16 +4,14 @@ import { supervisor } from "@/supervisor";
 
 interface UserResourcesResponse {
     userResources: {
-        balanceRaw: string | number;
-        bufferCapacityRaw: string | number;
+        balance: string | number;
         bufferCapacity: string | number;
         autoFillThresholdPercent: string | number;
     };
 }
 
 export interface UserResources {
-    balanceRaw: number;
-    bufferCapacityRaw: number;
+    balance: number;
     bufferCapacity: number;
     autoFillThresholdPercent: number;
 }
@@ -29,8 +27,7 @@ export const useUserResources = (user: string | null | undefined) => {
                 const query = `
                     query {
                         userResources(user: "${user}") {
-                            balanceRaw
-                            bufferCapacityRaw
+                            balance
                             bufferCapacity
                             autoFillThresholdPercent
                         }
@@ -59,10 +56,7 @@ export const useUserResources = (user: string | null | undefined) => {
                 }
 
                 return {
-                    balanceRaw: Number(response.data.userResources.balanceRaw),
-                    bufferCapacityRaw: Number(
-                        response.data.userResources.bufferCapacityRaw,
-                    ),
+                    balance: Number(response.data.userResources.balance),
                     bufferCapacity: Number(
                         response.data.userResources.bufferCapacity,
                     ),

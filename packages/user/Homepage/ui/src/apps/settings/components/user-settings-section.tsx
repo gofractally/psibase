@@ -29,11 +29,11 @@ export const UserSettingsSection = () => {
     const tokenSymbol = systemToken?.symbol || "$SYS";
 
     const fillPercentage = useMemo(() => {
-        if (!userResources || userResources.bufferCapacityRaw === 0) {
+        if (!userResources || userResources.bufferCapacity === 0) {
             return 0;
         }
 
-        const ratio = userResources.balanceRaw / userResources.bufferCapacityRaw;
+        const ratio = userResources.balance / userResources.bufferCapacity;
         const thresholdPercent = userResources.autoFillThresholdPercent / 100;
 
         if (ratio <= thresholdPercent) {
