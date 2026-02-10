@@ -306,6 +306,7 @@ namespace
 
    void recvMessage(std::int32_t socket, IdMessage&& msg)
    {
+      printf("Id %s\n", psio::convert_to_json(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -332,6 +333,7 @@ namespace
 
    void recvMessage(std::int32_t socket, HostnamesMessage&& msg)
    {
+      printf("Hostnames %s\n", psio::convert_to_json(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -359,6 +361,7 @@ namespace
    // on a different socket will work correctly.
    void recvMessage(std::int32_t socket, CheckDuplicatesMessage&& msg)
    {
+      printf("CheckDuplicates %s\n", psio::convert_to_json(msg).c_str());
       auto table   = XPeers{}.open<PeerConnectionTable>();
       auto hostIds = XPeers{}.open<HostIdTable>();
       std::vector<std::pair<std::int32_t, DuplicateConnectionMessage>> messages;
@@ -374,6 +377,7 @@ namespace
    }
    void recvMessage(std::int32_t socket, DuplicateConnectionMessage&& msg)
    {
+      printf("DuplicateConnection %s\n", psio::convert_to_json(msg).c_str());
       auto table = XPeers{}.open<PeerConnectionTable>();
       PSIBASE_SUBJECTIVE_TX
       {
