@@ -1,6 +1,6 @@
 import z from "zod";
 
-import { getCurrentUser } from "@/hooks/use-current-user";
+import { getCurrentUser } from "@shared/hooks/use-current-user";
 
 import { getActorHistory } from "./getActorHistory";
 import { getStagedByProposer } from "./getStagedByProposer";

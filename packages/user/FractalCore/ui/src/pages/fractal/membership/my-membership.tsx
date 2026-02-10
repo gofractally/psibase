@@ -10,12 +10,12 @@ import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { createIdenticon } from "@shared/lib/create-identicon";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";

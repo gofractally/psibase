@@ -13,8 +13,8 @@ import {
 import { NavLink } from "react-router-dom";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useCurrentUser } from "@/hooks/use-current-user";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import {
     Collapsible,

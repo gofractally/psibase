@@ -7,10 +7,10 @@ import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Table,
     TableBody,

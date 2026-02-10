@@ -1,11 +1,11 @@
 import { useState } from "react";
 
 import { EvaluationStatus, getStatus } from "@/lib/getStatus";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 
 import { useEvaluationInstance } from "./fractals/use-evaluation-instance";
 import { useFractal } from "./fractals/use-fractal";
 import { useUsersAndGroups } from "./fractals/use-users-and-groups";
-import { useCurrentUser } from "./use-current-user";
 
 export const useEvaluationStatus = (
     now: number,

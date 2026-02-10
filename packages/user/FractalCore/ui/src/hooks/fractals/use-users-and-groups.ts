@@ -1,4 +1,3 @@
-import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
@@ -10,9 +9,9 @@ import {
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
 
+import { assertUser } from "@shared/hooks/use-current-user";
+import { queryClient } from "@shared/lib/queryClient";
 import { Account } from "@shared/lib/schemas/account";
-
-import { assertUser } from "../use-current-user";
 
 let attestedEvaluationId: number | undefined;
 

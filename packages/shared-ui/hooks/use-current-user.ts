@@ -1,8 +1,10 @@
 import { QueryOptions, queryOptions, useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import QueryKey from "../lib/query-keys";
-import { zAccount } from "../lib/schemas/account";
+import { Account, zAccount } from "../lib/schemas/account";
 import { supervisor } from "../lib/supervisor";
+import { queryClient } from "../lib/queryClient";
 
 export type GetCurrentUserRes = string | null;
 
@@ -30,4 +32,12 @@ export const useCurrentUser = (
 ) => {
     const queryOptions = options ?? {};
     return useQuery({ ...queryCurrentUser, ...queryOptions });
+};
+
+export const assertUser = (): Account =>
+    zAccount.parse(queryClient.getQueryData(QueryKey.currentUser()));
+
+export const getCurrentUser = (): string | null => {
+    const res = queryClient.getQueryData(QueryKey.currentUser());
+    return res ? z.string().parse(res) : null;
 };

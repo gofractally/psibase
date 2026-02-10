@@ -1,13 +1,13 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 
+import { assertUser } from "@shared/hooks/use-current-user";
+import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { assertUser } from "../use-current-user";
 import { setDefaultMembership } from "./use-membership";
 
 const zParams = z.object({

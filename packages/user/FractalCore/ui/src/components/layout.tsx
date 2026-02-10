@@ -2,10 +2,10 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Breadcrumb,
     BreadcrumbItem,

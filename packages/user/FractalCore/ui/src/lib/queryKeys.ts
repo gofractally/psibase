@@ -16,7 +16,6 @@ const QueryKey = {
     guildMembership: (guild: OptionalAccount, member: OptionalAccount) =>
         ["guildMembership", guild, member] as const,
     guild: (guild: OptionalAccount) => ["guild", guild] as const,
-    currentUser: () => ["currentUser"] as const,
     chainId: () => ["chainId"] as const,
     createGuild: () => ["createGuild"] as const,
     userAccount: (account: string | undefined) => ["userAccount", account],

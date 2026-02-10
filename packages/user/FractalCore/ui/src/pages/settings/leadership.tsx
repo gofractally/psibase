@@ -5,9 +5,9 @@ import { SetGuildRepModal } from "@/components/modals/set-guild-rep-modal";
 
 import { useRemoveGuildRep } from "@/hooks/fractals/use-remove-guild-rep";
 import { useResignRep } from "@/hooks/fractals/use-resign-rep";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Item,

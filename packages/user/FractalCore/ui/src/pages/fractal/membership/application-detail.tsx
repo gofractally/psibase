@@ -5,10 +5,10 @@ import { EmptyBlock } from "@/components/empty-block";
 import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-modal";
 
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Card,
     CardContent,

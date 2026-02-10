@@ -1,4 +1,4 @@
-import { queryClient } from "@/queryClient";
+import { queryClient } from "@shared/lib/queryClient";
 
 import { fractalCorePlugin } from "@/lib/plugin";
 import QueryKey from "@/lib/queryKeys";

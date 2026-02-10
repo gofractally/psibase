@@ -7,10 +7,10 @@ import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-
 import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,

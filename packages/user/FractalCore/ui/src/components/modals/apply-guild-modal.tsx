@@ -2,10 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { useApplyGuild } from "@/hooks/fractals/use-apply-guild";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Dialog,
     DialogContent,

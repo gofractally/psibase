@@ -5,10 +5,10 @@ import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";

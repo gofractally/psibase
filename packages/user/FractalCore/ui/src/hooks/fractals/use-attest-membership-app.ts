@@ -1,4 +1,4 @@
-import { queryClient } from "@/queryClient";
+import { queryClient } from "@shared/lib/queryClient";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
