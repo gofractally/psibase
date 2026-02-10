@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { QueryOptions, queryOptions, useQuery } from "@tanstack/react-query";
 
 import QueryKey from "../lib/query-keys";
@@ -30,4 +31,9 @@ export const useCurrentUser = (
 ) => {
     const queryOptions = options ?? {};
     return useQuery({ ...queryCurrentUser, ...queryOptions });
+};
+
+export const getCurrentUser = (queryClient: QueryClient): string | null => {
+    const res = queryClient.getQueryData(QueryKey.currentUser());
+    return res ? zAccount.parse(res) : null;
 };

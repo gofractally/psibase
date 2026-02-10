@@ -4,7 +4,7 @@ import { FormProfile } from "@/components/form-profile";
 
 import { useCacheBust } from "@/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useProfile } from "@/hooks/use-profile";
+import { useProfile } from "@shared/hooks/use-profile";
 
 import { Avatar } from "@shared/components/avatar";
 import { useAvatar } from "@shared/hooks/use-avatar";

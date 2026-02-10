@@ -11,7 +11,7 @@ import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import { useCandidates } from "@/hooks/use-candidates";
 import { useConfigPlugin } from "@/hooks/use-config-plugin";
 import { useProducersPlugin } from "@/hooks/use-producers-plugin";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Params, SetProducerParams } from "@/lib/producers";
 
 import { Button } from "@shared/shadcn/ui/button";

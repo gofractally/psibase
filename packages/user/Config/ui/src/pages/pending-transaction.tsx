@@ -10,7 +10,7 @@ import { useRejectStaged } from "@/hooks/use-reject-staged";
 import { useRemoveStaged } from "@/hooks/use-remove-staged";
 import { useStagedTransaction } from "@/hooks/use-staged-transaction";
 import { useTxHistory } from "@/hooks/use-tx-history";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { generateAvatar } from "@/lib/createIdenticon";
 
 import { useChainId } from "@shared/hooks/use-chain-id";

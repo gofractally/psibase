@@ -1,6 +1,6 @@
 import { LogIn, LogOut, Moon, Settings, Sun, UserPlus } from "lucide-react";
 
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useLogout } from "@/hooks/useLogout";
 
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
