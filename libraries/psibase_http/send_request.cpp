@@ -48,9 +48,13 @@ namespace psibase::http
    template <>                                                                                    \
    boost::beast::websocket::stream<Stream>::stream(                                               \
        completed_handshake&&, Stream&& s, const HttpRequest& request,                             \
-       bhttp::response<bhttp::vector_body<char>>&& reply)                                         \
+       bhttp::response<bhttp::vector_body<char>>&& reply, boost::beast::flat_buffer& buffer)      \
        : stream(std::move(s))                                                                     \
    {                                                                                              \
+      if (buffer.size() > impl_->rd_buf.capacity())                                               \
+         throw std::runtime_error("Internal error: websocket buffer too large");                  \
+      impl_->rd_buf.commit(                                                                       \
+          boost::asio::buffer_copy(impl_->rd_buf.prepare(buffer.size()), buffer.data()));         \
       boost::beast::websocket::response_type response{                                            \
           reply.result(), reply.version(), std::string(reply.body().begin(), reply.body().end()), \
           static_cast<bhttp::fields&&>(reply)};                                                   \
@@ -184,8 +188,9 @@ namespace
             // TODO: We must wait for the request to be completely sent before moving
             // the stream.
             auto impl = std::make_unique<WebSocketImpl<boost::beast::websocket::stream<Stream>>>(
-                boost::beast::websocket::stream<Stream>(
-                    completed_handshake{}, std::move(self->stream), req, std::move(breply)));
+                boost::beast::websocket::stream<Stream>(completed_handshake{},
+                                                        std::move(self->stream), req,
+                                                        std::move(breply), self->buffer));
             auto cl = system->sockets->lockClose(self);
             self->replace(*bc.writer, newSocket);
             WebSocket::setImpl(cl, std::move(newSocket), std::move(impl));
