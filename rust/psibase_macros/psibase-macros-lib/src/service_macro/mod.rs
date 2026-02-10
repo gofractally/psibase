@@ -282,7 +282,7 @@ fn process_mod(
             actions = options.actions,
             name = options.name
         );
-        let call_as_with_doc = format!(
+        let call_as_extend_doc = format!(
             "{} This method also accepts `allowedActions` for nested `runAs` calls.",
             call_as_doc
         );
@@ -414,8 +414,8 @@ fn process_mod(
                     .into()
                 }
 
-                #[doc = #call_as_with_doc]
-                pub fn call_as_with(
+                #[doc = #call_as_extend_doc]
+                pub fn call_as_extend(
                     sender: #psibase_mod::AccountNumber,
                     allowed_actions: Vec<#psibase_mod::services::transact::ServiceMethod>)
                 -> #actions<#psibase_mod::RunAsCaller>
