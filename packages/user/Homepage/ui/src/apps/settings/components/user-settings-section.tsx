@@ -5,8 +5,8 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import { toast } from "@shared/shadcn/ui/sonner";
 
+import { useBillingConfig } from "../hooks/use-billing-config";
 import {
     useFillGasTank,
     useResizeAndFillGasTank,
@@ -17,8 +17,16 @@ import { GasTank } from "./gas-tank";
 
 export const UserSettingsSection = () => {
     const { data: currentUser } = useCurrentUser();
-    const { data: userResources, isLoading: isLoadingResources } =
-        useUserResources(currentUser);
+    const { data: billingConfig, isLoading: isLoadingBillingConfig } =
+        useBillingConfig();
+    const billingEnabled =
+        !isLoadingBillingConfig && billingConfig?.enabled === true;
+    const {
+        data: userResources,
+        isLoading: isLoadingResources,
+        isError: isUserResourcesError,
+        error: userResourcesError,
+    } = useUserResources(currentUser, { enabled: billingEnabled });
     const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const { mutateAsync: fillGasTank, isPending: isFilling } = useFillGasTank();
     const {
@@ -69,10 +77,13 @@ export const UserSettingsSection = () => {
             } else {
                 await fillGasTank();
             }
-        } catch (error) {
+        } catch {
             // Error is already handled by the mutation's onError
         }
     };
+
+    const isDisabled =
+        !billingEnabled || isPending || isLoadingResources;
 
     return (
         <div className="space-y-6">
@@ -98,7 +109,7 @@ export const UserSettingsSection = () => {
                                 className="w-24"
                                 min="0"
                                 step="any"
-                                disabled={isPending || isLoadingResources}
+                                disabled={isDisabled}
                             />
                             <span className="text-muted-foreground">
                                 {isLoadingToken ? "..." : tokenSymbol}
@@ -109,7 +120,7 @@ export const UserSettingsSection = () => {
                     <Button
                         className="w-full"
                         onClick={handleRefill}
-                        disabled={isPending || isLoadingResources}
+                        disabled={isDisabled}
                     >
                         {isPending
                             ? capacityModified
@@ -117,6 +128,11 @@ export const UserSettingsSection = () => {
                                 : "Refilling..."
                             : "Refill"}
                     </Button>
+                    {isUserResourcesError && (
+                        <div className="text-destructive text-sm">
+                            {userResourcesError?.message}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

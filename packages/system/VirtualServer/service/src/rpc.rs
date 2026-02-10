@@ -253,10 +253,11 @@ impl Query {
     async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
         self.check_user_auth(user)?;
 
-        let config = BillingConfig::get()
-            .filter(|c| c.enabled)
-            .ok_or_else(|| async_graphql::Error::new("billing not enabled"))?;
-        let p = Tokens::call().getToken(config.sys).precision;
+        let config = BillingConfig::get();
+        if config.is_none() {
+            return Err(async_graphql::Error::new("billing not initialized"));
+        }
+        let p = Tokens::call().getToken(config.unwrap().sys).precision;
 
         let settings = UserSettings::get(user);
 

@@ -36,6 +36,7 @@ export const useProfile = (
             `,
                 {
                     service: "profiles",
+                    baseUrlIncludesSibling: false,
                     ...options,
                 },
             );
