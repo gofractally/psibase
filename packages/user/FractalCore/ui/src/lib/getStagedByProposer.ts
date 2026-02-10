@@ -1,8 +1,7 @@
 import { z } from "zod";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
-
-import { graphql } from "./graphql";
 
 const zRes = z.object({
     getStagedByProposer: z.object({
@@ -25,7 +24,7 @@ export const getStagedByProposer = async (account: Account) => {
                 }
         }
     }`,
-        "staged-tx",
+        { service: "staged-tx" },
     );
 
     return zRes.parse(res).getStagedByProposer.nodes;

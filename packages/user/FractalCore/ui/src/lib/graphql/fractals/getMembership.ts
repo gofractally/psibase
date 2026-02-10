@@ -4,9 +4,8 @@ import { FRACTALS_SERVICE } from "@/lib/constants";
 import { zDateTime } from "@/lib/zod/DateTime";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
 
 export const zMember = z
     .object({
@@ -34,7 +33,7 @@ export const getMembership = async (
 
         } 
     }`,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return z

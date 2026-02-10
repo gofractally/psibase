@@ -4,11 +4,8 @@ import { FRACTALS_SERVICE } from "@/lib/constants";
 import { zDateTime } from "@/lib/zod/DateTime";
 import { MemberStatus } from "@/lib/zod/MemberStatus";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
-
-import { zDateTime } from "@/lib/zod/DateTime";
 
 export const zMemberListInstance = z.object({
     account: zAccount,
@@ -29,7 +26,7 @@ export const getMembers = async (fractalAccount: Account) => {
                 createdAt
         }} 
     }`,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return z

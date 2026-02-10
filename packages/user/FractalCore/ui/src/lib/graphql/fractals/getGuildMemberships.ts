@@ -2,9 +2,8 @@ import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
 
 const FractalSchema = z.object({
     account: z.string(),
@@ -45,7 +44,7 @@ export const getGuildMemberships = async (member: Account) => {
             }
         }
     `,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return DataSchema.parse(res).guildMemberships.nodes;

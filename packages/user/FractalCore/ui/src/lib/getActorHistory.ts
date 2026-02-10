@@ -1,8 +1,8 @@
 import z from "zod";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
-import { graphql } from "./graphql";
 import { zDateTime } from "./zod/DateTime";
 
 const HistoryItem = z.object({
@@ -37,7 +37,7 @@ export const getActorHistory = async (account: Account) => {
                         }
                     }
                 }`,
-        "staged-tx",
+        { service: "staged-tx" },
     );
 
     return response.parse(res).actorHistory.nodes;

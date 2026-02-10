@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { EVALUATIONS_SERVICE } from "@/lib/constants";
-import { graphql } from "@/lib/graphql";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zUser = z.object({
@@ -66,10 +66,8 @@ export const getUsersAndGroups = async (
                 }
             }
         }`,
-        EVALUATIONS_SERVICE,
+        { service: EVALUATIONS_SERVICE },
     );
-
-    console.log(res, "was the res");
 
     const response = z
         .object({

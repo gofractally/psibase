@@ -3,11 +3,8 @@ import { z } from "zod";
 import { FRACTALS_SERVICE } from "@/lib/constants";
 import { zDateTime } from "@/lib/zod/DateTime";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
-
-import { zDateTime } from "@/lib/zod/DateTime";
 
 export const zScore = z.object({
     member: zAccount,
@@ -29,7 +26,7 @@ export const getScores = async (guild: Account) => {
             } 
         }
     }`,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return z

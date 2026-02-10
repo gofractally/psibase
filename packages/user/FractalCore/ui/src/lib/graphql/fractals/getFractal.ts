@@ -3,10 +3,9 @@ import { z } from "zod";
 import { FRACTALS_SERVICE } from "@/lib/constants";
 import { zDateTime } from "@/lib/zod/DateTime";
 
+import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zU8 } from "@shared/lib/schemas/u8";
-
-import { graphql } from "../../graphql";
 
 export const zFractal = z
     .object({
@@ -100,7 +99,7 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
             }
         }
     }`,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return zFractalRes.parse(fractal);

@@ -2,9 +2,8 @@ import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
 
+import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
 
 export const zFractalListInstance = z.object({
     account: zAccount,
@@ -27,7 +26,7 @@ export const getFractals = async () => {
                 }
             }
         `,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return z
