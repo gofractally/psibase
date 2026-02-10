@@ -589,6 +589,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
 
 void XPeers::onConfig()
 {
+   check(getSender() == XAdmin::service, "Wrong sender");
    auto                     opts      = open<AdminOptionsTable>();
    auto                     urls      = open<UrlTable>();
    auto                     urlTimers = open<UrlTimerTable>();
@@ -647,6 +648,7 @@ void XPeers::onConfig()
 
 void XPeers::onP2P(std::int32_t socket, HttpReply reply)
 {
+   check(getSender() == XHttp::service, "Wrong sender");
    std::optional<ConnectionRequestRow> request;
    std::optional<ConnectReply>         replyBody;
    auto                                connectionRequests = open<ConnectionRequestTable>();
@@ -686,6 +688,7 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
 
 void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
 {
+   check(getSender() == XHttp::service, "Wrong sender");
    std::optional<ConnectionRequestRow> request;
    auto                                connectionRequests = open<ConnectionRequestTable>();
    auto                                peers              = open<PeerConnectionTable>();
@@ -721,6 +724,7 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
 
 void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data)
 {
+   check(getSender() == XHttp::service, "Wrong sender");
    check(!data.empty(), "Invalid message");
    switch (data[0].unpack())
    {
@@ -739,11 +743,13 @@ void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> da
 
 void XPeers::closeP2P(std::int32_t socket)
 {
+   check(getSender() == XHttp::service, "Wrong sender");
    removePeer(socket);
 }
 
 void XPeers::onTimer(std::uint64_t timerId)
 {
+   check(getSender() == XTimer::service, "Wrong sender");
    auto                  timers = open<UrlTimerTable>();
    auto                  urls   = open<UrlTable>();
    std::optional<UrlRow> url;
