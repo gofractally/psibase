@@ -268,9 +268,9 @@ void Invite::delInvite(uint32_t inviteId)
 
       if (balanceRecord.has_value())
       {
-         auto balance = *balanceRecord;
-         to<Tokens>().fromSub(sys, sub_account, balance);
-         to<Tokens>().credit(sys, invite->inviter, balance, "Unused invite tokens refunded");
+         to<Tokens>().fromSub(sys, sub_account, balanceRecord->value);
+         to<Tokens>().credit(sys, invite->inviter, balanceRecord->value,
+                             "Unused invite tokens refunded");
       }
    }
 
