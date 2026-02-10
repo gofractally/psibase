@@ -452,10 +452,60 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
     -> std::optional<HttpReply>
 {
    check(getSender() == XHttp::service, "Wrong sender");
+
+   auto target = request.path();
+   if (target == "/p2p")
+   {
+      auto options = to<XAdmin>().options();
+      if (options.p2p)
+      {
+         if (auto reply = webSocketHandshake(request))
+         {
+            if (auto origin = request.getHeader("origin"))
+            {
+               if (allowCorsSubdomains(request).empty())
+               {
+                  std::string_view msg{"Cross-origin request refused"};
+                  return HttpReply{.status      = HttpStatus::badRequest,
+                                   .contentType = "text/html",
+                                   .body{msg.begin(), msg.end()}};
+               }
+            }
+            to<XHttp>().accept(*socket, *reply);
+            auto table = Native::session().open<SocketTable>();
+            auto peers = open<PeerConnectionTable>();
+            PSIBASE_SUBJECTIVE_TX
+            {
+               auto  row     = table.get(*socket).value();
+               auto& oldInfo = std::get<WebSocketInfo>(row.info);
+               row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
+               table.put(row);
+               peers.put({.socket     = *socket,
+                          .peerSocket = -1,
+                          .nodeId     = 0,
+                          .secure     = false,
+                          .local      = false,
+                          .outgoing   = false});
+               to<XHttp>().setCallback(*socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
+            }
+            to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
+            to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}));
+            return {};
+         }
+         else
+         {
+            std::string_view msg{"/p2p is a websocket endpoint"};
+            return HttpReply{.status      = HttpStatus::upgradeRequired,
+                             .contentType = "text/html",
+                             .body{msg.begin(), msg.end()},
+                             .headers = {{"Upgrade", "websocket"}}};
+         }
+      }
+   }
+
    if (auto reply = to<XAdmin>().checkAuth(request, socket))
       return reply;
 
-   auto target = request.path();
    if (request.method == "OPTIONS")
    {
       HttpReply result{.headers = allowCors(request, XAdmin::service)};
@@ -468,7 +518,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       {
          std::string_view msg{"Content-Type must be application/json"};
          return HttpReply{.status      = HttpStatus::unsupportedMediaType,
-                          .contentType = "application/html",
+                          .contentType = "text/html",
                           .body{msg.begin(), msg.end()}};
       }
       if (request.method != "POST")
@@ -485,7 +535,7 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       {
          std::string_view msg{"Content-Type must be application/json"};
          return HttpReply{.status      = HttpStatus::unsupportedMediaType,
-                          .contentType = "application/html",
+                          .contentType = "text/html",
                           .body{msg.begin(), msg.end()}};
       }
       if (request.method != "POST")
@@ -512,37 +562,9 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
       {
          std::string_view msg{"Socket not found"};
          return HttpReply{.status      = HttpStatus::notFound,
-                          .contentType = "application/html",
+                          .contentType = "text/html",
                           .body{msg.begin(), msg.end()},
                           .headers = allowCors(request, XAdmin::service)};
-      }
-   }
-   else if (target == "/p2p")
-   {
-      if (auto reply = webSocketHandshake(request))
-      {
-         auto options = to<XAdmin>().options();
-         if (!options.p2p)
-            return {};
-         to<XHttp>().accept(*socket, *reply);
-         auto table = Native::session().open<SocketTable>();
-         auto peers = open<PeerConnectionTable>();
-         PSIBASE_SUBJECTIVE_TX
-         {
-            auto  row     = table.get(*socket).value();
-            auto& oldInfo = std::get<WebSocketInfo>(row.info);
-            row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
-            table.put(row);
-            peers.put({.socket     = *socket,
-                       .peerSocket = -1,
-                       .nodeId     = 0,
-                       .secure     = false,
-                       .local      = false,
-                       .outgoing   = false});
-            to<XHttp>().setCallback(*socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
-         }
-         to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
-         to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}));
       }
    }
    else if (target == "/peers")
