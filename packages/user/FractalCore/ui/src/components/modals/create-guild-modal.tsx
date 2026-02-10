@@ -5,10 +5,10 @@ import {
     zParams as zCreateGuild,
 } from "@/hooks/fractals/use-create-guild";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { isAccountAvailable } from "@/lib/isAccountAvailable";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { isAccountAvailable } from "@shared/lib/get-account";
 import {
     Dialog,
     DialogContent,
