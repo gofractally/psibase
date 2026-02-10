@@ -4,8 +4,8 @@ import { useUnregister } from "@/hooks/fractals/use-unregister";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNowUnix } from "@/hooks/use-now-unix";
 import { RegistrationPhase } from "@/lib/getStatus";
-import { humanize } from "@/lib/humanize";
 
+import { humanize } from "@shared/lib/humanize";
 import { Button } from "@shared/shadcn/ui/button";
 
 export const Register = ({ status }: { status: RegistrationPhase }) => {

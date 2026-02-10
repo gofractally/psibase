@@ -1,4 +1,4 @@
-import { humanize } from "@/lib/humanize";
+import { humanize } from "@shared/lib/humanize";
 
 import { useNowUnix } from "./use-now-unix";
 
