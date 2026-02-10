@@ -210,13 +210,19 @@ namespace UserService
 
       static void validate_decimal_string(std::string_view s)
       {
+         bool has_digit = false;
          for (char c : s)
          {
             if (c != '.' && !std::isdigit(static_cast<unsigned char>(c)))
             {
-               psibase::check(false, "Invalid number: contains non-digit characters");
+               psibase::abortMessage("Invalid number: contains non-digit characters");
+            }
+            if (std::isdigit(static_cast<unsigned char>(c)))
+            {
+               has_digit = true;
             }
          }
+         psibase::check(has_digit, "Invalid number: must contain at least one digit");
       }
 
       static std::tuple<std::string_view, std::string_view, uint8_t> split_decimal_string(
