@@ -2,6 +2,8 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 import {
@@ -19,32 +21,53 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
-import { staticFractalMenus } from "./nav-main";
+import { getMenuGroups } from "./nav-main";
 
 export const Layout = () => {
     const fractal = useFractalAccount();
     const location = useLocation();
+    const { data: currentUser } = useCurrentUser();
+    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
 
-    const pathNameIndex = (index: number) => {
-        return location.pathname.split("/")[index];
+    const menuGroups = getMenuGroups(memberships);
+
+    // Find breadcrumb data from the nested menu structure
+    const findBreadcrumbData = (pathname: string) => {
+        for (const group of menuGroups) {
+            // Check direct items (like "Guilds")
+            for (const item of group.items) {
+                if (item.path && pathname === item.path) {
+                    return {
+                        groupLabel: group.groupLabel,
+                        parentMenu: undefined,
+                        pageName: item.title,
+                    };
+                }
+
+                // Check sub-items
+                if (item.subItems) {
+                    for (const subItem of item.subItems) {
+                        if (pathname === subItem.path) {
+                            return {
+                                groupLabel: group.groupLabel,
+                                parentMenu: item.title,
+                                pageName: subItem.title,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     };
 
-    const selectedGroup = staticFractalMenus.find(
-        (menu) => pathNameIndex(3) == menu.path,
-    );
-
-    const selectedGroupName = selectedGroup?.groupLabel;
-
-    const selectedPage = selectedGroup?.menus.find(
-        (menu) => pathNameIndex(4) == menu.path,
-    );
-
-    const pageName = selectedPage?.title;
+    const breadcrumbData = findBreadcrumbData(location.pathname);
 
     const breadCrumbs: (string | undefined)[] = [
         fractal || "Browse",
-        selectedGroupName,
-        pageName,
+        breadcrumbData?.groupLabel,
+        breadcrumbData?.parentMenu,
+        breadcrumbData?.pageName,
     ];
 
     return (

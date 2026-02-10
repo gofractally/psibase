@@ -62,11 +62,6 @@ export const MyMembership = () => {
         error: errorChainId,
     } = useChainId();
 
-    console.log({ errorFractal, errorMembership, errorChainId }, "x", {
-        fractal,
-        membership,
-    });
-
     const isLoading =
         isLoadingCurrentUser ||
         isLoadingFractal ||

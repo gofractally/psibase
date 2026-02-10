@@ -31,64 +31,27 @@ import {
     SidebarMenuSubItem,
 } from "@shared/shadcn/ui/sidebar";
 
-interface SubMenuItem {
-    title: string;
-    icon: LucideIcon;
-    path: string;
+export interface MenuGroup {
+    groupLabel: string;
+    items: MenuItem[];
 }
 
-interface MenuItem {
+export interface MenuItem {
     title: string;
     icon?: LucideIcon;
     path?: string;
     subItems?: SubMenuItem[];
 }
 
-interface MenuGroup {
-    groupLabel: string;
-    items: MenuItem[];
+export interface SubMenuItem {
+    title: string;
+    icon: LucideIcon;
+    path: string;
 }
 
-// Export menu structure for breadcrumbs (compatible with old structure)
-export const staticFractalMenus = [
-    {
-        groupLabel: "Fractal",
-        path: "",
-        menus: [
-            {
-                title: "My membership",
-                icon: Contact,
-                path: "membership",
-            },
-            {
-                title: "Members",
-                icon: Users,
-                path: "members",
-            },
-            {
-                title: "Legislative",
-                icon: Scale,
-                path: "legislative",
-            },
-            {
-                title: "Judicial",
-                icon: Gavel,
-                path: "judicial",
-            },
-            {
-                title: "Guilds",
-                icon: Landmark,
-                path: "guilds",
-            },
-        ],
-    },
-];
-
-export function NavMain() {
-    const { data: currentUser } = useCurrentUser();
-    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
-
-    // Fractal group menu structure
+export function getMenuGroups(
+    memberships?: Array<{ guild: { account: string; displayName: string } }>,
+): MenuGroup[] {
     const fractalGroup: MenuGroup = {
         groupLabel: "Fractal",
         items: [
@@ -132,7 +95,6 @@ export function NavMain() {
         ],
     };
 
-    // My Guilds group menu structure
     const myGuildsGroup: MenuGroup = {
         groupLabel: "My Guilds",
         items:
@@ -163,11 +125,17 @@ export function NavMain() {
             })) || [],
     };
 
-    // Always show Fractal group, and My Guilds group when there are memberships
-    const groups = [
+    return [
         fractalGroup,
         ...(memberships && memberships.length > 0 ? [myGuildsGroup] : []),
     ];
+}
+
+export function NavMain() {
+    const { data: currentUser } = useCurrentUser();
+    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
+
+    const groups = getMenuGroups(memberships);
 
     const renderMenuItem = (item: MenuItem, basePath: string = "") => {
         const hasSubItems = item.subItems && item.subItems.length > 0;
