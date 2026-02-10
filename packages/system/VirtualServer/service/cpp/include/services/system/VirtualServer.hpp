@@ -269,9 +269,12 @@ namespace SystemService
 
       void notifyBlock(psibase::BlockNum block_num);
 
-      /// This actions sets the CPU limit for the specified account.
-      /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
-      void setCpuLimit(psibase::AccountNumber account);
+      /// This actions specifies which account is primarily responsible for
+      /// paying the bill for any consumed resources.
+      ///
+      /// A time limit for the execution of the current tx/query will be set based
+      /// on the resources available for the specified account.
+      void setBillableAcc(psibase::AccountNumber account);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
@@ -328,7 +331,7 @@ namespace SystemService
                 method(useCpuSys, user, amount_ns),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
-                method(setCpuLimit, account),
+                method(setBillableAcc, account),
                 method(serveSys, request, socket, user))
 
    PSIBASE_REFLECT_EVENTS(VirtualServer);

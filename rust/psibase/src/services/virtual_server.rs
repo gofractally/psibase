@@ -374,10 +374,13 @@ mod service {
         unimplemented!()
     }
 
-    /// This actions sets the CPU limit for the specified account.
-    /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
+    /// This actions specifies which account is primarily responsible for
+    /// paying the bill for any consumed resources.
+    ///
+    /// A time limit for the execution of the current tx/query will be set based
+    /// on the resources available for the specified account.
     #[action]
-    fn setCpuLimit(account: AccountNumber) {
+    fn setBillableAcc(account: AccountNumber) {
         unimplemented!()
     }
 

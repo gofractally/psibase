@@ -504,7 +504,7 @@ namespace SystemService
             if (isResMonitoring())
             {
                // If resMonitoring is disabled, no CPU limit is set for the transaction
-               to<VirtualServer>().setCpuLimit(act.sender());
+               to<VirtualServer>().setBillableAcc(act.sender());
             }
          }
          if (readOnly)
