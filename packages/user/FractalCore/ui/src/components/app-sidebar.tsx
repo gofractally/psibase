@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 
 // import { GuildSwitcher } from "@/components/guild-switcher";
 import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
 
 import { NetworkLogo } from "@shared/components/network-logo";
+import { UserSidebarNavFooter } from "@shared/components/user-sidebar-nav-footer";
 import {
     Sidebar,
     SidebarContent,
@@ -40,7 +40,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <NavMain />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser />
+                <UserSidebarNavFooter />
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>

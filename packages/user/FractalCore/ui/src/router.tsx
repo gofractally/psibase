@@ -6,7 +6,8 @@ import { AllMembers } from "@/pages/fractal/membership/all-members";
 import { MyMembership } from "@/pages/fractal/membership/my-membership";
 
 import { Layout } from "@/components/layout";
-import { ProtectedRoute } from "@/components/protected-route";
+
+import { ProtectedRoute } from "@shared/components/protected-route";
 
 import { Judicial } from "./pages/fractal/branches/judicial";
 import { Legislative } from "./pages/fractal/branches/legislative";
@@ -17,8 +18,8 @@ import { MyGuildMembership } from "./pages/fractal/guild-membership/my-guild-mem
 import { Guilds } from "./pages/fractal/guilds";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
 import { Applications } from "./pages/fractal/membership/applications";
-import { Settings } from "./pages/settings";
 import { Leadership } from "./pages/leadership";
+import { Settings } from "./pages/settings";
 
 export const router = createBrowserRouter([
     {
