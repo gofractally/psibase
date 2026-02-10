@@ -152,18 +152,21 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
       auto needed = sum.value * static_cast<uint64_t>(numAccounts);
       check(resources >= needed, notEnoughResources.data());
 
-      to<Tokens>().debit(sys, sender, resources, "");
+      if (needed > 0)
+      {
+         to<Tokens>().debit(sys, sender, resources, "");
 
-      // Reserve the exact amount needed for basic resource buffering for new accounts)
-      auto resource_buffers_reserve =
-          Quantity{gas_tank_reserve * static_cast<uint64_t>(numAccounts)};
-      to<Tokens>().toSub(sys, std::to_string(inviteId), resource_buffers_reserve);
+         // Reserve the exact amount needed for basic resource buffering for new accounts)
+         auto resource_buffers_reserve =
+             Quantity{gas_tank_reserve * static_cast<uint64_t>(numAccounts)};
+         to<Tokens>().toSub(sys, std::to_string(inviteId), resource_buffers_reserve);
 
-      // The rest of the resources go to the credential, to subsidize the `create` action,
-      // which could (via hooks) require more resources than the simple default `createAccount` action.
-      auto credential_resources = resources - resource_buffers_reserve;
-      to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
-      to<Credentials>().resource(cid, credential_resources);
+         // The rest of the resources go to the credential, to subsidize the `create` action,
+         // which could (via hooks) require more resources than the simple default `createAccount` action.
+         auto credential_resources = resources - resource_buffers_reserve;
+         to<Tokens>().credit(sys, Credentials::service, credential_resources, "");
+         to<Credentials>().resource(cid, credential_resources);
+      }
    }
 
    auto inviteTable = open<InviteTable>(KvMode::readWrite);
