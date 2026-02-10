@@ -11,9 +11,9 @@ import { useSetGuildDisplayName } from "@/hooks/fractals/use-set-guild-display-n
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { useNowUnix } from "@/hooks/use-now-unix";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { useNowUnix } from "@shared/hooks/use-now-unix";
 
 import { Leadership } from "./leadership";
 

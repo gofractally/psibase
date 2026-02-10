@@ -2,9 +2,9 @@ import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance"
 import { useRegister } from "@/hooks/fractals/use-register";
 import { useUnregister } from "@/hooks/fractals/use-unregister";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { useNowUnix } from "@/hooks/use-now-unix";
 import { RegistrationPhase } from "@/lib/getStatus";
 
+import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { humanize } from "@shared/lib/humanize";
 import { Button } from "@shared/shadcn/ui/button";
 

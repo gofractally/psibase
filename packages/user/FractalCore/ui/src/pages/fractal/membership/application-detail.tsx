@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { EmptyBlock } from "@/components/empty-block";
 import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-modal";
 
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Card,

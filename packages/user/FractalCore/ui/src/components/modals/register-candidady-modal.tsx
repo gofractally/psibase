@@ -2,9 +2,9 @@ import dayjs from "dayjs";
 
 import { useGuildMembership } from "@/hooks/fractals/use-guild-membership";
 import { useRegisterCandidacy } from "@/hooks/fractals/use-register-candidacy";
-import { useNowUnix } from "@/hooks/use-now-unix";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { humanize } from "@shared/lib/humanize";
 import { zAccount } from "@shared/lib/schemas/account";
 import {

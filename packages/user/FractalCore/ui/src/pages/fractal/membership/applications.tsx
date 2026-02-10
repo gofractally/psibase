@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { EmptyBlock } from "@/components/empty-block";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
@@ -10,6 +9,7 @@ import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-membership
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Table,

@@ -11,8 +11,8 @@ import { useWatchAttest } from "@/hooks/fractals/use-watch-attest";
 import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { useNowUnix } from "@/hooks/use-now-unix";
 
+import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { arrayMove } from "@shared/lib/array-move";
 import { humanize } from "@shared/lib/humanize";
 import { Account } from "@shared/lib/schemas/account";

@@ -34,7 +34,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
-                {/* <GuildSwitcher /> */}
             </SidebarHeader>
             <SidebarContent>
                 <NavMain />

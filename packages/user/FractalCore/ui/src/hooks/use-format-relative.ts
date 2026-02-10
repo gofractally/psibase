@@ -1,6 +1,6 @@
 import { humanize } from "@shared/lib/humanize";
 
-import { useNowUnix } from "./use-now-unix";
+import { useNowUnix } from "@shared/hooks/use-now-unix";
 
 export const useFormatRelative = (date: Date | number | undefined | null) => {
     const now = useNowUnix();
