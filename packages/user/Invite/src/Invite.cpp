@@ -1,3 +1,4 @@
+#include <limits>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/AuthSig.hpp>
@@ -141,7 +142,14 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
       auto sys                   = getSysToken();
       auto create_action_reserve = get_create_action_reserve();
       auto gas_tank_reserve      = get_std_buffer_reserve();
-      auto needed = (create_action_reserve + gas_tank_reserve) * static_cast<uint64_t>(numAccounts);
+      auto sum                   = create_action_reserve + gas_tank_reserve;
+      if (numAccounts > 0)
+      {
+         check(
+             sum.value <= std::numeric_limits<uint64_t>::max() / static_cast<uint64_t>(numAccounts),
+             tooManyAccounts.data());
+      }
+      auto needed = sum.value * static_cast<uint64_t>(numAccounts);
       check(resources >= needed, notEnoughResources.data());
 
       to<Tokens>().debit(sys, sender, resources, "");
