@@ -10,18 +10,12 @@ export type OptionalNumber = number | undefined | null;
 
 const QueryKey = {
     fractals: () => ["fractals"] as const,
-    memberships: (user: OptionalAccount) => ["memberships", user] as const,
     guildMemberships: (user: OptionalAccount) =>
         ["guildMemberships", user] as const,
     guildMembership: (guild: OptionalAccount, member: OptionalAccount) =>
         ["guildMembership", guild, member] as const,
     guild: (guild: OptionalAccount) => ["guild", guild] as const,
-    chainId: () => ["chainId"] as const,
-    createGuild: () => ["createGuild"] as const,
-    userAccount: (account: string | undefined) => ["userAccount", account],
     fractal: (account: OptionalAccount) => ["fractal", account] as const,
-    branding: () => ["branding"] as const,
-    logout: () => ["logout"] as const,
     members: (fractalAccount: OptionalAccount) =>
         ["members", fractalAccount] as const,
     scores: (guildAccount: OptionalAccount) =>
