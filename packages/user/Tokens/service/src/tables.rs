@@ -864,18 +864,39 @@ pub mod tables {
         }
 
         pub fn delete(&mut self) {
-            let sub_balances: Vec<_> = SubAccountBalanceTable::read()
+            let sub_bal_table = SubAccountBalanceTable::read_write();
+
+            let sub_balances: Vec<_> = sub_bal_table
                 .get_index_pk()
                 .range((self.id, 0)..(self.id, u32::MAX))
                 .collect();
 
-            let sab_table = SubAccountBalanceTable::read_write();
             for sub_balance in sub_balances {
+                check(
+                    sub_balance.balance.value == 0,
+                    "Sub-account with non-zero balances cannot be deleted",
+                );
+                sub_bal_table.erase(&sub_balance.pk());
+            }
+
+            SubAccountTable::read_write().erase(&(&self.pk()));
+        }
+
+        pub fn force_delete(&mut self) {
+            let sub_bal_table = SubAccountBalanceTable::read_write();
+
+            let sub_balances: Vec<_> = sub_bal_table
+                .get_index_pk()
+                .range((self.id, 0)..(self.id, u32::MAX))
+                .collect();
+
+            for sub_balance in sub_balances {
+                // Move any sub-account balances to the primary balance
                 if sub_balance.balance.value > 0 {
                     Balance::get_or_new(self.account, sub_balance.token_id)
                         .add_balance(sub_balance.balance);
                 }
-                sab_table.erase(&sub_balance.pk());
+                sub_bal_table.erase(&sub_balance.pk());
             }
 
             SubAccountTable::read_write().erase(&(&self.pk()));

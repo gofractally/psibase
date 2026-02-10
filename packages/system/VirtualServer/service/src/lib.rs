@@ -262,11 +262,11 @@ mod service {
         };
 
         let sub_account = UserSettings::to_sub_account_key(sender, &sub_account);
-        Tokens::call().deleteSub(sub_account);
-
         if balance.value != 0u64 {
+            Tokens::call().fromSub(sys, sub_account.clone(), balance);
             Tokens::call().toSub(sys, sender.to_string(), balance);
         }
+        Tokens::call().deleteSub(sub_account);
     }
 
     /// Gets the amount of resources available for the caller

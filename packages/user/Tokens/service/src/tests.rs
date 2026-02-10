@@ -87,7 +87,7 @@ mod tests {
         // Bob cannot debit more than whats in the shared balance
         assert_error(
             b.debit(tid, alice, 6.into(), memo.clone()),
-            "Insufficient token balance",
+            "Insufficient shared balance",
         );
         b.debit(tid, alice, 5.into(), memo.clone());
         assert_eq!(0, get_shared_balance(&chain, tid, alice, bob).value);
@@ -281,7 +281,7 @@ mod tests {
         // Check overdraw from primary
         assert_error(
             a.toSub(tid, savings.clone(), 100_0000.into()),
-            "Insufficient token balance",
+            "insufficient balance",
         );
 
         // Check multiple sub-accounts
@@ -308,8 +308,13 @@ mod tests {
         assert_eq!(3_0000, checking_balance);
 
         // Check delete sub-account
-        a.deleteSub(savings.clone()).get()?;
-        a.deleteSub(checking.clone()).get()?;
+
+        assert_error(
+            a.deleteSub(savings.clone()),
+            "Sub-account with non-zero balances cannot be deleted",
+        );
+        a.fDeleteSub(savings.clone()).get()?;
+        a.fDeleteSub(checking.clone()).get()?;
         assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
 
         assert_query_error(
@@ -340,8 +345,8 @@ mod tests {
         let savings_balance_b = get_subaccount_balance(&chain, bob, &savings, tid, &token_b)?;
         assert_eq!(1_0000, savings_balance_a);
         assert_eq!(2_0000, savings_balance_b);
-        a.deleteSub(savings.clone()).get()?;
-        b.deleteSub(savings.clone()).get()?;
+        a.fDeleteSub(savings.clone()).get()?;
+        b.fDeleteSub(savings.clone()).get()?;
 
         // Check multiple tokens in same sub-account
         a.toSub(tid, savings.clone(), 2_0000.into()).get()?;

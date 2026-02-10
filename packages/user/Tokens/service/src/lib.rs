@@ -507,15 +507,26 @@ pub mod service {
         SubAccount::get_or_add(get_sender(), sub_account);
     }
 
-    /// Deletes a "sub-account" balance
+    /// Deletes a "sub-account"
     ///
-    /// All nonzero token balances in the sub-account will be returned to the primary balance.
+    /// This action will fail if any sub-account balances are non-zero.
     ///
     /// # Arguments
     /// * `sub_account` - Sub-account key
     #[action]
     fn deleteSub(sub_account: String) {
         SubAccount::get_assert(get_sender(), sub_account).delete();
+    }
+
+    /// Force deletes a "sub-account"
+    ///
+    /// All nonzero token balances in the sub-account will be returned to the primary balance.
+    ///
+    /// # Arguments
+    /// * `sub_account` - Sub-account key
+    #[action]
+    fn fDeleteSub(sub_account: String) {
+        SubAccount::get_assert(get_sender(), sub_account).force_delete();
     }
 
     /// Sets the system token

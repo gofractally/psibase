@@ -223,11 +223,19 @@ namespace UserService
 
       /// Deletes a "sub-account" balance
       ///
-      /// All nonzero token balances in the sub-account will be returned to the primary balance.
+      /// This action will fail if any sub-account balances are non-zero.
       ///
       /// # Arguments
       /// * `sub_account` - Sub-account key
       void deleteSub(std::string subAccount);
+
+      /// Force deletes a "sub-account"
+      ///
+      /// All nonzero token balances in the sub-account will be returned to the primary balance.
+      ///
+      /// # Arguments
+      /// * `sub_account` - Sub-account key
+      void fDeleteSub(std::string subAccount);
 
       // Read-only interface:
 
@@ -377,6 +385,7 @@ namespace UserService
       method(fromSub, tokenId, subAccount, amount),
       method(createSub, subAccount),
       method(deleteSub, subAccount),
+      method(fDeleteSub, subAccount),
       method(debit, tokenId, creditor, amount, memo),
       method(recall, tokenId, from, amount, memo),
       method(getToken, tokenId),
