@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
-import { zDateTime } from "@/lib/zod/DateTime";
 
 import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
+import { zDateTime } from "@shared/lib/schemas/date-time";
 
 const FractalSchema = z.object({
     account: z.string(),

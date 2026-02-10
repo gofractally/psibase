@@ -3,7 +3,7 @@ import z from "zod";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
-import { zDateTime } from "./zod/DateTime";
+import { zDateTime } from "@shared/lib/schemas/date-time";
 
 const HistoryItem = z.object({
     actor: zAccount,

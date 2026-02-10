@@ -2,8 +2,8 @@ import z from "zod";
 
 import { getCurrentUser } from "@shared/hooks/use-current-user";
 
-import { getActorHistory } from "./getActorHistory";
-import { getStagedByProposer } from "./getStagedByProposer";
+import { getActorHistory } from "./get-actor-history";
+import { getStagedByProposer } from "./get-staged-by-proposer";
 
 const zExecuted = z
     .object({
