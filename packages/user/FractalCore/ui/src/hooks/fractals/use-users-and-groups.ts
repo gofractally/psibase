@@ -1,3 +1,5 @@
+import type { Account } from "@shared/lib/schemas/account";
+
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
@@ -7,11 +9,10 @@ import {
     zUsersAndGroupsResponse,
 } from "@/lib/graphql/evaluations/getUsersAndGroups";
 import QueryKey from "@/lib/queryKeys";
-import { updateArray } from "@/lib/updateArray";
 
 import { assertUser } from "@shared/hooks/use-current-user";
 import { queryClient } from "@shared/lib/queryClient";
-import { Account } from "@shared/lib/schemas/account";
+import { updateArray } from "@shared/lib/update-array";
 
 let attestedEvaluationId: number | undefined;
 
