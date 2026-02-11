@@ -366,12 +366,14 @@ mod tests {
         // Avoid cross-account sub-account contamination
         a.toSub(tid, savings.clone(), 1_0000.into()).get()?;
         b.toSub(tid, savings.clone(), 2_0000.into()).get()?;
-        let savings_balance_a = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
-        let savings_balance_b = get_sub_balance(&chain, bob, &savings, tid, &token_b)?;
-        assert_eq!(1_0000, savings_balance_a);
-        assert_eq!(2_0000, savings_balance_b);
-        a.fDeleteSub(savings.clone()).get()?;
-        b.fDeleteSub(savings.clone()).get()?;
+        let a_savings_bal = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let b_savings_bal = get_sub_balance(&chain, bob, &savings, tid, &token_b)?;
+        assert_eq!(1_0000, a_savings_bal);
+        assert_eq!(2_0000, b_savings_bal);
+        a.fromSub(tid, savings.clone(), a_savings_bal.into())
+            .get()?;
+        b.fromSub(tid, savings.clone(), b_savings_bal.into())
+            .get()?;
 
         // Check multiple tokens in same sub-account
         a.toSub(tid, savings.clone(), 2_0000.into()).get()?;
