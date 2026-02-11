@@ -185,6 +185,10 @@ pub mod tables {
                 get_sender() == self.administration_nft_owner(),
                 "Must own administration NFT to set new administration NFT",
             );
+            check(
+                psibase::services::nft::Wrapper::call().exists(nft_id),
+                "new NFT does not exist",
+            );
             self.admin_nft = nft_id;
             self.save();
         }
