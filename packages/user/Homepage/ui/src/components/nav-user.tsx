@@ -11,7 +11,6 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -73,10 +72,10 @@ export function NavUser() {
 
     const [showModal, setShowModal] = useState(false);
     const [modalType, setModalType] = useState<
-        "editProfile" | "generateInvite"
-    >("editProfile");
+        "generateInvite"
+    >("generateInvite");
 
-    const onEditProfile = () => {
+    const onUserSettings = () => {
         navigate("/settings");
     };
 
@@ -95,13 +94,6 @@ export function NavUser() {
                 {modalType == "generateInvite" && (
                     <GenerateInviteDialogContent
                         generateInvite={generateInvite}
-                    />
-                )}
-                {modalType == "editProfile" && (
-                    <EditProfileDialogContent
-                        onClose={() => {
-                            setShowModal(false);
-                        }}
                     />
                 )}
             </Dialog>
@@ -211,7 +203,7 @@ export function NavUser() {
                             <DropdownMenuItem
                                 disabled={!user}
                                 onClick={() => {
-                                    onEditProfile();
+                                    onUserSettings();
                                 }}
                             >
                                 <Contact className="mr-2 h-4 w-4" />
