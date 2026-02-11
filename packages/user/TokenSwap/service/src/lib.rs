@@ -4,7 +4,7 @@ mod helpers;
 pub mod tables {
 
     use async_graphql::{ComplexObject, SimpleObject};
-    use psibase::services::nft::NID;
+    use psibase::services::nft::{self, NID};
     use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
@@ -180,6 +180,15 @@ pub mod tables {
                 .owner
         }
 
+        pub fn set_admin_nft(&mut self, nft_id: NID) {
+            check(
+                get_sender() == self.administration_nft_owner(),
+                "Must own administration NFT to set new administration NFT",
+            );
+            self.admin_nft = nft_id;
+            self.save();
+        }
+
         fn pool_token(&self) -> TokenRecord {
             Tokens::call().getToken(self.liquidity_token)
         }
@@ -193,7 +202,7 @@ pub mod tables {
             Reserve::get_assert(self.liquidity_token, token_id)
         }
 
-        fn new(token_a_id: TID, token_b_id: TID) -> Self {
+        fn new(token_a_id: TID, token_b_id: TID, nft_id: Option<NID>) -> Self {
             check(
                 token_a_id != token_b_id,
                 "reserve tokens cannot be the same",
@@ -220,7 +229,9 @@ pub mod tables {
 
             Self {
                 liquidity_token: liquidity_token,
-                admin_nft: mint_and_send_back("Pool administration".try_into().unwrap()),
+                admin_nft: nft_id.unwrap_or_else(|| {
+                    mint_and_send_back("Pool administration".try_into().unwrap())
+                }),
             }
         }
 
@@ -382,8 +393,14 @@ pub mod tables {
             Tokens::call().burn(self.liquidity_token, amount, "Liquidity withdrawal".into());
         }
 
-        pub fn add(a_token: TID, b_token: TID, a_amount: Quantity, b_amount: Quantity) -> Self {
-            let pool = Self::new(a_token, b_token);
+        pub fn add(
+            a_token: TID,
+            b_token: TID,
+            a_amount: Quantity,
+            b_amount: Quantity,
+            nft_id: Option<NID>,
+        ) -> Self {
+            let pool = Self::new(a_token, b_token, nft_id);
 
             let (reserve_a, reserve_b) = pool.reserves_in_order(a_token, b_token);
             reserve_a.debit_from_sender(a_amount);
@@ -479,6 +496,7 @@ pub mod service {
     /// * `token_b` - Token ID of the second deposit.
     /// * `token_a_amount` - Amount of the first deposit.
     /// * `token_b_amount` - Amount of the second deposit.
+    /// * `nft_id`  - Optional administration NFT ID for the pool. If not provided, a new NFT is minted and credited to the sender.
     ///
     /// # Returns
     /// (TID of Liquidity token / Pool ID, Administration NFT ID of pool)
@@ -488,9 +506,22 @@ pub mod service {
         token_b: TID,
         token_a_amount: Quantity,
         token_b_amount: Quantity,
+        nft_id: Option<NID>,
     ) -> (u32, NID) {
-        let pool = Pool::add(token_a, token_b, token_a_amount, token_b_amount);
+        let pool = Pool::add(token_a, token_b, token_a_amount, token_b_amount, nft_id);
         (pool.liquidity_token, pool.admin_nft)
+    }
+
+    /// Set the administration NFT ID for an existing pool.
+    ///
+    /// Only the current owner of the existing administration NFT is allowed to change it.
+    ///
+    /// # Arguments
+    /// * `pool_id` - Liquidity token ID that identifies the pool
+    /// * `nft_id`  - New administration NFT ID for the pool
+    #[action]
+    fn set_admin_nft(pool_id: TID, nft_id: NID) {
+        Pool::get_assert(pool_id).set_admin_nft(nft_id);
     }
 
     /// Updates the swap fee for one of the tokens in an existing pool.
