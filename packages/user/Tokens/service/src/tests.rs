@@ -310,13 +310,13 @@ mod tests {
         assert_eq!(4_0000, savings_balance);
         assert_eq!(3_0000, checking_balance);
 
-        // Check delete sub-account
+        // Check auto-delete sub-account
         assert_error(
             a.deleteSub(savings.clone()),
             "Sub-account with non-zero balances cannot be deleted",
         );
-        a.fDeleteSub(savings.clone()).get()?;
-        a.fDeleteSub(checking.clone()).get()?;
+        a.fromSub(tid, savings.clone(), 4_0000.into()).get()?;
+        a.fromSub(tid, checking.clone(), 3_0000.into()).get()?;
         assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
 
         assert_query_error(
@@ -328,6 +328,29 @@ mod tests {
             get_sub_balance(&chain, alice, &checking, tid, &token_a),
             "Sub-account 'checking' not found",
         );
+
+        // Check manually deleted sub-accounts
+        a.toSub(tid, savings.clone(), 4_0000.into()).get()?;
+        a.createSub(savings.clone()).get()?; // Upgrades to manual deletion
+        assert_error(
+            a.createSub(savings.clone()),
+            "Sub-account was 'created' twice",
+        );
+        a.fromSub(tid, savings.clone(), 4_0000.into()).get()?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(0, savings_balance);
+        a.deleteSub(savings.clone()).get()?;
+
+        a.createSub(savings.clone()).get()?;
+        assert_error(
+            a.createSub(savings.clone()),
+            "Sub-account was 'created' twice",
+        );
+        a.toSub(tid, savings.clone(), 1_0000.into()).get()?;
+        a.fromSub(tid, savings.clone(), 1_0000.into()).get()?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(0, savings_balance);
+        a.deleteSub(savings.clone()).get()?;
 
         // Check sub-account key length validation
         let long_key = "a".repeat(80);

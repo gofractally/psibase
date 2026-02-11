@@ -405,17 +405,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Force deletes a "sub-account"
-    ///
-    /// All nonzero token balances in the sub-account will be returned to the primary balance.
-    ///
-    /// # Arguments
-    /// * `sub_account` - Sub-account key
-    #[action]
-    fn fDeleteSub(sub_account: String) {
-        unimplemented!()
-    }
-
     /// Sets the system token
     ///
     /// # Arguments
