@@ -190,7 +190,7 @@ mod tests {
         errors: Option<Vec<GraphQLError>>,
     }
 
-    fn get_subaccount_balance(
+    fn get_sub_balance(
         chain: &psibase::Chain,
         account: AccountNumber,
         subaccount: &str,
@@ -254,28 +254,31 @@ mod tests {
         // Check send to a sub-account
         a.toSub(tid, savings.clone(), 5_0000.into()).get()?;
         assert_eq!(5_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
         assert_eq!(5_0000, balance);
         a.toSub(tid, savings.clone(), 3_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
         assert_eq!(8_0000, balance);
 
         // Check retrieve from a sub-account
         a.fromSub(tid, savings.clone(), 2_0000.into()).get()?;
         assert_eq!(4_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
         assert_eq!(6_0000, balance);
-
-        a.fromSub(tid, savings.clone(), 6_0000.into()).get()?;
-        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        assert_eq!(0, balance);
 
         // Check overdraw from a sub-account
         assert_error(
-            a.fromSub(tid, savings.clone(), 1.into()),
+            a.fromSub(tid, savings.clone(), 6_0001.into()),
             "Insufficient sub-account balance",
+        );
+
+        // Check auto-deleted sub-account
+        a.fromSub(tid, savings.clone(), 6_0000.into()).get()?;
+        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
+        assert_query_error(
+            get_sub_balance(&chain, alice, &savings, tid, &token_a),
+            "not found",
         );
 
         // Check overdraw from primary
@@ -288,27 +291,26 @@ mod tests {
         a.toSub(tid, savings.clone(), 3_0000.into()).get()?;
         a.toSub(tid, checking.clone(), 5_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid, alice).get()?.value);
-        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_sub_balance(&chain, alice, &checking, tid, &token_a)?;
         assert_eq!(3_0000, savings_balance);
         assert_eq!(5_0000, checking_balance);
 
         a.toSub(tid, savings.clone(), 1_0000.into());
         assert_eq!(1_0000, a.getBalance(tid, alice).get()?.value);
-        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_sub_balance(&chain, alice, &checking, tid, &token_a)?;
         assert_eq!(4_0000, savings_balance);
         assert_eq!(5_0000, checking_balance);
 
         a.fromSub(tid, checking.clone(), 2_0000.into());
         assert_eq!(3_0000, a.getBalance(tid, alice).get()?.value);
-        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_sub_balance(&chain, alice, &checking, tid, &token_a)?;
         assert_eq!(4_0000, savings_balance);
         assert_eq!(3_0000, checking_balance);
 
         // Check delete sub-account
-
         assert_error(
             a.deleteSub(savings.clone()),
             "Sub-account with non-zero balances cannot be deleted",
@@ -318,12 +320,12 @@ mod tests {
         assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
 
         assert_query_error(
-            get_subaccount_balance(&chain, alice, &savings, tid, &token_a),
+            get_sub_balance(&chain, alice, &savings, tid, &token_a),
             "Sub-account 'savings' not found",
         );
 
         assert_query_error(
-            get_subaccount_balance(&chain, alice, &checking, tid, &token_a),
+            get_sub_balance(&chain, alice, &checking, tid, &token_a),
             "Sub-account 'checking' not found",
         );
 
@@ -341,8 +343,8 @@ mod tests {
         // Avoid cross-account sub-account contamination
         a.toSub(tid, savings.clone(), 1_0000.into()).get()?;
         b.toSub(tid, savings.clone(), 2_0000.into()).get()?;
-        let savings_balance_a = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let savings_balance_b = get_subaccount_balance(&chain, bob, &savings, tid, &token_b)?;
+        let savings_balance_a = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let savings_balance_b = get_sub_balance(&chain, bob, &savings, tid, &token_b)?;
         assert_eq!(1_0000, savings_balance_a);
         assert_eq!(2_0000, savings_balance_b);
         a.fDeleteSub(savings.clone()).get()?;
@@ -357,8 +359,8 @@ mod tests {
         a.toSub(tid2, savings.clone(), 3_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid2, alice).get()?.value);
 
-        let savings_balance_1 = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let savings_balance_2 = get_subaccount_balance(&chain, alice, &savings, tid2, &token_a)?;
+        let savings_balance_1 = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let savings_balance_2 = get_sub_balance(&chain, alice, &savings, tid2, &token_a)?;
         assert_eq!(2_0000, savings_balance_1);
         assert_eq!(3_0000, savings_balance_2);
 
