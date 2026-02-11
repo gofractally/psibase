@@ -109,9 +109,13 @@ namespace psibase
       IPAddress address;
       uint8_t   prefixLen;
 
-      bool contains(const IPV4Address& addr);
-      bool contains(const IPV6Address& addr);
-      bool contains(const IPAddress& addr);
+      bool contains(const IPV4Address& addr) const;
+      bool contains(const IPV6Address& addr) const;
+      bool contains(const IPAddress& addr) const;
+      bool contains(const IPV4Endpoint& endpoint) const;
+      bool contains(const IPV6Endpoint& endpoint) const;
+      bool contains(const LocalEndpoint& endpoint) const;
+      bool contains(const SocketEndpoint& endpoint) const;
 
       PSIO_REFLECT(IPAddressPrefix, address, prefixLen)
    };

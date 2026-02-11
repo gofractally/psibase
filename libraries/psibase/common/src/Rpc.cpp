@@ -1,6 +1,9 @@
 #include <psibase/Rpc.hpp>
 
 #include <ranges>
+#include "HttpUtil.hpp"
+
+using psibase::detail::split2sv;
 
 namespace
 {
@@ -37,16 +40,6 @@ namespace
             result += *iter;
       }
       return result;
-   }
-
-   // Used to convert a split_view element to a string_view.
-   // Note that this is only needed when the standard library
-   // doesn't implement P2210R2
-   std::string_view split2sv(const auto& r)
-   {
-      auto data = &*r.begin();
-      auto size = static_cast<std::size_t>(std::ranges::distance(r));
-      return std::string_view{data, size};
    }
 
    struct Origin

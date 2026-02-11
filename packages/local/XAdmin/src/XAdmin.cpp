@@ -1,5 +1,6 @@
 #include <services/local/XAdmin.hpp>
 
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/json/any.hpp>
 #include <services/local/XDb.hpp>
@@ -108,7 +109,53 @@ namespace LocalService
          return row && row->head;
       }
 
-      bool isAdminSocket(std::optional<std::int32_t> socket)
+      struct IPAddressPrefixSet
+      {
+         std::vector<IPAddressPrefix> prefixes;
+         template <typename T>
+         bool contains(const T& address) const
+         {
+            for (const auto& prefix : prefixes)
+               if (prefix.contains(address))
+                  return true;
+            return false;
+         }
+         template <typename... T>
+         bool contains(const std::variant<T...>& address) const
+         {
+            return std::visit([this](auto& addr) { return contains(addr); }, address);
+         }
+         void addEnv(const std::string& name)
+         {
+            auto                  native   = Native::session(KvMode::read);
+            auto                  envTable = native.open<EnvTable>();
+            std::optional<EnvRow> env;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               env = envTable.get(name);
+            }
+            if (env)
+            {
+               std::string_view            addrs = env->value;
+               std::string_view::size_type prev  = 0;
+               while (true)
+               {
+                  auto pos     = addrs.find(prev, ',');
+                  auto addrStr = addrs.substr(prev, pos);
+                  if (auto prefix = parseIPAddressPrefix(addrStr))
+                  {
+                     prefixes.push_back(std::move(*prefix));
+                  }
+                  if (pos == std::string_view::npos)
+                     break;
+                  prev = pos + 1;
+               }
+            }
+         }
+      };
+
+      bool isAdminSocket(std::optional<std::int32_t>                  socket,
+                         const std::vector<std::optional<IPAddress>>& forwarded)
       {
          if (socket)
          {
@@ -123,40 +170,18 @@ namespace LocalService
             const auto& info = std::get<HttpSocketInfo>(row.value().info);
             check(info.endpoint.has_value(), "Missing endpoint for socket");
             const auto& endpoint = info.endpoint.value();
-            if (isLoopback(endpoint))
-               return true;
 
-            std::optional<EnvRow> env;
-            PSIBASE_SUBJECTIVE_TX
+            IPAddressPrefixSet prefixes;
+            prefixes.addEnv("PSIBASE_ADMIN_IP");
+
+            if (!isLoopback(endpoint) && !prefixes.contains(endpoint))
+               return false;
+            for (const auto& addr : forwarded)
             {
-               env = native.open<EnvTable>().get(std::string("PSIBASE_ADMIN_IP"));
+               if (!addr || !isLoopback(*addr) && !prefixes.contains(*addr))
+                  return false;
             }
-            if (env)
-            {
-               std::string_view            addrs = env->value;
-               std::string_view::size_type prev  = 0;
-               while (true)
-               {
-                  auto pos     = addrs.find(prev, ',');
-                  auto addrStr = addrs.substr(prev, pos);
-                  if (auto prefix = parseIPAddressPrefix(addrStr))
-                  {
-                     if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
-                     {
-                        if (prefix->contains(v4->address))
-                           return true;
-                     }
-                     else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
-                     {
-                        if (prefix->contains(v6->address))
-                           return true;
-                     }
-                  }
-                  if (pos == std::string_view::npos)
-                     break;
-                  prev = pos + 1;
-               }
-            }
+            return true;
          }
          return false;
       }
@@ -432,7 +457,7 @@ namespace LocalService
    std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
                                               std::optional<std::int32_t> socket)
    {
-      if (isAdminSocket(socket))
+      if (isAdminSocket(socket, forwardedFor(req)))
          return {};
 
       if (chainIsBooted())
@@ -455,7 +480,9 @@ namespace LocalService
                        .body        = toVec("Not authorized")};
    }
 
-   bool XAdmin::isAdmin(std::optional<AccountNumber> account, std::optional<std::int32_t> socket)
+   bool XAdmin::isAdmin(std::optional<AccountNumber>          account,
+                        std::optional<std::int32_t>           socket,
+                        std::vector<std::optional<IPAddress>> forwarded)
    {
       if (account)
       {
@@ -467,7 +494,7 @@ namespace LocalService
                return true;
          }
       }
-      return isAdminSocket(socket);
+      return isAdminSocket(socket, forwarded);
    }
 
    std::optional<HttpReply> XAdmin::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
