@@ -266,7 +266,6 @@ mod service {
             Tokens::call().fromSub(sys, sub_account.clone(), balance);
             Tokens::call().toSub(sys, sender.to_string(), balance);
         }
-        Tokens::call().deleteSub(sub_account);
     }
 
     /// Gets the amount of resources available for the caller

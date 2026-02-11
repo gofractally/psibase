@@ -285,8 +285,6 @@ void Invite::delInvite(uint32_t inviteId)
             to<Tokens>().credit(sys, invite->inviter, balanceRecord->value,
                                 "Unused invite tokens refunded");
          }
-
-         to<Tokens>().deleteSub(sub_account);
       }
    }
 
