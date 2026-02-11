@@ -13,19 +13,20 @@ import { useMembership } from "@/hooks/fractals/use-membership";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { createIdenticon } from "@shared/lib/create-identicon";
+import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
-    Card,
     CardContent,
+    CardFooter,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const humanize = (ms: number) =>
@@ -77,15 +78,11 @@ export const MyMembership = () => {
 
     return (
         <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            <div className="flex h-9 items-center">
-                <h1 className="text-lg font-semibold">My membership</h1>
-            </div>
             <div className="mt-3 space-y-6">
                 {isLoading || !chainId ? (
                     <>
-                        <Skeleton className="h-44 w-full rounded-xl" />
-                        <Skeleton className="h-44 w-full rounded-xl" />
-                        <Skeleton className="h-44 w-full rounded-xl" />
+                        <Skeleton className="h-48 w-full rounded-xl" />
+                        <Skeleton className="h-48 w-full rounded-xl" />
                     </>
                 ) : (
                     <>
@@ -93,8 +90,8 @@ export const MyMembership = () => {
                             fractal={fractal}
                             fractalAccount={fractalAccount}
                             chainId={chainId}
+                            membership={membership}
                         />
-                        <MembershipStatusCard membership={membership} />
                         <ConsensusRewardStatusCard />
                         {membership == null && (
                             <JoinFractalCard fractalAccount={fractalAccount} />
@@ -110,46 +107,63 @@ const FractalOverviewCard = ({
     fractal,
     fractalAccount,
     chainId,
+    membership,
 }: {
     fractal?: FractalRes;
     fractalAccount?: string;
     chainId: string;
+    membership?: Membership;
 }) => {
+    const isMember = membership != null;
+    const status = !isMember
+        ? "Not a member"
+        : membership
+          ? getMemberLabel(membership.memberStatus)
+          : "Loading...";
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        <img
-                            src={createIdenticon(chainId + fractalAccount)}
-                            alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
-                            className="size-5"
-                        />
+        <GlowingCard>
+            <CardHeader className="flex items-center gap-2">
+                <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-12 items-center justify-center rounded-lg border">
+                    <img
+                        src={createIdenticon(chainId + fractalAccount)}
+                        alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
+                        className="size-3/5"
+                    />
+                </div>
+                <div className="flex-1">
+                    <div className="text-xl font-semibold leading-tight">
+                        {fractal?.fractal?.name || "Loading..."}
                     </div>
-                    <div>
-                        <div className="text-xl font-semibold">
-                            {fractal?.fractal?.name || "Loading..."}
-                        </div>
-                        <div className="text-muted-foreground text-sm font-normal">
-                            {fractalAccount}
-                        </div>
-                    </div>
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-3">
-                    <div>
-                        <h3 className="text-muted-foreground mb-1 text-sm font-medium">
-                            Mission
-                        </h3>
-                        <p className="text-sm leading-relaxed">
-                            {fractal?.fractal?.mission ||
-                                "No mission available"}
-                        </p>
+                    <div className="text-muted-foreground text-sm font-normal leading-tight">
+                        {fractalAccount}
                     </div>
                 </div>
+                <Badge
+                    variant={isMember ? "default" : "destructive"}
+                    className={cn({
+                        "bg-destructive/10 text-destructive border-destructive/20":
+                            !isMember,
+                    })}
+                >
+                    {status}
+                </Badge>
+            </CardHeader>
+            <CardContent className="space-y-1">
+                <h3 className="text-muted-foreground text-sm font-medium">
+                    Mission
+                </h3>
+                <p className="text-sm leading-relaxed">
+                    {fractal?.fractal?.mission ?? "No mission available"}
+                </p>
             </CardContent>
-        </Card>
+            <CardFooter className="justify-end">
+                <div className="text-muted-foreground text-xs font-normal italic">
+                    Member since{" "}
+                    {dayjs(membership?.createdAt).format("MMMM D, YYYY")}
+                </div>
+            </CardFooter>
+        </GlowingCard>
     );
 };
 
@@ -175,7 +189,7 @@ const ConsensusRewardStatusCard = () => {
     const isClaimTime = nextClaimTime.unix() < now;
 
     return (
-        <Card>
+        <GlowingCard>
             <CardHeader>
                 <CardTitle>Consensus Rewards</CardTitle>
             </CardHeader>
@@ -213,58 +227,7 @@ const ConsensusRewardStatusCard = () => {
                     </div>
                 </div>
             </CardContent>
-        </Card>
-    );
-};
-
-const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
-    const status =
-        membership == null
-            ? "Not a member"
-            : membership
-              ? getMemberLabel(membership.memberStatus)
-              : "Loading...";
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">Membership status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Status</span>
-                    <Badge
-                        variant={
-                            status === "Not a member"
-                                ? "destructive"
-                                : "default"
-                        }
-                        className={
-                            status === "Not a member"
-                                ? "bg-destructive/10 text-destructive border-destructive/20"
-                                : ""
-                        }
-                    >
-                        {status}
-                    </Badge>
-                </div>
-
-                {membership && (
-                    <>
-                        <Separator />
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                                Member since
-                            </span>
-                            <span className="text-muted-foreground text-sm">
-                                {dayjs(membership.createdAt).format(
-                                    "MMMM D, YYYY",
-                                )}
-                            </span>
-                        </div>
-                    </>
-                )}
-            </CardContent>
-        </Card>
+        </GlowingCard>
     );
 };
 
@@ -276,8 +239,8 @@ const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
     }
 
     return (
-        <Card className="border-dashed">
-            <CardContent className="pt-6">
+        <GlowingCard cardClassName="border-dashed">
+            <CardContent>
                 <div className="flex flex-col items-center space-y-4 text-center">
                     <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-full">
                         <Plus className="text-muted-foreground h-6 w-6" />
@@ -303,6 +266,6 @@ const JoinFractalCard = ({ fractalAccount }: { fractalAccount?: string }) => {
                     </Button>
                 </div>
             </CardContent>
-        </Card>
+        </GlowingCard>
     );
 };

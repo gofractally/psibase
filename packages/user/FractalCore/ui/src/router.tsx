@@ -35,14 +35,6 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: "/membership",
-                element: (
-                    <ProtectedRoute>
-                        <MyMembership />
-                    </ProtectedRoute>
-                ),
-            },
-            {
                 path: "/legislative",
                 element: (
                     <ProtectedRoute>

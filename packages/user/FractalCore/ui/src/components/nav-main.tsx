@@ -3,6 +3,7 @@ import {
     ChevronRight,
     Contact,
     Gavel,
+    Home,
     Landmark,
     LucideIcon,
     Scale,
@@ -56,20 +57,19 @@ export function getMenuGroups(
         groupLabel: "Fractal",
         items: [
             {
-                title: "Membership",
-                icon: Contact,
-                subItems: [
-                    {
-                        title: "My membership",
-                        icon: Contact,
-                        path: "/membership",
-                    },
-                    {
-                        title: "Members",
-                        icon: Users,
-                        path: "/members",
-                    },
-                ],
+                title: "Overview",
+                icon: Home,
+                path: "/",
+            },
+            {
+                title: "Guilds",
+                icon: Landmark,
+                path: "/guilds",
+            },
+            {
+                title: "Members",
+                icon: Users,
+                path: "/members",
             },
             {
                 title: "Governance",
@@ -86,11 +86,6 @@ export function getMenuGroups(
                         path: "/judicial",
                     },
                 ],
-            },
-            {
-                title: "Guilds",
-                icon: Landmark,
-                path: "/guilds",
             },
         ],
     };
