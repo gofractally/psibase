@@ -97,10 +97,7 @@ namespace psibase::net
       template <typename Msg>
       void multicast_producers(const Checksum256& blockid, const Msg& msg)
       {
-         for (const auto& [id, peer] : _peers)
-         {
-            send_after_block(id, blockid, msg);
-         }
+         multicast(blockid, msg);
       }
       template <typename Msg>
       void multicast(const Msg& msg)
@@ -108,6 +105,14 @@ namespace psibase::net
          for (const auto& [id, peer] : _peers)
          {
             send(peer, msg);
+         }
+      }
+      template <typename Msg>
+      void multicast(const Checksum256& blockid, const Msg& msg)
+      {
+         for (const auto& [id, peer] : _peers)
+         {
+            send_after_block(id, blockid, msg);
          }
       }
       template <typename Msg>
