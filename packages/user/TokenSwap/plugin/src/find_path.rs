@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    str::FromStr,
-};
+use std::{collections::HashMap, str::FromStr};
 
 use psibase::services::{
     token_swap::swap,
@@ -52,16 +49,6 @@ impl From<WitPool> for GraphPool {
     }
 }
 
-#[derive(Clone)]
-struct SearchState {
-    token: TID,
-    amount_out: Quantity,
-    path: Vec<GraphPool>,
-    max_slippage_ppm: u32,
-}
-
-
-
 /// Returns slippage (inc fee) in parts per million (out of 1_000_000)
 fn deviation_from_ideal_ppm(ideal_out: Quantity, actual_out: Quantity) -> u32 {
     if ideal_out.value == 0 {
@@ -91,127 +78,110 @@ pub fn find_path(
         return (vec![], amount, 0, false);
     }
 
-    let mut graph: HashMap<TID, Vec<GraphPool>> = HashMap::new();
+    // Best reachable amount to each token
+    let mut best: HashMap<TID, Quantity> = HashMap::new();
+    best.insert(from, amount);
 
-    for pool in all_pools {
-        graph
-            .entry(pool.token_a)
-            .or_insert_with(Vec::new)
-            .push(pool.clone());
+    // Predecessor map for path reconstruction: (previous token, pool used)
+    let mut pred: HashMap<TID, (TID, GraphPool)> = HashMap::new();
 
-        graph
-            .entry(pool.token_b)
-            .or_insert_with(Vec::new)
-            .push(pool);
-    }
+    for _ in 0..max_hops {
+        // Candidates for updates in this iteration
+        // Per pools
+        let mut candidates: HashMap<TID, (Quantity, Option<(TID, GraphPool)>)> = HashMap::new();
 
-    // Best known output amount reachable to each token
-    let mut best_reachable: HashMap<TID, Quantity> = HashMap::new();
-    best_reachable.insert(from, amount);
-
-    // Priority queue: explore highest-output paths first
-    let mut search_states: Vec<SearchState> = Vec::new();
-    search_states.push(SearchState {
-        token: from,
-        amount_out: amount,
-        path: vec![],
-        max_slippage_ppm: 0,
-    });
-
-    // Track best way found to reach target
-    let mut best_to_target = Quantity::from(0u64);
-    let mut best_path_to_target: Vec<GraphPool> = vec![];
-    let mut best_max_slippage_ppm: u32 = 0;
-    let mut path_was_found = false;
-
-    // Start from the beginning token, search state is just of
-    //
-    while let Some(search_state) = search_states.pop() {
-        // Respect max hops limit
-        if search_state.path.len() as u8 > max_hops {
-            continue;
-        }
-
-        // Found target → update if better
-        if search_state.token == to {
-            path_was_found = true;
-            if search_state.amount_out > best_to_target {
-                best_to_target = search_state.amount_out;
-                best_path_to_target = search_state.path.clone();
-                best_max_slippage_ppm = search_state.max_slippage_ppm;
-            }
-            continue; // no need to explore further from target
-        }
-
-        // Skip if we already have a strictly better way to this token
-        if let Some(&recorded) = best_reachable.get(&search_state.token) {
-            if search_state.amount_out < recorded {
-                continue;
-            }
-        }
-
-        // Try every pool connected to current token
-        if let Some(connected_pools) = graph.get(&search_state.token) {
-            for pool in connected_pools {
-                // Determine next token + correct fee/reserves direction
-                let (input_token, output_token) = if pool.token_a == search_state.token {
-                    (pool.token_a, pool.token_b)
-                } else if pool.token_b == search_state.token {
-                    (pool.token_b, pool.token_a)
-                } else {
-                    continue;
-                };
-
-                let (reserve_in, reserve_out) = if input_token == pool.token_a {
-                    (pool.reserve_a, pool.reserve_b)
-                } else {
-                    (pool.reserve_b, pool.reserve_a)
-                };
-
-                let fee_ppm = if input_token == pool.token_a {
-                    pool.token_a_fee_ppm
-                } else {
-                    pool.token_b_fee_ppm
-                };
-
-                let perfect_amount = mul_div(search_state.amount_out, reserve_out, reserve_in);
-                let actual_amount = swap(search_state.amount_out, reserve_in, reserve_out, fee_ppm);
-
-                // Skip useless swaps
-                if actual_amount.value == 0 {
-                    continue;
+        for pool in &all_pools {
+            // Try token_a -> token_b
+            if let Some(&amount_in) = best.get(&pool.token_a) {
+                let reserve_in = pool.reserve_a;
+                let reserve_out = pool.reserve_b;
+                let fee_ppm = pool.token_a_fee_ppm;
+                let actual = swap(amount_in, reserve_in, reserve_out, fee_ppm);
+                if actual.value > 0 {
+                    let entry = candidates
+                        .entry(pool.token_b)
+                        .or_insert((Quantity::from(0), None));
+                    if actual > entry.0 {
+                        *entry = (actual, Some((pool.token_a, pool.clone())));
+                    }
                 }
+            }
 
-
-                // Only continue if this improves the known best for the next token
-                let is_new_best_amount_found = best_reachable
-                    .get(&output_token)
-                    .map_or(true, |&prev| actual_amount > prev);
-
-                if is_new_best_amount_found {
-                    best_reachable.insert(output_token, actual_amount);
-
-                    let this_hop_slippage_ppm = deviation_from_ideal_ppm(perfect_amount, actual_amount);
-
-
-                    let mut new_path = search_state.path.clone();
-                    new_path.push(pool.clone());
-
-                    search_states.push(SearchState {
-                        token: output_token,
-                        amount_out: actual_amount,
-                        path: new_path,
-                        max_slippage_ppm: search_state.max_slippage_ppm.max(this_hop_slippage_ppm),
-                    });
+            // Try token_b -> token_a
+            if let Some(&amount_in) = best.get(&pool.token_b) {
+                let reserve_in = pool.reserve_b;
+                let reserve_out = pool.reserve_a;
+                let fee_ppm = pool.token_b_fee_ppm;
+                let actual = swap(amount_in, reserve_in, reserve_out, fee_ppm);
+                if actual.value > 0 {
+                    let entry = candidates
+                        .entry(pool.token_a)
+                        .or_insert((Quantity::from(0), None));
+                    if actual > entry.0 {
+                        *entry = (actual, Some((pool.token_b, pool.clone())));
+                    }
                 }
             }
         }
+
+        // Apply updates if better
+        let mut updated = false;
+        for (target, (new_amount, opt_prev)) in candidates {
+            let old_amount = *best.get(&target).unwrap_or(&Quantity::from(0));
+            if new_amount > old_amount {
+                best.insert(target, new_amount);
+                if let Some(prev) = opt_prev {
+                    pred.insert(target, prev);
+                }
+                updated = true;
+            }
+        }
+
+        if !updated {
+            break;
+        }
     }
 
-    (
-        best_path_to_target,
-        best_to_target,
-        best_max_slippage_ppm,
-        path_was_found,
-    )
+    if let Some(&best_to_target) = best.get(&to) {
+        if best_to_target.value == 0 {
+            return (vec![], Quantity::from(0), 0, false);
+        }
+
+        // Reconstruct the path
+        let mut path: Vec<GraphPool> = vec![];
+        let mut current = to;
+        while current != from {
+            let (prev, pool) = pred.get(&current).expect("broken predecessor chain");
+            path.push(pool.clone());
+            current = *prev;
+        }
+
+        path.reverse();
+
+        // Compute max_slippage_ppm by simulating the path
+        let mut max_slippage_ppm = 0u32;
+        let mut current_amount = amount;
+        let mut current_token = from;
+        for pool in &path {
+            let (reserve_in, reserve_out, fee_ppm) = if current_token == pool.token_a {
+                (pool.reserve_a, pool.reserve_b, pool.token_a_fee_ppm)
+            } else {
+                (pool.reserve_b, pool.reserve_a, pool.token_b_fee_ppm)
+            };
+            let perfect_amount = mul_div(current_amount, reserve_out, reserve_in);
+            let actual_amount = swap(current_amount, reserve_in, reserve_out, fee_ppm);
+            let this_hop_slippage_ppm = deviation_from_ideal_ppm(perfect_amount, actual_amount);
+            max_slippage_ppm = max_slippage_ppm.max(this_hop_slippage_ppm);
+            current_amount = actual_amount;
+            current_token = if current_token == pool.token_a {
+                pool.token_b
+            } else {
+                pool.token_a
+            };
+        }
+
+        (path, best_to_target, max_slippage_ppm, true)
+    } else {
+        (vec![], Quantity::from(0), 0, false)
+    }
 }
