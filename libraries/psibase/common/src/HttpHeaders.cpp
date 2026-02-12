@@ -47,7 +47,7 @@ namespace
 
    bool isTChar(char ch)
    {
-      return std::isalnum(ch) ||
+      return std::isalnum(static_cast<unsigned char>(ch)) ||
              std::string_view{"!#$%&'*+-.^_`|~"}.find(ch) != std::string_view::npos;
    }
 
@@ -64,7 +64,8 @@ namespace
          if (port.size() < 2)
             return false;
          for (char ch : port.substr(1))
-            if (!std::isalnum(ch) && ch != '.' && ch != '_' && ch != '-')
+            if (!std::isalnum(static_cast<unsigned char>(ch)) && ch != '.' && ch != '_' &&
+                ch != '-')
                return false;
          return true;
       }
