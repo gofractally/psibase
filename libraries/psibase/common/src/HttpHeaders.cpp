@@ -127,7 +127,64 @@ namespace
       }
       return std::nullopt;
    }
+
+   const char* findSeparator(const char* pos, const char* end, char ch)
+   {
+      while (pos != end)
+      {
+         if (*pos == ch)
+         {
+            return pos;
+         }
+         else if (*pos == '"')
+         {
+            // Find the end of the double-quoted string
+            ++pos;
+            while (true)
+            {
+               if (pos == end)
+               {
+                  return pos;
+               }
+               if (*pos == '\\')
+               {
+                  ++pos;
+                  if (pos == end)
+                  {
+                     return pos;
+                  }
+               }
+               else if (*pos == '"')
+               {
+                  break;
+               }
+               ++pos;
+            }
+         }
+         ++pos;
+      }
+      return pos;
+   }
 }  // namespace
+
+QSplitIterator::QSplitIterator(std::string_view s, char ch)
+    : start(s.data()), end(s.data() + s.size()), ch(ch)
+{
+   pos = findSeparator(start, end, ch);
+}
+
+QSplitIterator& QSplitIterator::operator++()
+{
+   if (pos == end)
+   {
+      ch = '"';
+      return *this;
+   }
+   ++pos;
+   start = pos;
+   pos   = findSeparator(pos, end, ch);
+   return *this;
+}
 
 std::vector<std::optional<IPAddress>> psibase::forwardedFor(const HttpRequest& request)
 {

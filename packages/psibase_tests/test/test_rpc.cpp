@@ -176,3 +176,26 @@ TEST_CASE("forwardedFor")
       }
    }
 }
+
+TEST_CASE("Test QSplit")
+{
+   auto split = [](std::string_view s)
+   {
+      std::vector<std::string_view> result;
+      for (std::string_view item : QSplit{s, ','})
+      {
+         result.push_back(item);
+      }
+      return result;
+   };
+   using V = std::vector<std::string_view>;
+   CHECK(split({}) == V{""});
+   CHECK(split("") == V{""});
+   CHECK(split(" a ") == V{" a "});
+   CHECK(split(",") == V{"", ""});
+   CHECK(split(R"(",")") == V{R"(",")"});
+   CHECK(split(R"("\",a")") == V{R"("\",a")"});
+   CHECK(split(R"("\\",a")") == V{R"("\\")", R"(a")"});
+   CHECK(split(R"(",", a )") == V{R"(",")", " a "});
+   CHECK(std::ranges::equal(QSplit{"a,b,c", ','}, V{"a", "b", "c"}));
+}
