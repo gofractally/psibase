@@ -109,6 +109,21 @@ namespace LocalService
          return row && row->head;
       }
 
+      std::optional<std::string> getEnv(const std::string& name)
+      {
+         auto                  native   = Native::session(KvMode::read);
+         auto                  envTable = native.open<EnvTable>();
+         std::optional<EnvRow> env;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            env = envTable.get(name);
+         }
+         if (env)
+            return std::move(env->value);
+         else
+            return {};
+      }
+
       struct IPAddressPrefixSet
       {
          std::vector<IPAddressPrefix> prefixes;
@@ -127,16 +142,9 @@ namespace LocalService
          }
          void addEnv(const std::string& name)
          {
-            auto                  native   = Native::session(KvMode::read);
-            auto                  envTable = native.open<EnvTable>();
-            std::optional<EnvRow> env;
-            PSIBASE_SUBJECTIVE_TX
+            if (auto env = getEnv(name))
             {
-               env = envTable.get(name);
-            }
-            if (env)
-            {
-               std::string_view            addrs = env->value;
+               std::string_view            addrs = *env;
                std::string_view::size_type prev  = 0;
                while (true)
                {
@@ -154,29 +162,60 @@ namespace LocalService
          }
       };
 
+      SocketEndpoint getEndpoint(std::int32_t socket)
+      {
+         std::optional<SocketRow> row;
+         auto                     native = Native::session(KvMode::read);
+         PSIBASE_SUBJECTIVE_TX
+         {
+            row = native.open<SocketTable>().get(socket);
+         }
+         check(row.has_value(), "Missing socket row");
+         check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
+         const auto& info = std::get<HttpSocketInfo>(row.value().info);
+         check(info.endpoint.has_value(), "Missing endpoint for socket");
+         return std::move(*info.endpoint);
+      }
+
       bool isAdminSocket(std::optional<std::int32_t>                  socket,
                          const std::vector<std::optional<IPAddress>>& forwarded)
       {
          if (socket)
          {
-            std::optional<SocketRow> row;
-            auto                     native = Native::session(KvMode::read);
-            PSIBASE_SUBJECTIVE_TX
-            {
-               row = native.open<SocketTable>().get(*socket);
-            }
-            check(row.has_value(), "Missing socket row");
-            check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
-            const auto& info = std::get<HttpSocketInfo>(row.value().info);
-            check(info.endpoint.has_value(), "Missing endpoint for socket");
-            const auto& endpoint = info.endpoint.value();
-
+            auto               endpoint = getEndpoint(*socket);
             IPAddressPrefixSet prefixes;
             prefixes.addEnv("PSIBASE_ADMIN_IP");
 
             if (!isLoopback(endpoint) && !prefixes.contains(endpoint))
                return false;
             for (const auto& addr : forwarded)
+            {
+               if (!addr || !isLoopback(*addr) && !prefixes.contains(*addr))
+                  return false;
+            }
+            return true;
+         }
+         return false;
+      }
+
+      bool isAdminSocket(std::optional<std::int32_t> socket, const HttpRequest& req)
+      {
+         if (socket)
+         {
+            auto               endpoint = getEndpoint(*socket);
+            IPAddressPrefixSet prefixes;
+            prefixes.addEnv("PSIBASE_ADMIN_IP");
+
+            if (!isLoopback(endpoint) && !prefixes.contains(endpoint))
+               return false;
+
+            if (auto env = getEnv("PSIBASE_USERNAME_FIELD"))
+            {
+               if (req.getHeader(*env))
+                  return true;
+            }
+
+            for (const auto& addr : forwardedFor(req))
             {
                if (!addr || !isLoopback(*addr) && !prefixes.contains(*addr))
                   return false;
@@ -457,7 +496,7 @@ namespace LocalService
    std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
                                               std::optional<std::int32_t> socket)
    {
-      if (isAdminSocket(socket, forwardedFor(req)))
+      if (isAdminSocket(socket, req))
          return {};
 
       if (chainIsBooted())
