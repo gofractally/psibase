@@ -21,3 +21,6 @@ psibase-system-workspace-hack.workspace = true
 
 [dev-dependencies]
 virtual-server-pkg = { path = "..", version = "0.22.0" }
+rand = "0.9.0"
+pem = "3"
+p256 = { version = "0.13", features = ["ecdsa", "pem", "ecdsa-core"] }

@@ -2,6 +2,8 @@
 
 #[allow(warnings)]
 mod bindings;
+use std::str::FromStr;
+
 use bindings::*;
 
 mod errors;
@@ -22,7 +24,7 @@ use exports::{
     invite::{self},
     transact_hook_actions_sender::Guest as HookActionsSender,
 };
-use host::common::{client as Client, server as Server};
+use host::common::{client as Client, client::get_receiver, server as Server};
 use host::crypto::keyvault;
 use host::types::types as HostTypes;
 use invite::plugin::{
@@ -33,8 +35,10 @@ use psibase::{
     fracpack::Pack,
     services::credentials::CREDENTIAL_SENDER,
     services::invite::{self as InviteService, action_structs::*},
+    services::tokens::{Decimal, Quantity},
 };
 use rand::{rngs::OsRng, Rng, TryRngCore};
+use tokens::plugin as Tokens;
 use transact::plugin::{hooks::*, intf as Transact};
 
 use crate::{
@@ -49,7 +53,7 @@ define_trust! {
             - Reject active invites
         ",
         Medium => "
-            - Generate new invites
+            - Generate (purchase) new invites
         ",
         High => "",
     }
@@ -182,22 +186,41 @@ impl Redemption for InvitePlugin {
     }
 }
 
+fn get_invite_cost(num_accounts: u16) -> Result<String, HostTypes::Error> {
+    let query = format!(
+        r#"query {{ getInviteCost(numAccounts: {}) }}"#,
+        num_accounts
+    );
+    let response = Server::post_graphql_get_json(&query)?;
+    let cost = GetInviteCostResponse::from_gql(response)?;
+    Ok(cost.getInviteCost)
+}
+
 impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, HostTypes::Error> {
         assert_authorized_with_whitelist(
             trust::FunctionName::generate_invite,
             vec!["homepage".into()],
         )?;
-        let (invite_token, details) = Self::prepare_new_invite()?;
+        let (invite_token, details, min_cost) = Self::prepare_new_invite(1)?;
+        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
+
+        if min_cost_u64 > 0 {
+            let sys = Tokens::helpers::fetch_network_token().unwrap().unwrap();
+            Tokens::user::credit(sys, &get_receiver(), &min_cost, "Create an invite")?;
+        }
 
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
             &createInvite {
-                id: details.invite_id,
-                inviteKey: details.invite_key.into(),
+                inviteId: details.invite_id,
+                fingerprint: psibase::Checksum256::from(
+                    <[u8; 32]>::try_from(details.fingerprint.as_slice()).unwrap(),
+                ),
                 numAccounts: 1,
                 useHooks: false,
                 secret: details.encrypted_secret,
+                resources: Quantity::from(min_cost_u64),
             }
             .packed(),
         )?;
@@ -205,7 +228,9 @@ impl Inviter for InvitePlugin {
         Ok(invite_token)
     }
 
-    fn prepare_new_invite() -> Result<(String, NewInviteDetails), HostTypes::Error> {
+    fn prepare_new_invite(
+        num_accounts: u16,
+    ) -> Result<(String, NewInviteDetails, String), HostTypes::Error> {
         assert_authorized(trust::FunctionName::prepare_new_invite)?;
         let keypair = keyvault::generate_unmanaged_keypair()?;
         let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
@@ -213,13 +238,25 @@ impl Inviter for InvitePlugin {
         let invite_id: u32 = rand::rng().random();
         let invite_token = encode_invite_token(invite_id, symmetric_key);
 
+        let sys = Tokens::helpers::fetch_network_token()?;
+        let min_cost = if sys.is_some() {
+            get_invite_cost(num_accounts)?
+        } else {
+            "0".to_string()
+        };
+
+        let fingerprint = psibase::sha256(&keyvault::to_der(&keypair.public_key)?)
+            .0
+            .to_vec();
+
         Ok((
             invite_token,
             NewInviteDetails {
                 invite_id,
-                invite_key: keyvault::to_der(&keypair.public_key)?,
+                fingerprint,
                 encrypted_secret: secret,
             },
+            min_cost,
         ))
     }
 

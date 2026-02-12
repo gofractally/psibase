@@ -220,7 +220,7 @@ impl Admin for TransactPlugin {
         // This will automatically add the actions into the tx to
         // refill the user's gas tank if it is below some threshold
         // and the user is configured for auto-filling.
-        VirtualServer::auto_fill_gas_tank()?;
+        VirtualServer::auto_fill_gas_tank(&actions[0].sender)?;
         actions.extend(CurrentActions::get().into_iter().map(|a| a.action));
         CurrentActions::clear();
 

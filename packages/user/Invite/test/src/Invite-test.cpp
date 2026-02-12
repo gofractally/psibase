@@ -8,9 +8,9 @@
 #include <services/system/Spki.hpp>
 #include <services/system/VerifySig.hpp>
 #include <services/system/commonErrors.hpp>
-#include "services/user/InviteErrors.hpp"
-
-#include "services/user/Invite.hpp"
+#include <services/user/Invite.hpp>
+#include <services/user/InviteErrors.hpp>
+#include "psibase/crypto.hpp"
 
 using namespace UserService;
 using namespace UserService::Errors;
@@ -69,7 +69,10 @@ namespace
 
 // Helper functions for tests
 auto createInvite = [](auto& user, const auto& pubKey)
-{ return user.createInvite(++inviteId, pubKey, 1, false, ""); };
+{
+   Checksum256 fingerprint = psibase::sha256(pubKey.data.data(), pubKey.data.size());
+   return user.createInvite(++inviteId, fingerprint, 1, false, "", 0);
+};
 
 // - Auth
 //    - Accounts can still create new accounts
