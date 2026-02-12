@@ -10,7 +10,7 @@ import { ProtectedRoute } from "@shared/components/protected-route";
 
 import { Judicial } from "./pages/fractal/governance/judicial";
 import { Legislative } from "./pages/fractal/governance/legislative";
-import { Guilds } from "./pages/fractal/guilds";
+import { Guilds } from "./pages/fractal/guilds/index";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
 import { Applications } from "./pages/fractal/membership/applications";
 import { Overview } from "./pages/fractal/overview/index";

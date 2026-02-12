@@ -12,11 +12,12 @@ import { isAccountAvailable } from "@shared/lib/get-account";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-export const CreateGuildModal = ({
+export const ModalCreateGuild = ({
     show,
     openChange,
 }: {
@@ -52,6 +53,7 @@ export const CreateGuildModal = ({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Create a guild</DialogTitle>
+                    <DialogDescription />
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
