@@ -349,6 +349,10 @@ mod service {
     ///
     /// The sub-account will be created if it does not exist.
     ///
+    /// If a sub-account is created in this way, it will be deleted automatically when
+    /// it has no token balances. To persist the sub-account until manually deleted, use
+    /// `createSub`.
+    ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
     /// * `sub_account` - Sub-account key
@@ -360,8 +364,10 @@ mod service {
 
     /// Returns tokens from a "sub-account" balance into the account's primary balance
     ///
-    /// The sub-account will not be deleted if it becomes empty, it must be manually
-    /// deleted with `deleteSub`.
+    /// If the subaccount was created using `toSub`, then it will be automatically deleted if this action
+    /// results in the sub-account having no token balances.
+    ///
+    /// If the subaccount was created manually, then it must be deleted manually using `deleteSub`.
     ///
     /// # Arguments
     /// * `token_id` - Unique token identifier
@@ -374,6 +380,13 @@ mod service {
 
     /// Creates a new "sub-account" with an empty balance
     ///
+    /// A sub-account created manually in this way must be deleted manually using
+    /// `deleteSub`.
+    ///
+    /// This action will fail if the sub-account was already manually created. This action
+    /// will succeed if the sub-account was created automatically using `toSub`, in which
+    /// case the sub-account is updated to require manual deletion using `deleteSub`.
+    ///
     /// # Arguments
     /// * `sub_account` - Sub-account key
     #[action]
@@ -383,7 +396,7 @@ mod service {
 
     /// Deletes a "sub-account" balance
     ///
-    /// All nonzero token balances in the sub-account will be returned to the primary balance.
+    /// This action will fail if any sub-account balances are non-zero.
     ///
     /// # Arguments
     /// * `sub_account` - Sub-account key

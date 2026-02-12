@@ -46,10 +46,11 @@ interface prompt {
     ///
     /// Returns:
     /// * On success, returns nothing,
-    /// * If any credentials fail validation, returns a list of the account names that failed validation.
+    /// * If any credentials fail validation, returns a list of tuples containing the account name 
+    ///   and the error that caused the failure.
     ///
     /// Any credentials that fails validation will not be imported.
-    import-existing: func(credentials: list<credential>) -> result<_, list<string>>;
+    import-existing: func(credentials: list<credential>) -> result<_, list<tuple<string, error>>>;
 
     /// Creates a new account, returns the private key used to authorize it.
     ///

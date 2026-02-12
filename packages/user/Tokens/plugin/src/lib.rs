@@ -189,7 +189,7 @@ impl User for TokensPlugin {
         let amount = Self::non_zero(token_id, amount)?;
         assert_authorized_with_whitelist(
             FunctionName::credit,
-            vec!["homepage".into(), "virtual-server".into(), "token-swap".into()],
+            vec!["homepage".into(), "virtual-server".into(), "invite".into(), "token-swap".into()],
         )?;
 
         let packed_args = Actions::credit {

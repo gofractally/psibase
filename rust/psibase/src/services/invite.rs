@@ -30,10 +30,38 @@ pub struct InviteRecord {
     secret: String,
 }
 
+/// This interface should be implemented by a service that wants to handle hooks from the invite service
+/// to be notified when an event occurs related to an invite.
+#[crate::service(
+    name = "invite-hooks",
+    actions = "hooks_actions",
+    wrapper = "hooks_wrapper",
+    structs = "hooks_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod InviteHooks {
+    use crate::AccountNumber;
+
+    /// Called on the invite creator when the invite is accepted
+    #[action]
+    fn onInvAccept(inviteId: u32, accepter: AccountNumber) {
+        unimplemented!()
+    }
+}
+
+/// This service facilitates the creation and redemption of invites
+///
+/// Invites are generic and their acceptance can, but does not always, result
+/// in the creation of a new account. This service can be used
+/// by third party applications to streamline their user onboarding.
 #[crate::service(name = "invite", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
+    use crate::services::tokens::Quantity;
     use crate::AccountNumber;
 
     #[action]
@@ -41,26 +69,38 @@ mod service {
         unimplemented!()
     }
 
-    /// Creates and stores a new invite object that can be used to create a new account
+    /// Returns the current minimum cost of creating an invite that can create the specified number of
+    /// accounts.
+    #[action]
+    fn getInvCost(numAccounts: u16) -> Quantity {
+        unimplemented!()
+    }
+
+    /// Creates and stores a new invite object that can be used to create new accounts
     /// Returns the ID of the newly created invite
     ///
     /// Parameters:
     /// - `inviteId` is the id of the invite (could be randomly generated)
-    /// - `inviteKey` is the public key of the invite
+    /// - `fingerprint` is the fingerprint of the invite public key
     /// - `numAccounts` is the number of accounts this invite can be used to create
     /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
     ///    the invite is updated
     /// - `secret` is an encrypted secret used to redeem the invite
+    /// - `resources` is the amount of resources stored in the invite (used when creating
+    ///               new accounts). The caller must send this amount of system tokens to this
+    ///               invite service before calling this action. Use the query interface to check
+    ///               the resources required for an invite of the specified number of accounts.
     ///
     /// If `useHooks` is true, the caller must be an account with a service deployed on it
     /// that implements the InviteHooks interface.
     #[action]
     fn createInvite(
-        id: u32,
-        inviteKey: SubjectPublicKeyInfo,
+        inviteId: u32,
+        fingerprint: crate::Checksum256,
         numAccounts: u16,
         useHooks: bool,
         secret: String,
+        resources: Quantity,
     ) -> u32 {
         unimplemented!()
     }

@@ -886,6 +886,106 @@ TEST_CASE("GraphQL Queries")
        R"({"data":{"userTokens":[{"id":1,"precision":4,"issuedSupply":"1000000.0000","maxIssuedSupply":"1000000000.0000","symbol":null}]}})");
 }
 
+TEST_CASE("Decimal")
+{
+   auto create_asset = [](uint64_t quantity, uint8_t precision) -> Decimal
+   { return Decimal{Quantity{quantity}, Precision{precision}}; };
+
+   SECTION("precision 0")
+   {
+      CHECK(create_asset(40000, 0).str() == "40000");
+      CHECK(create_asset(1, 0).str() == "1");
+      CHECK(create_asset(0, 0).str() == "0");
+   }
+
+   SECTION("precision 1")
+   {
+      CHECK(create_asset(4000, 1).str() == "400.0");
+      CHECK(create_asset(1, 1).str() == "0.1");
+      CHECK(create_asset(0, 1).str() == "0.0");
+   }
+
+   SECTION("precision 2")
+   {
+      CHECK(create_asset(40000, 2).str() == "400.00");
+      CHECK(create_asset(1, 2).str() == "0.01");
+      CHECK(create_asset(0, 2).str() == "0.00");
+   }
+
+   SECTION("precision 3")
+   {
+      CHECK(create_asset(400000, 3).str() == "400.000");
+      CHECK(create_asset(1, 3).str() == "0.001");
+      CHECK(create_asset(123, 3).str() == "0.123");
+      CHECK(create_asset(0, 3).str() == "0.000");
+   }
+
+   SECTION("precision 4")
+   {
+      CHECK(create_asset(40000, 4).str() == "4.0000");
+      CHECK(create_asset(1, 4).str() == "0.0001");
+      CHECK(create_asset(12345, 4).str() == "1.2345");
+      CHECK(create_asset(0, 4).str() == "0.0000");
+   }
+
+   SECTION("precision 5")
+   {
+      CHECK(create_asset(400000, 5).str() == "4.00000");
+      CHECK(create_asset(1, 5).str() == "0.00001");
+      CHECK(create_asset(54321, 5).str() == "0.54321");
+      CHECK(create_asset(0, 5).str() == "0.00000");
+   }
+
+   SECTION("precision 6")
+   {
+      CHECK(create_asset(4000000, 6).str() == "4.000000");
+      CHECK(create_asset(1, 6).str() == "0.000001");
+      CHECK(create_asset(123456, 6).str() == "0.123456");
+      CHECK(create_asset(0, 6).str() == "0.000000");
+   }
+
+   SECTION("precision 7")
+   {
+      CHECK(create_asset(4000000, 7).str() == "0.4000000");
+      CHECK(create_asset(1, 7).str() == "0.0000001");
+      CHECK(create_asset(123456, 7).str() == "0.0123456");
+      CHECK(create_asset(0, 7).str() == "0.0000000");
+   }
+
+   SECTION("precision 8")
+   {
+      CHECK(create_asset(4000000, 8).str() == "0.04000000");
+      CHECK(create_asset(1, 8).str() == "0.00000001");
+      CHECK(create_asset(123456, 8).str() == "0.00123456");
+      CHECK(create_asset(0, 8).str() == "0.00000000");
+   }
+
+   SECTION("large quantity")
+   {
+      CHECK(create_asset(UINT64_MAX, 0).str() == "18446744073709551615");
+      CHECK(create_asset(UINT64_MAX, 8).str() == "184467440737.09551615");
+      CHECK(create_asset(1000000000000000000ULL, 2).str() == "10000000000000000.00");
+   }
+
+   SECTION("fromStr parsing")
+   {
+      CHECK(Decimal::fromStr("40000").str() == "40000");
+      CHECK(Decimal::fromStr("400.0").str() == "400.0");
+      CHECK(Decimal::fromStr("400.00").str() == "400.00");
+      CHECK(Decimal::fromStr("0.1").str() == "0.1");
+      CHECK(Decimal::fromStr("0.01").str() == "0.01");
+      CHECK(Decimal::fromStr("0.001").str() == "0.001");
+      CHECK(Decimal::fromStr("0.123").str() == "0.123");
+      CHECK(Decimal::fromStr("1.2345").str() == "1.2345");
+      CHECK(Decimal::fromStr("0.54321").str() == "0.54321");
+      CHECK(Decimal::fromStr("0.123456").str() == "0.123456");
+      CHECK(Decimal::fromStr("0.0123456").str() == "0.0123456");
+      CHECK(Decimal::fromStr("0.00123456").str() == "0.00123456");
+      CHECK(Decimal::fromStr("18446744073709551615").str() == "18446744073709551615");
+      CHECK(Decimal::fromStr("10000000000000000.00").str() == "10000000000000000.00");
+   }
+}
+
 TEST_CASE("tokens schema")
 {
    CHECK_SCHEMA(Tokens);

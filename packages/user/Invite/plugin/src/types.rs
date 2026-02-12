@@ -41,12 +41,29 @@ pub struct DeviceDetails {
 
     // Whether the invite was accepted on this device
     pub accepted: bool,
+
+    // Whether this invite was rejected on this device
+    pub rejected: bool,
 }
 
 #[allow(non_snake_case)]
 #[derive(Deserialize)]
 pub struct GetInviteResponse<T> {
     pub inviteById: Option<T>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Deserialize)]
+pub struct GetInviteCostResponse {
+    pub getInviteCost: String,
+}
+
+impl TryParseGqlResponse for GetInviteCostResponse {
+    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+        let response_root: ResponseRoot<GetInviteCostResponse> =
+            serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
+        Ok(response_root.data)
+    }
 }
 
 impl TryParseGqlResponse for FixedDetailsResponse {
