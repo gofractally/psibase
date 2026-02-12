@@ -49,7 +49,7 @@ namespace
       {
          if (value.ends_with(']'))
          {
-            return parseIPV6Address(value);
+            return parseIPV6Address(value.substr(1, value.size() - 2));
          }
          else
          {
