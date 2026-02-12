@@ -105,6 +105,7 @@ namespace
    // Returns nullopt if "for" is not present or is not an IP address
    std::optional<IPAddress> parseForwardedFor(std::string_view forwarded)
    {
+      std::optional<IPAddress> result;
       for (auto kv : QSplit{forwarded, ';'})
       {
          auto pos = kv.find('=');
@@ -112,17 +113,17 @@ namespace
             return std::nullopt;
          auto key   = kv.substr(0, pos);
          auto value = kv.substr(pos + 1);
+         auto q     = unquote(value);
+         if (!q && !isToken(value))
+            return std::nullopt;
+         if (q)
+            value = *q;
          if (std::ranges::equal(key, std::string_view{"for"}, {}, ::tolower))
          {
-            if (auto q = unquote(value))
-               return parseNodeId(*q);
-            else if (!isToken(value))
-               return std::nullopt;
-            else
-               return parseNodeId(value);
+            result = parseNodeId(value);
          }
       }
-      return std::nullopt;
+      return result;
    }
 
    const char* findSeparator(const char* pos, const char* end, char ch)

@@ -186,6 +186,16 @@ TEST_CASE("forwardedFor")
          IPV4Address expected1{192, 168, 0, 1};
          CHECK(forwardedFor(request) == R{expected1});
       }
+      SECTION("invalid extension")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(comment=a:b;for=192.168.0.1)"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
+      SECTION("mismatched quote in extension")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for=192.168.0.1;comment=a")"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
    }
 }
 
