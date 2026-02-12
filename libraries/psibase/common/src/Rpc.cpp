@@ -1,5 +1,6 @@
 #include <psibase/Rpc.hpp>
 
+#include <psibase/HttpHeaders.hpp>
 #include <ranges>
 #include "HttpUtil.hpp"
 
@@ -105,10 +106,8 @@ namespace psibase
       {
          if (header.matches(name))
          {
-            for (auto range : header.value | std::views::split(','))
+            for (auto value : QSplit{header.value, ','})
             {
-               std::string_view value = split2sv(range);
-
                auto low  = value.find_first_not_of(" \t");
                auto high = value.find_last_not_of(" \t");
                if (low == std::string::npos)

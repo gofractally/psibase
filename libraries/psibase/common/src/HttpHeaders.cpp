@@ -4,10 +4,8 @@
 #include <cctype>
 #include <charconv>
 #include <ranges>
-#include "HttpUtil.hpp"
 
 using namespace psibase;
-using psibase::detail::split2sv;
 
 namespace
 {
@@ -107,9 +105,8 @@ namespace
    // Returns nullopt if "for" is not present or is not an IP address
    std::optional<IPAddress> parseForwardedFor(std::string_view forwarded)
    {
-      for (auto range : forwarded | std::views::split(';'))
+      for (auto kv : QSplit{forwarded, ';'})
       {
-         auto kv  = split2sv(range);
          auto pos = kv.find('=');
          if (pos == std::string_view::npos)
             return std::nullopt;

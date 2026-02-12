@@ -174,6 +174,18 @@ TEST_CASE("forwardedFor")
          IPV4Address expected1{192, 168, 0, 1};
          CHECK(forwardedFor(request) == R{std::nullopt, expected1});
       }
+      SECTION("unknown extension with comma")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for=192.168.0.1;comment=",")"}}};
+         IPV4Address expected1{192, 168, 0, 1};
+         CHECK(forwardedFor(request) == R{expected1});
+      }
+      SECTION("unknown extension with semi")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(comment=";for=wrong";for=192.168.0.1)"}}};
+         IPV4Address expected1{192, 168, 0, 1};
+         CHECK(forwardedFor(request) == R{expected1});
+      }
    }
 }
 
