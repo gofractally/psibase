@@ -9,6 +9,11 @@ using namespace psibase;
 
 namespace
 {
+   bool iequal(std::string_view lhs, std::string_view rhs)
+   {
+      return std::ranges::equal(lhs, rhs, {}, ::tolower, ::tolower);
+   }
+
    std::optional<std::string> unquote(std::string_view input)
    {
       if (!input.starts_with('"'))
@@ -105,7 +110,8 @@ namespace
    // Returns nullopt if "for" is not present or is not an IP address
    std::optional<IPAddress> parseForwardedFor(std::string_view forwarded)
    {
-      std::optional<IPAddress> result;
+      std::optional<IPAddress>      result;
+      std::vector<std::string_view> parameterNames;
       for (auto kv : QSplit{forwarded, ';'})
       {
          auto pos = kv.find('=');
@@ -118,7 +124,10 @@ namespace
             return std::nullopt;
          if (q)
             value = *q;
-         if (std::ranges::equal(key, std::string_view{"for"}, {}, ::tolower))
+         if (std::ranges::any_of(parameterNames, [&](auto k) { return iequal(k, key); }))
+            return std::nullopt;
+         parameterNames.push_back(key);
+         if (iequal(key, "for"))
          {
             result = parseNodeId(value);
          }

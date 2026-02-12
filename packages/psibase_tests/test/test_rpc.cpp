@@ -196,6 +196,11 @@ TEST_CASE("forwardedFor")
          HttpRequest request{.headers = {{"Forwarded", R"(for=192.168.0.1;comment=a")"}}};
          CHECK(forwardedFor(request) == R{std::nullopt});
       }
+      SECTION("duplicate parameter")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for=192.168.0.1;for=127.0.0.1)"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
    }
 }
 
