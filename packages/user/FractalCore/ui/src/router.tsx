@@ -1,25 +1,25 @@
 import { createBrowserRouter } from "react-router-dom";
 
-import { ActiveAndUpcoming } from "@/pages/fractal/evaluations/active-and-upcoming";
-import { Completed } from "@/pages/fractal/evaluations/completed";
-import { AllMembers } from "@/pages/fractal/membership/all-members";
-import { MyMembership } from "@/pages/fractal/membership/my-membership";
+import { Members } from "@/pages/fractal/members";
+import { ActiveAndUpcoming } from "@/pages/guilds/evaluations/active-and-upcoming";
+import { Completed } from "@/pages/guilds/evaluations/completed";
 
 import { Layout } from "@/components/layout";
 
 import { ProtectedRoute } from "@shared/components/protected-route";
 
-import { Judicial } from "./pages/fractal/branches/judicial";
-import { Legislative } from "./pages/fractal/branches/legislative";
-import { EvaluationDeliberation } from "./pages/fractal/evaluations/evaluation-deliberation";
-import { EvaluationResult } from "./pages/fractal/evaluations/evaluation-result";
-import { AllGuildMembers } from "./pages/fractal/guild-membership/all-guild-members";
-import { MyGuildMembership } from "./pages/fractal/guild-membership/my-guild-membership";
+import { Judicial } from "./pages/fractal/governance/judicial";
+import { Legislative } from "./pages/fractal/governance/legislative";
 import { Guilds } from "./pages/fractal/guilds";
 import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
 import { Applications } from "./pages/fractal/membership/applications";
-import { Leadership } from "./pages/leadership";
-import { Settings } from "./pages/settings";
+import { Overview } from "./pages/fractal/overview/index";
+import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
+import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
+import { Leadership } from "./pages/guilds/leadership";
+import { AllGuildMembers } from "./pages/guilds/membership/all-guild-members";
+import { MyGuildMembership } from "./pages/guilds/membership/my-guild-membership";
+import { Settings } from "./pages/guilds/settings";
 
 export const router = createBrowserRouter([
     {
@@ -30,7 +30,7 @@ export const router = createBrowserRouter([
                 path: "/",
                 element: (
                     <ProtectedRoute>
-                        <MyMembership />
+                        <Overview />
                     </ProtectedRoute>
                 ),
             },
@@ -54,7 +54,7 @@ export const router = createBrowserRouter([
                 path: "/members",
                 element: (
                     <ProtectedRoute>
-                        <AllMembers />
+                        <Members />
                     </ProtectedRoute>
                 ),
             },

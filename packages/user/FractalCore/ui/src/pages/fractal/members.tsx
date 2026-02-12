@@ -14,7 +14,7 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-export const AllMembers = () => {
+export const Members = () => {
     const currentFractal = useFractalAccount();
 
     const { data: members } = useMembers(currentFractal);
