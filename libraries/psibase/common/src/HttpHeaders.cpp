@@ -1,5 +1,7 @@
 #include <psibase/HttpHeaders.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <ranges>
 #include "HttpUtil.hpp"
@@ -41,6 +43,17 @@ namespace
       if (escape || !done)
          return std::nullopt;
       return result;
+   }
+
+   bool isTChar(char ch)
+   {
+      return std::isalnum(ch) ||
+             std::string_view{"!#$%&'*+-.^_`|~"}.find(ch) != std::string_view::npos;
+   }
+
+   bool isToken(std::string_view s)
+   {
+      return !s.empty() && std::ranges::all_of(s, isTChar);
    }
 
    // port or obfport
@@ -106,6 +119,8 @@ namespace
          {
             if (auto q = unquote(value))
                return parseNodeId(*q);
+            else if (!isToken(value))
+               return std::nullopt;
             else
                return parseNodeId(value);
          }

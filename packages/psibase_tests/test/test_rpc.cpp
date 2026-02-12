@@ -103,6 +103,11 @@ TEST_CASE("forwardedFor")
          IPV6Address expected{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
          CHECK(forwardedFor(request) == R{expected});
       }
+      SECTION("v6 missing quote")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for=[::1])"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
       SECTION("v6:port")
       {
          HttpRequest request{.headers = {{"Forwarded", R"(for="[::1]:12345")"}}};
