@@ -896,26 +896,6 @@ pub mod tables {
             SubAccountTable::read_write().erase(&(&self.pk()));
         }
 
-        pub fn force_delete(&mut self) {
-            let sub_bal_table = SubAccountBalanceTable::read_write();
-
-            let sub_balances: Vec<_> = sub_bal_table
-                .get_index_pk()
-                .range((self.id, 0)..(self.id, u32::MAX))
-                .collect();
-
-            for sub_balance in sub_balances {
-                // Move any sub-account balances to the primary balance
-                if sub_balance.balance.value > 0 {
-                    Balance::get_or_new(self.account, sub_balance.token_id)
-                        .add_balance(sub_balance.balance);
-                }
-                sub_bal_table.erase(&sub_balance.pk());
-            }
-
-            SubAccountTable::read_write().erase(&(&self.pk()));
-        }
-
         pub fn add_balance(&mut self, token_id: TID, quantity: Quantity) {
             Balance::get_assert(self.account, token_id).sub_balance(quantity);
             SubAccountBalance::get_or_new(self.id, token_id).add_balance(quantity);
@@ -990,10 +970,6 @@ pub mod tables {
 
         fn save(&self) {
             SubAccountBalanceTable::read_write().put(&self).unwrap();
-        }
-
-        pub fn delete(&mut self) {
-            SubAccountBalanceTable::read_write().erase(&self.pk());
         }
 
         fn add_balance(&mut self, quantity: Quantity) {
