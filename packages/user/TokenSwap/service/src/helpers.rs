@@ -8,12 +8,12 @@ pub fn sqrt(n: u128) -> u128 {
         return n;
     }
 
-    let mut x = n;
-    let mut y = (x + 1) >> 1;
+    let mut x = n >> (n.ilog2() / 2);
+    let mut y = (x + 1) / 2;
 
     while y < x {
         x = y;
-        y = (x + n / x) >> 1;
+        y = (x + n / x) / 2;
     }
 
     x
