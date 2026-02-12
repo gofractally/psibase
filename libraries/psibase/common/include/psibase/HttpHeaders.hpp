@@ -6,6 +6,13 @@
 
 namespace psibase
 {
+   struct ToLower
+   {
+      char        operator()(unsigned char ch) const;
+      std::string operator()(std::string_view s) const;
+   };
+   bool iequal(std::string_view lhs, std::string_view rhs);
+
    struct QSplitSentinel
    {
    };

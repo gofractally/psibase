@@ -82,7 +82,7 @@ namespace psibase
 {
    bool HttpHeader::matches(std::string_view h) const
    {
-      return std::ranges::equal(name, h, {}, ::tolower, ::tolower);
+      return iequal(name, h);
    }
 
    std::optional<std::string_view> HttpHeader::get(const std::vector<HttpHeader>& headers,
@@ -180,7 +180,7 @@ namespace psibase
       for (auto iter = headers.begin(); iter != headers.end();)
       {
          auto& header = *iter;
-         if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
+         if (header.matches("cookie"))
          {
             std::string newValue;
             bool        first = true;

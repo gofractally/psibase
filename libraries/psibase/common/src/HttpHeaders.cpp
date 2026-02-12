@@ -9,11 +9,6 @@ using namespace psibase;
 
 namespace
 {
-   bool iequal(std::string_view lhs, std::string_view rhs)
-   {
-      return std::ranges::equal(lhs, rhs, {}, ::tolower, ::tolower);
-   }
-
    std::optional<std::string> unquote(std::string_view input)
    {
       if (!input.starts_with('"'))
@@ -173,6 +168,24 @@ namespace
       return pos;
    }
 }  // namespace
+
+char ToLower::operator()(unsigned char ch) const
+{
+   return static_cast<char>(std::tolower(ch));
+}
+
+std::string ToLower::operator()(std::string_view s) const
+{
+   std::string result{s};
+   for (char& ch : result)
+      ch = (*this)(ch);
+   return result;
+}
+
+bool psibase::iequal(std::string_view lhs, std::string_view rhs)
+{
+   return std::ranges::equal(lhs, rhs, {}, ToLower{}, ToLower{});
+}
 
 QSplitIterator::QSplitIterator(std::string_view s, char ch)
     : start(s.data()), end(s.data() + s.size()), ch(ch)
