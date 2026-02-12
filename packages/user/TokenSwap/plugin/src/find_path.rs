@@ -82,15 +82,15 @@ pub fn find_path(
     let mut best: HashMap<TID, Quantity> = HashMap::new();
     best.insert(from, amount);
 
-    // Predecessor map for path reconstruction: (previous token, pool used)
-    let mut pred: HashMap<TID, (TID, GraphPool)> = HashMap::new();
+    // Predecessor map for path reconstruction: (previous token, pool index)
+    let mut pred: HashMap<TID, (TID, usize)> = HashMap::new();
 
     for _ in 0..max_hops {
         // Candidates for updates in this iteration
         // Per pools
-        let mut candidates: HashMap<TID, (Quantity, Option<(TID, GraphPool)>)> = HashMap::new();
+        let mut candidates: HashMap<TID, (Quantity, (TID, usize))> = HashMap::new();
 
-        for pool in &all_pools {
+        for (i, pool) in all_pools.iter().enumerate() {
             // Direction: token_a → token_b
             if let Some(&amount_in) = best.get(&pool.token_a) {
                 let actual = swap(
@@ -105,7 +105,7 @@ pub fn find_path(
                         .get(&pool.token_b)
                         .map_or(true, |(best, _)| actual > *best)
                 {
-                    candidates.insert(pool.token_b, (actual, Some((pool.token_a, pool.clone()))));
+                    candidates.insert(pool.token_b, (actual, (pool.token_a, i)));
                 }
             }
 
@@ -123,20 +123,18 @@ pub fn find_path(
                         .get(&pool.token_a)
                         .map_or(true, |(best, _)| actual > *best)
                 {
-                    candidates.insert(pool.token_a, (actual, Some((pool.token_b, pool.clone()))));
+                    candidates.insert(pool.token_a, (actual, (pool.token_b, i)));
                 }
             }
         }
 
         // Apply updates if better
         let mut updated = false;
-        for (target, (new_amount, opt_prev)) in candidates {
+        for (target, (new_amount, predecessor)) in candidates {
             let old_amount = *best.get(&target).unwrap_or(&Quantity::from(0));
             if new_amount > old_amount {
                 best.insert(target, new_amount);
-                if let Some(prev) = opt_prev {
-                    pred.insert(target, prev);
-                }
+                pred.insert(target, predecessor);
                 updated = true;
             }
         }
@@ -152,15 +150,20 @@ pub fn find_path(
         }
 
         // Reconstruct the path
-        let mut path: Vec<GraphPool> = vec![];
+        let mut path_indices: Vec<usize> = vec![];
         let mut current = to;
         while current != from {
-            let (prev, pool) = pred.get(&current).expect("broken predecessor chain");
-            path.push(pool.clone());
+            let (prev, pool_index) = pred.get(&current).expect("broken predecessor chain");
+            path_indices.push(*pool_index);
             current = *prev;
         }
 
-        path.reverse();
+        path_indices.reverse();
+
+        let path: Vec<GraphPool> = path_indices
+            .into_iter()
+            .map(|i| all_pools[i].clone())
+            .collect();
 
         // Compute max_slippage_ppm by simulating the path
         let mut max_slippage_ppm = 0u32;
