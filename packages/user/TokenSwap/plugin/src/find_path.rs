@@ -91,35 +91,39 @@ pub fn find_path(
         let mut candidates: HashMap<TID, (Quantity, Option<(TID, GraphPool)>)> = HashMap::new();
 
         for pool in &all_pools {
-            // Try token_a -> token_b
+            // Direction: token_a → token_b
             if let Some(&amount_in) = best.get(&pool.token_a) {
-                let reserve_in = pool.reserve_a;
-                let reserve_out = pool.reserve_b;
-                let fee_ppm = pool.token_a_fee_ppm;
-                let actual = swap(amount_in, reserve_in, reserve_out, fee_ppm);
-                if actual.value > 0 {
-                    let entry = candidates
-                        .entry(pool.token_b)
-                        .or_insert((Quantity::from(0), None));
-                    if actual > entry.0 {
-                        *entry = (actual, Some((pool.token_a, pool.clone())));
-                    }
+                let actual = swap(
+                    amount_in,
+                    pool.reserve_a,
+                    pool.reserve_b,
+                    pool.token_a_fee_ppm,
+                );
+
+                if actual.value > 0
+                    && candidates
+                        .get(&pool.token_b)
+                        .map_or(true, |(best, _)| actual > *best)
+                {
+                    candidates.insert(pool.token_b, (actual, Some((pool.token_a, pool.clone()))));
                 }
             }
 
-            // Try token_b -> token_a
+            // Direction: token_b → token_a
             if let Some(&amount_in) = best.get(&pool.token_b) {
-                let reserve_in = pool.reserve_b;
-                let reserve_out = pool.reserve_a;
-                let fee_ppm = pool.token_b_fee_ppm;
-                let actual = swap(amount_in, reserve_in, reserve_out, fee_ppm);
-                if actual.value > 0 {
-                    let entry = candidates
-                        .entry(pool.token_a)
-                        .or_insert((Quantity::from(0), None));
-                    if actual > entry.0 {
-                        *entry = (actual, Some((pool.token_b, pool.clone())));
-                    }
+                let actual = swap(
+                    amount_in,
+                    pool.reserve_b,
+                    pool.reserve_a,
+                    pool.token_b_fee_ppm,
+                );
+
+                if actual.value > 0
+                    && candidates
+                        .get(&pool.token_a)
+                        .map_or(true, |(best, _)| actual > *best)
+                {
+                    candidates.insert(pool.token_a, (actual, Some((pool.token_b, pool.clone()))));
                 }
             }
         }
