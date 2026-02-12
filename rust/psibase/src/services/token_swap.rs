@@ -126,7 +126,13 @@ pub mod Service {
     /// * `amount_a`   - Maximum amount of token A the caller wishes to add
     /// * `amount_b`   - Maximum amount of token B the caller wishes to add
     #[action]
-    fn add_liquidity(pool_id: TID, amount_a: Quantity, amount_b: Quantity) {
+    fn add_liquidity(
+        pool_id: TID,
+        token_a: TID,
+        token_b: TID,
+        amount_a: Quantity,
+        amount_b: Quantity,
+    ) {
         unimplemented!()
     }
 
