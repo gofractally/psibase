@@ -218,7 +218,7 @@ impl Liquidity for TokenSwapPlugin {
         )
     }
 
-    fn quote_remove_liquidity(
+    fn quote_single_sided_remove(
         pool: WitPool,
         user_pool_token_balance: Option<String>,
         desired_amount: TokenAmount,
@@ -256,7 +256,8 @@ impl Liquidity for TokenSwapPlugin {
 
         let pool_tokens_dec = Decimal::new(required_pool_tokens, pool_token_precision).to_string();
 
-        let (a_amount, b_amount) = Self::quote_pool_tokens(pool.into(), pool_tokens_dec.clone())?;
+        let (a_amount, b_amount) =
+            Self::quote_remove_liquidity(pool.into(), pool_tokens_dec.clone())?;
 
         let pool_token_amount = TokenAmount {
             amount: pool_tokens_dec,
@@ -281,7 +282,7 @@ impl Liquidity for TokenSwapPlugin {
         )
     }
 
-    fn quote_pool_tokens(
+    fn quote_remove_liquidity(
         pool: WitPool,
         amount: String,
     ) -> Result<(TokenAmount, TokenAmount), Error> {

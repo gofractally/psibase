@@ -1,14 +1,18 @@
 import { tokenSwap, usePluginFunctionQuery } from "@shared/lib/plugins";
-import { Pool, TokenAmount } from "@shared/lib/plugins/token-swap";
+import { Pool } from "@shared/lib/plugins/token-swap";
 
 export const useQuoteRemoveLiquidity = (
     enabled: boolean,
     pool?: Pool,
-    tokenBalance?: string,
-    desiredAmount?: TokenAmount,
+    amount?: string,
 ) =>
     usePluginFunctionQuery(
         tokenSwap.liquidity.quoteRemoveLiquidity,
-        [pool!, tokenBalance, desiredAmount!],
-        { enabled },
+        [pool!, amount!],
+        {
+            enabled,
+        },
     );
+
+
+    

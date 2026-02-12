@@ -118,7 +118,7 @@ interface liquidity {
     ///                                 (must match either `token-a-id` or `token-b-id`)
     /// Returns:
     /// * (Pool Tokens, First reserve, Second reserve)
-    quote-remove-liquidity: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: token-amount) -> result<tuple<token-amount, token-amount, token-amount>, error>;
+    quote-single-sided-remove: func(pool: pool, user-pool-token-balance: option<string>, desired-amount: token-amount) -> result<tuple<token-amount, token-amount, token-amount>, error>;
 
     /// Creates a new liquidity pool with the initial deposits of both reserve tokens.
     ///
@@ -138,7 +138,7 @@ interface liquidity {
     /// * `amount` - The target amount of LP tokens to burn
     /// Returns:
     /// * (First reserve amount, Second reserve amount)
-    quote-pool-tokens: func(pool: pool, amount: string) -> result<tuple<token-amount, token-amount>, error>;
+    quote-remove-liquidity: func(pool: pool, amount: string) -> result<tuple<token-amount, token-amount>, error>;
 }
 
 

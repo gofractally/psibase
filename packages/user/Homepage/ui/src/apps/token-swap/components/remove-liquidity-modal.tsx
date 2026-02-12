@@ -13,7 +13,7 @@ import {
 import { Button } from "@shared/shadcn/ui/button";
 
 import { usePools } from "../hooks/use-pools";
-import { useQuotePoolTokens } from "../hooks/use-quote-pool-tokens";
+import { useQuoteRemoveLiquidity } from "../hooks/use-quote-remove-liquidity";
 import { useRemoveLiquidity } from "../hooks/use-remove-liquidity";
 import { useToken } from "../hooks/use-token";
 import { AmountSummary } from "./amount-summary";
@@ -34,7 +34,7 @@ export const RemoveLiquidityModal = ({
         (pool) => pool.id == amount?.tokenId,
     );
 
-    const { data: outputs } = useQuotePoolTokens(
+    const { data: outputs } = useQuoteRemoveLiquidity(
         !!focusedPool,
         focusedPool,
         amount?.amount,

@@ -16,8 +16,8 @@ import { RemoveLiquidityModal } from "./components/remove-liquidity-modal";
 import { useAmount } from "./hooks/use-amount";
 import { usePools } from "./hooks/use-pools";
 import { useQuoteAddLiquidity } from "./hooks/use-quote-add";
-import { useQuotePoolTokens } from "./hooks/use-quote-pool-tokens";
 import { useQuoteRemoveLiquidity } from "./hooks/use-quote-remove-liquidity";
+import { useQuoteSingleSidedRemove } from "./hooks/use-quote-single-sided-remove";
 
 const pureDecimalToQuantity = (tokenAmount: TokenAmount): Quantity => {
     const [_, precPart] = tokenAmount.amount.split(".");
@@ -88,7 +88,7 @@ export const Liquidity = () => {
         includeLabel: false,
     });
 
-    const { data: maxWithdrawableLiquidity } = useQuotePoolTokens(
+    const { data: maxWithdrawableLiquidity } = useQuoteRemoveLiquidity(
         !!poolTokenBalance && !isAddingLiquidity,
         focusedPool,
         poolTokenBalanceDec,
@@ -152,7 +152,7 @@ export const Liquidity = () => {
         !sameTokensSelected
     );
 
-    const { data: quotedRemove } = useQuoteRemoveLiquidity(
+    const { data: quotedRemove } = useQuoteSingleSidedRemove(
         validQuote && !isAddingLiquidity,
         focusedPool,
         poolTokenBalance?.balance?.format({ includeLabel: false }),

@@ -68,9 +68,9 @@ class Liquidity extends PluginInterface {
         );
     }
 
-    get quotePoolTokens() {
+    get quoteRemoveLiquidity() {
         return this._call<[pool: Pool, amount: string], [TokenAmount, TokenAmount]>(
-            "quotePoolTokens",
+            "quoteRemoveLiquidity",
         );
     }
 
@@ -88,14 +88,14 @@ class Liquidity extends PluginInterface {
         >("removeLiquidity");
     }
 
-    get quoteRemoveLiquidity() {
+    get quoteSingleSidedRemove() {
         return this._call<
             [
                 pool: Pool,
                 userPoolTokenBalance: string | undefined,
                 desiredAmount: TokenAmount,
             ], [poolTokens: TokenAmount, reserveA: TokenAmount, reserveB: TokenAmount]
-        >("quoteRemoveLiquidity");
+        >("quoteSingleSidedRemove");
     }
 }
 
