@@ -1,8 +1,7 @@
-use crate::bindings::*;
-use crate::errors::ErrorType::*;
+use crate::errors::ErrorTypes::*;
 
-use host::types::types as CommonTypes;
 use psibase::fracpack::{Pack, Unpack};
+use psibase_plugin::types::*;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -11,7 +10,7 @@ pub struct ResponseRoot<T> {
 }
 
 pub trait TryParseGqlResponse: Sized {
-    fn from_gql(s: String) -> Result<Self, CommonTypes::Error>;
+    fn from_gql(s: String) -> Result<Self, Error>;
 }
 
 #[allow(non_snake_case)]
@@ -50,7 +49,7 @@ pub struct GetInviteResponse<T> {
 }
 
 impl TryParseGqlResponse for FixedDetailsResponse {
-    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+    fn from_gql(response: String) -> Result<Self, Error> {
         let response_root: ResponseRoot<GetInviteResponse<FixedDetailsResponse>> =
             serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
         Ok(response_root.data.inviteById.ok_or_else(|| {
@@ -60,7 +59,7 @@ impl TryParseGqlResponse for FixedDetailsResponse {
 }
 
 impl TryParseGqlResponse for CurrentDetailsResponse {
-    fn from_gql(response: String) -> Result<Self, CommonTypes::Error> {
+    fn from_gql(response: String) -> Result<Self, Error> {
         let response_root: ResponseRoot<GetInviteResponse<CurrentDetailsResponse>> =
             serde_json::from_str(&response).map_err(|e| QueryError(e.to_string()))?;
         Ok(response_root.data.inviteById.ok_or_else(|| {
