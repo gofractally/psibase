@@ -314,14 +314,12 @@ pub mod tables {
         pub fn sub_balance(&mut self, quantity: Quantity) {
             if self.balance < quantity {
                 let p = Token::get_assert(self.token_id).precision;
-                let b = Decimal::new(self.balance, p);
-                let q = Decimal::new(quantity, p);
                 abort_message(&format!(
                     "{} has insufficient balance (tid {}): {} < {}",
                     self.account.to_string(),
                     self.token_id,
-                    b,
-                    q
+                    Decimal::new(self.balance, p),
+                    Decimal::new(quantity, p)
                 ));
             }
             self.balance = self.balance - quantity;
@@ -809,6 +807,7 @@ pub mod tables {
         pub sub_account: String,
         #[graphql(skip)]
         pub id: u64,
+        pub manual_deletion: bool,
     }
     impl SubAccount {
         #[primary_key]
@@ -822,11 +821,14 @@ pub mod tables {
         }
     }
     impl SubAccount {
-        fn new(owner: AccountNumber, sub_account: String) -> Self {
+        pub const MANUAL_DEL: bool = true;
+
+        fn new(owner: AccountNumber, sub_account: String, manual_deletion: bool) -> Self {
             Self {
                 id: InitRow::next_subaccount_id(),
                 account: owner,
                 sub_account,
+                manual_deletion,
             }
         }
 
@@ -836,16 +838,28 @@ pub mod tables {
                 .get(&(owner, sub_account))
         }
 
-        pub fn get_or_add(owner: AccountNumber, sub_account: String) -> Self {
-            Self::get(owner, sub_account.clone()).unwrap_or_else(|| {
-                check(
-                    sub_account.len() <= 80,
-                    "Sub-account key must be 80 bytes or less",
-                );
-                let mut new_instance = Self::new(owner, sub_account);
-                new_instance.save();
-                new_instance
-            })
+        pub fn get_or_add(
+            owner: AccountNumber,
+            sub_account: String,
+            manual_deletion: bool,
+        ) -> Self {
+            if let Some(mut inst) = Self::get(owner, sub_account.clone()) {
+                if manual_deletion {
+                    check(!inst.manual_deletion, "Sub-account was 'created' twice");
+                    inst.manual_deletion = true;
+                    inst.save();
+                }
+
+                return inst;
+            }
+
+            check(
+                sub_account.len() <= 80,
+                "Sub-account key must be 80 bytes or less",
+            );
+            let mut new_instance = Self::new(owner, sub_account, manual_deletion);
+            new_instance.save();
+            new_instance
         }
 
         pub fn get_assert(owner: AccountNumber, sub_account: String) -> Self {
@@ -864,18 +878,19 @@ pub mod tables {
         }
 
         pub fn delete(&mut self) {
-            let sub_balances: Vec<_> = SubAccountBalanceTable::read()
+            let sub_bal_table = SubAccountBalanceTable::read_write();
+
+            let sub_balances: Vec<_> = sub_bal_table
                 .get_index_pk()
                 .range((self.id, 0)..(self.id, u32::MAX))
                 .collect();
 
-            let sab_table = SubAccountBalanceTable::read_write();
             for sub_balance in sub_balances {
-                if sub_balance.balance.value > 0 {
-                    Balance::get_or_new(self.account, sub_balance.token_id)
-                        .add_balance(sub_balance.balance);
-                }
-                sab_table.erase(&sub_balance.pk());
+                check(
+                    sub_balance.balance.value == 0,
+                    "Sub-account with non-zero balances cannot be deleted",
+                );
+                sub_bal_table.erase(&sub_balance.pk());
             }
 
             SubAccountTable::read_write().erase(&(&self.pk()));
@@ -887,8 +902,19 @@ pub mod tables {
         }
 
         pub fn sub_balance(&mut self, token_id: TID, quantity: Quantity) {
-            SubAccountBalance::get_assert(self.id, token_id).sub_balance(quantity);
+            let remaining = SubAccountBalance::get_assert(self.id, token_id).sub_balance(quantity);
             Balance::get_or_new(self.account, token_id).add_balance(quantity);
+
+            if remaining.value == 0 && !self.manual_deletion {
+                let keep = SubAccountBalanceTable::read()
+                    .get_index_pk()
+                    .range((self.id, 0)..(self.id, u32::MAX))
+                    .any(|sub_balance| sub_balance.balance.value > 0);
+
+                if !keep {
+                    self.delete();
+                }
+            }
         }
 
         pub fn get_balance(&self, token_id: TID) -> Quantity {
@@ -946,19 +972,16 @@ pub mod tables {
             SubAccountBalanceTable::read_write().put(&self).unwrap();
         }
 
-        pub fn delete(&mut self) {
-            SubAccountBalanceTable::read_write().erase(&self.pk());
-        }
-
         fn add_balance(&mut self, quantity: Quantity) {
             self.balance = self.balance + quantity;
             self.save();
         }
 
-        fn sub_balance(&mut self, quantity: Quantity) {
+        fn sub_balance(&mut self, quantity: Quantity) -> Quantity {
             check(self.balance >= quantity, "Insufficient sub-account balance");
             self.balance = self.balance - quantity;
             self.save();
+            self.balance
         }
 
         pub fn get_balance(&self) -> Quantity {
