@@ -25,7 +25,10 @@ export const CheckboxField = ({
         <div>
             <div className="flex w-full">
                 <Label
-                    className={cn(isError && isBlurred && "text-destructive")}
+                    className={cn(
+                        isError && isBlurred && "text-destructive",
+                        "cursor-pointer",
+                    )}
                 >
                     {label}
                 </Label>

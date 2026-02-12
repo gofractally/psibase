@@ -1,6 +1,6 @@
 import { Save, Trash, Upload } from "lucide-react";
 import { CircleAlert } from "lucide-react";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -16,6 +16,7 @@ import { useBranding } from "@shared/hooks/use-branding";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const Section = ({
     title = "Saluton, Mondo!",
@@ -70,6 +71,14 @@ export const Branding = () => {
             form.reset(data.value);
         },
     });
+
+    useEffect(() => {
+        if (!isBrandingLoading && networkName !== undefined) {
+            form.reset({ networkName: networkName || "" });
+        }
+        // form instance is stable; only sync when data loads
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isBrandingLoading, networkName]);
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
@@ -173,36 +182,39 @@ export const Branding = () => {
                     </div>
                 </div>
                 <div className="w-full">
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            form.handleSubmit();
-                        }}
-                        className="flex w-full flex-col gap-3"
-                    >
-                        <form.AppField
-                            name="networkName"
-                            children={(field) => (
-                                <field.TextField
-                                    isLoading={isBrandingLoading}
-                                    label="Network name"
-                                />
-                            )}
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .min(1, "Network must have a name"),
+                    {isBrandingLoading ? (
+                        <Skeleton className="h-10 w-full rounded-sm" />
+                    ) : (
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                form.handleSubmit();
                             }}
-                        />
-                        <div className="mt-6 flex flex-row-reverse font-medium">
-                            <form.AppForm>
-                                <form.SubmitButton
-                                    labels={["Save", "Saving..."]}
-                                />
-                            </form.AppForm>
-                        </div>
-                    </form>{" "}
+                            className="flex w-full flex-col gap-3"
+                        >
+                            <form.AppField
+                                name="networkName"
+                                children={(field) => (
+                                    <field.TextField
+                                        label="Network name"
+                                    />
+                                )}
+                                validators={{
+                                    onChange: z
+                                        .string()
+                                        .min(1, "Network must have a name"),
+                                }}
+                            />
+                            <div className="mt-6 flex flex-row-reverse font-medium">
+                                <form.AppForm>
+                                    <form.SubmitButton
+                                        labels={["Save", "Saving..."]}
+                                    />
+                                </form.AppForm>
+                            </div>
+                        </form>
+                    )}
                 </div>
             </div>
         </div>
