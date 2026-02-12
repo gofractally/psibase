@@ -87,7 +87,10 @@ mod tests {
         // Bob cannot debit more than whats in the shared balance
         assert_error(
             b.debit(tid, alice, 6.into(), memo.clone()),
-            "Insufficient token balance",
+            &format!(
+                "Insufficient shared balance (tid {}) between {} and {}: {} < {}",
+                tid, alice, bob, "0.0005", "0.0006"
+            ),
         );
         b.debit(tid, alice, 5.into(), memo.clone());
         assert_eq!(0, get_shared_balance(&chain, tid, alice, bob).value);
@@ -281,7 +284,7 @@ mod tests {
         // Check overdraw from primary
         assert_error(
             a.toSub(tid, savings.clone(), 100_0000.into()),
-            "Insufficient token balance",
+            "alice has insufficient balance (tid 1): 10.0000 < 100.0000",
         );
 
         // Check multiple sub-accounts
