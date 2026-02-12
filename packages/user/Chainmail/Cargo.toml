@@ -13,18 +13,18 @@ package-name = "Chainmail"
 services = ["chainmail"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.22.0"
-Supervisor = "0.22.0"
-Events = "0.22.0"
-SetCode = "0.22.0"
-Accounts = "0.22.0"
-CommonApi = "0.22.0"
-Sites = "0.22.0"
+HttpServer = "0.23.0"
+Supervisor = "0.23.0"
+Events = "0.23.0"
+SetCode = "0.23.0"
+Accounts = "0.23.0"
+CommonApi = "0.23.0"
+Sites = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-chainmail = { path = "service", version = "0.22.0" }
-chainmail-plugin = { path = "plugin", version = "0.22.0" }
+chainmail = { path = "service", version = "0.23.0" }
+chainmail-plugin = { path = "plugin", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true

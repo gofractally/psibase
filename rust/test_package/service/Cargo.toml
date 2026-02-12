@@ -14,8 +14,8 @@ server = "r-tpack"
 postinstall = [{ sender = "tpack", service = "tpack", method = "init" }]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.22.0"
-Sites = "0.22.0"
+HttpServer = "0.23.0"
+Sites = "0.23.0"
 
 [dependencies]
 psibase.workspace = true
@@ -23,4 +23,4 @@ psibase-rust-workspace-hack.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
-test_package = { path = "..", version = "0.22.0" }
+test_package = { path = "..", version = "0.23.0" }

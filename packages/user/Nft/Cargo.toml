@@ -13,15 +13,15 @@ package-name = "Nft"
 services = ["nft"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.22.0"
-Sites = "0.22.0"
-Events = "0.22.0"
+HttpServer = "0.23.0"
+Sites = "0.23.0"
+Events = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-nft = { path = "service", version = "0.22.0" }
-r-nft = { path = "query-service", version = "0.22.0" }
-nft-plugin = { path = "plugin", version = "0.22.0" }
+nft = { path = "service", version = "0.23.0" }
+r-nft = { path = "query-service", version = "0.23.0" }
+nft-plugin = { path = "plugin", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true
