@@ -149,7 +149,7 @@ namespace LocalService
                while (true)
                {
                   auto pos     = addrs.find(',', prev);
-                  auto addrStr = addrs.substr(prev, pos);
+                  auto addrStr = addrs.substr(prev, pos - prev);
                   if (auto prefix = parseIPAddressPrefix(addrStr))
                   {
                      prefixes.push_back(std::move(*prefix));
