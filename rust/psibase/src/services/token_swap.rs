@@ -164,9 +164,6 @@ pub mod Service {
     fn swap(pools: Vec<TID>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
         unimplemented!()
     }
-
-    #[event(history)]
-    pub fn created_pool(token_a: TID, token_b: TID) {}
 }
 
 #[test]
