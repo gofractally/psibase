@@ -1,0 +1,9 @@
+package caller:plugin;
+
+world impl {
+    
+    import callee:component/api;
+    export callee:component/callbacks;
+
+    export hello: func();
+}

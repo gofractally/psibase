@@ -1,0 +1,12 @@
+[package]
+name = "callee"
+version = "0.1.0"
+rust-version = "1.86.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+wit-bindgen = "0.49"
+
+[lib]
+crate-type = ["cdylib"]

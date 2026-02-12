@@ -1,0 +1,22 @@
+package callee:component;
+
+interface callbacks {
+    resource some-contract {
+        constructor();
+        run: func(message: string);
+    }
+}
+
+interface api {
+    use callbacks.{some-contract};
+    process: func(callback: some-contract);
+}
+
+interface simple-api {
+    hello: func();
+}
+
+world component {
+    export api;
+    export simple-api;
+}
