@@ -10,7 +10,7 @@ wit-bindgen-rt.workspace = true
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-identity = { path = "../service/", version = "0.22.0" }
+identity = { path = "../service/", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true
 
 [lib]
@@ -33,4 +33,4 @@ world = "impl"
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 [dev-dependencies]
-identity-pkg = { path = "..", version = "0.22.0" }
+identity-pkg = { path = "..", version = "0.23.0" }

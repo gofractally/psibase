@@ -12,7 +12,7 @@ psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
-branding = { path = "../service/", version = "0.22.0" }
+branding = { path = "../service/", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true
 
 [lib]
@@ -32,4 +32,4 @@ world = "impl"
 "staged-tx:plugin" = { path = "../../../system/StagedTx/plugin/wit/world.wit" }
 
 [dev-dependencies]
-branding-pkg = { path = "..", version = "0.22.0" }
+branding-pkg = { path = "..", version = "0.23.0" }
