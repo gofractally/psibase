@@ -201,6 +201,17 @@ TEST_CASE("forwardedFor")
          HttpRequest request{.headers = {{"Forwarded", R"(for=192.168.0.1;for=127.0.0.1)"}}};
          CHECK(forwardedFor(request) == R{std::nullopt});
       }
+      SECTION("case-insensitive")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(FoR=192.168.0.1)"}}};
+         IPV4Address expected{192, 168, 0, 1};
+         CHECK(forwardedFor(request) == R{expected});
+      }
+      SECTION("case-insensitive duplicate")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(FoR=192.168.0.1;comment=1;COMMENT=2)"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
    }
 }
 
