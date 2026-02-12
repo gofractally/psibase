@@ -1,5 +1,6 @@
 #include <psibase/HttpHeaders.hpp>
 
+#include <charconv>
 #include <ranges>
 #include "HttpUtil.hpp"
 
@@ -42,32 +43,50 @@ namespace
       return result;
    }
 
+   // port or obfport
+   bool validatePort(std::string_view port)
+   {
+      if (port.starts_with('_'))
+      {
+         if (port.size() < 2)
+            return false;
+         for (char ch : port.substr(1))
+            if (!std::isalnum(ch) && ch != '.' && ch != '_' && ch != '-')
+               return false;
+         return true;
+      }
+      else
+      {
+         std::uint16_t v;
+         const char*   p   = port.data();
+         const char*   end = port.data() + port.size();
+         auto          res = std::from_chars(p, end, v);
+         return res.ec == std::errc{} && res.ptr == end;
+      }
+   }
+
    // Forwarded "for" and "by"
    std::optional<IPAddress> parseNodeId(std::string_view value)
    {
       if (value.starts_with('['))
       {
-         if (value.ends_with(']'))
-         {
-            return parseIPV6Address(value.substr(1, value.size() - 2));
-         }
-         else
-         {
-            if (auto result = parseIPV6Endpoint(value))
-               return result->address;
-         }
+         auto pos = value.find(']');
+         if (pos == std::string_view::npos)
+            return {};
+         if (pos + 1 != value.size() &&
+             (value[pos + 1] != ':' || !validatePort(value.substr(pos + 2))))
+            return {};
+         return parseIPV6Address(value.substr(1, pos - 1));
       }
       else
       {
-         if (value.find(':') != std::string_view::npos)
+         auto pos = value.find(':');
+         if (pos != std::string_view::npos)
          {
-            if (auto result = parseIPV4Endpoint(value))
-               return result->address;
+            if (!validatePort(value.substr(pos + 1)))
+               return {};
          }
-         else
-         {
-            return parseIPV4Address(value);
-         }
+         return parseIPV4Address(value.substr(0, pos));
       }
       return {};
    }

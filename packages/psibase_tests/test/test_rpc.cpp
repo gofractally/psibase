@@ -91,6 +91,12 @@ TEST_CASE("forwardedFor")
          IPV4Address expected{192, 168, 0, 1};
          CHECK(forwardedFor(request) == R{expected});
       }
+      SECTION("v4:obfport")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for="192.168.0.1:_12345")"}}};
+         IPV4Address expected{192, 168, 0, 1};
+         CHECK(forwardedFor(request) == R{expected});
+      }
       SECTION("v6")
       {
          HttpRequest request{.headers = {{"Forwarded", R"(for="[::1]")"}}};
@@ -100,6 +106,12 @@ TEST_CASE("forwardedFor")
       SECTION("v6:port")
       {
          HttpRequest request{.headers = {{"Forwarded", R"(for="[::1]:12345")"}}};
+         IPV6Address expected{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+         CHECK(forwardedFor(request) == R{expected});
+      }
+      SECTION("v6:obfport")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for="[::1]:_12345")"}}};
          IPV6Address expected{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
          CHECK(forwardedFor(request) == R{expected});
       }
@@ -129,6 +141,21 @@ TEST_CASE("forwardedFor")
          HttpRequest request{.headers = {{"Forwarded", "for=asdf,for=192.168.0.1"}}};
          IPV4Address expected1{192, 168, 0, 1};
          CHECK(forwardedFor(request) == R{std::nullopt, expected1});
+      }
+      SECTION("v4:invalid")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for="192.168.0.1:err")"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
+      SECTION("invalid obfport")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for="192.168.0.1:_err$")"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
+      }
+      SECTION("v6:invalid")
+      {
+         HttpRequest request{.headers = {{"Forwarded", R"(for="[::1]:err")"}}};
+         CHECK(forwardedFor(request) == R{std::nullopt});
       }
       SECTION("obf")
       {
