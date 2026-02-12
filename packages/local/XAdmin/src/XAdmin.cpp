@@ -148,7 +148,7 @@ namespace LocalService
                std::string_view::size_type prev  = 0;
                while (true)
                {
-                  auto pos     = addrs.find(prev, ',');
+                  auto pos     = addrs.find(',', prev);
                   auto addrStr = addrs.substr(prev, pos);
                   if (auto prefix = parseIPAddressPrefix(addrStr))
                   {
