@@ -4,10 +4,14 @@ import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
-import { cn } from "@shared/lib/utils";
+import { GlowingCard } from "@shared/components/glowing-card";
+import { TableContact } from "@shared/components/tables/table-contact";
+import { Badge } from "@shared/shadcn/ui/badge";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -25,43 +29,51 @@ export const Members = () => {
     );
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            <div className="flex h-9 items-center">
-                <h1 className="text-lg font-semibold">All members</h1>
-            </div>
-            <div className="mt-3">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Created At</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {sortedMembers?.map((member, index) => (
-                            <TableRow
-                                key={member.account}
-                                className={cn({
-                                    "bg-background/80": index < 6,
-                                })}
-                            >
-                                <TableCell className="font-medium">
-                                    {member.account}
-                                </TableCell>
-                                <TableCell>
-                                    {getMemberLabel(member.memberStatus)}
-                                </TableCell>
-                                <TableCell>
-                                    {dayjs(member.createdAt).format(
-                                        "MMMM D, YYYY",
-                                    )}
-                                </TableCell>
+        <div className="mx-auto w-full max-w-5xl space-y-4">
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>All Members</CardTitle>
+                </CardHeader>
+                <CardContent className="@container">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Account</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-end">
+                                    Created At
+                                </TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedMembers?.map((member) => (
+                                <TableRow key={member.account}>
+                                    <TableCell className="font-medium">
+                                        <TableContact
+                                            account={member.account}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="default">
+                                            {getMemberLabel(
+                                                member.memberStatus,
+                                            )}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-end">
+                                        {dayjs(member.createdAt).format(
+                                            "MMMM D, YYYY",
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableCaption>
+                            A list of all members in this fractal.
+                        </TableCaption>
+                    </Table>
+                </CardContent>
+            </GlowingCard>
         </div>
     );
 };
