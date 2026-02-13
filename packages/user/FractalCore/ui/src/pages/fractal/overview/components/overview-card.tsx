@@ -3,7 +3,7 @@ import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
 
-import { FractalGuildHeaderIdentifier } from "@/components/fractal-guild-header-identifier";
+import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
 
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
@@ -31,7 +31,7 @@ export const OverviewCard = ({
     return (
         <GlowingCard>
             <CardHeader className="flex items-center justify-between gap-2">
-                <FractalGuildHeaderIdentifier
+                <FractalGuildIdentifier
                     name={fractal?.fractal?.name}
                     account={fractalAccount}
                 />

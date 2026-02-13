@@ -6,7 +6,7 @@ import { Guild } from "@/lib/graphql/fractals/getGuild";
 
 import { Card, CardContent, CardHeader } from "@shared/shadcn/ui/card";
 
-import { FractalGuildHeaderIdentifier } from "./fractal-guild-header-identifier";
+import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 const zLeadership = z.enum(["RepAndCouncil", "RepOnly", "CouncilOnly"]);
 
@@ -32,7 +32,7 @@ export const GuildOverviewCard = ({
     return (
         <Card>
             <CardHeader>
-                <FractalGuildHeaderIdentifier
+                <FractalGuildIdentifier
                     name={guild?.displayName}
                     account={guild?.account}
                 />
