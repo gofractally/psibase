@@ -86,6 +86,7 @@ pub mod Service {
     fn set_admin_nft(pool_id: TID, nft_id: NID) {
         unimplemented!()
     }
+
     /// Updates the swap fee for one of the tokens in an existing pool.
     ///
     /// Only the current owner of the administration NFT for the pool
@@ -123,6 +124,8 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `token_a` -   Token A ID.
+    /// * `token_b` -   Token B ID.
     /// * `amount_a`   - Maximum amount of token A the caller wishes to add
     /// * `amount_b`   - Maximum amount of token B the caller wishes to add
     #[action]

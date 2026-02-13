@@ -530,7 +530,7 @@ pub mod service {
 
     /// Updates the swap fee for one of the tokens in an existing pool.
     ///
-    /// Only the current owner of the administration NFT for the specified token's reserve
+    /// Only the current owner of the administration NFT for the pool
     /// is allowed to change the fee. The fee is set in parts per million (ppm).
     /// Maximum allowed value is 999_999 (≈99.9999%).
     ///
@@ -565,6 +565,8 @@ pub mod service {
     ///
     /// # Arguments
     /// * `pool_id`    - Liquidity token ID that identifies the pool
+    /// * `token_a` -   Token A ID.
+    /// * `token_b` -   Token B ID.
     /// * `amount_a`   - Maximum amount of token A the caller wishes to add
     /// * `amount_b`   - Maximum amount of token B the caller wishes to add
     #[action]
