@@ -3,13 +3,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { COUNCIL_SEATS } from "@/lib/constants";
 
-import { cn } from "@shared/lib/utils";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { Button } from "@shared/shadcn/ui/button";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -31,11 +32,8 @@ export const Guilds = () => {
     return (
         <>
             <ModalCreateGuild openChange={setShowModal} show={showModal} />
-            <div className="mx-auto w-full max-w-5xl p-4 px-6">
-                <div className="flex h-9 items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold">All Guilds</h1>
-                    </div>
+            <div className="mx-auto w-full max-w-5xl space-y-4">
+                <div className="flex justify-end">
                     <Button
                         variant="outline"
                         size="sm"
@@ -45,41 +43,45 @@ export const Guilds = () => {
                         <span className="hidden lg:inline">New Guild</span>
                     </Button>
                 </div>
-                <div className="mt-3">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Bio</TableHead>
-                                <TableHead>Leadership</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {guilds?.map((guild, index) => (
-                                <TableRow
-                                    key={guild.account}
-                                    className={cn({
-                                        "bg-background/80":
-                                            index < COUNCIL_SEATS,
-                                    })}
-                                    onClick={() => {
-                                        navigate(`/guild/${guild.account}/`);
-                                    }}
-                                >
-                                    <TableCell className="font-medium">
-                                        {guild.displayName}
-                                    </TableCell>
-                                    <TableCell>{guild.bio}</TableCell>
-                                    <TableCell>
-                                        {guild.rep?.member
-                                            ? guild.rep.member
-                                            : "Council"}
-                                    </TableCell>
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>All Guilds</CardTitle>
+                    </CardHeader>
+                    <CardContent className="@container">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-48">Name</TableHead>
+                                    <TableHead className="w-32 text-center">
+                                        Leadership
+                                    </TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
+                            </TableHeader>
+                            <TableBody>
+                                {guilds?.map((guild) => (
+                                    <TableRow
+                                        key={guild.account}
+                                        onClick={() => {
+                                            navigate(`/guild/${guild.account}`);
+                                        }}
+                                    >
+                                        <TableCell className="font-medium">
+                                            {guild.displayName}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            {guild.rep?.member
+                                                ? guild.rep.member
+                                                : "Council"}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableCaption>
+                                A list of all guilds in this fractal.
+                            </TableCaption>
+                        </Table>
+                    </CardContent>
+                </GlowingCard>
             </div>
         </>
     );

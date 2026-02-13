@@ -4,15 +4,9 @@ import z from "zod";
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/getGuild";
 
-import { useChainId } from "@shared/hooks/use-chain-id";
-import { createIdenticon } from "@shared/lib/create-identicon";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
-import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Card, CardContent, CardHeader } from "@shared/shadcn/ui/card";
+
+import { FractalGuildHeaderIdentifier } from "./fractal-guild-header-identifier";
 
 const zLeadership = z.enum(["RepAndCouncil", "RepOnly", "CouncilOnly"]);
 
@@ -32,39 +26,27 @@ export const GuildOverviewCard = ({
     guildAccount?: string;
 }) => {
     const { data: guild } = useGuild(guildAccount);
-    const { data: chainId } = useChainId();
 
     const leadershipStatus = getLeadershipStatus(guild);
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        {chainId && guild?.account ? (
-                            <img
-                                src={createIdenticon(chainId + guild?.account)}
-                                alt={guild?.displayName || "Guild"}
-                                className="size-5"
-                            />
-                        ) : (
-                            <Skeleton className="size-5 rounded-lg" />
-                        )}
-                    </div>
-                    <div>
-                        <div className="text-xl font-semibold">
-                            {guild?.displayName || "Loading..."}
-                        </div>
-                        <div className="text-muted-foreground text-sm font-normal">
-                            {guild?.bio}
-                        </div>
-                    </div>
-                </CardTitle>
+                <FractalGuildHeaderIdentifier
+                    name={guild?.displayName}
+                    account={guild?.account}
+                />
             </CardHeader>
             <CardContent>
                 <div className="space-y-3">
                     <div className="flex justify-between px-2">
                         <div>
+                            <h3 className="text-muted-foreground mb-1 text-sm font-medium">
+                                Description
+                            </h3>
+                            <p className="text-sm leading-relaxed">
+                                {guild?.bio || "No description available."}
+                            </p>
                             <h3 className="text-muted-foreground mb-1 text-sm font-medium">
                                 Mission
                             </h3>

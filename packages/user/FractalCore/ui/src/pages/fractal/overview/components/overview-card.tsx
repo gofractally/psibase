@@ -3,10 +3,11 @@ import type { Membership } from "@/lib/graphql/fractals/getMembership";
 
 import dayjs from "dayjs";
 
+import { FractalGuildHeaderIdentifier } from "@/components/fractal-guild-header-identifier";
+
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { GlowingCard } from "@shared/components/glowing-card";
-import { createIdenticon } from "@shared/lib/create-identicon";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
@@ -14,12 +15,10 @@ import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 export const OverviewCard = ({
     fractal,
     fractalAccount,
-    chainId,
     membership,
 }: {
     fractal?: FractalRes;
     fractalAccount?: string;
-    chainId: string;
     membership?: Membership;
 }) => {
     const isMember = membership != null;
@@ -31,22 +30,11 @@ export const OverviewCard = ({
 
     return (
         <GlowingCard>
-            <CardHeader className="flex items-center gap-2">
-                <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-12 items-center justify-center rounded-lg border">
-                    <img
-                        src={createIdenticon(chainId + fractalAccount)}
-                        alt={`${fractal?.fractal?.name || "Fractal"} identicon`}
-                        className="size-3/5"
-                    />
-                </div>
-                <div className="flex-1">
-                    <div className="text-xl font-semibold leading-tight">
-                        {fractal?.fractal?.name || "Loading..."}
-                    </div>
-                    <div className="text-muted-foreground text-sm font-normal leading-tight">
-                        {fractalAccount}
-                    </div>
-                </div>
+            <CardHeader className="flex items-center justify-between gap-2">
+                <FractalGuildHeaderIdentifier
+                    name={fractal?.fractal?.name}
+                    account={fractalAccount}
+                />
                 <Badge
                     variant={isMember ? "default" : "destructive"}
                     className={cn({

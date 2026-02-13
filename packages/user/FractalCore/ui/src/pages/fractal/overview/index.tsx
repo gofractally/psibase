@@ -3,7 +3,6 @@ import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembership } from "@/hooks/fractals/use-membership";
 
 import { ErrorCard } from "@shared/components/error-card";
-import { useChainId } from "@shared/hooks/use-chain-id";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
@@ -32,20 +31,10 @@ export const Overview = () => {
         error: errorMembership,
     } = useMembership(fractalAccount, currentUser);
 
-    const {
-        data: chainId,
-        isLoading: isLoadingChainId,
-        error: errorChainId,
-    } = useChainId();
-
     const isLoading =
-        isLoadingCurrentUser ||
-        isLoadingFractal ||
-        isLoadingMembership ||
-        isLoadingChainId;
+        isLoadingCurrentUser || isLoadingFractal || isLoadingMembership;
 
-    const error =
-        errorCurrentUser || errorFractal || errorMembership || errorChainId;
+    const error = errorCurrentUser || errorFractal || errorMembership;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -54,7 +43,7 @@ export const Overview = () => {
     return (
         <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="mt-3 space-y-6">
-                {isLoading || !chainId ? (
+                {isLoading ? (
                     <>
                         <Skeleton className="h-48 w-full rounded-xl" />
                         <Skeleton className="h-48 w-full rounded-xl" />
@@ -64,7 +53,6 @@ export const Overview = () => {
                         <OverviewCard
                             fractal={fractal}
                             fractalAccount={fractalAccount}
-                            chainId={chainId}
                             membership={membership}
                         />
                         <ConsensusRewardCard />
