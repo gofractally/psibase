@@ -8,6 +8,7 @@
 #include <boost/type_erasure/is_empty.hpp>
 #include <fstream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/TransactionContext.hpp>
@@ -48,8 +49,7 @@ namespace psibase::http
 
    bool is_private_header(const std::string& name)
    {
-      std::string lower_name = name;
-      std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+      std::string lower_name = ToLower{}(name);
       return private_headers.find(lower_name) != private_headers.end();
    }
 
