@@ -362,7 +362,7 @@ std::optional<SocketEndpoint> psibase::parseSocketEndpoint(std::string_view s)
       return LocalEndpoint{std::string(s)};
 }
 
-bool psibase::IPAddressPrefix::contains(const IPV4Address& addr)
+bool psibase::IPAddressPrefix::contains(const IPV4Address& addr) const
 {
    if (auto v4 = std::get_if<IPV4Address>(&address))
    {
@@ -383,7 +383,7 @@ bool psibase::IPAddressPrefix::contains(const IPV4Address& addr)
    return false;
 }
 
-bool psibase::IPAddressPrefix::contains(const IPV6Address& addr)
+bool psibase::IPAddressPrefix::contains(const IPV6Address& addr) const
 {
    if (auto v6 = std::get_if<IPV6Address>(&address))
    {
@@ -406,9 +406,29 @@ bool psibase::IPAddressPrefix::contains(const IPV6Address& addr)
    return false;
 }
 
-bool psibase::IPAddressPrefix::contains(const IPAddress& addr)
+bool psibase::IPAddressPrefix::contains(const IPAddress& addr) const
 {
    return std::visit([this](const auto& addr) { return contains(addr); }, addr);
+}
+
+bool psibase::IPAddressPrefix::contains(const IPV4Endpoint& endpoint) const
+{
+   return contains(endpoint.address);
+}
+
+bool psibase::IPAddressPrefix::contains(const IPV6Endpoint& endpoint) const
+{
+   return contains(endpoint.address);
+}
+
+bool psibase::IPAddressPrefix::contains(const LocalEndpoint& endpoint) const
+{
+   return false;
+}
+
+bool psibase::IPAddressPrefix::contains(const SocketEndpoint& endpoint) const
+{
+   return std::visit([this](const auto& endpoint) { return contains(endpoint); }, endpoint);
 }
 
 std::optional<IPAddressPrefix> psibase::parseIPAddressPrefix(std::string_view s)
