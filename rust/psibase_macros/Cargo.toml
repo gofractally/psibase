@@ -7,7 +7,6 @@ homepage.workspace = true
 edition.workspace = true
 description = "Macros to support psibase development"
 license.workspace = true
-publish.workspace = true
 
 [dependencies]
 psibase-macros-derive.workspace = true
