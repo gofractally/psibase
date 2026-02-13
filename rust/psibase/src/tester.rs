@@ -701,7 +701,8 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
         !(act.service == db::SERVICE && act.method == method!("open")
             || act.service == cpu_limit::SERVICE
             || act.sender == transact::SERVICE && act.service == virtual_server::SERVICE
-            || act.service == events::SERVICE && act.method == method!("sync"))
+            || act.service == events::SERVICE && act.method == method!("sync")
+            || act.sender == AccountNumber::default())
     }
 
     pub fn get_with_debug(&self, debug: bool) -> Result<T, anyhow::Error> {

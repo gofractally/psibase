@@ -318,6 +318,13 @@ namespace SystemService
       void execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
                    bool                                                          speculative);
 
+      /// Called by native code on objective writes to the database
+      void kvNotify(psibase::AccountNumber service,
+                    psibase::DbId          db,
+                    std::uint32_t          keyLen,
+                    std::uint32_t          oldValueLen,
+                    std::uint32_t          newValueLen);
+
       /// Sets the time between snapshots
       ///
       /// A value of 0 will disable snapshots. This is a chain-wide
@@ -458,6 +465,7 @@ namespace SystemService
                 method(finishBoot),
                 method(startBlock),
                 method(execTrx, transaction, speculative),
+                method(kvNotify, service, db, keyLen, oldValueLen, newValueLen),
                 method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),
