@@ -15,7 +15,7 @@ All of these options can also be specified on the command line or in the server'
 
 ### Accept incoming P2P connections
 
-If enabled, the node will accept p2p connections at the websocket endpoint `/native/p2p`.
+If enabled, the node will accept p2p connections from other nodes.
 
 ### Block Producer Name
 

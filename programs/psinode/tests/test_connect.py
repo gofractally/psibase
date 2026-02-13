@@ -18,11 +18,11 @@ class TestConnect(unittest.TestCase):
 
         def one_connection(other):
             def fn(node):
-                with node.get('/native/admin/peers', service='x-admin') as reply:
+                with node.get('/peers', service='x-peers') as reply:
                     reply.raise_for_status()
                     peers = reply.json()
                     print("peers: %s" % peers)
-                    return len(peers) == 1 and peers[0]['url'] == other.socketpath
+                    return len(peers) == 1 and other.socketpath in peers[0]['urls']
             return fn
         a.wait(one_connection(b))
         b.wait(one_connection(a))

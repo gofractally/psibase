@@ -108,6 +108,8 @@ namespace psibase
       std::string_view scheme;
       std::string_view host;
       std::string_view path;
+
+      std::string_view domain() const;
    };
    SplitURL splitURL(std::string_view url);
 
