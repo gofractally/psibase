@@ -624,3 +624,6 @@ pub mod service {
         tokens_service.credit(current_token, sender, current_amount, "Token swap".into());
     }
 }
+
+#[cfg(test)]
+mod tests;
