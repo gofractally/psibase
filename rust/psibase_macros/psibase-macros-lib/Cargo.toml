@@ -6,7 +6,6 @@ license.workspace = true
 description = "Macros to support psibase development"
 repository = "https://github.com/gofractally/psibase"
 homepage = "https://psibase.io"
-publish.workspace = true
 
 [dependencies]
 colored-diff = "0.2.3"
