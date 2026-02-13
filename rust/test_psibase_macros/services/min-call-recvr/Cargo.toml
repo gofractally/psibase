@@ -12,7 +12,7 @@ publish.workspace = true
 package-name = "mincallrecvr"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.22.0"
+HttpServer = "0.23.0"
 
 [dependencies]
 psibase.workspace = true
