@@ -15,7 +15,6 @@ services = ["token-swap"]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.22.0"
 Sites = "0.22.0"
-Permissions = "0.22.0"
 Tokens = "0.22.0"
 Nft = "0.22.0"
 
