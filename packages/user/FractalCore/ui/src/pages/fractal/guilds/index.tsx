@@ -2,9 +2,12 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
+
 import { useFractal } from "@/hooks/fractals/use-fractal";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { TableContact } from "@shared/components/tables/table-contact";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -51,8 +54,10 @@ export const Guilds = () => {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-48">Name</TableHead>
-                                    <TableHead className="w-32 text-center">
+                                    <TableHead className="w-48">
+                                        Guild
+                                    </TableHead>
+                                    <TableHead className="w-32 text-end">
                                         Leadership
                                     </TableHead>
                                 </TableRow>
@@ -66,12 +71,20 @@ export const Guilds = () => {
                                         }}
                                     >
                                         <TableCell className="font-medium">
-                                            {guild.displayName}
+                                            <FractalGuildIdentifier
+                                                name={guild.displayName}
+                                                account={guild.account}
+                                                size="sm"
+                                            />
                                         </TableCell>
-                                        <TableCell className="text-center">
-                                            {guild.rep?.member
-                                                ? guild.rep.member
-                                                : "Council"}
+                                        <TableCell className="justify-items-end">
+                                            {guild.rep?.member ? (
+                                                <TableContact
+                                                    account={guild.rep.member}
+                                                />
+                                            ) : (
+                                                "Council"
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))}
