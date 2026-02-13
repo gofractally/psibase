@@ -276,4 +276,47 @@ mod tests {
 
         Ok(())
     }
+
+    #[psibase::test_case(packages("TokenSwap"))]
+    fn test_remove_liquidity(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        let alice = account!("alice");
+        let token_swap = account!("token-swap");
+
+        chain.new_account(alice).unwrap();
+
+        let (pool_id, _nft_id, token_a, token_b) =
+            initialise_pool(&chain, alice, 100_000.into(), 100_000.into());
+
+        // Add extra liquidity (should take 50/50 due to ratio)
+        tokens_credit(&chain, token_a, alice, token_swap, 5000.into());
+        tokens_credit(&chain, token_b, alice, token_swap, 5000.into());
+
+        let lp_before = get_balance(&chain, pool_id, alice); // LP token is pool_id (liquidity_token)
+
+        Wrapper::push_from(&chain, alice)
+            .add_liquidity(pool_id, token_a, token_b, 5000.into(), 5000.into())
+            .get()
+            .unwrap();
+        let awarded_lp = get_balance(&chain, pool_id, alice) - lp_before;
+
+        let a_before = get_balance(&chain, token_a, alice);
+        let b_before = get_balance(&chain, token_b, alice);
+
+        // Remove half
+        let remove_amount = awarded_lp.value / 2;
+        tokens_credit(&chain, pool_id, alice, token_swap, remove_amount.into());
+
+        Wrapper::push_from(&chain, alice)
+            .remove_liquidity(pool_id, remove_amount.into())
+            .get()
+            .unwrap();
+
+        // Expect roughly half of added liquidity back (proportional)
+        let a_after = get_balance(&chain, token_a, alice);
+        let b_after = get_balance(&chain, token_b, alice);
+        assert_eq!(a_after - a_before, 2499.into()); // ~half minus rounding
+        assert_eq!(b_after - b_before, 2499.into());
+
+        Ok(())
+    }
 }
