@@ -3,15 +3,15 @@ import type {
     Transaction,
 } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 
-import { useContacts } from "@/apps/contacts/hooks/use-contacts";
-import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
+
+import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
 
 import { Loading } from "@/components/loading";
 
-import { Avatar } from "@shared/components/avatar";
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { TableContact } from "@shared/components/tables/table-contact";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -96,11 +96,8 @@ export function CreditTable({ user, token }: Props) {
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <CellCounterparty
-                                            counterParty={
-                                                transaction.counterParty
-                                            }
-                                            user={user}
+                                        <TableContact
+                                            account={transaction.counterParty}
                                         />
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -143,38 +140,6 @@ const CellAction = ({ action }: { action: ActionType }) => {
                 </TooltipTrigger>
             ) : null}
         </Tooltip>
-    );
-};
-
-const CellCounterparty = ({
-    counterParty,
-    user,
-}: {
-    counterParty: string;
-    user: string;
-}) => {
-    const { data: contacts } = useContacts(user);
-    const contact = contacts?.find(
-        (contact) => contact.account === counterParty,
-    );
-    return (
-        <div className="@lg:h-auto flex h-10 items-center gap-2">
-            <Avatar
-                account={counterParty}
-                className="@lg:h-5 @lg:w-5 h-8 w-8"
-                alt="Counterparty avatar"
-            />
-            {contact?.nickname ? (
-                <div className="@lg:flex-row @lg:gap-1 flex flex-col">
-                    <div className="font-medium">{contact.nickname}</div>
-                    <div className="text-muted-foreground italic">
-                        {counterParty}
-                    </div>
-                </div>
-            ) : (
-                <div className="italic">{counterParty}</div>
-            )}
-        </div>
     );
 };
 

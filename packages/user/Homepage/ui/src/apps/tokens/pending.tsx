@@ -5,6 +5,7 @@ import { Loading } from "@/components/loading";
 import { Avatar } from "@shared/components/avatar";
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { useContacts } from "@shared/hooks/use-contacts";
 import { cn } from "@shared/lib/utils";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -17,7 +18,6 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-import { useContacts } from "../contacts/hooks/use-contacts";
 import { AcceptButton } from "./components/pending/button-accept";
 import { CancelButton } from "./components/pending/button-cancel";
 import { RejectButton } from "./components/pending/button-reject";
@@ -43,12 +43,14 @@ export const PendingPageContents = () => {
     const context = useOutletContext<TokensOutletContext>();
     const { currentUser, isLoading, selectedToken } = context;
 
-    const { data, isError, error, isPending } =
-        useUserPendingBalance(currentUser, selectedToken?.id);
+    const { data, isError, error, isPending } = useUserPendingBalance(
+        currentUser,
+        selectedToken?.id,
+    );
 
-    const pendingBalances: PendingBalance[] = data?.filter(
-        (pt) => pt.balance.tokenNumber === selectedToken?.id
-    ) ?? [];
+    const pendingBalances: PendingBalance[] =
+        data?.filter((pt) => pt.balance.tokenNumber === selectedToken?.id) ??
+        [];
 
     if (isLoading || isPending) {
         return (
@@ -79,7 +81,7 @@ export const PendingPageContents = () => {
         );
     }
 
-    const counterParty =(pt: PendingBalance) => {
+    const counterParty = (pt: PendingBalance) => {
         if (pt.creditor === currentUser) {
             return pt.debitor;
         }
@@ -108,32 +110,35 @@ export const PendingPageContents = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {pendingBalances.map((pb: PendingBalance, index: number) => {
-                            const cntrParty = counterParty(pb);
-                            return (
-                                <TableRow key={`${cntrParty}-${index}`}>
-                                    <TableCell className="font-medium">
-                                        <CellCounterparty
-                                            counterParty={cntrParty}
-                                            currentUser={currentUser}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <CellIncoming
-                                            pendingBalance={pb}
-                                            counterParty={cntrParty}
-                                            currentUser={currentUser}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <CellOutgoing
-                                            pendingBalance={pb}
-                                            counterParty={cntrParty}
-                                            currentUser={currentUser}
-                                        />
-                                    </TableCell>
-                                </TableRow>
-                        );})}
+                        {pendingBalances.map(
+                            (pb: PendingBalance, index: number) => {
+                                const cntrParty = counterParty(pb);
+                                return (
+                                    <TableRow key={`${cntrParty}-${index}`}>
+                                        <TableCell className="font-medium">
+                                            <CellCounterparty
+                                                counterParty={cntrParty}
+                                                currentUser={currentUser}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <CellIncoming
+                                                pendingBalance={pb}
+                                                counterParty={cntrParty}
+                                                currentUser={currentUser}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <CellOutgoing
+                                                pendingBalance={pb}
+                                                counterParty={cntrParty}
+                                                currentUser={currentUser}
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            },
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>
@@ -149,7 +154,9 @@ const CellCounterparty = ({
     currentUser: string | null;
 }) => {
     const { data: contacts } = useContacts(currentUser);
-    const contact = contacts?.find((contact) => contact.account === counterParty);
+    const contact = contacts?.find(
+        (contact) => contact.account === counterParty,
+    );
     return (
         <div className="flex items-center gap-2">
             <Avatar
@@ -193,7 +200,8 @@ const CellIncoming = ({
                     <span
                         className={cn(
                             "text-muted-foreground",
-                            !pendingBalance.balance.hasTokenSymbol() && "italic",
+                            !pendingBalance.balance.hasTokenSymbol() &&
+                                "italic",
                         )}
                     >
                         {pendingBalance.balance.getDisplayLabel()}
@@ -240,7 +248,8 @@ const CellOutgoing = ({
                     <span
                         className={cn(
                             "text-muted-foreground",
-                            !pendingBalance.balance.hasTokenSymbol() && "italic",
+                            !pendingBalance.balance.hasTokenSymbol() &&
+                                "italic",
                         )}
                     >
                         {pendingBalance.balance.getDisplayLabel()}
