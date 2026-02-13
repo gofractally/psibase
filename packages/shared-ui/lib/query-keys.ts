@@ -12,6 +12,7 @@ const QueryKey = {
     branding: () => ["branding"] as const,
     profile: (account: OptionalAccount) => ["profile", account] as const,
     chainId: () => ["chainId"] as const,
+    contacts: (user: string | undefined | null) => ["contacts", user] as const,
     currentUser: () => ["currentUser"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 

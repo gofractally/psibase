@@ -1,19 +1,30 @@
-import { queryClient } from "@/main";
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
+import type { QueryOptions } from "./types";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
+import { supervisor } from "../lib/supervisor";
+import { queryClient } from "../lib/queryClient";
+import QueryKey from "../lib/query-keys";
+import { zAccount } from "../lib/schemas/account";
 
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+export const zLocalContact = z.object({
+    account: zAccount,
+    nickname: z.string().optional(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
+});
 
-import { LocalContact, zLocalContact } from "../types";
+export const zProcessedContact = zLocalContact.extend({
+    avatar: z.string(),
+});
 
-export const useContacts = (
-    username?: z.infer<typeof zAccount> | null | undefined,
-    enabled = true,
+export type LocalContact = z.infer<typeof zLocalContact>;
+export type ProcessedContact = z.infer<typeof zProcessedContact>;
+
+export const queryContacts = (
+    username: z.infer<typeof zAccount> | null | undefined,
 ) =>
-    useQuery({
+    queryOptions({
         queryKey: QueryKey.contacts(username),
         queryFn: async () => {
             const res = await supervisor.functionCall({
@@ -22,11 +33,22 @@ export const useContacts = (
                 params: [],
                 intf: "contacts",
             });
-
             return zLocalContact.array().parse(res);
         },
-        enabled: !!username && enabled,
     });
+
+export const useContacts = (
+    username?: z.infer<typeof zAccount> | null | undefined,
+    options?: QueryOptions<
+        LocalContact[],
+        Error,
+        LocalContact[],
+        ReturnType<typeof QueryKey.contacts>
+    >,
+) => {
+    const queryOptions = options ?? {};
+    return useQuery({ ...queryContacts(username), ...queryOptions, enabled: !!username && queryOptions.enabled })
+};
 
 export const upsertUserToCache = (
     username: z.infer<typeof zAccount>,
@@ -41,8 +63,8 @@ export const upsertUserToCache = (
 
             return isExisting
                 ? parsed.map((c) =>
-                      c.account === contact.account ? contact : c,
-                  )
+                    c.account === contact.account ? contact : c,
+                )
                 : [...parsed, contact];
         }
         return [contact];
