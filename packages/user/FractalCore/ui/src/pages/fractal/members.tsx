@@ -1,7 +1,9 @@
 import dayjs from "dayjs";
+import { Users } from "lucide-react";
 
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
+import { COUNCIL_SEATS } from "@/lib/constants";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { GlowingCard } from "@shared/components/glowing-card";
@@ -17,6 +19,11 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@shared/shadcn/ui/tooltip";
 
 export const Members = () => {
     const currentFractal = useFractalAccount();
@@ -46,14 +53,25 @@ export const Members = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedMembers?.map((member) => (
+                            {sortedMembers?.map((member, index) => (
                                 <TableRow key={member.account}>
                                     <TableCell className="font-medium">
                                         <TableContact
                                             account={member.account}
                                         />
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="flex items-center gap-2">
+                                        {index < COUNCIL_SEATS && (
+                                            <Tooltip>
+                                                <TooltipTrigger className="block">
+                                                    <Users className="size-4" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    This member is on the
+                                                    council
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        )}
                                         <Badge variant="default">
                                             {getMemberLabel(
                                                 member.memberStatus,
