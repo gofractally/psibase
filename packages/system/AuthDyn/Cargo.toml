@@ -24,3 +24,4 @@ crate-type = ["rlib"]
 auth-dyn = { path = "service", version = "0.23.0" }
 r-auth-dyn = { path = "query-service", version = "0.23.0" }
 auth-dyn-plugin = { path = "plugin", version = "0.23.0" }
+psibase-system-workspace-hack.workspace = true
