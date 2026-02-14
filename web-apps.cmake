@@ -41,6 +41,7 @@ set(UI_PROJECTS
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
     user/Config/ui:Config_js
+    user/Cost/ui:Cost_js
     local/XAdmin/ui:XAdmin_js
 )
 

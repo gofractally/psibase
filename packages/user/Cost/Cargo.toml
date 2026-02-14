@@ -1,0 +1,26 @@
+[package]
+name = "cost-pkg"                      # Crate name
+description = "Common Ownership Self-assessed Tax"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "Cost"
+services = ["cost"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.23.0"
+Sites = "0.23.0"
+Permissions = "0.23.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+cost = { path = "service", version = "0.23.0" }
+r-cost = { path = "query-service", version = "0.23.0" }
+cost-plugin = { path = "plugin", version = "0.23.0" }
