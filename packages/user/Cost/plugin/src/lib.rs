@@ -33,38 +33,27 @@ struct CostPlugin;
 
 impl Api for CostPlugin {
     fn set_example_thing(thing: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::set_example_thing)?;
-        let packed_example_thing_args = cost::action_structs::setExampleThing { thing }.packed();
-        add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
+        // trust::assert_authorized(trust::FunctionName::set_example_thing)?;
+        // let packed_example_thing_args = cost::action_structs::setExampleThing { thing }.packed();
+        // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
         Ok(())
     }
 }
 
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
-
 impl Queries for CostPlugin {
     fn get_example_thing() -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
+        // trust::assert_authorized(trust::FunctionName::get_example_thing)?;
 
-        let graphql_str = "query { exampleThing }";
+        // let graphql_str = "query { exampleThing }";
 
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
+        // let examplething_val = serde_json::from_str::<ExampleThingResponse>(
+        //     &CommonServer::post_graphql_get_json(&graphql_str)?,
+        // );
 
-        let examplething_val = 
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+        // let examplething_val =
+        //     examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
-        Ok(examplething_val.data.example_thing)
+        Ok("examplething_val.data.example_thing".to_string())
     }
 }
 

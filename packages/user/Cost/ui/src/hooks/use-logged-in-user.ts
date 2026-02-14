@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { useCurrentUser } from '@shared/hooks/use-current-user'
 
 const supervisor = getSupervisor();
 
