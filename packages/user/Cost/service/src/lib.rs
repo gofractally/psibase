@@ -1,6 +1,7 @@
 use psibase::services::tokens::Quantity;
 
-const SECONDS_IN_WEEK: u64 = 7 * 24 * 3600;
+const SECONDS_IN_WEEK: u128 = 7 * 24 * 3600;
+const DUTCH_BID_WINDOW: u128 = SECONDS_IN_WEEK;
 const SECONDS_IN_YEAR: u64 = 365 * 24 * 3600;
 const PPM_DENOMINATOR: u128 = 1_000_000;
 const RATE_PENALTY: u128 = 100_000;
@@ -53,7 +54,7 @@ pub mod tables {
     use psibase::services::transact::Wrapper as Transact;
 
     use crate::{
-        calculate_fee, calculate_seconds_covered, PPM_DENOMINATOR, RATE_PENALTY, SECONDS_IN_WEEK,
+        calculate_fee, calculate_seconds_covered, DUTCH_BID_WINDOW, PPM_DENOMINATOR, RATE_PENALTY,
     };
 
     #[table(name = "InitTable", index = 0)]
@@ -142,52 +143,46 @@ pub mod tables {
         }
 
         pub fn set_is_on_market(&mut self, is_on_market: bool) {
+            check(
+                get_sender() == self.manager,
+                "must be manager to take asset off market",
+            );
             self.is_on_market = is_on_market;
             self.save()
         }
 
         pub fn set_valuation(&mut self, price: Quantity) {
+            check(
+                get_sender() == self.sponsor,
+                "must be owner to update valuation",
+            );
+            self.commit_bill();
             self.valuation = price;
             self.save();
         }
 
         fn seconds_since_renewal(&self) -> u64 {
             (Transact::call().currentBlock().time.seconds().seconds - self.last_billed.seconds)
-                .min(0) as u64
-        }
-
-        fn billable_use(&self) -> Quantity {
-            let seconds_elapsed_since_last_billed = self.seconds_since_renewal();
-
-            let current_valuation = self.valuation;
-            let annual_tax_rate = self.annual_tax_rate;
-
-            calculate_fee(
-                annual_tax_rate,
-                seconds_elapsed_since_last_billed,
-                current_valuation,
-            )
+                as u64
         }
 
         pub fn get_billing_status(&self) -> (Quantity, u64) {
+            let elapsed_seconds = self.seconds_since_renewal();
             let prepaid_balance = self.prepaid_balance();
-            let amount_payable = self.billable_use();
 
-            if prepaid_balance >= amount_payable {
-                (amount_payable, 0)
-            } else {
-                let seconds_can_afford = calculate_seconds_covered(
-                    self.annual_tax_rate,
-                    prepaid_balance,
-                    self.valuation,
-                );
-                let paid_until = self.last_billed.seconds + (seconds_can_afford as i64);
+            let seconds_can_afford =
+                calculate_seconds_covered(self.annual_tax_rate, prepaid_balance, self.valuation);
 
-                let now = Transact::call().currentBlock().time.seconds();
-                let seconds_in_arrears = now.seconds - paid_until;
+            let effective_affordable_seconds = seconds_can_afford.min(elapsed_seconds);
 
-                (prepaid_balance, (seconds_in_arrears as u64))
-            }
+            let billable = calculate_fee(
+                self.annual_tax_rate,
+                effective_affordable_seconds,
+                self.valuation,
+            );
+
+            let arrears_seconds = elapsed_seconds - effective_affordable_seconds;
+            (billable, arrears_seconds)
         }
 
         pub fn draft_bill(&mut self) -> Quantity {
@@ -258,20 +253,24 @@ pub mod tables {
             tokens.toSub(self.token_id, self.sub_account(), amount);
         }
 
+        fn compute_discounted_price(&self, arrears_seconds: u64) -> Quantity {
+            let immediate_price_drop_penalty =
+                PPM_DENOMINATOR - RATE_PENALTY * (self.valuation.value as u128) / PPM_DENOMINATOR;
+
+            let dutch_bid_discount = DUTCH_BID_WINDOW.min(arrears_seconds as u128)
+                * immediate_price_drop_penalty
+                / DUTCH_BID_WINDOW;
+
+            ((immediate_price_drop_penalty - dutch_bid_discount) as u64).into()
+        }
+
         pub fn current_price(&self) -> Quantity {
-            let now = Transact::call().currentBlock().time.seconds().seconds;
-            let seconds_in_arrears = now - self.last_billed.seconds;
+            // Because current_price is called after bill, any seconds past renewal is now
+            // seconds in arrears.
+            let seconds_in_arrears = self.seconds_since_renewal();
 
             if seconds_in_arrears > 0 {
-                let immediate_price_drop_penalty = PPM_DENOMINATOR
-                    - RATE_PENALTY * (self.valuation.value as u128) / PPM_DENOMINATOR;
-
-                let dutch_bid_price_drop = ((seconds_in_arrears as u128)
-                    .min(SECONDS_IN_WEEK as u128))
-                    * immediate_price_drop_penalty
-                    / (SECONDS_IN_WEEK as u128);
-
-                ((immediate_price_drop_penalty - dutch_bid_price_drop) as u64).into()
+                self.compute_discounted_price(seconds_in_arrears)
             } else {
                 self.valuation
             }
@@ -285,7 +284,7 @@ pub mod tables {
 
             let purchaser = get_sender();
 
-            self.faciliate_trade(purchaser, price);
+            self.facilitate_trade(purchaser, price);
 
             let days_worth_rent = calculate_fee(self.annual_tax_rate, 3600 * 24, price);
             psibase::services::tokens::Wrapper::call().debit(
@@ -298,7 +297,7 @@ pub mod tables {
             self.top_up_sponsor_account(days_worth_rent);
         }
 
-        fn faciliate_trade(&mut self, buyer: AccountNumber, purchase_price: Quantity) {
+        fn facilitate_trade(&mut self, buyer: AccountNumber, purchase_price: Quantity) {
             let tokens = psibase::services::tokens::Wrapper::call();
             let seller = self.sponsor;
 
