@@ -492,7 +492,7 @@ pub mod service {
 
     /// Creates a new pool.
     ///
-    /// Requires two token deposits of equal value as the new pool reserves.
+    /// Requires two token deposits of equal market value as the new pool reserves.
     /// Mints and credits to the sender administration NFT of pool to set pool fees.
     ///
     /// # Arguments
