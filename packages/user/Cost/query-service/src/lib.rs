@@ -2,22 +2,15 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
+    use cost::tables::{Cost, CostTable};
     use psibase::*;
-    use serde::Deserialize;
-
-    #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
-    }
 
     struct Query;
 
     #[Object]
     impl Query {
-        /// This query gets the current value of the Example Thing.
-        async fn example_thing(&self) -> String {
-            "cost::Wrapper::call().getExampleThing()".to_string()
+        async fn cost(&self, manager: AccountNumber, id: AccountNumber) -> Option<Cost> {
+            CostTable::read().get_index_pk().get(&(manager, id))
         }
     }
 

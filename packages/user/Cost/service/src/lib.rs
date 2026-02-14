@@ -2,15 +2,16 @@ use psibase::services::tokens::Quantity;
 
 const SECONDS_IN_WEEK: u64 = 7 * 24 * 3600;
 const SECONDS_IN_YEAR: u64 = 365 * 24 * 3600;
+const PPM_DENOMINATOR: u128 = 1_000_000;
+const RATE_PENALTY: u128 = 100_000;
 
 fn calculate_fee(annual_fee_ppm: u32, seconds_elapsed: u64, value_amount: Quantity) -> Quantity {
-    let ppm_denominator: u128 = 1_000_000;
     let seconds_in_year: u128 = SECONDS_IN_YEAR as u128;
 
     // Use u128 to avoid overflow during multiplication
     let numerator: u128 =
         (value_amount.value as u128) * (annual_fee_ppm as u128) * (seconds_elapsed as u128);
-    let denominator: u128 = ppm_denominator * seconds_in_year;
+    let denominator: u128 = PPM_DENOMINATOR * seconds_in_year;
 
     // Integer division for the fee
     let fee: u128 = numerator / denominator;
@@ -43,14 +44,17 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         check, check_some, get_sender,
-        services::tokens::{Quantity, TID},
+        services::tokens::{Decimal, Quantity, TID},
         AccountNumber, Fracpack, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
 
+    use async_graphql::ComplexObject;
     use psibase::services::transact::Wrapper as Transact;
 
-    use crate::{calculate_fee, calculate_seconds_covered, SECONDS_IN_WEEK};
+    use crate::{
+        calculate_fee, calculate_seconds_covered, PPM_DENOMINATOR, RATE_PENALTY, SECONDS_IN_WEEK,
+    };
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
@@ -73,7 +77,8 @@ pub mod tables {
     }
 
     #[table(name = "CostTable", index = 2)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    #[graphql(complex)]
     pub struct Cost {
         // Namespace: savethewhales fractal
         pub manager: AccountNumber,
@@ -84,7 +89,7 @@ pub mod tables {
         pub token_id: TID,
         pub valuation: Quantity,
         pub sponsor: AccountNumber,
-        pub renewal_date: TimePointSec,
+        pub last_billed: TimePointSec,
         pub annual_tax_rate: u32,
     }
 
@@ -107,7 +112,7 @@ pub mod tables {
                 nft_id: psibase::services::nft::Wrapper::call().mint(),
                 sponsor: get_sender(),
                 is_on_market: true,
-                renewal_date: now,
+                last_billed: now,
                 manager,
                 id,
                 token_id,
@@ -146,33 +151,63 @@ pub mod tables {
             self.save();
         }
 
-        pub fn bill(&mut self) {
-            let seconds_elapsed_since_purchase = (Transact::call()
-                .currentBlock()
-                .time
-                .seconds()
-                .seconds
-                - self.renewal_date.seconds)
-                .min(0) as u64;
+        fn seconds_since_renewal(&self) -> u64 {
+            (Transact::call().currentBlock().time.seconds().seconds - self.last_billed.seconds)
+                .min(0) as u64
+        }
+
+        fn billable_use(&self) -> Quantity {
+            let seconds_elapsed_since_last_billed = self.seconds_since_renewal();
 
             let current_valuation = self.valuation;
             let annual_tax_rate = self.annual_tax_rate;
 
-            let amount_payable = calculate_fee(
+            calculate_fee(
                 annual_tax_rate,
-                seconds_elapsed_since_purchase,
+                seconds_elapsed_since_last_billed,
                 current_valuation,
-            );
+            )
+        }
 
+        pub fn get_billing_status(&self) -> (Quantity, u64) {
             let prepaid_balance = self.prepaid_balance();
+            let amount_payable = self.billable_use();
 
-            if prepaid_balance > amount_payable {
-                let now = Transact::call().currentBlock().time.seconds();
-
-                self.renewal_date = now;
-                self.tax_sponsor(amount_payable, false);
+            if prepaid_balance >= amount_payable {
+                (amount_payable, 0)
             } else {
+                let seconds_can_afford = calculate_seconds_covered(
+                    self.annual_tax_rate,
+                    prepaid_balance,
+                    self.valuation,
+                );
+                let paid_until = self.last_billed.seconds + (seconds_can_afford as i64);
+
+                let now = Transact::call().currentBlock().time.seconds();
+                let seconds_in_arrears = now.seconds - paid_until;
+
+                (prepaid_balance, (seconds_in_arrears as u64))
             }
+        }
+
+        pub fn draft_bill(&mut self) -> Quantity {
+            let (amount_payable, seconds_in_arrears_after_payment) = self.get_billing_status();
+
+            let now = Transact::call().currentBlock().time.seconds();
+
+            if seconds_in_arrears_after_payment == 0 {
+                self.last_billed = now;
+            } else {
+                self.last_billed =
+                    TimePointSec::from(now.seconds - seconds_in_arrears_after_payment as i64);
+            }
+            amount_payable
+        }
+
+        pub fn commit_bill(&mut self) {
+            let amount_payable = self.draft_bill();
+            self.tax_sponsor(amount_payable);
+            self.save();
         }
 
         fn prepaid_balance(&self) -> Quantity {
@@ -181,40 +216,31 @@ pub mod tables {
                 .unwrap_or_default()
         }
 
+        fn close_prepaid_account(&self) -> Quantity {
+            let balance = self.prepaid_balance();
+            if balance.value > 0 {
+                psibase::services::tokens::Wrapper::call().fromSub(
+                    self.token_id,
+                    self.sub_account(),
+                    balance,
+                )
+            }
+            balance
+        }
+
         fn sub_account(&self) -> String {
             self.manager.to_string() + &self.id.to_string() + &self.sponsor.to_string()
         }
 
-        fn tax_sponsor(&self, amount: Quantity, close_prepaid_account: bool) {
+        fn tax_sponsor(&self, amount: Quantity) {
             let tokens = psibase::services::tokens::Wrapper::call();
-
-            let sub_bal_deduction = if close_prepaid_account {
-                psibase::services::tokens::Wrapper::call()
-                    .getSubBal(self.token_id, self.sub_account())
-                    .unwrap_or_default()
-            } else {
-                amount
-            };
-            tokens.fromSub(self.token_id, self.sub_account(), sub_bal_deduction);
-
+            tokens.fromSub(self.token_id, self.sub_account(), amount);
             tokens.credit(
                 self.token_id,
                 self.manager,
                 amount,
-                "Tax rate fee".try_into().unwrap(),
-            );
-
-            if close_prepaid_account {
-                let remaining_balance = sub_bal_deduction - amount;
-                if remaining_balance.value > 0 {
-                    tokens.credit(
-                        self.token_id,
-                        self.sponsor,
-                        remaining_balance,
-                        "Remaining prepaid credit return".try_into().unwrap(),
-                    )
-                }
-            }
+                "Tax income".try_into().unwrap(),
+            )
         }
 
         pub fn top_up_sponsor_account(&self, amount: Quantity) {
@@ -232,59 +258,13 @@ pub mod tables {
             tokens.toSub(self.token_id, self.sub_account(), amount);
         }
 
-        fn credit_sponsor(&self, amount: Quantity) {
-            psibase::services::tokens::Wrapper::call().credit(
-                self.token_id,
-                self.sponsor,
-                amount,
-                "Purchase reward".try_into().unwrap(),
-            )
-        }
+        pub fn current_price(&self) -> Quantity {
+            let now = Transact::call().currentBlock().time.seconds().seconds;
+            let seconds_in_arrears = now - self.last_billed.seconds;
 
-        fn credit_manager(&self, amount: Quantity) {
-            psibase::services::tokens::Wrapper::call().credit(
-                self.token_id,
-                self.manager,
-                amount,
-                "Tax income".try_into().unwrap(),
-            )
-        }
-
-        pub fn purchase(&mut self) {
-            check(self.is_on_market, "cost is not on market");
-
-            let seconds_elapsed_since_renewal = (Transact::call()
-                .currentBlock()
-                .time
-                .seconds()
-                .seconds
-                - self.renewal_date.seconds)
-                .min(0) as u64;
-
-            let current_valuation = self.valuation;
-            let annual_tax_rate = self.annual_tax_rate;
-
-            let amount_payable = calculate_fee(
-                annual_tax_rate,
-                seconds_elapsed_since_renewal,
-                current_valuation,
-            );
-
-            let prepaid_amount = self.prepaid_balance();
-            let is_paid_for = prepaid_amount >= amount_payable;
-
-            let price = if is_paid_for {
-                self.tax_sponsor(amount_payable, true);
-                current_valuation
-            } else {
-                self.tax_sponsor(prepaid_amount, true);
-
-                let seconds_paid_for =
-                    calculate_seconds_covered(annual_tax_rate, prepaid_amount, current_valuation);
-                let seconds_in_arrears = seconds_elapsed_since_renewal - seconds_paid_for;
-
-                let immediate_price_drop_penalty =
-                    900_000 * (current_valuation.value as u128) / 1_000_000;
+            if seconds_in_arrears > 0 {
+                let immediate_price_drop_penalty = PPM_DENOMINATOR
+                    - RATE_PENALTY * (self.valuation.value as u128) / PPM_DENOMINATOR;
 
                 let dutch_bid_price_drop = ((seconds_in_arrears as u128)
                     .min(SECONDS_IN_WEEK as u128))
@@ -292,32 +272,75 @@ pub mod tables {
                     / (SECONDS_IN_WEEK as u128);
 
                 ((immediate_price_drop_penalty - dutch_bid_price_drop) as u64).into()
-            };
+            } else {
+                self.valuation
+            }
+        }
+
+        pub fn purchase(&mut self) {
+            check(self.is_on_market, "cost is not on market");
+
+            self.commit_bill();
+            let price = self.current_price();
 
             let purchaser = get_sender();
-            let days_worth_rent = calculate_fee(self.annual_tax_rate, 3600 * 24, price);
-            let total_billable = price + days_worth_rent;
 
+            self.faciliate_trade(purchaser, price);
+
+            let days_worth_rent = calculate_fee(self.annual_tax_rate, 3600 * 24, price);
             psibase::services::tokens::Wrapper::call().debit(
                 self.token_id,
                 purchaser,
-                total_billable,
-                "Cost purchase + initial prepaid balance"
-                    .try_into()
-                    .unwrap(),
+                days_worth_rent,
+                "Initial prepaid balance".try_into().unwrap(),
             );
-
-            self.credit_sponsor(price);
-
-            self.sponsor = purchaser;
-            self.valuation = price;
-            self.renewal_date = Transact::call().currentBlock().time.seconds();
 
             self.top_up_sponsor_account(days_worth_rent);
         }
 
+        fn faciliate_trade(&mut self, buyer: AccountNumber, purchase_price: Quantity) {
+            let tokens = psibase::services::tokens::Wrapper::call();
+            let seller = self.sponsor;
+
+            tokens.debit(
+                self.token_id,
+                buyer,
+                purchase_price,
+                "Buying asset".try_into().unwrap(),
+            );
+
+            let seller_prepaid_balance = self.close_prepaid_account();
+            tokens.credit(
+                self.token_id,
+                seller,
+                seller_prepaid_balance + purchase_price,
+                "Asset purchase + pre-existing prepaid balance"
+                    .try_into()
+                    .unwrap(),
+            );
+
+            self.sponsor = buyer;
+            self.valuation = purchase_price;
+            self.last_billed = Transact::call().currentBlock().time.seconds();
+        }
+
         fn save(&self) {
             CostTable::read_write().put(&self).unwrap()
+        }
+    }
+
+    #[ComplexObject]
+    impl Cost {
+        pub async fn price(&self) -> Decimal {
+            let mut cloned = self.clone();
+            cloned.draft_bill();
+            let price = cloned.current_price();
+
+            let precision = psibase::services::tokens::Wrapper::call()
+                .getToken(cloned.token_id)
+                .precision;
+
+            Decimal::new(price, precision)
         }
     }
 }
@@ -357,7 +380,7 @@ pub mod service {
 
     #[action]
     fn bill_cost(manager: AccountNumber, id: AccountNumber) {
-        Cost::get_assert(manager, id).bill()
+        Cost::get_assert(manager, id).commit_bill();
     }
 
     #[action]
