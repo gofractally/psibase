@@ -10,7 +10,7 @@ server = "r-cost"
 plugin = "cost-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
-    { sender = "cost", service = "cost", method = "init", data = {} },
+    { sender = "cost", service = "tokens", method = "setUserConf", data = { index = 0, enabled = true } },
 ]
 
 [dependencies]

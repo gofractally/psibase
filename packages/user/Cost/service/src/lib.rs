@@ -198,7 +198,9 @@ pub mod tables {
 
         pub fn commit_bill(&mut self) {
             let amount_payable = self.draft_bill();
-            self.tax_owner(amount_payable);
+            if amount_payable.value > 0 {
+                self.tax_owner(amount_payable);
+            }
             self.save();
         }
 
@@ -279,13 +281,13 @@ pub mod tables {
             }
 
             let seller_prepaid_balance = self.close_prepaid_account();
-            let credit_amount = seller_prepaid_balance + purchase_price;
+            let credit_amount = purchase_price + seller_prepaid_balance;
 
             if credit_amount.value > 0 {
                 tokens.credit(
                     self.token_id,
                     seller,
-                    seller_prepaid_balance + purchase_price,
+                    credit_amount,
                     "Asset sale proceeds + pre-existing prepaid balance"
                         .try_into()
                         .unwrap(),

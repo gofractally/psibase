@@ -1,5 +1,5 @@
 [package]
-name = "cost-pkg"                      # Crate name
+name = "cost-pkg"                                  # Crate name
 description = "Common Ownership Self-assessed Tax"
 version.workspace = true
 rust-version.workspace = true
@@ -15,7 +15,7 @@ services = ["cost"]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
-Permissions = "0.23.0"
+Tokens = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
