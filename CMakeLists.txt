@@ -459,6 +459,14 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Cost.psi
+    PATH packages/user/Cost
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${Cost_js_DEP}
+
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenStream.psi
     PATH packages/user/TokenStream
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1063,7 +1071,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Cost Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
 )
@@ -1073,7 +1081,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Cost Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
@@ -1118,7 +1126,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
+    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Cost Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XRun XSites XTimer XTransact)
@@ -1134,6 +1142,7 @@ install(
           ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
           ${SERVICE_DIR}/BrotliCodec.psi
+          ${SERVICE_DIR}/Cost.psi
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi

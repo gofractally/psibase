@@ -53,6 +53,10 @@ members = [
     "Nft/service",
     "Nft/plugin",
     "Nft/query-service",
+    "Cost",
+    "Cost/service",
+    "Cost/query-service",
+    "Cost/plugin",
 ]
 
 exclude = [
