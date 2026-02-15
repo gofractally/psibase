@@ -1,7 +1,7 @@
 use psibase::services::tokens::Quantity;
 
-const SECONDS_IN_WEEK: u128 = 7 * 24 * 3600;
-const DUTCH_BID_WINDOW: u128 = SECONDS_IN_WEEK;
+const SECONDS_IN_DAY: u128 = 24 * 3600;
+const DUTCH_BID_WINDOW: u128 = SECONDS_IN_DAY;
 const SECONDS_IN_YEAR: u64 = 365 * 24 * 3600;
 const PPM_DENOMINATOR: u128 = 1_000_000;
 
@@ -32,6 +32,12 @@ fn calculate_seconds_covered(
     seconds as u64
 }
 
+fn dutch_discount(valuation: Quantity, arrears_seconds: u64) -> Quantity {
+    ((DUTCH_BID_WINDOW.min(arrears_seconds as u128) * valuation.value as u128 / DUTCH_BID_WINDOW)
+        as u64)
+        .into()
+}
+
 #[psibase::service_tables]
 pub mod tables {
     use std::u64;
@@ -47,32 +53,12 @@ pub mod tables {
     use async_graphql::ComplexObject;
     use psibase::services::transact::Wrapper as Transact;
 
-    use crate::{calculate_fee, calculate_seconds_covered, DUTCH_BID_WINDOW};
+    use crate::{calculate_fee, calculate_seconds_covered, dutch_discount};
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "ManagerTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct Manager {
-        #[primary_key]
-        pub manager: AccountNumber,
-    }
-
-    impl Manager {
-        // #[primary_key]
-        // fn pk(&self) {}
-    }
-
-    #[table(name = "CostTable", index = 2)]
+    #[table(name = "AssetTable", index = 0)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
     #[graphql(complex)]
-    pub struct Cost {
+    pub struct Asset {
         // Namespace: savethewhales fractal
         pub manager: AccountNumber,
         // Name: development
@@ -81,12 +67,12 @@ pub mod tables {
         pub is_on_market: bool,
         pub token_id: TID,
         pub valuation: Quantity,
-        pub sponsor: AccountNumber,
+        pub owner: AccountNumber,
         pub last_billed: TimePointSec,
         pub annual_tax_rate: u32,
     }
 
-    impl Cost {
+    impl Asset {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.manager, self.id)
@@ -98,12 +84,12 @@ pub mod tables {
             token_id: TID,
             annual_tax_rate: u32,
             valuation: Quantity,
-        ) -> Cost {
+        ) -> Asset {
             let now = Transact::call().currentBlock().time.seconds();
 
-            Cost {
+            Asset {
                 nft_id: psibase::services::nft::Wrapper::call().mint(),
-                sponsor: get_sender(),
+                owner: get_sender(),
                 is_on_market: true,
                 last_billed: now,
                 manager,
@@ -120,44 +106,40 @@ pub mod tables {
             token_id: TID,
             annual_tax_rate: u32,
             valuation: Quantity,
-        ) -> Cost {
+        ) -> Asset {
             let new_instance = Self::new(manager, id, token_id, annual_tax_rate, valuation);
             new_instance.save();
             new_instance
         }
 
-        pub fn get(manager: AccountNumber, id: AccountNumber) -> Option<Cost> {
-            CostTable::read().get_index_pk().get(&(manager, id))
+        pub fn get(manager: AccountNumber, id: AccountNumber) -> Option<Asset> {
+            AssetTable::read().get_index_pk().get(&(manager, id))
         }
 
-        pub fn get_assert(manager: AccountNumber, id: AccountNumber) -> Cost {
-            check_some(Self::get(manager, id), "cost does not exist")
+        pub fn get_assert(manager: AccountNumber, id: AccountNumber) -> Asset {
+            check_some(Self::get(manager, id), "asset does not exist")
         }
 
         pub fn bill_many(manager: AccountNumber, from: u64, amount: u16) {
-            CostTable::read()
+            AssetTable::read()
                 .get_index_pk()
                 .range(
                     (manager, AccountNumber::new(from))..=(manager, AccountNumber::new(u64::MAX)),
                 )
                 .take(amount as usize)
-                .for_each(|mut cost| {
-                    cost.commit_bill();
+                .for_each(|mut asset| {
+                    asset.commit_bill();
                 });
         }
 
         pub fn set_is_on_market(&mut self, is_on_market: bool) {
-            check(
-                get_sender() == self.manager,
-                "must be manager to take asset off market",
-            );
             self.is_on_market = is_on_market;
             self.save()
         }
 
         pub fn set_valuation(&mut self, new_valuation: Quantity) {
             check(
-                get_sender() == self.sponsor,
+                get_sender() == self.owner,
                 "must be owner to update valuation",
             );
 
@@ -204,7 +186,7 @@ pub mod tables {
 
         pub fn commit_bill(&mut self) {
             let amount_payable = self.draft_bill();
-            self.tax_sponsor(amount_payable);
+            self.tax_owner(amount_payable);
             self.save();
         }
 
@@ -227,10 +209,10 @@ pub mod tables {
         }
 
         fn sub_account(&self) -> String {
-            self.manager.to_string() + &self.id.to_string() + &self.sponsor.to_string()
+            format!("{}-{}-{}", self.manager, self.id, self.owner)
         }
 
-        fn tax_sponsor(&self, amount: Quantity) {
+        fn tax_owner(&self, amount: Quantity) {
             let tokens = psibase::services::tokens::Wrapper::call();
             tokens.fromSub(self.token_id, self.sub_account(), amount);
             tokens.credit(
@@ -241,25 +223,19 @@ pub mod tables {
             )
         }
 
-        pub fn top_up_sponsor_account(&self, amount: Quantity) {
+        pub fn top_up_owner_account(&self, amount: Quantity) {
             check(
-                get_sender() == self.sponsor,
-                "must be sponsor to top up account",
+                get_sender() == self.owner,
+                "must be owner to top up account",
             );
             let tokens = psibase::services::tokens::Wrapper::call();
             tokens.debit(
                 self.token_id,
-                self.sponsor,
+                self.owner,
                 amount,
-                "Sponsor account top up".try_into().unwrap(),
+                "owner account top up".try_into().unwrap(),
             );
             tokens.toSub(self.token_id, self.sub_account(), amount);
-        }
-
-        fn dutch_price_discount(&self, arrears_seconds: u64) -> Quantity {
-            ((DUTCH_BID_WINDOW.min(arrears_seconds as u128) * self.valuation.value as u128
-                / DUTCH_BID_WINDOW) as u64)
-                .into()
         }
 
         pub fn current_price(&self) -> Quantity {
@@ -267,11 +243,11 @@ pub mod tables {
             // seconds in arrears.
             let seconds_in_arrears = self.seconds_since_renewal();
 
-            self.valuation - self.dutch_price_discount(seconds_in_arrears)
+            self.valuation - dutch_discount(self.valuation, seconds_in_arrears)
         }
 
         pub fn purchase(&mut self) {
-            check(self.is_on_market, "cost is not on market");
+            check(self.is_on_market, "asset is not on market");
 
             self.commit_bill();
             self.facilitate_trade(get_sender(), self.current_price());
@@ -279,37 +255,43 @@ pub mod tables {
 
         fn facilitate_trade(&mut self, buyer: AccountNumber, purchase_price: Quantity) {
             let tokens = psibase::services::tokens::Wrapper::call();
-            let seller = self.sponsor;
+            let seller = self.owner;
 
-            tokens.debit(
-                self.token_id,
-                buyer,
-                purchase_price,
-                "Buying asset".try_into().unwrap(),
-            );
+            if purchase_price.value > 0 {
+                tokens.debit(
+                    self.token_id,
+                    buyer,
+                    purchase_price,
+                    "Buying asset".try_into().unwrap(),
+                );
+            }
 
             let seller_prepaid_balance = self.close_prepaid_account();
-            tokens.credit(
-                self.token_id,
-                seller,
-                seller_prepaid_balance + purchase_price,
-                "Asset purchase + pre-existing prepaid balance"
-                    .try_into()
-                    .unwrap(),
-            );
+            let credit_amount = seller_prepaid_balance + purchase_price;
 
-            self.sponsor = buyer;
+            if credit_amount.value > 0 {
+                tokens.credit(
+                    self.token_id,
+                    seller,
+                    seller_prepaid_balance + purchase_price,
+                    "Asset sale proceeds + pre-existing prepaid balance"
+                        .try_into()
+                        .unwrap(),
+                );
+            }
+
+            self.owner = buyer;
             self.valuation = purchase_price;
             self.last_billed = Transact::call().currentBlock().time.seconds();
         }
 
         fn save(&self) {
-            CostTable::read_write().put(&self).unwrap()
+            AssetTable::read_write().put(&self).unwrap()
         }
     }
 
     #[ComplexObject]
-    impl Cost {
+    impl Asset {
         pub async fn price(&self) -> Decimal {
             let mut cloned = self.clone();
             cloned.draft_bill();
@@ -326,60 +308,45 @@ pub mod tables {
 
 #[psibase::service(name = "cost", tables = "tables")]
 pub mod service {
-    use crate::tables::{Cost, InitRow, InitTable};
+    use crate::tables::Asset;
     use psibase::{
         services::tokens::{Quantity, TID},
         *,
     };
 
     #[action]
-    fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table = InitTable::read();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
-    }
-
-    #[action]
-    fn set_is_on_market(id: AccountNumber, is_on_market: bool) {
-        Cost::get_assert(get_sender(), id).set_is_on_market(is_on_market);
+    fn set_is_mark(id: AccountNumber, is_on_market: bool) {
+        Asset::get_assert(get_sender(), id).set_is_on_market(is_on_market);
     }
 
     #[action]
     fn set_valuation(manager: AccountNumber, id: AccountNumber, price: Quantity) {
-        Cost::get_assert(manager, id).set_valuation(price);
+        Asset::get_assert(manager, id).set_valuation(price);
     }
 
     #[action]
-    fn bill(manager: AccountNumber, id: AccountNumber) {
-        Cost::get_assert(manager, id).commit_bill();
+    fn tax(manager: AccountNumber, id: AccountNumber) {
+        Asset::get_assert(manager, id).commit_bill();
     }
 
     #[action]
-    fn bill_many(manager: AccountNumber, from: u64, amount: u16) {
-        Cost::bill_many(manager, from, amount);
+    fn tax_many(manager: AccountNumber, from: u64, amount: u16) {
+        Asset::bill_many(manager, from, amount);
     }
 
     #[action]
-    fn new_cost(id: AccountNumber, token_id: TID, tax_rate: u32, valuation: Quantity) -> u32 {
-        Cost::add(get_sender(), id, token_id, tax_rate, valuation).nft_id
+    fn new_asset(id: AccountNumber, token_id: TID, tax_rate: u32, valuation: Quantity) -> u32 {
+        Asset::add(get_sender(), id, token_id, tax_rate, valuation).nft_id
     }
 
     #[action]
     fn purchase(manager: AccountNumber, id: AccountNumber) {
-        Cost::get_assert(manager, id).purchase();
+        Asset::get_assert(manager, id).purchase();
     }
 
     #[action]
     fn top_up(manager: AccountNumber, id: AccountNumber, amount: Quantity) {
-        Cost::get_assert(manager, id).top_up_sponsor_account(amount);
+        Asset::get_assert(manager, id).top_up_owner_account(amount);
     }
 }
 

@@ -2,11 +2,11 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::Wrapper;
+    // use crate::Wrapper;
 
     #[psibase::test_case(packages("Cost"))]
     fn test_set_thing(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        Wrapper::push(&chain).init();
+        // Wrapper::push(&chain).init();
 
         // let alice = AccountNumber::from("alice");
         // chain.new_account(alice).unwrap();

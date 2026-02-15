@@ -2,15 +2,15 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use cost::tables::{Cost, CostTable};
+    use cost::tables::{Asset, AssetTable};
     use psibase::*;
 
     struct Query;
 
     #[Object]
     impl Query {
-        async fn cost(&self, manager: AccountNumber, id: AccountNumber) -> Option<Cost> {
-            CostTable::read().get_index_pk().get(&(manager, id))
+        async fn asset(&self, manager: AccountNumber, id: AccountNumber) -> Option<Asset> {
+            AssetTable::read().get_index_pk().get(&(manager, id))
         }
     }
 
