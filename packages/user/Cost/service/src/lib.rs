@@ -45,7 +45,10 @@ pub mod tables {
     use async_graphql::SimpleObject;
     use psibase::{
         check, check_some, get_sender,
-        services::tokens::{Decimal, Quantity, TID},
+        services::{
+            nft::NID,
+            tokens::{Decimal, Quantity, TID},
+        },
         AccountNumber, Fracpack, Table, TimePointSec, ToSchema,
     };
     use serde::{Deserialize, Serialize};
@@ -76,6 +79,11 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.manager, self.id)
+        }
+
+        #[secondary_key(1)]
+        fn by_nft(&self) -> NID {
+            self.nft_id
         }
 
         fn new(
@@ -118,6 +126,10 @@ pub mod tables {
 
         pub fn get_assert(manager: AccountNumber, id: AccountNumber) -> Asset {
             check_some(Self::get(manager, id), "asset does not exist")
+        }
+
+        pub fn get_by_nft(nft_id: NID) -> Option<Asset> {
+            AssetTable::read().get_index_by_nft().get(&nft_id)
         }
 
         pub fn bill_many(manager: AccountNumber, from: u64, amount: u16) {
@@ -347,6 +359,16 @@ pub mod service {
     #[action]
     fn top_up(manager: AccountNumber, id: AccountNumber, amount: Quantity) {
         Asset::get_assert(manager, id).top_up_owner_account(amount);
+    }
+
+    #[action]
+    fn get_asset(manager: AccountNumber, id: AccountNumber) -> Option<Asset> {
+        Asset::get(manager, id)
+    }
+
+    #[action]
+    fn get_by_nft(nft_id: u32) -> Option<Asset> {
+        Asset::get_by_nft(nft_id)
     }
 }
 
