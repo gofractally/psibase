@@ -6,7 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-profiles = { path = "../service/", version = "0.22.0" }
+profiles = { path = "../service/", version = "0.23.0" }
 psibase.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -32,4 +32,4 @@ world = "impl"
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 
 [dev-dependencies]
-profiles-pkg = { path = "..", version = "0.22.0" }
+profiles-pkg = { path = "..", version = "0.23.0" }

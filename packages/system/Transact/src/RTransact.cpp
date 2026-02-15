@@ -8,6 +8,7 @@
 #include <services/system/Transact.hpp>
 
 #include <functional>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
@@ -1557,7 +1558,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    }
    else if (target == "/jwt_key" && request.method == "GET")
    {
-      if (!to<XAdmin>().isAdmin(user, socket))
+      if (!to<XAdmin>().isAdmin(user, socket, forwardedFor(request)))
       {
          std::string_view msg = "Not authorized";
          return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,
@@ -1571,7 +1572,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    }
    else if (target == "/stats" && request.method == "GET")
    {
-      if (!to<XAdmin>().isAdmin(user, socket))
+      if (!to<XAdmin>().isAdmin(user, socket, forwardedFor(request)))
       {
          std::string_view msg = "Not authorized";
          return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,

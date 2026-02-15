@@ -7,7 +7,6 @@ homepage.workspace = true
 edition.workspace = true
 description = "Library and command-line tool for interacting with psibase networks"
 license.workspace = true
-publish.workspace = true
 include = ["src/**/*", "boot-image/**/*", "Cargo.toml"]
 
 [lib]

@@ -5,4 +5,4 @@
 # Can also dry-run with:
 #   `./scripts/set-version.sh x.y.z --dry-run`
 
-cargo set-version "$@" --workspace
+cargo set-version --workspace --exclude psibase-rust-workspace-hack "$@"

@@ -319,7 +319,7 @@ set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
-set(PSIBASE_VERSION 0.22)
+set(PSIBASE_VERSION 0.23)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi

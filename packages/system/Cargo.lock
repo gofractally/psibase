@@ -244,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "auth-dyn"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "auth-dyn-pkg",
@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "auth-dyn-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "auth-dyn",
  "auth-dyn-plugin",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "auth-dyn-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "auth-dyn",
  "psibase",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "credentials"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "credentials-pkg",
  "psibase",
@@ -580,7 +580,7 @@ dependencies = [
 
 [[package]]
 name = "credentials-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "credentials",
  "credentials-plugin",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "credentials-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "credentials",
  "psibase",
@@ -896,7 +896,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1815,7 +1815,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1875,7 +1875,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1890,7 +1890,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -1923,7 +1923,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -1931,7 +1931,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -1948,7 +1948,7 @@ dependencies = [
 
 [[package]]
 name = "r-auth-dyn"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "auth-dyn",
@@ -1966,7 +1966,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-staged-tx"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2460,7 +2460,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "staged-tx"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "pem",
@@ -2474,7 +2474,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-system-workspace-hack",
  "r-staged-tx",
@@ -2484,7 +2484,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
@@ -2980,7 +2980,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "virtual-server"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "p256",
@@ -2997,7 +2997,7 @@ dependencies = [
 
 [[package]]
 name = "virtual-server-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase-system-workspace-hack",
@@ -3007,7 +3007,7 @@ dependencies = [
 
 [[package]]
 name = "virtual-server-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
