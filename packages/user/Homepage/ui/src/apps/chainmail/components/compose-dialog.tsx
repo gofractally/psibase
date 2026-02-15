@@ -9,7 +9,7 @@ import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import {
     AlertDialog,
