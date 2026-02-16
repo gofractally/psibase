@@ -3,13 +3,13 @@
 mod service {
     use async_graphql::*;
     use cost::tables::{Asset, AssetTable};
-    use psibase::*;
+    use psibase::{services::nft::NID, *};
 
     struct Query;
 
     #[Object]
     impl Query {
-        async fn asset(&self, manager: AccountNumber, id: AccountNumber) -> Option<Asset> {
+        async fn asset(&self, manager: NID, id: AccountNumber) -> Option<Asset> {
             AssetTable::read().get_index_pk().get(&(manager, id))
         }
     }
