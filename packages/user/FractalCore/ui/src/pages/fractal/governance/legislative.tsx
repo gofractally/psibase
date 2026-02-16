@@ -10,12 +10,13 @@ import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
-    Card,
     CardContent,
     CardDescription,
+    CardFooter,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
@@ -55,30 +56,30 @@ export const Legislative = () => {
     return (
         <div className="mx-auto w-full max-w-5xl space-y-8 p-4 px-6">
             <SetMinScorersModal
-                openChange={(e) => setShowMinScorers(e)}
+                openChange={setShowMinScorers}
                 show={showMinScorersModal}
             />
             <SetRankedGuildSlots
-                openChange={(e) => setShowRankedGuildsModal(e)}
+                openChange={setShowRankedGuildsModal}
                 show={showRankedGuildsModal}
             />
             <SetRankedGuilds
-                openChange={(e) => setShowRankGuildsModal(e)}
+                openChange={setShowRankGuildsModal}
                 show={showRankGuildsModal}
             />
 
-            <Card>
+            <GlowingCard>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Scale className="h-5 w-5" />
+                        <Scale className="size-5" />
                         LEGISLATIVE
                     </CardTitle>
                     <CardDescription>
-                        Architects of the Fractal’s Future
+                        Architects of the Fractal&rsquo;s Future
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                    <div>Powers</div>
+                <CardContent className="space-y-2 text-sm">
+                    <h3 className="font-semibold">Powers</h3>
                     <ul className="ml-2 list-inside list-disc space-y-1">
                         <li>Guild ranking</li>
                         <li>Foreign guild subsidies</li>
@@ -86,54 +87,46 @@ export const Legislative = () => {
                         <li>Consensus reward intervals</li>
                         <li>All policy that shapes growth and incentives</li>
                     </ul>
-                    <p className="text-muted-foreground mt-3">
-                        <Scale className="mr-1 inline h-4 w-4" />
+                </CardContent>
+                <CardFooter className="flex items-center gap-2">
+                    <Scale className="size-4 shrink-0" />
+                    <p className="text-muted-foreground text-sm">
                         The{" "}
                         <span className="text-primary font-medium">
                             {data?.account}
                         </span>{" "}
                         guild is selected to act as the legislature led by{" "}
-                        {data?.rep
-                            ? `its representative ${data.rep.member}.`
-                            : `its council.`}
+                        {data?.rep ? (
+                            <>
+                                its representative{" "}
+                                <span className="text-primary font-medium">
+                                    {data.rep.member}
+                                </span>
+                                .
+                            </>
+                        ) : (
+                            `its council.`
+                        )}
                     </p>
-                </CardContent>
-            </Card>
+                </CardFooter>
+            </GlowingCard>
 
             <GuildOverviewCard guildAccount={data?.account} />
 
             {isAdministrativeUser && (
-                <div className="flex flex-col gap-2 rounded-xl border p-6">
-                    <div className="py-2 text-lg">Control Panel</div>
-                    {awaitingConsensusReward && (
-                        <Item variant="outline">
-                            <ItemContent>
-                                <ItemTitle>Set minimum scorers</ItemTitle>
-                                <ItemDescription>
-                                    Set the minimum amount of users in an
-                                    evaluation required to initialise the
-                                    Fractal token and consensus rewards.
-                                </ItemDescription>
-                            </ItemContent>
-                            <ItemActions>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowMinScorers(true)}
-                                >
-                                    Set minimum scorers
-                                </Button>
-                            </ItemActions>
-                        </Item>
-                    )}
-
-                    {!awaitingConsensusReward && (
-                        <>
-                            <Item variant="outline">
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>Control Panel</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {awaitingConsensusReward && (
+                            <Item variant="muted">
                                 <ItemContent>
-                                    <ItemTitle>Set ranked guilds</ItemTitle>
+                                    <ItemTitle>Set minimum scorers</ItemTitle>
                                     <ItemDescription>
-                                        Rank guilds for consensus rewards.
+                                        Set the minimum amount of users in an
+                                        evaluation required to initialise the
+                                        Fractal token and consensus rewards.
                                     </ItemDescription>
                                 </ItemContent>
                                 <ItemActions>
@@ -142,34 +135,60 @@ export const Legislative = () => {
                                         size="sm"
                                         onClick={() => setShowMinScorers(true)}
                                     >
-                                        Rank guilds
+                                        Set minimum scorers
                                     </Button>
                                 </ItemActions>
                             </Item>
+                        )}
 
-                            <Item variant="outline">
-                                <ItemContent>
-                                    <ItemTitle>
-                                        Set ranked guild slots
-                                    </ItemTitle>
-                                    <ItemDescription>
-                                        Adjust how many guilds to pay consensus
-                                        rewards.
-                                    </ItemDescription>
-                                </ItemContent>
-                                <ItemActions>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setShowMinScorers(true)}
-                                    >
-                                        Set ranked guild slots
-                                    </Button>
-                                </ItemActions>
-                            </Item>
-                        </>
-                    )}
-                </div>
+                        {!awaitingConsensusReward && (
+                            <>
+                                <Item variant="muted">
+                                    <ItemContent>
+                                        <ItemTitle>Set ranked guilds</ItemTitle>
+                                        <ItemDescription>
+                                            Rank guilds for consensus rewards.
+                                        </ItemDescription>
+                                    </ItemContent>
+                                    <ItemActions>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setShowMinScorers(true)
+                                            }
+                                        >
+                                            Rank guilds
+                                        </Button>
+                                    </ItemActions>
+                                </Item>
+
+                                <Item variant="muted">
+                                    <ItemContent>
+                                        <ItemTitle>
+                                            Set ranked guild slots
+                                        </ItemTitle>
+                                        <ItemDescription>
+                                            Adjust how many guilds to pay
+                                            consensus rewards.
+                                        </ItemDescription>
+                                    </ItemContent>
+                                    <ItemActions>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setShowMinScorers(true)
+                                            }
+                                        >
+                                            Set ranked guild slots
+                                        </Button>
+                                    </ItemActions>
+                                </Item>
+                            </>
+                        )}
+                    </CardContent>
+                </GlowingCard>
             )}
         </div>
     );
