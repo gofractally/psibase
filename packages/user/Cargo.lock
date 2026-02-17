@@ -2615,7 +2615,7 @@ dependencies = [
 
 [[package]]
 name = "r-token-swap"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3434,7 +3434,7 @@ dependencies = [
 
 [[package]]
 name = "token-swap"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -3447,7 +3447,7 @@ dependencies = [
 
 [[package]]
 name = "token-swap-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "r-token-swap",
  "token-swap",
@@ -3456,7 +3456,7 @@ dependencies = [
 
 [[package]]
 name = "token-swap-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",

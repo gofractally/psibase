@@ -3,11 +3,8 @@
 #[cfg(test)]
 mod tests {
     use crate::Wrapper;
-    use psibase::services::chainmail::action_structs::send;
     use psibase::services::nft::NID;
-    use psibase::services::tokens::{
-        self, Decimal, Precision, Quantity, TokensError, Wrapper as Tokens, TID,
-    };
+    use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 
     fn create_and_mint_token(

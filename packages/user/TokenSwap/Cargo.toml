@@ -13,16 +13,16 @@ package-name = "TokenSwap"
 services = ["token-swap"]
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.22.0"
-Sites = "0.22.0"
-Tokens = "0.22.0"
-Nft = "0.22.0"
+HttpServer = "0.23.0"
+Sites = "0.23.0"
+Tokens = "0.23.0"
+Nft = "0.23.0"
 
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-token-swap = { path = "service", version = "0.22.0" }
-r-token-swap = { path = "query-service", version = "0.22.0" }
-token-swap-plugin = { path = "plugin", version = "0.22.0" }
+token-swap = { path = "service", version = "0.23.0" }
+r-token-swap = { path = "query-service", version = "0.23.0" }
+token-swap-plugin = { path = "plugin", version = "0.23.0" }

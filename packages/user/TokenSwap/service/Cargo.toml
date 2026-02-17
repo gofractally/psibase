@@ -22,4 +22,4 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-token-swap-pkg = { path = "..", version = "0.22.0" }
+token-swap-pkg = { path = "..", version = "0.23.0" }
