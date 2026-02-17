@@ -49,6 +49,7 @@ pub mod service {
     use psibase::services::auth_sig as AuthSig;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
+    use psibase::services::events;
     use psibase::services::nft as Nfts;
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
     use psibase::services::tokens::{Quantity, TID};
@@ -108,6 +109,18 @@ pub mod service {
             );
 
             auctions_table.put(&Auction { length, nft_id }).unwrap();
+
+            let add_index = |method: &str, column: u8| {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            };
+
+            add_index("premAcctEvent", 0);
+            add_index("premAcctEvent", 1);
         }
     }
 
@@ -149,6 +162,10 @@ pub mod service {
 
         let sender = get_sender();
         let service_account = get_service();
+
+        crate::Wrapper::emit()
+            .history()
+            .premAcctEvent(sender, acct_to_buy, BOUGHT);
 
         let auctions_table = AuctionsTable::new();
         let auction = check_some(
@@ -210,6 +227,10 @@ pub mod service {
             "account not purchased by sender",
         );
 
+        crate::Wrapper::emit()
+            .history()
+            .premAcctEvent(get_sender(), acct_to_claim, CLAIMED);
+
         let set_key_action = Action {
             sender: acct_to_claim,
             service: AuthSig::SERVICE,
@@ -236,6 +257,11 @@ pub mod service {
 
         purchased_accounts_table.remove(&purchased_account);
     }
+
+    pub const BOUGHT: u8 = 0;
+    pub const CLAIMED: u8 = 1;
+    #[event(history)]
+    fn premAcctEvent(owner: AccountNumber, account: AccountNumber, action: u8) {}
 }
 
 #[cfg(test)]

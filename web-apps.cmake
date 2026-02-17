@@ -38,6 +38,7 @@ set(UI_PROJECTS
     user/Identity/ui:Identity_js
     user/Packages/ui:Packages_js
     user/Permissions/ui:Permissions_js
+    user/PremAccounts/ui:PremAccounts_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
     user/Config/ui:Config_js
