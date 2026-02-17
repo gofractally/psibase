@@ -51,7 +51,7 @@ export const Guilds = () => {
                         <CardTitle>All Guilds</CardTitle>
                     </CardHeader>
                     <CardContent className="@container">
-                        <Table>
+                        <Table className="select-none">
                             <TableHeader>
                                 <TableRow>
                                     <TableHead className="w-48">
