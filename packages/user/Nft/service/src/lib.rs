@@ -213,7 +213,7 @@ pub mod tables {
                 "credited".to_string(),
                 creditor,
                 debitor,
-                memo.to_string(),
+                memo,
             );
 
             UserPending::add(creditor, debitor, nft_id);
@@ -229,7 +229,7 @@ pub mod tables {
                 "debited".to_string(),
                 self.creditor,
                 self.debitor,
-                memo.to_string(),
+                memo,
             );
 
             UserPending::remove(self.creditor, self.debitor, self.nftId);
@@ -247,7 +247,7 @@ pub mod tables {
                 "uncredit".to_string(),
                 self.debitor,
                 self.creditor,
-                memo.to_string(),
+                memo,
             );
 
             self.erase();
@@ -466,7 +466,7 @@ pub mod service {
         action: String,
         prev_owner: AccountNumber,
         new_owner: AccountNumber,
-        memo: String,
+        memo: Memo,
     ) {
     }
 

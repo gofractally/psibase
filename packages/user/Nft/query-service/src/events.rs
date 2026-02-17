@@ -11,7 +11,7 @@ pub struct OwnerChangeEvent {
     action: String,
     prev_owner: AccountNumber,
     new_owner: AccountNumber,
-    memo: String,
+    memo: Memo,
 }
 
 #[derive(Deserialize, SimpleObject)]
