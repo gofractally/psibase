@@ -258,6 +258,16 @@ pub mod service {
         purchased_accounts_table.remove(&purchased_account);
     }
 
+    #[action]
+    fn enable_market(length: u8, initial_price: u64, target_sales: u32, floor_price: u64) {
+        check_init();
+    }
+
+    #[action]
+    fn disable_market(length: u8) {
+        check_init();
+    }
+
     pub const BOUGHT: u8 = 0;
     pub const CLAIMED: u8 = 1;
     #[event(history)]
