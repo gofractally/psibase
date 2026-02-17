@@ -19,6 +19,7 @@ use psibase::fracpack::Pack;
 mod errors;
 mod graphql;
 mod helpers;
+use psibase::services::tokens::Decimal;
 use psibase::{AccountNumber, Memo};
 
 use bindings::evaluations::plugin::admin::close;
@@ -406,6 +407,24 @@ impl UserGuild for FractallyPlugin {
             fractals::action_structs::apply_guild::ACTION_NAME,
             &packed_args,
         )
+    }
+
+    fn invite_member(guild_account: String) -> Result<(), Error> {
+        // call the invite plugin function to do the prepare thing
+        // hit an action on fractals which registers the invite ID
+        //
+        // crate::bindings::
+        let (invite_token, invite_details, min_cost) =
+            bindings::invite::plugin::inviter::prepare_new_invite(1)?;
+
+        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
+        if min_cost_u64 > 0 {}
+        // should the min cost shit be paid by the user or the fractal here?
+
+        // return the invite token back as a string so it can be rendered as a link to copy and paste
+        // use the invite details to contact the fractals service
+
+        Ok(())
     }
 
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
