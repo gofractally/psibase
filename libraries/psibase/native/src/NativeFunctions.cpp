@@ -4,6 +4,8 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
+#include <psibase/serviceEntry.hpp>
+#include <psio/finally.hpp>
 #include <psio/to_hex.hpp>
 
 #include <random>
@@ -441,6 +443,46 @@ namespace psibase
          }
          return pos->second;
       }
+
+      void notifyKvMut(NativeFunctions& self,
+                       DbId             db,
+                       std::uint32_t    keyLen,
+                       std::uint32_t    oldValueLen,
+                       std::uint32_t    newValueLen)
+      {
+         auto saved          = self.currentActContext->transactionContext.remainingStack;
+         auto remainingStack = self.currentExecContext->remainingStack();
+         check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
+         remainingStack -= VMOptions::stack_usage_for_call;
+         self.currentActContext->transactionContext.remainingStack = remainingStack;
+
+         Action act{
+             .service = transactionServiceNum,
+             .method  = MethodNumber{"kvNotify"},
+             .rawData =
+                 psio::to_frac(std::tuple(self.code.codeNum, db, keyLen, oldValueLen, newValueLen)),
+         };
+
+         auto flags       = CallFlags::none;
+         auto callerFlags = self.code.flags;
+
+         auto savedImported = std::move(self.transactionContext.importedHandles);
+         auto savedExported = std::move(self.transactionContext.exportedHandles);
+         auto _ =
+             psio::finally{[&]
+                           {
+                              self.transactionContext.importedHandles = std::move(savedImported);
+                              self.transactionContext.exportedHandles = std::move(savedExported);
+                           }};
+
+         self.currentActContext->actionTrace.innerTraces.push_back({ActionTrace{}});
+         auto& inner_action_trace =
+             std::get<ActionTrace>(self.currentActContext->actionTrace.innerTraces.back().inner);
+         self.currentActContext->transactionContext.execCalledAction(callerFlags, act,
+                                                                     inner_action_trace, flags);
+
+         self.currentActContext->transactionContext.remainingStack = saved;
+      }
    }  // namespace
 
    uint32_t NativeFunctions::getResult(eosio::vm::span<char> dest, uint32_t offset)
@@ -750,6 +792,12 @@ namespace psibase
                       verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
                    }
+                   notifyKvMut(*this, bucket.db, fullKey.size(),
+                               existing ? existing->remaining() : -1, value.size());
+                }
+                else
+                {
+                   notifyKvMut(*this, bucket.db, fullKey.size(), -1, value.size());
                 }
              }
              else if (bucket.db == DbId::nativeSubjective)
@@ -828,6 +876,7 @@ namespace psibase
                           {
                              verifyRemoveConstrained(transactionContext, fullKey, *existing);
                           }
+                          notifyKvMut(*this, bucket.db, fullKey.size(), existing->remaining(), -1);
                        }
                     }
                     database.kvRemoveRaw(bucket.db, fullKey);
