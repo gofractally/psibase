@@ -2559,6 +2559,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 

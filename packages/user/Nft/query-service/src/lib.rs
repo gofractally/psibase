@@ -1,3 +1,5 @@
+mod events;
+
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
@@ -10,6 +12,8 @@ mod service {
         },
     };
     use psibase::{services::accounts::Account, *};
+
+    use crate::events::OwnerChangeEvent;
 
     #[derive(Fracpack, ToSchema, Debug, Clone, SimpleObject)]
     struct UserDetail {
@@ -37,6 +41,23 @@ mod service {
 
     #[Object]
     impl Query {
+        async fn ownerChanges(
+            &self,
+            nft_id: NID,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, OwnerChangeEvent>> {
+            EventQuery::new("history.nft.ownerChange")
+                .condition(format!("nftId = {}", nft_id))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
         async fn allNfts(
             &self,
             first: Option<i32>,
