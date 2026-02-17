@@ -7,7 +7,7 @@ use serde_aux::field_attributes::deserialize_number_from_string;
 #[derive(Deserialize, SimpleObject)]
 pub struct OwnerChangeEvent {
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    nftId: TID,
+    nft_id: TID,
     action: String,
     prev_owner: AccountNumber,
     new_owner: AccountNumber,
