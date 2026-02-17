@@ -4,7 +4,10 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use nft::{
         service::NID,
-        tables::{CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable},
+        tables::{
+            CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable, UserPending,
+            UserPendingTable,
+        },
     };
     use psibase::{services::accounts::Account, *};
 
@@ -81,6 +84,40 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn user_pending(
+            &self,
+            user: AccountNumber,
+            nft_id: Option<NID>,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, UserPending>> {
+            if let Some(nft_id) = nft_id {
+                TableQuery::subindex::<NID>(
+                    UserPendingTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
+                    &(user, nft_id),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            } else {
+                TableQuery::subindex::<NID>(
+                    UserPendingTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
+                    &(user),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            }
         }
 
         async fn userNfts(

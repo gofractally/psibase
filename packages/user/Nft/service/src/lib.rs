@@ -198,6 +198,8 @@ pub mod tables {
             let new_instance = Self::new(nft_id, creditor, debitor);
             new_instance.save();
 
+            UserPending::add(creditor, debitor, nft_id);
+
             super::Wrapper::emit()
                 .history()
                 .credited(nft_id, creditor, debitor, memo.to_string());
@@ -214,6 +216,8 @@ pub mod tables {
                 self.debitor,
                 memo.to_string(),
             );
+
+            UserPending::remove(self.creditor, self.debitor, self.nftId);
             self.erase();
         }
 
@@ -238,6 +242,51 @@ pub mod tables {
 
         fn erase(&self) {
             CreditTable::read_write().erase(&self.nftId);
+        }
+    }
+
+    #[table(name = "UserPendingTable", index = 4)]
+    #[derive(Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone, SimpleObject)]
+    #[allow(non_snake_case)]
+    #[graphql(complex)]
+    pub struct UserPending {
+        pub user: AccountNumber,
+        pub nft_id: NID,
+    }
+
+    impl UserPending {
+        #[primary_key]
+        fn by_pk(&self) -> (AccountNumber, NID) {
+            (self.user, self.nft_id)
+        }
+
+        fn new(user: AccountNumber, nft_id: NID) -> Self {
+            Self { user, nft_id }
+        }
+
+        fn add(creditor: AccountNumber, debitor: AccountNumber, nft_id: NID) {
+            Self::new(creditor, nft_id).save();
+            Self::new(debitor, nft_id).save();
+        }
+
+        fn save(&self) {
+            UserPendingTable::read_write().put(&self).unwrap();
+        }
+
+        fn remove(creditor: AccountNumber, debitor: AccountNumber, nft_id: NID) {
+            let table = UserPendingTable::read_write();
+            table.erase(&(creditor, nft_id));
+            table.erase(&(debitor, nft_id));
+        }
+    }
+
+    #[ComplexObject]
+    impl UserPending {
+        pub async fn credit(&self) -> CreditRecord {
+            CreditTable::with_service(crate::Wrapper::SERVICE)
+                .get_index_pk()
+                .get(&self.nft_id)
+                .unwrap()
         }
     }
 
