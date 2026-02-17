@@ -3,7 +3,11 @@ use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
 use flate2::write::GzEncoder;
 use fracpack::Pack;
-use futures::future::{join_all, try_join_all};
+use futures::{
+    future::{join_all, pending, try_join_all, LocalBoxFuture, Shared},
+    stream::FuturesUnordered,
+    FutureExt, StreamExt,
+};
 use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{
@@ -18,15 +22,15 @@ use psibase::{
     AnyPublicKey, AutoAbort, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
     FileSetRegistry, FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
     PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
-    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
-    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
-    TransactionTrace, Version,
+    PackageRegistry, PackagedService, PrettyAction, SchemaMap, Seconds, ServiceInfo,
+    SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -34,6 +38,7 @@ use std::fs::{metadata, read_dir, File};
 use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::Arc;
 
 mod cli;
@@ -543,6 +548,116 @@ fn store_sys(
         content_encoding,
         content.into(),
     )
+}
+
+struct TaposFetcherData<'a> {
+    tapos: Shared<LocalBoxFuture<'a, Result<TaposRefBlock, ()>>>,
+    refetch_tapos: TimePointSec,
+    err: Option<anyhow::Error>,
+}
+
+struct TaposFetcher<'a> {
+    data: Rc<RefCell<TaposFetcherData<'a>>>,
+}
+
+impl<'a> TaposFetcher<'a> {
+    async fn new() -> Self {
+        TaposFetcher {
+            data: Rc::new(RefCell::new(TaposFetcherData {
+                tapos: pending().boxed_local().shared(),
+                refetch_tapos: i64::MIN.into(),
+                err: None,
+            })),
+        }
+    }
+    async fn fetch(
+        &self,
+        base_url: &'a Url,
+        client: &'a reqwest::Client,
+        now: TimePointSec,
+        expiration: TimePointSec,
+    ) -> Result<TaposRefBlock, anyhow::Error> {
+        let res = {
+            let mut data = self.data.borrow_mut();
+            if expiration >= data.refetch_tapos {
+                data.refetch_tapos = now + Seconds::new(120);
+                let data_ref = self.data.clone();
+                data.tapos = async move {
+                    get_tapos_for_head(base_url, client.clone())
+                        .await
+                        .map_err(|e| {
+                            data_ref.borrow_mut().err = Some(e);
+                        })
+                }
+                .boxed_local()
+                .shared();
+            }
+            data.tapos.clone()
+        }
+        .await;
+        match res {
+            Err(()) => {
+                // The first error will be reported. The rest will never resolve
+                let mut data = self.data.borrow_mut();
+                if let Some(e) = std::mem::take(&mut data.err) {
+                    Err(e)
+                } else {
+                    pending().await
+                }
+            }
+            Ok(res) => Ok(res),
+        }
+    }
+}
+
+struct TransactionSigner<'a> {
+    tapos: TaposFetcher<'a>,
+    proposer: &'a Option<ExactAccountNumber>,
+    auto_exec: bool,
+    keys: &'a [AnyPrivateKey],
+}
+
+impl<'a> TransactionSigner<'a> {
+    async fn new(
+        proposer: &'a Option<ExactAccountNumber>,
+        auto_exec: bool,
+        keys: &'a [AnyPrivateKey],
+    ) -> Self {
+        TransactionSigner {
+            tapos: TaposFetcher::new().await,
+            proposer,
+            auto_exec,
+            keys,
+        }
+    }
+    async fn sign_transaction(
+        &self,
+        base_url: &'a Url,
+        client: &'a reqwest::Client,
+        mut actions: Vec<Action>,
+    ) -> Result<SignedTransaction, anyhow::Error> {
+        let now: TimePointSec = Utc::now().into();
+        let expiration = now + Seconds::new(10);
+        let tapos = self.tapos.fetch(base_url, client, now, expiration).await?;
+        if let Some(proposer) = self.proposer {
+            actions =
+                vec![staged_tx::Wrapper::pack_from((*proposer).into())
+                    .propose(actions, self.auto_exec)];
+        }
+        Ok(sign_transaction(
+            Transaction {
+                tapos: Tapos {
+                    expiration,
+                    refBlockSuffix: tapos.ref_block_suffix,
+                    flags: 0,
+                    refBlockIndex: tapos.ref_block_index,
+                },
+                actions,
+                claims: vec![],
+            },
+            self.keys,
+        )?)
+    }
 }
 
 fn with_tapos(
@@ -1199,6 +1314,95 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn push_transactions_parallel<'a>(
+    base_url: &'a Url,
+    client: &'a reqwest::Client,
+    signer: &TransactionSigner<'a>,
+    transaction_groups: Vec<(String, Vec<Vec<Action>>, bool)>,
+    fmt: TraceFormat,
+    console: bool,
+    progress: &ProgressBar,
+    max_simultaneous_transactions: usize,
+) -> Result<(), anyhow::Error> {
+    struct GroupCount {
+        n: u64,
+        remaining: usize,
+    }
+    impl GroupCount {
+        fn incref(&mut self) {
+            self.remaining += 1
+        }
+        fn decref(&mut self, progress: &ProgressBar) {
+            self.remaining -= 1;
+            if self.remaining == 0 {
+                progress.inc(self.n)
+            }
+        }
+    }
+    let mut futures = Vec::new();
+    let mut current_group: Option<Rc<RefCell<GroupCount>>> = None;
+    for (label, transactions, carry) in transaction_groups {
+        if !carry {
+            current_group = None;
+        }
+        if transactions.is_empty() {
+            if current_group.is_none() {
+                current_group = Some(Rc::new(RefCell::new(GroupCount { n: 0, remaining: 0 })))
+            }
+        } else {
+            let mut prev_group = std::mem::replace(
+                &mut current_group,
+                Some(Rc::new(RefCell::new(GroupCount { n: 0, remaining: 0 }))),
+            );
+            for trx in transactions {
+                let label = label.clone();
+                let prev = std::mem::take(&mut prev_group);
+                let current_group = current_group.as_ref().unwrap().clone();
+                if let Some(prev) = &prev {
+                    prev.borrow_mut().incref();
+                }
+                current_group.borrow_mut().incref();
+                futures.push(async move {
+                    progress.set_message(label.clone());
+                    let trx = signer.sign_transaction(base_url, &client, trx).await?;
+                    push_transaction(
+                        base_url,
+                        client.clone(),
+                        trx.packed(),
+                        fmt,
+                        console,
+                        Some(progress),
+                    )
+                    .await
+                    .with_context(|| label.to_string())?;
+                    if let Some(prev) = prev {
+                        prev.borrow_mut().decref(progress);
+                    }
+                    current_group.borrow_mut().decref(progress);
+                    Ok::<(), anyhow::Error>(())
+                });
+            }
+        }
+        current_group.as_ref().unwrap().borrow_mut().n += 1;
+    }
+    let mut available_slots = max_simultaneous_transactions;
+    let mut running = FuturesUnordered::new();
+    for future in futures {
+        if available_slots == 0 {
+            if let Some(res) = running.next().await {
+                res?
+            }
+        } else {
+            available_slots -= 1;
+        }
+        running.push(future)
+    }
+    while let Some(res) = running.next().await {
+        res?
+    }
+    Ok(())
+}
+
 async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
     let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
 
@@ -1240,17 +1444,12 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
     )?);
     progress.set_message("Preparing transactions");
 
-    let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
+    let signer = TransactionSigner::new(&args.sig_args.proposer, true, &args.sig_args.sign).await;
 
     let action_limit: usize = 1024 * 1024;
     let mut builder = TransactionBuilder::new(
         action_limit,
-        |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-            Ok(sign_transaction(
-                with_tapos(&tapos, actions, &args.sig_args.proposer, false),
-                &args.sig_args.sign,
-            )?)
-        },
+        |actions: Vec<Action>| -> Result<Vec<Action>, anyhow::Error> { Ok(actions) },
     );
 
     for (i, path) in args.packages.iter().enumerate() {
@@ -1295,45 +1494,19 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
     let transactions = builder.finish()?;
     let num_transactions: usize = transactions.iter().map(|group| group.1.len()).sum();
 
-    let mut running = Vec::new();
     progress.set_message("Publishing packages");
-    let mut n = 0;
-    for (label, transactions, carry) in &transactions {
-        if !transactions.is_empty() {
-            let mut group = Vec::new();
-            for trx in transactions {
-                let prev = n;
-                let progress = &progress;
-                let client = client.clone();
-                n = 0;
-                group.push(async move {
-                    push_transaction(
-                        &args.node_args.api,
-                        client,
-                        trx.packed(),
-                        args.tx_args.trace,
-                        args.tx_args.console,
-                        Some(progress),
-                    )
-                    .await
-                    .with_context(|| label.to_string())?;
-                    progress.inc(prev);
-                    Ok::<(), anyhow::Error>(())
-                });
-            }
-            // The groups can be merged, but not split.
-            debug_assert!(!carry);
-            debug_assert!(transactions.len() == 1);
-            running.push(async {
-                try_join_all(group).await?;
-                progress.inc(1);
-                Ok(())
-            })
-        } else {
-            n += 1;
-        }
-    }
-    let result: Result<_, anyhow::Error> = try_join_all(running).await;
+
+    let result: Result<_, anyhow::Error> = push_transactions_parallel(
+        &args.node_args.api,
+        &client,
+        &signer,
+        transactions,
+        args.tx_args.trace,
+        args.tx_args.console,
+        &progress,
+        4,
+    )
+    .await;
     if result.is_ok() {
         progress.finish_and_clear();
     } else {
