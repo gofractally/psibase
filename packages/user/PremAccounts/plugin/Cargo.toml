@@ -1,0 +1,32 @@
+[package]
+name = "prem-accounts-plugin"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+prem-accounts = { path = "../service/", version = "0.22.0" }
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wit-bindgen-rt.workspace = true
+psibase-user-workspace-hack.workspace = true
+pem = "3.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "prem-accounts:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
+"auth-sig:plugin" = { path = "../../../system/AuthSig/plugin/wit/world.wit" }

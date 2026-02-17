@@ -67,7 +67,12 @@ namespace SystemService
       {
          check(!strName.starts_with("x-"),
                "The 'x-' account prefix is reserved for infrastructure providers");
-         check(strName.length() >= 10, "account name must be at least 10 characters: " + strName);
+         // Allow PremAccounts service to create accounts with < 10 characters
+         if (getSender() != AccountNumber("prem-accounts"))
+         {
+            check(strName.length() >= 10,
+                  "account name must be at least 10 characters: " + strName);
+         }
       }
 
       // Check compression roundtrip

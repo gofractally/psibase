@@ -1,0 +1,17 @@
+package prem-accounts:plugin;
+
+interface api {
+    use host:types/types.{error};
+    buy: func(account: string, max-cost: string) -> result<_, error>;
+    claim: func(account: string) -> result<string, error>;
+}
+
+interface queries {
+    use host:types/types.{error};
+    get-prices: func() -> result<list<u64>, error>;
+}
+
+world imports {
+    import api;
+    import queries;
+}
