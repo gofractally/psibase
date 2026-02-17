@@ -1347,7 +1347,7 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
 
 fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>>(
     accounts: Vec<AccountNumber>,
-    out: &mut TransactionBuilder<F>,
+    out: &mut TransactionBuilder<SignedTransaction, F>,
     sender: AccountNumber,
 ) -> Result<(), anyhow::Error> {
     for account in accounts {
@@ -1388,8 +1388,8 @@ async fn apply_packages<
     reg: &R,
     ops: Vec<PackageOp>,
     mut uploader: StagedUpload,
-    out: &mut TransactionBuilder<F>,
-    files: &mut TransactionBuilder<G>,
+    out: &mut TransactionBuilder<SignedTransaction, F>,
+    files: &mut TransactionBuilder<SignedTransaction, G>,
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
