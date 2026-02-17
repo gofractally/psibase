@@ -43,21 +43,15 @@ namespace UserService
          // clang-format off
          struct History
          {
-            void minted(NID nftId, Account issuer) {}
-            void burned(NID nftId, Account owner) {}
+            void ownerChange(NID nftId, std::string action, Account prev_owner, Account new_owner, MemoView memo) {}
             void userConfSet(Account account, std::uint8_t flag, bool enable) {}
-            void credited(NID nftId, Account sender, Account receiver, MemoView memo) {}
-            void uncredited(NID nftId, Account sender, Account receiver, MemoView memo) {}
          };
          // clang-format on
 
          struct Ui
          {
          };
-         struct Merkle
-         {
-            void transferred(NID nftId, Account creditor, Account debitor, MemoView memo) {}
-         };
+
       };
    };
 
@@ -79,16 +73,10 @@ namespace UserService
    );
    PSIBASE_REFLECT_EVENTS(Nft);
    PSIBASE_REFLECT_HISTORY_EVENTS(Nft,
-      method(minted, nftId, issuer),
-      method(burned, nftId, owner),
       method(userConfSet, account, flag, enable),
-      method(credited, nftId, sender, receiver, memo),
-      method(uncredited, nftId, sender, receiver, memo)
+      method(ownerChange, nftId, action, prev_owner, new_owner, memo),
    );
    PSIBASE_REFLECT_UI_EVENTS(Nft);
-   PSIBASE_REFLECT_MERKLE_EVENTS(Nft,
-      method(transferred, nftId, creditor, debitor, memo)
-   );
 
    PSIBASE_REFLECT_TABLES(Nft, Nft::Tables)
    // clang-format on

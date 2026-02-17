@@ -467,8 +467,7 @@ pub mod service {
         prev_owner: AccountNumber,
         new_owner: AccountNumber,
         memo: Memo,
-    ) {
-    }
+    ) {}
 
     #[event(history)]
     pub fn userConfSet(account: AccountNumber, index: u8, enable: bool) {}
