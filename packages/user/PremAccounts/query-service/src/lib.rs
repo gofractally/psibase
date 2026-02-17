@@ -102,23 +102,6 @@ mod service {
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
             self.check_user_auth(owner.clone())?;
-            // let mut query = EventQuery::new("history.prem-accounts.premAcctEvent");
-
-            // // Build conditions if filters are provided
-            // let mut conditions = Vec::new();
-            // let mut params = Vec::new();
-
-            // conditions.push("owner = ?".to_string());
-            // params.push(owner.to_string());
-
-            // query = query.condition_with_params(conditions.join(" AND "), params);
-
-            // query
-            //     .first(first)
-            //     .last(last)
-            //     .before(before)
-            //     .after(after)
-            //     .query()
 
             EventQuery::new("history.prem-accounts.premAcctEvent")
                 .condition(format!("owner = '{}'", owner))
