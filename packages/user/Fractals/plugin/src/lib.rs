@@ -43,6 +43,7 @@ define_trust! {
         ",
         Medium => "
             - Joining the fractal
+            - Invite member
             - Registering for a guild evaluation
             - Unregistering from guild evaluation
             - Applying to join a guild
@@ -67,7 +68,7 @@ define_trust! {
     functions {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
-        Medium => [apply_guild, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
         High => [attest, con_membership_app, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
@@ -409,22 +410,27 @@ impl UserGuild for FractallyPlugin {
         )
     }
 
-    fn invite_member(guild_account: String) -> Result<(), Error> {
-        // call the invite plugin function to do the prepare thing
-        // hit an action on fractals which registers the invite ID
-        //
-        // crate::bindings::
-        let (invite_token, invite_details, min_cost) =
+    fn invite_member(guild_account: String) -> Result<String, Error> {
+        let (invite_token, invite_details, _) =
             bindings::invite::plugin::inviter::prepare_new_invite(1)?;
 
-        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
-        if min_cost_u64 > 0 {}
-        // should the min cost shit be paid by the user or the fractal here?
+        let finger_print: [u8; 32] = invite_details.fingerprint.try_into().unwrap();
 
-        // return the invite token back as a string so it can be rendered as a link to copy and paste
-        // use the invite details to contact the fractals service
+        let packed_args = fractals::action_structs::inv_g_member {
+            guild: guild_account.as_str().into(),
+            finger_print: finger_print.into(),
+            invite_id: invite_details.invite_id,
+            secret: invite_details.encrypted_secret,
+        }
+        .packed();
 
-        Ok(())
+        add_action_to_transaction(
+            fractals::action_structs::inv_g_member::ACTION_NAME,
+            &packed_args,
+        )
+        .unwrap();
+
+        Ok(invite_token)
     }
 
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {

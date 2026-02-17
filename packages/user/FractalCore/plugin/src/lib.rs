@@ -29,6 +29,7 @@ define_trust! {
         Medium => "
             - Joining the fractal
             - Registering for a guild evaluation
+            - Invite member to guild
             - Unregistering from guild evaluation
             - Applying to join a guild
             - Attesting guild membership for a fractal member
@@ -52,7 +53,7 @@ define_trust! {
     functions {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
-        Medium => [apply_guild, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, invite_member, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
         High => [attest, con_membership_app, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
@@ -252,6 +253,11 @@ impl UserGuild for FractalCorePlugin {
     fn apply_guild(guild_account: String, app: String) -> Result<(), Error> {
         assert_authorized(FunctionName::apply_guild)?;
         FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
+    }
+
+    fn invite_member(guild_account: String) -> Result<String, Error> {
+        assert_authorized(FunctionName::invite_member)?;
+        FractalsPlugin::user_guild::invite_member(&guild_account)
     }
 
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {

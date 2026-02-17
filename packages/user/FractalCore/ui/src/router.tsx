@@ -19,6 +19,7 @@ import { ApplicationDetail } from "./pages/fractal/membership/application-detail
 import { Applications } from "./pages/fractal/membership/applications";
 import { Settings } from "./pages/settings";
 import { Leadership } from "./pages/leadership";
+import { InviteDetail } from "./pages/invite-detail";
 
 export const router = createBrowserRouter([
     {
@@ -30,6 +31,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <MyMembership />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/invite/:token",
+                element: (
+                    <ProtectedRoute>
+                        <InviteDetail />
                     </ProtectedRoute>
                 ),
             },

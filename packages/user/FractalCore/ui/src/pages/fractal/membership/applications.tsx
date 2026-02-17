@@ -1,5 +1,4 @@
 import dayjs from "dayjs";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { EmptyBlock } from "@/components/empty-block";
@@ -19,13 +18,19 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import {Button } from "@shared/shadcn/ui/button"
+import { InviteGuildMemberModal } from "@/components/modals/invite-guild-member-modal";
+import { useBoolean } from "usehooks-ts";
 
 export const Applications = () => {
     const { data: guild } = useGuild();
     const { data: applications } = useGuildApplications(guild?.account);
 
+
+    const { setValue: setGuildInviteModal, value: showGuildInviteModal } = useBoolean()
+    const {setValue: setShowGuildApplyModal, value: showGuildApplyModal, } = useBoolean();
+    
     const navigate = useNavigate();
-    const [showGuildModal, setShowGuildModal] = useState(false);
 
     const guildAccount = useGuildAccount();
     const { data: currentUser } = useCurrentUser();
@@ -41,10 +46,17 @@ export const Applications = () => {
                 <h1 className="text-lg font-semibold">Applications</h1>
             </div>
             <ApplyGuildModal
-                openChange={(e) => setShowGuildModal(e)}
-                show={showGuildModal}
+                openChange={(e) => setShowGuildApplyModal(e)}
+                show={showGuildApplyModal}
             />
+            <InviteGuildMemberModal 
+                openChange={(e) => setGuildInviteModal(e)}
+                show={showGuildInviteModal}            />
             <div className="mt-3">
+                <div className="flex justify-end">
+                    {isGuildMember && <Button onClick={() => { setGuildInviteModal(true)}} >Create invite</Button>}
+                    {!isGuildMember && <Button onClick={() => { setShowGuildApplyModal(true)}} >Apply</Button>}
+                </div>
                 {applications && applications.length > 0 ? (
                     <Table>
                         <TableHeader>
@@ -86,7 +98,7 @@ export const Applications = () => {
                             isGuildMember || isPending
                                 ? undefined
                                 : () => {
-                                      setShowGuildModal(true);
+                                      setShowGuildApplyModal(true);
                                   }
                         }
                     />

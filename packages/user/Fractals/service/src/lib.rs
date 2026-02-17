@@ -68,7 +68,6 @@ pub mod service {
 
     use psibase::services::{
         auth_dyn::{self, policy::DynamicAuthPolicy},
-        tokens::Quantity,
         transact::ServiceMethod,
     };
     use psibase::*;
@@ -470,7 +469,6 @@ pub mod service {
         invite_id: u32,
         finger_print: Checksum256,
         secret: String,
-        resources: Quantity,
     ) {
         GuildInvite::add(guild, invite_id);
 
@@ -478,11 +476,11 @@ pub mod service {
         // debit from the user? whos paying for this shit?...
 
         // for now, assume there will be no billing.
-        let tokens = psibase::services::tokens::Wrapper::call();
-        let system_token = tokens.getSysToken();
+        // let tokens = psibase::services::tokens::Wrapper::call();
+        // let system_token = tokens.getSysToken();
         // tokens.debit(token_id, creditor, amount, memo)
 
-        let cost = psibase::services::invite::Wrapper::call().getInvCost(1);
+        // let cost = psibase::services::invite::Wrapper::call().getInvCost(1);
 
         psibase::services::invite::Wrapper::call().createInvite(
             invite_id,
@@ -490,7 +488,7 @@ pub mod service {
             1,
             true,
             secret,
-            resources,
+            0.into(),
         );
     }
 
