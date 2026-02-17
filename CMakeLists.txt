@@ -137,7 +137,7 @@ if(DEFINED WASI_SDK_PREFIX)
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
         CpuLimit Db Events EventIndex Explorer Invite
         Nop Packages Producers HttpServer Sites RAccounts
-        RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
+        RAuthSig RAuthDelegate REvents RInvite RPackages RPremAccounts RProducers
         RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
@@ -705,6 +705,13 @@ cargo_psibase_package(
     DEPENDS ${Identity_js_DEP}
 )
 
+cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/PremAccounts.psi
+    PATH packages/user/PremAccounts
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+    DEPENDS ${PremAccounts_js_DEP}
+)
+
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Nop.psi
     NAME Nop
@@ -866,6 +873,7 @@ psibase_package(
     DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
+
 
 
 psibase_package(
@@ -1115,7 +1123,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions PremAccounts Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
@@ -1125,7 +1133,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions PremAccounts Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
@@ -1171,7 +1179,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions PremAccounts Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
@@ -1215,6 +1223,7 @@ install(
           ${SERVICE_DIR}/Nop.psi
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
+          ${SERVICE_DIR}/PremAccounts.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/Profiles.psi
           ${SERVICE_DIR}/Registry.psi
