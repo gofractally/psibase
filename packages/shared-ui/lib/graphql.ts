@@ -1,5 +1,8 @@
+import { z } from "zod";
+
 import { siblingUrl } from "@psibase/common-lib";
 
+import { zAccount } from "@shared/lib/schemas/account";
 interface GraphQLError {
     message: string;
     locations?: { line: number; column: number }[];
@@ -28,7 +31,7 @@ function extractGraphQLErrorMessage(body: unknown): string | null {
 
 export type GraphQLUrlOptions = {
     baseUrl?: string | null;
-    service?: string | null;
+    service?: z.infer<typeof zAccount> | null;
     path?: string | null;
     baseUrlIncludesSibling?: boolean;
 };
@@ -42,7 +45,12 @@ export const graphql = async <T>(
     query: string,
     options: GraphQLUrlOptions = {},
 ): Promise<T> => {
-    const { baseUrl, service, path, baseUrlIncludesSibling } = options;
+    const { baseUrl, service, path, baseUrlIncludesSibling = true } = options;
+    console.info("baseUrlIncludesSibling", baseUrlIncludesSibling);
+    console.info("path", path);
+    console.info("service", service);
+    console.info("baseUrl", baseUrl);
+    console.info("siblingUrl():", siblingUrl(baseUrl, service, path, baseUrlIncludesSibling));
     const host = service
         ? siblingUrl(baseUrl, service, path, baseUrlIncludesSibling)
         : "";

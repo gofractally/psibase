@@ -18,7 +18,9 @@ export const ProfileResponse = z.object({
 export const useProfile = (
     account: string | undefined | null,
     enabled = true,
-    options: GraphQLUrlOptions = {},
+    options: GraphQLUrlOptions = {
+        baseUrlIncludesSibling: true,
+    },
 ) =>
     useQuery({
         queryKey: QueryKey.profile(account),
@@ -36,7 +38,6 @@ export const useProfile = (
             `,
                 {
                     service: "profiles",
-                    baseUrlIncludesSibling: false,
                     ...options,
                 },
             );

@@ -6,7 +6,7 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { useBillingConfig } from "../hooks/use-billing-config";
+import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import {
     useFillGasTank,
     useResizeAndFillGasTank,
@@ -18,7 +18,7 @@ import { GasTank } from "./gas-tank";
 export const UserSettingsSection = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
-        useBillingConfig();
+        useBillingConfig({baseUrlIncludesSibling: false});
     const billingEnabled =
         !isLoadingBillingConfig && billingConfig?.enabled === true;
     const {

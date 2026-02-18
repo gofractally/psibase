@@ -22,7 +22,7 @@ const zNetworkVariablesResponse = z.object({
 
 export const useNetworkVariables = () => {
     return useQuery<NetworkVariables>({
-        queryKey: [...queryKeys.config, "networkVariables"],
+        queryKey: [...queryKeys.configNetworkVariables],
         queryFn: async () => {
             const query = `{
                 getNetworkVariables {

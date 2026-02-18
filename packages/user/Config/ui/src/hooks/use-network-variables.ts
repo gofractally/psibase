@@ -1,23 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
-
 import { siblingUrl } from "@psibase/common-lib";
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
-interface NetworkVariables {
-    blockReplayFactor: number;
-    perBlockSysCpuNs: number;
-    objStorageBytes: number;
-}
+const zNetworkVariables = z.object({
+    blockReplayFactor: z.number(),
+    perBlockSysCpuNs: z.number(),
+    objStorageBytes: z.number(),
+});
 
-interface NetworkVariablesResponse {
-    getNetworkVariables: NetworkVariables;
-}
+const zNetworkVariablesResponse = z.object({
+    getNetworkVariables: zNetworkVariables,
+});
+
+export type NetworkVariables = z.infer<typeof zNetworkVariables>;
 
 export const useNetworkVariables = () => {
     return useQuery({
-        queryKey: [...QueryKey.virtualServer(), "networkVariables"],
+        queryKey: [...QueryKey.virtualServerNetworkVariables()],
         queryFn: async () => {
             const query = `
                 query {
@@ -29,12 +31,9 @@ export const useNetworkVariables = () => {
                 }
             `;
 
-            const res = await graphql<NetworkVariablesResponse>(
-                query,
-                siblingUrl(null, "virtual-server", "/graphql"),
-            );
-
-            return res.getNetworkVariables;
+            const res = await graphql(query, siblingUrl(null, "virtual-server", "/graphql"));
+            const parsed = zNetworkVariablesResponse.parse(res);
+            return parsed.getNetworkVariables;
         },
     });
 };

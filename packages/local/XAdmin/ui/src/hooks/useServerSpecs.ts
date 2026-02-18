@@ -33,7 +33,7 @@ const zServerSpecsResponse = z.union([
 
 export const useServerSpecs = () => {
     return useQuery<ServerSpecs>({
-        queryKey: [...queryKeys.config, "serverSpecs"],
+        queryKey: [...queryKeys.configServerSpecs],
         queryFn: async () => {
             const query = `{
                 getServerSpecs {

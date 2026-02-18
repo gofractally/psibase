@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
+import { graphql } from "@shared/lib/graphql";
 import { supervisor } from "@/supervisor";
 import { zAccount } from "@/lib/zod/Account";
 
@@ -89,7 +89,7 @@ export const fetchUserSettings = async (username: string) => {
     const query = `{${qs.userSettings(username)}}`;
     const res = await graphql<z.infer<typeof zUserSettingsSchema>>(
         query,
-        "tokens",
+        {service: "tokens", baseUrlIncludesSibling: false},
     );
     const parsed = zUserSettingsSchema.parse(res);
     return parsed.userSettings.settings;
@@ -139,7 +139,7 @@ export const fetchTokenMeta = async (tokenId: string) => {
     const query = `{${qs.tokenMeta(tokenId)}}`;
     const res = await graphql<z.infer<typeof zTokenMetaSchema>>(
         query,
-        "tokens",
+        {service: "tokens", baseUrlIncludesSibling: false},
     );
     const parsed = zTokenMetaSchema.parse(res);
     return parsed.token;

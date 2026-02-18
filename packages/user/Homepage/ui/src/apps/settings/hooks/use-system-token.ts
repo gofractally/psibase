@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { graphql } from "@/lib/graphql";
-import { zAccount } from "@/lib/zod/Account";
+import { graphql } from "@shared/lib/graphql";
 
 interface ConfigResponse {
     config?: {
@@ -39,7 +38,7 @@ export const useSystemToken = () => {
 
                 const configRes = await graphql<ConfigResponse>(
                     configQuery,
-                    zAccount.parse("tokens"),
+                    {service: "tokens", baseUrlIncludesSibling: false},
                 );
 
                 if (!configRes.config?.sysTid) {
@@ -60,7 +59,7 @@ export const useSystemToken = () => {
 
                 const tokenRes = await graphql<TokenResponse>(
                     tokenQuery,
-                    zAccount.parse("tokens"),
+                    {service: "tokens", baseUrlIncludesSibling: false},
                 );
 
                 if (!tokenRes.token) {

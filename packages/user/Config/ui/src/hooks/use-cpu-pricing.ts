@@ -1,39 +1,35 @@
 import { siblingUrl } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
-interface Thresholds {
-    idlePct: string;
-    congestedPct: string;
-}
+const zThresholds = z.object({
+    idlePct: z.string(),
+    congestedPct: z.string(),
+});
 
-interface CpuPricingResponse {
-    cpuPricing: {
-        numBlocksToAverage: number;
-        billableUnit: number;
-        pricePerUnit: number;
-        halvingTimeSec: number;
-        doublingTimeSec: number;
-        avgUsagePct: string;
-        thresholds: Thresholds;
-    } | null;
-}
+const zCpuPricing = z.object({
+    numBlocksToAverage: z.number(),
+    billableUnit: z.number(),
+    pricePerUnit: z.number(),
+    halvingTimeSec: z.number(),
+    doublingTimeSec: z.number(),
+    avgUsagePct: z.string(),
+    thresholds: zThresholds,
+});
 
-export interface CpuPricing {
-    numBlocksToAverage: number;
-    billableUnit: number; // in nanoseconds
-    pricePerUnit: number;
-    halvingTimeSec: number;
-    doublingTimeSec: number;
-    avgUsagePct: string;
-    thresholds: Thresholds;
-}
+const zCpuPricingResponse = z.object({
+    cpuPricing: zCpuPricing.nullable(),
+});
+
+export type CpuPricing = z.infer<typeof zCpuPricing>;
+export type Thresholds = z.infer<typeof zThresholds>;
 
 export const useCpuPricing = () => {
     return useQuery({
-        queryKey: [...QueryKey.virtualServer(), "cpuPricing"],
+        queryKey: [...QueryKey.virtualServerCpuPricing()],
         queryFn: async () => {
             const query = `
                 query {
@@ -52,16 +48,14 @@ export const useCpuPricing = () => {
                 }
             `;
 
-            const res = await graphql<CpuPricingResponse>(
-                query,
-                siblingUrl(null, "virtual-server", "/graphql"),
-            );
+            const res = await graphql(query, siblingUrl(null, "virtual-server", "/graphql"));
+            const parsed = zCpuPricingResponse.parse(res);
 
-            if (!res.cpuPricing) {
+            if (!parsed.cpuPricing) {
                 throw new Error("CPU pricing not available");
             }
 
-            return res.cpuPricing;
+            return parsed.cpuPricing;
         },
     });
 };

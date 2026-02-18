@@ -6,7 +6,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
 import { useAppForm } from "@/components/forms/app-form";
-import { useBillingConfig } from "@/hooks/use-billing-config";
+import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
 import { parseError } from "@shared/lib/parseErrorMessage";
@@ -68,12 +68,12 @@ export const Billing = ({
         }
     }, [billingConfig]);
 
-    const form = useAppForm({
+    const billingForm = useAppForm({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: BillingFormData }) => {
             resetFeeReceiver();
             await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount]);
-            form.reset(data.value);
+            billingForm.reset(data.value);
         },
     });
 
@@ -88,9 +88,9 @@ export const Billing = ({
 
     const handleApplyEnableBilling = async () => {
         resetEnableBilling();
-        await setEnableBilling([form.state.values.enableBilling]);
-        setSubmittedEnableBilling(form.state.values.enableBilling);
-        form.reset(form.state.values);
+        await setEnableBilling([billingForm.state.values.enableBilling]);
+        setSubmittedEnableBilling(billingForm.state.values.enableBilling);
+        billingForm.reset(billingForm.state.values);
     };
 
     if (billingConfigLoading) {
@@ -114,7 +114,7 @@ export const Billing = ({
                 onSubmit={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    form.handleSubmit();
+                    billingForm.handleSubmit();
                 }}
             >
                 <div className="space-y-4">
@@ -129,7 +129,7 @@ export const Billing = ({
                         </p>
                     </div>
 
-                    <form.Field name="tokenFeeReceiverAccount">
+                    <billingForm.Field name="tokenFeeReceiverAccount">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(accountField: any) => {
                             const currentValue = (accountField.state.value || "").trim();
@@ -168,12 +168,12 @@ export const Billing = ({
                                 </div>
                             );
                         }}
-                    </form.Field>
+                    </billingForm.Field>
 
-                    <form.Field name="enableBilling">
+                    <billingForm.Field name="enableBilling">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(field: any) => (
-                            <form.Subscribe
+                            <billingForm.Subscribe
                                 selector={(state) => state.values.enableBilling}
                             >
                                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -214,9 +214,9 @@ export const Billing = ({
                                         </div>
                                     );
                                 }}
-                            </form.Subscribe>
+                            </billingForm.Subscribe>
                         )}
-                    </form.Field>
+                    </billingForm.Field>
                 </div>
             </form>
         </div>

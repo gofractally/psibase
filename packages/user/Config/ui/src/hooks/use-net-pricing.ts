@@ -1,39 +1,35 @@
 import { siblingUrl } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
-interface Thresholds {
-    idlePct: string;
-    congestedPct: string;
-}
+const zThresholds = z.object({
+    idlePct: z.string(),
+    congestedPct: z.string(),
+});
 
-interface NetPricingResponse {
-    networkPricing: {
-        numBlocksToAverage: number;
-        billableUnit: number;
-        pricePerUnit: number;
-        halvingTimeSec: number;
-        doublingTimeSec: number;
-        avgUsagePct: string;
-        thresholds: Thresholds;
-    } | null;
-}
+const zNetPricing = z.object({
+    numBlocksToAverage: z.number(),
+    billableUnit: z.number(),
+    pricePerUnit: z.number(),
+    halvingTimeSec: z.number(),
+    doublingTimeSec: z.number(),
+    avgUsagePct: z.string(),
+    thresholds: zThresholds,
+});
 
-export interface NetPricing {
-    numBlocksToAverage: number;
-    billableUnit: number; // in bits
-    pricePerUnit: number;
-    halvingTimeSec: number;
-    doublingTimeSec: number;
-    avgUsagePct: string;
-    thresholds: Thresholds;
-}
+const zNetPricingResponse = z.object({
+    networkPricing: zNetPricing.nullable(),
+});
+
+export type NetPricing = z.infer<typeof zNetPricing>;
+export type Thresholds = z.infer<typeof zThresholds>;
 
 export const useNetPricing = () => {
     return useQuery({
-        queryKey: [...QueryKey.virtualServer(), "netPricing"],
+        queryKey: [...QueryKey.virtualServerNetPricing()],
         queryFn: async () => {
             const query = `
                 query {
@@ -52,16 +48,14 @@ export const useNetPricing = () => {
                 }
             `;
 
-            const res = await graphql<NetPricingResponse>(
-                query,
-                siblingUrl(null, "virtual-server", "/graphql"),
-            );
+            const res = await graphql(query, siblingUrl(null, "virtual-server", "/graphql"));
+            const parsed = zNetPricingResponse.parse(res);
 
-            if (!res.networkPricing) {
+            if (!parsed.networkPricing) {
                 throw new Error("Network pricing not available");
             }
 
-            return res.networkPricing;
+            return parsed.networkPricing;
         },
     });
 };

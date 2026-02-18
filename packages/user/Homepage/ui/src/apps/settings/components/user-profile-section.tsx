@@ -35,7 +35,7 @@ export const UserProfileSection = () => {
         isLoading,
         isFetching,
         error,
-    } = useProfile(currentUser);
+    } = useProfile(currentUser, true, {baseUrlIncludesSibling: false});
     const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
         useUploadAvatar();
 

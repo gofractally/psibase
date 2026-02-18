@@ -1,19 +1,21 @@
-import { useQuery } from "@tanstack/react-query";
-
 import { siblingUrl } from "@psibase/common-lib";
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
-interface ServerSpecs {
-    netBps: number;
-    storageBytes: number;
-    recommendedMinMemoryBytes: number;
-}
+const zServerSpecs = z.object({
+    netBps: z.number(),
+    storageBytes: z.number(),
+    recommendedMinMemoryBytes: z.number(),
+});
 
-interface ServerSpecsResponse {
-    getServerSpecs: ServerSpecs;
-}
+const zServerSpecsResponse = z.object({
+    getServerSpecs: zServerSpecs,
+});
+
+export type ServerSpecs = z.infer<typeof zServerSpecs>;
 
 export const useServerSpecs = () => {
     return useQuery({
@@ -29,12 +31,9 @@ export const useServerSpecs = () => {
                 }
             `;
 
-            const res = await graphql<ServerSpecsResponse>(
-                query,
-                siblingUrl(null, "virtual-server", "/graphql"),
-            );
-
-            return res.getServerSpecs;
+            const res = await graphql(query, siblingUrl(null, "virtual-server", "/graphql"));
+            const parsed = zServerSpecsResponse.parse(res);
+            return parsed.getServerSpecs;
         },
     });
 };

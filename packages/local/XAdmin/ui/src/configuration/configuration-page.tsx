@@ -16,6 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Switch } from "@shared/shadcn/ui/switch";
 import {
     Tabs,
@@ -63,9 +64,9 @@ const NodeSpecsContent = () => {
             <div className="rounded-lg border p-4 space-y-4">
                 {isLoadingSpecs ? (
                     <div className="space-y-3">
-                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
-                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
-                        <div className="h-6 w-32 bg-gray-200 animate-pulse rounded" />
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-6 w-32" />
                     </div>
                 ) : (
                     <>
