@@ -1,4 +1,4 @@
-use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned};
+use fracpack::{CompiledSchema, Pack, Result, SchemaBuilder, Unpack, UnpackOwned, View};
 use serde::Deserialize;
 use test_fracpack::*;
 
@@ -896,3 +896,12 @@ where
 test_fracpack_macros::include_tests!(
     "${CARGO_MANIFEST_DIR}/../../libraries/psio/tests/fracpack-tests.json"
 );
+
+#[test]
+fn test_view() {
+    let data = vec![Some("asdf"), Some(""), None].packed();
+    let v = <View<Vec<Option<String>>>>::new(&data).unwrap();
+    assert_eq!(v[0].get().unwrap().find('d'), Some(2));
+    assert!(v[1].get().unwrap().is_empty());
+    assert!(v[2].get().is_none());
+}

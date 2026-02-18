@@ -59,6 +59,9 @@ pub use schema::*;
 mod nested;
 pub use nested::*;
 
+mod view;
+pub use view::*;
+
 custom_error! {pub Error
     ReadPastEnd         = "Read past end",
     BadOffset           = "Bad offset",
