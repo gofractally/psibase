@@ -54,7 +54,7 @@ export const Legislative = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-8 p-4 px-6">
+        <div className="mx-auto w-full max-w-5xl space-y-6 p-4 px-6">
             <SetMinScorersModal
                 openChange={setShowMinScorers}
                 show={showMinScorersModal}

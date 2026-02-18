@@ -15,8 +15,6 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useAppForm } from "@shared/components/form/app-form";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 
-import { Leadership } from "./leadership";
-
 export const Settings = () => {
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
 
@@ -137,10 +135,6 @@ export const Settings = () => {
                             <form.SubmitButton />
                         </form.AppForm>
                     </form>
-                </div>
-
-                <div>
-                    <Leadership />
                 </div>
             </div>
         </div>

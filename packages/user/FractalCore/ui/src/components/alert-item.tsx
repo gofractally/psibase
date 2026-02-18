@@ -40,7 +40,7 @@ export const AlertItem = ({
     variant = "outline",
 }: AlertItemProps) => {
     return (
-        <Item variant="outline">
+        <Item variant="muted">
             <ItemContent>
                 <ItemTitle>{title}</ItemTitle>
                 <ItemDescription>{description}</ItemDescription>

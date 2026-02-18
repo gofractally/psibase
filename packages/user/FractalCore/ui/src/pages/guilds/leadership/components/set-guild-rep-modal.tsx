@@ -5,7 +5,6 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
-import { supervisor } from "@shared/lib/supervisor";
 import {
     Dialog,
     DialogContent,
@@ -67,7 +66,7 @@ export const SetGuildRepModal = ({
                             description={undefined}
                             placeholder="Enter account name"
                             disabled={false}
-                            supervisor={supervisor}
+                            onValidate={undefined}
                         />
 
                         <form.AppForm>

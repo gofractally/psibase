@@ -37,7 +37,7 @@ export const GuildOverviewCard = ({
                     account={guild?.account}
                 />
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-4">
                 <div>
                     <h3 className="text-sm font-semibold">Description</h3>
                     <p className="text-sm leading-relaxed">
