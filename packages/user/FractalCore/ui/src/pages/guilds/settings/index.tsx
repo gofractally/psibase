@@ -13,7 +13,21 @@ import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
+import {
+    CardContent,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
+import {
+    Item,
+    ItemActions,
+    ItemContent,
+    ItemDescription,
+    ItemTitle,
+} from "@shared/shadcn/ui/item";
 
 export const Settings = () => {
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
@@ -74,69 +88,76 @@ export const Settings = () => {
     });
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            <div className="flex flex-col gap-3">
-                <div className="flex justify-between rounded-sm border p-4 ">
-                    <div>
-                        <div>Evaluations</div>
-                        {!isGuildPending && (
-                            <div className="text-muted-foreground text-sm">
-                                {isUpcomingEvaluation && evaluation
-                                    ? `Next evaluation at ${dayjs.unix(evaluation.registrationStarts).format("MMM, DD")}`
-                                    : `No evaluation scheduled`}
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <ScheduleDialog
-                            isOpen={isScheduleDialogOpen}
-                            setIsOpen={setIsScheduleDialogOpen}
-                            disabled={
-                                status?.type &&
-                                status?.type !== "waitingRegistration"
-                            }
-                        />
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-2 rounded-sm border p-4 ">
-                    <div>
-                        <div className="text-xl font-semibold">Metadata</div>
-                    </div>
+        <div className="mx-auto w-full max-w-5xl space-y-6 p-4 px-6">
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Metadata</CardTitle>
+                </CardHeader>
+                <form.AppForm>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
                             void form.handleSubmit();
                         }}
+                        className="flex flex-col gap-6"
                     >
-                        <div className="my-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <form.AppField
-                                name="displayName"
-                                children={(field) => (
-                                    <field.TextField label="Display name" />
-                                )}
-                            />
-                            <form.AppField
-                                name="bio"
-                                children={(field) => (
-                                    <field.TextField label="Bio" />
-                                )}
-                            />
-                            <div className="col-span-2">
+                        <CardContent className="flex flex-col gap-4">
+                            <div className="max-w-3xs">
                                 <form.AppField
-                                    name="description"
+                                    name="displayName"
                                     children={(field) => (
-                                        <field.TextField label="Description" />
+                                        <field.TextField label="Guild name" />
                                     )}
                                 />
                             </div>
-                        </div>
-                        <form.AppForm>
+                            <form.AppField
+                                name="bio"
+                                children={(field) => (
+                                    <field.TextField label="Description" />
+                                )}
+                            />
+                            <form.AppField
+                                name="description"
+                                children={(field) => (
+                                    <field.TextField label="Mission" />
+                                )}
+                            />
+                        </CardContent>
+                        <CardFooter className="justify-end">
                             <form.SubmitButton />
-                        </form.AppForm>
+                        </CardFooter>
                     </form>
-                </div>
-            </div>
+                </form.AppForm>
+            </GlowingCard>
+            {!isGuildPending && (
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>Scheduling</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Item variant="muted">
+                            <ItemContent>
+                                <ItemTitle>Evaluations schedule</ItemTitle>
+                                <ItemDescription>
+                                    {isUpcomingEvaluation && evaluation
+                                        ? `Next evaluation at ${dayjs.unix(evaluation.registrationStarts).format("MMM, DD")}`
+                                        : `No evaluation scheduled`}
+                                </ItemDescription>
+                            </ItemContent>
+                            <ItemActions>
+                                <ScheduleDialog
+                                    isOpen={isScheduleDialogOpen}
+                                    setIsOpen={setIsScheduleDialogOpen}
+                                    disabled={
+                                        status?.type &&
+                                        status?.type !== "waitingRegistration"
+                                    }
+                                />
+                            </ItemActions>
+                        </Item>
+                    </CardContent>
+                </GlowingCard>
+            )}
         </div>
     );
 };
