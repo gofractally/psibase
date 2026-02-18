@@ -1044,6 +1044,7 @@ namespace
                         bool                           speculate,
                         std::optional<TraceClientInfo> client = std::nullopt)
    {
+      bool result = true;
       PSIBASE_SUBJECTIVE_TX
       {
          if (client)
@@ -1058,12 +1059,14 @@ namespace
          auto pending = Subjective{}.open<PendingTransactionTable>();
          if (pending.get(id))
          {
-            return false;
+            result = false;
+            continue;
          }
          auto unverified = RTransact{}.open<UnverifiedTransactionTable>();
          if (auto row = unverified.get(id))
          {
-            return false;
+            result = false;
+            continue;
          }
          auto speculative = speculate ? std::optional{scheduleSpeculative(id, trx)} : std::nullopt;
          scheduleVerify(id, trx, false, speculative);
@@ -1074,11 +1077,11 @@ namespace
          ++stats.total;
          statsTable.put(stats);
       }
-      if (!speculate && trx.transaction->claims().empty())
+      if (result && !speculate && trx.transaction->claims().empty())
       {
          forwardTransaction(trx);
       }
-      return true;
+      return result;
    }
    void forwardTransaction(const SignedTransaction& trx)
    {
