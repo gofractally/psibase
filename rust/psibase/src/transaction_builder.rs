@@ -90,7 +90,7 @@ impl<R, F: Fn(Vec<Action>) -> Result<R, anyhow::Error>> ActionSink for Transacti
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Tapos, Transaction};
+    use crate::{SignedTransaction, Tapos, Transaction};
     use fracpack::Pack;
 
     fn mkact(size: usize) -> Action {
