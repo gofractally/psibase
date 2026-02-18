@@ -1039,10 +1039,22 @@ namespace
       }
    }
 
-   bool pushTransaction(const Checksum256& id, const SignedTransaction& trx, bool speculate)
+   bool pushTransaction(const Checksum256&             id,
+                        const SignedTransaction&       trx,
+                        bool                           speculate,
+                        std::optional<TraceClientInfo> client = std::nullopt)
    {
       PSIBASE_SUBJECTIVE_TX
       {
+         if (client)
+         {
+            auto clients = RTransact{}.open<TraceClientTable>();
+            auto row     = clients.get(id).value_or(
+                TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+            row.clients.push_back(*client);
+            clients.put(row);
+            to<HttpServer>().deferReply(client->socket);
+         }
          auto pending = Subjective{}.open<PendingTransactionTable>();
          if (pending.get(id))
          {
@@ -1490,16 +1502,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       bool enforceAuth = validateTransaction(id, trx);
       bool json        = acceptJson(request.headers);
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto clients = open<TraceClientTable>();
-         auto row     = clients.get(id).value_or(
-             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
-         row.clients.push_back({*socket, json, query.flag()});
-         clients.put(row);
-         to<HttpServer>().deferReply(*socket);
-      }
-      pushTransaction(id, trx, enforceAuth);
+      auto client      = TraceClientInfo{*socket, json, query.flag()};
+      pushTransaction(id, trx, enforceAuth, std::move(client));
    }
    else if (request.method == "POST" && target == "/login")
    {
