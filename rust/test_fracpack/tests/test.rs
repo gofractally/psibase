@@ -924,11 +924,11 @@ fn test_view() {
         assert_eq!(v.find(';'), Some(3));
     }
     {
-        let data = ("asdf", 7u32 /*, Some(42u32), Some("jkl;")*/).packed();
-        let v = <View<(String, u32 /*, Option<u32>, Option<String>*/)>>::new(&data).unwrap();
+        let data = ("asdf", 7u32, Some(42u32), Some("jkl;")).packed();
+        let v = <View<(String, u32, Option<u32>, Option<String>)>>::new(&data).unwrap();
         assert_eq!(&v.get0().unpack(), "asdf");
         assert_eq!(v.get1().unpack(), 7);
-        //assert_eq!(v.get2().unpack(), Some(42));
-        //assert_eq!(&v.get3().unpack().unwrap(), "jkl;");
+        assert_eq!(v.get2().unpack(), Some(42));
+        assert_eq!(&v.get3().unpack().unwrap(), "jkl;");
     }
 }

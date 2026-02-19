@@ -23,7 +23,13 @@ impl<'a, T: Unpack<'a>> View<T> {
     }
     pub fn unpack(&'a self) -> T {
         let mut stream = FracInputStream::new(&self.data);
-        T::unpack(&mut stream).unwrap()
+        if T::IS_OPTIONAL {
+            stream.known_end = false;
+            let mut fixed_pos = 0;
+            T::embedded_unpack(&mut stream, &mut fixed_pos).unwrap()
+        } else {
+            T::unpack(&mut stream).unwrap()
+        }
     }
 }
 
