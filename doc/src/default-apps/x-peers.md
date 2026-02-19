@@ -48,7 +48,7 @@ type Peer {
 
 ### connect
 
-`/connect` creates a new p2p connection to another node. To set up a peer that will automatically connect whenever the server is running, use the [`peers` config field](#server-configuration).
+`/connect` creates a new p2p connection to another node. To set up a peer that will automatically connect whenever the server is running, use the [`peers` config field](../run-infrastructure/administration.md#server-configuration).
 
 | Field | Type   | Description                                    |
 |-------|--------|------------------------------------------------|
