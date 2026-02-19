@@ -77,9 +77,10 @@ mod service {
     }
 
     /// Close a socket. The socket should be either a websocket
-    /// or a pending http request.
+    /// or a pending http request. The regular close notification
+    /// will be called.
     #[action]
-    fn close(socket: i32) {
+    fn asyncClose(socket: i32) {
         unimplemented!()
     }
 

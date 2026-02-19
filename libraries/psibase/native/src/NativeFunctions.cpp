@@ -270,9 +270,38 @@ namespace psibase
                "ScheduledSnapshotRow has incorrect key");
       }
 
-      void verifySocketRow(psio::input_stream key, psio::input_stream value)
+      void verifySocketRow(TransactionContext& tc, psio::input_stream key, psio::input_stream value)
       {
-         abortMessage("Socket table is read only");
+         auto existing = tc.blockContext.db.kvGetRaw(DbId::nativeSession, key);
+         if (!existing)
+            abortMessage("Cannot write a new socket");
+         auto old = psio::view<const SocketRow>(
+             psio::prevalidated{std::span{existing->pos, existing->end}});
+         check(psio::fracpack_validate_strict<SocketRow>({value.pos, value.end}),
+               "SocketRow has invalid format");
+         auto row =
+             psio::view<const SocketRow>(psio::prevalidated{std::span{value.pos, value.end}});
+         if (old.fd() != row.fd())
+            abortMessage("SocketRow has incorrect key");
+
+         if (auto oldInfo = get_if<WebSocketInfo>(old.info()))
+         {
+            if (auto newInfo = get_if<P2PSocketInfo>(row.info()))
+            {
+               if (oldInfo->endpoint() == newInfo->endpoint() && oldInfo->tls() == newInfo->tls())
+               {
+                  auto err = tc.blockContext.db.socketEnableP2P(
+                      row.fd(), *tc.blockContext.systemContext.sockets, tc.ownedSockets);
+                  if (err != 0)
+                     abortMessage("Socket cannot enable P2P: " + std::to_string(err));
+                  return;
+               }
+            }
+         }
+         if (old.info() != row.info())
+         {
+            abortMessage("Invalid update to SocketRow");
+         }
       }
 
       void verifyEnvRow(psio::input_stream key, psio::input_stream value)
@@ -375,7 +404,7 @@ namespace psibase
          memcpy(&table, key.pos, sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == socketTable)
-            verifySocketRow(key, value);
+            verifySocketRow(context, key, value);
          else if (table == envTable)
             verifyEnvRow(key, value);
          else if (table == hostConfigTable)

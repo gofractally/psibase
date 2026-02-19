@@ -74,6 +74,11 @@ bool Socket::canAutoClose() const
    return false;
 }
 
+bool Socket::supportsP2P() const
+{
+   return false;
+}
+
 void AutoCloseSocket::replace(Writer& writer, std::shared_ptr<AutoCloseSocket>&& other)
 {
    if (auto sockets = weak_sockets.lock())
@@ -123,6 +128,12 @@ void Socket::writeInfo(Writer& writer)
 bool AutoCloseSocket::canAutoClose() const
 {
    return true;
+}
+
+void AutoCloseSocket::enableP2P(std::function<void(const std::shared_ptr<net::connection_base>&)>)
+{
+   throw std::runtime_error(
+       "Internal error: enableP2P must be implemented if supportsP2P() is true");
 }
 
 void AutoCloseSocket::onLock(CloseLock&&)
@@ -407,6 +418,39 @@ std::int32_t Sockets::setFlags(std::int32_t               fd,
    return 0;
 }
 
+std::int32_t Sockets::enableP2P(
+    std::int32_t                                                      fd,
+    SocketAutoCloseSet*                                               owner,
+    std::vector<SocketChange>*                                        diff,
+    std::function<void(const std::shared_ptr<net::connection_base>&)> connect)
+{
+   std::shared_ptr<AutoCloseSocket> sockptr;
+   {
+      std::lock_guard l{mutex};
+      if (fd < 0 || fd >= sockets.size() || !sockets[fd])
+         return wasi_errno_badf;
+      auto p = sockets[fd];
+
+      if (!p->supportsP2P())
+         return wasi_errno_notsup;
+
+      sockptr = std::static_pointer_cast<AutoCloseSocket>(p);
+
+      if (isClosing(*sockptr))
+         return wasi_errno_acces;
+   }
+
+   if (diff)
+   {
+      diff->push_back({sockptr, SocketChange::setP2PFlag, SocketChange::setP2PFlag});
+   }
+   else
+   {
+      sockptr->enableP2P(connect);
+   }
+   return 0;
+}
+
 void Sockets::asyncClose(AutoCloseSocket& socket)
 {
    bool close;
@@ -424,7 +468,11 @@ CloseLock Sockets::lockRecv(const std::shared_ptr<AutoCloseSocket>& socket)
    bool            okay = false;
    std::lock_guard l{mutex};
    assert(!socket->pendingRecv);
-   if (socket->receiving)
+   if (socket->closed)
+   {
+      return CloseLock{nullptr, nullptr};
+   }
+   else if (socket->receiving)
    {
       socket->receiving = false;
       ++socket->closeLocks;
@@ -509,7 +557,9 @@ void Sockets::setOwner(CloseLock&& rl, SocketAutoCloseSet* owner)
    rl.socket = -1;
 }
 
-bool Sockets::applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet* owner)
+bool Sockets::applyChanges(std::vector<SocketChange>&& diff,
+                           SocketAutoCloseSet*         owner,
+                           const DatabaseCallbacks*    callbacks)
 {
    {
       std::lock_guard l{mutex};
@@ -527,7 +577,7 @@ bool Sockets::applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet*
       // in the changeset.
       for (auto& change : diff)
       {
-         change.value = 0;
+         change.value &= SocketChange::setP2PFlag;
          if (tryConsumeRecv(*change.socket))
          {
             change.value |= static_cast<std::uint32_t>(SocketFlags::recv);
@@ -540,6 +590,8 @@ bool Sockets::applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet*
    }
    for (const auto& change : diff)
    {
+      if (change.value & SocketChange::setP2PFlag)
+         change.socket->enableP2P(callbacks->socketP2P);
       if (change.value & SocketFlags::recv)
          change.socket->onLock(CloseLock{this, change.socket.get()});
       if (change.value & SocketFlags::lockClose)

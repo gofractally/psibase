@@ -90,7 +90,6 @@
 - [Default apps](default-apps/README.md)
 
   - [accounts](default-apps/accounts.md)
-  - [x-admin](default-apps/x-admin.md)
   - [auth-sig](default-apps/auth-sig.md)
   - [common-api](default-apps/common-api.md)
   - [cpu-limit]()
@@ -108,5 +107,7 @@
   - [tokens]()
   - [transact](default-apps/transact.md)
   - [verify-sig]()
+  - [x-admin](default-apps/x-admin.md)
+  - [x-peers](default-apps/x-peers.md)
 
 - [Contributing guide](contribute/README.md)
