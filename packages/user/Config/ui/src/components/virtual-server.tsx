@@ -238,6 +238,7 @@ export const VirtualServer = () => {
     );
 
     return (
+        <form.AppForm>
         <form
             onSubmit={(e) => {
                 e.preventDefault();
@@ -253,7 +254,33 @@ export const VirtualServer = () => {
                 {/* Server Specs Subsection */}
                 <div className="mb-0 border-b pb-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <form.Field
+                        <form.AppField
+                            name="netGbps"
+                            children={(field) => (
+                                <>
+                                    <field.TextField
+                                        label="Net bandwidth"
+                                        description="for P2P traffic, Tx traffic, and Query traffic"
+                                    />
+                                    <Select value="Gbps" onValueChange={() => {}}>
+                                        <SelectTrigger className="w-24" disabled>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Gbps">Gbps</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </>
+                            )}
+                            validators={{
+                                onChange: z
+                                    .string()
+                                    .refine(nonNegativeNumberRefine, {
+                                        message: "Net Bandwidth must be a positive number",
+                                    }),
+                            }}
+                        />
+                        {/* <form.Field
                             name="netGbps"
                             validators={{
                                 onChange: z
@@ -263,7 +290,7 @@ export const VirtualServer = () => {
                                     }),
                             }}
                         >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any * /}
                             {(field: any) => (
                                 <div>
                                     <LabelWithInfo
@@ -297,7 +324,7 @@ export const VirtualServer = () => {
                                     )}
                                 </div>
                             )}
-                        </form.Field>
+                        </form.Field> */}
 
                         <form.Field
                             name="storageAmount"
@@ -716,6 +743,7 @@ export const VirtualServer = () => {
                 </form.Subscribe>
             </div>
         </form>
+        </form.AppForm>
     );
 };
 
