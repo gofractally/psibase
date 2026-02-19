@@ -46,11 +46,6 @@ export const graphql = async <T>(
     options: GraphQLUrlOptions = {},
 ): Promise<T> => {
     const { baseUrl, service, path, baseUrlIncludesSibling = true } = options;
-    console.info("baseUrlIncludesSibling", baseUrlIncludesSibling);
-    console.info("path", path);
-    console.info("service", service);
-    console.info("baseUrl", baseUrl);
-    console.info("siblingUrl():", siblingUrl(baseUrl, service, path, baseUrlIncludesSibling));
     const host = service
         ? siblingUrl(baseUrl, service, path, baseUrlIncludesSibling)
         : "";
