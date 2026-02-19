@@ -16,5 +16,5 @@ services = ["subgroups"]
 crate-type = ["rlib"]
 
 [dependencies]
-subgroups = { path = "service", version = "0.22.0" }
+subgroups = { path = "service", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true

@@ -319,7 +319,7 @@ set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
 set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
-set(PSIBASE_VERSION 0.22)
+set(PSIBASE_VERSION 0.23)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Transact.psi
@@ -812,7 +812,7 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/Invite.psi
     NAME Invite
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "This service facilitates the creation and redemption of invites"
+    DESCRIPTION "Create invite links to apps. An invite can facilitate the creation of one or more new accounts."
     PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm

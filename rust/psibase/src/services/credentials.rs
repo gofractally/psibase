@@ -4,8 +4,8 @@ pub const CREDENTIAL_SENDER: &str = "cred-sys";
 #[allow(unused_variables)]
 pub mod service {
     use crate::{
-        services::auth_sig::SubjectPublicKeyInfo, services::transact::ServiceMethod, AccountNumber,
-        Claim, MethodNumber, TimePointSec,
+        services::{tokens::Quantity, transact::ServiceMethod},
+        AccountNumber, Claim, MethodNumber, TimePointSec,
     };
 
     #[action]
@@ -54,10 +54,10 @@ pub mod service {
         unimplemented!()
     }
 
-    /// Creates a credential
+    /// Issues a credential
     ///
     /// Parameters:
-    /// - `pubkey`: The credential public key
+    /// - `pubkey_fingerprint`: The fingerprint of the credential public key
     /// - `expires`: The number of seconds until the credential expires
     /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
     ///
@@ -67,24 +67,27 @@ pub mod service {
     /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
     /// that matches the specified public key.
     #[action]
-    fn create(
-        pubkey: SubjectPublicKeyInfo,
+    fn issue(
+        pubkey_fingerprint: crate::Checksum256,
         expires: Option<u32>,
         allowed_actions: Vec<MethodNumber>,
     ) -> u32 {
         unimplemented!()
     }
 
-    /// Looks up the credential used to sign the active transaction, and consumes it.
-    /// Can only be called by the credential's issuer.
+    /// Notifies the credentials service that tokens have been credited to a credential
+    ///
+    /// This notification must be called after crediting the credential's service, or else
+    /// the credited tokens will not be aplied to a particular credential.
     #[action]
-    fn consume_active() -> u32 {
+    fn resource(id: u32, amount: Quantity) {
         unimplemented!()
     }
 
-    /// Gets the `pubkey` of the specified credential
+    /// Gets the fingerprint of the specified credential pubkey
+    #[allow(non_snake_case)]
     #[action]
-    fn get_pubkey(id: u32) -> SubjectPublicKeyInfo {
+    fn getFingerprint(id: u32) -> crate::Checksum256 {
         unimplemented!()
     }
 

@@ -8,6 +8,7 @@
 #include <services/system/Transact.hpp>
 
 #include <functional>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/jwt.hpp>
@@ -1038,19 +1039,34 @@ namespace
       }
    }
 
-   bool pushTransaction(const Checksum256& id, const SignedTransaction& trx, bool speculate)
+   bool pushTransaction(const Checksum256&             id,
+                        const SignedTransaction&       trx,
+                        bool                           speculate,
+                        std::optional<TraceClientInfo> client = std::nullopt)
    {
+      bool result = true;
       PSIBASE_SUBJECTIVE_TX
       {
+         if (client)
+         {
+            auto clients = RTransact{}.open<TraceClientTable>();
+            auto row     = clients.get(id).value_or(
+                TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
+            row.clients.push_back(*client);
+            clients.put(row);
+            to<HttpServer>().deferReply(client->socket);
+         }
          auto pending = Subjective{}.open<PendingTransactionTable>();
          if (pending.get(id))
          {
-            return false;
+            result = false;
+            continue;
          }
          auto unverified = RTransact{}.open<UnverifiedTransactionTable>();
          if (auto row = unverified.get(id))
          {
-            return false;
+            result = false;
+            continue;
          }
          auto speculative = speculate ? std::optional{scheduleSpeculative(id, trx)} : std::nullopt;
          scheduleVerify(id, trx, false, speculative);
@@ -1061,11 +1077,11 @@ namespace
          ++stats.total;
          statsTable.put(stats);
       }
-      if (!speculate && trx.transaction->claims().empty())
+      if (result && !speculate && trx.transaction->claims().empty())
       {
          forwardTransaction(trx);
       }
-      return true;
+      return result;
    }
    void forwardTransaction(const SignedTransaction& trx)
    {
@@ -1489,16 +1505,8 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
       auto id          = psibase::sha256(trx.transaction.data(), trx.transaction.size());
       bool enforceAuth = validateTransaction(id, trx);
       bool json        = acceptJson(request.headers);
-      PSIBASE_SUBJECTIVE_TX
-      {
-         auto clients = open<TraceClientTable>();
-         auto row     = clients.get(id).value_or(
-             TraceClientRow{.id = id, .expiration = trx.transaction->tapos().expiration()});
-         row.clients.push_back({*socket, json, query.flag()});
-         clients.put(row);
-         to<HttpServer>().deferReply(*socket);
-      }
-      pushTransaction(id, trx, enforceAuth);
+      auto client      = TraceClientInfo{*socket, json, query.flag()};
+      pushTransaction(id, trx, enforceAuth, std::move(client));
    }
    else if (request.method == "POST" && target == "/login")
    {
@@ -1557,7 +1565,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    }
    else if (target == "/jwt_key" && request.method == "GET")
    {
-      if (!to<XAdmin>().isAdmin(user, socket))
+      if (!to<XAdmin>().isAdmin(user, socket, forwardedFor(request)))
       {
          std::string_view msg = "Not authorized";
          return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,
@@ -1571,7 +1579,7 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
    }
    else if (target == "/stats" && request.method == "GET")
    {
-      if (!to<XAdmin>().isAdmin(user, socket))
+      if (!to<XAdmin>().isAdmin(user, socket, forwardedFor(request)))
       {
          std::string_view msg = "Not authorized";
          return HttpReply{.status      = user ? HttpStatus::forbidden : HttpStatus::unauthorized,

@@ -25,6 +25,7 @@ function(add suffix)
         common/src/zip.cpp
         common/src/fileUtil.cpp
         common/src/WebSocket.cpp
+        common/src/HttpHeaders.cpp
     )
 
     if(DEFINED IS_WASM)

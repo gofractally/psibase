@@ -79,6 +79,17 @@ namespace UserService
                                          [](auto&& row) { return toInviteDetails(row); });
          }
 
+         auto getInviteCost(uint16_t numAccounts) const
+         {
+            auto sys = to<Tokens>().getSysToken();
+            if (!sys.has_value())
+            {
+               return Decimal{Quantity{0ULL}, Precision{0}};
+            }
+            auto cost = to<Invite>().getInvCost(numAccounts);
+            return Decimal{cost, sys->precision};
+         }
+
          auto history(uint32_t                   inviteId,
                       std::optional<int32_t>     first,
                       std::optional<int32_t>     last,
@@ -97,6 +108,7 @@ namespace UserService
       PSIO_REFLECT(Query,
                    method(inviteById, inviteId),
                    method(invitesByInviter, inviter),
+                   method(getInviteCost, numAccounts),
                    method(history, inviteId, first, last, before, after))
 
       class RInvite : public Service

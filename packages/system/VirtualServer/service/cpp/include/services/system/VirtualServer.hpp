@@ -112,6 +112,9 @@ namespace SystemService
       /// the network by consuming all of the network's resources.
       void enable_billing(bool enabled);
 
+      /// Returns whether the billing system has been enabled
+      bool is_billing_enabled();
+
       /// Reserves system tokens for future resource consumption by the specified user.
       ///
       /// The reserve is consumed when interacting with metered network functionality.
@@ -127,6 +130,28 @@ namespace SystemService
                        psibase::AccountNumber       for_user,
                        std::optional<psibase::Memo> memo);
 
+      /// Reserves system tokens for future resource consumption by the specified sub-account.
+      ///
+      /// The sender must have already credited the system tokens to this service.
+      ///
+      /// The sender of this action owns the resources in the specified subaccount and is therefore able to specify
+      /// it as the billable account for a given transaction at any time.
+      ///
+      /// # Arguments
+      /// * `amount`      - The amount of systems tokens to reserve
+      /// * `sub_account` - The sub-account to reserve the system tokens for
+      void buy_res_sub(UserService::Quantity amount, std::string sub_account);
+
+      /// Deletes the resource subaccount, returning the resources back to the caller's primary
+      /// resource balance.
+      void del_res_sub(std::string sub_account);
+
+      /// Gets the amount of resources available for the caller
+      UserService::Quantity res_balance();
+
+      /// Gets the amount of resources available for the caller's specified sub-account
+      UserService::Quantity res_balance_sub(std::string sub_account);
+
       /// Reserves system tokens for future resource consumption by the sender
       ///
       /// The reserve is consumed when interacting with metered network functionality.
@@ -134,11 +159,21 @@ namespace SystemService
       /// The sender must have already credited the system tokens to this service.
       void buy_res(UserService::Quantity amount);
 
+      /// Allows the sender to specify one of their sub-accounts as the billable account for
+      /// the current transaction.
+      ///
+      /// This will only succeed if the sender has already been set by `Transact` to be the
+      /// billable account.
+      void bill_to_sub(std::string sub_account);
+
       /// Allows the sender to manage the behavior of client-side tooling with respect to the
       /// automatic management of the sender's resource buffer.
       ///
       /// If `config` is None, the account will use a default configuration
       void conf_buffer(std::optional<BufferConfig> config);
+
+      /// Returns the current cost (in system tokens) of a typically sized resource buffer
+      UserService::Quantity std_buffer_cost();
 
       /// Set the network bandwidth pricing thresholds
       ///
@@ -174,6 +209,10 @@ namespace SystemService
       /// This unit is also the minimum amount billed for bandwidth in a single transaction.
       void net_min_unit(uint64_t bits);
 
+      /// Returns the current cost (in system tokens) of consuming the specified amount of network
+      /// bandwidth
+      UserService::Quantity get_net_cost(uint64_t bytes);
+
       /// Set the CPU pricing thresholds
       ///
       /// Configures the idle and congested thresholds used by the pricing algorithm
@@ -208,6 +247,10 @@ namespace SystemService
       /// This unit is also the minimum amount billed for CPU in a single transaction.
       void cpu_min_unit(uint64_t ns);
 
+      /// Returns the current cost (in system tokens) of consuming the specified amount of
+      /// CPU time
+      UserService::Quantity get_cpu_cost(uint64_t ns);
+
       /// Called by the system to indicate that the specified user has consumed a
       /// given amount of network bandwidth.
       ///
@@ -226,9 +269,12 @@ namespace SystemService
 
       void notifyBlock(psibase::BlockNum block_num);
 
-      /// This actions sets the CPU limit for the specified account.
-      /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
-      void setCpuLimit(psibase::AccountNumber account);
+      /// This action specifies which account is primarily responsible for
+      /// paying the bill for any consumed resources.
+      ///
+      /// A time limit for the execution of the current tx/query will be set based
+      /// on the resources available for the specified account.
+      void setBillableAcc(psibase::AccountNumber account);
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest                  request,
                                                  std::optional<std::int32_t>           socket,
@@ -261,22 +307,31 @@ namespace SystemService
                 method(set_specs, specs),
                 method(set_network_variables, variables),
                 method(enable_billing, enabled),
+                method(is_billing_enabled),
                 method(buy_res_for, amount, for_user, memo),
+                method(buy_res_sub, amount, sub_account),
+                method(del_res_sub, sub_account),
+                method(res_balance),
+                method(res_balance_sub, sub_account),
                 method(buy_res, amount),
+                method(bill_to_sub, sub_account),
                 method(conf_buffer, config),
+                method(std_buffer_cost),
                 method(net_thresholds, idle_ppm, congested_ppm),
                 method(net_rates, doubling_time_sec, halving_time_sec),
                 method(net_blocks_avg, num_blocks),
                 method(net_min_unit, bits),
+                method(get_net_cost, bytes),
                 method(cpu_thresholds, idle_ppm, congested_ppm),
                 method(cpu_rates, doubling_time_sec, halving_time_sec),
                 method(cpu_blocks_avg, num_blocks),
                 method(cpu_min_unit, ns),
+                method(get_cpu_cost, ns),
                 method(useNetSys, user, amount_bytes),
                 method(useCpuSys, user, amount_ns),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
-                method(setCpuLimit, account),
+                method(setBillableAcc, account),
                 method(serveSys, request, socket, user))
 
    PSIBASE_REFLECT_EVENTS(VirtualServer);

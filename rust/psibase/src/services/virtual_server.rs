@@ -147,6 +147,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns whether the billing system has been enabled
+    #[action]
+    fn is_billing_enabled() -> bool {
+        unimplemented!()
+    }
+
     /// Reserves system tokens for future resource consumption by the specified user.
     ///
     /// The reserve is consumed when interacting with metered network functionality.
@@ -163,6 +169,40 @@ mod service {
         unimplemented!()
     }
 
+    /// Reserves system tokens for future resource consumption by the specified sub-account.
+    ///
+    /// The sender must have already credited the system tokens to this service.
+    ///
+    /// The sender of this action owns the resources in the specified subaccount and is therefore able to specify
+    /// it as the billable account for a given transaction at any time.
+    ///
+    /// # Arguments
+    /// * `amount`      - The amount of systems tokens to reserve
+    /// * `sub_account` - The sub-account to reserve the system tokens for
+    #[action]
+    fn buy_res_sub(amount: Quantity, sub_account: String) {
+        unimplemented!()
+    }
+
+    /// Deletes the resource subaccount, returning the resources back to the caller's primary
+    /// resource balance.
+    #[action]
+    fn del_res_sub(sub_account: String) {
+        unimplemented!()
+    }
+
+    /// Gets the amount of resources available for the caller
+    #[action]
+    fn res_balance() -> Quantity {
+        unimplemented!()
+    }
+
+    /// Gets the amount of resources available for the caller's specified sub-account
+    #[action]
+    fn res_balance_sub(sub_account: String) -> Quantity {
+        unimplemented!()
+    }
+
     /// Reserves system tokens for future resource consumption by the sender
     ///
     /// The reserve is consumed when interacting with metered network functionality.
@@ -173,12 +213,28 @@ mod service {
         unimplemented!()
     }
 
+    /// Allows the sender to specify one of their sub-accounts as the billable account for
+    /// the current transaction.
+    ///
+    /// This will only succeed if the sender has already been set by `Transact` to be the
+    /// billable account.
+    #[action]
+    fn bill_to_sub(sub_account: String) {
+        unimplemented!()
+    }
+
     /// Allows the sender to manage the behavior of client-side tooling with respect to the
     /// automatic management of the sender's resource buffer.
     ///
     /// If `config` is None, the account will use a default configuration
     #[action]
     fn conf_buffer(config: Option<BufferConfig>) {
+        unimplemented!()
+    }
+
+    /// Returns the current cost (in system tokens) of a typically sized resource buffer
+    #[action]
+    fn std_buffer_cost() -> Quantity {
         unimplemented!()
     }
 
@@ -228,6 +284,13 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns the current cost (in system tokens) of consuming the specified amount of network
+    /// bandwidth
+    #[action]
+    fn get_net_cost(bytes: u64) -> Quantity {
+        unimplemented!()
+    }
+
     /// Set the CPU pricing thresholds
     ///
     /// Configures the idle and congested thresholds used by the pricing algorithm
@@ -274,6 +337,13 @@ mod service {
         unimplemented!()
     }
 
+    /// Returns the current cost (in system tokens) of consuming the specified amount of
+    /// CPU time
+    #[action]
+    fn get_cpu_cost(ns: u64) -> Quantity {
+        unimplemented!()
+    }
+
     /// Called by the system to indicate that the specified user has consumed a
     /// given amount of network bandwidth.
     ///
@@ -304,10 +374,13 @@ mod service {
         unimplemented!()
     }
 
-    /// This actions sets the CPU limit for the specified account.
-    /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
+    /// This actions specifies which account is primarily responsible for
+    /// paying the bill for any consumed resources.
+    ///
+    /// A time limit for the execution of the current tx/query will be set based
+    /// on the resources available for the specified account.
     #[action]
-    fn setCpuLimit(account: AccountNumber) {
+    fn setBillableAcc(account: AccountNumber) {
         unimplemented!()
     }
 

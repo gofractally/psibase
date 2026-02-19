@@ -284,6 +284,13 @@ pub struct IPV6Address {
 }
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub enum IPAddress {
+    IPV4Address(IPV4Address),
+    IPV6Address(IPV6Address),
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack", definition_will_not_change)]
 pub struct IPV4Endpoint {
     address: IPV4Address,

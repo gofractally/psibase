@@ -17,6 +17,6 @@ services = ["tpack"]
 crate-type = ["rlib"]
 
 [dependencies]
-tpack = { path = "service", version = "0.22.0" }
-r-tpack = { path = "query", version = "0.22.0" }
+tpack = { path = "service", version = "0.23.0" }
+r-tpack = { path = "query", version = "0.23.0" }
 psibase-rust-workspace-hack.workspace = true

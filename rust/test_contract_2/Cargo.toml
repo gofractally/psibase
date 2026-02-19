@@ -15,8 +15,8 @@ package-name = "TestContract2"
 server = "example"
 
 [package.metadata.psibase.dependencies]
-HttpServer = "0.22.0"
-Events = "0.22.0"
+HttpServer = "0.23.0"
+Events = "0.23.0"
 
 [lib]
 path = "src/lib.rs"

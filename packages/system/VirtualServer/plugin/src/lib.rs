@@ -283,10 +283,11 @@ impl Billing for VirtualServerPlugin {
 }
 
 impl Transact for VirtualServerPlugin {
-    fn auto_fill_gas_tank() -> Result<(), Error> {
+    fn auto_fill_gas_tank(account: String) -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 
-        if !query::billing_config()?.enabled || AccountsPlugin::api::get_current_user().is_none() {
+        let user = AccountsPlugin::api::get_current_user();
+        if !query::billing_config()?.enabled || user.is_none() || user.unwrap() != account {
             return Ok(());
         }
 

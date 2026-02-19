@@ -20,6 +20,10 @@ async def echo(connection):
     async for msg in connection:
         await connection.send(msg)
 
+async def send_some(connection):
+    for msg in ["lorem", "ipsum", "dolor", "sit", "amet"]:
+        await connection.send(msg)
+
 def decode(arg):
     if isinstance(arg, bytes):
         return arg.decode()
@@ -38,6 +42,21 @@ class TestWebSocket(unittest.TestCase):
             for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
                 await websocket.send(message)
                 self.assertEqual(decode(await websocket.recv()), message)
+
+    @testutil.psinode_test
+    async def test_fast_recv(self, cluster):
+        (a,) = cluster.complete(*testutil.generate_names(1))
+
+        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+
+        async with websockets.serve(send_some, host='127.0.0.1', port=0) as server:
+            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
+                reply.raise_for_status()
+
+            url = websocket_url(a, '/', service='x-proxy')
+            async with websockets.unix_connect(a.socketpath, url) as websocket:
+                for message in ['lorem', 'ipsum', 'dolor', 'sit', 'amet']:
+                    self.assertEqual(decode(await websocket.recv()), message)
 
     @testutil.psinode_test
     async def test_proxy(self, cluster):

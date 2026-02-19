@@ -20,12 +20,12 @@ psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 
 [package.metadata.psibase.dependencies]
-Sites = "0.22.0"
-HttpServer = "0.22.0"
-Tokens = "0.22.0"
-Symbol = "0.22.0"
-Transact = "0.22.0"
-Nft = "0.22.0"
+Sites = "0.23.0"
+HttpServer = "0.23.0"
+Tokens = "0.23.0"
+Symbol = "0.23.0"
+Transact = "0.23.0"
+Nft = "0.23.0"
 
 [dev-dependencies]
-faucet-tok-pkg = { path = "..", version = "0.22.0" }
+faucet-tok-pkg = { path = "..", version = "0.23.0" }
