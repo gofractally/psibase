@@ -26,10 +26,9 @@ import {
 } from "@shared/shadcn/ui/accordion";
 
 import { useAppForm } from "@/components/forms/app-form";
-import { useNetworkVariables } from "@/hooks/use-network-variables";
-import { useServerSpecs } from "@/hooks/use-server-specs";
 import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
 import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
+import { useVirtualServerResources } from "@/hooks/use-virtual-server-resources";
 
 import { parseError } from "@shared/lib/parseErrorMessage";
 import {
@@ -84,8 +83,9 @@ export const VirtualServer = () => {
         isError: networkVarsIsError,
         reset: resetNetworkVars,
     } = useSetNetworkVariables();
-    const { data: serverSpecs } = useServerSpecs();
-    const { data: networkVariables } = useNetworkVariables();
+    const { data: resources } = useVirtualServerResources();
+    const serverSpecs = resources?.serverSpecs;
+    const networkVariables = resources?.networkVariables;
 
     // Compute initial values from fetched data
     const computedInitialValues = useMemo<VirtualServerFormData>(() => {
@@ -396,14 +396,14 @@ export const VirtualServer = () => {
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <form.Field
-                            name="blockReplayFactor"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(blockReplayFactorRefine, {
-                                        message: "Block replay factor must be an integer between 0 and 255",
-                                    }),
-                            }}
+                                        name="blockReplayFactor"
+                                        validators={{
+                                            onChange: z
+                                                .string()
+                                                .refine(blockReplayFactorRefine, {
+                                                    message: "Block replay factor must be an integer between 0 and 255",
+                                                }),
+                                        }}
                                     >
                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                         {(field: any) => (

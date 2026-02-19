@@ -1,11 +1,9 @@
-import { useCpuPricing } from "@/hooks/use-cpu-pricing";
-import { useNetPricing } from "@/hooks/use-net-pricing";
+import { useResourcePricing } from "@/hooks/use-resource-pricing";
 
 import { PricingSection } from "@/components/pricing-section";
 
 export const ResourcePricing = () => {
-    const { data: cpuPricing, isLoading: cpuLoading } = useCpuPricing();
-    const { data: netPricing, isLoading: netLoading } = useNetPricing();
+    const { data: pricing, isLoading } = useResourcePricing();
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
@@ -19,14 +17,14 @@ export const ResourcePricing = () => {
             <div className="space-y-6">
                 <PricingSection
                     title="CPU Pricing"
-                    pricing={cpuPricing}
-                    isLoading={cpuLoading}
+                    pricing={pricing?.cpuPricing}
+                    isLoading={isLoading}
                     billableUnitLabel="ms"
                 />
                 <PricingSection
                     title="NET Pricing"
-                    pricing={netPricing}
-                    isLoading={netLoading}
+                    pricing={pricing?.netPricing}
+                    isLoading={isLoading}
                     billableUnitLabel="bytes"
                 />
             </div>

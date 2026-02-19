@@ -1,7 +1,7 @@
 import { AppConfigType } from "@/configuredApps";
 import { Settings } from "lucide-react";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { SettingsPage } from "./page";
 

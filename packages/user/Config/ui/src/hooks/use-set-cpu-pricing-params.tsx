@@ -29,7 +29,7 @@ export const useSetCpuPricingParams = () =>
             onSuccess: (_params, status) => {
                 if (status.type === "executed") {
                     queryClient.invalidateQueries({
-                        queryKey: [...QueryKey.virtualServerCpuPricing()],
+                        queryKey: [...QueryKey.virtualServerPricing()],
                     });
                 }
             },

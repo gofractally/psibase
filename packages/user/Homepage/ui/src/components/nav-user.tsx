@@ -71,9 +71,6 @@ export function NavUser() {
     };
 
     const [showModal, setShowModal] = useState(false);
-    const [modalType, setModalType] = useState<
-        "generateInvite"
-    >("generateInvite");
 
     const onUserSettings = () => {
         navigate("/settings");
@@ -82,7 +79,6 @@ export function NavUser() {
     const generateInvite = useGenerateInvite();
     const onGenerateInvite = () => {
         generateInvite.mutate();
-        setModalType("generateInvite");
         setShowModal(true);
     };
 
@@ -91,11 +87,9 @@ export function NavUser() {
     return (
         <>
             <Dialog open={showModal} onOpenChange={setShowModal}>
-                {modalType == "generateInvite" && (
-                    <GenerateInviteDialogContent
-                        generateInvite={generateInvite}
-                    />
-                )}
+                <GenerateInviteDialogContent
+                    generateInvite={generateInvite}
+                />
             </Dialog>
             <SidebarMenu>
                 <SidebarMenuItem>

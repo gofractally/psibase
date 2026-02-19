@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -17,8 +17,49 @@ import {
     convertRateTimeUnit,
     TIME_FACTORS,
 } from "@/lib/unit-conversions";
-import type { CpuPricing } from "@/hooks/use-cpu-pricing";
-import type { NetPricing } from "@/hooks/use-net-pricing";
+import type { CpuPricing, NetPricing } from "@/hooks/use-resource-pricing";
+
+interface PricingFormValues {
+    halvingTimeUnit: RateTimeUnit;
+    halvingTimeValue: string;
+    doublingTimeUnit: RateTimeUnit;
+    doublingTimeValue: string;
+    idleThreshold: string;
+    congestedThreshold: string;
+    averageWindowSize: string;
+    billableUnit: string;
+}
+
+function getInitialFormValues(
+    pricing: CpuPricing | NetPricing,
+    isCpu: boolean,
+): PricingFormValues {
+    const initialHalving = getBestRateTimeUnit(pricing.halvingTimeSec);
+    const initialDoubling = getBestRateTimeUnit(pricing.doublingTimeSec);
+    const billableUnitValue = isCpu
+        ? pricing.billableUnit / TIME_FACTORS.ms
+        : pricing.billableUnit / 8;
+    return {
+        halvingTimeUnit: initialHalving.unit,
+        halvingTimeValue: convertRateTimeUnit(
+            pricing.halvingTimeSec,
+            "sec",
+            initialHalving.unit,
+        ).toString(),
+        doublingTimeUnit: initialDoubling.unit,
+        doublingTimeValue: convertRateTimeUnit(
+            pricing.doublingTimeSec,
+            "sec",
+            initialDoubling.unit,
+        ).toString(),
+        idleThreshold: Math.round(parseFloat(pricing.thresholds.idlePct)).toString(),
+        congestedThreshold: Math.round(
+            parseFloat(pricing.thresholds.congestedPct),
+        ).toString(),
+        averageWindowSize: pricing.numBlocksToAverage.toString(),
+        billableUnit: billableUnitValue.toString(),
+    };
+}
 
 const RateTimeField = ({
     label,
@@ -108,14 +149,29 @@ export const PricingSection = ({
 }: PricingSectionProps) => {
     const isCpu = title === "CPU Pricing";
 
-    const [halvingTimeUnit, setHalvingTimeUnit] = useState<RateTimeUnit>("sec");
-    const [doublingTimeUnit, setDoublingTimeUnit] = useState<RateTimeUnit>("sec");
-    const [halvingTimeValue, setHalvingTimeValue] = useState<string>("");
-    const [doublingTimeValue, setDoublingTimeValue] = useState<string>("");
-    const [idleThreshold, setIdleThreshold] = useState<string>("");
-    const [congestedThreshold, setCongestedThreshold] = useState<string>("");
-    const [averageWindowSize, setAverageWindowSize] = useState<string>("");
-    const [billableUnit, setBillableUnit] = useState<string>("");
+    const initialValues = useMemo<PricingFormValues | null>(() => {
+        if (!pricing) return null;
+        return getInitialFormValues(pricing, isCpu);
+    }, [pricing, isCpu]);
+
+    const [edits, setEdits] = useState<Partial<PricingFormValues>>({});
+    useEffect(() => {
+        setEdits({});
+    }, [pricing]);
+
+    const formValues: PricingFormValues = useMemo(() => {
+        const base = initialValues ?? {
+            halvingTimeUnit: "sec" as RateTimeUnit,
+            halvingTimeValue: "",
+            doublingTimeUnit: "sec" as RateTimeUnit,
+            doublingTimeValue: "",
+            idleThreshold: "",
+            congestedThreshold: "",
+            averageWindowSize: "",
+            billableUnit: "",
+        };
+        return { ...base, ...edits };
+    }, [initialValues, edits]);
 
     const {
         mutateAsync: setCpuPricingParams,
@@ -126,70 +182,34 @@ export const PricingSection = ({
         isPending: isSavingNet,
     } = useSetNetPricingParams();
 
-    useEffect(() => {
-        if (!pricing) {
-            return;
-        }
-
-        const initialHalving = getBestRateTimeUnit(pricing.halvingTimeSec);
-        const initialDoubling = getBestRateTimeUnit(pricing.doublingTimeSec);
-
-        setHalvingTimeUnit(initialHalving.unit);
-        setDoublingTimeUnit(initialDoubling.unit);
-
-        setHalvingTimeValue(
-            convertRateTimeUnit(
-                pricing.halvingTimeSec,
-                "sec",
-                initialHalving.unit,
-            ).toString(),
-        );
-        setDoublingTimeValue(
-            convertRateTimeUnit(
-                pricing.doublingTimeSec,
-                "sec",
-                initialDoubling.unit,
-            ).toString(),
-        );
-
-        setIdleThreshold(
-            Math.round(parseFloat(pricing.thresholds.idlePct)).toString(),
-        );
-        setCongestedThreshold(
-            Math.round(parseFloat(pricing.thresholds.congestedPct)).toString(),
-        );
-        setAverageWindowSize(pricing.numBlocksToAverage.toString());
-
-        const billableUnitValue = isCpu
-            ? pricing.billableUnit / TIME_FACTORS.ms
-            : pricing.billableUnit / 8;
-        setBillableUnit(billableUnitValue.toString());
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pricing]);
-
     const isSaving = isCpu ? isSavingCpu : isSavingNet;
+
+    const updateEdit = <K extends keyof PricingFormValues>(
+        key: K,
+        value: PricingFormValues[K],
+    ) => setEdits((prev) => ({ ...prev, [key]: value }));
 
     const handleSave = async () => {
         if (!pricing) return;
 
         const halvingTimeSec = convertRateTimeUnit(
-            Number(halvingTimeValue) || 0,
-            halvingTimeUnit,
+            Number(formValues.halvingTimeValue) || 0,
+            formValues.halvingTimeUnit,
             "sec",
         );
         const doublingTimeSec = convertRateTimeUnit(
-            Number(doublingTimeValue) || 0,
-            doublingTimeUnit,
+            Number(formValues.doublingTimeValue) || 0,
+            formValues.doublingTimeUnit,
             "sec",
         );
 
-        const idlePct = (idleThreshold || "0").trim();
-        const congestedPct = (congestedThreshold || "0").trim();
-        const numBlocksToAverage = Number(averageWindowSize) || 0;
+        const idlePct = (formValues.idleThreshold || "0").trim();
+        const congestedPct = (formValues.congestedThreshold || "0").trim();
+        const numBlocksToAverage = Number(formValues.averageWindowSize) || 0;
 
         if (isCpu) {
             const minBillableUnitNs = Math.floor(
-                (Number(billableUnit) || 0) * TIME_FACTORS.ms,
+                (Number(formValues.billableUnit) || 0) * TIME_FACTORS.ms,
             );
 
             await setCpuPricingParams([
@@ -204,7 +224,7 @@ export const PricingSection = ({
             ]);
         } else {
             const minBillableUnitBits = Math.floor(
-                (Number(billableUnit) || 0) * 8,
+                (Number(formValues.billableUnit) || 0) * 8,
             );
 
             await setNetPricingParams([
@@ -244,23 +264,29 @@ export const PricingSection = ({
 
     const handleHalvingUnitChange = (newUnit: RateTimeUnit) => {
         const valueInSec = convertRateTimeUnit(
-            Number(halvingTimeValue) || 0,
-            halvingTimeUnit,
+            Number(formValues.halvingTimeValue) || 0,
+            formValues.halvingTimeUnit,
             "sec",
         );
         const newValue = convertRateTimeUnit(valueInSec, "sec", newUnit);
-        setHalvingTimeUnit(newUnit);
-        setHalvingTimeValue(newValue.toString());
+        setEdits((prev) => ({
+            ...prev,
+            halvingTimeUnit: newUnit,
+            halvingTimeValue: newValue.toString(),
+        }));
     };
     const handleDoublingUnitChange = (newUnit: RateTimeUnit) => {
         const valueInSec = convertRateTimeUnit(
-            Number(doublingTimeValue) || 0,
-            doublingTimeUnit,
+            Number(formValues.doublingTimeValue) || 0,
+            formValues.doublingTimeUnit,
             "sec",
         );
         const newValue = convertRateTimeUnit(valueInSec, "sec", newUnit);
-        setDoublingTimeUnit(newUnit);
-        setDoublingTimeValue(newValue.toString());
+        setEdits((prev) => ({
+            ...prev,
+            doublingTimeUnit: newUnit,
+            doublingTimeValue: newValue.toString(),
+        }));
     };
 
     return (
@@ -272,38 +298,38 @@ export const PricingSection = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <RateTimeField
                     label="Halving rate"
-                    value={halvingTimeValue}
-                    unit={halvingTimeUnit}
-                    onValueChange={setHalvingTimeValue}
+                    value={formValues.halvingTimeValue}
+                    unit={formValues.halvingTimeUnit}
+                    onValueChange={(v) => updateEdit("halvingTimeValue", v)}
                     onUnitChange={handleHalvingUnitChange}
                 />
                 <RateTimeField
                     label="Doubling rate"
-                    value={doublingTimeValue}
-                    unit={doublingTimeUnit}
-                    onValueChange={setDoublingTimeValue}
+                    value={formValues.doublingTimeValue}
+                    unit={formValues.doublingTimeUnit}
+                    onValueChange={(v) => updateEdit("doublingTimeValue", v)}
                     onUnitChange={handleDoublingUnitChange}
                 />
                 <ThresholdField
                     label="Idle threshold"
-                    value={idleThreshold}
-                    onChange={setIdleThreshold}
+                    value={formValues.idleThreshold}
+                    onChange={(v) => updateEdit("idleThreshold", v)}
                 />
                 <ThresholdField
                     label="Congested threshold"
-                    value={congestedThreshold}
-                    onChange={setCongestedThreshold}
+                    value={formValues.congestedThreshold}
+                    onChange={(v) => updateEdit("congestedThreshold", v)}
                 />
                 <LabeledInputField
                     label="Average window size"
-                    value={averageWindowSize}
-                    onChange={setAverageWindowSize}
+                    value={formValues.averageWindowSize}
+                    onChange={(v) => updateEdit("averageWindowSize", v)}
                     suffix="blocks"
                 />
                 <LabeledInputField
                     label="Minimum billable unit"
-                    value={billableUnit}
-                    onChange={setBillableUnit}
+                    value={formValues.billableUnit}
+                    onChange={(v) => updateEdit("billableUnit", v)}
                     suffix={billableUnitLabel}
                 />
             </div>

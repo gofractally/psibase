@@ -3,6 +3,7 @@ import { queryClient } from "@/queryClient";
 import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 
+import type { VirtualServerResources } from "./use-virtual-server-resources";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 interface NetworkVariables {
@@ -26,8 +27,14 @@ export const useSetNetworkVariables = () =>
             onSuccess: (networkVariables, status) => {
                 if (status.type == "executed") {
                     queryClient.setQueryData(
-                        [...QueryKey.virtualServer(), "networkVariables"],
-                        networkVariables[0],
+                        [...QueryKey.virtualServerResources()],
+                        (old: VirtualServerResources | undefined) => {
+                            if (!old) return old;
+                            return {
+                                ...old,
+                                networkVariables: networkVariables[0],
+                            };
+                        },
                     );
                 }
             },

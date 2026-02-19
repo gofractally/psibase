@@ -3,11 +3,12 @@ import { queryClient } from "@/queryClient";
 import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 
+import type { VirtualServerResources } from "./use-virtual-server-resources";
 import { usePluginMutation } from "./use-plugin-mutation";
 
 interface ServerSpecs {
-    netBps: number; // bits per second
-    storageBytes: number; // bytes
+    netBps: number;
+    storageBytes: number;
 }
 
 export const useSetServerSpecs = () =>
@@ -25,13 +26,18 @@ export const useSetServerSpecs = () =>
             onSuccess: (serverSpecs, status) => {
                 if (status.type == "executed") {
                     queryClient.setQueryData(
-                        [...QueryKey.virtualServer(), "serverSpecs"],
-                        {
-                            ...serverSpecs[0],
-                            recommendedMinMemoryBytes: queryClient.getQueryData<
-                                ServerSpecs & { recommendedMinMemoryBytes?: number }
-                            >([...QueryKey.virtualServer(), "serverSpecs"])
-                                ?.recommendedMinMemoryBytes ?? 0,
+                        [...QueryKey.virtualServerResources()],
+                        (old: VirtualServerResources | undefined) => {
+                            if (!old) return old;
+                            const recommendedMinMemoryBytes =
+                                old.serverSpecs?.recommendedMinMemoryBytes ?? 0;
+                            return {
+                                ...old,
+                                serverSpecs: {
+                                    ...serverSpecs[0],
+                                    recommendedMinMemoryBytes,
+                                },
+                            };
                         },
                     );
                 }

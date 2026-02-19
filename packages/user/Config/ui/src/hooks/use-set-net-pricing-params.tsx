@@ -29,7 +29,7 @@ export const useSetNetPricingParams = () =>
             onSuccess: (_params, status) => {
                 if (status.type === "executed") {
                     queryClient.invalidateQueries({
-                        queryKey: [...QueryKey.virtualServer(), "netPricing"],
+                        queryKey: [...QueryKey.virtualServerPricing()],
                     });
                 }
             },
