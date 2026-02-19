@@ -25,7 +25,7 @@ import {
     AccordionTrigger,
 } from "@shared/shadcn/ui/accordion";
 
-import { useAppForm } from "@/components/forms/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
 import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
 import { useVirtualServerResources } from "@/hooks/use-virtual-server-resources";

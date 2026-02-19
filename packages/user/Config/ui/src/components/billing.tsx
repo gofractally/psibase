@@ -5,7 +5,7 @@ import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { useAppForm } from "@/components/forms/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
