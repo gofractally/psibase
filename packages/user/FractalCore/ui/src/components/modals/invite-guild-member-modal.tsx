@@ -19,6 +19,8 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { siblingUrl } from "@psibase/common-lib";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useEffect } from "react";
+import { getSubDomain } from "@shared/lib/get-sub-domain";
+
 
 
 export const InviteGuildMemberModal = ({
@@ -32,14 +34,14 @@ export const InviteGuildMemberModal = ({
     const { mutateAsync: createGuildInvite, isPending: isCreatingGuildInvite, data: inviteString, error, isSuccess } = useCreateGuildInvite();
 
     const guildAccount = useGuildAccount();
-    const link = siblingUrl(null, 'thekellygang', `/invite/${inviteString}`, true)
+    const link = siblingUrl(null, getSubDomain(), `/invite?token=${inviteString}`, true)
 
-    console.log({ link, inviteString});
+    console.log({ link, inviteString });
 
     useEffect(() => {
         if (show && !isSuccess)
         createGuildInvite([guildAccount!])
-    }, [show, isSuccess])
+    }, [show, isSuccess, guildAccount, createGuildInvite])
 
     const onCopyClick = async () => {
         if (!link) {
@@ -63,7 +65,7 @@ export const InviteGuildMemberModal = ({
             <DialogHeader>
                 <DialogTitle>Share link</DialogTitle>
                 <DialogDescription>
-                    Anyone who has this link will be able to create an account.
+                    Anyone who has this link will be able to apply to the guild without fee.
                 </DialogDescription>
             </DialogHeader>
             <div className="flex items-center space-x-2">

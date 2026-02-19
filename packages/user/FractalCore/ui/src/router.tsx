@@ -19,7 +19,8 @@ import { ApplicationDetail } from "./pages/fractal/membership/application-detail
 import { Applications } from "./pages/fractal/membership/applications";
 import { Settings } from "./pages/settings";
 import { Leadership } from "./pages/leadership";
-import { InviteDetail } from "./pages/invite-detail";
+import { Invite } from "./pages/invite-detail/Invite";
+import { InviteResponse } from "./pages/invite-detail/InviteResponse";
 
 export const router = createBrowserRouter([
     {
@@ -35,10 +36,10 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: "/invite/:token",
+                path: "/invite",
                 element: (
                     <ProtectedRoute>
-                        <InviteDetail />
+                        <Invite />
                     </ProtectedRoute>
                 ),
             },
@@ -91,6 +92,14 @@ export const router = createBrowserRouter([
                         element: (
                             <ProtectedRoute>
                                 <MyGuildMembership />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "invite-response",
+                        element: (
+                            <ProtectedRoute>
+                                <InviteResponse />
                             </ProtectedRoute>
                         ),
                     },

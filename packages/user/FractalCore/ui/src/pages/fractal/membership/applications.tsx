@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
 import { EmptyBlock } from "@/components/empty-block";
@@ -21,6 +20,7 @@ import {
 import {Button } from "@shared/shadcn/ui/button"
 import { InviteGuildMemberModal } from "@/components/modals/invite-guild-member-modal";
 import { useBoolean } from "usehooks-ts";
+import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 
 export const Applications = () => {
     const { data: guild } = useGuild();
@@ -40,6 +40,10 @@ export const Applications = () => {
         (membership) => membership.guild.account == guildAccount,
     );
 
+    const { data: pendingApplicant,} = useGuildApplication(guildAccount, currentUser);
+
+
+
     return (
         <div className="mx-auto w-full max-w-5xl p-4 px-6">
             <div className="flex h-9 items-center">
@@ -54,8 +58,10 @@ export const Applications = () => {
                 show={showGuildInviteModal}            />
             <div className="mt-3">
                 <div className="flex justify-end">
-                    {isGuildMember && <Button onClick={() => { setGuildInviteModal(true)}} >Create invite</Button>}
-                    {!isGuildMember && <Button onClick={() => { setShowGuildApplyModal(true)}} >Apply</Button>}
+                    {isGuildMember && <Button variant={"secondary"} onClick={() => { setGuildInviteModal(true)}} >Create invite</Button>}
+                    {!isGuildMember && !pendingApplicant && <Button variant={"secondary"} onClick={() => { setShowGuildApplyModal(true)}} >Apply</Button>}
+                    {!isGuildMember && pendingApplicant && <Button onClick={() => { navigate(currentUser!)}} >Pending application</Button>}
+
                 </div>
                 {applications && applications.length > 0 ? (
                     <Table>
@@ -69,19 +75,19 @@ export const Applications = () => {
                         <TableBody>
                             {applications.map((member) => (
                                 <TableRow
-                                    key={member.member}
+                                    key={member.applicant}
                                     onClick={() => {
-                                        navigate(member.member);
+                                        navigate(member.applicant);
                                     }}
                                 >
                                     <TableCell className="font-medium">
-                                        {member.member}
+                                        {member.applicant}
                                     </TableCell>
                                     <TableCell>
-                                        {member.attestations.length}
+                                        {member.attestations.nodes.length}
                                     </TableCell>
                                     <TableCell>
-                                        {dayjs(member.createdAt).format(
+                                        {member.createdAt.format(
                                             "ddd MMM D, HH:mm",
                                         )}
                                     </TableCell>

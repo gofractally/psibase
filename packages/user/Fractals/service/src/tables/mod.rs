@@ -171,7 +171,7 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+        fn by_applicant(&self) -> (AccountNumber, AccountNumber) {
             (self.applicant, self.guild)
         }
     }

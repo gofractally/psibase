@@ -192,6 +192,12 @@ mod service {
             .await
         }
 
+        async fn guild_invite(&self, id: u32) -> Option<GuildInvite> {
+            GuildInviteTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&id)
+        }
+
         async fn guild_invites(
             &self,
             guild: AccountNumber,

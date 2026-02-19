@@ -1,10 +1,14 @@
 use async_graphql::ComplexObject;
 
-use psibase::{check, check_some, get_sender, AccountNumber, Table};
+use psibase::{
+    check, check_some, get_sender,
+    services::{tokens::Quantity, virtual_server},
+    AccountNumber, Checksum256, Table,
+};
 
 use crate::{
     constants::MAX_GUILD_INVITES_PER_MEMBER,
-    tables::tables::{Guild, GuildInvite, GuildInviteTable, GuildMember},
+    tables::tables::{Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember},
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -27,7 +31,37 @@ impl GuildInvite {
             .collect()
     }
 
-    pub fn add(guild: AccountNumber, invite_id: u32) {
+    fn invite_cost() -> Option<(u32, Quantity)> {
+        if virtual_server::Wrapper::call().is_billing_enabled() {
+            let tokens = psibase::services::tokens::Wrapper::call();
+            let system_token = check_some(
+                tokens.getSysToken(),
+                "expected system token when billing is enabled",
+            )
+            .id;
+            let cost = psibase::services::invite::Wrapper::call().getInvCost(1);
+
+            Some((system_token, cost))
+        } else {
+            None
+        }
+    }
+
+    fn charge_invite_fee_from_sender(token_id: u32, cost: Quantity) {
+        let tokens = psibase::services::tokens::Wrapper::call();
+        let inviter = get_sender();
+
+        tokens.debit(token_id, inviter, cost, "memo".into());
+        tokens.credit(
+            token_id,
+            psibase::services::invite::SERVICE,
+            cost,
+            "memo".into(),
+        );
+        tokens.reject(token_id, inviter, "dust".into());
+    }
+
+    pub fn add(guild: AccountNumber, invite_id: u32, finger_print: Checksum256, secret: String) {
         let inviter = get_sender();
         check(
             Self::by_inviter(guild, inviter).len() <= MAX_GUILD_INVITES_PER_MEMBER.into(),
@@ -36,6 +70,20 @@ impl GuildInvite {
         check_some(
             GuildMember::get(guild, inviter),
             "must be a member of guild to invite to it",
+        );
+
+        let invite_cost = Self::invite_cost();
+        if let Some((system_token_id, cost)) = invite_cost {
+            Self::charge_invite_fee_from_sender(system_token_id, cost)
+        }
+
+        psibase::services::invite::Wrapper::call().createInvite(
+            invite_id,
+            finger_print,
+            1,
+            true,
+            secret,
+            invite_cost.map_or(0.into(), |(_, amount)| amount),
         );
 
         Self::new(guild, invite_id).save();
@@ -56,9 +104,9 @@ impl GuildInvite {
         }
     }
 
-    pub fn accept(&self, accepter: AccountNumber) {
-        GuildMember::add(self.guild, accepter);
-        self.remove()
+    pub fn accept(&self, accepter: AccountNumber, extra_info: String) {
+        self.remove();
+        GuildApplication::add(self.guild, accepter, extra_info);
     }
 
     pub fn cancel(&self) {
@@ -70,7 +118,7 @@ impl GuildInvite {
     }
 
     fn remove(&self) {
-        GuildInviteTable::read_write().put(&self).unwrap()
+        GuildInviteTable::read_write().remove(&self)
     }
 
     fn save(&self) {

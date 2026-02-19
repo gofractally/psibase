@@ -20,13 +20,13 @@ impl GuildApplication {
         }
     }
 
-    pub fn add(guild: AccountNumber, member: AccountNumber, extra_info: String) {
-        check_none(Self::get(guild, member), "application already exists");
+    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) {
+        check_none(Self::get(guild, applicant), "application already exists");
         check_none(
-            GuildMember::get(guild, member),
+            GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
-        Self::new(guild, member, extra_info).save();
+        Self::new(guild, applicant, extra_info).save();
     }
 
     pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
@@ -42,16 +42,25 @@ impl GuildApplication {
         )
     }
 
-    pub fn applications_by_member(member: AccountNumber) -> Vec<Self> {
+    pub fn applications_by_applicant(
+        applicant: AccountNumber,
+        fractal: AccountNumber,
+    ) -> Vec<Self> {
+        let guilds_of_fractal = Guild::guilds_of_fractal(fractal);
         GuildApplicationTable::read()
-            .get_index_by_member()
-            .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
+            .get_index_by_applicant()
+            .range((applicant, AccountNumber::new(0))..=(applicant, AccountNumber::new(u64::MAX)))
+            .filter(|application| {
+                guilds_of_fractal
+                    .iter()
+                    .any(|guild| guild.account == application.guild)
+            })
             .collect()
     }
 
-    pub fn remove_all_by_member(member: AccountNumber) {
+    pub fn remove_all_by_applicant(applicant: AccountNumber, fractal: AccountNumber) {
         let table = GuildApplicationTable::read_write();
-        for application in GuildApplication::applications_by_member(member) {
+        for application in GuildApplication::applications_by_applicant(applicant, fractal) {
             table.remove(&application);
         }
     }
