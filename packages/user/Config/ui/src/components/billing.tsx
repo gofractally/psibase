@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Label } from "@shared/shadcn/ui/label";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 
@@ -168,32 +167,27 @@ export const Billing = ({
                         )}
                     </div>
 
-                    <billingForm.Field name="enableBilling">
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {(field: any) => (
-                            <billingForm.Subscribe
-                                selector={(state) => state.values.enableBilling}
-                            >
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {(enableBilling: any) => {
-                                    const isApplyEnabled =
-                                        submittedEnableBilling !== null &&
-                                        enableBilling !== submittedEnableBilling;
-                                    return (
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <Checkbox
-                                                    checked={field.state.value}
-                                                    onCheckedChange={(checked) => {
-                                                        field.handleChange(!!checked);
-                                                    }}
-                                                    disabled={!hasFeeReceiverAccount}
-                                                />
-                                                <Label className="cursor-pointer">
-                                                    Enable billing (for public networks)
-                                                </Label>
-                                            </div>
-                                            {hasFeeReceiverAccount && (
+                    <billingForm.AppField name="enableBilling">
+                        {(field) => (
+                            <>
+                                <field.CheckboxField
+                                    label="Enable billing (for public networks)"
+                                    disabled={!hasFeeReceiverAccount}
+                                />
+                                {hasFeeReceiverAccount && (
+                                    <billingForm.Subscribe
+                                        selector={(state) =>
+                                            state.values.enableBilling
+                                        }
+                                    >
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {(enableBilling: any) => {
+                                            const isApplyEnabled =
+                                                submittedEnableBilling !==
+                                                    null &&
+                                                enableBilling !==
+                                                    submittedEnableBilling;
+                                            return (
                                                 <div className="mt-2">
                                                     {enableBillingTxError && (
                                                         <p className="text-destructive text-sm mb-2">
@@ -202,19 +196,23 @@ export const Billing = ({
                                                     )}
                                                     <Button
                                                         type="button"
-                                                        onClick={handleApplyEnableBilling}
-                                                        disabled={!isApplyEnabled}
+                                                        onClick={
+                                                            handleApplyEnableBilling
+                                                        }
+                                                        disabled={
+                                                            !isApplyEnabled
+                                                        }
                                                     >
                                                         Apply
                                                     </Button>
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                }}
-                            </billingForm.Subscribe>
+                                            );
+                                        }}
+                                    </billingForm.Subscribe>
+                                )}
+                            </>
                         )}
-                    </billingForm.Field>
+                    </billingForm.AppField>
                 </div>
             </form>
         </div>
