@@ -373,13 +373,13 @@ pub mod tables {
             self.mint_pool_tokens(lp_tokens_to_mint);
             self.credit_sender_pool_tokens(lp_tokens_to_mint);
             if token_a_id < token_b_id {
-                self.on_liquidity_event(token_a_id, token_b_id, amount_a, amount_b);
+                self.on_liquidity_add(token_a_id, token_b_id, amount_a, amount_b);
             } else {
-                self.on_liquidity_event(token_b_id, token_a_id, amount_b, amount_a);
+                self.on_liquidity_add(token_b_id, token_a_id, amount_b, amount_a);
             }
         }
 
-        fn on_liquidity_event(
+        fn on_liquidity_add(
             &self,
             token_a_id: TID,
             token_b_id: TID,
@@ -395,6 +395,24 @@ pub mod tables {
                 Decimal::new(amount_b, tokens.getToken(token_b_id).precision).to_string(),
             );
         }
+
+        fn on_liquidity_remove(
+            &self,
+            token_a_id: TID,
+            token_b_id: TID,
+            amount_a: Quantity,
+            amount_b: Quantity,
+        ) {
+            let tokens = psibase::services::tokens::Wrapper::call();
+
+            crate::Wrapper::emit().history().liq_removed(
+                self.liquidity_token,
+                get_sender(),
+                Decimal::new(amount_a, tokens.getToken(token_a_id).precision).to_string(),
+                Decimal::new(amount_b, tokens.getToken(token_b_id).precision).to_string(),
+            );
+        }
+
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
             check(
                 liquidity_amount.value > 0,
@@ -414,6 +432,8 @@ pub mod tables {
             a_reserve.withdraw_and_credit_to_sender(a_amount, "Withdrawal 1/2".into());
             b_reserve.withdraw_and_credit_to_sender(b_amount, "Withdrawal 2/2".into());
             self.burn_lp_tokens(liquidity_amount);
+
+            self.on_liquidity_remove(a_reserve.token_id, b_reserve.token_id, a_amount, b_amount)
         }
 
         fn debit_lp_tokens_from_sender(&self, liquidity_amount: Quantity) {
@@ -555,8 +575,9 @@ pub mod service {
             };
 
             add_index("swapped", vec![0, 1, 3]);
-            add_index("liq_added", vec![0, 1, 3]);
             add_index("swap_completed", vec![0]);
+            add_index("liq_added", vec![0, 1]);
+            add_index("liq_removed", vec![0, 1]);
         }
     }
 
@@ -718,6 +739,15 @@ pub mod service {
 
     #[event(history)]
     pub fn liq_added(
+        pool_id: TID,
+        sender: AccountNumber,
+        amount_first: String,
+        amount_second: String,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn liq_removed(
         pool_id: TID,
         sender: AccountNumber,
         amount_first: String,
