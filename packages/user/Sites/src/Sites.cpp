@@ -1,6 +1,7 @@
 #include "services/user/Sites.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
@@ -18,13 +19,6 @@ namespace SystemService
 {
    namespace
    {
-      std::string to_lower(const std::string& str)
-      {
-         std::string lower(str.size(), '\0');
-         std::ranges::transform(str, lower.begin(), ::tolower);
-         return lower;
-      }
-
       template <typename T>
       bool contains(const std::vector<T>& vec, const T& value)
       {
@@ -36,7 +30,7 @@ namespace SystemService
          std::vector<std::string> tokens;
          for (auto&& part : str | std::views::split(delimiter))
          {
-            tokens.emplace_back(to_lower(std::string(part.begin(), part.end())));
+            tokens.emplace_back(ToLower{}(std::string(part.begin(), part.end())));
          }
          return tokens;
       }
@@ -231,9 +225,9 @@ namespace SystemService
       std::optional<std::string> get_header_value(const HttpRequest& request,
                                                   const std::string& name)
       {
-         auto it = std::find_if(request.headers.begin(), request.headers.end(),
-                                [name](const HttpHeader& header)
-                                { return to_lower(header.name) == to_lower(name); });
+         auto it =
+             std::find_if(request.headers.begin(), request.headers.end(),
+                          [name](const HttpHeader& header) { return iequal(header.name, name); });
          if (it == request.headers.end())
             return std::nullopt;
          return it->value;

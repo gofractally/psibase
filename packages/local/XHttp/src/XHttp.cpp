@@ -1,5 +1,6 @@
 #include <services/local/XHttp.hpp>
 
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
@@ -27,7 +28,7 @@ namespace
 
    bool matches(psio::view<const HttpHeader> header, std::string_view h)
    {
-      return std::ranges::equal(std::string_view{header.name()}, h, {}, ::tolower, ::tolower);
+      return iequal(header.name(), h);
    }
 
    std::string_view getRootHost(std::string_view host)
