@@ -291,8 +291,14 @@ namespace
       auto& sock = get_lowest_layer(socket->stream);
       sock.async_connect(std::forward<E>(endpoints),
                          [socket = std::move(socket), next = std::forward<F>(next)](
-                             const std::error_code& ec, const auto& /*sock*/) mutable
-                         { next(ec, std::move(socket)); });
+                             const std::error_code& ec, const auto& endpoint) mutable
+                         {
+                            if (!ec)
+                               socket->logger.add_attribute(
+                                   "RemoteEndpoint", boost::log::attributes::constant(
+                                                         to_string(toSocketEndpoint(endpoint))));
+                            next(ec, std::move(socket));
+                         });
    }
 
    template <typename Stream, typename F>
@@ -300,8 +306,6 @@ namespace
                    StringEndpoint&&                            endpoint,
                    F&&                                         next)
    {
-      socket->logger.add_attribute("RemoteEndpoint",
-                                   boost::log::attributes::constant(std::string(endpoint.host)));
       PSIBASE_LOG(socket->logger, debug) << "Sending HTTP request";
       auto [host, port] = split_port(endpoint.host);
       if (port.empty())
