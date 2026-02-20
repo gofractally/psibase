@@ -9,6 +9,7 @@ publish.workspace = true
 server = "r-token-swap"
 plugin = "token-swap-plugin"
 postinstall = [
+    { sender = "token-swap", service = "token-swap", method = "init", data = {} },
     { sender = "token-swap", service = "tokens", method = "setUserConf", data = { index = 0, enabled = true } },
     { sender = "token-swap", service = "nft", method = "setUserConf", data = { index = 0, enable = true } },
 ]

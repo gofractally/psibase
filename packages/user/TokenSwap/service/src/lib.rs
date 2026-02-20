@@ -8,13 +8,40 @@ pub mod tables {
     use psibase::services::token_swap::{swap, Wrapper as TokenSwap, PPM};
     use psibase::services::tokens::{Decimal, Quantity, TokenRecord, Wrapper as Tokens, TID};
     use psibase::{
-        abort_message, check, check_some, get_sender, AccountNumber, Fracpack, Table, ToSchema,
+        abort_message, check, check_none, check_some, get_sender, AccountNumber, Fracpack, Memo,
+        Table, ToSchema,
     };
 
     use crate::helpers::{mul_div, sqrt};
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "PoolTable", index = 0)]
+    #[table(name = "InitTable", index = 0)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    pub struct InitRow {}
+
+    impl InitRow {
+        #[primary_key]
+        fn pk(&self) {}
+
+        fn new() -> Self {
+            Self {}
+        }
+
+        pub fn get() -> Option<Self> {
+            InitTable::read().get_index_pk().get(&())
+        }
+
+        pub fn init() {
+            check_none(Self::get(), "init row already exists");
+            Self::new().save();
+        }
+
+        fn save(&self) {
+            InitTable::read_write().put(&self).unwrap();
+        }
+    }
+
+    #[table(name = "PoolTable", index = 1)]
     #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Fracpack, Debug)]
     #[graphql(complex)]
     pub struct Pool {
@@ -23,7 +50,7 @@ pub mod tables {
         pub admin_nft: NID,
     }
 
-    #[table(name = "ReserveTable", index = 1)]
+    #[table(name = "ReserveTable", index = 2)]
     #[derive(Serialize, Deserialize, SimpleObject, ToSchema, Fracpack, Debug)]
     #[graphql(complex)]
     pub struct Reserve {
@@ -101,8 +128,8 @@ pub mod tables {
         pub fn debit_from_sender(&self, amount: Quantity) {
             let sender = get_sender();
             let tokens = Tokens::call();
-            tokens.debit(self.token_id, sender, amount, "memo".into());
-            tokens.reject(self.token_id, sender, "memo".into());
+            tokens.debit(self.token_id, sender, amount, "".into());
+            tokens.reject(self.token_id, sender, "Dust".into());
         }
 
         pub fn pool_token_entitlement(
@@ -125,16 +152,11 @@ pub mod tables {
             Tokens::call().fromSub(self.token_id, self.pool_sub_account_id(), amount);
         }
 
-        pub fn withdraw_and_credit_to_sender(&self, amount: Quantity) {
+        pub fn withdraw_and_credit_to_sender(&self, amount: Quantity, memo: Memo) {
             let token_id = self.token_id;
             let tokens = Tokens::call();
             tokens.fromSub(token_id, self.pool_sub_account_id(), amount);
-            tokens.credit(
-                token_id,
-                get_sender(),
-                amount,
-                "Liquidity withdrawal".into(),
-            );
+            tokens.credit(token_id, get_sender(), amount, memo);
         }
 
         fn save(&self) {
@@ -350,8 +372,29 @@ pub mod tables {
 
             self.mint_pool_tokens(lp_tokens_to_mint);
             self.credit_sender_pool_tokens(lp_tokens_to_mint);
+            if token_a_id < token_b_id {
+                self.on_liquidity_event(token_a_id, token_b_id, amount_a, amount_b);
+            } else {
+                self.on_liquidity_event(token_b_id, token_a_id, amount_b, amount_a);
+            }
         }
 
+        fn on_liquidity_event(
+            &self,
+            token_a_id: TID,
+            token_b_id: TID,
+            amount_a: Quantity,
+            amount_b: Quantity,
+        ) {
+            let tokens = psibase::services::tokens::Wrapper::call();
+
+            crate::Wrapper::emit().history().liq_added(
+                self.liquidity_token,
+                get_sender(),
+                Decimal::new(amount_a, tokens.getToken(token_a_id).precision).to_string(),
+                Decimal::new(amount_b, tokens.getToken(token_b_id).precision).to_string(),
+            );
+        }
         pub fn remove_liquidity(&self, liquidity_amount: Quantity) {
             check(
                 liquidity_amount.value > 0,
@@ -368,8 +411,8 @@ pub mod tables {
             check(a_amount.value > 0, "no a token reserve balance to return");
             check(b_amount.value > 0, "no b token reserve balance to return");
 
-            a_reserve.withdraw_and_credit_to_sender(a_amount);
-            b_reserve.withdraw_and_credit_to_sender(b_amount);
+            a_reserve.withdraw_and_credit_to_sender(a_amount, "Withdrawal 1/2".into());
+            b_reserve.withdraw_and_credit_to_sender(b_amount, "Withdrawal 2/2".into());
             self.burn_lp_tokens(liquidity_amount);
         }
 
@@ -378,12 +421,14 @@ pub mod tables {
                 self.liquidity_token,
                 get_sender(),
                 liquidity_amount,
-                "Liquidity withdrawal".into(),
+                format!("Remove pool: {} liquidity", self.liquidity_token)
+                    .as_str()
+                    .into(),
             );
         }
 
         fn mint_pool_tokens(&self, amount: Quantity) {
-            Tokens::call().mint(self.liquidity_token, amount, "Pool tokens".into());
+            Tokens::call().mint(self.liquidity_token, amount, "".into());
         }
 
         fn credit_sender_pool_tokens(&self, amount: Quantity) {
@@ -483,7 +528,8 @@ pub mod tables {
 
 #[psibase::service(name = "token-swap", tables = "tables")]
 pub mod service {
-    use crate::tables::{Pool, Reserve};
+    use crate::tables::{InitRow, Pool, Reserve};
+    use psibase::services::events;
     use psibase::{
         services::{
             nft::NID,
@@ -491,6 +537,33 @@ pub mod service {
         },
         *,
     };
+
+    #[action]
+    fn init() {
+        if InitRow::get().is_none() {
+            InitRow::init();
+
+            let add_index = |method: &str, columns: Vec<u8>| {
+                for column in columns {
+                    events::Wrapper::call().addIndex(
+                        DbId::HistoryEvent,
+                        Wrapper::SERVICE,
+                        MethodNumber::from(method),
+                        column,
+                    );
+                }
+            };
+
+            add_index("swapped", vec![0, 1, 3]);
+            add_index("liq_added", vec![0, 1, 3]);
+            add_index("swap_completed", vec![0]);
+        }
+    }
+
+    #[pre_action(exclude(init))]
+    fn check_init() {
+        check_some(InitRow::get(), "service not initialized");
+    }
 
     /// Creates a new pool.
     ///
@@ -609,6 +682,9 @@ pub mod service {
     #[action]
     fn swap(pools: Vec<TID>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
         check(pools.len() > 0, "pools length must be at least 1");
+        check(amount_in.value > 0, "amount in must be non-zero");
+        check(min_return.value > 0, "min return must be non-zero");
+
         let sender = get_sender();
         let tokens_service = psibase::services::tokens::Wrapper::call();
         tokens_service.debit(token_in, sender, amount_in, "".into());
@@ -620,6 +696,13 @@ pub mod service {
             let (token_out, amount_out) =
                 Pool::get_assert(pool_id).swap(current_token, current_amount);
 
+            Wrapper::emit().history().swapped(
+                pool_id,
+                current_token,
+                current_amount,
+                token_out,
+                amount_out,
+            );
             current_token = token_out;
             current_amount = amount_out;
         }
@@ -631,6 +714,35 @@ pub mod service {
             current_amount,
             "Swap complete".into(),
         );
+    }
+
+    #[event(history)]
+    pub fn liq_added(
+        pool_id: TID,
+        sender: AccountNumber,
+        amount_first: String,
+        amount_second: String,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn swapped(
+        pool_id: TID,
+        token_in: TID,
+        amount_in: Quantity,
+        token_out: TID,
+        amount_out: Quantity,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn swap_completed(
+        sender: AccountNumber,
+        token_in: TID,
+        amount_in: Quantity,
+        token_out: TID,
+        amount_out: Quantity,
+    ) {
     }
 }
 

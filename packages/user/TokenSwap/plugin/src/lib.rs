@@ -278,7 +278,7 @@ impl Liquidity for TokenSwapPlugin {
         pool: WitPool,
         amount: String,
     ) -> Result<(TokenAmount, TokenAmount), Error> {
-        assert_authed(FunctionName::quote_pool_tokens)?;
+        assert_authed(FunctionName::quote_remove_liquidity)?;
 
         let lp_supply = Decimal::from_str(&pool.liquidity_token_supply).unwrap();
 

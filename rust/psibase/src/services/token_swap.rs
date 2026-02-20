@@ -28,10 +28,7 @@ pub fn swap(
         return 0.into();
     }
 
-    let incoming_after_fee = incoming_amount
-        .checked_mul((PPM - fee_ppm) as u128)
-        .and_then(|v| v.checked_div(PPM as u128))
-        .unwrap_or(0);
+    let incoming_after_fee = ((PPM - fee_ppm) as u128) * incoming_amount / PPM as u128;
 
     if incoming_after_fee == 0 {
         return 0.into();
