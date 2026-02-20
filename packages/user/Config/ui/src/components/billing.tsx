@@ -2,8 +2,8 @@ import { useMemo, useState, useEffect } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
-import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { useBillingConfig } from "@shared/hooks/use-billing-config";
@@ -18,7 +18,7 @@ interface SystemTokenInfo {
 
 interface BillingFormData {
     enableBilling: boolean;
-    tokenFeeReceiverAccount: string;
+    tokenFeeReceiverAccount: { account: string };
 }
 
 interface BillingProps {
@@ -51,12 +51,12 @@ export const Billing = ({
         if (billingConfig) {
             return {
                 enableBilling: billingConfig.enabled,
-                tokenFeeReceiverAccount: billingConfig.feeReceiver || "",
+                tokenFeeReceiverAccount: { account: billingConfig.feeReceiver || "" },
             };
         }
         return {
             enableBilling: false,
-            tokenFeeReceiverAccount: "",
+            tokenFeeReceiverAccount: { account: "" },
         };
     }, [billingConfig]);
 
@@ -72,7 +72,7 @@ export const Billing = ({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: BillingFormData }) => {
             resetFeeReceiver();
-            await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount]);
+            await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount.account]);
             billingForm.reset(data.value);
         },
     });
@@ -129,28 +129,26 @@ export const Billing = ({
                         </p>
                     </div>
 
-                    <billingForm.Field name="tokenFeeReceiverAccount">
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {(accountField: any) => {
-                            const currentValue = (accountField.state.value || "").trim();
-                            const initialValue = (computedInitialValues.tokenFeeReceiverAccount || "").trim();
-                            const isSaveEnabled = !hasFeeReceiverAccount && currentValue !== "" && currentValue !== initialValue;
-                            
-                            return (
-                                <div>
-                                    <Label>Token fee receiver account</Label>
-                                    <Input
-                                        type="text"
-                                        value={accountField.state.value}
-                                        onChange={(e) => {
-                                            accountField.handleChange(e.target.value);
-                                        }}
-                                        onBlur={accountField.handleBlur}
-                                        placeholder="Enter account name"
-                                        className="mt-1"
-                                        disabled={hasFeeReceiverAccount}
-                                    />
-                                    {!hasFeeReceiverAccount && (
+                    <div>
+                        <FieldAccountExisting
+                            form={billingForm}
+                            fields={{ account: "tokenFeeReceiverAccount.account" }}
+                            label="Token fee receiver account"
+                            placeholder="Enter account name"
+                            disabled={hasFeeReceiverAccount}
+                            description={undefined}
+                            onValidate={undefined}
+                        />
+                        {!hasFeeReceiverAccount && (
+                            <billingForm.Subscribe selector={(state) => state}>
+                                {(state) => {
+                                    const account =
+                                        state.values.tokenFeeReceiverAccount?.account ?? "";
+                                    const initial =
+                                        computedInitialValues.tokenFeeReceiverAccount?.account ?? "";
+                                    const isSaveEnabled =
+                                        account !== "" && account !== initial;
+                                    return (
                                         <div className="mt-2">
                                             {feeReceiverTxError && (
                                                 <p className="text-destructive text-sm mb-2">
@@ -164,11 +162,11 @@ export const Billing = ({
                                                 Save
                                             </Button>
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        }}
-                    </billingForm.Field>
+                                    );
+                                }}
+                            </billingForm.Subscribe>
+                        )}
+                    </div>
 
                     <billingForm.Field name="enableBilling">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -222,4 +220,3 @@ export const Billing = ({
         </div>
     );
 };
-

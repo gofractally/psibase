@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type React from "react";
 import z from "zod";
 import { Info } from "lucide-react";
@@ -215,8 +215,6 @@ export const VirtualServer = () => {
         </div>
     );
 
-    const [advancedOpen, setAdvancedOpen] = useState(false);
-
     const txError =
         serverSpecsIsError && serverSpecsError
             ? parseError(serverSpecsError)
@@ -386,24 +384,11 @@ export const VirtualServer = () => {
                     </div>
                 </div>
 
-                {/* Update Button position when Advanced is collapsed */}
-                {!advancedOpen && (
-                    <>
-                        {txError && (
-                            <p className="text-destructive text-sm mt-2">{txError}</p>
-                        )}
-                        {updateButton}
-                    </>
-                )}
-
                 {/* Network Variables Subsection */}
                 <div>
                     <Accordion
                         type="single"
                         collapsible
-                        onValueChange={(val) => {
-                            setAdvancedOpen(val === "advanced");
-                        }}
                     >
                         <AccordionItem value="advanced">
                             <AccordionTrigger className="!flex-none !justify-start flex-row-reverse w-fit">
@@ -598,15 +583,12 @@ export const VirtualServer = () => {
                     </Accordion>
                 </div>
 
-                {/* Update Button when Advanced is expanded */}
-                {advancedOpen && (
-                    <>
-                        {txError && (
-                            <p className="text-destructive text-sm mt-2">{txError}</p>
-                        )}
-                        {updateButton}
-                    </>
-                )}
+                <>
+                    {txError && (
+                        <p className="text-destructive text-sm mt-2">{txError}</p>
+                    )}
+                    {updateButton}
+                </>
 
                 {/* Network Resources Display */}
                 <form.Subscribe selector={(state) => state.values}>
