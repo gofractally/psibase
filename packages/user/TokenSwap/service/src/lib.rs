@@ -211,9 +211,11 @@ pub mod tables {
                 token_a_id != token_b_id,
                 "reserve tokens cannot be the same",
             );
+            let tokens = psibase::services::tokens::Wrapper::call();
+            tokens.getToken(token_a_id);
+            tokens.getToken(token_b_id);
 
             let nft = psibase::services::nft::Wrapper::call();
-            let tokens = psibase::services::tokens::Wrapper::call();
             let sender = get_sender();
 
             let liquidity_token = tokens.create(4.try_into().unwrap(), u64::MAX.into());
