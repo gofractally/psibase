@@ -34,34 +34,31 @@ impl GuildInvite {
             .collect()
     }
 
-    fn invite_cost() -> Option<(u32, Quantity)> {
+    fn invite_cost(num_accounts: u16) -> Quantity {
         if virtual_server::Wrapper::call().is_billing_enabled() {
-            let tokens = psibase::services::tokens::Wrapper::call();
-            let system_token = check_some(
-                tokens.getSysToken(),
-                "expected system token when billing is enabled",
-            )
-            .id;
-            let cost = psibase::services::invite::Wrapper::call().getInvCost(1);
-
-            Some((system_token, cost))
+            psibase::services::invite::Wrapper::call().getInvCost(num_accounts)
         } else {
-            None
+            0.into()
         }
     }
 
-    fn charge_invite_fee_from_sender(token_id: u32, cost: Quantity) {
+    fn charge_invite_fee_from_sender(cost: Quantity) {
         let tokens = psibase::services::tokens::Wrapper::call();
         let inviter = get_sender();
 
-        tokens.debit(token_id, inviter, cost, "Invite fee".into());
+        let system_token_id = psibase::services::tokens::Wrapper::call()
+            .getSysToken()
+            .unwrap()
+            .id;
+
+        tokens.debit(system_token_id, inviter, cost, "Invite fee".into());
         tokens.credit(
-            token_id,
+            system_token_id,
             psibase::services::invite::SERVICE,
             cost,
             "Invite fee".into(),
         );
-        tokens.reject(token_id, inviter, "Invite fee dust return".into());
+        tokens.reject(system_token_id, inviter, "Invite fee dust return".into());
     }
 
     pub fn add(
@@ -69,6 +66,7 @@ impl GuildInvite {
         invite_id: u32,
         finger_print: Checksum256,
         secret: String,
+        num_accounts: u16,
         pre_attest: bool,
     ) {
         let inviter = get_sender();
@@ -81,18 +79,18 @@ impl GuildInvite {
             "must be a member of guild to invite to it",
         );
 
-        let invite_cost = Self::invite_cost();
-        if let Some((system_token_id, cost)) = invite_cost {
-            Self::charge_invite_fee_from_sender(system_token_id, cost)
+        let invite_cost = Self::invite_cost(num_accounts);
+        if invite_cost.value > 0 {
+            Self::charge_invite_fee_from_sender(invite_cost)
         }
 
         psibase::services::invite::Wrapper::call().createInvite(
             invite_id,
             finger_print,
-            1,
+            num_accounts,
             true,
             secret,
-            invite_cost.map_or(0.into(), |(_, amount)| amount),
+            invite_cost,
         );
 
         Self::new(guild, invite_id, pre_attest).save();
@@ -106,20 +104,15 @@ impl GuildInvite {
         check_some(Self::get(invite_id), "guild application does not exist")
     }
 
-    pub fn remove_all_by_member(guild: AccountNumber, member: AccountNumber) {
-        let table = GuildInviteTable::read_write();
-        for application in GuildInvite::by_inviter(guild, member) {
-            table.remove(&application);
-        }
-    }
-
-    pub fn accept(&self, accepter: AccountNumber, extra_info: String) {
-        GuildApplication::add(self.guild, accepter, extra_info);
+    pub fn accept(&self, accepter: AccountNumber) {
+        GuildApplication::add(self.guild, accepter, "".to_string());
         if self.pre_attest {
-            GuildAttest::set(self.guild, accepter, self.inviter, "".to_string(), true);
+            // Despite this check being made in GuildAttest::set, we do it here to ensure it does not throw
+            let pre_attester_is_still_member = GuildMember::get(self.guild, self.inviter).is_some();
+            if pre_attester_is_still_member {
+                GuildAttest::set(self.guild, accepter, self.inviter, "".to_string(), true);
+            }
         }
-        // is there more invites...?
-        self.remove();
     }
 
     pub fn cancel(&self) {
@@ -131,6 +124,10 @@ impl GuildInvite {
     }
 
     fn remove(&self) {
+        let invite_service = psibase::services::invite::Wrapper::call();
+        if invite_service.getInvite(self.id).is_some() {
+            invite_service.delInvite(self.id)
+        }
         GuildInviteTable::read_write().remove(&self)
     }
 

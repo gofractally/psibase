@@ -104,9 +104,9 @@ impl FractalMember {
     }
 
     fn remove(&self) {
-        GuildApplication::remove_all_by_applicant(self.account, self.fractal);
-        GuildAttest::remove_all_by_member(self.account);
-        GuildMember::remove_all_by_member(self.account);
+        for guild_membership in GuildMember::memberships_of_member(self.account) {
+            guild_membership.kick()
+        }
 
         FractalMemberTable::read_write().remove(&self);
     }

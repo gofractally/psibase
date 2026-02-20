@@ -69,7 +69,6 @@ pub mod service {
     use psibase::services::{
         auth_dyn::{self, policy::DynamicAuthPolicy},
         transact::ServiceMethod,
-        virtual_server::{self, action_structs::is_billing_enabled},
     };
     use psibase::*;
 
@@ -444,12 +443,12 @@ pub mod service {
     /// * `accepter` - Guild invitee will join.
     #[action]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
-        GuildInvite::get_assert(invite_id).accept(accepter, "".to_string());
+        GuildInvite::get_assert(invite_id).accept(accepter);
     }
 
     /// Invite a guild member.
     ///
-    /// Must be called by judiciary.  
+    /// Must be called by pre existing guild member.  
     ///
     /// # Arguments
     /// * `guild` - Guild invitee will join.
@@ -462,9 +461,17 @@ pub mod service {
         invite_id: u32,
         finger_print: Checksum256,
         secret: String,
+        num_accounts: u16,
         pre_attest: bool,
     ) {
-        GuildInvite::add(guild, invite_id, finger_print, secret, pre_attest);
+        GuildInvite::add(
+            guild,
+            invite_id,
+            finger_print,
+            secret,
+            num_accounts,
+            pre_attest,
+        );
     }
 
     /// Invite a guild member.

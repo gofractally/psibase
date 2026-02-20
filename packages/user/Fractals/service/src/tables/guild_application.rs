@@ -42,29 +42,6 @@ impl GuildApplication {
         )
     }
 
-    pub fn applications_by_applicant(
-        applicant: AccountNumber,
-        fractal: AccountNumber,
-    ) -> Vec<Self> {
-        let guilds_of_fractal = Guild::guilds_of_fractal(fractal);
-        GuildApplicationTable::read()
-            .get_index_by_applicant()
-            .range((applicant, AccountNumber::new(0))..=(applicant, AccountNumber::new(u64::MAX)))
-            .filter(|application| {
-                guilds_of_fractal
-                    .iter()
-                    .any(|guild| guild.account == application.guild)
-            })
-            .collect()
-    }
-
-    pub fn remove_all_by_applicant(applicant: AccountNumber, fractal: AccountNumber) {
-        let table = GuildApplicationTable::read_write();
-        for application in GuildApplication::applications_by_applicant(applicant, fractal) {
-            table.remove(&application);
-        }
-    }
-
     fn check_attests(&self) {
         let passed = self.attestations_score() >= 3;
         if passed {
@@ -86,13 +63,7 @@ impl GuildApplication {
     }
 
     pub fn attest(&self, comment: String, endorses: bool) {
-        let attester = get_sender();
-        let guild = Guild::get_assert(self.guild);
-        check_some(
-            GuildMember::get(guild.account, attester),
-            "must be member of the guild to attest",
-        );
-        GuildAttest::set(self.guild, self.applicant, attester, comment, endorses);
+        GuildAttest::set(self.guild, self.applicant, get_sender(), comment, endorses);
         self.check_attests();
     }
 

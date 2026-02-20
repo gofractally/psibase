@@ -394,7 +394,11 @@ impl UserGuild for FractallyPlugin {
         )
     }
 
-    fn invite_member(guild_account: String, pre_attest: bool) -> Result<String, Error> {
+    fn invite_member(
+        guild_account: String,
+        num_accounts: u16,
+        pre_attest: bool,
+    ) -> Result<String, Error> {
         let (invite_token, invite_details, _) =
             bindings::invite::plugin::inviter::prepare_new_invite(1)?;
 
@@ -406,6 +410,7 @@ impl UserGuild for FractallyPlugin {
             invite_id: invite_details.invite_id,
             secret: invite_details.encrypted_secret,
             pre_attest,
+            num_accounts,
         }
         .packed();
 

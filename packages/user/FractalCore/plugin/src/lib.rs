@@ -243,9 +243,13 @@ impl UserGuild for FractalCorePlugin {
         FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
     }
 
-    fn invite_member(guild_account: String, pre_attest: bool) -> Result<String, Error> {
+    fn invite_member(
+        guild_account: String,
+        num_seats: u16,
+        pre_attest: bool,
+    ) -> Result<String, Error> {
         assert_authorized(FunctionName::invite_member)?;
-        FractalsPlugin::user_guild::invite_member(&guild_account, pre_attest)
+        FractalsPlugin::user_guild::invite_member(&guild_account, num_seats, pre_attest)
     }
 
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
