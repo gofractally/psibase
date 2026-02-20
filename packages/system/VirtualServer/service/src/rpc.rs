@@ -257,7 +257,6 @@ impl Query {
         if config.is_none() {
             return Err(async_graphql::Error::new("billing not initialized"));
         }
-
         let p = Tokens::call().getToken(config.unwrap().sys).precision;
 
         let settings = UserSettings::get(user);

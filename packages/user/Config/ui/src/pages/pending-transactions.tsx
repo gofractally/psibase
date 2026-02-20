@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
-import { ErrorCard } from "@/components/error-card";
+import { ListTodo } from "lucide-react";
+
+import { EmptyBlock } from "@shared/components/empty-block";
+import { ErrorCard } from "@shared/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useStagedTransactions } from "@/hooks/use-staged-transactions";
@@ -30,6 +32,7 @@ export const PendingTransactions = () => {
             <div className="flex flex-col gap-2">
                 {transactions?.length == 0 && (
                     <EmptyBlock
+                        Icon={ListTodo}
                         title="No pending transactions."
                         description="Proposed changes will appear here."
                     />
