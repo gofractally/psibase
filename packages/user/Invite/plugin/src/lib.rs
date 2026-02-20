@@ -30,7 +30,7 @@ use psibase::{
     fracpack::Pack,
     services::tokens::{Decimal, Quantity},
     services::{credentials::CREDENTIAL_SENDER, invite as Invite},
-    AccountNumber,
+    AccountNumber, MethodNumber,
 };
 use transact::hooks::*;
 
@@ -249,10 +249,18 @@ impl Inviter for InvitePlugin {
 
 impl HookActionsSender for InvitePlugin {
     fn on_actions_sender(service: String, method: String) -> Result<Option<String>, Error> {
-        if service == Invite::SERVICE.to_string()
-            && method == Invite::action_structs::createAccount::ACTION_NAME
-        {
+        let create_account_method =
+            MethodNumber::from(Invite::action_structs::createAccount::ACTION_NAME).to_string();
+        if service == Invite::SERVICE.to_string() && method == create_account_method {
             return Ok(Some(CREDENTIAL_SENDER.to_string()));
+        } else {
+            println!(
+                "Action sender hook set, but {}:{} is not {}:{}",
+                method,
+                service,
+                Invite::SERVICE.to_string(),
+                Invite::action_structs::createAccount::ACTION_NAME
+            );
         }
 
         Ok(None)
