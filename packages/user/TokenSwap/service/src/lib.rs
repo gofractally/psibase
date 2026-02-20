@@ -17,23 +17,22 @@ pub mod service {
     fn init() {
         if InitRow::get().is_none() {
             InitRow::init();
-
-            let add_index = |method: &str, columns: Vec<u8>| {
-                for column in columns {
-                    events::Wrapper::call().addIndex(
-                        DbId::HistoryEvent,
-                        Wrapper::SERVICE,
-                        MethodNumber::from(method),
-                        column,
-                    );
-                }
-            };
-
-            add_index("swapped", vec![0, 1, 3]);
-            add_index("swap_completed", vec![0]);
-            add_index("liq_added", vec![0, 1]);
-            add_index("liq_removed", vec![0, 1]);
         }
+        let add_index = |method: &str, columns: Vec<u8>| {
+            for column in columns {
+                events::Wrapper::call().addIndex(
+                    DbId::HistoryEvent,
+                    Wrapper::SERVICE,
+                    MethodNumber::from(method),
+                    column,
+                );
+            }
+        };
+
+        add_index("swapped", vec![0, 1, 3]);
+        add_index("swap_completed", vec![0]);
+        add_index("liq_added", vec![0, 1]);
+        add_index("liq_removed", vec![0, 1]);
     }
 
     #[pre_action(exclude(init))]
