@@ -444,7 +444,7 @@ void psibase::http::send_request(boost::asio::io_context&        context,
    {
       if (ec)
       {
-         PSIBASE_LOG(socket->logger, warning) << "Connection failed: " << ec.message();
+         PSIBASE_LOG(socket->logger, warning) << ec.message();
          socket->do_error(ec);
       }
       else
