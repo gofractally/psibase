@@ -69,8 +69,6 @@ namespace psibase::http
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
       }
 
-      ~http_session() { PSIBASE_LOG(logger, debug) << "Connection closed"; }
-
       // Start the session
       void run()
       {
@@ -86,6 +84,7 @@ namespace psibase::http
       {
          auto result = std::move(derived_session().stream);
          _closed     = true;
+         _moved      = true;
          _timer->cancel();
          return result;
       }
