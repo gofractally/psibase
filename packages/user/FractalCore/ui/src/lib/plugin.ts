@@ -147,7 +147,7 @@ class UserGuild extends PluginInterface {
     }
 
     get createGuildInvite() {
-        return this._call<[guildAccount: Account]>("inviteMember");
+        return this._call<[guildAccount: Account, preAttest: boolean]>("inviteMember");
     }
 
     get attestMembershipApp() {

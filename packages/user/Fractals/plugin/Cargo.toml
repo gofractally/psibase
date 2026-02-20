@@ -31,6 +31,7 @@ world = "impl"
 "permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
 
 
 [dev-dependencies]

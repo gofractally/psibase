@@ -47,7 +47,7 @@ interface user-guild {
     register-candidacy: func(guild-account: string, active: bool) -> result<_, error>;
     apply-guild: func(guild-account: string, extra-info: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
-    invite-member: func(guild-account: string) -> result<string, error>;
+    invite-member: func(guild-account: string, pre-attest: bool) -> result<string, error>;
 }
 
 interface user-eval {

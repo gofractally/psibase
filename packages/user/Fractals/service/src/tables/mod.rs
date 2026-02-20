@@ -186,6 +186,7 @@ pub mod tables {
         pub guild: AccountNumber,
         pub inviter: AccountNumber,
         pub created_at: psibase::TimePointSec,
+        pub pre_attest: bool,
     }
 
     impl GuildInvite {

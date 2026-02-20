@@ -472,8 +472,9 @@ pub mod service {
         invite_id: u32,
         finger_print: Checksum256,
         secret: String,
+        pre_attest: bool,
     ) {
-        GuildInvite::add(guild, invite_id, finger_print, secret);
+        GuildInvite::add(guild, invite_id, finger_print, secret, pre_attest);
     }
 
     /// Invite a guild member.

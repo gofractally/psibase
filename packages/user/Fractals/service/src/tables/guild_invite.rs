@@ -8,12 +8,14 @@ use psibase::{
 
 use crate::{
     constants::MAX_GUILD_INVITES_PER_MEMBER,
-    tables::tables::{Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember},
+    tables::tables::{
+        Guild, GuildApplication, GuildAttest, GuildInvite, GuildInviteTable, GuildMember,
+    },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildInvite {
-    fn new(guild: AccountNumber, id: u32) -> Self {
+    fn new(guild: AccountNumber, id: u32, pre_attest: bool) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
@@ -21,6 +23,7 @@ impl GuildInvite {
             id,
             inviter: get_sender(),
             created_at: now,
+            pre_attest,
         }
     }
 
@@ -51,17 +54,23 @@ impl GuildInvite {
         let tokens = psibase::services::tokens::Wrapper::call();
         let inviter = get_sender();
 
-        tokens.debit(token_id, inviter, cost, "memo".into());
+        tokens.debit(token_id, inviter, cost, "Invite fee".into());
         tokens.credit(
             token_id,
             psibase::services::invite::SERVICE,
             cost,
-            "memo".into(),
+            "Invite fee".into(),
         );
-        tokens.reject(token_id, inviter, "dust".into());
+        tokens.reject(token_id, inviter, "Invite fee dust return".into());
     }
 
-    pub fn add(guild: AccountNumber, invite_id: u32, finger_print: Checksum256, secret: String) {
+    pub fn add(
+        guild: AccountNumber,
+        invite_id: u32,
+        finger_print: Checksum256,
+        secret: String,
+        pre_attest: bool,
+    ) {
         let inviter = get_sender();
         check(
             Self::by_inviter(guild, inviter).len() <= MAX_GUILD_INVITES_PER_MEMBER.into(),
@@ -86,7 +95,7 @@ impl GuildInvite {
             invite_cost.map_or(0.into(), |(_, amount)| amount),
         );
 
-        Self::new(guild, invite_id).save();
+        Self::new(guild, invite_id, pre_attest).save();
     }
 
     pub fn get(id: u32) -> Option<Self> {
@@ -105,8 +114,12 @@ impl GuildInvite {
     }
 
     pub fn accept(&self, accepter: AccountNumber, extra_info: String) {
-        self.remove();
         GuildApplication::add(self.guild, accepter, extra_info);
+        if self.pre_attest {
+            GuildAttest::set(self.guild, accepter, self.inviter, "".to_string(), true);
+        }
+        // is there more invites...?
+        self.remove();
     }
 
     pub fn cancel(&self) {

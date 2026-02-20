@@ -40,7 +40,7 @@ export const InviteGuildMemberModal = ({
 
     useEffect(() => {
         if (show && !isSuccess)
-        createGuildInvite([guildAccount!])
+        createGuildInvite([guildAccount!, true])
     }, [show, isSuccess, guildAccount, createGuildInvite])
 
     const onCopyClick = async () => {
@@ -53,7 +53,7 @@ export const InviteGuildMemberModal = ({
             toast("Copied to clipboard.");
         } else {
             toast("Copying failed, not in secure context?");
-            createGuildInvite([guildAccount!])
+            createGuildInvite([guildAccount!, true])
         }
     };
 
