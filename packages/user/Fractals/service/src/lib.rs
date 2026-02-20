@@ -201,16 +201,6 @@ pub mod service {
         GuildApplication::get_assert(guild_account, applicant).attest(comment, endorses);
     }
 
-    /// Conclude Guild Membership application
-    ///
-    /// # Arguments
-    /// * `applicant` - Account of the applicant.
-    /// * `accepted` - True to accept application, False will deny and delete the application.
-    #[action]
-    fn con_mem_app(applicant: AccountNumber, accepted: bool) {
-        GuildApplication::get_assert(get_sender(), applicant).conclude(accepted);
-    }
-
     /// Starts an evaluation for the specified guild.
     ///
     /// # Arguments

@@ -61,7 +61,6 @@ define_trust! {
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
             - Set minimum scorers required to enable consensus rewards
-            - Conclude membership applications
             - Set token init and guild ranking threshold
             ",
     }
@@ -69,7 +68,7 @@ define_trust! {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
         Medium => [apply_guild, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
-        High => [attest, con_membership_app, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
+        High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -198,21 +197,6 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl AdminGuild for FractallyPlugin {
-    fn con_membership_app(guild: String, applicant: String, accepted: bool) -> Result<(), Error> {
-        get_guild(guild)?.assert_authorized(FunctionName::con_membership_app)?;
-
-        let packed_args = fractals::action_structs::con_mem_app {
-            accepted,
-            applicant: applicant.as_str().into(),
-        }
-        .packed();
-
-        add_action_to_transaction(
-            fractals::action_structs::con_mem_app::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account.clone())?;
 

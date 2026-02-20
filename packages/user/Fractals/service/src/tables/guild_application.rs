@@ -65,12 +65,24 @@ impl GuildApplication {
         }
     }
 
-    pub fn conclude(&self, accepted: bool) {
-        if accepted {
+    fn check_attests(&self) {
+        let passed = self.attestations_score() >= 3;
+        if passed {
             GuildMember::add(self.guild, self.applicant);
+            self.remove()
         }
+    }
 
-        self.remove()
+    fn attestations_score(&self) -> i16 {
+        GuildAttestTable::read()
+            .get_index_pk()
+            .range(
+                (self.guild, self.applicant, AccountNumber::new(0))
+                    ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
+            )
+            .fold(0i16, |acc, e| {
+                acc.saturating_add(if e.endorses { 1 } else { -1 })
+            })
     }
 
     pub fn attest(&self, comment: String, endorses: bool) {
@@ -81,6 +93,7 @@ impl GuildApplication {
             "must be member of the guild to attest",
         );
         GuildAttest::set(self.guild, self.applicant, attester, comment, endorses);
+        self.check_attests();
     }
 
     pub fn cancel(&self) {

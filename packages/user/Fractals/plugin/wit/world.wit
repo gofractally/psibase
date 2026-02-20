@@ -28,7 +28,6 @@ interface admin-guild {
     resign-guild-rep: func(guild-account: string) -> result<_, error>;
     remove-guild-rep: func(guild-account: string) -> result<_, error>;
 
-    con-membership-app: func(guild-account: string, member: string, accepted: bool) -> result<_, error>;
     set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
 
 }

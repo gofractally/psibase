@@ -97,15 +97,12 @@ const fetchInviteById = async (inviteId: number) => {
 }
 
 const fetchInvites = async (token: string) => {
-    console.log(token, 'fetching invite')
     const inviteId = await supervisor.functionCall({
         service: "invite",
         intf: "invitee",
         method: "importInviteToken",
         params: [token],
     });
-
-    console.log(inviteId, 'is the invite id')
 
     const [guildInvite, vanillaInvite] = await Promise.all([fetchGuildInvite(inviteId), fetchInviteById(inviteId)]);
 
