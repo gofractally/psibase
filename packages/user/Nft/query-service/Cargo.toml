@@ -13,3 +13,4 @@ serde_json.workspace = true
 nft = { path = "../service", version = "0.23.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true
+serde-aux.workspace = true
