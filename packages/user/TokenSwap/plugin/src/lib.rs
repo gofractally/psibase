@@ -21,26 +21,18 @@ mod errors;
 use errors::ErrorType;
 use psibase::services::tokens::{Decimal, Quantity};
 
+use psibase::services::token_swap::{mul_div, PPM};
+
 use crate::{
     bindings::{
         exports::token_swap::plugin::liquidity::{Pool as WitPool, TokenAmount},
         token_swap::plugin::types::Path,
         tokens::plugin::helpers::u64_to_decimal,
     },
-    constants::PPM,
     find_path::{find_path, GraphPool},
     graphql::{fetch_all_pools, GraphQLPool},
     trust::{assert_authorized_with_whitelist, FunctionName},
 };
-
-mod constants {
-    pub const PPM: u32 = 1_000_000;
-}
-
-pub fn mul_div(a: Quantity, b: Quantity, c: Quantity) -> Quantity {
-    let res = (a.value as u128 * b.value as u128) / (c.value as u128);
-    (res as u64).into()
-}
 
 define_trust! {
     descriptions {
