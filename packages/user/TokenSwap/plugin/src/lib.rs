@@ -152,7 +152,7 @@ impl Swap for TokenSwapPlugin {
 
         let packed_args = token_swap::action_structs::swap {
             token_in: amount_in.token_id,
-            amount_in: credit_to_service(amount_in, "Swap")?,
+            amount_in: credit_to_service(amount_in, "Swap start")?,
             min_return: Decimal::from_str(&min_return).unwrap().quantity,
             pools: pools
                 .into_iter()

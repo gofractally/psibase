@@ -611,7 +611,7 @@ pub mod service {
         check(pools.len() > 0, "pools length must be at least 1");
         let sender = get_sender();
         let tokens_service = psibase::services::tokens::Wrapper::call();
-        tokens_service.debit(token_in, sender, amount_in, "Swap".into());
+        tokens_service.debit(token_in, sender, amount_in, "".into());
 
         let mut current_token = token_in;
         let mut current_amount = amount_in;
@@ -625,7 +625,12 @@ pub mod service {
         }
 
         check(current_amount >= min_return, "does not meet minimum return");
-        tokens_service.credit(current_token, sender, current_amount, "Token swap".into());
+        tokens_service.credit(
+            current_token,
+            sender,
+            current_amount,
+            "Swap complete".into(),
+        );
     }
 }
 
