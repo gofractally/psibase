@@ -139,7 +139,11 @@ fn refill_to_capacity(capacity: Option<u64>, force: bool) -> Result<(), Error> {
         }
     }
 
-    let amount = capacity - balance;
+    let amount = capacity.saturating_sub(balance);
+    if amount == 0 {
+        return Ok(());
+    }
+
     let amount_str = TokensPlugin::helpers::u64_to_decimal(sys_id, amount)?;
 
     // Refill
@@ -207,10 +211,11 @@ impl Billing for VirtualServerPlugin {
 }
 
 impl TransactInterface for VirtualServerPlugin {
-    fn auto_fill_gas_tank() -> Result<(), Error> {
+    fn auto_fill_gas_tank(account: String) -> Result<(), Error> {
         assert_caller(&["transact"], "auto_fill_gas_tank");
 
-        if !query::billing_enabled()? || AccountsPlugin::api::get_current_user().is_none() {
+        let user = AccountsPlugin::api::get_current_user();
+        if !query::billing_enabled()? || user.is_none() || user.unwrap() != account {
             return Ok(());
         }
 

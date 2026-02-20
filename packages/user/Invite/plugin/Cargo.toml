@@ -26,6 +26,9 @@ package = "invite:plugin"
 [package.metadata.component.target]
 world = "impl"
 
+[package.metadata.component.bindings.with]
+"host:types/types" = "psibase_plugin::types"
+
 [package.metadata.component.target.dependencies]
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
@@ -33,6 +36,4 @@ world = "impl"
 "aes:plugin" = { path = "../../Aes/plugin/wit/world.wit" }
 "base64:plugin" = { path = "../../Base64/plugin/wit/world.wit" }
 "credentials:plugin" = { path = "../../../system/Credentials/plugin/wit/world.wit" }
-
-[package.metadata.component.bindings.with]
-"host:types/types" = "psibase_plugin::types"
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }

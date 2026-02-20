@@ -2,6 +2,7 @@
 
 #[allow(warnings)]
 mod bindings;
+use std::str::FromStr;
 
 mod errors;
 use errors::ErrorTypes::*;
@@ -20,13 +21,14 @@ use bindings::exports::{
 use bindings::invite::plugin::types::NewInviteDetails;
 use bindings::{
     aes::plugin as aes, base64::plugin as base64, credentials::plugin as credentials,
-    transact::plugin as transact,
+    tokens::plugin as tokens, transact::plugin as transact,
 };
 use invite::plugin::{
     invitee::Guest as Invitee, inviter::Guest as Inviter, redemption::Guest as Redemption,
 };
 use psibase::{
     fracpack::Pack,
+    services::tokens::{Decimal, Quantity},
     services::{credentials::CREDENTIAL_SENDER, invite as Invite},
     AccountNumber,
 };
@@ -45,7 +47,7 @@ impl TrustConfig for InvitePlugin {
     fn capabilities() -> Capabilities {
         Capabilities {
             low: &["Delete previously created invites", "Reject active invites"],
-            medium: &["Generate new invites"],
+            medium: &["Generate (purchase) new invites"],
             high: &[""],
         }
     }
@@ -164,38 +166,75 @@ impl Redemption for InvitePlugin {
     }
 }
 
+fn get_invite_cost(num_accounts: u16) -> Result<String, Error> {
+    let query = format!(
+        r#"query {{ getInviteCost(numAccounts: {}) }}"#,
+        num_accounts
+    );
+    let response = host::server::post_graphql_get_json(&query)?;
+    let cost = GetInviteCostResponse::from_gql(response)?;
+    Ok(cost.getInviteCost)
+}
+
 impl Inviter for InvitePlugin {
     #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
     fn generate_invite() -> Result<String, Error> {
-        let (invite_token, d) = Self::prepare_new_invite()?;
-
         const NUM_ACCOUNTS: u16 = 1;
+        let (invite_token, details, min_cost) = Self::prepare_new_invite(NUM_ACCOUNTS)?;
+        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
+
+        if min_cost_u64 > 0 {
+            let sys = tokens::helpers::fetch_network_token().unwrap().unwrap();
+            tokens::user::credit(
+                sys,
+                &host::client::get_receiver(),
+                &min_cost,
+                "Create an invite",
+            )?;
+        }
+
+        let fingerprint = psibase::Checksum256::from(
+            <[u8; 32]>::try_from(details.fingerprint.as_slice()).unwrap(),
+        );
         Invite::Wrapper::add_to_tx().createInvite(
-            d.invite_id,
-            d.invite_key.into(),
+            details.invite_id,
+            fingerprint,
             NUM_ACCOUNTS,
             false,
-            d.encrypted_secret,
+            details.encrypted_secret,
+            Quantity::from(min_cost_u64),
         );
 
         Ok(invite_token)
     }
 
     #[psibase_plugin::authorized(None)]
-    fn prepare_new_invite() -> Result<(String, NewInviteDetails), Error> {
+    fn prepare_new_invite(num_accounts: u16) -> Result<(String, NewInviteDetails, String), Error> {
         let keypair = host::crypto::generate_unmanaged_keypair()?;
         let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
         let invite_id: u32 = rand::rng().random();
         let invite_token = encode_invite_token(invite_id, symmetric_key);
 
+        let sys = tokens::helpers::fetch_network_token()?;
+        let min_cost = if sys.is_some() {
+            get_invite_cost(num_accounts)?
+        } else {
+            "0".to_string()
+        };
+
+        let fingerprint = psibase::sha256(&host::crypto::to_der(&keypair.public_key)?)
+            .0
+            .to_vec();
+
         Ok((
             invite_token,
             NewInviteDetails {
                 invite_id,
-                invite_key: host::crypto::to_der(&keypair.public_key)?,
+                fingerprint,
                 encrypted_secret: secret,
             },
+            min_cost,
         ))
     }
 

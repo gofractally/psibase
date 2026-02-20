@@ -318,6 +318,13 @@ namespace SystemService
       void execTrx(psio::view<const psio::shared_view_ptr<psibase::Transaction>> trx,
                    bool                                                          speculative);
 
+      /// Called by native code on objective writes to the database
+      void kvNotify(psibase::AccountNumber service,
+                    psibase::DbId          db,
+                    std::uint32_t          keyLen,
+                    std::uint32_t          oldValueLen,
+                    std::uint32_t          newValueLen);
+
       /// Sets the time between snapshots
       ///
       /// A value of 0 will disable snapshots. This is a chain-wide
@@ -367,7 +374,62 @@ namespace SystemService
       ///   `AuthInterface::runAsMatchedExpandedReq` if not empty (normally fails).
       /// * All other cases, requires `action.sender's authService`
       ///   to approve with flag `AuthInterface::runAsOtherReq` (normally fails).
-      // TODO: rename. Requires changes throughout C++, Rust, js, and documentation.
+      ///
+      ///         +---------------------------------------+
+      ///         | call runAs(action, allowedActions)    |
+      ///         +-------------------+-------------------+
+      ///                             |
+      ///                             v
+      ///          +--------------------------------------+
+      ///          | getSender() == action.sender.authSvc |
+      ///          +-------------------+------------------+
+      ///              yes |                          | no
+      ///                  v                          v
+      ///               +----+          +------------------------------+
+      ///               | OK |          | getSender() == action.sender |
+      ///               +----+          +---------------+--------------+
+      ///                                   yes |           | no
+      ///                                       v           v
+      ///                 +-------------------------+   +----------------------+
+      ///                 | Auth: runAsRequesterReq |   | earlier runAs frame? |
+      ///                 +-----------+-------------+   +----------+-----------+
+      ///                             |                    no |           | yes
+      ///                             v                       v           |
+      ///                +----------------+             (FALLTHROUGH)     |
+      ///                | Needs approval |                               |
+      ///                | (Normally OK)  |                               v
+      ///                +----------------+    +-----------------------------------+
+      ///                                      | getSender() == earlier.action.svc |
+      ///                                      +---------------+-------------------+
+      ///                                       no |           | yes
+      ///                                          |           |
+      ///                                          v           |
+      ///                                   (FALLTHROUGH)      |
+      ///                                                      v-
+      ///                                       +---------------------------------+
+      ///                                       | action matches earlier.allowed? |
+      ///                                       +---------------+-----------------+
+      ///                                         no |         | yes
+      ///                                            v         |
+      ///                                     (FALLTHROUGH)    |
+      ///                                                      |
+      ///                                                      v
+      ///                                        +-------------------------------+
+      ///                                        | current allowedActions empty? |
+      ///                                        +------------+------------------+
+      ///                                            yes |              | no
+      ///                                                v              v
+      ///                            +-------------------------+  +-------------------------------+
+      ///                            | Auth: runAsMatchedReq   |  | Auth: runAsMatchedExpandedReq |
+      ///                            +-----------+-------------+  +---------------+---------------+
+      ///                                        |                                |
+      ///                                        v                                v
+      ///                        +------------------------------+   +------------------------------+
+      ///                        | Needs approval (normally OK) |   | Needs approval (normally no) |
+      ///                        +------------------------------+   +------------------------------+
+      ///
+      ///  (FALLTHROUGH) -> "Auth: runAsOtherReq" -> Needs approval (normally no)
+      ///
       std::vector<char> runAs(psibase::Action action, std::vector<ServiceMethod> allowedActions);
 
       /// Checks authorization for the sender of the first action
@@ -403,6 +465,7 @@ namespace SystemService
                 method(finishBoot),
                 method(startBlock),
                 method(execTrx, transaction, speculative),
+                method(kvNotify, service, db, keyLen, oldValueLen, newValueLen),
                 method(setSnapTime, seconds),
                 method(addCallback, type, objective, action),
                 method(removeCallback, type, objective, action),

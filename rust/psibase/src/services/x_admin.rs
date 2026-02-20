@@ -1,13 +1,17 @@
 #[crate::service(name = "x-admin", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{AccountNumber, HttpReply, HttpRequest};
+    use crate::{AccountNumber, HttpReply, HttpRequest, IPAddress};
     use fracpack::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
     /// Returns true if the account or the remote end of socket is a node admin
     #[action]
-    fn isAdmin(account: Option<AccountNumber>, socket: Option<i32>) -> bool {
+    fn isAdmin(
+        account: Option<AccountNumber>,
+        socket: Option<i32>,
+        forwarded: Vec<Option<IPAddress>>,
+    ) -> bool {
         unimplemented!()
     }
 
@@ -36,6 +40,7 @@ mod service {
     struct AdminOptionsRow {
         p2p: bool,
         hosts: Vec<String>,
+        peers: Vec<String>,
     }
 }
 

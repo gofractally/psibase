@@ -105,6 +105,10 @@ impl CpuPricing {
     pub fn set_billable_unit(amount_ns: u64) {
         Self::update_cpu(|cpu| cpu.billable_unit = amount_ns);
     }
+
+    pub fn get_billable_unit(&self) -> u64 {
+        self.billable_unit
+    }
 }
 
 #[ComplexObject]

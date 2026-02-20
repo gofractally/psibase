@@ -56,17 +56,19 @@ const combinePeers = (
 
     const connectMap: { [index: string]: PeerType } = {};
     for (const peer of livePeers) {
-        if (peer.url) {
-            connectMap[peer.url] = peer;
+        for (const url of peer.urls) {
+            connectMap[url] = peer;
         }
     }
 
     const persistentPeers = configPeers.map((url): z.infer<typeof UIPeer> => {
         if (url in connectMap) {
+            const { id, endpoint } = connectMap[url];
             return {
                 state: "persistent",
                 url: url,
-                ...connectMap[url],
+                id,
+                endpoint,
             };
         } else {
             return {
@@ -79,12 +81,13 @@ const combinePeers = (
     });
 
     const transientPeers: z.infer<typeof UIPeer>[] = livePeers
-        .filter((peer) => !peer.url || !configSet.has(peer.url))
+        .filter((peer) => !peer.urls.some((url) => configSet.has(url)))
         .map(
             (peer): z.infer<typeof UIPeer> => ({
                 state: "transient",
-                url: peer.url ?? "",
-                ...peer,
+                url: peer.urls[0] ?? "",
+                id: peer.id,
+                endpoint: peer.endpoint,
             }),
         );
 

@@ -1,9 +1,11 @@
 #include <services/local/XAdmin.hpp>
 
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/json/any.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
+#include <services/local/XPeers.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
 
@@ -108,55 +110,118 @@ namespace LocalService
          return row && row->head;
       }
 
-      bool isAdminSocket(std::optional<std::int32_t> socket)
+      std::optional<std::string> getEnv(const std::string& name)
       {
-         if (socket)
+         auto                  native   = Native::session(KvMode::read);
+         auto                  envTable = native.open<EnvTable>();
+         std::optional<EnvRow> env;
+         PSIBASE_SUBJECTIVE_TX
          {
-            std::optional<SocketRow> row;
-            auto                     native = Native::session(KvMode::read);
-            PSIBASE_SUBJECTIVE_TX
-            {
-               row = native.open<SocketTable>().get(*socket);
-            }
-            check(row.has_value(), "Missing socket row");
-            check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
-            const auto& info = std::get<HttpSocketInfo>(row.value().info);
-            check(info.endpoint.has_value(), "Missing endpoint for socket");
-            const auto& endpoint = info.endpoint.value();
-            if (isLoopback(endpoint))
-               return true;
+            env = envTable.get(name);
+         }
+         if (env)
+            return std::move(env->value);
+         else
+            return {};
+      }
 
-            std::optional<EnvRow> env;
-            PSIBASE_SUBJECTIVE_TX
+      struct IPAddressPrefixSet
+      {
+         std::vector<IPAddressPrefix> prefixes;
+         template <typename T>
+         bool contains(const T& address) const
+         {
+            for (const auto& prefix : prefixes)
+               if (prefix.contains(address))
+                  return true;
+            return false;
+         }
+         template <typename... T>
+         bool contains(const std::variant<T...>& address) const
+         {
+            return std::visit([this](auto& addr) { return contains(addr); }, address);
+         }
+         void addEnv(const std::string& name)
+         {
+            if (auto env = getEnv(name))
             {
-               env = native.open<EnvTable>().get(std::string("PSIBASE_ADMIN_IP"));
-            }
-            if (env)
-            {
-               std::string_view            addrs = env->value;
+               std::string_view            addrs = *env;
                std::string_view::size_type prev  = 0;
                while (true)
                {
-                  auto pos     = addrs.find(prev, ',');
-                  auto addrStr = addrs.substr(prev, pos);
+                  auto pos     = addrs.find(',', prev);
+                  auto addrStr = addrs.substr(prev, pos - prev);
                   if (auto prefix = parseIPAddressPrefix(addrStr))
                   {
-                     if (auto v4 = std::get_if<IPV4Endpoint>(&info.endpoint.value()))
-                     {
-                        if (prefix->contains(v4->address))
-                           return true;
-                     }
-                     else if (auto v6 = std::get_if<IPV6Endpoint>(&info.endpoint.value()))
-                     {
-                        if (prefix->contains(v6->address))
-                           return true;
-                     }
+                     prefixes.push_back(std::move(*prefix));
                   }
                   if (pos == std::string_view::npos)
                      break;
                   prev = pos + 1;
                }
             }
+         }
+      };
+
+      SocketEndpoint getEndpoint(std::int32_t socket)
+      {
+         std::optional<SocketRow> row;
+         auto                     native = Native::session(KvMode::read);
+         PSIBASE_SUBJECTIVE_TX
+         {
+            row = native.open<SocketTable>().get(socket);
+         }
+         check(row.has_value(), "Missing socket row");
+         check(std::holds_alternative<HttpSocketInfo>(row->info), "Wrong socket type");
+         const auto& info = std::get<HttpSocketInfo>(row.value().info);
+         check(info.endpoint.has_value(), "Missing endpoint for socket");
+         return std::move(*info.endpoint);
+      }
+
+      bool isAdminSocket(std::optional<std::int32_t>                  socket,
+                         const std::vector<std::optional<IPAddress>>& forwarded)
+      {
+         if (socket)
+         {
+            auto               endpoint = getEndpoint(*socket);
+            IPAddressPrefixSet prefixes;
+            prefixes.addEnv("PSIBASE_ADMIN_IP");
+
+            if (!isLoopback(endpoint) && !prefixes.contains(endpoint))
+               return false;
+            for (const auto& addr : forwarded)
+            {
+               if (!addr || !isLoopback(*addr) && !prefixes.contains(*addr))
+                  return false;
+            }
+            return true;
+         }
+         return false;
+      }
+
+      bool isAdminSocket(std::optional<std::int32_t> socket, const HttpRequest& req)
+      {
+         if (socket)
+         {
+            auto               endpoint = getEndpoint(*socket);
+            IPAddressPrefixSet prefixes;
+            prefixes.addEnv("PSIBASE_ADMIN_IP");
+
+            if (!isLoopback(endpoint) && !prefixes.contains(endpoint))
+               return false;
+
+            if (auto env = getEnv("PSIBASE_USERNAME_FIELD"))
+            {
+               if (req.getHeader(*env))
+                  return true;
+            }
+
+            for (const auto& addr : forwardedFor(req))
+            {
+               if (!addr || !isLoopback(*addr) && !prefixes.contains(*addr))
+                  return false;
+            }
+            return true;
          }
          return false;
       }
@@ -320,7 +385,7 @@ namespace LocalService
                // because they are used by the UI, which is part of this
                // service. Unknown host options will not be displayed and
                // will be round-tripped unmodified.
-               if (entry.key == "hosts")
+               if (entry.key == "hosts" || entry.key == "peers")
                   continue;
                else if (psio::get_data_member<AdminOptionsRow>(entry.key, [](auto) {}) ||
                         // In the unlikely event that the host has a option that
@@ -333,6 +398,8 @@ namespace LocalService
          result.push_back({"p2p", adminOpts.p2p});
          result.push_back({"hosts", psio::convert_from_json<psio::json::any>(
                                         psio::convert_to_json(adminOpts.hosts))});
+         result.push_back({"peers", psio::convert_from_json<psio::json::any>(
+                                        psio::convert_to_json(adminOpts.peers))});
          return psio::convert_to_json(psio::json::any{std::move(result)});
       }
       void writeConfig(std::string config)
@@ -359,6 +426,12 @@ namespace LocalService
                else if (entry.key == "hosts")
                {
                   adminConfig.hosts = psio::convert_from_json<std::vector<std::string>>(
+                      psio::convert_to_json(entry.value));
+                  host.push_back(std::move(entry));
+               }
+               else if (entry.key == "peers")
+               {
+                  adminConfig.peers = psio::convert_from_json<std::vector<std::string>>(
                       psio::convert_to_json(entry.value));
                   host.push_back(std::move(entry));
                }
@@ -393,6 +466,10 @@ namespace LocalService
          {
             adminOpts.hosts = parseOptionList(*hosts, std::vector<std::string>());
          }
+         if (auto* peers = json.hostOption("peers"))
+         {
+            adminOpts.peers = parseOptionList(*peers, std::vector<std::string>());
+         }
          if (auto* config = json.serviceConfig())
          {
             for (const auto& entry : *config)
@@ -416,23 +493,26 @@ namespace LocalService
          }
          open<AdminOptionsTable>().put(adminOpts);
       }
+      recurse().to<XPeers>().onConfig();
    }
 
    AdminOptionsRow XAdmin::options()
    {
-      check(getSender() == XHttp::service, "Wrong sender");
+      auto sender = getSender();
+      check(sender == XHttp::service || sender == XPeers::service, "Wrong sender");
+      std::optional<AdminOptionsRow> result;
       PSIBASE_SUBJECTIVE_TX
       {
-         return open<AdminOptionsTable>().get({}).value_or(AdminOptionsRow{});
+         result = open<AdminOptionsTable>().get({});
       }
-      __builtin_unreachable();
+      return result.value_or(AdminOptionsRow{});
    }
 
    // Returns nullopt on success, an appropriate error on failure
    std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
                                               std::optional<std::int32_t> socket)
    {
-      if (isAdminSocket(socket))
+      if (isAdminSocket(socket, req))
          return {};
 
       if (chainIsBooted())
@@ -455,7 +535,9 @@ namespace LocalService
                        .body        = toVec("Not authorized")};
    }
 
-   bool XAdmin::isAdmin(std::optional<AccountNumber> account, std::optional<std::int32_t> socket)
+   bool XAdmin::isAdmin(std::optional<AccountNumber>          account,
+                        std::optional<std::int32_t>           socket,
+                        std::vector<std::optional<IPAddress>> forwarded)
    {
       if (account)
       {
@@ -467,7 +549,7 @@ namespace LocalService
                return true;
          }
       }
-      return isAdminSocket(socket);
+      return isAdminSocket(socket, forwarded);
    }
 
    std::optional<HttpReply> XAdmin::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
@@ -507,6 +589,7 @@ namespace LocalService
                };
             }
             writeConfig(std::string(req.body.begin(), req.body.end()));
+            recurse().to<XPeers>().onConfig();
             return HttpReply{
                 .status = HttpStatus::ok,
             };

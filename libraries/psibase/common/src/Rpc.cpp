@@ -1,6 +1,10 @@
 #include <psibase/Rpc.hpp>
 
+#include <psibase/HttpHeaders.hpp>
 #include <ranges>
+#include "HttpUtil.hpp"
+
+using psibase::detail::split2sv;
 
 namespace
 {
@@ -37,16 +41,6 @@ namespace
             result += *iter;
       }
       return result;
-   }
-
-   // Used to convert a split_view element to a string_view.
-   // Note that this is only needed when the standard library
-   // doesn't implement P2210R2
-   std::string_view split2sv(const auto& r)
-   {
-      auto data = &*r.begin();
-      auto size = static_cast<std::size_t>(std::ranges::distance(r));
-      return std::string_view{data, size};
    }
 
    struct Origin
@@ -88,7 +82,7 @@ namespace psibase
 {
    bool HttpHeader::matches(std::string_view h) const
    {
-      return std::ranges::equal(name, h, {}, ::tolower, ::tolower);
+      return iequal(name, h);
    }
 
    std::optional<std::string_view> HttpHeader::get(const std::vector<HttpHeader>& headers,
@@ -112,10 +106,8 @@ namespace psibase
       {
          if (header.matches(name))
          {
-            for (auto range : header.value | std::views::split(','))
+            for (auto value : QSplit{header.value, ','})
             {
-               std::string_view value = split2sv(range);
-
                auto low  = value.find_first_not_of(" \t");
                auto high = value.find_last_not_of(" \t");
                if (low == std::string::npos)
@@ -188,7 +180,7 @@ namespace psibase
       for (auto iter = headers.begin(); iter != headers.end();)
       {
          auto& header = *iter;
-         if (std::ranges::equal(header.name, std::string_view{"cookie"}, {}, ::tolower))
+         if (header.matches("cookie"))
          {
             std::string newValue;
             bool        first = true;
@@ -286,6 +278,18 @@ namespace psibase
       auto enduserinfo = authority.find('@');
       auto host = enduserinfo == std::string::npos ? authority : authority.substr(enduserinfo + 1);
       return {scheme, host, path};
+   }
+
+   std::string_view SplitURL::domain() const
+   {
+      if (auto pos = host.rfind(':'); pos != std::string::npos)
+      {
+         if (host.find(']', pos) == std::string::npos)
+         {
+            return host.substr(0, pos);
+         }
+      }
+      return host;
    }
 
    std::vector<HttpHeader> allowCors(std::string_view origin)

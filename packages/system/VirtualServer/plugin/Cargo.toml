@@ -1,12 +1,12 @@
 [package]
 name = "virtual-server-plugin"
-version.workspace = true
+version = "0.23.1"
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-virtual-server = { path = "../service/", version = "0.22.0" }
+virtual-server = { path = "../service/", version = "0.23.0" }
 psibase.workspace = true
 psibase_plugin.workspace = true
 serde.workspace = true

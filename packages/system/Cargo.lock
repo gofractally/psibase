@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "auth-dyn"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "auth-dyn-pkg",
@@ -269,16 +269,17 @@ dependencies = [
 
 [[package]]
 name = "auth-dyn-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "auth-dyn",
  "auth-dyn-plugin",
+ "psibase-system-workspace-hack",
  "r-auth-dyn",
 ]
 
 [[package]]
 name = "auth-dyn-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "auth-dyn",
  "psibase",
@@ -590,7 +591,7 @@ dependencies = [
 
 [[package]]
 name = "credentials"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "credentials-pkg",
  "psibase",
@@ -602,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "credentials-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "credentials",
  "credentials-plugin",
@@ -611,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "credentials-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "credentials",
  "psibase",
@@ -635,7 +636,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0dc92fb57ca44df6db8059111ab3af99a63d5d0f8375d9972e319a379c6bab76"
 dependencies = [
  "generic-array",
- "rand_core",
+ "rand_core 0.6.4",
  "subtle",
  "zeroize",
 ]
@@ -823,7 +824,7 @@ dependencies = [
  "group",
  "pem-rfc7468",
  "pkcs8",
- "rand_core",
+ "rand_core 0.6.4",
  "sec1",
  "subtle",
  "zeroize",
@@ -881,7 +882,7 @@ version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0b50bfb653653f9ca9095b427bed08ab8d75a137839d9ad64eb11810d5b6393"
 dependencies = [
- "rand_core",
+ "rand_core 0.6.4",
  "subtle",
 ]
 
@@ -918,7 +919,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1125,7 +1126,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
 dependencies = [
  "ff",
- "rand_core",
+ "rand_core 0.6.4",
  "subtle",
 ]
 
@@ -1848,6 +1849,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ppv-lite86"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
+dependencies = [
+ "zerocopy",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1910,7 +1920,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -1945,7 +1955,7 @@ dependencies = [
  "psibase-rust-workspace-hack",
  "psibase_macros",
  "psibase_names",
- "rand_core",
+ "rand_core 0.6.4",
  "regex",
  "reqwest",
  "ring",
@@ -1970,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -1985,7 +1995,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -2006,7 +2016,9 @@ checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
 name = "psibase-system-workspace-hack"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.3.4",
  "indexmap",
+ "libc",
  "memchr",
  "proc-macro2",
  "quote",
@@ -2018,7 +2030,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -2026,7 +2038,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -2034,7 +2046,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "graphql_client",
  "psibase",
@@ -2055,7 +2067,7 @@ dependencies = [
 
 [[package]]
 name = "r-auth-dyn"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "auth-dyn",
@@ -2073,7 +2085,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r-staged-tx"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2084,12 +2096,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
+dependencies = [
+ "rand_chacha",
+ "rand_core 0.9.5",
+]
+
+[[package]]
+name = "rand_chacha"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
+dependencies = [
+ "ppv-lite86",
+ "rand_core 0.9.5",
+]
+
+[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.16",
+]
+
+[[package]]
+name = "rand_core"
+version = "0.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
+dependencies = [
+ "getrandom 0.3.4",
 ]
 
 [[package]]
@@ -2479,7 +2520,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest",
- "rand_core",
+ "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -2553,7 +2594,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "staged-tx"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "pem",
@@ -2567,7 +2608,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-system-workspace-hack",
  "r-staged-tx",
@@ -2577,7 +2618,7 @@ dependencies = [
 
 [[package]]
 name = "staged-tx-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
@@ -3093,12 +3134,15 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "virtual-server"
-version = "0.22.0"
+version = "0.23.1"
 dependencies = [
  "async-graphql",
+ "p256",
+ "pem",
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_macros",
+ "rand",
  "serde",
  "serde-aux",
  "serde_json",
@@ -3107,9 +3151,8 @@ dependencies = [
 
 [[package]]
 name = "virtual-server-pkg"
-version = "0.22.0"
+version = "0.23.1"
 dependencies = [
- "async-graphql",
  "psibase-system-workspace-hack",
  "virtual-server",
  "virtual-server-plugin",
@@ -3117,8 +3160,9 @@ dependencies = [
 
 [[package]]
 name = "virtual-server-plugin"
-version = "0.22.0"
+version = "0.23.1"
 dependencies = [
+ "async-graphql",
  "graphql_client",
  "psibase",
  "psibase-system-workspace-hack",
@@ -3743,18 +3787,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.39"
+version = "0.8.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6d35d663eadb6c932438e763b262fe1a70987f9ae936e60158176d710cae4a"
+checksum = "57cf3aa6855b23711ee9852dfc97dfaa51c45feaba5b645d0c777414d494a961"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.39"
+version = "0.8.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4122cd3169e94605190e77839c9a40d40ed048d305bfdc146e7df40ab0f3e517"
+checksum = "8a616990af1a287837c4fe6596ad77ef57948f787e46ce28e166facc0cc1cb75"
 dependencies = [
  "proc-macro2",
  "quote",

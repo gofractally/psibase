@@ -4,6 +4,36 @@ pub mod rpc;
 pub mod tables;
 pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
+mod tx_cache {
+    use psibase::AccountNumber;
+    use std::cell::{Cell, RefCell};
+    use std::collections::HashMap;
+
+    thread_local! {
+        static BILLABLE_ACCOUNT: Cell<Option<AccountNumber>> = const { Cell::new(None) };
+        static BILL_TO_SUB: RefCell<Option<HashMap<AccountNumber, String>>> = const { RefCell::new(None) };
+    }
+
+    pub fn get_billable_account() -> Option<AccountNumber> {
+        BILLABLE_ACCOUNT.with(|cell| cell.get())
+    }
+
+    pub fn set_billable_account(account: AccountNumber) {
+        BILLABLE_ACCOUNT.with(|cell| cell.set(Some(account)));
+    }
+
+    pub fn get_sub(user: AccountNumber) -> Option<String> {
+        BILL_TO_SUB.with_borrow(|map| map.as_ref().and_then(|m| m.get(&user).cloned()))
+    }
+
+    pub fn set_sub(user: AccountNumber, sub_account: String) {
+        BILL_TO_SUB.with_borrow_mut(|map| {
+            map.get_or_insert_with(HashMap::new)
+                .insert(user, sub_account);
+        });
+    }
+}
+
 /// Virtual Server Service
 ///
 /// This service defines a "virtual server" that represents the "server" with which
@@ -49,7 +79,8 @@ pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 #[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
 mod service {
     use crate::rpc::resources;
-    use crate::tables::tables::*;
+    use crate::tables::tables::{UserSettings, *};
+    use crate::tx_cache;
     use psibase::services::events;
     use psibase::services::{
         accounts::Wrapper as Accounts,
@@ -60,9 +91,6 @@ mod service {
     };
     use psibase::{abort_message, *};
     use std::cmp::min;
-
-    // A small amount of CPU leeway given to transactions
-    const CPU_LEEWAY: u64 = 1_000_000u64; // 1 ms
 
     #[action]
     fn init() {
@@ -156,6 +184,12 @@ mod service {
         BillingConfig::enable(enabled);
     }
 
+    /// Returns whether the billing system has been enabled
+    #[action]
+    fn is_billing_enabled() -> bool {
+        BillingConfig::get().map(|c| c.enabled).unwrap_or(false)
+    }
+
     /// Reserves system tokens for future resource consumption by the specified user.
     ///
     /// The reserve is consumed when interacting with metered network functionality.
@@ -169,9 +203,7 @@ mod service {
     ///                the resource recipient
     #[action]
     fn buy_res_for(amount: Quantity, for_user: AccountNumber, memo: Option<psibase::Memo>) {
-        let config = check_some(BillingConfig::get(), "Billing not initialized");
-
-        let sys = config.sys;
+        let sys = BillingConfig::get_assert().sys;
         let buyer = get_sender();
 
         Tokens::call().debit(sys, buyer, amount, "".into());
@@ -189,6 +221,65 @@ mod service {
         }
     }
 
+    /// Reserves system tokens for future resource consumption by the specified sub-account.
+    ///
+    /// The sender must have already credited the system tokens to this service.
+    ///
+    /// The sender of this action owns the resources in the specified subaccount and is therefore able to specify
+    /// it as the billable account for a given transaction at any time.
+    ///
+    /// # Arguments
+    /// * `amount`      - The amount of systems tokens to reserve
+    /// * `sub_account` - The sub-account to reserve the system tokens for
+    #[action]
+    fn buy_res_sub(amount: Quantity, sub_account: String) {
+        let sys = BillingConfig::get_assert().sys;
+        let buyer = get_sender();
+
+        Tokens::call().debit(sys, buyer, amount, "".into());
+        Tokens::call().toSub(
+            sys,
+            UserSettings::to_sub_account_key(buyer, &sub_account),
+            amount,
+        );
+    }
+
+    /// Deletes the resource subaccount, returning the resources back to the caller's primary
+    /// resource balance.
+    #[action]
+    fn del_res_sub(sub_account: String) {
+        let config = BillingConfig::get();
+        if config.is_none() {
+            return;
+        }
+        let sys = config.unwrap().sys;
+
+        let sender = get_sender();
+        let Some(balance) =
+            UserSettings::get_resource_balance_opt(sender, Some(sub_account.clone()))
+        else {
+            return;
+        };
+
+        let sub_account = UserSettings::to_sub_account_key(sender, &sub_account);
+        if balance.value != 0u64 {
+            Tokens::call().fromSub(sys, sub_account.clone(), balance);
+            Tokens::call().toSub(sys, sender.to_string(), balance);
+        }
+    }
+
+    /// Gets the amount of resources available for the caller
+    #[action]
+    fn res_balance() -> Quantity {
+        UserSettings::get_resource_balance(get_sender(), None)
+    }
+
+    /// Gets the amount of resources available for the caller's specified sub-account
+    #[action]
+    fn res_balance_sub(sub_account: String) -> Quantity {
+        UserSettings::get_resource_balance(get_sender(), Some(sub_account.clone()))
+    }
+
     /// Reserves system tokens for future resource consumption by the sender
     ///
     /// The reserve is consumed when interacting with metered network functionality.
@@ -197,6 +288,32 @@ mod service {
     #[action]
     fn buy_res(amount: Quantity) {
         buy_res_for(amount, get_sender(), None);
+    }
+
+    /// Allows the sender to specify one of their sub-accounts as the billable account for
+    /// the current transaction.
+    ///
+    /// This will only succeed if the sender has already been set by `Transact` to be the
+    /// billable account.
+    #[action]
+    fn bill_to_sub(sub_account: String) {
+        let billable_account =
+            check_some(tx_cache::get_billable_account(), "Billable account not set");
+
+        check(
+            !sub_account.is_empty(),
+            "Billable sub-account cannot be empty",
+        );
+
+        let sender = get_sender();
+        tx_cache::set_sub(sender, sub_account.clone());
+
+        if sender == billable_account {
+            CpuLimit::rpc().setCpuLimit(get_cpu_limit(sender, Some(sub_account.clone())));
+        }
+
+        let cpu_time = CpuLimit::rpc().getCpuTime();
+        psibase::write_console(&format!("CPU time at limit change: {} ns\n", cpu_time));
     }
 
     /// Allows the sender to manage the behavior of client-side tooling with respect to the
@@ -208,7 +325,13 @@ mod service {
         UserSettings::get(get_sender()).configure_buffer(config);
     }
 
-    fn bill(user: AccountNumber, amount: u64) {
+    /// Returns the current cost of a typically sized resource buffer
+    #[action]
+    fn std_buffer_cost() -> Quantity {
+        return Quantity::new(UserSettings::get_default_buffer_capacity());
+    }
+
+    fn bill(user: AccountNumber, amount: u64, sub_account: Option<String>) {
         if amount == 0 {
             return;
         }
@@ -216,7 +339,7 @@ mod service {
         if let Some(config) = BillingConfig::get() {
             let sys = config.sys;
 
-            let balance = UserSettings::get(user).get_resource_balance();
+            let balance = UserSettings::get_resource_balance(user, sub_account.clone());
             let amt = Quantity::new(amount);
 
             if balance < amt {
@@ -224,7 +347,13 @@ mod service {
                 abort_message(&err);
             }
 
-            Tokens::call().fromSub(sys, user.to_string(), amt);
+            let sub_key = if let Some(ref sub) = sub_account {
+                UserSettings::to_sub_account_key(user, sub)
+            } else {
+                user.to_string()
+            };
+
+            Tokens::call().fromSub(sys, sub_key, amt);
             Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
         }
     }
@@ -280,6 +409,23 @@ mod service {
         NetPricing::set_billable_unit(bits);
     }
 
+    /// Returns the current cost (in system tokens) of consuming the specified amount of network
+    /// bandwidth
+    #[action]
+    fn get_net_cost(bytes: u64) -> Quantity {
+        let bits = bytes * 8;
+        let net_pricing = NetPricing::get();
+        if net_pricing.is_none() {
+            return Quantity::new(0);
+        }
+
+        let net_pricing = net_pricing.unwrap();
+        let billable_unit = net_pricing.get_billable_unit();
+        let amount_units = (bits + billable_unit - 1) / billable_unit;
+
+        return Quantity::new(net_pricing.price() * amount_units);
+    }
+
     /// Set the CPU pricing thresholds
     ///
     /// Configures the idle and congested thresholds used by the pricing algorithm
@@ -331,6 +477,22 @@ mod service {
         CpuPricing::set_billable_unit(ns);
     }
 
+    /// Returns the current cost (in system tokens) of consuming the specified amount of
+    /// CPU time
+    #[action]
+    fn get_cpu_cost(ns: u64) -> Quantity {
+        let cpu_pricing = CpuPricing::get();
+        if cpu_pricing.is_none() {
+            return Quantity::new(0);
+        }
+
+        let cpu_pricing = cpu_pricing.unwrap();
+        let billable_unit = cpu_pricing.get_billable_unit();
+        let amount_units = (ns + billable_unit - 1) / billable_unit;
+
+        Quantity::new(cpu_pricing.price() * amount_units)
+    }
+
     /// Called by the system to indicate that the specified user has consumed a
     /// given amount of network bandwidth.
     ///
@@ -345,18 +507,14 @@ mod service {
 
         let mut cost = NetPricing::consume(amount_bytes);
 
-        if !isBillingEnabled() {
+        if !is_billing_enabled() {
             cost = 0
         }
-        bill(user, cost);
+        bill(user, cost, tx_cache::get_sub(user));
 
         Wrapper::emit()
             .history()
             .consumed(user, resources::NET, amount_bytes, cost);
-    }
-
-    fn isBillingEnabled() -> bool {
-        BillingConfig::get().map(|c| c.enabled).unwrap_or(false)
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -371,13 +529,12 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let amount_ns = amount_ns.saturating_sub(CPU_LEEWAY);
         let mut cost = CpuPricing::consume(amount_ns);
 
-        if !isBillingEnabled() {
+        if !is_billing_enabled() {
             cost = 0
         }
-        bill(user, cost);
+        bill(user, cost, tx_cache::get_sub(user));
 
         Wrapper::emit()
             .history()
@@ -411,13 +568,13 @@ mod service {
     // Gets the CPU limit (in ns) for the specified account
     //
     // Returns None if there is no limit for the specified account
-    fn get_cpu_limit(account: AccountNumber) -> Option<u64> {
-        if !isBillingEnabled() {
+    fn get_cpu_limit(account: AccountNumber, sub_account: Option<String>) -> Option<u64> {
+        if !is_billing_enabled() {
             return None;
         }
 
         let cpu_pricing = CpuPricing::get_assert();
-        let res_balance = UserSettings::get(account).get_resource_balance().value;
+        let res_balance = UserSettings::get_resource_balance(account, sub_account).value;
 
         let price_per_unit = cpu_pricing.price();
         let ns_per_unit = cpu_pricing.billable_unit;
@@ -427,20 +584,29 @@ mod service {
         let limit_units = min(full_block_units, affordable_units);
         let mut limit_ns = limit_units * ns_per_unit;
 
-        // To add some leeway, we simply bump the limit by more CPU than the limit allows,
-        //   and before billing, we subtract the leeway from the reported consumed amount.
+        // The purpose of adding "leeway" is to allow for some additional cpu time in which the
+        //   user may increase their available CPU. As long as the cpu_time is updated before the leeway
+        //   time expires, the transaction can proceed. The user is still billed for the full CPU time of
+        //   the transaction at the end.
+        const CPU_LEEWAY: u64 = 5_000_000u64; // 5 ms
         limit_ns = limit_ns.saturating_add(CPU_LEEWAY);
         limit_ns = min(limit_ns, NetworkSpecs::get_assert().cpu_ns);
 
         Some(limit_ns)
     }
 
-    /// This actions sets the CPU limit for the specified account.
-    /// If the current tx exceeds the limit (ns), then the tx will timeout and fail.
+    /// This actions specifies which account is primarily responsible for
+    /// paying the bill for any consumed resources.
+    ///
+    /// A time limit for the execution of the current tx/query will be set based
+    /// on the resources available for the specified account.
     #[action]
-    fn setCpuLimit(account: AccountNumber) {
+    fn setBillableAcc(account: AccountNumber) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
-        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account));
+
+        tx_cache::set_billable_account(account);
+
+        CpuLimit::rpc().setCpuLimit(get_cpu_limit(account, None));
     }
 
     #[action]

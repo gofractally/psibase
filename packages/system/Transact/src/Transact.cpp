@@ -35,6 +35,7 @@ namespace SystemService
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
+      auto _           = recurse();
       auto statusTable = open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
@@ -43,6 +44,7 @@ namespace SystemService
 
    void Transact::finishBoot()
    {
+      auto _           = recurse();
       auto tables      = Transact::Tables(Transact::service);
       auto statusTable = tables.open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
@@ -83,6 +85,7 @@ namespace SystemService
    void Transact::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
+      auto _ = recurse();
 
       Tables tables(Transact::service);
 
@@ -135,6 +138,7 @@ namespace SystemService
    void Transact::setSnapTime(uint32_t seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");
+      auto   _ = recurse();
       Tables tables(Transact::service);
 
       auto& stat = getStatus();
@@ -183,6 +187,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       if (objective)
       {
          check(act.sender == me, "Objective callbacks must have 'transact' as sender");
@@ -223,6 +228,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       if (objective)
       {
          Tables tables(me);
@@ -267,6 +273,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       Transact::Tables(Transact::service).open<EventIndexerTable>().put({service});
    }
 
@@ -286,8 +293,7 @@ namespace SystemService
    {
       auto requester = getSender();
 
-      auto tables         = Transact::Tables(Transact::service);
-      auto statusTable    = tables.open<TransactStatusTable>();
+      auto statusTable    = open<TransactStatusTable>(KvMode::read);
       auto statusIdx      = statusTable.getIndex<0>();
       auto transactStatus = statusIdx.get(std::tuple{});
 
@@ -302,10 +308,11 @@ namespace SystemService
                psibase::writeConsole(" - " + a.service.str() + "->" + a.method.str() + "\n");
          }
       }
+      auto _ = recurse();
 
       if (transactStatus && transactStatus->enforceAuth)
       {
-         auto accountsTables = Accounts::Tables(Accounts::service);
+         auto accountsTables = Accounts::Tables(Accounts::service, KvMode::read);
          auto accountTable   = accountsTables.open<AccountTable>();
          auto accountIndex   = accountTable.getIndex<0>();
          auto account        = accountIndex.get(action.sender);
@@ -369,7 +376,6 @@ namespace SystemService
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
 
-      auto _      = recurse();
       auto result = call(action);
 
       for (auto& a : allowedActions)
@@ -505,7 +511,7 @@ namespace SystemService
             if (isResMonitoring())
             {
                // If resMonitoring is disabled, no CPU limit is set for the transaction
-               to<VirtualServer>().setCpuLimit(act.sender());
+               to<VirtualServer>().setBillableAcc(act.sender());
             }
          }
          if (readOnly)
@@ -519,6 +525,7 @@ namespace SystemService
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
       check(trx.actions().size() > 0, "transaction has no actions");
+      auto _           = recurse();
       bool enforceAuth = checkTapos(id, trx.tapos(), true);
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
@@ -528,6 +535,7 @@ namespace SystemService
    void Transact::resMonitoring(bool enable)
    {
       check(getSender() == VirtualServer::service, "Wrong sender");
+      auto _ = recurse();
 
       Transact::Tables(Transact::service)
           .open<ResMonitoringConfigTable>()  //
@@ -545,13 +553,6 @@ namespace SystemService
       auto id  = sha256(t.data(), t.size());
 
       check(trx.actions().size() > 0, "transaction has no actions");
-
-      if (isResMonitoring())
-      {
-         uint64_t      netUsage = t.size();
-         AccountNumber sender   = trx.actions()[0].sender();
-         to<VirtualServer>().useNetSys(sender, netUsage);
-      }
 
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
@@ -573,7 +574,17 @@ namespace SystemService
       {
          if (enforceAuth)
          {
-            checkAuth(act, claims, get_view_data(act) == get_view_data(trx.actions()[0]), false);
+            auto first = get_view_data(act) == get_view_data(trx.actions()[0]);
+            checkAuth(act, claims, first, false);
+
+            if (first && isResMonitoring())
+            {
+               // Billing network usage *after* first action auth, because first action auth may set
+               //   a billable subaccount on the VirtualServer.
+               uint64_t      netUsage = t.size();
+               AccountNumber sender   = act.sender();
+               to<VirtualServer>().useNetSys(sender, netUsage);
+            }
          }
          if constexpr (enable_print)
             std::printf("call action\n");
@@ -630,6 +641,15 @@ namespace SystemService
       check(sender == AccountNumber{} || sender == RTransact::service, "Wrong sender");
       auto _ = recurse();
       processTransactionImpl(trx, speculative);
+   }
+
+   void Transact::kvNotify(AccountNumber service,
+                           DbId          db,
+                           std::uint32_t keyLen,
+                           std::uint32_t oldValueLen,
+                           std::uint32_t newValueLen)
+   {
+      check(getSender() == AccountNumber{}, "Wrong sender");
    }
 
 #ifndef PSIBASE_GENERATE_SCHEMA

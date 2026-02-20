@@ -8,6 +8,7 @@
 #include <services/system/CommonTables.hpp>
 #include <services/user/InviteErrors.hpp>
 #include <services/user/InviteTables.hpp>
+#include <services/user/tokenTypes.hpp>
 
 namespace UserService
 {
@@ -20,14 +21,8 @@ namespace UserService
       {
          /// Called on the invite creator when the invite is accepted
          void onInvAccept(uint32_t inviteId, psibase::AccountNumber accepter);
-
-         /// Called on the invite creator when the invite is deleted, unless it is
-         /// deleted by the invite creator manually.
-         void onInvDelete(uint32_t inviteId);
       };
-      PSIO_REFLECT(InviteHooks,
-                   method(onInvAccept, inviteId, accepter),
-                   method(onInvDelete, inviteId))
+      PSIO_REFLECT(InviteHooks, method(onInvAccept, inviteId, accepter))
 
       /// This service facilitates the creation and redemption of invites
       ///
@@ -45,24 +40,33 @@ namespace UserService
 
          void init();
 
-         /// Creates and stores a new invite object that can be used to create a new account
+         /// Returns the current minimum cost of creating an invite that can create the specified number of
+         /// accounts.
+         Quantity getInvCost(uint16_t numAccounts);
+
+         /// Creates and stores a new invite object that can be used to create new accounts
          /// Returns the ID of the newly created invite
          ///
          /// Parameters:
          /// - `inviteId` is the id of the invite (could be randomly generated)
-         /// - `inviteKey` is the public key of the invite
+         /// - `fingerprint` is the fingerprint of the invite public key
          /// - `numAccounts` is the number of accounts this invite can be used to create
          /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
          ///    the invite is updated
          /// - `secret` is an encrypted secret used to redeem the invite
+         /// - `resources` is the amount of resources stored in the invite (used when creating
+         ///               new accounts). The caller must send this amount of system tokens to this
+         ///               invite service before calling this action. Use the query interface to check
+         ///               the resources required for an invite of the specified number of accounts.
          ///
          /// If `useHooks` is true, the caller must be an account with a service deployed on it
          /// that implements the InviteHooks interface.
-         uint32_t createInvite(uint32_t    inviteId,
-                               Spki        inviteKey,
-                               uint16_t    numAccounts,
-                               bool        useHooks,
-                               std::string secret);
+         uint32_t createInvite(uint32_t              inviteId,
+                               psibase::Checksum256  fingerprint,
+                               uint16_t              numAccounts,
+                               bool                  useHooks,
+                               std::string           secret,
+                               UserService::Quantity resources);
 
          /// Called by an invite credential (not a user account) to create the specified
          /// account. The new account is authorized by the specified public key.
@@ -96,7 +100,8 @@ namespace UserService
       // clang-format off
       PSIO_REFLECT(Invite,
          method(init),
-         method(createInvite, inviteId, inviteKey, numAccounts, useHooks, secret),
+         method(getInvCost, numAccounts),
+         method(createInvite, inviteId, fingerprint, numAccounts, useHooks, secret, resources),
          method(createAccount, account, accountKey),
          method(accept, inviteId),
          method(delInvite, inviteId),

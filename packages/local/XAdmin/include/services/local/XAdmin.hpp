@@ -2,6 +2,7 @@
 
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
+#include <psibase/SocketInfo.hpp>
 #include <services/system/SetCode.hpp>
 
 namespace LocalService
@@ -21,7 +22,8 @@ namespace LocalService
    {
       bool                     p2p = false;
       std::vector<std::string> hosts;
-      PSIO_REFLECT(AdminOptionsRow, p2p, hosts)
+      std::vector<std::string> peers;
+      PSIO_REFLECT(AdminOptionsRow, p2p, hosts, peers)
    };
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
@@ -33,15 +35,17 @@ namespace LocalService
       using Subjective = psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable>;
       using Session    = psibase::SessionTables<AdminOptionsTable>;
       /// Returns true if the account or the remote end of socket is a node admin
-      bool isAdmin(std::optional<psibase::AccountNumber> account,
-                   std::optional<std::int32_t>           socket);
+      bool isAdmin(std::optional<psibase::AccountNumber>          account,
+                   std::optional<std::int32_t>                    socket,
+                   std::vector<std::optional<psibase::IPAddress>> forwardedFor);
 
       std::optional<psibase::HttpReply> checkAuth(const psibase::HttpRequest& req,
                                                   std::optional<std::int32_t> socket);
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest        req,
                                                  std::optional<std::int32_t> socket);
 
-      void            startSession();
+      void startSession();
+      /// This action can be called inside a subjective tx
       AdminOptionsRow options();
    };
    PSIO_REFLECT(XAdmin,

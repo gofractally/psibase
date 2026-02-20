@@ -253,13 +253,17 @@ impl Query {
     async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
         self.check_user_auth(user)?;
 
-        let config = BillingConfig::get_assert();
-        let p = Tokens::call().getToken(config.sys).precision;
+        let config = BillingConfig::get();
+        if config.is_none() {
+            return Err(async_graphql::Error::new("billing not initialized"));
+        }
+
+        let p = Tokens::call().getToken(config.unwrap().sys).precision;
 
         let settings = UserSettings::get(user);
 
         Ok(UserResources {
-            balance: Decimal::new(settings.get_resource_balance(), p),
+            balance: Decimal::new(UserSettings::get_resource_balance(user, None), p),
             buffer_capacity: Decimal::new(Quantity::from(settings.buffer_capacity), p),
             auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
         })

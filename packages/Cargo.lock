@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "accounts"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -54,7 +54,7 @@ dependencies = [
 
 [[package]]
 name = "aes"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "aes-gcm",
  "psibase-plugin-workspace-hack",
@@ -313,7 +313,7 @@ dependencies = [
 
 [[package]]
 name = "auth-any"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "auth-delegate"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -330,7 +330,7 @@ dependencies = [
 
 [[package]]
 name = "auth-sig"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "lazy_static",
  "pem",
@@ -368,18 +368,18 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "base64"
-version = "0.22.0"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
+
+[[package]]
+name = "base64"
+version = "0.23.0"
 dependencies = [
  "base64 0.22.1",
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
 ]
-
-[[package]]
-name = "base64"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64ct"
@@ -546,7 +546,7 @@ checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
 name = "clientdata"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -599,7 +599,7 @@ checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 
 [[package]]
 name = "config"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "custom_error",
  "hex 0.3.2",
@@ -998,7 +998,7 @@ dependencies = [
 
 [[package]]
 name = "fractal-core"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -1293,7 +1293,7 @@ dependencies = [
 
 [[package]]
 name = "host-auth"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -1302,7 +1302,7 @@ dependencies = [
 
 [[package]]
 name = "host-common"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -1315,7 +1315,7 @@ dependencies = [
 
 [[package]]
 name = "host-crypto"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "p256",
  "pem",
@@ -1326,7 +1326,7 @@ dependencies = [
 
 [[package]]
 name = "host-prompt"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -1337,7 +1337,7 @@ dependencies = [
 
 [[package]]
 name = "host-types"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
@@ -1628,7 +1628,7 @@ dependencies = [
 
 [[package]]
 name = "invite"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chrono",
  "pem",
@@ -1704,7 +1704,7 @@ dependencies = [
 
 [[package]]
 name = "kdf"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "pbkdf2",
  "psibase-plugin-workspace-hack",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "packages"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1983,7 +1983,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "permissions"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -2159,7 +2159,7 @@ dependencies = [
 
 [[package]]
 name = "producers"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "hex 0.4.3",
  "psibase",
@@ -2171,7 +2171,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2231,7 +2231,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.11",
@@ -2290,7 +2290,7 @@ checksum = "824a4a32ab0318fedcd1c101a8d644d157741c9de1cf716a94368e6447a67946"
 
 [[package]]
 name = "psibase_macros"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -2298,7 +2298,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -2306,7 +2306,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "graphql_client",
  "psibase",
@@ -2725,7 +2725,7 @@ dependencies = [
 
 [[package]]
 name = "setcode"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
@@ -2776,7 +2776,7 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "sites"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "brotli",
  "psibase",
@@ -3187,7 +3187,7 @@ dependencies = [
 
 [[package]]
 name = "transact"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "chrono",
  "psibase",
@@ -3503,7 +3503,7 @@ dependencies = [
 
 [[package]]
 name = "web-crypto"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "p256",
  "pem",
@@ -3976,7 +3976,7 @@ dependencies = [
 
 [[package]]
 name = "workshop"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",

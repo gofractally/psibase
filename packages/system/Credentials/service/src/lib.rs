@@ -1,95 +1,19 @@
-pub const CREDENTIAL_SENDER: psibase::AccountNumber = psibase::account!("cred-sys");
+mod tables;
 
-#[psibase::service_tables]
-pub mod tables {
-    use psibase::fracpack::{Pack, Unpack};
-    use psibase::services::{
-        nft::{NftHolderFlags, Wrapper as Nft},
-        tokens::{BalanceFlags, Wrapper as Tokens},
-    };
-    use psibase::{AccountNumber, FlagsType, MethodNumber, ToSchema};
-    use psibase::{Table, TimePointSec};
-    use serde::{Deserialize, Serialize};
+pub const CRED_SYS: psibase::AccountNumber = psibase::account!("cred-sys");
 
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Pack, Unpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    impl InitRow {
-        pub fn init() {
-            let table = InitTable::read_write();
-            if table.get_index_pk().get(&()).is_some() {
-                return;
-            }
-            table.put(&InitRow {}).unwrap();
-
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-        }
-    }
-
-    #[table(name = "CredentialIdTable", index = 1)]
-    #[derive(Default, Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct CredentialId {
-        pub id: u32,
-    }
-
-    impl CredentialId {
-        #[primary_key]
-        fn pk(&self) {
-            ()
-        }
-
-        pub fn next_id() -> u32 {
-            let table = CredentialIdTable::new();
-            let id = table.get_index_pk().get(&()).unwrap_or_default().id;
-
-            table.put(&CredentialId { id: id + 1 }).unwrap();
-
-            id
-        }
-    }
-
-    #[table(name = "CredentialTable", index = 2)]
-    #[derive(Pack, Unpack, ToSchema, Serialize, Deserialize, Debug)]
-    pub struct Credential {
-        pub id: u32,
-        pub issuer: AccountNumber,
-        pub pubkey: Vec<u8>,
-        pub issuance_date: TimePointSec,
-        pub expiry_date: Option<TimePointSec>,
-        pub allowed_actions: Vec<MethodNumber>,
-    }
-
-    impl Credential {
-        #[primary_key]
-        fn pk(&self) -> u32 {
-            self.id
-        }
-
-        #[secondary_key(1)]
-        fn by_pubkey(&self) -> Vec<u8> {
-            self.pubkey.clone()
-        }
-
-        #[secondary_key(2)]
-        fn by_expiry_date(&self) -> (Option<TimePointSec>, u32) {
-            (self.expiry_date, self.id)
-        }
-    }
-}
-
-#[psibase::service(name = "credentials", tables = "tables")]
+#[psibase::service(name = "credentials", tables = "tables::tables")]
 pub mod service {
-    use crate::tables::{Credential, CredentialId, CredentialTable, InitRow, InitTable};
-    use crate::CREDENTIAL_SENDER;
-    use psibase::services::auth_sig::SubjectPublicKeyInfo;
-    use psibase::services::{transact, transact::ServiceMethod};
+    use crate::tables::tables::*;
+    use crate::CRED_SYS;
+    use psibase::services::{
+        tokens::{Quantity, Wrapper as Tokens},
+        transact::{ServiceMethod, Wrapper as Transact},
+        virtual_server::Wrapper as VirtualServer,
+    };
     use psibase::*;
+
+    const VSERVER: AccountNumber = VirtualServer::SERVICE;
 
     #[action]
     fn init() {
@@ -109,11 +33,8 @@ pub mod service {
     #[allow(non_snake_case)]
     fn canAuthUserSys(user: AccountNumber) {
         check(
-            user == CREDENTIAL_SENDER,
-            &format!(
-                "only {} can use credentials as an auth service",
-                CREDENTIAL_SENDER
-            ),
+            user == CRED_SYS,
+            &format!("only {} can use credentials as an auth service", CRED_SYS),
         );
     }
 
@@ -130,7 +51,7 @@ pub mod service {
     #[allow(non_snake_case)]
     fn checkAuthSys(
         flags: u32,
-        _requester: AccountNumber,
+        requester: AccountNumber,
         sender: AccountNumber,
         action: ServiceMethod,
         _allowedActions: Vec<ServiceMethod>,
@@ -139,39 +60,48 @@ pub mod service {
         use psibase::services::transact::auth_interface::*;
 
         let auth_type = flags & REQUEST_MASK;
-
         match auth_type {
             RUN_AS_REQUESTER_REQ | RUN_AS_MATCHED_REQ => return,
             RUN_AS_MATCHED_EXPANDED_REQ => check(false, "runAs: caller attempted to expand powers"),
-            RUN_AS_OTHER_REQ => check(false, "runAs: caller is not authorized"),
+            RUN_AS_OTHER_REQ => {
+                if requester == Wrapper::SERVICE {
+                    // This allows credentials service to call actions on behalf of any credential
+                    return;
+                } else {
+                    check(false, "runAs: caller is not authorized")
+                }
+            }
             t if t != TOP_ACTION_REQ => check(false, "unsupported auth type"),
             _ => {}
         }
 
-        check(
-            sender == CREDENTIAL_SENDER,
-            &format!("sender must be {}", CREDENTIAL_SENDER),
-        );
+        check(sender == CRED_SYS, &format!("sender must be {}", CRED_SYS));
 
         check(claims.len() == 1, "Must be exactly one claim");
         let claim = &claims[0];
+
+        let credential = check_some(
+            CredentialTable::read()
+                .get_index_by_pkh()
+                .get(&psibase::sha256(&claim.rawData)),
+            "Claim uses an invalid credential",
+        );
+
+        // FIRST_AUTH_FLAG is set when this check is running for the top-level action and
+        // we are NOT executing speculatively.
+        if (flags & FIRST_AUTH_FLAG) != 0 && VirtualServer::call().is_billing_enabled() {
+            VirtualServer::call_as(CRED_SYS).bill_to_sub(credential.id.to_string());
+        }
 
         check(
             claim.service == psibase::services::verify_sig::SERVICE,
             "Claim must use verify-sig",
         );
 
-        let credential = CredentialTable::read()
-            .get_index_by_pubkey()
-            .get(&claim.rawData);
-        check(credential.is_some(), "Claim uses an invalid credential");
-        let credential = credential.unwrap();
-
         check(
             action.service == credential.issuer,
             "Can only call actions on the credential issuer service",
         );
-
         check(
             credential.allowed_actions.contains(&action.method),
             &format!("Action {} not allowed using this credential", action.method),
@@ -205,10 +135,10 @@ pub mod service {
         abort_message("isRejectSys not supported");
     }
 
-    /// Creates a credential
+    /// Issues a credential
     ///
     /// Parameters:
-    /// - `pubkey`: The credential public key
+    /// - `pubkey_fingerprint`: The fingerprint of the credential public key
     /// - `expires`: The number of seconds until the credential expires
     /// - `allowed_actions`: The actions that the credential is allowed to call on the issuer service
     ///
@@ -218,49 +148,48 @@ pub mod service {
     /// A transaction sent from the CREDENTIAL_SENDER account must include a proof for a claim
     /// that matches the specified public key.
     #[action]
-    fn create(
-        pubkey: SubjectPublicKeyInfo,
+    fn issue(
+        pubkey_fingerprint: Checksum256,
         expires: Option<u32>,
         allowed_actions: Vec<MethodNumber>,
     ) -> u32 {
-        let table = CredentialTable::new();
-
-        let existing = table.get_index_by_pubkey().get(&pubkey.0);
-        check_none(existing, "Credential already exists");
-        let id = CredentialId::next_id();
-        let now = transact::Wrapper::call().currentBlock().time.seconds();
-        table
-            .put(&Credential {
-                id,
-                issuer: get_sender(),
-                pubkey: pubkey.0.clone(),
-                issuance_date: now,
-                expiry_date: expires.map(|e| now + psibase::Seconds::new(e as i64)),
-                allowed_actions,
-            })
-            .unwrap();
-
-        id
+        Credential::add(pubkey_fingerprint, expires, allowed_actions)
     }
 
-    /// Looks up the credential used to sign the active transaction, and consumes it.
-    /// Can only be called by the credential's issuer.
+    /// Notifies the credentials service that tokens have been credited to a credential
+    ///
+    /// This notification must be called after crediting the credential's service, or else
+    /// the credited tokens will not be aplied to a particular credential.
     #[action]
-    fn consume_active() -> u32 {
-        let id = get_active().expect("No active credential");
-        consume(id);
-        id
+    fn resource(id: u32, amount: Quantity) {
+        let credential = CredentialTable::read().get_index_pk().get(&id);
+        let credential = check_some(credential, "Credential not found");
+
+        check(
+            credential.issuer == get_sender(),
+            "Only the issuer can credit this credential",
+        );
+        let sys = Tokens::call()
+            .getSysToken()
+            .expect("System token not found")
+            .id;
+
+        Tokens::call().debit(sys, get_sender(), amount, "".into());
+        Tokens::call().credit(sys, CRED_SYS, amount, "".into());
+        Tokens::call_as(CRED_SYS).debit(sys, SERVICE, amount, "".into());
+        Tokens::call_as(CRED_SYS).credit(sys, VSERVER, amount, "".into());
+        VirtualServer::call_as(CRED_SYS).buy_res_sub(amount, id.to_string());
     }
 
-    /// Gets the `pubkey` of the specified credential
+    /// Gets the fingerprint of the specified credential pubkey
+    #[allow(non_snake_case)]
     #[action]
-    fn get_pubkey(id: u32) -> SubjectPublicKeyInfo {
+    fn getFingerprint(id: u32) -> Checksum256 {
         CredentialTable::read()
             .get_index_pk()
             .get(&id)
             .expect("Credential DNE")
-            .pubkey
-            .into()
+            .pubkey_fingerprint
     }
 
     /// Gets the `expiry_date` of the specified credential
@@ -276,13 +205,13 @@ pub mod service {
     /// Gets the `id` of the active credential
     #[action]
     fn get_active() -> Option<u32> {
-        let claims = transact::Wrapper::call().getTransaction().claims;
-        let table = CredentialTable::read().get_index_by_pubkey();
+        let claims = Transact::call().getTransaction().claims;
+        let table = CredentialTable::read().get_index_by_pkh();
 
         let mut active_id = None;
-        let now = transact::Wrapper::call().currentBlock().time.seconds();
+        let now = Transact::call().currentBlock().time.seconds();
         for claim in claims {
-            if let Some(credential) = table.get(&claim.rawData) {
+            if let Some(credential) = table.get(&psibase::sha256(&claim.rawData)) {
                 check(
                     active_id.is_none(),
                     "Only one active credential is supported",
@@ -302,9 +231,13 @@ pub mod service {
     /// Can only be called by the credential's issuer.
     #[action]
     fn consume(id: u32) {
-        let table = CredentialTable::new();
-        let credential = table.get_index_pk().get(&id).expect("Credential DNE");
+        let table = CredentialTable::read_write();
+
+        let credential = check_some(table.get_index_pk().get(&id), "Credential DNE");
         check(credential.issuer == get_sender(), "Unauthorized");
         table.remove(&credential);
+
+        // Avoid orphaned resources
+        VirtualServer::call_as(CRED_SYS).del_res_sub(id.to_string());
     }
 }

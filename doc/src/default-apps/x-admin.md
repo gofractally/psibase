@@ -5,9 +5,9 @@ The adminstrator service is hosted on localhost by default as a [Builtin Service
 ## Authentication
 
 Access to `x-admin` is allowed only if
-- The client is running over a loopback interface (localhost), or
-- The client's IP address is listed in the environmental variable `PSIBASE_ADMIN_IP`, which holds a comma separated list of IP addresses, or
-- The user is logged in as an authorized on-chain account
+- The client and all proxies are either running over the loopback interface (localhost) or have IP addresses listed in the environmental variable `PSIBASE_ADMIN_IP`, which holds a comma separated list of IP addresses, or
+- The user is logged in as an authorized on-chain account, or
+- The proxy that is directly connected to psinode is authorized and the request includes the header configured in the environmental variable `PSIBASE_USERNAME_FIELD`
 
 ## Configuration Options
 
@@ -15,7 +15,7 @@ All of these options can also be specified on the command line or in the server'
 
 ### Accept incoming P2P connections
 
-If enabled, the node will accept p2p connections at the websocket endpoint `/native/p2p`.
+If enabled, the node will accept p2p connections from other nodes.
 
 ### Block Producer Name
 

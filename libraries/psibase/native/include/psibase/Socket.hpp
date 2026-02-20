@@ -36,6 +36,7 @@ namespace psibase
       ~Socket();
       virtual void       send(Writer&, std::span<const char>) = 0;
       virtual bool       canAutoClose() const;
+      virtual bool       supportsP2P() const;
       virtual SocketInfo info() const = 0;
 
       void remove(Writer& writer);
@@ -66,6 +67,7 @@ namespace psibase
       /// - Shutdown and close the socket
       /// - Clean up all remaining shared_ptrs
       virtual void onClose(const std::optional<std::string>& message) noexcept = 0;
+      virtual void enableP2P(std::function<void(const std::shared_ptr<net::connection_base>&)>);
       /// Called when the recv lock is acquired asynchronously. This
       /// should post to an appropriate executor. It MUST NOT run
       /// wasm directly.
@@ -85,8 +87,10 @@ namespace psibase
    struct SocketChange
    {
       std::shared_ptr<AutoCloseSocket> socket;
-      std::uint32_t                    mask;
-      std::uint32_t                    value;
+      static const std::uint32_t       setP2PFlag = 16;
+
+      std::uint32_t mask;
+      std::uint32_t value;
    };
 
    struct SocketAutoCloseSet
@@ -119,6 +123,10 @@ namespace psibase
                             SocketAutoCloseSet*        owner,
                             std::vector<SocketChange>* diff);
 
+      std::int32_t enableP2P(std::int32_t               socket,
+                             SocketAutoCloseSet*        owner,
+                             std::vector<SocketChange>* diff,
+                             std::function<void(const std::shared_ptr<net::connection_base>&)>);
       /// Marks a socket for closing. This is irreversible and cannot
       /// be affected directly by WASM. This should be called when
       /// the socket is closed at the remote end, when there is an
@@ -133,7 +141,9 @@ namespace psibase
       /// closed, onLock might never be called.
       CloseLock lockRecv(const std::shared_ptr<AutoCloseSocket>& socket);
       void      setOwner(CloseLock&& l, SocketAutoCloseSet* owner);
-      bool      applyChanges(std::vector<SocketChange>&& diff, SocketAutoCloseSet* owner);
+      bool      applyChanges(std::vector<SocketChange>&& diff,
+                             SocketAutoCloseSet*         owner,
+                             const DatabaseCallbacks*    callbacks);
    };
 
 }  // namespace psibase

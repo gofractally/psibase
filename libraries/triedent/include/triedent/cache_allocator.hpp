@@ -77,6 +77,8 @@ namespace triedent
 
       bool is_empty() const { return _obj_ids.is_empty(); }
 
+      access_mode mode() const { return _obj_ids.mode(); }
+
       bool gc_retain(object_id i) { return _obj_ids.gc_retain(i); }
       void gc_start() { _obj_ids.gc_start(); }
       void gc_finish() { _obj_ids.gc_finish(); }
@@ -158,7 +160,7 @@ namespace triedent
 
       if constexpr (CopyToHot)
       {
-         if (loc.cache != hot_cache && obj->size <= 4096)
+         if (loc.cache != hot_cache && obj->size <= 4096 && mode() != access_mode::read_only)
          {
             // MUST NOT wait for free memory while holding a location lock
             if (auto copy =

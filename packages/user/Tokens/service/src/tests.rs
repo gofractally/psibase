@@ -87,7 +87,7 @@ mod tests {
         // Bob cannot debit more than whats in the shared balance
         assert_error(
             b.debit(tid, alice, 6.into(), memo.clone()),
-            "Insufficient token balance",
+            "Insufficient shared balance",
         );
         b.debit(tid, alice, 5.into(), memo.clone());
         assert_eq!(0, get_shared_balance(&chain, tid, alice, bob).value);
@@ -190,7 +190,7 @@ mod tests {
         errors: Option<Vec<GraphQLError>>,
     }
 
-    fn get_subaccount_balance(
+    fn get_sub_balance(
         chain: &psibase::Chain,
         account: AccountNumber,
         subaccount: &str,
@@ -254,73 +254,103 @@ mod tests {
         // Check send to a sub-account
         a.toSub(tid, savings.clone(), 5_0000.into()).get()?;
         assert_eq!(5_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
         assert_eq!(5_0000, balance);
         a.toSub(tid, savings.clone(), 3_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
         assert_eq!(8_0000, balance);
 
         // Check retrieve from a sub-account
         a.fromSub(tid, savings.clone(), 2_0000.into()).get()?;
         assert_eq!(4_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
+        let balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
         assert_eq!(6_0000, balance);
-
-        a.fromSub(tid, savings.clone(), 6_0000.into()).get()?;
-        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
-        let balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        assert_eq!(0, balance);
 
         // Check overdraw from a sub-account
         assert_error(
-            a.fromSub(tid, savings.clone(), 1.into()),
+            a.fromSub(tid, savings.clone(), 6_0001.into()),
             "Insufficient sub-account balance",
+        );
+
+        // Check auto-deleted sub-account
+        a.fromSub(tid, savings.clone(), 6_0000.into()).get()?;
+        assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
+        assert_query_error(
+            get_sub_balance(&chain, alice, &savings, tid, &token_a),
+            "not found",
         );
 
         // Check overdraw from primary
         assert_error(
             a.toSub(tid, savings.clone(), 100_0000.into()),
-            "Insufficient token balance",
+            "insufficient balance",
         );
 
         // Check multiple sub-accounts
         a.toSub(tid, savings.clone(), 3_0000.into()).get()?;
         a.toSub(tid, checking.clone(), 5_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid, alice).get()?.value);
-        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_sub_balance(&chain, alice, &checking, tid, &token_a)?;
         assert_eq!(3_0000, savings_balance);
         assert_eq!(5_0000, checking_balance);
 
         a.toSub(tid, savings.clone(), 1_0000.into());
         assert_eq!(1_0000, a.getBalance(tid, alice).get()?.value);
-        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_sub_balance(&chain, alice, &checking, tid, &token_a)?;
         assert_eq!(4_0000, savings_balance);
         assert_eq!(5_0000, checking_balance);
 
         a.fromSub(tid, checking.clone(), 2_0000.into());
         assert_eq!(3_0000, a.getBalance(tid, alice).get()?.value);
-        let savings_balance = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let checking_balance = get_subaccount_balance(&chain, alice, &checking, tid, &token_a)?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let checking_balance = get_sub_balance(&chain, alice, &checking, tid, &token_a)?;
         assert_eq!(4_0000, savings_balance);
         assert_eq!(3_0000, checking_balance);
 
-        // Check delete sub-account
-        a.deleteSub(savings.clone()).get()?;
-        a.deleteSub(checking.clone()).get()?;
+        // Check auto-delete sub-account
+        assert_error(
+            a.deleteSub(savings.clone()),
+            "Sub-account with non-zero balances cannot be deleted",
+        );
+        a.fromSub(tid, savings.clone(), 4_0000.into()).get()?;
+        a.fromSub(tid, checking.clone(), 3_0000.into()).get()?;
         assert_eq!(10_0000, a.getBalance(tid, alice).get()?.value);
 
         assert_query_error(
-            get_subaccount_balance(&chain, alice, &savings, tid, &token_a),
+            get_sub_balance(&chain, alice, &savings, tid, &token_a),
             "Sub-account 'savings' not found",
         );
 
         assert_query_error(
-            get_subaccount_balance(&chain, alice, &checking, tid, &token_a),
+            get_sub_balance(&chain, alice, &checking, tid, &token_a),
             "Sub-account 'checking' not found",
         );
+
+        // Check manually deleted sub-accounts
+        a.toSub(tid, savings.clone(), 4_0000.into()).get()?;
+        a.createSub(savings.clone()).get()?; // Upgrades to manual deletion
+        assert_error(
+            a.createSub(savings.clone()),
+            "Sub-account was 'created' twice",
+        );
+        a.fromSub(tid, savings.clone(), 4_0000.into()).get()?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(0, savings_balance);
+        a.deleteSub(savings.clone()).get()?;
+
+        a.createSub(savings.clone()).get()?;
+        assert_error(
+            a.createSub(savings.clone()),
+            "Sub-account was 'created' twice",
+        );
+        a.toSub(tid, savings.clone(), 1_0000.into()).get()?;
+        a.fromSub(tid, savings.clone(), 1_0000.into()).get()?;
+        let savings_balance = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        assert_eq!(0, savings_balance);
+        a.deleteSub(savings.clone()).get()?;
 
         // Check sub-account key length validation
         let long_key = "a".repeat(80);
@@ -336,12 +366,14 @@ mod tests {
         // Avoid cross-account sub-account contamination
         a.toSub(tid, savings.clone(), 1_0000.into()).get()?;
         b.toSub(tid, savings.clone(), 2_0000.into()).get()?;
-        let savings_balance_a = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let savings_balance_b = get_subaccount_balance(&chain, bob, &savings, tid, &token_b)?;
-        assert_eq!(1_0000, savings_balance_a);
-        assert_eq!(2_0000, savings_balance_b);
-        a.deleteSub(savings.clone()).get()?;
-        b.deleteSub(savings.clone()).get()?;
+        let a_savings_bal = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let b_savings_bal = get_sub_balance(&chain, bob, &savings, tid, &token_b)?;
+        assert_eq!(1_0000, a_savings_bal);
+        assert_eq!(2_0000, b_savings_bal);
+        a.fromSub(tid, savings.clone(), a_savings_bal.into())
+            .get()?;
+        b.fromSub(tid, savings.clone(), b_savings_bal.into())
+            .get()?;
 
         // Check multiple tokens in same sub-account
         a.toSub(tid, savings.clone(), 2_0000.into()).get()?;
@@ -352,8 +384,8 @@ mod tests {
         a.toSub(tid2, savings.clone(), 3_0000.into()).get()?;
         assert_eq!(2_0000, a.getBalance(tid2, alice).get()?.value);
 
-        let savings_balance_1 = get_subaccount_balance(&chain, alice, &savings, tid, &token_a)?;
-        let savings_balance_2 = get_subaccount_balance(&chain, alice, &savings, tid2, &token_a)?;
+        let savings_balance_1 = get_sub_balance(&chain, alice, &savings, tid, &token_a)?;
+        let savings_balance_2 = get_sub_balance(&chain, alice, &savings, tid2, &token_a)?;
         assert_eq!(2_0000, savings_balance_1);
         assert_eq!(3_0000, savings_balance_2);
 

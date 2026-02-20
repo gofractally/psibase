@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "addcheckinit"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -367,7 +367,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "basicwquery"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "mincallrecvr",
@@ -454,7 +454,7 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "burst-transfer"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-psibase"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -1142,12 +1142,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
 name = "example"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -1228,7 +1228,7 @@ dependencies = [
 
 [[package]]
 name = "fracpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "custom_error",
  "hex",
@@ -1356,7 +1356,7 @@ dependencies = [
 
 [[package]]
 name = "gen-cpp-doc"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "clang",
@@ -2212,7 +2212,7 @@ dependencies = [
 
 [[package]]
 name = "md2man"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "clap",
  "psibase-rust-workspace-hack",
@@ -2278,7 +2278,7 @@ dependencies = [
 
 [[package]]
 name = "mincallrecvr"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "psibase",
@@ -2876,7 +2876,7 @@ dependencies = [
 
 [[package]]
 name = "psibase"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2936,7 +2936,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-derive"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "darling 0.14.4",
  "proc-macro-error",
@@ -2951,7 +2951,7 @@ dependencies = [
 
 [[package]]
 name = "psibase-macros-lib"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "colored-diff",
  "darling 0.20.10",
@@ -3016,7 +3016,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_macros"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-macros-derive",
  "psibase-rust-workspace-hack",
@@ -3024,7 +3024,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_names"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "seahash",
@@ -3032,7 +3032,7 @@ dependencies = [
 
 [[package]]
 name = "psibase_plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "graphql_client",
  "psibase",
@@ -3044,7 +3044,7 @@ dependencies = [
 
 [[package]]
 name = "psimacrotest"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "addcheckinit",
  "async-graphql",
@@ -3098,7 +3098,7 @@ dependencies = [
 
 [[package]]
 name = "r-tpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -3785,7 +3785,7 @@ dependencies = [
 
 [[package]]
 name = "subjective"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -3941,7 +3941,7 @@ dependencies = [
 
 [[package]]
 name = "test-contract"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -3951,7 +3951,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -3969,7 +3969,7 @@ dependencies = [
 
 [[package]]
 name = "test_fracpack_macros"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anyhow",
  "fracpack",
@@ -3986,7 +3986,7 @@ dependencies = [
 
 [[package]]
 name = "test_package"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase-rust-workspace-hack",
  "r-tpack",
@@ -4167,7 +4167,7 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tpack"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -4177,7 +4177,7 @@ dependencies = [
 
 [[package]]
 name = "tpack-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
@@ -4788,12 +4788,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-link"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
-
-[[package]]
 name = "windows-sys"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4818,15 +4812,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.61.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
-dependencies = [
- "windows-link",
 ]
 
 [[package]]

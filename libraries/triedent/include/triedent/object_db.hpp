@@ -184,6 +184,8 @@ namespace triedent
          return true;
       }
 
+      access_mode mode() const { return _region.mode(); }
+
       // returns true if this is the first time the object has been retained
       // during this gc operation.
       bool gc_retain(object_id id);

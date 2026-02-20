@@ -125,7 +125,7 @@ impl TokensPlugin {
 }
 
 impl User for TokensPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "virtual-server"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage", "virtual-server", "invite"])]
     fn credit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();

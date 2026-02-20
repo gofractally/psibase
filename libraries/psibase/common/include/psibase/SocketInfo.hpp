@@ -109,9 +109,13 @@ namespace psibase
       IPAddress address;
       uint8_t   prefixLen;
 
-      bool contains(const IPV4Address& addr);
-      bool contains(const IPV6Address& addr);
-      bool contains(const IPAddress& addr);
+      bool contains(const IPV4Address& addr) const;
+      bool contains(const IPV6Address& addr) const;
+      bool contains(const IPAddress& addr) const;
+      bool contains(const IPV4Endpoint& endpoint) const;
+      bool contains(const IPV6Endpoint& endpoint) const;
+      bool contains(const LocalEndpoint& endpoint) const;
+      bool contains(const SocketEndpoint& endpoint) const;
 
       PSIO_REFLECT(IPAddressPrefix, address, prefixLen)
    };
@@ -153,8 +157,19 @@ namespace psibase
       friend bool operator==(const HttpClientSocketInfo&, const HttpClientSocketInfo&) = default;
    };
 
-   using SocketInfo = std::
-       variant<ProducerMulticastSocketInfo, HttpSocketInfo, HttpClientSocketInfo, WebSocketInfo>;
+   struct P2PSocketInfo
+   {
+      std::optional<SocketEndpoint> endpoint;
+      std::optional<TLSInfo>        tls;
+      PSIO_REFLECT(P2PSocketInfo, endpoint, tls)
+      friend bool operator==(const P2PSocketInfo&, const P2PSocketInfo&) = default;
+   };
+
+   using SocketInfo = std::variant<ProducerMulticastSocketInfo,
+                                   HttpSocketInfo,
+                                   HttpClientSocketInfo,
+                                   WebSocketInfo,
+                                   P2PSocketInfo>;
 
    inline auto get_gql_name(SocketInfo*)
    {

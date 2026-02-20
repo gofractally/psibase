@@ -7,7 +7,6 @@ homepage.workspace = true
 edition.workspace = true
 description = "Psibase name conversion functions"
 license.workspace = true
-publish.workspace = true
 
 [dependencies]
 seahash = "4.1.0"
