@@ -17,6 +17,7 @@ use crate::services::tokens::{Precision, TokensError};
     Deserialize,
     SimpleObject,
     InputObject,
+    Ord,
     PartialOrd,
     PartialEq,
     Eq,
@@ -94,11 +95,5 @@ impl Sub for Quantity {
 
     fn sub(self, rhs: Self) -> Self::Output {
         self.value.checked_sub(rhs.value).unwrap().into()
-    }
-}
-
-impl core::cmp::Ord for Quantity {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.value.cmp(&other.value)
     }
 }
