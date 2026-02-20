@@ -45,7 +45,7 @@ define_trust! {
         ",
     }
     functions {
-        None => [quote, quote_pool_tokens, quote_add_liquidity, quote_remove_liquidity, fetch_pools],
+        None => [quote, quote_pool_tokens, quote_add_liquidity, quote_remove_liquidity],
         High => [swap, new_pool, add_liquidity, remove_liquidity],
     }
 }
