@@ -289,16 +289,30 @@ namespace
                             F&&                                         next)
    {
       auto& sock = get_lowest_layer(socket->stream);
-      sock.async_connect(std::forward<E>(endpoints),
-                         [socket = std::move(socket), next = std::forward<F>(next)](
-                             const std::error_code& ec, const auto& endpoint) mutable
-                         {
-                            if (!ec)
-                               socket->logger.add_attribute(
-                                   "RemoteEndpoint", boost::log::attributes::constant(
-                                                         to_string(toSocketEndpoint(endpoint))));
-                            next(ec, std::move(socket));
-                         });
+      sock.async_connect(
+          std::forward<E>(endpoints),
+          [socket = std::move(socket), next = std::forward<F>(next)](const std::error_code& ec,
+                                                                     const auto& endpoint) mutable
+          {
+             if (!ec)
+             {
+                if constexpr (requires { toSocketEndpoint(endpoint); })
+                {
+                   socket->logger.add_attribute(
+                       "RemoteEndpoint",
+                       boost::log::attributes::constant(to_string(toSocketEndpoint(endpoint))));
+                }
+                else
+                {
+                   // Workaround: some versions of Boost seem to pass in an
+                   // iterator. 1.83 is okay. 1.87 fails without this.
+                   socket->logger.add_attribute(
+                       "RemoteEndpoint",
+                       boost::log::attributes::constant(to_string(toSocketEndpoint(*endpoint))));
+                }
+             }
+             next(ec, std::move(socket));
+          });
    }
 
    template <typename Stream, typename F>
