@@ -119,7 +119,8 @@ namespace psibase::http
          }
          if (oldState != StateType::error)
          {
-            if (ec == make_error_code(boost::beast::websocket::error::closed))
+            if (ec == make_error_code(boost::beast::websocket::error::closed) ||
+                ec == make_error_code(boost::asio::error::eof))
             {
                PSIBASE_LOG(logger, info) << ec.message();
             }
