@@ -192,18 +192,10 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn liq_added(
+    pub fn liq_modified(
         pool_id: TID,
         sender: AccountNumber,
-        amount_first: String,
-        amount_second: String,
-    ) {
-    }
-
-    #[event(history)]
-    pub fn liq_removed(
-        pool_id: TID,
-        sender: AccountNumber,
+        is_add: bool,
         amount_first: String,
         amount_second: String,
     ) {

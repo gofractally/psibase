@@ -371,14 +371,15 @@ pub mod tables {
             self.mint_pool_tokens(lp_tokens_to_mint);
             self.credit_sender_pool_tokens(lp_tokens_to_mint);
             if token_a_id < token_b_id {
-                self.on_liquidity_add(token_a_id, token_b_id, amount_a, amount_b);
+                self.on_liquidity_mod(true, token_a_id, token_b_id, amount_a, amount_b);
             } else {
-                self.on_liquidity_add(token_b_id, token_a_id, amount_b, amount_a);
+                self.on_liquidity_mod(true, token_b_id, token_a_id, amount_b, amount_a);
             }
         }
 
-        fn on_liquidity_add(
+        fn on_liquidity_mod(
             &self,
+            is_add: bool,
             token_a_id: TID,
             token_b_id: TID,
             amount_a: Quantity,
@@ -386,26 +387,10 @@ pub mod tables {
         ) {
             let tokens = psibase::services::tokens::Wrapper::call();
 
-            crate::Wrapper::emit().history().liq_added(
+            crate::Wrapper::emit().history().liq_modified(
                 self.liquidity_token,
                 get_sender(),
-                Decimal::new(amount_a, tokens.getToken(token_a_id).precision).to_string(),
-                Decimal::new(amount_b, tokens.getToken(token_b_id).precision).to_string(),
-            );
-        }
-
-        fn on_liquidity_remove(
-            &self,
-            token_a_id: TID,
-            token_b_id: TID,
-            amount_a: Quantity,
-            amount_b: Quantity,
-        ) {
-            let tokens = psibase::services::tokens::Wrapper::call();
-
-            crate::Wrapper::emit().history().liq_removed(
-                self.liquidity_token,
-                get_sender(),
+                is_add,
                 Decimal::new(amount_a, tokens.getToken(token_a_id).precision).to_string(),
                 Decimal::new(amount_b, tokens.getToken(token_b_id).precision).to_string(),
             );
@@ -431,7 +416,13 @@ pub mod tables {
             b_reserve.withdraw_and_credit_to_sender(b_amount, "Withdrawal 2/2".into());
             self.burn_lp_tokens(liquidity_amount);
 
-            self.on_liquidity_remove(a_reserve.token_id, b_reserve.token_id, a_amount, b_amount)
+            self.on_liquidity_mod(
+                false,
+                a_reserve.token_id,
+                b_reserve.token_id,
+                a_amount,
+                b_amount,
+            )
         }
 
         fn debit_lp_tokens_from_sender(&self, liquidity_amount: Quantity) {
