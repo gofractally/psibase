@@ -20,13 +20,13 @@ impl GuildApplication {
         }
     }
 
-    pub fn add(guild: AccountNumber, member: AccountNumber, extra_info: String) {
-        check_none(Self::get(guild, member), "application already exists");
+    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) {
+        check_none(Self::get(guild, applicant), "application already exists");
         check_none(
-            GuildMember::get(guild, member),
+            GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
-        Self::new(guild, member, extra_info).save();
+        Self::new(guild, applicant, extra_info).save();
     }
 
     pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
@@ -42,36 +42,34 @@ impl GuildApplication {
         )
     }
 
-    pub fn applications_by_member(member: AccountNumber) -> Vec<Self> {
-        GuildApplicationTable::read()
-            .get_index_by_member()
-            .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
-            .collect()
+    pub fn set_extra_info(&mut self, extra_info: String) {
+        self.extra_info = extra_info;
+        self.save();
     }
 
-    pub fn remove_all_by_member(member: AccountNumber) {
-        let table = GuildApplicationTable::read_write();
-        for application in GuildApplication::applications_by_member(member) {
-            table.remove(&application);
-        }
-    }
-
-    pub fn conclude(&self, accepted: bool) {
-        if accepted {
+    fn check_attests(&self) {
+        let passed = self.attestations_score() >= 3;
+        if passed {
             GuildMember::add(self.guild, self.applicant);
+            self.remove()
         }
+    }
 
-        self.remove()
+    fn attestations_score(&self) -> i16 {
+        GuildAttestTable::read()
+            .get_index_pk()
+            .range(
+                (self.guild, self.applicant, AccountNumber::new(0))
+                    ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
+            )
+            .fold(0i16, |acc, e| {
+                acc.saturating_add(if e.endorses { 1 } else { -1 })
+            })
     }
 
     pub fn attest(&self, comment: String, endorses: bool) {
-        let attester = get_sender();
-        let guild = Guild::get_assert(self.guild);
-        check_some(
-            GuildMember::get(guild.account, attester),
-            "must be member of the guild to attest",
-        );
-        GuildAttest::set(self.guild, self.applicant, attester, comment, endorses);
+        GuildAttest::set(self.guild, self.applicant, get_sender(), comment, endorses);
+        self.check_attests();
     }
 
     pub fn cancel(&self) {

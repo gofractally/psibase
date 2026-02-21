@@ -42,6 +42,7 @@ define_trust! {
         ",
         Medium => "
             - Joining the fractal
+            - Create and delete guild member invites
             - Registering for a guild evaluation
             - Unregistering from guild evaluation
             - Applying to join a guild
@@ -59,15 +60,14 @@ define_trust! {
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
             - Set minimum scorers required to enable consensus rewards
-            - Conclude membership applications
             - Set token init and guild ranking threshold
             ",
     }
     functions {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
-        Medium => [apply_guild, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
-        High => [attest, con_membership_app, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
+        Medium => [apply_guild, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -196,21 +196,6 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl AdminGuild for FractallyPlugin {
-    fn con_membership_app(guild: String, applicant: String, accepted: bool) -> Result<(), Error> {
-        get_guild(guild)?.assert_authorized(FunctionName::con_membership_app)?;
-
-        let packed_args = fractals::action_structs::con_mem_app {
-            accepted,
-            applicant: applicant.as_str().into(),
-        }
-        .packed();
-
-        add_action_to_transaction(
-            fractals::action_structs::con_mem_app::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account.clone())?;
 
@@ -406,6 +391,61 @@ impl UserGuild for FractallyPlugin {
             fractals::action_structs::apply_guild::ACTION_NAME,
             &packed_args,
         )
+    }
+
+    fn delete_guild_invite(invite_id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::delete_guild_invite)?;
+
+        let packed_args = fractals::action_structs::del_g_inv { invite_id }.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::del_g_inv::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_guild_app_info(guild_account: String, extra_info: String) -> Result<(), Error> {
+        get_guild(guild_account.clone())?.assert_authorized(FunctionName::set_guild_app_info)?;
+
+        let packed_args = fractals::action_structs::set_g_app {
+            guild_account: guild_account.as_str().into(),
+            extra_info,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::set_g_app::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn invite_member(
+        guild_account: String,
+        num_accounts: u16,
+        pre_attest: bool,
+    ) -> Result<String, Error> {
+        let (invite_token, invite_details, _) =
+            bindings::invite::plugin::inviter::prepare_new_invite(1)?;
+
+        let finger_print: [u8; 32] = invite_details.fingerprint.try_into().unwrap();
+
+        let packed_args = fractals::action_structs::inv_g_member {
+            guild: guild_account.as_str().into(),
+            finger_print: finger_print.into(),
+            invite_id: invite_details.invite_id,
+            secret: invite_details.encrypted_secret,
+            pre_attest,
+            num_accounts,
+        }
+        .packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::inv_g_member::ACTION_NAME,
+            &packed_args,
+        )
+        .unwrap();
+
+        Ok(invite_token)
     }
 
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {

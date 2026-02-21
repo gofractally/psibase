@@ -9,16 +9,18 @@ import { graphql } from "../../graphql";
 
 export const zGuildApplicationListInstance = z
     .object({
-        member: zAccount,
+        applicant: zAccount,
         extraInfo: z.string(),
         createdAt: zDateTime,
-        attestations: z
+        attestations: z.object({
+            nodes: z
             .object({
                 endorses: z.boolean(),
                 comment: z.string(),
-                attestee: zAccount,
+                attester: zAccount,
             })
-            .array(),
+            .array()
+        }),
     })
     .nullable();
 
@@ -28,19 +30,21 @@ export type GuildApplicationListInstance = z.infer<
 
 export const getGuildApplication = async (
     guildAccount: Account,
-    member: Account,
+    applicant: Account,
 ) => {
     const res = await graphql(
         `
             {
-                guildApplication(guild: ${guildAccount}, member: "${member}") {
-                        member
+                guildApplication(guild: ${guildAccount}, applicant: "${applicant}") {
+                        applicant
                         extraInfo
                         createdAt
                         attestations {
-                            endorses
-                            comment
-                            attestee
+                            nodes {
+                                endorses
+                                comment
+                                attester
+                            }
                         }
                 }
             }

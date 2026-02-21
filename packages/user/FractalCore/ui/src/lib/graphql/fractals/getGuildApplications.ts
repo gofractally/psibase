@@ -1,23 +1,25 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
-import { zDateTime } from "@/lib/zod/DateTime";
 
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
 import { graphql } from "../../graphql";
-
 import { zDateTime } from "@/lib/zod/DateTime";
+import dayjs from "dayjs";
+
 
 export const zGuildApplicationListInstance = z.object({
-    member: zAccount,
-    extraInfo: z.string(),
-    createdAt: zDateTime,
+    applicant: zAccount,
+    createdAt: zDateTime.transform(dayjs),
     attestations: z
         .object({
-            endorses: z.boolean(),
+            nodes: z.object({
+                endorses: z.boolean()
+            }).array(),
+
         })
-        .array(),
+        ,
 });
 
 export type GuildApplicationListInstance = z.infer<
@@ -28,13 +30,14 @@ export const getGuildApplications = async (guildAccount: Account) => {
     const res = await graphql(
         `
             {
-                guildApplications(guild: ${guildAccount}) {
+                guildApplications(guild: "${guildAccount}") {
                     nodes {
-                        member
-                        extraInfo
+                        applicant
                         createdAt
                         attestations {
+                            nodes {
                             endorses
+                            }
                         }
                     }
                 }
