@@ -4,6 +4,7 @@
 
 #ifdef __APPLE__
 #include <libproc.h>
+#include <unistd.h>
 #endif
 
 std::filesystem::path psibase::installPrefix()
