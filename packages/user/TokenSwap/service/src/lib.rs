@@ -13,11 +13,17 @@ pub mod service {
         *,
     };
 
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nft};
+    use psibase::services::tokens::{BalanceFlags, Wrapper as Tokens};
+
     #[action]
     fn init() {
         if InitRow::get().is_none() {
             InitRow::init();
-        }
+
+            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+        };
         let add_index = |method: &str, columns: Vec<u8>| {
             for column in columns {
                 events::Wrapper::call().addIndex(
