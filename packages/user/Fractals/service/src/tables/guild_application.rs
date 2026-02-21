@@ -42,6 +42,11 @@ impl GuildApplication {
         )
     }
 
+    pub fn set_extra_info(&mut self, extra_info: String) {
+        self.extra_info = extra_info;
+        self.save();
+    }
+
     fn check_attests(&self) {
         let passed = self.attestations_score() >= 3;
         if passed {

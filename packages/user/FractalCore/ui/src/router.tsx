@@ -38,9 +38,7 @@ export const router = createBrowserRouter([
             {
                 path: "/invite",
                 element: (
-                    <ProtectedRoute>
-                        <Invite />
-                    </ProtectedRoute>
+                    <Invite />
                 ),
             },
             {

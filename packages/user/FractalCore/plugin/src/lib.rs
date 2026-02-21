@@ -10,13 +10,21 @@ use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
 
-use psibase::define_trust;
+use psibase::{
+    define_trust,
+    fracpack::{Pack, Unpack},
+};
 mod errors;
 mod propose;
 
 use bindings::fractals::plugin as FractalsPlugin;
 
 use trust::{assert_authorized, FunctionName};
+
+use crate::bindings::host::{
+    self,
+    common::store::{Bucket, Database},
+};
 
 define_trust! {
     descriptions {
@@ -257,6 +265,27 @@ impl UserGuild for FractalCorePlugin {
         FractalsPlugin::user_guild::register_candidacy(&guild_account, active)
     }
 
+    fn draft_application(guild_account: String, description: String) -> Result<(), Error> {
+        let bucket = Self::draft_bucket();
+        bucket.set(&guild_account, &description.packed());
+
+        Ok(())
+    }
+
+    fn push_application(guild_account: String) -> Result<(), Error> {
+        let bucket = Self::draft_bucket();
+
+        let extra_info = String::from_utf8(bucket.get(&guild_account).ok_or_else(|| {
+            format!("Application draft for guild {guild_account} does not exist")
+        })?)
+        .map_err(|e| errors::ErrorType::StorageError(e.to_string()))?;
+
+        FractalsPlugin::user_guild::set_guild_app_info(&guild_account, &extra_info)?;
+        bucket.delete(&guild_account);
+
+        Ok(())
+    }
+
     fn attest_membership_app(
         guild_account: String,
         applicant: String,
@@ -269,6 +298,19 @@ impl UserGuild for FractalCorePlugin {
             &applicant,
             &comment,
             endorses,
+        )
+    }
+}
+
+impl FractalCorePlugin {
+    fn draft_bucket() -> Bucket {
+        use host::common::store::{Bucket, DbMode::Transactional, StorageDuration::Persistent};
+        Bucket::new(
+            Database {
+                mode: Transactional,
+                duration: Persistent,
+            },
+            "drafts",
         )
     }
 }

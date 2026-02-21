@@ -13,7 +13,6 @@ import { z } from "zod";
 import { supervisor } from "@shared/lib/supervisor";
 import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
-import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
     CardContent,
@@ -24,6 +23,10 @@ import {
 } from "@shared/shadcn/ui/card";
 import { zDateTime } from "@/lib/zod/DateTime";
 import { zAccount } from '@shared/lib/schemas/account'
+import { useConnectAccount } from "@/hooks/use-connect-account";
+import { useDraftApplication } from "@/hooks/use-draft-application";
+import { useAppForm } from "@shared/components/form/app-form";
+
 
 dayjs.extend(relativeTime);
 
@@ -126,6 +129,21 @@ export const Invite = () => {
         queryFn: async () => fetchInvites(z.string().parse(token)),
     });
 
+    const { mutateAsync: connectAccount } = useConnectAccount();
+    const { mutateAsync: draftApplication } = useDraftApplication();
+
+    const form = useAppForm({
+        defaultValues: {
+            extraInfo: ''
+        },
+        onSubmit: async ({ value: { extraInfo } }) => {
+            const guild = zAccount.parse(invite?.guildInvite?.guild.account);
+            await draftApplication([guild, extraInfo])
+            await connectAccount(guild)
+        }
+    })
+
+
     if (!token) {
         return (
             <Card className="mx-auto mt-4 w-[350px]">
@@ -204,7 +222,7 @@ export const Invite = () => {
                 </Card>
             );
         } else {
-            
+
             return (
                 <Card className="mx-auto mt-4 w-[350px]">
                     <CardHeader>
@@ -214,26 +232,27 @@ export const Invite = () => {
                         <CardTitle>{`Apply to join the ${guildInvite.guild.displayName} guild.`}</CardTitle>
                         <CardDescription>{description}</CardDescription>
                     </CardHeader>
-                    <CardContent></CardContent>
-                    <CardFooter className="flex justify-between">
-                        <Button
-                            onClick={async () => {
-                                await supervisor.functionCall(
-                                    {
-                                        service: "accounts",
-                                        intf: "activeApp",
-                                        method: "connectAccount",
-                                        params: [],
-                                    },
-                                    {
-                                        enabled: true,
-                                        returnPath: `/guild/${guildInvite.guild.account}/invite-response`,
-                                    },
-                                );
+                    <CardContent>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                form.handleSubmit()
                             }}
                         >
-                            Continue
-                        </Button>
+                            <form.AppField
+                                name="extraInfo"
+                                children={(field) => (<field.TextField
+                                    label="Description"
+                                />)}
+                            />
+                            <form.AppForm>
+                                <form.SubmitButton
+                                    labels={["Continue", "Loading..."]}
+                                />
+                            </form.AppForm>
+                        </form>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
                     </CardFooter>
                 </Card>
             );
