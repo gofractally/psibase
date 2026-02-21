@@ -4,6 +4,8 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
+#include <psibase/serviceEntry.hpp>
+#include <psio/finally.hpp>
 #include <psio/to_hex.hpp>
 
 #include <random>
@@ -268,9 +270,38 @@ namespace psibase
                "ScheduledSnapshotRow has incorrect key");
       }
 
-      void verifySocketRow(psio::input_stream key, psio::input_stream value)
+      void verifySocketRow(TransactionContext& tc, psio::input_stream key, psio::input_stream value)
       {
-         abortMessage("Socket table is read only");
+         auto existing = tc.blockContext.db.kvGetRaw(DbId::nativeSession, key);
+         if (!existing)
+            abortMessage("Cannot write a new socket");
+         auto old = psio::view<const SocketRow>(
+             psio::prevalidated{std::span{existing->pos, existing->end}});
+         check(psio::fracpack_validate_strict<SocketRow>({value.pos, value.end}),
+               "SocketRow has invalid format");
+         auto row =
+             psio::view<const SocketRow>(psio::prevalidated{std::span{value.pos, value.end}});
+         if (old.fd() != row.fd())
+            abortMessage("SocketRow has incorrect key");
+
+         if (auto oldInfo = get_if<WebSocketInfo>(old.info()))
+         {
+            if (auto newInfo = get_if<P2PSocketInfo>(row.info()))
+            {
+               if (oldInfo->endpoint() == newInfo->endpoint() && oldInfo->tls() == newInfo->tls())
+               {
+                  auto err = tc.blockContext.db.socketEnableP2P(
+                      row.fd(), *tc.blockContext.systemContext.sockets, tc.ownedSockets);
+                  if (err != 0)
+                     abortMessage("Socket cannot enable P2P: " + std::to_string(err));
+                  return;
+               }
+            }
+         }
+         if (old.info() != row.info())
+         {
+            abortMessage("Invalid update to SocketRow");
+         }
       }
 
       void verifyEnvRow(psio::input_stream key, psio::input_stream value)
@@ -373,7 +404,7 @@ namespace psibase
          memcpy(&table, key.pos, sizeof(table));
          std::reverse((char*)&table, (char*)(&table + 1));
          if (table == socketTable)
-            verifySocketRow(key, value);
+            verifySocketRow(context, key, value);
          else if (table == envTable)
             verifyEnvRow(key, value);
          else if (table == hostConfigTable)
@@ -440,6 +471,46 @@ namespace psibase
             pos = deltas.insert(pos, KvResourcePair{key, {}});
          }
          return pos->second;
+      }
+
+      void notifyKvMut(NativeFunctions& self,
+                       DbId             db,
+                       std::uint32_t    keyLen,
+                       std::uint32_t    oldValueLen,
+                       std::uint32_t    newValueLen)
+      {
+         auto saved          = self.currentActContext->transactionContext.remainingStack;
+         auto remainingStack = self.currentExecContext->remainingStack();
+         check(remainingStack >= VMOptions::stack_usage_for_call, "stack overflow");
+         remainingStack -= VMOptions::stack_usage_for_call;
+         self.currentActContext->transactionContext.remainingStack = remainingStack;
+
+         Action act{
+             .service = transactionServiceNum,
+             .method  = MethodNumber{"kvNotify"},
+             .rawData =
+                 psio::to_frac(std::tuple(self.code.codeNum, db, keyLen, oldValueLen, newValueLen)),
+         };
+
+         auto flags       = CallFlags::none;
+         auto callerFlags = self.code.flags;
+
+         auto savedImported = std::move(self.transactionContext.importedHandles);
+         auto savedExported = std::move(self.transactionContext.exportedHandles);
+         auto _ =
+             psio::finally{[&]
+                           {
+                              self.transactionContext.importedHandles = std::move(savedImported);
+                              self.transactionContext.exportedHandles = std::move(savedExported);
+                           }};
+
+         self.currentActContext->actionTrace.innerTraces.push_back({ActionTrace{}});
+         auto& inner_action_trace =
+             std::get<ActionTrace>(self.currentActContext->actionTrace.innerTraces.back().inner);
+         self.currentActContext->transactionContext.execCalledAction(callerFlags, act,
+                                                                     inner_action_trace, flags);
+
+         self.currentActContext->transactionContext.remainingStack = saved;
       }
    }  // namespace
 
@@ -750,6 +821,12 @@ namespace psibase
                       verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
                    }
+                   notifyKvMut(*this, bucket.db, fullKey.size(),
+                               existing ? existing->remaining() : -1, value.size());
+                }
+                else
+                {
+                   notifyKvMut(*this, bucket.db, fullKey.size(), -1, value.size());
                 }
              }
              else if (bucket.db == DbId::nativeSubjective)
@@ -828,6 +905,7 @@ namespace psibase
                           {
                              verifyRemoveConstrained(transactionContext, fullKey, *existing);
                           }
+                          notifyKvMut(*this, bucket.db, fullKey.size(), existing->remaining(), -1);
                        }
                     }
                     database.kvRemoveRaw(bucket.db, fullKey);

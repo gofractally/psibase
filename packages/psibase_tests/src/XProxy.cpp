@@ -212,7 +212,7 @@ void XProxy::close(std::int32_t socket)
                "upstream and downstream sockets must be added and removed atomically");
          table.remove(*row);
          table.remove(*row2);
-         to<XHttp>().close(row->to);
+         to<XHttp>().asyncClose(row->to);
       }
    }
 }

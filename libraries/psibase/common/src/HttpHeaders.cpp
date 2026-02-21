@@ -4,10 +4,8 @@
 #include <cctype>
 #include <charconv>
 #include <ranges>
-#include "HttpUtil.hpp"
 
 using namespace psibase;
-using psibase::detail::split2sv;
 
 namespace
 {
@@ -108,27 +106,106 @@ namespace
    // Returns nullopt if "for" is not present or is not an IP address
    std::optional<IPAddress> parseForwardedFor(std::string_view forwarded)
    {
-      for (auto range : forwarded | std::views::split(';'))
+      std::optional<IPAddress>      result;
+      std::vector<std::string_view> parameterNames;
+      for (auto kv : QSplit{forwarded, ';'})
       {
-         auto kv  = split2sv(range);
          auto pos = kv.find('=');
          if (pos == std::string_view::npos)
             return std::nullopt;
          auto key   = kv.substr(0, pos);
          auto value = kv.substr(pos + 1);
-         if (std::ranges::equal(key, std::string_view{"for"}, {}, ::tolower))
+         auto q     = unquote(value);
+         if (!q && !isToken(value))
+            return std::nullopt;
+         if (q)
+            value = *q;
+         if (std::ranges::any_of(parameterNames, [&](auto k) { return iequal(k, key); }))
+            return std::nullopt;
+         parameterNames.push_back(key);
+         if (iequal(key, "for"))
          {
-            if (auto q = unquote(value))
-               return parseNodeId(*q);
-            else if (!isToken(value))
-               return std::nullopt;
-            else
-               return parseNodeId(value);
+            result = parseNodeId(value);
          }
       }
-      return std::nullopt;
+      return result;
+   }
+
+   const char* findSeparator(const char* pos, const char* end, char ch)
+   {
+      while (pos != end)
+      {
+         if (*pos == ch)
+         {
+            return pos;
+         }
+         else if (*pos == '"')
+         {
+            // Find the end of the double-quoted string
+            ++pos;
+            while (true)
+            {
+               if (pos == end)
+               {
+                  return pos;
+               }
+               if (*pos == '\\')
+               {
+                  ++pos;
+                  if (pos == end)
+                  {
+                     return pos;
+                  }
+               }
+               else if (*pos == '"')
+               {
+                  break;
+               }
+               ++pos;
+            }
+         }
+         ++pos;
+      }
+      return pos;
    }
 }  // namespace
+
+char ToLower::operator()(unsigned char ch) const
+{
+   return static_cast<char>(std::tolower(ch));
+}
+
+std::string ToLower::operator()(std::string_view s) const
+{
+   std::string result{s};
+   for (char& ch : result)
+      ch = (*this)(ch);
+   return result;
+}
+
+bool psibase::iequal(std::string_view lhs, std::string_view rhs)
+{
+   return std::ranges::equal(lhs, rhs, {}, ToLower{}, ToLower{});
+}
+
+QSplitIterator::QSplitIterator(std::string_view s, char ch)
+    : start(s.data()), end(s.data() + s.size()), ch(ch)
+{
+   pos = findSeparator(start, end, ch);
+}
+
+QSplitIterator& QSplitIterator::operator++()
+{
+   if (pos == end)
+   {
+      ch = '"';
+      return *this;
+   }
+   ++pos;
+   start = pos;
+   pos   = findSeparator(pos, end, ch);
+   return *this;
+}
 
 std::vector<std::optional<IPAddress>> psibase::forwardedFor(const HttpRequest& request)
 {

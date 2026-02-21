@@ -4,6 +4,7 @@
 
 #include <openssl/sha.h>
 #include <algorithm>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/api.hpp>
 
 #include "base64.hpp"
@@ -12,11 +13,6 @@ using namespace psibase;
 
 namespace
 {
-   bool iequal(std::string_view lhs, std::string_view rhs)
-   {
-      return std::ranges::equal(lhs, rhs, {}, ::tolower, ::tolower);
-   }
-
    bool headerContains(const HttpRequest& request, std::string_view name, std::string_view value)
    {
       auto values = request.getHeaderValues(name);

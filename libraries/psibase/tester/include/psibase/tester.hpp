@@ -40,6 +40,8 @@ namespace psibase
          return false;
       if (action.service == "events"_a && action.method == "sync"_m)
          return false;
+      if (action.sender == AccountNumber{})
+         return false;
       return true;
    }
 

@@ -17,9 +17,7 @@ export const JoinPage = () => {
         const res = await connect(data);
         toast({
             title: "Success",
-            description: `Connected to ${
-                res.newPeer.url || res.newPeer.endpoint
-            }.`,
+            description: `Connected to ${res.urls[0] || res.endpoint}.`,
         });
         navigate("/");
     };

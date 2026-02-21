@@ -88,7 +88,8 @@ namespace psio
       {
          auto orig_pos = pos;
          bool result   = unpack_impl<Unpack>(
-             [&](Rep* value) {
+             [&](Rep* value)
+             {
                 return is_p::template unpack<Unpack, Verify>(value, has_unknown, known_end, src,
                                                                pos, end_pos);
              },
@@ -259,7 +260,8 @@ namespace psio
       {
          auto orig_pos = pos;
          bool result   = unpack_impl<Unpack>(
-             [&](Rep* value) {
+             [&](Rep* value)
+             {
                 return is_p::template unpack<Unpack, Verify>(value, has_unknown, known_end, src,
                                                                pos, end_pos);
              },
@@ -385,6 +387,21 @@ namespace psio
           std::chrono::duration_cast<Duration>(std::chrono::duration<std::int64_t>(sec)) +
           std::chrono::duration_cast<Duration>(
               std::chrono::duration<std::uint32_t, std::nano>(nsec)));
+   }
+
+   template <typename Duration, typename Stream>
+   void to_json(const std::chrono::time_point<std::chrono::steady_clock, Duration>& obj,
+                Stream&                                                             stream)
+   {
+      to_json(obj.time_since_epoch(), stream);
+   }
+
+   template <typename Duration, typename Stream>
+   void from_json(std::chrono::time_point<std::chrono::steady_clock, Duration>& obj, Stream& stream)
+   {
+      Duration d;
+      from_json(d, stream);
+      obj = std::chrono::time_point<std::chrono::steady_clock, Duration>(d);
    }
 
    template <typename Clock, typename Duration, typename Stream>
