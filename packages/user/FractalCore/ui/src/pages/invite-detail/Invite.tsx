@@ -10,8 +10,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { supervisor } from "@shared/lib/supervisor";
-import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
+
 
 import {
     Card,
@@ -21,99 +20,19 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { zDateTime } from "@/lib/zod/DateTime";
 import { zAccount } from '@shared/lib/schemas/account'
 import { useConnectAccount } from "@/hooks/use-connect-account";
 import { useDraftApplication } from "@/hooks/use-draft-application";
 import { useAppForm } from "@shared/components/form/app-form";
+import { getInvites } from "@/lib/graphql/fractals/getInvites";
 
 
 dayjs.extend(relativeTime);
 
-const zInviteDetailsResponse = z.object({
-    data: z.object({
-        inviteById: z.object({
-            inviter: z.string(),
-            numAccounts: z.number(),
-            expiryDate: zDateTime.transform(date => new Date(date)),
-        }),
-    }),
-});
-
-const zGuildInviteDetailsResponse = z.object({
-    data: z.object({
-        guildInvite: z.object({
-            createdAt: zDateTime,
-            inviter: zAccount,
-            guild: z.object({
-                account: zAccount,
-                bio: z.string(),
-                displayName: z.string(),
-                fractal: z.object({
-                    name: z.string()
-                })
-            })
-        }).nullable(),
-    }),
-});
 
 
 
-export const fetchGuildInvite = async (inviteId: number) => {
-    const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "fractals", "graphql", true),
-        `
-        {
-            guildInvite(id: ${inviteId}) {
-                createdAt
-                guild {
-                    account
-                    bio
-                    displayName
-                    fractal {
-                        name
-                    }
-                }
-                inviter
-            }
-        }
-        `,
-    );
-    return zGuildInviteDetailsResponse.parse(response).data.guildInvite;
-}
 
-const fetchInviteById = async (inviteId: number) => {
-
-    const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "invite", "graphql", true),
-        `
-            query InviteById {
-                inviteById(inviteId: ${inviteId}) {
-                    inviter
-                    numAccounts
-                    expiryDate
-                }
-            }
-        `,
-    );
-    return zInviteDetailsResponse.parse(response).data.inviteById;
-}
-
-const fetchInvites = async (token: string) => {
-    const inviteId = await supervisor.functionCall({
-        service: "invite",
-        intf: "invitee",
-        method: "importInviteToken",
-        params: [token],
-    });
-
-    const [guildInvite, vanillaInvite] = await Promise.all([fetchGuildInvite(inviteId), fetchInviteById(inviteId)]);
-
-    return {
-        guildInvite,
-        vanillaInvite
-    }
-};
 
 export const Invite = () => {
     const [searchParams] = useSearchParams();
@@ -126,7 +45,7 @@ export const Invite = () => {
     } = useQuery({
         enabled: !!token,
         queryKey: ["invite", token],
-        queryFn: async () => fetchInvites(z.string().parse(token)),
+        queryFn: async () => getInvites(z.string().parse(token)),
     });
 
     const { mutateAsync: connectAccount } = useConnectAccount();
@@ -168,8 +87,7 @@ export const Invite = () => {
                     </div>
                     <CardTitle>Error.</CardTitle>
                     <CardDescription>
-                        The invitation token is either invalid or has already
-                        been used.
+                        {error.message}
                     </CardDescription>
                     <CardDescription>
                         {error.message}

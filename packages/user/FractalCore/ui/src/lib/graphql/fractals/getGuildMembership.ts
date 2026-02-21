@@ -54,6 +54,5 @@ export const getGuildMembership = async (guild: Account, member: Account) => {
         FRACTALS_SERVICE,
     );
 
-    console.log("raw", res);
     return DataSchema.parse(res).guildMembership;
 };

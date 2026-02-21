@@ -66,6 +66,9 @@ interface user-guild {
     draft-application: func(guild-account: string, description: string) -> result<_, error>;
     push-application: func(guild-account: string) -> result<_, error>;
 
+
+    delete-guild-invite: func(invite-id: u32) -> result<_, error>;
+
     invite-member: func(guild-account: string, num-accounts: u16, pre-attest: bool) -> result<string, error>;
     apply-guild: func(guild-account: string, app: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;

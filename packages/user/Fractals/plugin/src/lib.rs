@@ -42,7 +42,7 @@ define_trust! {
         ",
         Medium => "
             - Joining the fractal
-            - Invite member
+            - Create and delete guild member invites
             - Registering for a guild evaluation
             - Unregistering from guild evaluation
             - Applying to join a guild
@@ -66,7 +66,7 @@ define_trust! {
     functions {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
-        Medium => [apply_guild, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
         High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
@@ -389,6 +389,17 @@ impl UserGuild for FractallyPlugin {
 
         add_action_to_transaction(
             fractals::action_structs::apply_guild::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn delete_guild_invite(invite_id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::delete_guild_invite)?;
+
+        let packed_args = fractals::action_structs::del_g_inv { invite_id }.packed();
+
+        add_action_to_transaction(
+            fractals::action_structs::del_g_inv::ACTION_NAME,
             &packed_args,
         )
     }
