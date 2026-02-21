@@ -10,10 +10,7 @@ use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
 
-use psibase::{
-    define_trust,
-    fracpack::{Pack, Unpack},
-};
+use psibase::{define_trust, fracpack::Pack};
 mod errors;
 mod propose;
 
@@ -275,17 +272,21 @@ impl UserGuild for FractalCorePlugin {
     fn push_application(guild_account: String) -> Result<(), Error> {
         let bucket = Self::draft_bucket();
 
-        let extra_info = String::from_utf8(bucket.get(&guild_account).ok_or_else(|| {
-            format!("Application draft for guild {guild_account} does not exist")
-        })?)
-        .map_err(|e| errors::ErrorType::StorageError(e.to_string()))?;
+        let packed_data = bucket
+            .get(&guild_account)
+            .ok_or(errors::ErrorType::StorageError(format!(
+                "Application draft for guild {} does not exist",
+                guild_account
+            )))?;
+
+        let extra_info = String::from_utf8(packed_data)
+            .map_err(|error| errors::ErrorType::StorageError(error.to_string()))?;
 
         FractalsPlugin::user_guild::set_guild_app_info(&guild_account, &extra_info)?;
         bucket.delete(&guild_account);
 
         Ok(())
     }
-
     fn attest_membership_app(
         guild_account: String,
         applicant: String,

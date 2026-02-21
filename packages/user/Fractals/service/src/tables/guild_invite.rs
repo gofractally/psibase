@@ -111,10 +111,10 @@ impl GuildInvite {
         }
     }
 
-    pub fn cancel(&self) {
+    pub fn delete(&self) {
         check(
             get_sender() == self.inviter,
-            "only inviter can cancel invites",
+            "only inviter can delete invites",
         );
         self.remove()
     }
