@@ -182,6 +182,11 @@ pub mod Service {
     use crate::services::tokens::Quantity;
     use crate::services::tokens::TID;
 
+    #[action]
+    fn init() {
+        unimplemented!()
+    }
+
     /// Creates a new pool.
     ///
     /// Requires two token deposits of equal market value as the new pool reserves.
