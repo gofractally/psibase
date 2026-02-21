@@ -1,7 +1,7 @@
 import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const randomText = () => Math.random().toString(36).substring(2, 15);
 

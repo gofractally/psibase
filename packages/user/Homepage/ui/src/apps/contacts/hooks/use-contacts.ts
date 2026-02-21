@@ -5,7 +5,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { LocalContact, zLocalContact } from "../types";
 

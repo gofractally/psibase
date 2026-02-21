@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import { supervisor } from "@/supervisor";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const qs = {
     userTokenBalances: (username: string) => `

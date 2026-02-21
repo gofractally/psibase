@@ -466,6 +466,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/TokenSwap.psi
+    PATH packages/user/TokenSwap
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/DiffAdjust.psi
     PATH packages/user/DiffAdjust
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1077,7 +1083,7 @@ psibase_package(
     DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1087,7 +1093,7 @@ psibase_package(
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
 
@@ -1132,7 +1138,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream TokenSwap Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
 install(
@@ -1186,6 +1192,7 @@ install(
           ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/TokenStream.psi
+          ${SERVICE_DIR}/TokenSwap.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
           ${SERVICE_DIR}/VirtualServer.psi

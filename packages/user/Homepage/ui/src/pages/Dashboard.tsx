@@ -1,11 +1,11 @@
 import { motion } from "framer-motion";
-import { Book, BookUser, Coins, Mail, MoveRight } from "lucide-react";
+import { Book, BookUser, Coins, Mail, MoveRight, ArrowRightLeft, } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const AppSchema = z
     .object({
@@ -28,6 +28,12 @@ const apps: App[] = [
         description: "Send tokens and manage balances.",
         icon: <Coins className="h-6 w-6" />,
         service: zAccount.parse("tokens"),
+    },
+    {
+        title: "Swap",
+        description: "DeFi trading pools.",
+        icon: <ArrowRightLeft className="h-6 w-6" />,
+        service: zAccount.parse("token-swap"),
     },
     {
         title: "Chain mail",
