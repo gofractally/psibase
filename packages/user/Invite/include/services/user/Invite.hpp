@@ -84,6 +84,9 @@ namespace UserService
          /// Called synchronously by other services to retrieve the specified invite record
          std::optional<InviteRecord> getInvite(uint32_t inviteId);
 
+         /// Gets the expiration date of the specified invite
+         psibase::TimePointSec getExpDate(uint32_t inviteId);
+
          // clang-format off
          struct Events
          {
@@ -106,6 +109,7 @@ namespace UserService
          method(accept, inviteId),
          method(delInvite, inviteId),
          method(getInvite, inviteId),
+         method(getExpDate, inviteId),
       );
       PSIBASE_REFLECT_EVENTS(Invite);
       PSIBASE_REFLECT_HISTORY_EVENTS(Invite,

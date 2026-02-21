@@ -298,4 +298,12 @@ optional<InviteRecord> Invite::getInvite(uint32_t inviteId)
    return Tables(getReceiver(), KvMode::read).open<InviteTable>().get(inviteId);
 }
 
+psibase::TimePointSec Invite::getExpDate(uint32_t inviteId)
+{
+   auto cid    = getInvite(inviteId)->cid;
+   auto expiry = to<Credentials>().get_expiry_date(cid);
+   check(expiry.has_value(), inviteCorrupted.data());
+   return *expiry;
+}
+
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)
