@@ -37,7 +37,7 @@ pub mod service {
 
         add_index("swapped", vec![0, 1, 3]);
         add_index("swap_completed", vec![0]);
-        add_index("liq_modified", vec![0, 1, 2]);
+        add_index("liq_mod", vec![0, 1, 2]);
     }
 
     #[pre_action(exclude(init))]
@@ -197,7 +197,7 @@ pub mod service {
     }
 
     #[event(history)]
-    pub fn liq_modified(
+    pub fn liq_mod(
         pool_id: TID,
         sender: AccountNumber,
         is_add: bool,

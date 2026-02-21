@@ -387,7 +387,7 @@ pub mod tables {
         ) {
             let tokens = psibase::services::tokens::Wrapper::call();
 
-            crate::Wrapper::emit().history().liq_modified(
+            crate::Wrapper::emit().history().liq_mod(
                 self.liquidity_token,
                 get_sender(),
                 is_add,
