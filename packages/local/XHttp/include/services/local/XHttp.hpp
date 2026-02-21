@@ -101,8 +101,9 @@ namespace LocalService
                        psibase::MethodNumber err);
 
       /// Close a socket. The socket should be either a websocket
-      /// or a pending http request.
-      void close(std::int32_t socket);
+      /// or a pending http request. The regular close notification
+      /// will be called.
+      void asyncClose(std::int32_t socket);
 
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
@@ -118,7 +119,7 @@ namespace LocalService
                 method(sendReply, socket, response),
                 method(accept, socket, reply, callback, err),
                 method(setCallback, socket, callback, err),
-                method(close, socket),
+                method(asyncClose, socket),
                 method(rootHost, host),
                 method(startSession))
 

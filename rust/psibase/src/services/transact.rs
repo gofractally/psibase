@@ -261,6 +261,18 @@ mod service {
         unimplemented!()
     }
 
+    /// Called by native code on objective writes to the database
+    #[action]
+    fn kvNotify(
+        service: crate::AccountNumber,
+        db: crate::DbId,
+        keyLen: u32,
+        oldValueLen: u32,
+        newValueLen: u32,
+    ) {
+        unimplemented!()
+    }
+
     /// Sets the time between snapshots
     ///
     /// A value of 0 will disable snapshots. This is a chain-wide

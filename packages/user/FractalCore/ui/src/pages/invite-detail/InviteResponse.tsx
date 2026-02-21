@@ -6,21 +6,28 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNavigate } from "react-router-dom";
+import { usePushApplication } from "@/hooks/use-push-application";
+import { useEffect } from "react";
 
 export const InviteResponse = () => {
 
     const guild = useGuildAccount();
     const { data: currentUser } = useCurrentUser();
-    const { data: guildApplication, error } = useGuildApplication(guild, currentUser)
     const navigate = useNavigate();
 
 
-    if (guildApplication) {
+    const { mutateAsync: pushApplication, isIdle, error } = usePushApplication(() => {
         navigate(`/guild/${guild}/applications/${currentUser}`)
-    }
+    })
+
+    useEffect(() => {
+        if (guild && isIdle) {
+            pushApplication([guild!])
+        }
+    }, [isIdle, guild, pushApplication])
+
 
     if (error) {
         <Card className="mx-auto mt-4 w-[350px]">

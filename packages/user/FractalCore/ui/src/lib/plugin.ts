@@ -166,6 +166,14 @@ class UserGuild extends PluginInterface {
             "registerCandidacy",
         );
     }
+
+    get draftApplication() {
+        return this._call<[guildAccount: Account, description: string]>("draftApplication");
+    }
+
+    get pushApplication() {
+        return this._call<[guildAccount: Account]>("pushApplication");
+    }
 }
 
 export class Plugin {

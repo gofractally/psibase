@@ -58,15 +58,11 @@ psinode - The psibase blockchain server
 
 - `--p2p`
 
-  allows external nodes to peer to `psinode` it over its http interface at `/native/p2p`.
+  allows external nodes to peer to `psinode` over its http interface at `x-peers.<host>/p2p`.
 
 - `--peer` *url*
 
   tells psinode a peer to sync with. This argument can appear any number of times.
-
-- `--autoconnect` *number*
-
-  limits the number of out-going peer connections. If it is less than the number of `--peer` options, the later peers will be tried after a connection to an earlier peer fails.
 
 ### HTTP Server
 

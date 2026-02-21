@@ -3,7 +3,7 @@ use async_graphql::ComplexObject;
 use psibase::{
     check, check_some, get_sender,
     services::{tokens::Quantity, virtual_server},
-    AccountNumber, Checksum256, Table,
+    AccountNumber, Checksum256, Table, TimePointSec,
 };
 
 use crate::{
@@ -107,11 +107,7 @@ impl GuildInvite {
     pub fn accept(&self, accepter: AccountNumber) {
         GuildApplication::add(self.guild, accepter, "".to_string());
         if self.pre_attest {
-            // Despite this check being made in GuildAttest::set, we do it here to ensure it does not throw
-            let pre_attester_is_still_member = GuildMember::get(self.guild, self.inviter).is_some();
-            if pre_attester_is_still_member {
-                GuildAttest::set(self.guild, accepter, self.inviter, "".to_string(), true);
-            }
+            GuildAttest::set(self.guild, accepter, self.inviter, "".to_string(), true);
         }
     }
 
@@ -125,9 +121,7 @@ impl GuildInvite {
 
     fn remove(&self) {
         let invite_service = psibase::services::invite::Wrapper::call();
-        if invite_service.getInvite(self.id).is_some() {
-            invite_service.delInvite(self.id)
-        }
+        invite_service.delInvite(self.id);
         GuildInviteTable::read_write().remove(&self)
     }
 
