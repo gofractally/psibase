@@ -37,8 +37,7 @@ pub mod service {
 
         add_index("swapped", vec![0, 1, 3]);
         add_index("swap_completed", vec![0]);
-        add_index("liq_added", vec![0, 1]);
-        add_index("liq_removed", vec![0, 1]);
+        add_index("liq_modified", vec![0, 1, 2]);
     }
 
     #[pre_action(exclude(init))]
