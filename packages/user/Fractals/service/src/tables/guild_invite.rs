@@ -12,7 +12,9 @@ use crate::{
         Guild, GuildApplication, GuildAttest, GuildInvite, GuildInviteTable, GuildMember,
     },
 };
-use psibase::services::transact::Wrapper as TransactSvc;
+use psibase::services::{
+    invite::Wrapper as Invite, tokens::Wrapper as Tokens, transact::Wrapper as TransactSvc,
+};
 
 impl GuildInvite {
     fn new(guild: AccountNumber, id: u32, pre_attest: bool) -> Self {
@@ -43,13 +45,10 @@ impl GuildInvite {
     }
 
     fn charge_invite_fee_from_sender(cost: Quantity) {
-        let tokens = psibase::services::tokens::Wrapper::call();
+        let tokens = Tokens::call();
         let inviter = get_sender();
 
-        let system_token_id = psibase::services::tokens::Wrapper::call()
-            .getSysToken()
-            .unwrap()
-            .id;
+        let system_token_id = Tokens::call().getSysToken().unwrap().id;
 
         tokens.debit(system_token_id, inviter, cost, "Invite fee".into());
         tokens.credit(
@@ -84,7 +83,7 @@ impl GuildInvite {
             Self::charge_invite_fee_from_sender(invite_cost)
         }
 
-        psibase::services::invite::Wrapper::call().createInvite(
+        Invite::call().createInvite(
             invite_id,
             finger_print,
             num_accounts,
@@ -120,8 +119,7 @@ impl GuildInvite {
     }
 
     fn remove(&self) {
-        let invite_service = psibase::services::invite::Wrapper::call();
-        invite_service.delInvite(self.id);
+        Invite::call().delInvite(self.id);
         GuildInviteTable::read_write().remove(&self)
     }
 
@@ -136,5 +134,9 @@ impl GuildInvite {
 impl GuildInvite {
     pub async fn guild(&self) -> Guild {
         Guild::get_assert(self.guild)
+    }
+
+    pub async fn expiry(&self) -> TimePointSec {
+        Invite::call().getExpDate(self.id)
     }
 }

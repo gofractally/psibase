@@ -442,6 +442,7 @@ pub mod service {
     /// * `invite_id` - Unique ID of invite.
     /// * `accepter` - Guild invitee will join.
     #[action]
+    #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
         GuildInvite::get_assert(invite_id).accept(accepter);
     }
