@@ -41,7 +41,10 @@ namespace
       auto urlTimers = XPeers{}.open<UrlTimerTable>();
       auto row       = urls.get(url);
       if (!row)
-         row = {url, 0, false, timeoutBase, MonotonicTimePointUSec::min(), std::nullopt};
+      {
+         auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+         row      = {url, 0, false, timeoutBase, now + timeoutBase, std::nullopt};
+      }
       if (row->timerId)
       {
          to<XTimer>().cancel(*row->timerId);
@@ -651,7 +654,10 @@ void XPeers::onConfig()
       {
          auto url = urls.get(peer);
          if (!url)
-            url = {peer, 0, false, timeoutBase, MonotonicTimePointUSec::min(), std::nullopt};
+         {
+            auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+            url      = {peer, 0, false, timeoutBase, now + timeoutBase, std::nullopt};
+         }
          if (!url->autoconnect)
          {
             url->autoconnect = true;

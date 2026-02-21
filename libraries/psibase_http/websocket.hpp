@@ -119,7 +119,8 @@ namespace psibase::http
          }
          if (oldState != StateType::error)
          {
-            if (ec == make_error_code(boost::beast::websocket::error::closed))
+            if (ec == make_error_code(boost::beast::websocket::error::closed) ||
+                ec == make_error_code(boost::asio::error::eof))
             {
                PSIBASE_LOG(logger, info) << ec.message();
             }
@@ -154,6 +155,7 @@ namespace psibase::http
             }
             p2pState = P2PState::reading;
          }
+         channel.set("p2p");
          callback(shared_from_this());
       }
 
@@ -243,13 +245,15 @@ namespace psibase::http
          }
       }
 
+      using ChannelAttr = boost::log::attributes::mutable_constant<std::string>;
+
+      ChannelAttr                        channel;
       server_state&                      server;
       WebSocketInfo                      savedInfo;
       std::mutex                         mutex;
       std::unique_ptr<WebSocketImplBase> impl;
       std::deque<QueueItem>              outbox;
       boost::beast::flat_buffer          input;
-      psibase::loggers::common_logger    logger;
       StateType                          state    = StateType::normal;
       P2PState                           p2pState = P2PState::off;
       //

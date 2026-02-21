@@ -27,9 +27,9 @@ namespace
 }  // namespace
 
 WebSocket::WebSocket(server_state& server, SocketInfo&& info)
-    : server(server), savedInfo(toWebSocketInfo(std::move(info)))
+    : channel("http"), server(server), savedInfo(toWebSocketInfo(std::move(info)))
 {
-   logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
+   logger.add_attribute("Channel", channel);
    if (savedInfo.endpoint)
    {
       logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant<std::string>(
