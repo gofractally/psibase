@@ -1117,7 +1117,7 @@ struct PsinodeConfig
    TLSConfig                   tls;
    std::vector<native_service> services;
    Timeout                     http_timeout;
-   std::size_t                 service_threads;
+   std::uint32_t               service_threads;
    psibase::loggers::Config    loggers;
 
    static bool isNative(std::string_view name)
@@ -1319,7 +1319,7 @@ void run(const std::string&              db_path,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
          Timeout&                        http_timeout,
-         std::size_t&                    service_threads,
+         std::uint32_t&               service_threads,
          std::vector<std::string>        root_ca,
          std::string                     tls_cert,
          std::string                     tls_key,
@@ -1383,7 +1383,7 @@ void run(const std::string&              db_path,
 #endif
               .services        = services,
               .http_timeout    = http_timeout,
-              .service_threads = service_threads,
+              .service_threads = static_cast<std::uint32_t>(service_threads),
               .loggers         = loggers::Config::get(),
           },
           extra_options);
@@ -2102,7 +2102,7 @@ int main(int argc, char* argv[])
    byte_size                   db_cache_size;
    byte_size                   db_size;
    Timeout                     http_timeout;
-   std::size_t                 service_threads;
+   std::uint32_t               service_threads;
    PsinodeServiceConfig        extra_options;
 
    namespace po = boost::program_options;

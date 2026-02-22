@@ -752,7 +752,8 @@ struct callbacks
    int32_t wasi_environ_sizes_get(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
    {
       std::size_t totalSize = 0;
-      char**      p         = environ;
+      char**      env_start = PSIBASE_ENVIRON;
+      char**      p         = env_start;
       for (; *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
@@ -760,9 +761,9 @@ struct callbacks
             return wasi_errno_overflow;
          totalSize += size;
       }
-      if (totalSize > 0xffffffffu || p - environ > 0xffffffffu)
+      if (totalSize > 0xffffffffu || p - env_start > 0xffffffffu)
          return wasi_errno_overflow;
-      *environc = p - environ;
+      *environc = p - env_start;
       *bufsize  = totalSize;
       return 0;
    }
