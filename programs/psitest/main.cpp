@@ -17,6 +17,10 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#ifdef __APPLE__
+// macOS 26+ SDK does not declare environ in unistd.h; declare it explicitly
+extern "C" { extern char** environ; }
+#endif
 #include <bitset>
 #include <chrono>
 #include <optional>

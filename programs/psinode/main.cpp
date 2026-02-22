@@ -1117,7 +1117,7 @@ struct PsinodeConfig
    TLSConfig                   tls;
    std::vector<native_service> services;
    Timeout                     http_timeout;
-   std::uint32_t               service_threads;
+   std::size_t                 service_threads;
    psibase::loggers::Config    loggers;
 
    static bool isNative(std::string_view name)
@@ -1383,7 +1383,7 @@ void run(const std::string&              db_path,
 #endif
               .services        = services,
               .http_timeout    = http_timeout,
-              .service_threads = service_threads,
+              .service_threads = static_cast<std::uint32_t>(service_threads),
               .loggers         = loggers::Config::get(),
           },
           extra_options);
