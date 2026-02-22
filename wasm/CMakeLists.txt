@@ -120,6 +120,11 @@ function(download url archive hash)
     endif()
 endfunction()
 
+# On macOS, CMAKE_AR is Apple's libtool which cannot create WASM static libraries.
+# Use WASI SDK's llvm-ar/llvm-ranlib instead, which works on both macOS and Linux.
+set(WASM_AR "$ENV{WASI_SDK_PREFIX}/bin/llvm-ar")
+set(WASM_RANLIB "$ENV{WASI_SDK_PREFIX}/bin/llvm-ranlib")
+
 # These builds are done at generation time so cmake's find_* commands can find them
 if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
     download(${DEP_URL}/${ZLIB_ARCHIVE} ${DEP_PREFIX}/${ZLIB_ARCHIVE} ${ZLIB_SHA256})
@@ -153,6 +158,8 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libgmp.a)
             && cd ${GMP_EXTRACTED}                                                          \
             && ./configure                                                                  \
                 CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"                     \
+                AR=${WASM_AR}                                                               \
+                RANLIB=${WASM_RANLIB}                                                       \
                 CFLAGS=\"--sysroot=${CMAKE_SYSROOT} -D_WASI_EMULATED_SIGNAL --target=wasm32-wasip1\"               \
                 LDFLAGS=-lwasi-emulated-signal                                              \
                 --prefix=${DEP_PREFIX}                                                      \
@@ -179,8 +186,8 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libssl.a)
                 no-afalgeng no-asm no-autoalginit no-autoerrinit no-autoload-config no-dso no-async no-shared no-sock no-tests no-threads no-ui       \
                 CC=\"${CMAKE_C_COMPILER_LAUNCHER} ${CMAKE_C_COMPILER}\"                     \
                 CXX=\"${CMAKE_CXX_COMPILER_LAUNCHER} ${CMAKE_CXX_COMPILER}\"                \
-                AR=${CMAKE_AR}                                                              \
-                RANLIB=${CMAKE_RANLIB}                                                      \
+                AR=${WASM_AR}                                                               \
+                RANLIB=${WASM_RANLIB}                                                       \
                 CFLAGS=\"${OPENSSL_BUILD_FLAGS}\"                                           \
                 CXXFLAGS=\"${OPENSSL_BUILD_FLAGS}\"                                         \
             && make -j install_dev install_engines                                          \
