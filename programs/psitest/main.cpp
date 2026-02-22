@@ -16,6 +16,7 @@
 #include <psio/view.hpp>
 
 #include <stdio.h>
+#include <unistd.h>
 #include <bitset>
 #include <chrono>
 #include <optional>

@@ -32,6 +32,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <unistd.h>
 
 using namespace psibase;
 using namespace psibase::net;
@@ -1116,7 +1117,7 @@ struct PsinodeConfig
    TLSConfig                   tls;
    std::vector<native_service> services;
    Timeout                     http_timeout;
-   std::size_t                 service_threads;
+   std::uint32_t               service_threads;
    psibase::loggers::Config    loggers;
 
    static bool isNative(std::string_view name)
