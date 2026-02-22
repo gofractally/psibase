@@ -17,6 +17,12 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <crt_externs.h>
+#define PSIBASE_ENVIRON (*_NSGetEnviron())
+#else
+#define PSIBASE_ENVIRON (::environ)
+#endif
 #include <bitset>
 #include <chrono>
 #include <optional>
