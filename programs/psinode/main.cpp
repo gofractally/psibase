@@ -352,7 +352,7 @@ void initialize_database(SystemContext& context, const std::string& template_);
 
 void load_environment(Database& db)
 {
-   for (const char* const* iter = ::environ; *iter; ++iter)
+   for (const char* const* iter = PSIBASE_ENVIRON; *iter; ++iter)
    {
       std::string_view entry{*iter};
       auto             pos = entry.find('=');
@@ -1383,7 +1383,7 @@ void run(const std::string&              db_path,
 #endif
               .services        = services,
               .http_timeout    = http_timeout,
-              .service_threads = static_cast<std::uint32_t>(service_threads),
+              .service_threads = service_threads,
               .loggers         = loggers::Config::get(),
           },
           extra_options);

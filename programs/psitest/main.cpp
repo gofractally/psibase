@@ -17,10 +17,6 @@
 
 #include <stdio.h>
 #include <unistd.h>
-#ifdef __APPLE__
-// macOS 26+ SDK does not declare environ in unistd.h; declare it explicitly
-extern "C" { extern char** environ; }
-#endif
 #include <bitset>
 #include <chrono>
 #include <optional>
@@ -781,7 +777,7 @@ struct callbacks
          return wasi_errno_fault;
       char* memory = state.backend.get_context().linear_memory();
 
-      for (char** p = ::environ; *p; ++p)
+      for (char** p = PSIBASE_ENVIRON; *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
          if (end - buf < size || end - env < 4)
