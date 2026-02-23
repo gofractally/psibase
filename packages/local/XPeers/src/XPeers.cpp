@@ -499,6 +499,15 @@ namespace
       PSIO_REFLECT(GQLPeerConnection, id, urls, hosts, method(endpoint))
    };
 
+   struct GQLUrl
+   {
+      std::string   url;
+      std::uint32_t refcount;
+      bool          hasToken() const { return XPeers{}.open<UrlAuthTable>().get(url).has_value(); }
+      bool          connected() const { return refcount != 0; }
+      PSIO_REFLECT(GQLUrl, url, method(hasToken), method(connected))
+   };
+
    struct Query
    {
       auto peers() const
@@ -510,7 +519,14 @@ namespace
                                          std::move(row.hosts)};
              }};
       }
-      PSIO_REFLECT(Query, method(peers))
+      auto urls() const
+      {
+         return TransformedConnection{
+             XPeers{}.open<UrlTable>().getIndex<0>(),
+             [](UrlRow&& row) { return GQLUrl{std::move(row.url), std::move(row.refcount)}; }};
+      }
+      auto users() const { return XPeers{}.open<PeerUsernameTable>().getIndex<0>(); }
+      PSIO_REFLECT(Query, method(peers), method(urls), method(users))
    };
 
 }  // namespace
