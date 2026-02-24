@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from "react";
 
-import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { useAppForm } from "@shared/components/form/app-form";
 import { useSetCpuPricingParams } from "@/hooks/use-set-cpu-pricing-params";
@@ -209,44 +208,42 @@ export const PricingSection = ({
                                         <div>
                                             <Label>Halving rate</Label>
                                             <div className="mt-1 flex items-center gap-2">
-                                                <Input
-                                                    type="text"
+                                                <valueField.TextField
+                                                    label={undefined}
+                                                    description={undefined}
                                                     className="w-36"
-                                                    value={valueField.state.value}
-                                                    onChange={(e) =>
-                                                        valueField.handleChange(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    onBlur={valueField.handleBlur}
                                                 />
-                                                <TimeUnitSelect
-                                                    value={unitField.state.value}
-                                                    onChange={(newUnit) => {
-                                                        const val =
-                                                            Number(
-                                                                valueField.state.value,
-                                                            ) || 0;
-                                                        const oldUnit =
-                                                            unitField.state.value;
-                                                        const inSec =
-                                                            convertRateTimeUnit(
-                                                                val,
-                                                                oldUnit,
-                                                                "sec",
-                                                            );
-                                                        const newVal =
-                                                            convertRateTimeUnit(
-                                                                inSec,
-                                                                "sec",
+                                                <div className="mt-2">
+                                                    <TimeUnitSelect
+                                                        value={unitField.state.value}
+                                                        onChange={(newUnit) => {
+                                                            const val =
+                                                                Number(
+                                                                    valueField.state.value,
+                                                                ) || 0;
+                                                            const oldUnit =
+                                                                unitField.state.value;
+                                                            const inSec =
+                                                                convertRateTimeUnit(
+                                                                    val,
+                                                                    oldUnit,
+                                                                    "sec",
+                                                                );
+                                                            const newVal =
+                                                                convertRateTimeUnit(
+                                                                    inSec,
+                                                                    "sec",
+                                                                    newUnit,
+                                                                );
+                                                            unitField.handleChange(
                                                                 newUnit,
                                                             );
-                                                        unitField.handleChange(newUnit);
-                                                        valueField.handleChange(
-                                                            newVal.toString(),
-                                                        );
-                                                    }}
-                                                />
+                                                            valueField.handleChange(
+                                                                newVal.toString(),
+                                                            );
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -261,44 +258,42 @@ export const PricingSection = ({
                                         <div>
                                             <Label>Doubling rate</Label>
                                             <div className="mt-1 flex items-center gap-2">
-                                                <Input
-                                                    type="text"
+                                                <valueField.TextField
+                                                    label={undefined}
+                                                    description={undefined}
                                                     className="w-36"
-                                                    value={valueField.state.value}
-                                                    onChange={(e) =>
-                                                        valueField.handleChange(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    onBlur={valueField.handleBlur}
                                                 />
-                                                <TimeUnitSelect
-                                                    value={unitField.state.value}
-                                                    onChange={(newUnit) => {
-                                                        const val =
-                                                            Number(
-                                                                valueField.state.value,
-                                                            ) || 0;
-                                                        const oldUnit =
-                                                            unitField.state.value;
-                                                        const inSec =
-                                                            convertRateTimeUnit(
-                                                                val,
-                                                                oldUnit,
-                                                                "sec",
-                                                            );
-                                                        const newVal =
-                                                            convertRateTimeUnit(
-                                                                inSec,
-                                                                "sec",
+                                                <div className="mt-2">
+                                                    <TimeUnitSelect
+                                                        value={unitField.state.value}
+                                                        onChange={(newUnit) => {
+                                                            const val =
+                                                                Number(
+                                                                    valueField.state.value,
+                                                                ) || 0;
+                                                            const oldUnit =
+                                                                unitField.state.value;
+                                                            const inSec =
+                                                                convertRateTimeUnit(
+                                                                    val,
+                                                                    oldUnit,
+                                                                    "sec",
+                                                                );
+                                                            const newVal =
+                                                                convertRateTimeUnit(
+                                                                    inSec,
+                                                                    "sec",
+                                                                    newUnit,
+                                                                );
+                                                            unitField.handleChange(
                                                                 newUnit,
                                                             );
-                                                        unitField.handleChange(newUnit);
-                                                        valueField.handleChange(
-                                                            newVal.toString(),
-                                                        );
-                                                    }}
-                                                />
+                                                            valueField.handleChange(
+                                                                newVal.toString(),
+                                                            );
+                                                        }}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     )}

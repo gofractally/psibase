@@ -243,18 +243,6 @@ export const VirtualServer = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <form.AppField
                             name="netGbps"
-                            children={(field) => (
-                                <>
-                                    <field.TextField
-                                        label="Net bandwidth"
-                                        description="for P2P traffic, Tx traffic, and Query traffic"
-                                    />
-                                    {/* Gbps is fixed, so this is a disabled text suffix rather than a full select */}
-                                    <div className="mt-1 text-muted-foreground text-sm">
-                                        Gbps
-                                    </div>
-                                </>
-                            )}
                             validators={{
                                 onChange: z
                                     .string()
@@ -262,7 +250,27 @@ export const VirtualServer = () => {
                                         message: "Net Bandwidth must be a positive number",
                                     }),
                             }}
-                        />
+                        >
+                            {(field) => (
+                                <div>
+                                    <LabelWithInfo
+                                        label="Net bandwidth"
+                                        tooltip="for P2P traffic, Tx traffic, and Query traffic"
+                                    />
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <field.TextField
+                                            label={undefined}
+                                            description={undefined}
+                                            placeholder="0"
+                                            className="w-36"
+                                        />
+                                        <div className="text-muted-foreground text-sm">
+                                            Gbps
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </form.AppField>
                         <form.AppField
                             name="storageAmount"
                             validators={{
@@ -279,7 +287,7 @@ export const VirtualServer = () => {
                                         label="Total storage"
                                         tooltip="Total storage space (objective + subjective)"
                                     />
-                                    <div className="mt-1 flex gap-2 items-center">
+                                    <div className="mt-1 flex items-center gap-2">
                                         <field.TextField
                                             label={undefined}
                                             description={undefined}
@@ -289,12 +297,14 @@ export const VirtualServer = () => {
                                         <form.Field name="storageUnit">
                                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                             {(unitField: any) => (
-                                                <StorageUnitSelect
-                                                    value={unitField.state.value}
-                                                    onChange={(value) => {
-                                                        unitField.handleChange(value);
-                                                    }}
-                                                />
+                                                <div className="mt-2">
+                                                    <StorageUnitSelect
+                                                        value={unitField.state.value}
+                                                        onChange={(value) => {
+                                                            unitField.handleChange(value);
+                                                        }}
+                                                    />
+                                                </div>
                                             )}
                                         </form.Field>
                                     </div>
@@ -363,7 +373,7 @@ export const VirtualServer = () => {
                                                 <p className="text-muted-foreground text-sm">
                                                     CPU devoted to system execution
                                                 </p>
-                                                <div className="mt-1 flex gap-2 items-center">
+                                                <div className="mt-1 flex items-center gap-2">
                                                     <field.TextField
                                                         label={undefined}
                                                         description={undefined}
@@ -373,12 +383,14 @@ export const VirtualServer = () => {
                                                     <form.Field name="perBlockSysCpuUnit">
                                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                         {(unitField: any) => (
-                                                            <PerBlockSysCpuUnitSelect
-                                                                value={unitField.state.value}
-                                                                onChange={(value) => {
-                                                                    unitField.handleChange(value);
-                                                                }}
-                                                            />
+                                                            <div className="mt-2">
+                                                                <PerBlockSysCpuUnitSelect
+                                                                    value={unitField.state.value}
+                                                                    onChange={(value) => {
+                                                                        unitField.handleChange(value);
+                                                                    }}
+                                                                />
+                                                            </div>
                                                         )}
                                                     </form.Field>
                                                 </div>
@@ -403,7 +415,7 @@ export const VirtualServer = () => {
                                                     Storage devoted to objective state (vs subjective
                                                     state)
                                                 </p>
-                                                <div className="mt-1 flex gap-2 items-center">
+                                                <div className="mt-1 flex items-center gap-2">
                                                     <field.TextField
                                                         label={undefined}
                                                         description={undefined}
@@ -413,12 +425,14 @@ export const VirtualServer = () => {
                                                     <form.Field name="objStorageUnit">
                                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                         {(unitField: any) => (
-                                                            <StorageUnitSelect
-                                                                value={unitField.state.value}
-                                                                onChange={(value) => {
-                                                                    unitField.handleChange(value);
-                                                                }}
-                                                            />
+                                                            <div className="mt-2">
+                                                                <StorageUnitSelect
+                                                                    value={unitField.state.value}
+                                                                    onChange={(value) => {
+                                                                        unitField.handleChange(value);
+                                                                    }}
+                                                                />
+                                                            </div>
                                                         )}
                                                     </form.Field>
                                                 </div>
