@@ -4,7 +4,6 @@ import z from "zod";
 import { Info } from "lucide-react";
 
 import { Button } from "@shared/shadcn/ui/button";
-import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
     Tooltip,
@@ -264,53 +263,7 @@ export const VirtualServer = () => {
                                     }),
                             }}
                         />
-                        {/* <form.Field
-                            name="netGbps"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(nonNegativeNumberRefine, {
-                                        message: "Net Bandwidth must be a positive number",
-                                    }),
-                            }}
-                        >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any * /}
-                            {(field: any) => (
-                                <div>
-                                    <LabelWithInfo
-                                        label="Net bandwidth"
-                                        tooltip="for P2P traffic, Tx traffic, and Query traffic"
-                                    />
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <Input
-                                            type="text"
-                                            value={String(field.state.value ?? "")}
-                                            onChange={(e) => {
-                                                field.handleChange(e.target.value);
-                                            }}
-                                            onBlur={field.handleBlur}
-                                            placeholder="0"
-                                            className="w-36"
-                                        />
-                                        <Select value="Gbps" onValueChange={() => {}}>
-                                            <SelectTrigger className="w-24" disabled>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Gbps">Gbps</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    {field.state.meta.errors && (
-                                        <p className="text-destructive text-sm mt-1">
-                                            {field.state.meta.errors[0]}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </form.Field> */}
-
-                        <form.Field
+                        <form.AppField
                             name="storageAmount"
                             validators={{
                                 onChange: z
@@ -320,21 +273,16 @@ export const VirtualServer = () => {
                                     }),
                             }}
                         >
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {(field: any) => (
+                            {(field) => (
                                 <div>
                                     <LabelWithInfo
                                         label="Total storage"
-                    tooltip="Total storage space (objective + subjective)"
+                                        tooltip="Total storage space (objective + subjective)"
                                     />
                                     <div className="mt-1 flex gap-2 items-center">
-                                        <Input
-                                            type="text"
-                                            value={String(field.state.value ?? "")}
-                                            onChange={(e) => {
-                                                field.handleChange(e.target.value);
-                                            }}
-                                            onBlur={field.handleBlur}
+                                        <field.TextField
+                                            label={undefined}
+                                            description={undefined}
                                             placeholder="0"
                                             className="w-36"
                                         />
@@ -350,14 +298,9 @@ export const VirtualServer = () => {
                                             )}
                                         </form.Field>
                                     </div>
-                                    {field.state.meta.errors && (
-                                        <p className="text-destructive text-sm mt-1">
-                                            {field.state.meta.errors[0]}
-                                        </p>
-                                    )}
                                 </div>
                             )}
-                        </form.Field>
+                        </form.AppField>
                     </div>
                 </div>
 
@@ -384,7 +327,7 @@ export const VirtualServer = () => {
                                     from the server specs.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <form.Field
+                                    <form.AppField
                                         name="blockReplayFactor"
                                         validators={{
                                             onChange: z
@@ -394,58 +337,36 @@ export const VirtualServer = () => {
                                                 }),
                                         }}
                                     >
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(field: any) => (
-                                            <div>
-                                                <Label>Block Replay Factor</Label>
-                                                <p className="text-muted-foreground text-sm">
-                                                    Block replay speed compared to live network
-                                                    processing
-                                                </p>
-                                                <Input
-                                                    type="text"
-                                                    value={String(field.state.value ?? "")}
-                                                    onChange={(e) => {
-                                                        field.handleChange(e.target.value);
-                                                    }}
-                                                    onBlur={field.handleBlur}
-                                                    placeholder="0-255"
-                                                    className="mt-1 w-36"
-                                                />
-                                                {field.state.meta.errors && (
-                                                    <p className="text-destructive text-sm mt-1">
-                                                        {field.state.meta.errors[0]}
-                                                    </p>
-                                                )}
-                                            </div>
+                                        {(field) => (
+                                            <field.TextField
+                                                label="Block Replay Factor"
+                                                description="Block replay speed compared to live network processing"
+                                                placeholder="0-255"
+                                                className="mt-1 w-36"
+                                            />
                                         )}
-                                    </form.Field>
+                                    </form.AppField>
 
-                                    <form.Field
-                            name="perBlockSysCpu"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(nonNegativeNumberRefine, {
-                                        message: "Per-block system CPU must be a positive number",
-                                    }),
-                            }}
+                                    <form.AppField
+                                        name="perBlockSysCpu"
+                                        validators={{
+                                            onChange: z
+                                                .string()
+                                                .refine(nonNegativeNumberRefine, {
+                                                    message: "Per-block system CPU must be a positive number",
+                                                }),
+                                        }}
                                     >
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(field: any) => (
+                                        {(field) => (
                                             <div>
                                                 <Label>Per-Block System CPU</Label>
                                                 <p className="text-muted-foreground text-sm">
                                                     CPU devoted to system execution
                                                 </p>
                                                 <div className="mt-1 flex gap-2 items-center">
-                                                    <Input
-                                                        type="text"
-                                                        value={String(field.state.value ?? "")}
-                                                        onChange={(e) => {
-                                                            field.handleChange(e.target.value);
-                                                        }}
-                                                        onBlur={field.handleBlur}
+                                                    <field.TextField
+                                                        label={undefined}
+                                                        description={undefined}
                                                         placeholder="0"
                                                         className="w-36"
                                                     />
@@ -461,27 +382,21 @@ export const VirtualServer = () => {
                                                         )}
                                                     </form.Field>
                                                 </div>
-                                                {field.state.meta.errors && (
-                                                    <p className="text-destructive text-sm mt-1">
-                                                        {field.state.meta.errors[0]}
-                                                    </p>
-                                                )}
                                             </div>
                                         )}
-                                    </form.Field>
+                                    </form.AppField>
 
-                                    <form.Field
-                            name="objStorageAmount"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(nonNegativeNumberRefine, {
-                                        message: "Objective storage must be a positive number",
-                                    }),
-                            }}
+                                    <form.AppField
+                                        name="objStorageAmount"
+                                        validators={{
+                                            onChange: z
+                                                .string()
+                                                .refine(nonNegativeNumberRefine, {
+                                                    message: "Objective storage must be a positive number",
+                                                }),
+                                        }}
                                     >
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(field: any) => (
+                                        {(field) => (
                                             <div>
                                                 <Label>Objective Storage</Label>
                                                 <p className="text-muted-foreground text-sm">
@@ -489,36 +404,27 @@ export const VirtualServer = () => {
                                                     state)
                                                 </p>
                                                 <div className="mt-1 flex gap-2 items-center">
-                                                    <Input
-                                                        type="text"
-                                                        value={String(field.state.value ?? "")}
-                                                        onChange={(e) => {
-                                                            field.handleChange(e.target.value);
-                                                        }}
-                                                        onBlur={field.handleBlur}
+                                                    <field.TextField
+                                                        label={undefined}
+                                                        description={undefined}
                                                         placeholder="0"
                                                         className="w-36"
                                                     />
-                                                        <form.Field name="objStorageUnit">
-                                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                                            {(unitField: any) => (
-                                                                <StorageUnitSelect
-                                                                    value={unitField.state.value}
-                                                                    onChange={(value) => {
-                                                                        unitField.handleChange(value);
-                                                                    }}
-                                                                />
-                                                            )}
-                                                        </form.Field>
+                                                    <form.Field name="objStorageUnit">
+                                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                                        {(unitField: any) => (
+                                                            <StorageUnitSelect
+                                                                value={unitField.state.value}
+                                                                onChange={(value) => {
+                                                                    unitField.handleChange(value);
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </form.Field>
                                                 </div>
-                                                {field.state.meta.errors && (
-                                                    <p className="text-destructive text-sm mt-1">
-                                                        {field.state.meta.errors[0]}
-                                                    </p>
-                                                )}
                                             </div>
                                         )}
-                                    </form.Field>
+                                    </form.AppField>
 
                                 </div>
                             </AccordionContent>
