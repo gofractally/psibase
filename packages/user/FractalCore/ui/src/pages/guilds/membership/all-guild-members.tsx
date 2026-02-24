@@ -1,3 +1,6 @@
+import type { Guild } from "@/lib/graphql/fractals/getGuild";
+import type { Score } from "@/lib/graphql/fractals/getScores";
+
 import dayjs from "dayjs";
 
 import { PageContainer } from "@/components/page-container";
@@ -5,56 +8,92 @@ import { PageContainer } from "@/components/page-container";
 import { useScores } from "@/hooks/fractals/use-scores";
 import { useGuild } from "@/hooks/use-guild";
 
-import { cn } from "@shared/lib/utils";
+import { GlowingCard } from "@shared/components/glowing-card";
+import { TableContact } from "@shared/components/tables/table-contact";
+import { Badge } from "@shared/shadcn/ui/badge";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
 
+function getGuildMemberRoleLabel(
+    memberAccount: string,
+    guild: Guild | null | undefined,
+): "Representative" | "Councilor" | "Candidate" | null {
+    if (!guild) return null;
+    if (guild.rep?.member === memberAccount) return "Representative";
+    if (guild.council?.includes(memberAccount)) return "Councilor";
+    return null;
+}
+
 export const AllGuildMembers = () => {
     const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
 
+    const sortedScores = (scores || []).sort(
+        (a, b) =>
+            new Date(a.createdAt).valueOf() - new Date(b.createdAt).valueOf(),
+    );
+
     return (
         <PageContainer>
-            <div className="flex h-9 items-center">
-                <h1 className="text-lg font-semibold">Guild members</h1>
-            </div>
-            <div className="mt-3">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Reputation</TableHead>
-                            <TableHead>Member since</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {scores?.map((member, index) => (
-                            <TableRow
-                                key={member.member}
-                                className={cn({
-                                    "bg-background/80": index < 6,
-                                })}
-                            >
-                                <TableCell className="font-medium">
-                                    {member.member}
-                                </TableCell>
-                                <TableCell>{member.score}</TableCell>
-                                <TableCell>
-                                    {dayjs(member.createdAt).format(
-                                        "MMMM D, YYYY",
-                                    )}
-                                </TableCell>
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Guild members</CardTitle>
+                </CardHeader>
+                <CardContent className="@container">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Account</TableHead>
+                                <TableHead>Reputation</TableHead>
+                                <TableHead className="text-end">
+                                    Member since
+                                </TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedScores?.map((member: Score) => {
+                                const roleLabel = getGuildMemberRoleLabel(
+                                    member.member,
+                                    guild,
+                                );
+                                return (
+                                    <TableRow key={member.member}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex flex-row gap-2">
+                                                <TableContact
+                                                    account={member.member}
+                                                />
+                                                {roleLabel != null && (
+                                                    <Badge variant="default">
+                                                        {roleLabel}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{member.score}</TableCell>
+                                        <TableCell className="text-end">
+                                            {dayjs(member.createdAt).format(
+                                                "MMMM D, YYYY",
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                        <TableCaption>
+                            A list of all members in this guild.
+                        </TableCaption>
+                    </Table>
+                </CardContent>
+            </GlowingCard>
         </PageContainer>
     );
 };
