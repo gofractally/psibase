@@ -97,9 +97,14 @@ export function getMenuGroups(
                 title: membership.guild.displayName,
                 subItems: [
                     {
-                        title: "Membership",
-                        icon: Contact,
+                        title: "Overview",
+                        icon: Home,
                         path: `/guild/${membership.guild.account}`,
+                    },
+                    {
+                        title: "Members",
+                        icon: Contact,
+                        path: `/guild/${membership.guild.account}/members`,
                     },
                     {
                         title: "Evaluations",
