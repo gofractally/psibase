@@ -13,6 +13,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { RegisterCandidacyItem } from "./register-candidacy-item";
 import { ResignAsRepItem } from "./resign-as-rep-item";
@@ -20,18 +21,40 @@ import { ResignAsRepItem } from "./resign-as-rep-item";
 export const MyMembershipCard = () => {
     const {
         data: currentUser,
-        // isLoading: isLoadingCurrentUser,
+        isPending: isPendingCurrentUser,
         error: errorCurrentUser,
     } = useCurrentUser();
     const guildAccount = useGuildAccount();
     const {
         data: membership,
-        // isLoading: isLoadingMembership,
+        isPending: isPendingMembership,
         error: errorMembership,
     } = useGuildMembership(guildAccount, currentUser);
 
     const isGuildMember = membership != null;
-    // const isLoading = isLoadingCurrentUser || isLoadingMembership;
+    const isPending = isPendingCurrentUser || isPendingMembership;
+
+    if (isPending) {
+        return (
+            <GlowingCard>
+                <CardHeader className="flex items-center justify-between">
+                    <Skeleton className="h-6 w-32" />
+                    <div className="flex gap-2">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                </CardContent>
+                <CardFooter className="justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-28" />
+                </CardFooter>
+            </GlowingCard>
+        );
+    }
 
     const error = errorCurrentUser || errorMembership;
 

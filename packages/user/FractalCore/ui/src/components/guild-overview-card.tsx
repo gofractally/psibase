@@ -6,8 +6,10 @@ import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identi
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/getGuild";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const zLeadership = z.enum(["RepAndCouncil", "RepOnly", "CouncilOnly"]);
 
@@ -26,8 +28,39 @@ export const GuildOverviewCard = ({
 }: {
     guildAccount?: string;
 }) => {
-    const { data: guild } = useGuild(guildAccount);
+    const { data: guild, isPending, error } = useGuild(guildAccount);
     const leadershipStatus = getLeadershipStatus(guild);
+
+    if (isPending) {
+        return (
+            <GlowingCard>
+                <CardHeader>
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="mt-1 h-4 w-28" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="mt-2 h-4 w-full" />
+                        <Skeleton className="mt-1 h-4 w-4/5" />
+                    </div>
+                    <div>
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="mt-2 h-4 w-full" />
+                        <Skeleton className="mt-1 h-4 w-3/4" />
+                    </div>
+                </CardContent>
+                <CardFooter className="flex items-center gap-2">
+                    <Skeleton className="size-4 shrink-0 rounded" />
+                    <Skeleton className="h-4 w-48" />
+                </CardFooter>
+            </GlowingCard>
+        );
+    }
+
+    if (error) {
+        return <ErrorCard error={error} />;
+    }
 
     return (
         <GlowingCard>
