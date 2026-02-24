@@ -3,22 +3,29 @@ import { z } from "zod";
 import { FRACTALS_SERVICE } from "@/lib/constants";
 
 import { graphql } from "@shared/lib/graphql";
-import { Account } from "@shared/lib/schemas/account";
+import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
 const FractalSchema = z.object({
-    account: z.string(),
+    account: zAccount,
+});
+
+const RepSchema = z.object({
+    member: zAccount,
 });
 
 const GuildSchema = z.object({
-    account: z.string(),
+    account: zAccount,
     displayName: z.string(),
     candidacyCooldown: z.number().int(),
+    council: zAccount.array().nullable(),
     fractal: FractalSchema,
+    rep: RepSchema,
 });
 
 const NodeSchema = z
     .object({
+        createdAt: zDateTime,
         guild: GuildSchema,
         score: z.number(),
         candidacyEligibleFrom: zDateTime,
@@ -35,17 +42,22 @@ export const getGuildMembership = async (guild: Account, member: Account) => {
         `
         {
             guildMembership(guild:"${guild}", member:"${member}") {
+                createdAt
                 isCandidate
                 score
                 candidacyEligibleFrom
-                    guild {
+                guild {
+                    account
+                    displayName
+                    candidacyCooldown
+                    council
+                    fractal {
                         account
-                        displayName
-                        candidacyCooldown
-                        fractal {
-                            account
-                        }
                     }
+                    rep {
+                        member
+                    }
+                }
 
             }
         }

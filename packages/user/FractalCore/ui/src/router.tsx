@@ -18,7 +18,7 @@ import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-de
 import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
 import { AllGuildMembers } from "./pages/guilds/membership/all-guild-members";
-import { MyGuildMembership } from "./pages/guilds/membership/my-guild-membership";
+import { GuildOverview } from "./pages/guilds/overview";
 import { Settings } from "./pages/guilds/settings";
 
 export const router = createBrowserRouter([
@@ -74,7 +74,7 @@ export const router = createBrowserRouter([
                         path: "",
                         element: (
                             <ProtectedRoute>
-                                <MyGuildMembership />
+                                <GuildOverview />
                             </ProtectedRoute>
                         ),
                     },

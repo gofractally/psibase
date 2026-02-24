@@ -1,13 +1,13 @@
 import { Crown, User, Users } from "lucide-react";
 import z from "zod";
 
+import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
+
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/getGuild";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
-
-import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 const zLeadership = z.enum(["RepAndCouncil", "RepOnly", "CouncilOnly"]);
 

@@ -5,7 +5,7 @@ import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 import { PageContainer } from "@/components/page-container";
 
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMembership } from "@/hooks/fractals/use-guild-membership";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { ErrorCard } from "@shared/components/error-card";
@@ -14,20 +14,18 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Card, CardContent } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
-export const MyGuildMembership = () => {
+import { MyMembershipCard } from "./components/my-membership-card";
+
+export const GuildOverview = () => {
     const {
         data: currentUser,
         isLoading: isLoadingCurrentUser,
         error: errorCurrentUser,
     } = useCurrentUser();
-
-    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
-
     const guildAccount = useGuildAccount();
-    const isGuildMember = memberships?.some(
-        (membership) => membership.guild.account == guildAccount,
-    );
+    const { data: membership } = useGuildMembership(guildAccount, currentUser);
 
+    const isGuildMember = membership != null;
     const isLoading = isLoadingCurrentUser;
 
     const error = errorCurrentUser;
@@ -48,7 +46,11 @@ export const MyGuildMembership = () => {
                 ) : (
                     <>
                         <GuildOverviewCard guildAccount={guildAccount} />
-                        {!isGuildMember && <ApplyGuildCard />}
+                        {isGuildMember ? (
+                            <MyMembershipCard />
+                        ) : (
+                            <ApplyGuildCard />
+                        )}
                     </>
                 )}
             </div>
