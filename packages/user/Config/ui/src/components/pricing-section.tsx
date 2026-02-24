@@ -2,14 +2,6 @@ import { useEffect, useMemo } from "react";
 
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@shared/shadcn/ui/select";
-
 import { useAppForm } from "@shared/components/form/app-form";
 import { useSetCpuPricingParams } from "@/hooks/use-set-cpu-pricing-params";
 import { useSetNetPricingParams } from "@/hooks/use-set-net-pricing-params";
@@ -20,6 +12,7 @@ import {
     TIME_FACTORS,
 } from "@/lib/unit-conversions";
 import type { CpuPricing, NetPricing } from "@/hooks/use-resource-pricing";
+import { TimeUnitSelect } from "@/components/unit-select";
 
 interface PricingFormValues {
     halvingTimeUnit: RateTimeUnit;
@@ -227,10 +220,9 @@ export const PricingSection = ({
                                                     }
                                                     onBlur={valueField.handleBlur}
                                                 />
-                                                <Select
-                                                    value={unitField.state.value ?? "sec"}
-                                                    onValueChange={(v) => {
-                                                        const newUnit = v as RateTimeUnit;
+                                                <TimeUnitSelect
+                                                    value={unitField.state.value}
+                                                    onChange={(newUnit) => {
                                                         const val =
                                                             Number(
                                                                 valueField.state.value,
@@ -249,26 +241,12 @@ export const PricingSection = ({
                                                                 "sec",
                                                                 newUnit,
                                                             );
-                                                        unitField.handleChange(
-                                                            newUnit,
-                                                        );
+                                                        unitField.handleChange(newUnit);
                                                         valueField.handleChange(
                                                             newVal.toString(),
                                                         );
                                                     }}
-                                                >
-                                                    <SelectTrigger className="w-24">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="sec">
-                                                            sec
-                                                        </SelectItem>
-                                                        <SelectItem value="min">
-                                                            min
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                />
                                             </div>
                                         </div>
                                     )}
@@ -294,10 +272,9 @@ export const PricingSection = ({
                                                     }
                                                     onBlur={valueField.handleBlur}
                                                 />
-                                                <Select
-                                                    value={unitField.state.value ?? "sec"}
-                                                    onValueChange={(v) => {
-                                                        const newUnit = v as RateTimeUnit;
+                                                <TimeUnitSelect
+                                                    value={unitField.state.value}
+                                                    onChange={(newUnit) => {
                                                         const val =
                                                             Number(
                                                                 valueField.state.value,
@@ -316,26 +293,12 @@ export const PricingSection = ({
                                                                 "sec",
                                                                 newUnit,
                                                             );
-                                                        unitField.handleChange(
-                                                            newUnit,
-                                                        );
+                                                        unitField.handleChange(newUnit);
                                                         valueField.handleChange(
                                                             newVal.toString(),
                                                         );
                                                     }}
-                                                >
-                                                    <SelectTrigger className="w-24">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="sec">
-                                                            sec
-                                                        </SelectItem>
-                                                        <SelectItem value="min">
-                                                            min
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                />
                                             </div>
                                         </div>
                                     )}

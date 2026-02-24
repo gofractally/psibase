@@ -7,13 +7,6 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@shared/shadcn/ui/select";
-import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -32,13 +25,14 @@ import { useVirtualServerResources } from "@/hooks/use-virtual-server-resources"
 
 import { parseError } from "@shared/lib/parseErrorMessage";
 import {
-    type StorageUnit,
-    type TimeUnit,
     STORAGE_FACTORS,
     TIME_FACTORS,
     getBestStorageUnit,
     getBestTimeUnit,
+    type StorageUnit,
+    type TimeUnit,
 } from "@/lib/unit-conversions";
+import { PerBlockSysCpuUnitSelect, StorageUnitSelect } from "@/components/unit-select";
 
 /** Pattern for partial decimal input (e.g. ".", ".5", "0.") while typing */
 const PARTIAL_DECIMAL = /^\d*\.?\d*$/;
@@ -260,14 +254,10 @@ export const VirtualServer = () => {
                                         label="Net bandwidth"
                                         description="for P2P traffic, Tx traffic, and Query traffic"
                                     />
-                                    <Select value="Gbps" onValueChange={() => {}}>
-                                        <SelectTrigger className="w-24" disabled>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Gbps">Gbps</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    {/* Gbps is fixed, so this is a disabled text suffix rather than a full select */}
+                                    <div className="mt-1 text-muted-foreground text-sm">
+                                        Gbps
+                                    </div>
                                 </>
                             )}
                             validators={{
@@ -355,21 +345,12 @@ export const VirtualServer = () => {
                                         <form.Field name="storageUnit">
                                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                             {(unitField: any) => (
-                                                <Select
+                                                <StorageUnitSelect
                                                     value={unitField.state.value}
-                                                    onValueChange={(value) => {
-                                                        unitField.handleChange(value as StorageUnit);
+                                                    onChange={(value) => {
+                                                        unitField.handleChange(value);
                                                     }}
-                                                >
-                                                    <SelectTrigger className="w-24">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="GB">GB</SelectItem>
-                                                        <SelectItem value="TB">TB</SelectItem>
-                                                        <SelectItem value="PB">PB</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                />
                                             )}
                                         </form.Field>
                                     </div>
@@ -474,31 +455,14 @@ export const VirtualServer = () => {
                                                     />
                                                     <form.Field name="perBlockSysCpuUnit">
                                                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(unitField: any) => (
-                                            <Select
-                                                value={unitField.state.value}
-                                                onValueChange={(value) => {
-                                                    unitField.handleChange(
-                                                        value as TimeUnit,
-                                                    );
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-24">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="ns">
-                                                        ns
-                                                    </SelectItem>
-                                                    <SelectItem value="us">
-                                                        us
-                                                    </SelectItem>
-                                                    <SelectItem value="ms">
-                                                        ms
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        )}
+                                                        {(unitField: any) => (
+                                                            <PerBlockSysCpuUnitSelect
+                                                                value={unitField.state.value}
+                                                                onChange={(value) => {
+                                                                    unitField.handleChange(value);
+                                                                }}
+                                                            />
+                                                        )}
                                                     </form.Field>
                                                 </div>
                                                 {field.state.meta.errors && (
@@ -540,33 +504,16 @@ export const VirtualServer = () => {
                                                         className="w-36"
                                                     />
                                                         <form.Field name="objStorageUnit">
-                                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                                        {(unitField: any) => (
-                                                            <Select
-                                                                value={unitField.state.value}
-                                                                onValueChange={(value) => {
-                                                                    unitField.handleChange(
-                                                                        value as StorageUnit,
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <SelectTrigger className="w-24">
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="GB">
-                                                                        GB
-                                                                    </SelectItem>
-                                                                    <SelectItem value="TB">
-                                                                        TB
-                                                                    </SelectItem>
-                                                                    <SelectItem value="PB">
-                                                                        PB
-                                                                    </SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        )}
-                                                    </form.Field>
+                                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                                            {(unitField: any) => (
+                                                                <StorageUnitSelect
+                                                                    value={unitField.state.value}
+                                                                    onChange={(value) => {
+                                                                        unitField.handleChange(value);
+                                                                    }}
+                                                                />
+                                                            )}
+                                                        </form.Field>
                                                 </div>
                                                 {field.state.meta.errors && (
                                                     <p className="text-destructive text-sm mt-1">
