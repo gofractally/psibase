@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { useSetGuildBio } from "@/hooks/fractals/use-set-guild-bio";
@@ -5,8 +6,10 @@ import { useSetGuildDescription } from "@/hooks/fractals/use-set-guild-descripti
 import { useSetGuildDisplayName } from "@/hooks/fractals/use-set-guild-display-name";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
+import QueryKey from "@/lib/queryKeys";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Dialog,
     DialogContent,
@@ -21,7 +24,9 @@ export const SetGuildMetadataModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
+    const queryClient = useQueryClient();
     const guildAccount = useGuildAccount();
+    const { data: currentUser } = useCurrentUser();
 
     const { data: guild, refetch } = useGuild();
 
@@ -57,6 +62,14 @@ export const SetGuildMetadataModal = ({
                 }
 
                 await Promise.all(promises);
+
+                queryClient.invalidateQueries({
+                    queryKey: QueryKey.guild(guildAccount!),
+                });
+                queryClient.invalidateQueries({
+                    queryKey: QueryKey.guildMemberships(currentUser!),
+                });
+
                 openChange(false);
             } catch (e) {
                 refetch();

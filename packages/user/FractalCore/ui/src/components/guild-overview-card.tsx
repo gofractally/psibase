@@ -1,4 +1,5 @@
-import { Crown, User, Users } from "lucide-react";
+import { Crown, Pencil, User, Users } from "lucide-react";
+import { useState } from "react";
 import z from "zod";
 
 import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
@@ -6,8 +7,11 @@ import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identi
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/getGuild";
 
+import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
+
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
@@ -30,6 +34,7 @@ export const GuildOverviewCard = ({
 }) => {
     const { data: guild, isPending, error } = useGuild(guildAccount);
     const leadershipStatus = getLeadershipStatus(guild);
+    const [metadataModalOpen, setMetadataModalOpen] = useState(false);
 
     if (isPending) {
         return (
@@ -64,12 +69,24 @@ export const GuildOverviewCard = ({
 
     return (
         <GlowingCard>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-start justify-between gap-2">
                 <FractalGuildIdentifier
                     name={guild?.displayName}
                     account={guild?.account}
                 />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setMetadataModalOpen(true)}
+                    aria-label="Edit guild metadata"
+                >
+                    <Pencil className="size-4" />
+                </Button>
             </CardHeader>
+            <SetGuildMetadataModal
+                show={metadataModalOpen}
+                openChange={setMetadataModalOpen}
+            />
             <CardContent className="space-y-4">
                 <div>
                     <h3 className="text-sm font-semibold">Description</h3>
