@@ -138,13 +138,13 @@ export function NavMain() {
 
         if (hasSubItems) {
             return (
-                <SidebarMenuItem key={item.title} className="list-none">
-                    <Collapsible className="group/collapsible list-none [&[data-state=open]>button>svg:first-child]:rotate-90">
+                <Collapsible className="group/collapsible list-none">
+                    <SidebarMenuItem key={item.title} className="list-none">
                         <CollapsibleTrigger asChild>
                             <SidebarMenuButton tooltip={item.title}>
-                                <ChevronRight className="transition-transform" />
                                 {item.icon && <item.icon />}
                                 <span>{item.title}</span>
+                                <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
                             </SidebarMenuButton>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
@@ -168,8 +168,8 @@ export function NavMain() {
                                 ))}
                             </SidebarMenuSub>
                         </CollapsibleContent>
-                    </Collapsible>
-                </SidebarMenuItem>
+                    </SidebarMenuItem>
+                </Collapsible>
             );
         }
 
