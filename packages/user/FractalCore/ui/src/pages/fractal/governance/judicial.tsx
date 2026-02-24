@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ExileFractalMemberModal } from "@/components/modals/exile-fractal-member-modal";
+import { PageContainer } from "@/components/page-container";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
@@ -48,7 +49,7 @@ export const Judicial = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-6 p-4 px-6">
+        <PageContainer className="space-y-6">
             <ExileFractalMemberModal
                 openChange={setShowModal}
                 show={showModal}
@@ -123,6 +124,6 @@ export const Judicial = () => {
                     </CardContent>
                 </GlowingCard>
             )}
-        </div>
+        </PageContainer>
     );
 };

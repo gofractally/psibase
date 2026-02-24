@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/page-container";
+
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembership } from "@/hooks/fractals/use-membership";
@@ -41,8 +43,8 @@ export const Overview = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            <div className="mt-3 space-y-6">
+        <PageContainer>
+            <div className="space-y-6">
                 {isLoading ? (
                     <>
                         <Skeleton className="h-48 w-full rounded-xl" />
@@ -62,6 +64,6 @@ export const Overview = () => {
                     </>
                 )}
             </div>
-        </div>
+        </PageContainer>
     );
 };

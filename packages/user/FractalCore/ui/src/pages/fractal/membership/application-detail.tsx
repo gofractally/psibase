@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-modal";
+import { PageContainer } from "@/components/page-container";
 
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
@@ -33,15 +34,15 @@ export const ApplicationDetail = () => {
 
     if (application === null) {
         return (
-            <div className="mx-auto w-full max-w-5xl p-4 px-6">
+            <PageContainer>
                 Application for {currentUser} to join the guild{" "}
                 {guild.data?.displayName} does not exist.
-            </div>
+            </PageContainer>
         );
     }
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <AttestGuildMemberModal
                 openChange={(e) => setShowModal(e)}
                 show={showModal}
@@ -117,6 +118,6 @@ export const ApplicationDetail = () => {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </PageContainer>
     );
 };

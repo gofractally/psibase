@@ -1,6 +1,8 @@
 import { CircleSlash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
+import { PageContainer } from "@/components/page-container";
+
 import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
 
 import { EmptyBlock } from "@shared/components/empty-block";
@@ -42,7 +44,7 @@ export const EvaluationResult = () => {
     const { data } = useEvaluationResults(Number(evaluationId));
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">
                     Results for evaluation {evaluationId}
@@ -126,6 +128,6 @@ export const EvaluationResult = () => {
                     </div>
                 )}
             </div>
-        </div>
+        </PageContainer>
     );
 };

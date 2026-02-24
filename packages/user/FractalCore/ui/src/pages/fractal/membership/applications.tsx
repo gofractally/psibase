@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
+import { PageContainer } from "@/components/page-container";
 
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
@@ -36,7 +37,7 @@ export const Applications = () => {
     );
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">Applications</h1>
             </div>
@@ -92,6 +93,6 @@ export const Applications = () => {
                     />
                 )}
             </div>
-        </div>
+        </PageContainer>
     );
 };

@@ -5,6 +5,7 @@ import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { SetMinScorersModal } from "@/components/modals/set-min-scorers-modal";
 import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
 import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
+import { PageContainer } from "@/components/page-container";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
@@ -54,7 +55,7 @@ export const Legislative = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-6 p-4 px-6">
+        <PageContainer className="space-y-6">
             <SetMinScorersModal
                 openChange={setShowMinScorers}
                 show={showMinScorersModal}
@@ -190,6 +191,6 @@ export const Legislative = () => {
                     </CardContent>
                 </GlowingCard>
             )}
-        </div>
+        </PageContainer>
     );
 };

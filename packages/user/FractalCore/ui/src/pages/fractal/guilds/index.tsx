@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
+import { PageContainer } from "@/components/page-container";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 
@@ -35,7 +36,7 @@ export const Guilds = () => {
     return (
         <>
             <ModalCreateGuild openChange={setShowModal} show={showModal} />
-            <div className="mx-auto w-full max-w-5xl space-y-4">
+            <PageContainer className="space-y-4">
                 <div className="flex justify-end">
                     <Button
                         variant="outline"
@@ -95,7 +96,7 @@ export const Guilds = () => {
                         </Table>
                     </CardContent>
                 </GlowingCard>
-            </div>
+            </PageContainer>
         </>
     );
 };

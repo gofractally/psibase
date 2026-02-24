@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { z } from "zod";
 
+import { PageContainer } from "@/components/page-container";
 import { ScheduleDialog } from "@/components/schedule-dialog";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
@@ -88,7 +89,7 @@ export const Settings = () => {
     });
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-6 p-4 px-6">
+        <PageContainer className="space-y-6">
             <GlowingCard>
                 <CardHeader>
                     <CardTitle>Metadata</CardTitle>
@@ -158,6 +159,6 @@ export const Settings = () => {
                     </CardContent>
                 </GlowingCard>
             )}
-        </div>
+        </PageContainer>
     );
 };

@@ -1,6 +1,8 @@
 import dayjs from "dayjs";
 import { Users } from "lucide-react";
 
+import { PageContainer } from "@/components/page-container";
+
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
 import { COUNCIL_SEATS } from "@/lib/constants";
@@ -36,7 +38,7 @@ export const Members = () => {
     );
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-4">
+        <PageContainer>
             <GlowingCard>
                 <CardHeader>
                     <CardTitle>All Members</CardTitle>
@@ -92,6 +94,6 @@ export const Members = () => {
                     </Table>
                 </CardContent>
             </GlowingCard>
-        </div>
+        </PageContainer>
     );
 };

@@ -4,6 +4,8 @@ import { AlignJustify, Info, Plus, X } from "lucide-react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
 
+import { PageContainer } from "@/components/page-container";
+
 import { useGroupUsers } from "@/hooks/fractals/use-group-users";
 import { setCachedProposal, useProposal } from "@/hooks/fractals/use-proposal";
 import { usePropose } from "@/hooks/fractals/use-propose";
@@ -165,7 +167,7 @@ export const EvaluationDeliberation = () => {
     } = useRanking();
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <GroupStatus />
             <div className="mt-3">
                 <div>
@@ -236,6 +238,6 @@ export const EvaluationDeliberation = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </PageContainer>
     );
 };

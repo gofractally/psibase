@@ -1,6 +1,8 @@
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
+import { PageContainer } from "@/components/page-container";
+
 import { useCompletedEvaluation } from "@/hooks/fractals/use-completed-evaluations";
 import { useGuild } from "@/hooks/use-guild";
 
@@ -20,7 +22,7 @@ export const Completed = () => {
 
     const navigate = useNavigate();
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">Completed</h1>
             </div>
@@ -55,6 +57,6 @@ export const Completed = () => {
                     </Table>
                 )}
             </div>
-        </div>
+        </PageContainer>
     );
 };

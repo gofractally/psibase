@@ -1,5 +1,7 @@
 import dayjs from "dayjs";
 
+import { PageContainer } from "@/components/page-container";
+
 import { useScores } from "@/hooks/fractals/use-scores";
 import { useGuild } from "@/hooks/use-guild";
 
@@ -18,7 +20,7 @@ export const AllGuildMembers = () => {
     const { data: scores } = useScores(guild?.account);
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <div className="flex h-9 items-center">
                 <h1 className="text-lg font-semibold">Guild members</h1>
             </div>
@@ -53,6 +55,6 @@ export const AllGuildMembers = () => {
                     </TableBody>
                 </Table>
             </div>
-        </div>
+        </PageContainer>
     );
 };

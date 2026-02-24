@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
+import { PageContainer } from "@/components/page-container";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-account";
@@ -36,8 +37,8 @@ export const MyGuildMembership = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            <div className="mt-3 space-y-6">
+        <PageContainer>
+            <div className="space-y-6">
                 {isLoading ? (
                     <>
                         <Skeleton className="h-44 w-full rounded-xl" />
@@ -51,7 +52,7 @@ export const MyGuildMembership = () => {
                     </>
                 )}
             </div>
-        </div>
+        </PageContainer>
     );
 };
 

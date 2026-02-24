@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 
 import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
+import { PageContainer } from "@/components/page-container";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
@@ -22,7 +23,7 @@ export const ActiveAndUpcoming = () => {
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <div className="flex h-9 items-center justify-between">
                 <h1 className="text-lg font-semibold">Active & upcoming</h1>
             </div>
@@ -38,7 +39,7 @@ export const ActiveAndUpcoming = () => {
                     />
                 )}
             </div>
-        </div>
+        </PageContainer>
     );
 };
 

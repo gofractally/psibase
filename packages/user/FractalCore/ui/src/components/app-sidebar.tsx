@@ -33,7 +33,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             size="lg"
-                            asChild
                             onClick={() => navigate("/")}
                         >
                             <FractalGuildIdentifier

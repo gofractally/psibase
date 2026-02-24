@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/page-container";
+
 import { GlowingCard } from "@shared/components/glowing-card";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 
@@ -8,7 +10,7 @@ import { SetGuildRepItem } from "./components/set-guild-rep-item";
 
 export const Leadership = () => {
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
+        <PageContainer>
             <GlowingCard>
                 <CardHeader>
                     <CardTitle>Leadership</CardTitle>
@@ -20,6 +22,6 @@ export const Leadership = () => {
                     <ResignAsRepItem />
                 </CardContent>
             </GlowingCard>
-        </div>
+        </PageContainer>
     );
 };
