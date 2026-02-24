@@ -69,13 +69,11 @@ export const VirtualServer = () => {
         mutateAsync: setServerSpecs,
         error: serverSpecsError,
         isError: serverSpecsIsError,
-        reset: resetServerSpecs,
     } = useSetServerSpecs();
     const {
         mutateAsync: setNetworkVariables,
         error: networkVarsError,
         isError: networkVarsIsError,
-        reset: resetNetworkVars,
     } = useSetNetworkVariables();
     const { data: resources } = useVirtualServerResources();
     const serverSpecs = resources?.serverSpecs;
@@ -135,8 +133,6 @@ export const VirtualServer = () => {
     const form = useAppForm({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: VirtualServerFormData }) => {
-            resetServerSpecs();
-            resetNetworkVars();
             // Parse and validate server specs
             const parsedSpecs = serverSpecsSchema.parse({
                 netGbps: data.value.netGbps,
