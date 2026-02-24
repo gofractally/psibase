@@ -1,10 +1,12 @@
 # Nix-Based Development Environment for Psibase (Linux)
 
-This document describes how to use Nix as an alternative to the Docker-based development environment (psibase-contributor). **Supported platforms: Linux x86_64 and Linux aarch64.** macOS is not supported in this delivery.
+How to use Nix as an alternative to the Docker-based development environment (psibase-contributor).
+**Supported platforms: Linux x86_64 and Linux aarch64.**
+Not (yet) supported: macOS
 
 ## Overview
 
-The Nix configuration provides:
+The Nix configuration, emulating the current psibase-contributor config provides:
 
 - **C++**: Clang/LLVM 18, Boost, CMake
 - **Rust**: 1.86.0 (pinned) with WASM targets (`wasm32-unknown-unknown`, `wasm32-wasip1`)
@@ -17,30 +19,31 @@ You do **not** need to pre-install Rust, Node, or other dev tools; `nix develop`
 
 ## Prerequisites
 
-- **Nix** with flakes enabled
+- **Nix** (the pkg mgr, not the OS) *with flakes enabled*
 - **direnv** (optional but recommended)
 
 ### Install Nix (Linux)
 
-Determinate Systems installer (recommended; enables flakes by default):
+There are 2 primary ways to install Nix. Recommended: Determinate Systems' installer
 
+#### RECOMMENDED: Determinate Systems' installer
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 ```
 
-Or official installer:
+#### Fallback: the official installer
 
 ```bash
 sh <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
-If using the official installer, enable flakes in `~/.config/nix/nix.conf` or `/etc/nix/nix.conf`:
+Note: the default installer requires you manually enable flakes in `~/.config/nix/nix.conf` or `/etc/nix/nix.conf`:
 
 ```
 experimental-features = nix-command flakes
 ```
 
-### NixOS
+#### Configuring for NixOS
 
 Add to `/etc/nixos/configuration.nix`:
 
@@ -64,10 +67,6 @@ Then `sudo nixos-rebuild switch`.
 From the **psibase** repo root:
 
 ```bash
-git clone https://github.com/gofractally/psibase.git
-cd psibase
-git submodule update --init --recursive
-
 nix develop
 ```
 
@@ -76,10 +75,9 @@ nix develop
 Inside the `nix develop` shell:
 
 ```bash
+# Installs cargo-component, cargo-generate, and cargo-edit (pinned for Rust 1.86.0) into `$CARGO_INSTALL_ROOT`.
 ./nix/scripts/setup_prereqs.sh
 ```
-
-This installs cargo-component, cargo-generate, and cargo-edit (pinned for Rust 1.86.0) into `$CARGO_INSTALL_ROOT`.
 
 ### 3. Verify environment (optional)
 
@@ -88,6 +86,7 @@ This installs cargo-component, cargo-generate, and cargo-edit (pinned for Rust 1
 ```
 
 Checks compilers, Rust, Node, WASI SDK, ICU paths, and cargo tools.
+All should be green checkmarks. Yellow warnings are likely OK, but rare. Red Xs mean something's wrong.
 
 ### 4. Build psibase
 
@@ -100,6 +99,7 @@ cmake --build . -j$(nproc)
 ```
 
 ## Using direnv
+(which activates the environment automatically when you `cd` into the repo)
 
 From the psibase repo root:
 
@@ -108,9 +108,8 @@ echo 'use flake .' > .envrc
 direnv allow
 ```
 
-Then the environment activates automatically when you `cd` into the repo.
-
 ## Optional: HTTPS and SoftHSM
+SKIP if you're doing a quick build and http test.
 
 - **HTTPS**: The shell includes `mkcert`. Run `mkcert -install`, create certs, and set `VITE_SECURE_LOCAL_DEV=true` and `VITE_SECURE_PATH_TO_CERTS` if needed.
 - **SoftHSM2**: `softhsm2-util --init-token --slot 0 --label "psibase SoftHSM" --pin "Ch4ng#Me!" --so-pin "Ch4ng#Me!"`
