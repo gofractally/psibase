@@ -16,12 +16,14 @@ export const ResourcePricing = () => {
 
             <div className="space-y-6">
                 <PricingSection
+                    key={pricing?.cpuPricing ? "cpu-ready" : "cpu-loading"}
                     title="CPU Pricing"
                     pricing={pricing?.cpuPricing}
                     isLoading={isLoading}
                     billableUnitLabel="ms"
                 />
                 <PricingSection
+                    key={pricing?.netPricing ? "net-ready" : "net-loading"}
                     title="NET Pricing"
                     pricing={pricing?.netPricing}
                     isLoading={isLoading}

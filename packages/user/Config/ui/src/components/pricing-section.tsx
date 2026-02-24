@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@shared/shadcn/ui/button";
+import { useEffect, useMemo } from "react";
+
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -9,6 +9,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+
+import { useAppForm } from "@shared/components/form/app-form";
 import { useSetCpuPricingParams } from "@/hooks/use-set-cpu-pricing-params";
 import { useSetNetPricingParams } from "@/hooks/use-set-net-pricing-params";
 import {
@@ -30,109 +32,51 @@ interface PricingFormValues {
     billableUnit: string;
 }
 
+const DEFAULT_FORM_VALUES: PricingFormValues = {
+    halvingTimeUnit: "sec",
+    halvingTimeValue: "",
+    doublingTimeUnit: "sec",
+    doublingTimeValue: "",
+    idleThreshold: "",
+    congestedThreshold: "",
+    averageWindowSize: "",
+    billableUnit: "",
+};
+
 function getInitialFormValues(
     pricing: CpuPricing | NetPricing,
     isCpu: boolean,
 ): PricingFormValues {
-    const initialHalving = getBestRateTimeUnit(pricing.halvingTimeSec);
-    const initialDoubling = getBestRateTimeUnit(pricing.doublingTimeSec);
+    const halvingSec = Number(pricing.halvingTimeSec) || 0;
+    const doublingSec = Number(pricing.doublingTimeSec) || 0;
+    const initialHalving = getBestRateTimeUnit(halvingSec);
+    const initialDoubling = getBestRateTimeUnit(doublingSec);
     const billableUnitValue = isCpu
-        ? pricing.billableUnit / TIME_FACTORS.ms
-        : pricing.billableUnit / 8;
+        ? (Number(pricing.billableUnit) || 0) / TIME_FACTORS.ms
+        : (Number(pricing.billableUnit) || 0) / 8;
     return {
         halvingTimeUnit: initialHalving.unit,
         halvingTimeValue: convertRateTimeUnit(
-            pricing.halvingTimeSec,
+            halvingSec,
             "sec",
             initialHalving.unit,
         ).toString(),
         doublingTimeUnit: initialDoubling.unit,
         doublingTimeValue: convertRateTimeUnit(
-            pricing.doublingTimeSec,
+            doublingSec,
             "sec",
             initialDoubling.unit,
         ).toString(),
-        idleThreshold: Math.round(parseFloat(pricing.thresholds.idlePct)).toString(),
+        idleThreshold: Math.round(parseFloat(pricing.thresholds.idlePct) || 0).toString(),
         congestedThreshold: Math.round(
-            parseFloat(pricing.thresholds.congestedPct),
+            parseFloat(pricing.thresholds.congestedPct) || 0,
         ).toString(),
-        averageWindowSize: pricing.numBlocksToAverage.toString(),
-        billableUnit: billableUnitValue.toString(),
+        averageWindowSize: String(Number(pricing.numBlocksToAverage) || 0),
+        billableUnit: Number.isFinite(billableUnitValue)
+            ? billableUnitValue.toString()
+            : "0",
     };
 }
-
-const RateTimeField = ({
-    label,
-    value,
-    unit,
-    onValueChange,
-    onUnitChange,
-}: {
-    label: string;
-    value: string;
-    unit: RateTimeUnit;
-    onValueChange: (value: string) => void;
-    onUnitChange: (unit: RateTimeUnit) => void;
-}) => (
-    <div>
-        <Label>{label}</Label>
-        <div className="mt-1 flex items-center gap-2">
-            <Input
-                type="text"
-                value={value}
-                onChange={(e) => onValueChange(e.target.value)}
-                className="w-36"
-            />
-            <Select value={unit} onValueChange={(v) => onUnitChange(v as RateTimeUnit)}>
-                <SelectTrigger className="w-24">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="sec">sec</SelectItem>
-                    <SelectItem value="min">min</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-    </div>
-);
-
-const ThresholdField = ({
-    label,
-    value,
-    onChange,
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-}) => (
-    <div>
-        <Label>{label}</Label>
-        <div className="mt-1 flex items-center gap-2">
-            <Input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="w-36" />
-            <span className="text-sm text-muted-foreground">%</span>
-        </div>
-    </div>
-);
-
-const LabeledInputField = ({
-    label,
-    value,
-    onChange,
-    suffix,
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    suffix: string;
-}) => (
-    <div>
-        <Label>{label}</Label>
-        <div className="mt-1 flex items-center gap-2">
-            <Input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="w-36" />
-            <span className="text-sm text-muted-foreground">{suffix}</span>
-        </div>
-    </div>
-);
 
 interface PricingSectionProps {
     title: string;
@@ -149,96 +93,84 @@ export const PricingSection = ({
 }: PricingSectionProps) => {
     const isCpu = title === "CPU Pricing";
 
-    const initialValues = useMemo<PricingFormValues | null>(() => {
-        if (!pricing) return null;
+    const defaultValues = useMemo<PricingFormValues>(() => {
+        if (!pricing) return DEFAULT_FORM_VALUES;
         return getInitialFormValues(pricing, isCpu);
     }, [pricing, isCpu]);
 
-    const [edits, setEdits] = useState<Partial<PricingFormValues>>({});
+    const { mutateAsync: setCpuPricingParams } = useSetCpuPricingParams();
+    const { mutateAsync: setNetPricingParams } = useSetNetPricingParams();
+
+    const pricingForm = useAppForm({
+        defaultValues,
+        onSubmit: async (data: { value: PricingFormValues }) => {
+            if (!pricing) return;
+
+            const formValues = data.value;
+
+            const halvingTimeSec = convertRateTimeUnit(
+                Number(formValues.halvingTimeValue) || 0,
+                formValues.halvingTimeUnit,
+                "sec",
+            );
+            const doublingTimeSec = convertRateTimeUnit(
+                Number(formValues.doublingTimeValue) || 0,
+                formValues.doublingTimeUnit,
+                "sec",
+            );
+
+            const idlePct = (formValues.idleThreshold || "0").trim();
+            const congestedPct = (formValues.congestedThreshold || "0").trim();
+            const numBlocksToAverage = Number(formValues.averageWindowSize) || 0;
+
+            if (isCpu) {
+                const minBillableUnitNs = Math.floor(
+                    (Number(formValues.billableUnit) || 0) * TIME_FACTORS.ms,
+                );
+
+                await setCpuPricingParams([
+                    {
+                        idlePct,
+                        congestedPct,
+                        halvingTimeSec: Math.round(halvingTimeSec),
+                        doublingTimeSec: Math.round(doublingTimeSec),
+                        numBlocksToAverage,
+                        minBillableUnitNs,
+                    },
+                ]);
+            } else {
+                const minBillableUnitBits = Math.floor(
+                    (Number(formValues.billableUnit) || 0) * 8,
+                );
+
+                await setNetPricingParams([
+                    {
+                        idlePct,
+                        congestedPct,
+                        halvingTimeSec: Math.round(halvingTimeSec),
+                        doublingTimeSec: Math.round(doublingTimeSec),
+                        numBlocksToAverage,
+                        minBillableUnitBits,
+                    },
+                ]);
+            }
+
+            pricingForm.reset(data.value);
+        },
+    });
+
     useEffect(() => {
-        setEdits({});
-    }, [pricing]);
-
-    const formValues: PricingFormValues = useMemo(() => {
-        const base = initialValues ?? {
-            halvingTimeUnit: "sec" as RateTimeUnit,
-            halvingTimeValue: "",
-            doublingTimeUnit: "sec" as RateTimeUnit,
-            doublingTimeValue: "",
-            idleThreshold: "",
-            congestedThreshold: "",
-            averageWindowSize: "",
-            billableUnit: "",
-        };
-        return { ...base, ...edits };
-    }, [initialValues, edits]);
-
-    const {
-        mutateAsync: setCpuPricingParams,
-        isPending: isSavingCpu,
-    } = useSetCpuPricingParams();
-    const {
-        mutateAsync: setNetPricingParams,
-        isPending: isSavingNet,
-    } = useSetNetPricingParams();
-
-    const isSaving = isCpu ? isSavingCpu : isSavingNet;
-
-    const updateEdit = <K extends keyof PricingFormValues>(
-        key: K,
-        value: PricingFormValues[K],
-    ) => setEdits((prev) => ({ ...prev, [key]: value }));
-
-    const handleSave = async () => {
-        if (!pricing) return;
-
-        const halvingTimeSec = convertRateTimeUnit(
-            Number(formValues.halvingTimeValue) || 0,
-            formValues.halvingTimeUnit,
-            "sec",
-        );
-        const doublingTimeSec = convertRateTimeUnit(
-            Number(formValues.doublingTimeValue) || 0,
-            formValues.doublingTimeUnit,
-            "sec",
-        );
-
-        const idlePct = (formValues.idleThreshold || "0").trim();
-        const congestedPct = (formValues.congestedThreshold || "0").trim();
-        const numBlocksToAverage = Number(formValues.averageWindowSize) || 0;
-
-        if (isCpu) {
-            const minBillableUnitNs = Math.floor(
-                (Number(formValues.billableUnit) || 0) * TIME_FACTORS.ms,
-            );
-
-            await setCpuPricingParams([
-                {
-                    idlePct,
-                    congestedPct,
-                    halvingTimeSec: Math.round(halvingTimeSec),
-                    doublingTimeSec: Math.round(doublingTimeSec),
-                    numBlocksToAverage,
-                    minBillableUnitNs,
-                },
-            ]);
-        } else {
-            const minBillableUnitBits = Math.floor(
-                (Number(formValues.billableUnit) || 0) * 8,
-            );
-
-            await setNetPricingParams([
-                {
-                    idlePct,
-                    congestedPct,
-                    halvingTimeSec: Math.round(halvingTimeSec),
-                    doublingTimeSec: Math.round(doublingTimeSec),
-                    numBlocksToAverage,
-                    minBillableUnitBits,
-                },
-            ]);
+        if (pricing) {
+            const values = getInitialFormValues(pricing, isCpu);
+            console.info("[PricingSection] useEffect reset with", {
+                halvingTimeValue: values.halvingTimeValue,
+                doublingTimeValue: values.doublingTimeValue,
+                halvingTimeUnit: values.halvingTimeUnit,
+                doublingTimeUnit: values.doublingTimeUnit,
+            });
+            pricingForm.reset(values);
         }
-    };
+    }, [pricing, isCpu]);
 
     if (isLoading) {
         return (
@@ -262,87 +194,220 @@ export const PricingSection = ({
         );
     }
 
-    const handleHalvingUnitChange = (newUnit: RateTimeUnit) => {
-        const valueInSec = convertRateTimeUnit(
-            Number(formValues.halvingTimeValue) || 0,
-            formValues.halvingTimeUnit,
-            "sec",
-        );
-        const newValue = convertRateTimeUnit(valueInSec, "sec", newUnit);
-        setEdits((prev) => ({
-            ...prev,
-            halvingTimeUnit: newUnit,
-            halvingTimeValue: newValue.toString(),
-        }));
-    };
-    const handleDoublingUnitChange = (newUnit: RateTimeUnit) => {
-        const valueInSec = convertRateTimeUnit(
-            Number(formValues.doublingTimeValue) || 0,
-            formValues.doublingTimeUnit,
-            "sec",
-        );
-        const newValue = convertRateTimeUnit(valueInSec, "sec", newUnit);
-        setEdits((prev) => ({
-            ...prev,
-            doublingTimeUnit: newUnit,
-            doublingTimeValue: newValue.toString(),
-        }));
-    };
-
     return (
         <div className="rounded-lg border p-4">
             <div className="mb-4">
                 <h3 className="text-base font-medium">{title}</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <RateTimeField
-                    label="Halving rate"
-                    value={formValues.halvingTimeValue}
-                    unit={formValues.halvingTimeUnit}
-                    onValueChange={(v) => updateEdit("halvingTimeValue", v)}
-                    onUnitChange={handleHalvingUnitChange}
-                />
-                <RateTimeField
-                    label="Doubling rate"
-                    value={formValues.doublingTimeValue}
-                    unit={formValues.doublingTimeUnit}
-                    onValueChange={(v) => updateEdit("doublingTimeValue", v)}
-                    onUnitChange={handleDoublingUnitChange}
-                />
-                <ThresholdField
-                    label="Idle threshold"
-                    value={formValues.idleThreshold}
-                    onChange={(v) => updateEdit("idleThreshold", v)}
-                />
-                <ThresholdField
-                    label="Congested threshold"
-                    value={formValues.congestedThreshold}
-                    onChange={(v) => updateEdit("congestedThreshold", v)}
-                />
-                <LabeledInputField
-                    label="Average window size"
-                    value={formValues.averageWindowSize}
-                    onChange={(v) => updateEdit("averageWindowSize", v)}
-                    suffix="blocks"
-                />
-                <LabeledInputField
-                    label="Minimum billable unit"
-                    value={formValues.billableUnit}
-                    onChange={(v) => updateEdit("billableUnit", v)}
-                    suffix={billableUnitLabel}
-                />
-            </div>
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pricingForm.handleSubmit();
+                }}
+            >
+                <pricingForm.AppForm>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <pricingForm.AppField name="halvingTimeValue">
+                            {(valueField) => (
+                                <pricingForm.AppField name="halvingTimeUnit">
+                                    {(unitField) => (
+                                        <div>
+                                            <Label>Halving rate</Label>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <Input
+                                                    type="text"
+                                                    className="w-36"
+                                                    value={valueField.state.value}
+                                                    onChange={(e) =>
+                                                        valueField.handleChange(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    onBlur={valueField.handleBlur}
+                                                />
+                                                <Select
+                                                    value={unitField.state.value ?? "sec"}
+                                                    onValueChange={(v) => {
+                                                        const newUnit = v as RateTimeUnit;
+                                                        const val =
+                                                            Number(
+                                                                valueField.state.value,
+                                                            ) || 0;
+                                                        const oldUnit =
+                                                            unitField.state.value;
+                                                        const inSec =
+                                                            convertRateTimeUnit(
+                                                                val,
+                                                                oldUnit,
+                                                                "sec",
+                                                            );
+                                                        const newVal =
+                                                            convertRateTimeUnit(
+                                                                inSec,
+                                                                "sec",
+                                                                newUnit,
+                                                            );
+                                                        unitField.handleChange(
+                                                            newUnit,
+                                                        );
+                                                        valueField.handleChange(
+                                                            newVal.toString(),
+                                                        );
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-24">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="sec">
+                                                            sec
+                                                        </SelectItem>
+                                                        <SelectItem value="min">
+                                                            min
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </pricingForm.AppField>
+                            )}
+                        </pricingForm.AppField>
 
-            <div className="mt-4 flex justify-end">
-                <Button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={isSaving || !pricing}
-                >
-                    Save
-                </Button>
-            </div>
+                        <pricingForm.AppField name="doublingTimeValue">
+                            {(valueField) => (
+                                <pricingForm.AppField name="doublingTimeUnit">
+                                    {(unitField) => (
+                                        <div>
+                                            <Label>Doubling rate</Label>
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <Input
+                                                    type="text"
+                                                    className="w-36"
+                                                    value={valueField.state.value}
+                                                    onChange={(e) =>
+                                                        valueField.handleChange(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    onBlur={valueField.handleBlur}
+                                                />
+                                                <Select
+                                                    value={unitField.state.value ?? "sec"}
+                                                    onValueChange={(v) => {
+                                                        const newUnit = v as RateTimeUnit;
+                                                        const val =
+                                                            Number(
+                                                                valueField.state.value,
+                                                            ) || 0;
+                                                        const oldUnit =
+                                                            unitField.state.value;
+                                                        const inSec =
+                                                            convertRateTimeUnit(
+                                                                val,
+                                                                oldUnit,
+                                                                "sec",
+                                                            );
+                                                        const newVal =
+                                                            convertRateTimeUnit(
+                                                                inSec,
+                                                                "sec",
+                                                                newUnit,
+                                                            );
+                                                        unitField.handleChange(
+                                                            newUnit,
+                                                        );
+                                                        valueField.handleChange(
+                                                            newVal.toString(),
+                                                        );
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-24">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="sec">
+                                                            sec
+                                                        </SelectItem>
+                                                        <SelectItem value="min">
+                                                            min
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    )}
+                                </pricingForm.AppField>
+                            )}
+                        </pricingForm.AppField>
+
+                        <pricingForm.AppField name="idleThreshold">
+                            {(field) => (
+                                <field.TextField
+                                    label="Idle threshold"
+                                    endContent={
+                                        <span className="text-muted-foreground text-sm">
+                                            %
+                                        </span>
+                                    }
+                                    className="w-36"
+                                />
+                            )}
+                        </pricingForm.AppField>
+
+                        <pricingForm.AppField name="congestedThreshold">
+                            {(field) => (
+                                <field.TextField
+                                    label="Congested threshold"
+                                    endContent={
+                                        <span className="text-muted-foreground text-sm">
+                                            %
+                                        </span>
+                                    }
+                                    className="w-36"
+                                />
+                            )}
+                        </pricingForm.AppField>
+
+                        <pricingForm.AppField name="averageWindowSize">
+                            {(field) => (
+                                <field.TextField
+                                    label="Average window size"
+                                    endContent={
+                                        <span className="text-muted-foreground text-sm">
+                                            blocks
+                                        </span>
+                                    }
+                                    className="w-36"
+                                />
+                            )}
+                        </pricingForm.AppField>
+
+                        <pricingForm.AppField name="billableUnit">
+                            {(field) => (
+                                <field.TextField
+                                    label="Minimum billable unit"
+                                    endContent={
+                                        <span className="text-muted-foreground text-sm">
+                                            {billableUnitLabel}
+                                        </span>
+                                    }
+                                    className="w-36"
+                                />
+                            )}
+                        </pricingForm.AppField>
+                    </div>
+
+                    <div className="mt-4 flex justify-end">
+                        <pricingForm.SubmitButton
+                            labels={["Save", "Saving..."]}
+                            disabled={!pricing}
+                        />
+                    </div>
+                </pricingForm.AppForm>
+            </form>
         </div>
     );
 };
