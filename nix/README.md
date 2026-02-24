@@ -108,6 +108,16 @@ echo 'use flake .' > .envrc
 direnv allow
 ```
 
+## Launch a chain
+### Launch
+Within the nix shell, replace the PROJECT_ROOT below with your repo root path:
+```bash
+PROJECT_ROOT="/home/mike/repos/fractally/psibase" PSIBASE_ADMIN_IP=127.0.0.1 psinode "$PROJECT_ROOT/db" -p myprod -l 7777
+```
+
+### Boot
+Use the provided x-admin link and boot with the UI.
+
 ## Optional: HTTPS and SoftHSM
 SKIP if you're doing a quick build and http test.
 
