@@ -181,6 +181,7 @@ pub mod Service {
     use crate::services::nft::NID;
     use crate::services::tokens::Quantity;
     use crate::services::tokens::TID;
+    use crate::AccountNumber;
 
     #[action]
     fn init() {
@@ -303,6 +304,36 @@ pub mod Service {
     #[action]
     fn swap(pools: Vec<TID>, token_in: TID, amount_in: Quantity, min_return: Quantity) {
         unimplemented!()
+    }
+
+    #[event(history)]
+    pub fn liq_mod(
+        pool_id: TID,
+        sender: AccountNumber,
+        is_add: bool,
+        amount_first: String,
+        amount_second: String,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn swapped(
+        pool_id: TID,
+        token_in: TID,
+        amount_in: Quantity,
+        token_out: TID,
+        amount_out: Quantity,
+    ) {
+    }
+
+    #[event(history)]
+    pub fn swap_completed(
+        sender: AccountNumber,
+        token_in: TID,
+        amount_in: Quantity,
+        token_out: TID,
+        amount_out: Quantity,
+    ) {
     }
 }
 
