@@ -106,6 +106,7 @@ export const ScheduleDialog = ({
                 {trigger ?? (
                     <Button
                         size="sm"
+                        variant="outline"
                         onClick={() => {
                             setIsOpen(true);
                         }}

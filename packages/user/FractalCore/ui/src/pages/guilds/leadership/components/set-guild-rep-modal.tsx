@@ -51,30 +51,30 @@ export const SetGuildRepModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Set guild representative</DialogTitle>
-                    <form
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            void form.handleSubmit();
-                        }}
-                        className="mt-3 w-full space-y-6"
-                    >
-                        <FieldAccountExisting
-                            form={form}
-                            fields={{ account: "representation.newRep" }}
-                            label="New representative"
-                            description={undefined}
-                            placeholder="Enter account name"
-                            disabled={false}
-                            onValidate={undefined}
-                        />
+                    <DialogTitle>Update guild metadata</DialogTitle>
+                    <form.AppForm>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                void form.handleSubmit();
+                            }}
+                            className="mt-3 w-full space-y-6"
+                        >
+                            <FieldAccountExisting
+                                form={form}
+                                fields={{ account: "representation.newRep" }}
+                                label="New representative"
+                                description={undefined}
+                                placeholder="Enter account name"
+                                disabled={false}
+                                onValidate={undefined}
+                            />
 
-                        <form.AppForm>
                             <form.SubmitButton
                                 labels={["Set rep", "Setting rep"]}
                             />
-                        </form.AppForm>
-                    </form>
+                        </form>
+                    </form.AppForm>
                 </DialogHeader>
             </DialogContent>
         </Dialog>

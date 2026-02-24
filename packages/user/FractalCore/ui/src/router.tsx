@@ -19,7 +19,6 @@ import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
 import { AllGuildMembers } from "./pages/guilds/membership/all-guild-members";
 import { GuildOverview } from "./pages/guilds/overview";
-import { Settings } from "./pages/guilds/settings";
 
 export const router = createBrowserRouter([
     {
@@ -140,14 +139,6 @@ export const router = createBrowserRouter([
                         element: (
                             <ProtectedRoute>
                                 <Leadership />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
-                        path: "settings",
-                        element: (
-                            <ProtectedRoute>
-                                <Settings />
                             </ProtectedRoute>
                         ),
                     },

@@ -7,7 +7,6 @@ import {
     Landmark,
     LucideIcon,
     Scale,
-    SettingsIcon,
     Users,
     UsersRound,
 } from "lucide-react";
@@ -115,11 +114,6 @@ export function getMenuGroups(
                         title: "Leadership",
                         icon: UsersRound,
                         path: `/guild/${membership.guild.account}/leadership`,
-                    },
-                    {
-                        title: "Settings",
-                        icon: SettingsIcon,
-                        path: `/guild/${membership.guild.account}/settings`,
                     },
                 ],
             })) || [],
