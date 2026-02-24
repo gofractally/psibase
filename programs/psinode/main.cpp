@@ -1,4 +1,5 @@
 #include <psibase/ConfigFile.hpp>
+#include <psibase/Mount.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
 #include <psibase/RunQueue.hpp>
@@ -40,6 +41,24 @@ using http::listen_spec;
 
 #define PSIBASE_VERSION_STRING \
    BOOST_PP_STRINGIZE(PSIBASE_VERSION_MAJOR) "." BOOST_PP_STRINGIZE(PSIBASE_VERSION_MINOR) "." BOOST_PP_STRINGIZE(PSIBASE_VERSION_PATCH)
+
+struct MountArg
+{
+   std::string hostPath;
+   std::string mountPath;
+};
+
+void validate(boost::any& v, const std::vector<std::string>& values, MountArg*, int)
+{
+   boost::program_options::validators::check_first_occurrence(v);
+   const std::string& s = boost::program_options::validators::get_single_string(values);
+
+   auto pos = s.find(':');
+   if (pos == std::string::npos)
+      v = MountArg{std::string(s), std::string(s)};
+   else
+      v = MountArg{s.substr(0, pos), s.substr(pos + 1)};
+}
 
 struct native_service
 {
@@ -1122,9 +1141,9 @@ struct PsinodeConfig
    static bool isNative(std::string_view name)
    {
       constexpr std::string_view opts[] = {
-          "peers",           "producer", "pkcs11-modules",     "host",    "listen",
-          "tls-key",         "tls-cert", "tls-trustfile",      "service", "http-timeout",
-          "service-threads", "key",      "database-cache-size"};
+          "peers",           "producer", "pkcs11-modules",      "host",    "listen",
+          "tls-key",         "tls-cert", "tls-trustfile",       "service", "http-timeout",
+          "service-threads", "key",      "database-cache-size", "mount"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
@@ -1220,6 +1239,7 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
    // private keys.
    file.keep("", "key");
    file.keep("", "database-cache-size");
+   file.keep("", "mount");
    //
    to_config(config.loggers, file);
 }
@@ -1317,6 +1337,7 @@ void run(const std::string&              db_path,
          std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<native_service>&    services,
+         std::vector<MountArg>&          mountpoints,
          Timeout&                        http_timeout,
          std::size_t&                    service_threads,
          std::vector<std::string>        root_ca,
@@ -1344,6 +1365,15 @@ void run(const std::string&              db_path,
           << ". Try upgrading your shell's limits using \"sudo prlimit --memlock=-1 --pid "
              "$$\". "
              "If that doesn't work, try running psinode with \"sudo\".";
+   }
+
+   {
+      for (const auto& [hostpath, mountpath] : mountpoints)
+      {
+         PSIBASE_LOG(psibase::loggers::generic::get(), info)
+             << "Mounting " << hostpath << " at " << mountpath;
+         system->mountpoints->mount(hostpath, mountpath);
+      }
    }
 
    // If the server's config file doesn't exist yet, create it
@@ -2095,6 +2125,7 @@ int main(int argc, char* argv[])
    std::vector<listen_spec>    listen;
    std::vector<std::string>    peers;
    std::vector<native_service> services;
+   std::vector<MountArg>       mountpoints;
    std::vector<std::string>    root_ca;
    std::string                 tls_cert;
    std::string                 tls_key;
@@ -2120,6 +2151,12 @@ int main(int argc, char* argv[])
    opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
    opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
        "Serve static content from directory using the specified virtual host name");
+   opt("mount",
+       po::value(&mountpoints)
+           ->composing()
+           ->default_value({}, "")
+           ->value_name("hostpath[:mountpath]"),
+       "Makes files available to services");
    opt("database-template", po::value(&db_template)->default_value("XDefault", ""),
        "Template to install when initializing a new database");
    opt("database-cache-size",
@@ -2244,8 +2281,8 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, peers, hosts, listen, services, http_timeout, service_threads, root_ca,
-             tls_cert, tls_key, extra_options, restart);
+             pkcs11_modules, peers, hosts, listen, services, mountpoints, http_timeout,
+             service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

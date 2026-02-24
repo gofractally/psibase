@@ -379,6 +379,7 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::socketOpen>("env", "socketOpen");
       rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
       rhf_t::add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
+      rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
    }
 
    std::uint32_t ExecutionContext::remainingStack() const

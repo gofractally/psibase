@@ -733,6 +733,36 @@ namespace LocalService
          }
          return HttpReply::methodNotAllowed(req);
       }
+      else if (target.starts_with("/packages/"))
+      {
+         if (req.method != "GET")
+            return HttpReply::methodNotAllowed(req);
+         auto datadir = getEnv("PSIBASE_DATADIR");
+         if (datadir)
+         {
+            auto path = std::move(*datadir);
+            path += target;
+            HttpReply result{.status = HttpStatus::ok};
+            if (target.ends_with(".psi"))
+            {
+               result.contentType = "application/zip";
+            }
+            else if (target.ends_with(".json"))
+            {
+               result.contentType = "application/json";
+            }
+            else
+            {
+               return {};
+            }
+            printf("reading %s\n", path.c_str());
+            auto sz = raw::readFile(path.data(), path.size());
+            if (sz == -1)
+               return {};
+            result.body = getResult();
+            return result;
+         }
+      }
       else if (target == "/admin_accounts")
       {
          if (auto reply = checkAuth(req, socket))

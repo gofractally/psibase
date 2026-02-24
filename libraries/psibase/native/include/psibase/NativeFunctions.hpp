@@ -71,5 +71,7 @@ namespace psibase
       int32_t socketOpen(eosio::vm::span<const char> args);
       int32_t socketSend(int32_t fd, eosio::vm::span<const char> msg);
       int32_t socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value);
+
+      std::uint32_t readFile(eosio::vm::span<const char> path);
    };  // NativeFunctions
 }  // namespace psibase

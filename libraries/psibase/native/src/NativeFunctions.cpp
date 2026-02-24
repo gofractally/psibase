@@ -1,6 +1,7 @@
 #include <psibase/NativeFunctions.hpp>
 
 #include <psibase/ActionContext.hpp>
+#include <psibase/Mount.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/saturating.hpp>
@@ -8,6 +9,8 @@
 #include <psio/finally.hpp>
 #include <psio/to_hex.hpp>
 
+#include <sys/stat.h>
+#include <unistd.h>
 #include <random>
 
 namespace psibase
@@ -1070,6 +1073,38 @@ namespace psibase
       return database.socketSetFlags(fd, mask, value,
                                      *transactionContext.blockContext.systemContext.sockets,
                                      transactionContext.ownedSockets);
+   }
+
+   std::uint32_t NativeFunctions::readFile(eosio::vm::span<const char> filename)
+   {
+      try
+      {
+         auto file = transactionContext.blockContext.systemContext.mountpoints->open(
+             std::string_view{filename.data(), filename.size()});
+
+         struct stat stat;
+         if (::fstat(file.fd, &stat) < 0)
+            return clearResult(*this);
+         // -1 is reserved to indicate errors
+         if (stat.st_size >= std::numeric_limits<std::uint32_t>::max())
+            return clearResult(*this);
+         std::vector<char> result(static_cast<std::size_t>(stat.st_size));
+         char*             pos       = result.data();
+         std::size_t       remaining = result.size();
+         while (remaining)
+         {
+            auto count = ::read(file.fd, pos, remaining);
+            if (count <= 0)
+               return clearResult(*this);
+            remaining -= count;
+            pos += count;
+         }
+         return setResult(*this, std::move(result));
+      }
+      catch (std::system_error&)
+      {
+         return clearResult(*this);
+      }
    }
 
 }  // namespace psibase
