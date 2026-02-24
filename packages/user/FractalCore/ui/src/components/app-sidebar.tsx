@@ -1,10 +1,11 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 
-// import { GuildSwitcher } from "@/components/guild-switcher";
 import { NavMain } from "@/components/nav-main";
 
-import { NetworkLogo } from "@shared/components/network-logo";
+import { useFractal } from "@/hooks/fractals/use-fractal";
+import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
+
 import { UserSidebarNavFooter } from "@shared/components/user-sidebar-nav-footer";
 import {
     Sidebar,
@@ -17,8 +18,13 @@ import {
     SidebarRail,
 } from "@shared/shadcn/ui/sidebar";
 
+import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const navigate = useNavigate();
+
+    const fractalAccount = useFractalAccount();
+    const { data: fractal } = useFractal();
 
     return (
         <Sidebar {...props}>
@@ -30,7 +36,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             asChild
                             onClick={() => navigate("/")}
                         >
-                            <NetworkLogo />
+                            <FractalGuildIdentifier
+                                size="sm"
+                                name={fractal?.fractal?.name}
+                                account={fractalAccount}
+                            />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
