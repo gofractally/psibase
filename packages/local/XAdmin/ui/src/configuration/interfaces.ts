@@ -2,13 +2,6 @@ import { z } from "zod";
 
 import { LogConfig } from "../log/interfaces";
 
-export type ServiceConfig = {
-    host: string;
-    root: string;
-    // auto-generated
-    key: string;
-};
-
 export type ListenConfig = {
     protocol: string;
     address?: string;
@@ -32,7 +25,6 @@ export type PsinodeConfigUI = {
     hosts: HostConfig[];
     port?: number;
     listen: ListenConfig[];
-    services: ServiceConfig[];
     loggers: { [index: string]: LogConfig };
 };
 
@@ -90,12 +82,6 @@ export const psinodeConfigSchema = z
         port: z.number().optional(),
         http_timeout: z.string().nullable().optional(),
         listen: ListenProperty,
-        services: z
-            .object({
-                host: z.string(),
-                root: z.string(),
-            })
-            .array(),
         loggers: z.record(z.string(), LogConfigSchema),
     })
     .passthrough();

@@ -24,15 +24,10 @@ import {
     TabsTrigger,
 } from "@shared/shadcn/ui/tabs";
 
-import { Service } from "../components";
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
 import { Logger } from "../log/logger";
-import {
-    PsinodeConfigUI,
-    PsinodeConfigUpdate,
-    ServiceConfig,
-} from "./interfaces";
-import { defaultService, newId, writeConfig } from "./utils";
+import { PsinodeConfigUI, PsinodeConfigUpdate } from "./interfaces";
+import { newId, writeConfig } from "./utils";
 
 export const ConfigurationPage = () => {
     const { data: config, isLoading, isError } = useConfig();
@@ -67,32 +62,14 @@ export const ConfigurationForm = ({
         name: "listen",
     });
 
-    const services = useFieldArray({
-        control: configForm.control,
-        name: "services",
-    });
-
     const hosts = useFieldArray({
         control: configForm.control,
         name: "hosts",
     });
 
     const onConfig = async (input: PsinodeConfigUI) => {
-        for (const service of input.services) {
-            if (service.host == "") {
-                service.host = defaultService(service.root);
-            }
-        }
         void (await onSubmit(writeConfig(input)));
         configForm.reset(input);
-    };
-
-    const addNewService = () => {
-        services.append({
-            host: "",
-            key: Math.floor(Math.random() * 100000).toString(),
-            root: "",
-        });
     };
 
     const onAddNewLoggerClick = () => {
@@ -171,7 +148,6 @@ export const ConfigurationForm = ({
                                 Connections
                             </TabsTrigger>
                             <TabsTrigger value="logs">Logs</TabsTrigger>
-                            <TabsTrigger value="services">Services</TabsTrigger>
                         </TabsList>
                         <TabsContent value="connections">
                             <Controller
@@ -387,59 +363,6 @@ export const ConfigurationForm = ({
                                     ))}
                                 </div>
                             )}
-                        </TabsContent>
-                        <TabsContent value="services">
-                            <div className="flex justify-between">
-                                <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                                    Built-in Services
-                                </h2>
-                                <div>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            addNewService();
-                                        }}
-                                    >
-                                        <Plus size={20} className="" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            <fieldset>
-                                <table className="w-full">
-                                    <thead>
-                                        <tr>
-                                            <th className="text-left">
-                                                Hostname
-                                            </th>
-                                            <th className="text-left">Path</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {services.fields.map((field, index) => (
-                                            <Service
-                                                key={field.key}
-                                                register={(name, options) =>
-                                                    configForm.register(
-                                                        `services.${name}`,
-                                                        // @ts-expect-error eeej
-                                                        options,
-                                                    )
-                                                }
-                                                getValues={() =>
-                                                    configForm.getValues(
-                                                        `services.${index}`,
-                                                    ) as ServiceConfig
-                                                }
-                                                index={index}
-                                                services={services}
-                                            />
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </fieldset>
                         </TabsContent>
                     </Tabs>
 
