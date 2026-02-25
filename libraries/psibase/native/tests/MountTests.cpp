@@ -165,3 +165,12 @@ TEST_CASE("Nested mount")
    CHECK(readFile(mount.open("/two")) == "2");
    CHECK(readFile(mount.open("/three/four")) == "4");
 }
+
+TEST_CASE("Symlink loop")
+{
+   TempDirectory dir;
+   std::filesystem::create_directory_symlink("loop", dir.path / "loop");
+   Mount mount;
+   mount.mount(dir.path.string(), "/");
+   CHECK_THROWS_AS(mount.open("/loop/one"), std::system_error);
+}

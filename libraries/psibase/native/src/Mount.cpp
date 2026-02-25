@@ -23,7 +23,8 @@ namespace psibase
          // This contains path components to be resolved
          // in reverse order
          std::vector<std::string> stack;
-         std::size_t              symlinkEnd = -1;
+         std::size_t              symlinkEnd        = -1;
+         std::size_t              remainingSymlinks = 64;
          void                     push(std::string_view sv)
          {
             std::size_t initialSize = stack.size();
@@ -86,6 +87,10 @@ namespace psibase
                auto type = statbuf.st_mode & S_IFMT;
                if (type == S_IFLNK)
                {
+                  if (remainingSymlinks == 0)
+                     throw std::system_error(ELOOP, std::generic_category());
+                  --remainingSymlinks;
+
                   std::string linkValue(statbuf.st_size ? statbuf.st_size + 1 : 256, '\0');
                   while (true)
                   {
