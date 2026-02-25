@@ -46,6 +46,10 @@ psinode - The psibase blockchain server
 
   Loads a PKCS #11 module from *filename*. The server will be able to sign blocks using keys from the module. The tokens that the module provides must be unlocked using the HTTP API before they can be used. This option can appear any number of times.
 
+- `--mount` *directory*[:*mountpoint*]
+
+  Allows services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../administration.md#server-configuration).
+
 - `--service-threads` *num*
 
   The number of threads that run async actions posted by services.
@@ -65,10 +69,6 @@ psinode - The psibase blockchain server
   tells psinode a peer to sync with. This argument can appear any number of times.
 
 ### HTTP Server
-
-- `--service` *host*:*path*
-
-  tells psinode to host static content from *path*. This argument is included in the default config file template. It should typically not be necessary to change these default settings.
 
 - `--http-timeout` *seconds*
 
