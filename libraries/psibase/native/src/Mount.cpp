@@ -30,7 +30,8 @@ namespace psibase
             std::size_t initialSize = stack.size();
             for (auto range : sv | std::views::split('/'))
             {
-               std::string item(range.begin(), range.end());
+               std::string item(&*range.begin(),
+                                static_cast<std::size_t>(std::ranges::distance(range)));
                if (!item.empty())
                {
                   stack.push_back(item);
@@ -184,7 +185,7 @@ namespace psibase
       Dir* current = &root;
       for (auto range : mountpath | std::views::split('/'))
       {
-         std::string item(range.begin(), range.end());
+         std::string item(&*range.begin(), static_cast<std::size_t>(std::ranges::distance(range)));
          if (!item.empty())
          {
             if (item == "." || item == "..")
