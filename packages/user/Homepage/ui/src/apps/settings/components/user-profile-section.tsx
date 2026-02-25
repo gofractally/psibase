@@ -122,13 +122,12 @@ export const UserProfileSection = () => {
             {(isLoading || profile === undefined) && <UserProfileSkeleton />}
             {profile !== undefined && !isFetching && (
                 <FormProfile
-                    initialData={profile?.profile || undefined}
+                    initialData={profile?.profile ?? undefined}
                     onSubmit={async (data) => {
                         await setProfile({
                             bio: data.bio,
                             displayName: data.displayName,
                         });
-                        toast.success("Profile updated");
                         return data;
                     }}
                 />
