@@ -1077,6 +1077,9 @@ namespace psibase
 
    std::uint32_t NativeFunctions::readFile(eosio::vm::span<const char> filename)
    {
+      check(isSubjectiveContext(*this), "Files are only available during subjective execution");
+      check(code.flags & CodeRow::isPrivileged, "Service is not allowed to read files");
+      check(code.flags & ExecutionContext::isLocal, "Service is not allowed to read files");
       try
       {
          auto file = transactionContext.blockContext.systemContext.mountpoints->open(
