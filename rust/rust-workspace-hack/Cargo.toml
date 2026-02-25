@@ -36,19 +36,23 @@ indexmap = { version = "2", features = ["serde"] }
 itertools = { version = "0.10" }
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
+mime_guess = { version = "2" }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
+phf_shared = { version = "0.10", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 rand = { version = "0.8", features = ["small_rng"] }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
 scopeguard = { version = "1" }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_core = { version = "1", default-features = false, features = ["alloc", "rc", "result", "std"] }
-serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
+serde_core = { version = "1", features = ["alloc", "rc"] }
+serde_json = { version = "1", features = ["preserve_order", "raw_value", "unbounded_depth"] }
+smallvec = { version = "1", default-features = false, features = ["const_new"] }
 stable_deref_trait = { version = "1", default-features = false, features = ["std"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
-syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+sync_wrapper = { version = "1", default-features = false, features = ["futures"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
@@ -73,19 +77,23 @@ indexmap = { version = "2", features = ["serde"] }
 itertools = { version = "0.10" }
 log = { version = "0.4", default-features = false, features = ["std"] }
 memchr = { version = "2" }
+mime_guess = { version = "2" }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
+phf_shared = { version = "0.10", default-features = false, features = ["std"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 rand = { version = "0.8", features = ["small_rng"] }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
 scopeguard = { version = "1" }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_core = { version = "1", default-features = false, features = ["alloc", "rc", "result", "std"] }
-serde_json = { version = "1", features = ["preserve_order", "unbounded_depth"] }
+serde_core = { version = "1", features = ["alloc", "rc"] }
+serde_json = { version = "1", features = ["preserve_order", "raw_value", "unbounded_depth"] }
+smallvec = { version = "1", default-features = false, features = ["const_new"] }
 stable_deref_trait = { version = "1", default-features = false, features = ["std"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
-syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
+sync_wrapper = { version = "1", default-features = false, features = ["futures"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 zeroize = { version = "1", default-features = false, features = ["alloc"] }
 
@@ -94,50 +102,62 @@ bitflags = { version = "2", default-features = false, features = ["std"] }
 clap = { version = "4", default-features = false, features = ["env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["env", "string"] }
 console = { version = "0.15" }
-hyper = { version = "0.14", features = ["client", "http1", "http2", "runtime", "server", "stream"] }
+hyper = { version = "1", features = ["client", "http1", "server"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "client-proxy", "http1", "server", "service"] }
 libc = { version = "0.2" }
-mio = { version = "0.8", features = ["net", "os-ext"] }
+mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", default-features = false, features = ["log", "make", "retry", "timeout"] }
+tower-http = { version = "0.6", features = ["decompression-gzip", "follow-redirect", "fs", "trace"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+zeroize = { version = "1" }
 
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
 clap = { version = "4", default-features = false, features = ["env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["env", "string"] }
 console = { version = "0.15" }
-hyper = { version = "0.14", features = ["client", "http1", "http2", "runtime", "server", "stream"] }
+hyper = { version = "1", features = ["client", "http1", "server"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "client-proxy", "http1", "server", "service"] }
 libc = { version = "0.2" }
-mio = { version = "0.8", features = ["net", "os-ext"] }
+mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", default-features = false, features = ["log", "make", "retry", "timeout"] }
+tower-http = { version = "0.6", features = ["decompression-gzip", "follow-redirect", "fs", "trace"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+zeroize = { version = "1" }
 
 [target.aarch64-unknown-linux-gnu.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
 clap = { version = "4", default-features = false, features = ["env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["env", "string"] }
 console = { version = "0.15" }
-hyper = { version = "0.14", features = ["client", "http1", "http2", "runtime", "server", "stream"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
+hyper = { version = "1", features = ["client", "http1", "server"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "client-proxy", "http1", "server", "service"] }
+mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", default-features = false, features = ["log", "make", "retry", "timeout"] }
+tower-http = { version = "0.6", features = ["decompression-gzip", "follow-redirect", "fs", "trace"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+zeroize = { version = "1" }
 
 [target.aarch64-unknown-linux-gnu.build-dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
 clap = { version = "4", default-features = false, features = ["env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["env", "string"] }
 console = { version = "0.15" }
-hyper = { version = "0.14", features = ["client", "http1", "http2", "runtime", "server", "stream"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
+hyper = { version = "1", features = ["client", "http1", "server"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "client-proxy", "http1", "server", "service"] }
+mio = { version = "1", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", default-features = false, features = ["log", "make", "retry", "timeout"] }
+tower-http = { version = "0.6", features = ["decompression-gzip", "follow-redirect", "fs", "trace"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+zeroize = { version = "1" }
 
 [target.wasm32-wasip1.dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -158,23 +178,29 @@ bitflags = { version = "2", default-features = false, features = ["std"] }
 clap = { version = "4", default-features = false, features = ["env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["env", "string"] }
 console = { version = "0.15" }
-hyper = { version = "0.14", features = ["client", "http1", "http2", "runtime", "server", "stream"] }
+hyper = { version = "1", features = ["client", "http1", "server"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "client-proxy", "http1", "server", "service"] }
 libc = { version = "0.2", features = ["extra_traits"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", default-features = false, features = ["log", "make", "retry", "timeout"] }
+tower-http = { version = "0.6", features = ["decompression-gzip", "follow-redirect", "fs", "trace"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+zeroize = { version = "1" }
 
 [target.aarch64-apple-darwin.build-dependencies]
 bitflags = { version = "2", default-features = false, features = ["std"] }
 clap = { version = "4", default-features = false, features = ["env", "string"] }
 clap_builder = { version = "4", default-features = false, features = ["env", "string"] }
 console = { version = "0.15" }
-hyper = { version = "0.14", features = ["client", "http1", "http2", "runtime", "server", "stream"] }
+hyper = { version = "1", features = ["client", "http1", "server"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "client-proxy", "http1", "server", "service"] }
 libc = { version = "0.2", features = ["extra_traits"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
-smallvec = { version = "1", default-features = false, features = ["const_generics"] }
 tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", default-features = false, features = ["log", "make", "retry", "timeout"] }
+tower-http = { version = "0.6", features = ["decompression-gzip", "follow-redirect", "fs", "trace"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+zeroize = { version = "1" }
 
 ### END HAKARI SECTION

@@ -56,12 +56,12 @@ psibase-rust-workspace-hack.workspace = true
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = { version = "4.5", features = ["derive", "env", "string"] }
 hmac = "0.12"
-hyper = "0.14"
+hyper-util = "0.1"
 indicatif = "0.17"
 jwt = "0.16"
-reqwest = { version = "0.11", default-features = false, features = [
+reqwest = { version = "0.13", default-features = false, features = [
     "json",
-    "rustls-tls",
+    "rustls",
     "gzip",
 ] }
 ring = { version = "0.17", features = ["std"] }
@@ -72,6 +72,7 @@ secp256k1 = { version = "0.27", features = [
 ] }
 tempfile = "3"
 tokio = { version = "1", features = ["full"] }
+tower = "0.5"
 pkcs8 = { version = "0.10", features = ["pem"] }
 subprocess = "0.2"
 cryptoki = "0.6"
