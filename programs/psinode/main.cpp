@@ -60,52 +60,6 @@ void validate(boost::any& v, const std::vector<std::string>& values, MountArg*, 
       v = MountArg{s.substr(0, pos), s.substr(pos + 1)};
 }
 
-struct native_service
-{
-   std::string           host;
-   std::filesystem::path root;
-   friend auto           operator<=>(const native_service&, const native_service&) = default;
-};
-PSIO_REFLECT(native_service, host, root)
-
-void to_json(const native_service& obj, auto& stream)
-{
-   stream.write('{');
-   to_json("host", stream);
-   stream.write(':');
-   to_json(obj.host, stream);
-   stream.write(',');
-   to_json("root", stream);
-   stream.write(':');
-   to_json(obj.root.native(), stream);
-   stream.write('}');
-}
-
-void from_json(native_service& obj, auto& stream)
-{
-   psio::from_json_object(stream,
-                          [&](std::string_view key)
-                          {
-                             if (key == "host")
-                             {
-                                obj.host = stream.get_string();
-                             }
-                             else if (key == "root")
-                             {
-                                obj.root = stream.get_string();
-                             }
-                             else
-                             {
-                                psio::from_json_skip_value(stream);
-                             }
-                          });
-}
-
-std::string to_string(const native_service& obj)
-{
-   return obj.host + ":" + obj.root.native();
-}
-
 struct byte_size
 {
    std::size_t value;
@@ -307,50 +261,6 @@ std::filesystem::path parse_path(std::string_view             s,
    }
 }
 
-void parse_config(native_service&              service,
-                  std::string_view             str,
-                  const std::filesystem::path& context = option_path)
-{
-   auto pos = str.starts_with('[') ? str.find("]:") : str.find(':');
-   if (pos == std::string_view::npos)
-   {
-      service.root = parse_path(str, context);
-      service.host = (service.root.has_filename() ? service.root.filename()
-                                                  : service.root.parent_path().filename())
-                         .native() +
-                     ".";
-   }
-   else
-   {
-      pos          = str.find(':', pos);
-      service.host = str.substr(0, pos);
-      service.root = parse_path(str.substr(pos + 1), context);
-   }
-}
-
-native_service service_from_string(std::string_view s)
-{
-   native_service result;
-   parse_config(result, s);
-   return result;
-}
-
-void validate(boost::any& v, const std::vector<std::string>& values, native_service*, int)
-{
-   boost::program_options::validators::check_first_occurrence(v);
-   native_service result;
-   std::string    s = boost::program_options::validators::get_single_string(values);
-   try
-   {
-      parse_config(result, s);
-   }
-   catch (std::exception&)
-   {
-      throw boost::program_options::invalid_option_value(s);
-   }
-   v = std::move(result);
-}
-
 std::filesystem::path config_template_path()
 {
    return installPrefix() / "share" / "psibase" / "config.in";
@@ -379,68 +289,6 @@ void load_environment(Database& db)
          EnvRow row{.name  = std::string(entry.substr(0, pos)),
                     .value = std::string{entry.substr(pos + 1)}};
          db.kvPut(EnvRow::db, row.key(), row);
-      }
-   }
-}
-
-void load_service(const native_service& config,
-                  http::services_t&     services,
-                  const std::string&    root_host)
-{
-   auto  host    = config.host.ends_with('.') ? config.host + root_host : config.host;
-   auto& service = services[host];
-   if (config.root.empty())
-      return;
-   for (const auto& entry : std::filesystem::recursive_directory_iterator{
-            config.root, std::filesystem::directory_options::follow_directory_symlink})
-   {
-      auto                 extension = entry.path().filename().extension().native();
-      http::native_content result;
-      if (extension == ".html")
-      {
-         result.content_type = "text/html";
-      }
-      else if (extension == ".svg")
-      {
-         result.content_type = "image/svg+xml";
-      }
-      else if (extension == ".js" || extension == ".mjs")
-      {
-         result.content_type = "text/javascript";
-      }
-      else if (extension == ".css")
-      {
-         result.content_type = "text/css";
-      }
-      else if (extension == ".ttf")
-      {
-         result.content_type = "font/ttf";
-      }
-      else if (extension == ".wasm")
-      {
-         result.content_type = "application/wasm";
-      }
-      else if (extension == ".json")
-      {
-         result.content_type = "application/json";
-      }
-      else if (extension == ".psi")
-      {
-         result.content_type = "application/zip";
-      }
-      if (!result.content_type.empty() && entry.is_regular_file())
-      {
-         result.path = entry.path();
-         auto path   = "/" + entry.path().lexically_relative(config.root).generic_string();
-         service.try_emplace(path, result);
-         if (path.ends_with("/index.html"))
-         {
-            service.try_emplace(path.substr(0, path.size() - 10), result);
-            if (path.size() > 11)
-            {
-               service.try_emplace(path.substr(0, path.size() - 11), result);
-            }
-         }
       }
    }
 }
@@ -1127,23 +975,31 @@ struct PsinodeServiceConfig
 
 struct PsinodeConfig
 {
-   std::vector<std::string>    peers;
-   AccountNumber               producer;
-   std::vector<std::string>    pkcs11_modules;
-   std::vector<std::string>    hosts;
-   std::vector<listen_spec>    listen;
-   TLSConfig                   tls;
-   std::vector<native_service> services;
-   Timeout                     http_timeout;
-   std::size_t                 service_threads;
-   psibase::loggers::Config    loggers;
+   std::vector<std::string> peers;
+   AccountNumber            producer;
+   std::vector<std::string> pkcs11_modules;
+   std::vector<std::string> hosts;
+   std::vector<listen_spec> listen;
+   TLSConfig                tls;
+   Timeout                  http_timeout;
+   std::size_t              service_threads;
+   psibase::loggers::Config loggers;
 
    static bool isNative(std::string_view name)
    {
-      constexpr std::string_view opts[] = {
-          "peers",           "producer", "pkcs11-modules",      "host",    "listen",
-          "tls-key",         "tls-cert", "tls-trustfile",       "service", "http-timeout",
-          "service-threads", "key",      "database-cache-size", "mount"};
+      constexpr std::string_view opts[] = {"peers",
+                                           "producer",
+                                           "pkcs11-modules",
+                                           "host",
+                                           "listen",
+                                           "tls-key",
+                                           "tls-cert",
+                                           "tls-trustfile",
+                                           "http-timeout",
+                                           "service-threads",
+                                           "key",
+                                           "database-cache-size",
+                                           "mount"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
@@ -1157,7 +1013,6 @@ PSIO_REFLECT(PsinodeConfig,
 #ifdef PSIBASE_ENABLE_SSL
              tls,
 #endif
-             services,
              http_timeout,
              service_threads,
              loggers);
@@ -1215,17 +1070,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
           { return std::string(text); }, "A file containing trusted certificate authorities");
    }
 #endif
-   if (!config.services.empty())
-   {
-      std::vector<std::string> services;
-      for (const auto& service : config.services)
-      {
-         services.push_back(to_string(service));
-      }
-      file.set(
-          "", "service", services, [](std::string_view text)
-          { return service_from_string(text).host; }, "Native service root directory");
-   }
    if (config.http_timeout != Timeout::none())
    {
       file.set("", "http-timeout", to_string(config.http_timeout),
@@ -1336,7 +1180,6 @@ void run(const std::string&              db_path,
          const std::vector<std::string>& peers,
          std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
-         std::vector<native_service>&    services,
          std::vector<MountArg>&          mountpoints,
          Timeout&                        http_timeout,
          std::size_t&                    service_threads,
@@ -1410,7 +1253,6 @@ void run(const std::string&              db_path,
                       .trustfiles  = root_ca,
                   },
 #endif
-              .services        = services,
               .http_timeout    = http_timeout,
               .service_threads = service_threads,
               .loggers         = loggers::Config::get(),
@@ -1596,14 +1438,14 @@ void run(const std::string&              db_path,
        });
    node.chain().onChangeHostConfig(
        [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
-        &service_threads, &tpool, &services, &tls_cert, &tls_key, &root_ca, &pkcs11_modules,
-        &system, setPKCS11Libs]
+        &service_threads, &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &system,
+        setPKCS11Libs]
        {
           boost::asio::post(
               chainContext,
-              [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &services,
-               &http_timeout, &service_threads, &tpool, &tls_cert, &tls_key, &root_ca,
-               &pkcs11_modules, &system, setPKCS11Libs]
+              [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
+               &service_threads, &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &system,
+               setPKCS11Libs]
               {
                  auto writer = system->sharedDatabase.createWriter();
                  auto row    = system->sharedDatabase.kvGetSubjective(
@@ -1613,28 +1455,10 @@ void run(const std::string&              db_path,
                      psio::convert_from_json<PsinodeCombinedConfig>(hostConfig.config);
                  auto& config = combinedConfig.host;
 
-                 std::optional<http::services_t> new_services;
-                 for (auto& entry : config.services)
-                 {
-                    entry.root =
-                        parse_path(entry.root.native(), std::filesystem::current_path() / db_path);
-                 }
-                 if (services != config.services || hosts != config.hosts)
-                 {
-                    new_services.emplace();
-                    for (const auto& entry : config.services)
-                    {
-                       for (const auto& host : config.hosts)
-                       {
-                          load_service(entry, *new_services, host);
-                       }
-                    }
-                 }
                  setPKCS11Libs(config.pkcs11_modules);
                  node.set_producer_id(config.producer);
                  pkcs11_modules  = config.pkcs11_modules;
                  hosts           = config.hosts;
-                 services        = config.services;
                  http_timeout    = config.http_timeout;
                  service_threads = config.service_threads;
 #ifdef PSIBASE_ENABLE_SSL
@@ -1649,12 +1473,6 @@ void run(const std::string&              db_path,
                     http_config->listen              = config.listen;
                     http_config->enable_transactions = !hosts.empty();
                     http_config->idle_timeout_us     = http_timeout.duration.count();
-                    if (new_services)
-                    {
-                       // Use swap instead of move to delay freeing the old
-                       // services until after releasing the mutex
-                       http_config->services.swap(*new_services);
-                    }
                  }
                  tpool.setNumThreads(service_threads);
                  {
@@ -1717,14 +1535,6 @@ void run(const std::string&              db_path,
       http_config->enable_transactions = !hosts.empty();
       http_config->status              = http::http_status{
                        .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
-
-      for (const auto& entry : services)
-      {
-         for (const auto& host : hosts)
-         {
-            load_service(entry, http_config->services, host);
-         }
-      }
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =
@@ -2053,25 +1863,7 @@ void run(const std::string&              db_path,
 
    if (node.chain().get_head_state()->blockId() == Checksum256{} && peers.empty())
    {
-      std::string xAdminSubdomain;
-      for (const auto& service : services)
-      {
-         if (service.root.string().find("services/x-admin") != std::string::npos)
-         {
-            if (service.host.ends_with('.'))
-            {
-               if (!hosts.empty())
-               {
-                  xAdminSubdomain = service.host + hosts.front();
-                  break;
-               }
-            }
-            else if (xAdminSubdomain.empty())
-            {
-               xAdminSubdomain = service.host;
-            }
-         }
-      }
+      std::string xAdminSubdomain = "x-admin." + hosts.front();
 
       if (!xAdminSubdomain.empty())
       {
@@ -2117,23 +1909,22 @@ int main(int argc, char* argv[])
       ::setenv("PSIBASE_DATADIR", (prefix / "share" / "psibase").c_str(), 1);
    }
 
-   std::string                 db_template;
-   std::string                 producer = {};
-   auto                        keys     = std::make_shared<CompoundProver>();
-   std::vector<std::string>    pkcs11_modules;
-   std::vector<std::string>    hosts = {};
-   std::vector<listen_spec>    listen;
-   std::vector<std::string>    peers;
-   std::vector<native_service> services;
-   std::vector<MountArg>       mountpoints;
-   std::vector<std::string>    root_ca;
-   std::string                 tls_cert;
-   std::string                 tls_key;
-   byte_size                   db_cache_size;
-   byte_size                   db_size;
-   Timeout                     http_timeout;
-   std::size_t                 service_threads;
-   PsinodeServiceConfig        extra_options;
+   std::string              db_template;
+   std::string              producer = {};
+   auto                     keys     = std::make_shared<CompoundProver>();
+   std::vector<std::string> pkcs11_modules;
+   std::vector<std::string> hosts = {};
+   std::vector<listen_spec> listen;
+   std::vector<std::string> peers;
+   std::vector<MountArg>    mountpoints;
+   std::vector<std::string> root_ca;
+   std::string              tls_cert;
+   std::string              tls_key;
+   byte_size                db_cache_size;
+   byte_size                db_size;
+   Timeout                  http_timeout;
+   std::size_t              service_threads;
+   PsinodeServiceConfig     extra_options;
 
    namespace po = boost::program_options;
 
@@ -2149,8 +1940,6 @@ int main(int argc, char* argv[])
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
    opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
-   opt("service", po::value(&services)->default_value({}, "")->value_name("host:directory"),
-       "Serve static content from directory using the specified virtual host name");
    opt("mount",
        po::value(&mountpoints)
            ->composing()
@@ -2281,8 +2070,8 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, peers, hosts, listen, services, mountpoints, http_timeout,
-             service_threads, root_ca, tls_cert, tls_key, extra_options, restart);
+             pkcs11_modules, peers, hosts, listen, mountpoints, http_timeout, service_threads,
+             root_ca, tls_cert, tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";
