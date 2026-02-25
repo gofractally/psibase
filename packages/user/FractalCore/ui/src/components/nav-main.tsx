@@ -103,7 +103,7 @@ export function getMenuGroups(
                     {
                         title: "Membership",
                         icon: Contact,
-                        path: `/guild/${membership.guild.account}/members`,
+                        path: `/guild/${membership.guild.account}/membership`,
                     },
                     {
                         title: "Evaluations",

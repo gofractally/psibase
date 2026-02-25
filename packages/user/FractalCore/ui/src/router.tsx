@@ -11,13 +11,12 @@ import { ProtectedRoute } from "@shared/components/protected-route";
 import { Judicial } from "./pages/fractal/governance/judicial";
 import { Legislative } from "./pages/fractal/governance/legislative";
 import { Guilds } from "./pages/fractal/guilds/index";
-import { ApplicationDetail } from "./pages/fractal/membership/application-detail";
-import { Applications } from "./pages/fractal/membership/applications";
 import { Overview } from "./pages/fractal/overview/index";
+import { ApplicationDetail } from "./pages/guilds/application-detail";
 import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
-import { AllGuildMembers } from "./pages/guilds/membership/all-guild-members";
+import { Membership } from "./pages/guilds/membership";
 import { GuildOverview } from "./pages/guilds/overview";
 
 export const router = createBrowserRouter([
@@ -78,10 +77,10 @@ export const router = createBrowserRouter([
                         ),
                     },
                     {
-                        path: "members",
+                        path: "membership",
                         element: (
                             <ProtectedRoute>
-                                <AllGuildMembers />
+                                <Membership />
                             </ProtectedRoute>
                         ),
                     },
@@ -90,14 +89,6 @@ export const router = createBrowserRouter([
                         element: (
                             <ProtectedRoute>
                                 <ActiveAndUpcoming />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
-                        path: "applications",
-                        element: (
-                            <ProtectedRoute>
-                                <Applications />
                             </ProtectedRoute>
                         ),
                     },
