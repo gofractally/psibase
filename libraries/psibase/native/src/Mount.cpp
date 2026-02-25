@@ -154,34 +154,6 @@ namespace psibase
       {
          check(path.find('\0') == std::string_view::npos, "Invalid path");
       }
-      // removes repeated '/'. Does not resolve symlinks, "." or ".."
-      void normalizePath(std::string& path)
-      {
-         bool isSlash = false;
-         auto iter    = path.begin();
-         auto out     = iter;
-         auto end     = path.end();
-         for (; iter != end; ++iter)
-         {
-            if (*iter == '/')
-            {
-               if (!isSlash)
-               {
-                  *out++ = *iter;
-               }
-               isSlash = true;
-            }
-            else
-            {
-               *out++  = *iter;
-               isSlash = false;
-            }
-         }
-         path.erase(out, path.end());
-         // Only directories can be mounted
-         if (!path.ends_with('/'))
-            path.push_back('/');
-      }
    }  // namespace
 
    Mount::Fd::~Fd()
