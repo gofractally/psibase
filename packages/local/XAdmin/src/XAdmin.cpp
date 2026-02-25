@@ -735,6 +735,8 @@ namespace LocalService
       }
       else if (target.starts_with("/packages/"))
       {
+         if (target.find("/.") != std::string_view::npos)
+            return {};
          if (req.method != "GET")
             return HttpReply::methodNotAllowed(req);
          auto datadir = getEnv("PSIBASE_DATADIR");
@@ -755,7 +757,6 @@ namespace LocalService
             {
                return {};
             }
-            printf("reading %s\n", path.c_str());
             auto sz = raw::readFile(path.data(), path.size());
             if (sz == -1)
                return {};
