@@ -289,6 +289,7 @@ namespace psibase
       // Well-known fds
       static constexpr std::int32_t producer_multicast = 0;
       static constexpr std::int32_t log                = 1;
+      static constexpr std::int32_t unreservedStart    = 2;
 
       std::int32_t fd;
       SocketInfo   info;

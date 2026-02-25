@@ -1,4 +1,5 @@
 #include <psibase/ConfigFile.hpp>
+#include <psibase/LogSocket.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
 #include <psibase/RunQueue.hpp>
@@ -1258,26 +1259,6 @@ HostConfigRow toHostConfig(const PsinodeConfig& config, const PsinodeServiceConf
    return result;
 }
 
-struct LogSocket : Socket
-{
-   LogSocket()
-   {
-      logger.add_attribute("Channel", boost::log::attributes::constant(std::string("service")));
-   }
-   void send(Writer&, std::span<const char> data)
-   {
-      auto record = psio::from_frac<LogMessage>(data);
-      check(record.severity <= LogMessage::Severity::critical, "Unknown severity");
-      auto _ = record.service
-                   ? std::optional{boost::log::add_scoped_logger_attribute(
-                         logger, "Service", boost::log::attributes::constant(*record.service))}
-                   : std::nullopt;
-      BOOST_LOG_SEV(logger, static_cast<loggers::level>(record.severity)) << record.message;
-   }
-   SocketInfo             info() const { return LogSocketInfo{}; }
-   loggers::common_logger logger;
-};
-
 // Asio's timers are not usable for shutdown because they keep the io_context alive
 struct ShutdownTimer
 {
@@ -1381,7 +1362,7 @@ void run(const std::string&              db_path,
 
    {
       auto writer = system->sharedDatabase.createWriter();
-      system->sockets->set(*writer, SocketRow::log, std::make_shared<LogSocket>());
+      system->sockets->set(*writer, SocketRow::log, makeLogSocket());
 
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;

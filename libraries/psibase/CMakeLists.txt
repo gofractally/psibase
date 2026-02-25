@@ -206,6 +206,7 @@ function(add suffix)
             native/src/ExecutionContext.cpp
             native/src/ForkDb.cpp
             native/src/log.cpp
+            native/src/LogSocket.cpp
             native/src/NativeFunctions.cpp
             native/src/OpenSSLProver.cpp
             native/src/pkcs11.cpp
