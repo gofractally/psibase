@@ -419,7 +419,7 @@ filter = %s
 format = %s
 '''
 _default_log_filter = 'Severity >= info'
-_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
+_default_log_format = '[{TimeStamp}] [{Severity}]{?: [{Service}]}{?: [{RemoteEndpoint}]}: {Message}{?: {TransactionId}}{?: {BlockId}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: {ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}'
 
 def _write_config(dir, log_filter, log_format, softhsm, trustfile):
     logfile = os.path.join(dir, 'config')

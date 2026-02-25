@@ -1819,7 +1819,8 @@ struct ConsoleLog
    std::string type   = "console";
    std::string filter = "Severity > critical";
    std::string format =
-       "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
+       "[{TimeStamp}] [{Severity}] [{Host}]{?: [{Service}]}: {Message}{?: {TransactionId}}{?: "
+       "{BlockId}: "
        "{BlockHeader}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: "
        "{ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}";
 };
