@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -11,7 +11,7 @@ import {
     useFillGasTank,
     useResizeAndFillGasTank,
 } from "../hooks/use-fill-gas-tank";
-import { useSystemToken } from "../hooks/use-system-token";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { useUserResources } from "../hooks/use-user-resources";
 import { GasTank } from "./gas-tank";
 

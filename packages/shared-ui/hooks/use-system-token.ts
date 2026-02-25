@@ -64,7 +64,7 @@ export const useSystemToken = () => {
 
                 return {
                     id: tokenRes.token.id.toString(),
-                    symbol: tokenRes.token.symbol?.symbolId,
+                    symbol: tokenRes.token.symbol?.symbolId || "$SYS",
                 };
             } catch (error) {
                 console.error("Error fetching system token:", error);

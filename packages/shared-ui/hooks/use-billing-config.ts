@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { graphql, GraphQLUrlOptions } from "@shared/lib/graphql";
+import QueryKey from "@shared/lib/query-keys";
 
 interface BillingConfigResponse {
     getBillingConfig: {
@@ -11,7 +12,7 @@ interface BillingConfigResponse {
 
 export const useBillingConfig = (options: GraphQLUrlOptions = {baseUrlIncludesSibling: true}) => {
     return useQuery({
-        queryKey: ["billingConfig"],
+        queryKey: QueryKey.billingConfig(),
         queryFn: async () => {
             const query = `
                 query {

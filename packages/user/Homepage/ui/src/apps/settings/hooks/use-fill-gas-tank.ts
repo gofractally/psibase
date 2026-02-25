@@ -1,12 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
 import { toast } from "@shared/shadcn/ui/sonner";
+import QueryKey from "@/lib/queryKeys";
 
 export const useFillGasTank = () => {
-    const queryClient = useQueryClient();
-
     return useMutation<void, Error, void>({
         mutationKey: ["fillGasTank"],
         mutationFn: async () => {
@@ -18,10 +17,10 @@ export const useFillGasTank = () => {
                 params: [],
             });
         },
-        onSuccess: () => {
+        onSuccess: (_, _variables, _id, context) => {
             toast.success("Gas tank refilled");
-            queryClient.invalidateQueries({
-                queryKey: ["userResources"],
+            context.client.invalidateQueries({
+                queryKey: QueryKey.userResources(),
             });
         },
         onError: (error) => {
@@ -31,8 +30,6 @@ export const useFillGasTank = () => {
 };
 
 export const useResizeAndFillGasTank = () => {
-    const queryClient = useQueryClient();
-
     return useMutation<void, Error, string>({
         mutationKey: ["resizeAndFillGasTank"],
         mutationFn: async (newCapacity: string) => {
@@ -44,10 +41,10 @@ export const useResizeAndFillGasTank = () => {
                 params: [newCapacity],
             });
         },
-        onSuccess: () => {
+        onSuccess: (_, _variables, _id, context) => {
             toast.success("Gas tank resized and refilled");
-            queryClient.invalidateQueries({
-                queryKey: ["userResources"],
+            context.client.invalidateQueries({
+                queryKey: QueryKey.userResources(),
             });
         },
         onError: (error) => {

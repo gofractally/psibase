@@ -13,7 +13,7 @@ import { useNavigate } from "react-router-dom";
 
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
 import { useLogout } from "@/hooks/use-logout";
 

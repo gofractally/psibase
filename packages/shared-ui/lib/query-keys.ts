@@ -14,6 +14,7 @@ const QueryKey = {
     systemToken: () => ["systemToken"] as const,
     chainId: () => ["chainId"] as const,
     currentUser: () => ["currentUser"] as const,
+    billingConfig: () => ["billingConfig"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

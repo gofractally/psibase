@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
+import QueryKey from "@/lib/queryKeys";
+
 interface UserResourcesResponse {
     userResources: {
         balance: string | number;
@@ -22,7 +24,7 @@ export const useUserResources = (
 ) => {
     const { enabled = true } = options ?? {};
     return useQuery<UserResources | null>({
-        queryKey: ["userResources", user],
+        queryKey: [...QueryKey.userResources(), user],
         enabled: !!user && enabled,
         queryFn: async () => {
             if (!user) return null;
