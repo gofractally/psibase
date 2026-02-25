@@ -572,8 +572,8 @@ class Node(API):
             url = other.socketpath
         else:
             url = other
-        with self.post('/connect', service='x-peers', json={'url':url}):
-            pass
+        with self.post('/connect', service='x-peers', json={'url':url}) as result:
+            result.raise_for_status()
     def disconnect(self, other):
         '''Disconnects a peer. other can be a peer id, a URL, or a Node object.'''
         if isinstance(other, int):
