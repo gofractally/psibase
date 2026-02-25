@@ -397,7 +397,9 @@ pub async fn build_package(
     let out_dir = get_package_dir(args, metadata);
     let out_path = out_dir.join(package_name.clone() + ".psi");
     let mut file =
-        if should_build_package(&out_path, &meta, &service_wasms, &data_files, &postinstall)? {
+        if should_build_package(&out_path, &meta, &service_wasms, &data_files, &postinstall)
+            .unwrap_or(true)
+        {
             std::fs::create_dir_all(&out_dir)?;
             let mut out = ZipWriter::new(
                 OpenOptions::new()

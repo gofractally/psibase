@@ -1222,8 +1222,7 @@ namespace
       AcceptParser parser;
       for (const auto& header : headers)
       {
-         if (std::ranges::equal(header.name | std::views::transform(::tolower),
-                                std::string_view("accept")))
+         if (iequal(header.name, "accept"))
          {
             parseHeader(header.value, parser);
          }
@@ -1385,7 +1384,7 @@ std::optional<AccountNumber> RTransact::getUser(HttpRequest request)
 
    for (const auto& header : request.headers)
    {
-      if (std::ranges::equal(header.name, std::string_view{"authorization"}, {}, ::tolower))
+      if (iequal(header.name, "authorization"))
       {
          parseHeader(header.value,
                      [&](std::string_view value)
