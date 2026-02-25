@@ -109,42 +109,45 @@ export const Billing = ({
                 <h3 className="text-base font-medium">Billing</h3>
             </div>
 
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    billingForm.handleSubmit();
-                }}
-            >
-                <div className="space-y-4">
-                    <div>
-                        <Label>System Token</Label>
-                        <p className="mt-1 text-sm">
-                            {systemTokenLoading
-                                ? "Loading..."
-                                : systemToken
-                                  ? systemToken.symbol || systemToken.id
-                                  : "None"}
-                        </p>
-                    </div>
+            <div className="space-y-6">
+                <div>
+                    <Label>System Token</Label>
+                    <p className="mt-1 text-sm">
+                        {systemTokenLoading
+                            ? "Loading..."
+                            : systemToken
+                              ? systemToken.symbol || systemToken.id
+                              : "None"}
+                    </p>
+                </div>
 
-                    <div>
-                        <FieldAccountExisting
-                            form={billingForm}
-                            fields={{ account: "tokenFeeReceiverAccount.account" }}
-                            label="Token fee receiver account"
-                            placeholder="Enter account name"
-                            disabled={hasFeeReceiverAccount}
-                            description={undefined}
-                            onValidate={undefined}
-                        />
-                        {!hasFeeReceiverAccount && (
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        billingForm.handleSubmit();
+                    }}
+                >
+                    <div className="space-y-4">
+                        <div>
+                            <FieldAccountExisting
+                                form={billingForm}
+                                fields={{ account: "tokenFeeReceiverAccount.account" }}
+                                label="Token fee receiver account"
+                                placeholder="Enter account name"
+                                disabled={hasFeeReceiverAccount}
+                                description={undefined}
+                                onValidate={undefined}
+                            />
                             <billingForm.Subscribe selector={(state) => state}>
                                 {(state) => {
                                     const account =
-                                        state.values.tokenFeeReceiverAccount?.account ?? "";
+                                        state.values.tokenFeeReceiverAccount
+                                            ?.account ?? "";
                                     const initial =
-                                        computedInitialValues.tokenFeeReceiverAccount?.account ?? "";
+                                        computedInitialValues
+                                            .tokenFeeReceiverAccount?.account ??
+                                        "";
                                     const isSaveEnabled =
                                         account !== "" && account !== initial;
                                     return (
@@ -156,7 +159,10 @@ export const Billing = ({
                                             )}
                                             <Button
                                                 type="submit"
-                                                disabled={!isSaveEnabled}
+                                                disabled={
+                                                    hasFeeReceiverAccount ||
+                                                    !isSaveEnabled
+                                                }
                                             >
                                                 Save
                                             </Button>
@@ -164,9 +170,17 @@ export const Billing = ({
                                     );
                                 }}
                             </billingForm.Subscribe>
-                        )}
+                        </div>
                     </div>
+                </form>
 
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleApplyEnableBilling();
+                    }}
+                >
                     <billingForm.AppField name="enableBilling">
                         {(field) => (
                             <>
@@ -174,47 +188,43 @@ export const Billing = ({
                                     label="Enable billing"
                                     disabled={!hasFeeReceiverAccount}
                                 />
-                                {hasFeeReceiverAccount && (
-                                    <billingForm.Subscribe
-                                        selector={(state) =>
-                                            state.values.enableBilling
-                                        }
-                                    >
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {(enableBilling: any) => {
-                                            const isApplyEnabled =
-                                                submittedEnableBilling !==
-                                                    null &&
-                                                enableBilling !==
-                                                    submittedEnableBilling;
-                                            return (
-                                                <div className="mt-2">
-                                                    {enableBillingTxError && (
-                                                        <p className="text-destructive text-sm mb-2">
-                                                            {enableBillingTxError}
-                                                        </p>
-                                                    )}
-                                                    <Button
-                                                        type="button"
-                                                        onClick={
-                                                            handleApplyEnableBilling
-                                                        }
-                                                        disabled={
-                                                            !isApplyEnabled
-                                                        }
-                                                    >
-                                                        Apply
-                                                    </Button>
-                                                </div>
-                                            );
-                                        }}
-                                    </billingForm.Subscribe>
-                                )}
+                                <billingForm.Subscribe
+                                    selector={(state) =>
+                                        state.values.enableBilling
+                                    }
+                                >
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                    {(enableBilling: any) => {
+                                        const isApplyEnabled =
+                                            submittedEnableBilling !==
+                                                null &&
+                                            enableBilling !==
+                                                submittedEnableBilling;
+                                        return (
+                                            <div className="mt-2">
+                                                {enableBillingTxError && (
+                                                    <p className="text-destructive text-sm mb-2">
+                                                        {enableBillingTxError}
+                                                    </p>
+                                                )}
+                                                <Button
+                                                    type="submit"
+                                                    disabled={
+                                                        !hasFeeReceiverAccount ||
+                                                        !isApplyEnabled
+                                                    }
+                                                >
+                                                    Apply
+                                                </Button>
+                                            </div>
+                                        );
+                                    }}
+                                </billingForm.Subscribe>
                             </>
                         )}
                     </billingForm.AppField>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     );
 };
