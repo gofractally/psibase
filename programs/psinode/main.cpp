@@ -1863,10 +1863,11 @@ void run(const std::string&              db_path,
 
    if (node.chain().get_head_state()->blockId() == Checksum256{} && peers.empty())
    {
-      std::string xAdminSubdomain = "x-admin." + hosts.front();
-
-      if (!xAdminSubdomain.empty())
+      std::string message = "Node is not connected to any psibase network.";
+      if (!hosts.empty())
       {
+         std::string xAdminSubdomain = "x-admin." + hosts.front();
+
          std::string protocol;
          std::string port;
          for (const auto& listen : http_config->listen)
@@ -1884,11 +1885,7 @@ void run(const std::string&              db_path,
             }
          }
          xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
-      }
 
-      std::string message = "Node is not connected to any psibase network.";
-      if (!xAdminSubdomain.empty())
-      {
          message += " Visit '" + xAdminSubdomain + "' for node setup.";
       }
 
