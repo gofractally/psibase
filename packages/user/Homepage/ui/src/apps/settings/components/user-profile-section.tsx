@@ -2,7 +2,7 @@ import { Trash, Upload } from "lucide-react";
 
 import { FormProfile } from "@/components/form-profile";
 
-import { useCacheBust } from "@/hooks/use-cache-bust";
+import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 

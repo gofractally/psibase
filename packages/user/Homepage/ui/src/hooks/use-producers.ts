@@ -6,7 +6,7 @@ import { type Producer, getProducers } from "@/lib/get-producers";
 import { GraphQLUrlOptions } from "@shared/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const queryProducers = (opts: GraphQLUrlOptions) => queryOptions({
     queryKey: QueryKey.producers(),

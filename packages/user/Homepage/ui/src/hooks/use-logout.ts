@@ -5,7 +5,6 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 
 import { useConnectedAccounts } from "./use-connected-accounts";
-import { setCurrentUser } from "./use-current-user";
 
 export const useLogout = () => {
     const { data: connectedAccounts } = useConnectedAccounts();
@@ -28,7 +27,7 @@ export const useLogout = () => {
             }
         },
         onSuccess: (_data, _variables, _onMutateResult, context) => {
-            setCurrentUser(null);
+            context.client.setQueryData(QueryKey.currentUser(), null);
             context.client.invalidateQueries({
                 queryKey: QueryKey.currentUser(),
             });

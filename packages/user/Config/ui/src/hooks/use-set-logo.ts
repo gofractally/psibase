@@ -1,5 +1,4 @@
 import { queryClient } from "@/queryClient";
-
 import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 

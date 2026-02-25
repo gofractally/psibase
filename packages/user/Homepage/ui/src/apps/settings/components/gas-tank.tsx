@@ -10,7 +10,7 @@ export const GasTank = ({ fillPercentage }: GasTankProps) => {
     // For readability, text is pushed up/down to avoid the current level and colored to contrast the background at its location
     const textColor = clampedFill >= 50 ? "text-gray-900" : "text-white";
     const fillLevelBufferToMovePercent = 5;
-    const fillLevelBufferToMovePercentOffsete = 8;
+    const fillLevelBufferToMovePercentOffset = 8;
 
     return (
         <div className="relative h-full w-16 rounded-lg border-2 border-gray-700 bg-gray-900 overflow-hidden">
@@ -71,8 +71,8 @@ export const GasTank = ({ fillPercentage }: GasTankProps) => {
                         // - above 50% → nudge down
                         const offset =
                             clampedFill < 50
-                                ? -fillLevelBufferToMovePercentOffsete
-                                : fillLevelBufferToMovePercentOffsete;
+                                ? -fillLevelBufferToMovePercentOffset
+                                : fillLevelBufferToMovePercentOffset;
 
                         return `translate(-50%, calc(-50% + ${offset}px))`;
                     })(),

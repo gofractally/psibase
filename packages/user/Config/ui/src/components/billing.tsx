@@ -171,7 +171,7 @@ export const Billing = ({
                         {(field) => (
                             <>
                                 <field.CheckboxField
-                                    label="Enable billing (for public networks)"
+                                    label="Enable billing"
                                     disabled={!hasFeeReceiverAccount}
                                 />
                                 {hasFeeReceiverAccount && (
