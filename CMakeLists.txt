@@ -295,22 +295,7 @@ add_rs_component_workspace(packages/:Plugins
     producers
 )
 
-function(psinode_files target pfx)
-    add_custom_target(
-    ${target}
-    ALL
-    DEPENDS ${XAdmin_js_DEP} wasm
-    COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
-    COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin
-    COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/x-admin/packages
-    )
-endfunction()
-
-psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-
 include(GNUInstallDirs)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)

@@ -76,6 +76,8 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_timer)
 endif()
 
+configure_file(config.in ${ROOT_BINARY_DIR}/share/psibase/config.in COPYONLY)
+
 include(GNUInstallDirs)
 install(FILES config.in DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase COMPONENT ServerData)
 install(TARGETS psinode RUNTIME COMPONENT ServerBin)
