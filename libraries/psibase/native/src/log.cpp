@@ -2375,7 +2375,6 @@ namespace psibase::loggers
          {
             AccountNumber account{value};
             check(account != AccountNumber{}, "Invalid account");
-            // TODO: interpret units
             return make_filter_impl(name, op, account, "=", std::equal_to<>(),
                                     "!=", std::not_equal_to<>());
          };
