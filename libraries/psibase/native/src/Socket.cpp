@@ -325,8 +325,7 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
       std::lock_guard l{mutex};
       check(!stopped, "Shutting down");
       check(fd >= 0, "invalid fd");
-      check(static_cast<std::size_t>(fd) < SocketRow::unreservedStart,
-            "Can only set reserved socket numbers");
+      check(fd < SocketRow::unreservedStart, "Can only set reserved socket numbers");
       auto pos = static_cast<std::size_t>(fd);
       if (pos + 1 > available.size())
       {
