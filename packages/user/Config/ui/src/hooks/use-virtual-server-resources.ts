@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
+// import { CpuPricing, NetPricing } from "./use-resource-pricing";
 
 const zServerSpecs = z.object({
     netBps: z.number(),
@@ -17,9 +18,19 @@ const zNetworkVariables = z.object({
     objStorageBytes: z.number(),
 });
 
+const zCpuPricing = z.object({
+    availableUnits: z.number(),
+});
+
+const zNetPricing = z.object({
+    availableUnits: z.number(),
+});
+
 const zResourcesResponse = z.object({
     getServerSpecs: zServerSpecs,
     getNetworkVariables: zNetworkVariables,
+    cpuPricing: zCpuPricing.nullable(),
+    networkPricing: zNetPricing.nullable(),
 });
 
 export type ServerSpecs = z.infer<typeof zServerSpecs>;
@@ -28,6 +39,8 @@ export type NetworkVariables = z.infer<typeof zNetworkVariables>;
 export interface VirtualServerResources {
     serverSpecs: ServerSpecs;
     networkVariables: NetworkVariables;
+    cpuAvailableUnits: number;
+    netAvailableUnits: number;
 }
 
 export const useVirtualServerResources = () => {
@@ -46,6 +59,12 @@ export const useVirtualServerResources = () => {
                         perBlockSysCpuNs
                         objStorageBytes
                     }
+                    networkPricing {
+                        availableUnits
+                    }
+                    cpuPricing {
+                        availableUnits
+                    }
                 }
             `;
 
@@ -57,6 +76,8 @@ export const useVirtualServerResources = () => {
             return {
                 serverSpecs: parsed.getServerSpecs,
                 networkVariables: parsed.getNetworkVariables,
+                cpuAvailableUnits: parsed.cpuPricing?.availableUnits ?? 0,
+                netAvailableUnits: parsed.networkPricing?.availableUnits ?? 0,
             };
         },
     });

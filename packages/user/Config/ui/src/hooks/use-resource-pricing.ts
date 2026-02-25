@@ -12,6 +12,7 @@ const zThresholds = z.object({
 
 const zPricing = z.object({
     numBlocksToAverage: z.number(),
+    availableUnits: z.number(),
     billableUnit: z.number(),
     pricePerUnit: z.number(),
     halvingTimeSec: z.number(),
@@ -42,6 +43,7 @@ export const useResourcePricing = () => {
                 query {
                     cpuPricing {
                         numBlocksToAverage
+                        availableUnits
                         billableUnit
                         pricePerUnit
                         halvingTimeSec
@@ -54,6 +56,7 @@ export const useResourcePricing = () => {
                     }
                     networkPricing {
                         numBlocksToAverage
+                        availableUnits
                         billableUnit
                         pricePerUnit
                         halvingTimeSec

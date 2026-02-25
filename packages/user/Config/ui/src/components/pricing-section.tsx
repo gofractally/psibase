@@ -22,6 +22,7 @@ interface PricingFormValues {
     congestedThreshold: string;
     averageWindowSize: string;
     billableUnit: string;
+    availableUnits: string;
 }
 
 const DEFAULT_FORM_VALUES: PricingFormValues = {
@@ -33,6 +34,7 @@ const DEFAULT_FORM_VALUES: PricingFormValues = {
     congestedThreshold: "",
     averageWindowSize: "",
     billableUnit: "",
+    availableUnits: "",
 };
 
 function getInitialFormValues(
@@ -67,6 +69,7 @@ function getInitialFormValues(
         billableUnit: Number.isFinite(billableUnitValue)
             ? billableUnitValue.toString()
             : "0",
+        availableUnits: String(Number(pricing.availableUnits) || 0),
     };
 }
 

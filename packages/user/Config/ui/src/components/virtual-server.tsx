@@ -77,6 +77,7 @@ export const VirtualServer = () => {
     const { data: resources } = useVirtualServerResources();
     const serverSpecs = resources?.serverSpecs;
     const networkVariables = resources?.networkVariables;
+    const cpuAvailableUnits = resources?.cpuAvailableUnits ?? 0;
 
     // Compute initial values from fetched data
     const computedInitialValues = useMemo<VirtualServerFormData>(() => {
@@ -478,61 +479,35 @@ export const VirtualServer = () => {
                             return value * STORAGE_FACTORS[unit];
                         };
 
-                        const getPerBlockSysCpuNs = (): number => {
-                            const value = parseFloat(formValues.perBlockSysCpu || "0");
-                            if (isNaN(value)) return 0;
-                            const unit = (formValues.perBlockSysCpuUnit || "ns") as TimeUnit;
-                            return value * TIME_FACTORS[unit];
-                        };
+                        // const getPerBlockSysCpuNs = (): number => {
+                        //     const value = parseFloat(formValues.perBlockSysCpu || "0");
+                        //     if (isNaN(value)) return 0;
+                        //     const unit = (formValues.perBlockSysCpuUnit || "ns") as TimeUnit;
+                        //     return value * TIME_FACTORS[unit];
+                        // };
 
-                        const getBlockReplayFactor = (): number => {
-                            return parseFloat(formValues.blockReplayFactor || "0") || 0;
-                        };
+                        // const getBlockReplayFactor = (): number => {
+                        //     return parseFloat(formValues.blockReplayFactor || "0") || 0;
+                        // };
 
                         // Calculate derived values (in base units)
                         const storageBytes = getStorageBytes();
                         const objStorageBytes = getObjStorageBytes();
-                        const perBlockSysCpuNs = getPerBlockSysCpuNs();
-                        const blockReplayFactor = getBlockReplayFactor();
+                        // const perBlockSysCpuNs = getPerBlockSysCpuNs();
+                        // const blockReplayFactor = getBlockReplayFactor();
 
-                        const netGbps = parseFloat(formValues.netGbps || "0") || 0;
+                        // Server-derived values (not form state); display only
+                        // Bandwidth: server net capacity in Gbps (netBps / 1e9)
+                        const netGbps =
+                            serverSpecs != null
+                                ? serverSpecs.netBps / 1_000_000_000
+                                : 0;
+                        const cpuForTxNs = cpuAvailableUnits;
+                        const cpuForTxDisplay = getBestTimeUnit(cpuForTxNs);
 
                         const objStorageDisplay = getBestStorageUnit(objStorageBytes);
                         const subjectiveStorageBytes = Math.max(0, storageBytes - objStorageBytes);
                         const subjectiveStorageDisplay = getBestStorageUnit(subjectiveStorageBytes);
-                        
-                        // CPU for transactions: (1sec - perBlockSysCpuNs) / blockReplayFactor
-                        const oneSecondNs = 1_000_000_000; // 1 second in nanoseconds
-                        const cpuForTxNs = blockReplayFactor > 0 
-                            ? (oneSecondNs - perBlockSysCpuNs) / blockReplayFactor 
-                            : 0;
-                        const cpuForTxDisplay = getBestTimeUnit(cpuForTxNs);
-
-                        // Helper component for value with info icon
-                        const ValueWithInfo = ({ 
-                            value, 
-                            tooltipText 
-                        }: { 
-                            value: React.ReactNode; 
-                            tooltipText?: string;
-                        }) => {
-                            if (!tooltipText) {
-                                return <>{value}</>;
-                            }
-                            return (
-                                <span className="inline-flex items-center gap-1">
-                                    {value}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {tooltipText}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </span>
-                            );
-                        };
 
                         return (
                             <div className="border-t mt-2 pt-2">
@@ -540,6 +515,9 @@ export const VirtualServer = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="col-span-1 md:col-span-2">
                                             <div className="text-sm">Billable Resources</div>
+                                            <p className="text-muted-foreground text-xs mt-1">
+                                                These values are automatically computed and take into account many variables, such as the virtual server specs, advanced variables, number of infrastructure providers, etc.
+                                            </p>
                                         </div>
 
                                         {/* Row 1 (desktop): Objective / Subjective storage */}
@@ -567,10 +545,7 @@ export const VirtualServer = () => {
                                                 <span className="text-muted-foreground">
                                                     CPU for transactions:
                                                 </span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
-                                                    tooltipText="= (1sec - per-block-sys-cpu-ns) / block-replay-factor"
-                                                />
+                                                {`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
                                             </div>
                                         </div>
 
