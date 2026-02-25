@@ -134,6 +134,11 @@ namespace psibase
       friend bool operator==(const ProducerMulticastSocketInfo&,
                              const ProducerMulticastSocketInfo&) = default;
    };
+   struct LogSocketInfo
+   {
+      PSIO_REFLECT(LogSocketInfo)
+      friend bool operator==(const LogSocketInfo&, const LogSocketInfo&) = default;
+   };
    struct HttpSocketInfo
    {
       std::optional<SocketEndpoint> endpoint;
@@ -166,6 +171,7 @@ namespace psibase
    };
 
    using SocketInfo = std::variant<ProducerMulticastSocketInfo,
+                                   LogSocketInfo,
                                    HttpSocketInfo,
                                    HttpClientSocketInfo,
                                    WebSocketInfo,

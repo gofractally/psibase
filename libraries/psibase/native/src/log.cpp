@@ -2368,6 +2368,19 @@ namespace psibase::loggers
          };
       };
 
+      template <>
+      auto make_simple_filter_factory<AccountNumber>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            AccountNumber account{value};
+            check(account != AccountNumber{}, "Invalid account");
+            // TODO: interpret units
+            return make_filter_impl(name, op, account, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>());
+         };
+      };
+
       auto make_alias_filter_factory(boost::log::attribute_name name)
       {
          return [name](boost::log::attribute_name /*name*/, std::string_view& trailing)
@@ -2532,6 +2545,25 @@ namespace psibase::loggers
                if (auto attr = boost::log::extract<std::chrono::microseconds>(name, rec))
                {
                   stream << attr->count();
+               }
+            };
+         };
+      }
+
+      template <>
+      auto make_simple_formatter_factory<AccountNumber>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("Unexpected format spec for " + name.string());
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<AccountNumber>(name, rec))
+               {
+                  stream << attr->str();
                }
             };
          };
@@ -2709,6 +2741,7 @@ namespace psibase::loggers
          add_attribute<Checksum256>("TransactionId");
          add_attribute<std::string>("Process");
          add_attribute<std::string>("Channel");
+         add_attribute<AccountNumber>("Service");
          add_attribute<std::string>("Host");
          add_attribute<int>("PeerId");
          add_attribute<boost::log::process_id>("ProcessId");
