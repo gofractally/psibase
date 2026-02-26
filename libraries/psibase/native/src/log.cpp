@@ -2594,6 +2594,21 @@ namespace psibase::loggers
                                                          std::forward<F>(f));
       }
 
+      auto make_message_formatter = [](boost::log::attribute_name name, std::string_view spec)
+      {
+         if (!spec.empty())
+         {
+            throw std::runtime_error("std::format not supported yet");
+         }
+         return [name](auto& rec, auto& stream)
+         {
+            if (auto attr = boost::log::extract<std::string>(name, rec))
+            {
+               stream << sanitize(*attr);
+            }
+         };
+      };
+
       auto make_escape_formatter = [](auto name, std::string_view spec)
       {
          auto pos = spec.find(':');
@@ -2731,6 +2746,11 @@ namespace psibase::loggers
                                     boost::log::attributes::constant(std::string(hostname)));
          core->add_global_attribute("Process", boost::log::attributes::current_process_name());
          core->add_global_attribute("ProcessId", boost::log::attributes::current_process_id());
+
+         filter_parser::global_filters.try_emplace("Message",
+                                                   make_simple_filter_factory<std::string>());
+         formatter_parser::global_formatters.try_emplace(
+             "Message", boost::log::attribute_name{"Message"}, make_message_formatter);
 
          add_attribute<std::string>("Message");
          add_attribute<level>("Severity");
@@ -3224,6 +3244,18 @@ namespace psibase::loggers
          boost::log::core::get()->add_sink(impl->sink);
          impl->registered = true;
       }
+   }
+
+   std::string sanitize(std::string message)
+   {
+      for (char& ch : message)
+      {
+         if (static_cast<unsigned char>(ch) < 32 && ch != '\t' || ch == 127)
+         {
+            ch = ' ';
+         }
+      }
+      return message;
    }
 
 }  // namespace psibase::loggers
