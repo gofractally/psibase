@@ -1,0 +1,8 @@
+# launch nix env via flake
+use flake .
+# set IP for Launch/Continue scripts
+HOST_IP=127.0.0.1
+# configure git credentials in .git/config as follows. first (empty) helper is necessary to override some (global) configs
+#[credential]
+#  helper =
+#  helper = store --file=/home/mike/.git-credentials-work
