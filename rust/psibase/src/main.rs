@@ -4,7 +4,6 @@ use clap::{Args, FromArgMatches, Parser, Subcommand};
 use flate2::write::GzEncoder;
 use fracpack::Pack;
 use futures::future::{join_all, try_join_all};
-use hyper::service::Service as _;
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{
     accounts, auth_delegate, packages, sites, staged_tx, transact, x_packages,
@@ -15,12 +14,11 @@ use psibase::{
     get_package_sources, get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, AutoAbort, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile,
-    PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference, PackageRef,
-    PackageRegistry, PackagedService, PrettyAction, SchemaMap, ServiceInfo, SignedTransaction,
-    StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
-    TransactionTrace, Version,
+    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
+    FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageInfo, PackageList,
+    PackageOp, PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService,
+    PrettyAction, SchemaMap, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -35,6 +33,7 @@ use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tower::Service;
 
 mod cli;
 use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
@@ -592,7 +591,7 @@ fn finish_progress(sig_args: &SigArgs, progress: ProgressBar, num_transactions: 
 }
 
 async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<PrettyAction> = Vec::new();
 
     if args.actions.is_empty() {
@@ -661,7 +660,7 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
 }
 
 async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
     if args.key.is_some() && args.insecure {
@@ -708,7 +707,7 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
 }
 
 async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
     if args.key.is_some() && args.insecure {
@@ -760,7 +759,7 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
 
 #[allow(clippy::too_many_arguments)]
 async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let wasm = std::fs::read(args.filename.clone())
         .with_context(|| format!("Can not read {}", args.filename))?;
     let schema: psibase::Schema = serde_json::from_slice(
@@ -824,7 +823,7 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
 }
 
 async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let deduced_content_type = match &args.content_type {
         Some(t) => t.clone(),
         None => {
@@ -1045,7 +1044,7 @@ async fn get_package_registry(
 }
 
 async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let now_plus_120secs = Utc::now() + Duration::seconds(120);
     let expiration = TimePointSec::from(now_plus_120secs);
     let mut package_registry = JointRegistry::new();
@@ -1144,7 +1143,7 @@ fn normalize_upload_path(path: &Option<String>) -> String {
 }
 
 async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
     let normalized_dest = normalize_upload_path(&args.dest);
 
     let mut actions = Vec::new();
@@ -1200,7 +1199,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
 }
 
 async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut client = build_client(&args.node_args.proxy).await?;
 
     // Read package metadata and determine which packages are already published
     let mut query_existing = "query {".to_string();
@@ -1610,7 +1609,7 @@ async fn do_install<T: Read + Seek>(
 }
 
 async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut client = build_client(&args.node_args.proxy).await?;
     let installed = if args.local {
         PackageList::local_installed(&args.node_args.api, &mut client).await?
     } else {
@@ -1823,7 +1822,7 @@ async fn do_install_local<T: Read + Seek>(
 }
 
 async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut client = build_client(&args.node_args.proxy).await?;
     let installed = if args.local {
         PackageList::local_installed(&args.node_args.api, &mut client).await?
     } else {
@@ -1882,7 +1881,7 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
 }
 
 async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut client = build_client(&args.node_args.proxy).await?;
     // Resolve selection shortcuts
     if args.all || (!args.installed && !args.available && !args.updates) {
         args.installed = true;
@@ -1937,7 +1936,7 @@ async fn list(mut args: ListArgs) -> Result<(), anyhow::Error> {
 }
 
 async fn search(args: &SearchArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut client = build_client(&args.node_args.proxy).await?;
     let mut compiled = vec![];
     for pattern in &args.patterns {
         compiled.push(Regex::new(&("(?i)".to_string() + pattern))?);
@@ -2123,7 +2122,7 @@ fn handle_unbooted<T: Default>(list: Result<T, anyhow::Error>) -> Result<T, anyh
 }
 
 async fn package_info(args: &InfoArgs) -> Result<(), anyhow::Error> {
-    let (mut client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let mut client = build_client(&args.node_args.proxy).await?;
     let mut installed =
         handle_unbooted(PackageList::installed(&args.node_args.api, &mut client).await)?;
     if let Ok(local) = PackageList::local_installed(&args.node_args.api, &mut client).await {
@@ -2188,7 +2187,7 @@ struct LoginReply {
 }
 
 async fn handle_login(args: &LoginArgs) -> Result<(), anyhow::Error> {
-    let (client, _proxy) = build_client(&args.node_args.proxy).await?;
+    let client = build_client(&args.node_args.proxy).await?;
 
     let root_host = args
         .node_args
@@ -2330,20 +2329,20 @@ fn parse_args() -> Result<BasicArgs, anyhow::Error> {
 }
 
 struct LocalhostResolver {
-    resolver: hyper::client::connect::dns::GaiResolver,
+    resolver: hyper_util::client::legacy::connect::dns::GaiResolver,
 }
 
 impl LocalhostResolver {
     fn new() -> LocalhostResolver {
         LocalhostResolver {
-            resolver: hyper::client::connect::dns::GaiResolver::new(),
+            resolver: hyper_util::client::legacy::connect::dns::GaiResolver::new(),
         }
     }
 }
 
 async fn forward_resolve(
-    mut resolver: hyper::client::connect::dns::GaiResolver,
-    mut name: hyper::client::connect::dns::Name,
+    mut resolver: hyper_util::client::legacy::connect::dns::GaiResolver,
+    mut name: hyper_util::client::legacy::connect::dns::Name,
 ) -> Result<reqwest::dns::Addrs, Box<dyn core::error::Error + Send + Sync>> {
     if name.as_str().ends_with(".localhost") {
         name = "localhost".parse().map_err(|err| Box::new(err))?
@@ -2355,22 +2354,20 @@ async fn forward_resolve(
 }
 
 impl reqwest::dns::Resolve for LocalhostResolver {
-    fn resolve(&self, name: hyper::client::connect::dns::Name) -> reqwest::dns::Resolving {
-        Box::pin(forward_resolve(self.resolver.clone(), name))
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        Box::pin(forward_resolve(
+            self.resolver.clone(),
+            name.as_str().parse().unwrap(),
+        ))
     }
 }
 
-async fn build_client(
-    proxy: &Option<Url>,
-) -> Result<(reqwest::Client, Option<AutoAbort>), anyhow::Error> {
-    let (builder, result) = apply_proxy(reqwest::Client::builder(), proxy).await?;
-    Ok((
-        builder
-            .gzip(true)
-            .dns_resolver(Arc::new(LocalhostResolver::new()))
-            .build()?,
-        result,
-    ))
+async fn build_client(proxy: &Option<Url>) -> Result<reqwest::Client, anyhow::Error> {
+    let builder = apply_proxy(reqwest::Client::builder(), proxy)?;
+    Ok(builder
+        .gzip(true)
+        .dns_resolver(Arc::new(LocalhostResolver::new()))
+        .build()?)
 }
 
 pub fn parse_api_endpoint(api_str: &str) -> Result<Url, anyhow::Error> {
