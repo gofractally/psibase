@@ -184,6 +184,7 @@ async function loadWasmComponent(
         tlaCompat: false,
         validLiftingOptimization: false,
         noNamespacedExports: true,
+        tracing: false,
     };
 
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
