@@ -20,6 +20,7 @@ interface admin {
 
 world impl {
     include host:common/imports;
+    include host:db/imports;
     include supervisor:bridge/imports;
 
     export admin;

@@ -63,6 +63,7 @@ exclude = [
     "Host/plugin/auth",
     "Host/plugin/crypto",
     "Host/plugin/common",
+    "Host/plugin/db",
     "Host/plugin/prompt",
     "Host/plugin/types",
     "Invite/plugin",

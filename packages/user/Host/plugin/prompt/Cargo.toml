@@ -21,5 +21,6 @@ world = "impl"
 
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../common/wit/world.wit" }
+"host:db" = { path = "../db/wit/world.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
 "supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }

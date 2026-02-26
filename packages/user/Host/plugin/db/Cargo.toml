@@ -1,24 +1,24 @@
 [package]
-name = "host-auth"
+name = "host-db"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 wit-bindgen-rt.workspace = true
 psibase.workspace = true
+regex = "1.0"
 psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "host:auth"
+package = "host:db"
 
 [package.metadata.component.target]
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"transact:plugin" = { path = "../../../../system/Transact/plugin/wit/world.wit" }
-"host:common" = { path = "../common/wit/world.wit" }
-"host:db" = { path = "../db/wit/world.wit" }
+"supervisor:bridge" = { path = "./wit/deps/supervisor.wit" }
 "host:types" = { path = "../types/wit/world.wit" }
+"host:common" = { path = "../common/wit/world.wit" }

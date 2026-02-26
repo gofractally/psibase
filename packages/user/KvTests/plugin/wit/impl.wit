@@ -17,7 +17,7 @@ interface tests {
 }
 
 world impl {
-    include host:common/imports;
+    include host:db/imports;
     include setcode:plugin/imports;
     include chainmail:plugin/imports;
 

@@ -15,6 +15,7 @@ members = [
     "user/Host/plugin/auth",
     "user/Host/plugin/crypto",
     "user/Host/plugin/common",
+    "user/Host/plugin/db",
     "user/Host/plugin/prompt",
     "user/Host/plugin/types",
     "user/Invite/plugin",

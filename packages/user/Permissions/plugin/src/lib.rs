@@ -17,8 +17,8 @@ use psibase::fracpack::{Pack, Unpack};
 use host::common::{
     client as HostClient,
     client::{get_active_app, get_receiver, get_sender},
-    store::StorageDuration,
 };
+use host::db::store::StorageDuration;
 use host::prompt::api as HostPrompt;
 use host::types::types::Error;
 

@@ -19,7 +19,7 @@ package = "kvtests:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
+"host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
 "chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }

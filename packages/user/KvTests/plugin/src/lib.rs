@@ -3,7 +3,7 @@ mod bindings;
 
 use bindings::chainmail::plugin as chainmail;
 use bindings::exports::kvtests::plugin::tests::Guest as Tests;
-use bindings::host::common::store::{self as KvStore, Database, DbMode, StorageDuration};
+use bindings::host::db::store::{self as KvStore, Database, DbMode, StorageDuration};
 use bindings::host::types::types::{Error, PluginId};
 use bindings::setcode::plugin as setcode;
 

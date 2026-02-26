@@ -4,16 +4,12 @@ use bindings::*;
 
 mod helpers;
 use helpers::*;
-mod bucket;
 
 mod types;
 
 use bindings::host::auth::api as HostAuth;
 use exports::host::common::{
-    admin::Guest as Admin,
-    client::Guest as Client,
-    server::Guest as Server,
-    store::{DbMode, Guest as Store},
+    admin::Guest as Admin, client::Guest as Client, server::Guest as Server,
 };
 use helpers::make_error;
 use host::types::types::{BodyTypes, Error, PostRequest};
@@ -189,36 +185,6 @@ impl Client for HostCommon {
         let stack = get_callstack();
         assert!(stack.len() > 0);
         stack.into_iter().next().unwrap()
-    }
-}
-
-impl Store for HostCommon {
-    type Bucket = bucket::Bucket;
-
-    fn clear_buffers() {
-        use crate::bucket::host_buffer;
-
-        check_caller(&["transact"], "clear-buffers@host:common/store");
-        host_buffer::clear_all();
-    }
-
-    fn flush_transactional_data() {
-        use crate::bucket::host_buffer;
-        use crate::supervisor::bridge::database as HostDb;
-
-        check_caller(&["transact"], "flush@host:common/store");
-
-        let buffer_data = host_buffer::drain_all(DbMode::Transactional);
-
-        for (db, entries) in buffer_data {
-            for (key, op) in entries {
-                if let Some(value) = op.0 {
-                    HostDb::set(db.duration as u8, &key, &value);
-                } else {
-                    HostDb::remove(db.duration as u8, &key);
-                }
-            }
-        }
     }
 }
 

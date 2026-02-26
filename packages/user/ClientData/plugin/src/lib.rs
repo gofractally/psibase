@@ -3,9 +3,8 @@ mod bindings;
 use bindings::*;
 
 use exports::clientdata::plugin::keyvalue::Guest as KeyValue;
-use host::common::{
-    client::get_sender, store as KvStore, store::Database, store::DbMode, store::StorageDuration,
-};
+use host::common::client::get_sender;
+use host::db::{store as KvStore, store::Database, store::DbMode, store::StorageDuration};
 
 struct ClientData;
 

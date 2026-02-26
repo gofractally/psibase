@@ -11,11 +11,8 @@ use psibase::fracpack::{Pack, Unpack};
 
 use crate::bindings::{
     host::{
-        common::{
-            admin as HostAdmin,
-            store::Bucket,
-            store::{Database, DbMode, StorageDuration},
-        },
+        common::admin as HostAdmin,
+        db::store::{Bucket, Database, DbMode, StorageDuration},
         types::types::{BodyTypes, Error, PostRequest},
     },
     transact::plugin::auth as Transact,

@@ -1,7 +1,7 @@
 use crate::{
     bindings::exports::permissions::plugin::api::TrustLevel,
     host::common::client::get_active_app,
-    host::common::store::{DbMode::*, StorageDuration::*, *},
+    host::db::store::{DbMode::*, StorageDuration::*, *},
 };
 use psibase::fracpack::{Pack, Unpack};
 
