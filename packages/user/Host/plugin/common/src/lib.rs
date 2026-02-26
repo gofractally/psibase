@@ -25,6 +25,15 @@ use url::Url;
 
 struct HostCommon;
 
+fn get_auth_token() -> Option<String> {
+    let current_user = accounts::plugin::api::get_current_user();
+    if current_user.is_some() {
+        HostAuth::get_active_query_token(&HostCommon::get_active_app(), &current_user.unwrap())
+    } else {
+        None
+    }
+}
+
 fn do_post_internal(
     app: String,
     endpoint: String,
@@ -32,7 +41,8 @@ fn do_post_internal(
     with_credentials: bool,
 ) -> Result<HttpResponse, Error> {
     let (ty, content) = content.get_content();
-    let auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
+
+    let auth_token = get_auth_token();
     let headers = if auth_token.is_none() {
         make_headers(&[("Content-Type", &ty)])
     } else {
@@ -67,7 +77,7 @@ fn do_post_with_credentials(
 }
 
 fn do_get(app: String, endpoint: String) -> Result<HttpResponse, Error> {
-    let auth_token = HostAuth::get_active_query_token(&HostCommon::get_active_app());
+    let auth_token = get_auth_token();
     let headers = if auth_token.is_none() {
         make_headers(&[("Accept", "application/json")])
     } else {
