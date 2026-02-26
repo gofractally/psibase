@@ -102,6 +102,9 @@ EOF
 direnv allow
 ```
 
+#### 2.4 extensions
+Copy nix/docs/extensions.json.example to .vscode/extensions.json to pick up the standard dev extensions.
+
 ### 3. Verify environment (optional)
 
 ```bash
