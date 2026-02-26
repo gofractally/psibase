@@ -185,18 +185,19 @@ namespace psibase
       Dir* current = &root;
       for (auto range : mountpath | std::views::split('/'))
       {
-         std::string item(&*range.begin(), static_cast<std::size_t>(std::ranges::distance(range)));
+         std::string_view item(&*range.begin(),
+                               static_cast<std::size_t>(std::ranges::distance(range)));
          if (!item.empty())
          {
             if (item == "." || item == "..")
                abortMessage("Mounted path must not contain . or ..");
-            auto [pos, inserted] = current->children.try_emplace(std::move(item));
+            auto [pos, inserted] = current->children.try_emplace(std::string(item));
             if (inserted)
             {
                pos->second.parent = current;
                if (!current->hostPath.empty())
                {
-                  pos->second.hostPath = current->hostPath + item + '/';
+                  pos->second.hostPath = current->hostPath + std::string(item) + '/';
                }
             }
             current = &pos->second;
@@ -209,6 +210,7 @@ namespace psibase
       current->hostPath     = std::move(hostpath);
       std::vector<Dir*> stack;
       stack.push_back(current);
+      while (!stack.empty())
       {
          auto parent = stack.back();
          stack.pop_back();

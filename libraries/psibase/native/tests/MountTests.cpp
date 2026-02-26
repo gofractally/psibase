@@ -197,3 +197,23 @@ TEST_CASE("Absolute symlink in nested mount")
       CHECK(readFile(mount.open("/root/link/three/four")) == "4");
    }
 }
+
+TEST_CASE("Nested mount with branch")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one" / "two" / "three" / "four", "4");
+   writeFile(dir.path / "five" / "six", "6");
+   Mount mount;
+   SECTION("root first")
+   {
+      mount.mount((dir.path / "one").string(), "/");
+      mount.mount((dir.path / "five").string(), "/two/three/five");
+   }
+   SECTION("nested first")
+   {
+      mount.mount((dir.path / "five").string(), "/two/three/five");
+      mount.mount((dir.path / "one").string(), "/");
+   }
+   CHECK(readFile(mount.open("/two/three/four")) == "4");
+   CHECK(readFile(mount.open("/two/three/five/six")) == "6");
+}
