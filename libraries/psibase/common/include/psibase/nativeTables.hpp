@@ -266,7 +266,7 @@ namespace psibase
 
    struct LogMessage
    {
-      enum class Severity
+      enum class Severity : std::uint32_t
       {
          debug,
          info,

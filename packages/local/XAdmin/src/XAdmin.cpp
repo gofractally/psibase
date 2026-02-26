@@ -591,10 +591,7 @@ namespace LocalService
       recurse().to<XPeers>().onConfig();
       if (setupMessage)
       {
-         socketSend(SocketRow::log,
-                    psio::to_frac(LogMessage{.message  = std::move(*setupMessage),
-                                             .severity = LogMessage::Severity::notice,
-                                             .service  = XAdmin::service}));
+         to<XHttp>().log(LogMessage::Severity::notice, std::move(*setupMessage));
       }
    }
 
