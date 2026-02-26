@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 import { TokenId } from "@/lib/zod/TokenId";
 
 import { updateUserTokenBalancesCache } from "./use-user-token-balances";

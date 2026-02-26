@@ -17,9 +17,9 @@ use crate::services::tokens::{Precision, TokensError};
     Deserialize,
     SimpleObject,
     InputObject,
+    Ord,
     PartialOrd,
     PartialEq,
-    Ord,
     Eq,
 )]
 #[fracpack(fracpack_mod = "fracpack")]

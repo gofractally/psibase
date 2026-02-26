@@ -64,7 +64,7 @@ export const TokensLayout = () => {
 
     return (
         <div className="p-4">
-            <div className="mx-auto max-w-screen-md">
+            <div className="mx-auto max-w-3xl">
                 {isNoTokens ? (
                     <NoTokensWarning />
                 ) : (
