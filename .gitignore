@@ -41,3 +41,5 @@ target/
 **/install-state.gz
 .clangd
 AGENTS.md
+
+nix/.workspace-bootstrapped

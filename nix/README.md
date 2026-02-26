@@ -53,7 +53,7 @@ nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
 Then `sudo nixos-rebuild switch`.
 
-### Install direnv (optional)
+### Install direnv (Recommended but optional)
 
 - **Ubuntu/Debian**: `sudo apt install direnv` then add `eval "$(direnv hook bash)"` to `~/.bashrc`
 - **Fedora/RHEL**: `sudo dnf install direnv` and same hook in `~/.bashrc`
@@ -70,13 +70,36 @@ From the **psibase** repo root:
 nix develop
 ```
 
-### 2. One-time: install cargo tools
+### 2. One-time Setup
 
+#### 2.1 Setup cargo things
 Inside the `nix develop` shell:
 
 ```bash
 # Installs cargo-component, cargo-generate, and cargo-edit (pinned for Rust 1.86.0) into `$CARGO_INSTALL_ROOT`.
 ./nix/scripts/setup_prereqs.sh
+```
+
+#### 2.2 Run .vscode/setup_env.sh
+This will ensure your build and dev envs can find everything they need
+
+#### 2.3 Initializing/Configuring the Environment (using direnv,
+which activates the environment automatically when you `cd` into the repo)
+
+From the psibase repo root:
+
+```bash
+cat >> .vscode/.envrc <<'EOF'
+# launch nix env via flake
+use flake .
+# set IP for Launch/Continue scripts
+HOST_IP=127.0.0.1
+# git credentials configured in .git/config
+#[credential]
+#    helper = 
+#    helper = store --file=/home/mike/.git-credentials-work
+EOF
+direnv allow
 ```
 
 ### 3. Verify environment (optional)
@@ -89,8 +112,8 @@ Checks compilers, Rust, Node, WASI SDK, ICU paths, and cargo tools.
 All should be green checkmarks. Yellow warnings are likely OK, but rare. Red Xs mean something's wrong.
 
 ### 4. Build psibase
-
-Clean build required on first run (or after shell changes):
+#### Clean build required on first run (or after shell changes):
+You should, at this point, see the standard tasks.json buttons. Manually wipe your build dir, then click the Build button (manual steps below)
 
 ```bash
 rm -rf build && mkdir build && cd build
@@ -98,25 +121,17 @@ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=psidk ..
 cmake --build . -j$(nproc)
 ```
 
-## Using direnv
-(which activates the environment automatically when you `cd` into the repo)
+### 5. Launch a chain
+#### Launch
+You should, at this point, see the standard tasks.json buttons. Press Launch to launch a change (manual hacky command below).
 
-From the psibase repo root:
-
-```bash
-echo 'use flake .' > .envrc
-direnv allow
-```
-
-## Launch a chain
-### Launch
 Within the nix shell, replace the PROJECT_ROOT below with your repo root path:
 ```bash
 PROJECT_ROOT="/home/mike/repos/fractally/psibase" PSIBASE_ADMIN_IP=127.0.0.1 psinode "$PROJECT_ROOT/db" -p myprod -l 7777
 ```
 
-### Boot
-Use the provided x-admin link and boot with the UI.
+#### Boot
+Boot as you normally would from the cli or use the provided x-admin link and boot with the UI.
 
 ## Optional: HTTPS and SoftHSM
 SKIP if you're doing a quick build and http test.
@@ -152,6 +167,7 @@ Recommended extensions: clangd, rust-analyzer, wit-idl, ESLint, Prettier, direnv
 ## Updating the environment
 
 ```bash
+# NOTE: the cargo/rust versions we needed to pin are pineed; so you can update freely without worrying about those.
 nix flake update
 nix develop
 ```
