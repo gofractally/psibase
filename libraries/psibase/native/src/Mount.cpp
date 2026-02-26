@@ -202,7 +202,9 @@ namespace psibase
             current = &pos->second;
          }
       }
-      mountpoints.push_back(current);
+      auto pos = std::ranges::partition_point(
+          mountpoints, [&](Dir* d) { return d->hostPath.size() > hostpath.size(); });
+      mountpoints.insert(pos, current);
       current->isMountpoint = true;
       current->hostPath     = std::move(hostpath);
       std::vector<Dir*> stack;

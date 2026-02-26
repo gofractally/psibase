@@ -174,3 +174,26 @@ TEST_CASE("Symlink loop")
    mount.mount(dir.path.string(), "/");
    CHECK_THROWS_AS(mount.open("/loop/one"), std::system_error);
 }
+
+TEST_CASE("Absolute symlink in nested mount")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one" / "two", "2");
+   writeFile(dir.path / "three" / "four", "4");
+   std::filesystem::create_directory_symlink(dir.path / "one", dir.path / "link");
+   Mount mount;
+   SECTION("root first")
+   {
+      mount.mount(dir.path.string(), "/root");
+      mount.mount((dir.path / "one").string(), "/one");
+      mount.mount((dir.path / "three").string(), "/one/three");
+      CHECK(readFile(mount.open("/root/link/three/four")) == "4");
+   }
+   SECTION("nested first")
+   {
+      mount.mount((dir.path / "one").string(), "/one");
+      mount.mount((dir.path / "three").string(), "/one/three");
+      mount.mount(dir.path.string(), "/root");
+      CHECK(readFile(mount.open("/root/link/three/four")) == "4");
+   }
+}
