@@ -5,7 +5,8 @@ import QueryKey from "@shared/lib/query-keys";
 
 export interface SystemTokenInfo {
     id: string;
-    symbol?: string;
+    /** Display label: token symbol, or "ID: {id}" when no symbol is set */
+    symbol: string;
 }
 
 interface ConfigResponse {
@@ -17,16 +18,17 @@ interface ConfigResponse {
 interface TokenResponse {
     token: {
         id: string;
-        symbol?: {
-            symbolId: string;
-        } | null;
+        /** Symbol is the account name (symbol id) returned by the Tokens GraphQL API */
+        symbol?: string | null;
     } | null;
 }
 
+const NO_SYSTEM_TOKEN: SystemTokenInfo = { id: "", symbol: "" };
+
 export const useSystemToken = () => {
-    return useQuery<SystemTokenInfo | null>({
+    return useQuery<SystemTokenInfo>({
         queryKey: QueryKey.systemToken(),
-        queryFn: async () => {
+        queryFn: async (): Promise<SystemTokenInfo> => {
             try {
                 const configQuery = `
                     query {
@@ -41,7 +43,7 @@ export const useSystemToken = () => {
                 });
 
                 if (!configRes.config?.sysTid) {
-                    return null;
+                    return NO_SYSTEM_TOKEN;
                 }
 
                 const sysTid = configRes.config.sysTid;
@@ -59,16 +61,20 @@ export const useSystemToken = () => {
                 });
 
                 if (!tokenRes.token) {
-                    return null;
+                    return NO_SYSTEM_TOKEN;
                 }
 
+                const idStr = tokenRes.token.id.toString();
+                const symbol =
+                    tokenRes.token.symbol?.trim() ?? `ID: ${idStr}`;
+
                 return {
-                    id: tokenRes.token.id.toString(),
-                    symbol: tokenRes.token.symbol?.symbolId || "$SYS",
+                    id: idStr,
+                    symbol,
                 };
             } catch (error) {
                 console.error("Error fetching system token:", error);
-                return null;
+                return NO_SYSTEM_TOKEN;
             }
         },
     });

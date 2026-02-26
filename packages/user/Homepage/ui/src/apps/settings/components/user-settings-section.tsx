@@ -34,7 +34,7 @@ export const UserSettingsSection = () => {
         isPending: isResizingAndFilling,
     } = useResizeAndFillGasTank();
 
-    const tokenSymbol = systemToken?.symbol || "$SYS";
+    const tokenSymbol = systemToken?.symbol;
 
     const fillPercentage = useMemo(() => {
         if (!userResources || userResources.bufferCapacity === 0) {
@@ -88,7 +88,7 @@ export const UserSettingsSection = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold mb-2">Settings</h2>
+                <h2 className="text-2xl font-bold mb-2">Resources</h2>
             </div>
 
             <div className="flex items-stretch gap-6">
