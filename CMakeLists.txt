@@ -391,7 +391,7 @@ psibase_package(
     NAME Kvtests
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "KvStore tests"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE kvtests
         DATA ${Plugins_OUTPUT_FILE_kvtests} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -1143,7 +1143,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
@@ -1180,6 +1180,7 @@ install(
           ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Kdf.psi
+          ${SERVICE_DIR}/Kvtests.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi
