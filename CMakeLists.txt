@@ -276,6 +276,7 @@ add_rs_component_workspace(packages/:Plugins
     auth-sig
     base64
     kdf
+    kvtests
     setcode
     clientdata
     invite
@@ -382,6 +383,17 @@ psibase_package(
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE kdf
         DATA ${Plugins_OUTPUT_FILE_kdf} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Kvtests.psi
+    NAME Kvtests
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "KvStore tests"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)"
+    SERVICE kvtests
+        DATA ${Plugins_OUTPUT_FILE_kvtests} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
 

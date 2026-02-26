@@ -68,6 +68,7 @@ exclude = [
     "Invite/plugin",
     "Invite/plugin_AuthInvite",
     "Kdf/plugin",
+    "KvTests/plugin",
     "Sites/plugin",
     "Packages/plugin",
     "Permissions/plugin",

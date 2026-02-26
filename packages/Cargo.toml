@@ -19,6 +19,7 @@ members = [
     "user/Host/plugin/types",
     "user/Invite/plugin",
     "user/Kdf/plugin",
+    "user/KvTests/plugin",
     "user/Packages/plugin",
     "user/Permissions/plugin",
     "user/Sites/plugin",
