@@ -29,6 +29,7 @@ vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
 .envrc
+nix/.nix-develop-bashrc
 psinode_db
 psinode_db_secure
 /db

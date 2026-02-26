@@ -158,6 +158,10 @@
           mdbook-mermaid
           mdbook-linkcheck
           cacert
+          # Shell and editor UX in nix develop
+          vim
+          bashInteractive
+          bash-completion
         ];
 
         linuxPackages = with pkgs; [
@@ -199,6 +203,9 @@
           CMAKE_SYSTEM_IGNORE_PATH = "/usr/lib:/usr/lib64";
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
 
+          EDITOR = "vim";
+          VISUAL = "vim";
+
           shellHook = ''
             export NIX_SHELL_DEPTH=$(("''${NIX_SHELL_DEPTH:-0}" + 1))
             export IN_NIX_SHELL=1
@@ -237,8 +244,11 @@
               PSIBASE_ROOT="$(pwd)"
             fi
             export PSIBASE_ROOT
-            if [ -d "$PSIBASE_ROOT/build" ]; then
-              export PATH="$PSIBASE_ROOT/build:$PATH"
+            if [ -d "$PSIBASE_ROOT/build/psidk/bin" ]; then
+              export PATH="$PSIBASE_ROOT/build/psidk/bin:$PATH"
+            fi
+            if [ -d "$PSIBASE_ROOT/build/rust/release" ]; then
+              export PATH="$PSIBASE_ROOT/build/rust/release:$PATH"
             fi
 
             export CCACHE_DIR="''${CCACHE_DIR:-$HOME/.cache/ccache}"
@@ -252,8 +262,25 @@
             }
             export PS1="\[\033[01;32m\]psibase-nix\[\033[00m\]:\[\033[01;34m\]\w\[\033[32m\]\$(parse_git_branch)\[\033[00m\]\$ "
 
-            if [ -n "$BASH_VERSION" ] && command -v direnv &> /dev/null; then
-              eval "$(direnv hook bash)"
+            if [ -n "$BASH_VERSION" ]; then
+              set -o vi
+              if [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]]; then
+                source ${pkgs.bash-completion}/share/bash-completion/bash_completion
+              fi
+              # Init file for inner bash (e.g. Cursor terminal) so vi mode and completions
+              # are applied even when bash is started with custom args.
+              _nix_bash_init="$PSIBASE_ROOT/nix/.nix-develop-bashrc"
+              if [[ -d "$PSIBASE_ROOT/nix" ]] && [[ -w "$PSIBASE_ROOT/nix" ]]; then
+                cat > "$_nix_bash_init" << 'NIX_BASH_INIT_EOF'
+            set -o vi
+            [[ -r __BASH_COMPLETION__ ]] && source __BASH_COMPLETION__
+            [[ -f "$HOME/.bashrc" ]] && . "$HOME/.bashrc"
+            NIX_BASH_INIT_EOF
+                sed -i "s|__BASH_COMPLETION__|${pkgs.bash-completion}/share/bash-completion/bash_completion|g" "$_nix_bash_init"
+              fi
+              if command -v direnv &> /dev/null; then
+                eval "$(direnv hook bash)"
+              fi
             fi
 
             export CARGO_INSTALL_ROOT="$HOME/.cache/psibase-nix-cargo"
