@@ -72,7 +72,14 @@ auto createInvite = [](auto& user, const auto& pubKey)
 {
    Checksum256 fingerprint     = psibase::sha256(pubKey.data.data(), pubKey.data.size());
    auto        fingerprint_vec = std::vector<uint8_t>{fingerprint.begin(), fingerprint.end()};
-   return user.createInvite(++inviteId, fingerprint_vec, 1, false, "", 0);
+   auto        payload         = InvPayload{
+                      .fingerprint = fingerprint_vec,
+                      .secret      = "",
+   };
+   auto                 packed = psio::to_frac(payload);
+   std::vector<uint8_t> packed_payload(packed.begin(), packed.end());
+
+   return user.createInvite(++inviteId, packed_payload, 1, false, 0);
 };
 
 // - Auth

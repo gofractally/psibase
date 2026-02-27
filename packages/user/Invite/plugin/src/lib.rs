@@ -18,7 +18,6 @@ use db::*;
 
 use aes::plugin as aes;
 use base64::plugin as base64;
-use bindings::invite::plugin::types::NewInviteDetails;
 use credentials::plugin::api as Credentials;
 use exports::{
     invite::{self},
@@ -34,7 +33,7 @@ use psibase::define_trust;
 use psibase::{
     fracpack::Pack,
     services::credentials::CREDENTIAL_SENDER,
-    services::invite::{self as InviteService, action_structs::*},
+    services::invite::{self as InviteService, action_structs::*, InvPayload},
     services::tokens::{Decimal, Quantity},
 };
 use rand::{rngs::OsRng, Rng, TryRngCore};
@@ -202,18 +201,18 @@ impl Inviter for InvitePlugin {
             trust::FunctionName::generate_invite,
             vec!["homepage".into()],
         )?;
-        let (invite_token, details, min_cost) = Self::prepare_new_invite(1, get_receiver())?;
+        let (invite_token, invite_id, payload, min_cost) =
+            Self::prepare_new_invite(1, get_receiver())?;
 
         let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
 
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
             &createInvite {
-                inviteId: details.invite_id,
-                fingerprint: details.fingerprint,
+                inviteId: invite_id,
+                payload,
                 numAccounts: 1,
                 useHooks: false,
-                secret: details.encrypted_secret,
                 resources: Quantity::from(min_cost_u64),
             }
             .packed(),
@@ -225,7 +224,7 @@ impl Inviter for InvitePlugin {
     fn prepare_new_invite(
         num_accounts: u16,
         service_name: String,
-    ) -> Result<(String, NewInviteDetails, String), HostTypes::Error> {
+    ) -> Result<(String, u32, Vec<u8>, String), HostTypes::Error> {
         assert_authorized(trust::FunctionName::prepare_new_invite)?;
 
         let keypair = keyvault::generate_unmanaged_keypair()?;
@@ -250,15 +249,13 @@ impl Inviter for InvitePlugin {
             Tokens::user::credit(sys.unwrap(), &service_name, &min_cost, "Create an invite")?;
         }
 
-        Ok((
-            invite_token,
-            NewInviteDetails {
-                invite_id,
-                fingerprint,
-                encrypted_secret: secret,
-            },
-            min_cost,
-        ))
+        let payload = InvPayload {
+            fingerprint,
+            secret,
+        }
+        .packed();
+
+        Ok((invite_token, invite_id, payload, min_cost))
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {

@@ -425,14 +425,13 @@ impl UserGuild for FractallyPlugin {
         pre_attest: bool,
     ) -> Result<String, Error> {
         let fractal = get_guild(guild_account.clone())?.fractal.to_string();
-        let (invite_token, invite_details, _) =
+        let (invite_token, invite_id, invite_payload, _) =
             bindings::invite::plugin::inviter::prepare_new_invite(1, &fractal)?;
 
         let packed_args = fractals::action_structs::inv_g_member {
             guild: guild_account.as_str().into(),
-            finger_print: invite_details.fingerprint,
-            invite_id: invite_details.invite_id,
-            secret: invite_details.encrypted_secret,
+            invite_id,
+            invite_payload,
             pre_attest,
             num_accounts,
         }

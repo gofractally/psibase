@@ -30,6 +30,13 @@ pub struct InviteRecord {
     secret: String,
 }
 
+#[derive(Clone, Pack, Unpack)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct InvPayload {
+    pub fingerprint: Vec<u8>,
+    pub secret: String,
+}
+
 /// This interface should be implemented by a service that wants to handle hooks from the invite service
 /// to be notified when an event occurs related to an invite.
 #[crate::service(
@@ -81,11 +88,11 @@ mod service {
     ///
     /// Parameters:
     /// - `inviteId` is the id of the invite (could be randomly generated)
-    /// - `fingerprint` is the fingerprint of the invite public key
+    /// - `payload` is a packed payload containing various important invite data like the
+    ///             key fingerprint and an encrypted secret.
     /// - `numAccounts` is the number of accounts this invite can be used to create
     /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
     ///    the invite is updated
-    /// - `secret` is an encrypted secret used to redeem the invite
     /// - `resources` is the amount of resources stored in the invite (used when creating
     ///               new accounts). The caller must send this amount of system tokens to this
     ///               invite service before calling this action. Use the query interface to check
@@ -96,10 +103,9 @@ mod service {
     #[action]
     fn createInvite(
         inviteId: u32,
-        fingerprint: Vec<u8>,
+        payload: Vec<u8>,
         numAccounts: u16,
         useHooks: bool,
-        secret: String,
         resources: Quantity,
     ) -> u32 {
         unimplemented!()

@@ -13,22 +13,17 @@ interface types {
     }
 
     type url = string;
-
-    record new-invite-details {
-        invite-id: u32,
-        fingerprint: list<u8>,
-        encrypted-secret: string,
-    }
     type invite-token = string;
     type pubkey-der = list<u8>;
     type min-cost = string;
+    type payload = list<u8>;
 }
 
 
 /// Functionality exposed for the inviter
 interface inviter {
     use host:types/types.{error};
-    use types.{invite-token, new-invite-details, min-cost};
+    use types.{invite-token, min-cost, payload};
 
     /// Allows a user to generate an invite token that can be used to invite someone (with 
     /// or without a preexisting account) to an application.
@@ -54,12 +49,13 @@ interface inviter {
     ///
     /// Returns:
     /// * `invite-token` - should be kept private, can be used to accept the invite
-    /// * `new-invite-details` - Contains values that should be used when calling `create-invite`
-    ///   on the invite service in order to correctly correspond to the `invite-token`.
+    /// * `invite-id` - An id that must be used when calling create-invite
+    /// * `payload` - A packed payload containing various important invite data, must be passed through
+    ///               to the service when calling create-invite
     /// * `min-cost` - The minimum cost of creating the invite for the specified number of 
     ///                accounts. This amount (at minimum) must be credited to the invite service 
     ///                before creating the invite.
-    prepare-new-invite: func(num-accounts: u16, service-name: string) -> result<tuple<invite-token, new-invite-details, min-cost>, error>;
+    prepare-new-invite: func(num-accounts: u16, service-name: string) -> result<tuple<invite-token, u32, payload, min-cost>, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database.

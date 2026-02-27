@@ -43,7 +43,6 @@ namespace
          Actor<InviteHooks>{Invite::service, invite.inviter}.onInvAccept(invite.id, accepter);
       }
    }
-
 }  // namespace
 
 Invite::Invite(psio::shared_view_ptr<Action> action)
@@ -129,12 +128,15 @@ TID getSysToken()
 }
 
 uint32_t Invite::createInvite(uint32_t             inviteId,
-                              std::vector<uint8_t> fingerprint,
+                              std::vector<uint8_t> payload,
                               uint16_t             numAccounts,
                               bool                 useHooks,
-                              std::string          secret,
                               Quantity             resources)
 {
+   std::vector<char> payloadChars(payload.begin(), payload.end());
+   auto              invPayload  = psio::from_frac<InvPayload>(payloadChars);
+   auto              fingerprint = invPayload.fingerprint;
+
    auto sender    = getSender();
    auto isBilling = to<VirtualServer>().is_billing_enabled();
 
@@ -186,7 +188,7 @@ uint32_t Invite::createInvite(uint32_t             inviteId,
        .inviter     = sender,
        .numAccounts = numAccounts,
        .useHooks    = useHooks,
-       .secret      = secret,
+       .secret      = invPayload.secret,
    };
    inviteTable.put(invite);
 

@@ -14,6 +14,12 @@ namespace UserService
 {
    namespace InviteNs
    {
+      struct InvPayload
+      {
+         std::vector<uint8_t> fingerprint;
+         std::string          secret;
+      };
+      PSIO_REFLECT(InvPayload, fingerprint, secret);
 
       /// This interface should be implemented by a service that wants to handle hooks from the invite service
       /// to be notified when an event occurs related to an invite.
@@ -49,11 +55,11 @@ namespace UserService
          ///
          /// Parameters:
          /// - `inviteId` is the id of the invite (could be randomly generated)
-         /// - `fingerprint` is the fingerprint of the invite public key
+         /// - `payload` is a packed payload containing various important invite data like the
+         ///             key fingerprint and an encrypted secret.
          /// - `numAccounts` is the number of accounts this invite can be used to create
          /// - `useHooks` is a flag that indicates whether to use hooks to notify the caller when
          ///    the invite is updated
-         /// - `secret` is an encrypted secret used to redeem the invite
          /// - `resources` is the amount of resources stored in the invite (used when creating
          ///               new accounts). The caller must send this amount of system tokens to this
          ///               invite service before calling this action. Use the query interface to check
@@ -62,10 +68,9 @@ namespace UserService
          /// If `useHooks` is true, the caller must be an account with a service deployed on it
          /// that implements the InviteHooks interface.
          uint32_t createInvite(uint32_t              inviteId,
-                               std::vector<uint8_t>  fingerprint,
+                               std::vector<uint8_t>  payload,
                                uint16_t              numAccounts,
                                bool                  useHooks,
-                               std::string           secret,
                                UserService::Quantity resources);
 
          /// Called by an invite credential (not a user account) to create the specified
@@ -107,7 +112,7 @@ namespace UserService
       PSIO_REFLECT(Invite,
          method(init),
          method(getInvCost, numAccounts),
-         method(createInvite, inviteId, fingerprint, numAccounts, useHooks, secret, resources),
+         method(createInvite, inviteId, payload, numAccounts, useHooks, resources),
          method(createAccount, account, accountKey),
          method(accept, inviteId),
          method(delInvite, inviteId),
