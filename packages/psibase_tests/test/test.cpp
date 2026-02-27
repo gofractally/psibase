@@ -86,7 +86,7 @@ TEST_CASE("Tester socket cleanup")
    DefaultTestChain t;
    auto             reply  = t.asyncGet(Transact::service, "/stats");
    auto             len    = psio::convert_to_key(socketPrefix()).size();
-   auto             minKey = socketKey(1);
+   auto             minKey = socketKey(SocketRow::unreservedStart);
    auto             row1   = t.kvGreaterEqual<SocketRow>(DbId::nativeSession, minKey, len);
    REQUIRE(row1.has_value());
    reply.get();
