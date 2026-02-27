@@ -78,6 +78,9 @@ export const VirtualServer = () => {
     const serverSpecs = resources?.serverSpecs;
     const networkVariables = resources?.networkVariables;
     const cpuAvailableUnits = resources?.cpuAvailableUnits ?? 0;
+    const netAvailableUnits = resources?.netAvailableUnits ?? 0;
+    const cpuBillableUnit = resources?.cpuBillableUnit ?? 0;
+    const netBillableUnit = resources?.netBillableUnit ?? 0;
 
     // Compute initial values from fetched data
     const computedInitialValues = useMemo<VirtualServerFormData>(() => {
@@ -479,31 +482,19 @@ export const VirtualServer = () => {
                             return value * STORAGE_FACTORS[unit];
                         };
 
-                        // const getPerBlockSysCpuNs = (): number => {
-                        //     const value = parseFloat(formValues.perBlockSysCpu || "0");
-                        //     if (isNaN(value)) return 0;
-                        //     const unit = (formValues.perBlockSysCpuUnit || "ns") as TimeUnit;
-                        //     return value * TIME_FACTORS[unit];
-                        // };
-
-                        // const getBlockReplayFactor = (): number => {
-                        //     return parseFloat(formValues.blockReplayFactor || "0") || 0;
-                        // };
-
+                        
                         // Calculate derived values (in base units)
                         const storageBytes = getStorageBytes();
                         const objStorageBytes = getObjStorageBytes();
-                        // const perBlockSysCpuNs = getPerBlockSysCpuNs();
-                        // const blockReplayFactor = getBlockReplayFactor();
 
                         // Server-derived values (not form state); display only
-                        // Bandwidth: server net capacity in Gbps (netBps / 1e9)
-                        const netGbps =
-                            serverSpecs != null
-                                ? serverSpecs.netBps / 1_000_000_000
-                                : 0;
-                        const cpuForTxNs = cpuAvailableUnits;
-                        const cpuForTxDisplay = getBestTimeUnit(cpuForTxNs);
+                        // CPU / Bandwidth capacity are derived from pricing:
+                        //   capacity = availableUnits * billableUnit
+                        const cpuCapacityNs = cpuAvailableUnits * cpuBillableUnit;
+                        const cpuForTxDisplay = getBestTimeUnit(cpuCapacityNs);
+
+                        const netCapacityBps = netAvailableUnits * netBillableUnit;
+                        const netGbps = netCapacityBps / 1_000_000_000;
 
                         const objStorageDisplay = getBestStorageUnit(objStorageBytes);
                         const subjectiveStorageBytes = Math.max(0, storageBytes - objStorageBytes);

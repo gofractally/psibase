@@ -20,10 +20,12 @@ const zNetworkVariables = z.object({
 
 const zCpuPricing = z.object({
     availableUnits: z.number(),
+    billableUnit: z.number(),
 });
 
 const zNetPricing = z.object({
     availableUnits: z.number(),
+    billableUnit: z.number(),
 });
 
 const zResourcesResponse = z.object({
@@ -41,6 +43,8 @@ export interface VirtualServerResources {
     networkVariables: NetworkVariables;
     cpuAvailableUnits: number;
     netAvailableUnits: number;
+    cpuBillableUnit: number;
+    netBillableUnit: number;
 }
 
 export const useVirtualServerResources = () => {
@@ -61,9 +65,11 @@ export const useVirtualServerResources = () => {
                     }
                     networkPricing {
                         availableUnits
+                        billableUnit
                     }
                     cpuPricing {
                         availableUnits
+                        billableUnit
                     }
                 }
             `;
@@ -78,6 +84,8 @@ export const useVirtualServerResources = () => {
                 networkVariables: parsed.getNetworkVariables,
                 cpuAvailableUnits: parsed.cpuPricing?.availableUnits ?? 0,
                 netAvailableUnits: parsed.networkPricing?.availableUnits ?? 0,
+                cpuBillableUnit: parsed.cpuPricing?.billableUnit ?? 0,
+                netBillableUnit: parsed.networkPricing?.billableUnit ?? 0,
             };
         },
     });
