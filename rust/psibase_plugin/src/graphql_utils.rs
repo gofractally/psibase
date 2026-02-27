@@ -48,6 +48,15 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
     result
 }
 
+fn is_valid_graphql_name(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c == '_' || c.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    chars.all(|c| c == '_' || c.is_ascii_alphanumeric())
+}
+
 fn json_to_graphql_literal(value: &Value) -> String {
     match value {
         Value::String(s) => {
@@ -69,7 +78,12 @@ fn json_to_graphql_literal(value: &Value) -> String {
         Value::Object(obj) => {
             let fields: Vec<String> = obj
                 .iter()
-                .map(|(k, v)| format!("{}: {}", k, json_to_graphql_literal(v)))
+                .map(|(k, v)| {
+                    if !is_valid_graphql_name(k) {
+                        panic!("invalid GraphQL object key \"{k}\": keys must be valid GraphQL Names (e.g. [_A-Za-z][_0-9A-Za-z]*)");
+                    }
+                    format!("{}: {}", k, json_to_graphql_literal(v))
+                })
                 .collect();
             format!("{{{}}}", fields.join(", "))
         }
@@ -78,8 +92,21 @@ fn json_to_graphql_literal(value: &Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{inline_variables, json_to_graphql_literal};
+    use super::{inline_variables, is_valid_graphql_name, json_to_graphql_literal};
     use serde_json::Value;
+
+    #[test]
+    fn test_is_valid_graphql_name() {
+        assert!(is_valid_graphql_name("a"));
+        assert!(is_valid_graphql_name("_"));
+        assert!(is_valid_graphql_name("abc"));
+        assert!(is_valid_graphql_name("_foo"));
+        assert!(is_valid_graphql_name("foo_bar"));
+        assert!(is_valid_graphql_name("a1"));
+        assert!(!is_valid_graphql_name(""));
+        assert!(!is_valid_graphql_name("1abc"));
+        assert!(!is_valid_graphql_name("foo-bar"));
+    }
 
     #[test]
     fn test_json_to_graphql_literal_string() {
