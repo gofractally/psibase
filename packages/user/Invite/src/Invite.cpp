@@ -267,7 +267,7 @@ void Invite::accept(uint32_t inviteId)
    hookOnInvAccept(*invite, accepter);
 }
 
-void Invite::delInvite(uint32_t inviteId)
+Quantity Invite::delInvite(uint32_t inviteId)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -275,7 +275,8 @@ void Invite::delInvite(uint32_t inviteId)
    check(invite.has_value(), inviteDNE.data());
    check(invite->inviter == sender, unauthDelete.data());
 
-   auto sysRecord = to<Tokens>().getSysToken();
+   Quantity refund    = 0;
+   auto     sysRecord = to<Tokens>().getSysToken();
    if (sysRecord.has_value())
    {
       auto sys           = sysRecord->id;
@@ -286,9 +287,9 @@ void Invite::delInvite(uint32_t inviteId)
       {
          if (balanceRecord->value > 0)
          {
-            to<Tokens>().fromSub(sys, sub_account, balanceRecord->value);
-            to<Tokens>().credit(sys, invite->inviter, balanceRecord->value,
-                                "Unused invite tokens refunded");
+            refund = *balanceRecord;
+            to<Tokens>().fromSub(sys, sub_account, refund);
+            to<Tokens>().credit(sys, invite->inviter, refund, "Unused invite tokens refunded");
          }
       }
    }
@@ -296,6 +297,8 @@ void Invite::delInvite(uint32_t inviteId)
    inviteTable.remove(*invite);
    to<Credentials>().consume(invite->cid);
    emit().history().updated(invite->id, getSender(), InviteEventType::deleted);
+
+   return refund;
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)

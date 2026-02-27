@@ -77,9 +77,12 @@ namespace UserService
          /// proof for the credential associated with the invite.
          void accept(uint32_t inviteId);
 
-         /// Delete the invite and its secret (if applicable).
+         /// Delete the invite and associated data.
          /// Can only be called by the invite creator.
-         void delInvite(uint32_t inviteId);
+         ///
+         /// If the invite was holding a balance of tokens, the tokens are refunded to the invite creator.
+         /// The return value contains the refund quantity.
+         Quantity delInvite(uint32_t inviteId);
 
          /// Called synchronously by other services to retrieve the specified invite record
          std::optional<InviteRecord> getInvite(uint32_t inviteId);

@@ -120,10 +120,13 @@ mod service {
         unimplemented!()
     }
 
-    /// Delete the invite and its secret (if applicable).
+    /// Delete the invite and associated data.
     /// Can only be called by the invite creator.
+    ///
+    /// If the invite was holding a balance of tokens, the tokens are refunded to the invite creator.
+    /// The return value contains the refund quantity.
     #[action]
-    fn delInvite(inviteId: u32) {
+    fn delInvite(inviteId: u32) -> Quantity {
         unimplemented!()
     }
 
