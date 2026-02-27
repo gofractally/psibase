@@ -129,7 +129,7 @@ namespace psibase
                {
                   path.pop_back();
                }
-               else if (mount->isMountpoint)
+               if (path.empty() && mount->isMountpoint)
                {
                   // This can only happen after reading an absolute symlink
                   // that points into a sub-mount.
@@ -142,7 +142,7 @@ namespace psibase
                   } while (!base->isMountpoint && base->parent != base);
                   if (base->isMountpoint)
                   {
-                     path.push_back(Fd{::open(mount->hostPath.c_str(), O_PATH | O_DIRECTORY)});
+                     path.push_back(Fd{::open(base->hostPath.c_str(), O_PATH | O_DIRECTORY)});
                      for (Dir* d : dirs | std::views::reverse)
                      {
                         path.push_back(requireDir(path.back(), d->hostPath));

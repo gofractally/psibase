@@ -242,3 +242,15 @@ TEST_CASE("Symlink OOB above nested mount")
    mount.mount((dir.path / "inner").string(), "/one/link/inner");
    CHECK_THROWS_AS(readFile(mount.open("/one/link/bad")), std::system_error);
 }
+
+TEST_CASE("Absolute symlink before ..")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "outer" / "one" / "two", "2");
+   writeFile(dir.path / "inner" / "three", "3");
+   std::filesystem::create_directory_symlink(dir.path / "inner", dir.path / "outer" / "link");
+   Mount mount;
+   mount.mount((dir.path / "outer").string(), "/");
+   mount.mount((dir.path / "inner").string(), "/one/inner");
+   CHECK(readFile(mount.open("/link/../../one/two")) == "2");
+}
