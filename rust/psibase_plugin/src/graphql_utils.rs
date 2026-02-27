@@ -39,9 +39,95 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
         vars.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
 
         for (name, value) in vars {
-            let pattern = format!("${}", name);
             let replacement = json_to_graphql_literal(&value);
-            result = result.replace(&pattern, &replacement);
+            result = replace_variable(&result, name.as_str(), replacement.as_str());
+        }
+    }
+
+    result
+}
+
+fn replace_variable(query: &str, name: &str, replacement: &str) -> String {
+    enum State {
+        Normal,
+        LineComment,
+        StringLit,
+        BlockString,
+    }
+    let pattern = format!("${}", name);
+    let mut result = String::with_capacity(query.len());
+    let mut i = 0;
+    let chars: Vec<char> = query.chars().collect();
+    let n = chars.len();
+    let mut state = State::Normal;
+
+    while i < n {
+        match &state {
+            State::Normal => {
+                if chars[i] == '#' {
+                    state = State::LineComment;
+                    result.push(chars[i]);
+                    i += 1;
+                } else if i + 2 < n && chars[i] == '"' && chars[i + 1] == '"' && chars[i + 2] == '"'
+                {
+                    state = State::BlockString;
+                    result.push_str("\"\"\"");
+                    i += 3;
+                } else if chars[i] == '"' {
+                    state = State::StringLit;
+                    result.push('"');
+                    i += 1;
+                } else if chars[i] == '$' && i + pattern.len() <= n {
+                    let chunk: String = chars[i..i + pattern.len()].iter().collect();
+                    if chunk == pattern {
+                        let next_ok = i + pattern.len() >= n || {
+                            let c = chars[i + pattern.len()];
+                            c != '_' && !c.is_ascii_alphanumeric()
+                        };
+                        if next_ok {
+                            result.push_str(replacement);
+                            i += pattern.len();
+                            continue;
+                        }
+                    }
+                    result.push(chars[i]);
+                    i += 1;
+                } else {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            }
+            State::LineComment => {
+                result.push(chars[i]);
+                if chars[i] == '\n' || chars[i] == '\r' {
+                    state = State::Normal;
+                }
+                i += 1;
+            }
+            State::StringLit => {
+                if chars[i] == '\\' && i + 1 < n {
+                    result.push(chars[i]);
+                    result.push(chars[i + 1]);
+                    i += 2;
+                } else if chars[i] == '"' {
+                    result.push('"');
+                    state = State::Normal;
+                    i += 1;
+                } else {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            }
+            State::BlockString => {
+                if i + 2 < n && chars[i] == '"' && chars[i + 1] == '"' && chars[i + 2] == '"' {
+                    result.push_str("\"\"\"");
+                    state = State::Normal;
+                    i += 3;
+                } else {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+            }
         }
     }
 
@@ -259,6 +345,126 @@ mod tests {
             result,
             "query GetUser { user(name: \"bob\", age: 30, active: false) }"
         );
+    }
+
+    #[test]
+    fn test_inline_variables_skip_string_and_comment() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query =
+            "query GetUser($id: Int!) { user(id: $id) # $id is the user ID\n  alias: \"$id\" }";
+        let vars = Vars { id: 42 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            "query GetUser { user(id: 42) # $id is the user ID\n  alias: \"$id\" }"
+        );
+    }
+
+    #[test]
+    fn test_inline_variables_skip_block_string() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            x: i32,
+        }
+        let query = "query($x: Int!) { f(doc: \"\"\"ignore $x here\"\"\", id: $x) }";
+        let vars = Vars { x: 1 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            "query { f(doc: \"\"\"ignore $x here\"\"\", id: 1) }"
+        );
+    }
+
+    #[test]
+    fn test_inline_variables_skip_string_with_escape() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query = "query($id: Int!) { f(msg: \"literal \\\"$id\\\"\", id: $id) }";
+        let vars = Vars { id: 99 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(msg: \"literal \\\"$id\\\"\", id: 99) }");
+    }
+
+    #[test]
+    fn test_inline_variables_skip_comment_at_line_start() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            x: String,
+        }
+        let query = "# $x is documented\nquery($x: String!) { f(x: $x) }";
+        let vars = Vars {
+            x: "val".to_string(),
+        };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "# $x is documented\nquery { f(x: \"val\") }");
+    }
+
+    #[test]
+    fn test_inline_variables_skip_empty_block_string() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            x: i32,
+        }
+        let query = "query($x: Int!) { f(doc: \"\"\"\"\"\", id: $x) }";
+        let vars = Vars { x: 1 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(doc: \"\"\"\"\"\", id: 1) }");
+    }
+
+    #[test]
+    fn test_inline_variables_skip_block_string_with_newlines() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            x: i32,
+        }
+        let query = "query($x: Int!) { f(doc: \"\"\"line1\nline2 $x\nline3\"\"\", id: $x) }";
+        let vars = Vars { x: 1 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            "query { f(doc: \"\"\"line1\nline2 $x\nline3\"\"\", id: 1) }"
+        );
+    }
+
+    #[test]
+    fn test_inline_variables_skip_block_string_escaped_quote() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            x: i32,
+        }
+        let query = "query($x: Int!) { f(doc: \"\"\"a\"\"b $x\"\"\", id: $x) }";
+        let vars = Vars { x: 1 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(doc: \"\"\"a\"\"b $x\"\"\", id: 1) }");
+    }
+
+    #[test]
+    fn test_inline_variables_skip_string_backslash_at_end() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            x: i32,
+        }
+        let query = "query($x: Int!) { f(s: \"a\\\\$x\", id: $x) }";
+        let vars = Vars { x: 99 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(s: \"a\\\\$x\", id: 99) }");
+    }
+
+    #[test]
+    fn test_inline_variables_variable_adjacent_to_string() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query = "query($id: Int!) { f(x: \"a\"$id) }";
+        let vars = Vars { id: 42 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(x: \"a\"42) }");
     }
 
     #[test]
