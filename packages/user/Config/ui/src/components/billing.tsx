@@ -115,8 +115,8 @@ export const Billing = ({
                     <p className="mt-1 text-sm">
                         {systemTokenLoading
                             ? "Loading..."
-                            : systemToken
-                              ? systemToken.symbol || systemToken.id
+                            : systemToken?.id
+                              ? systemToken.symbol
                               : "None"}
                     </p>
                 </div>
@@ -133,9 +133,9 @@ export const Billing = ({
                             <FieldAccountExisting
                                 form={billingForm}
                                 fields={{ account: "tokenFeeReceiverAccount.account" }}
-                                label="Token fee receiver account"
+                                label="Billing fees paid to:"
                                 placeholder="Enter account name"
-                                disabled={hasFeeReceiverAccount}
+                                disabled={!systemToken?.id || hasFeeReceiverAccount}
                                 description={undefined}
                                 onValidate={undefined}
                             />
@@ -160,6 +160,7 @@ export const Billing = ({
                                             <Button
                                                 type="submit"
                                                 disabled={
+                                                    !systemToken?.id ||
                                                     hasFeeReceiverAccount ||
                                                     !isSaveEnabled
                                                 }

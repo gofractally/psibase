@@ -255,7 +255,7 @@ export const VirtualServer = () => {
                                 <div>
                                     <LabelWithInfo
                                         label="Net bandwidth"
-                                        tooltip="for P2P traffic, Tx traffic, and Query traffic"
+                                        tooltip="Configures the total network bandwidth available to the virtual server"
                                     />
                                     <div className="mt-1 flex items-center gap-2">
                                         <field.TextField
@@ -285,7 +285,7 @@ export const VirtualServer = () => {
                                 <div>
                                     <LabelWithInfo
                                         label="Total storage"
-                                        tooltip="Total storage space (objective + subjective)"
+                                        tooltip="Configures the total disk space available to the virtual server"
                                     />
                                     <div className="mt-1 flex items-center gap-2">
                                         <field.TextField
@@ -508,38 +508,13 @@ export const VirtualServer = () => {
                             : 0;
                         const cpuForTxDisplay = getBestTimeUnit(cpuForTxNs);
 
-                        // Helper component for value with info icon
-                        const ValueWithInfo = ({ 
-                            value, 
-                            tooltipText 
-                        }: { 
-                            value: React.ReactNode; 
-                            tooltipText?: string;
-                        }) => {
-                            if (!tooltipText) {
-                                return <>{value}</>;
-                            }
-                            return (
-                                <span className="inline-flex items-center gap-1">
-                                    {value}
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            {tooltipText}
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </span>
-                            );
-                        };
-
                         return (
                             <div className="border-t mt-2 pt-2">
                                 <div className="border rounded p-2 m-1">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="col-span-1 md:col-span-2">
                                             <div className="text-sm">Billable Resources</div>
+                                            <p className="text-muted-foreground text-xs mt-1">These values are automatically computed and take into account many variables, such as the virtual server specs, advanced variables, number of infrastructure providers, etc.</p>
                                         </div>
 
                                         {/* Row 1 (desktop): Objective / Subjective storage */}
@@ -567,10 +542,7 @@ export const VirtualServer = () => {
                                                 <span className="text-muted-foreground">
                                                     CPU for transactions:
                                                 </span>{" "}
-                                                <ValueWithInfo
-                                                    value={`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
-                                                    tooltipText="= (1sec - per-block-sys-cpu-ns) / block-replay-factor"
-                                                />
+                                                {`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
                                             </div>
                                         </div>
 
