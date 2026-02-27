@@ -5,14 +5,12 @@ use psibase::{
 use crate::{
     constants::MEMBER_STREAM_HALF_LIFE,
     tables::tables::{
-        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildApplication,
-        GuildAttest, GuildMember,
+        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildMember,
     },
 };
 
 use async_graphql::ComplexObject;
-use psibase::services::token_stream::Wrapper as TokenStream;
-use psibase::services::transact::Wrapper as TransactSvc;
+use psibase::services::{token_stream::Wrapper as TokenStream, transact::Wrapper as TransactSvc};
 
 #[derive(PartialEq)]
 pub enum MemberStatus {
@@ -104,9 +102,9 @@ impl FractalMember {
     }
 
     fn remove(&self) {
-        GuildApplication::remove_all_by_member(self.account);
-        GuildAttest::remove_all_by_member(self.account);
-        GuildMember::remove_all_by_member(self.account);
+        for guild_membership in GuildMember::memberships_of_member(self.account) {
+            guild_membership.kick()
+        }
 
         FractalMemberTable::read_write().remove(&self);
     }

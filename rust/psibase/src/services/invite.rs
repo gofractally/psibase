@@ -62,7 +62,7 @@ pub mod InviteHooks {
 mod service {
     use crate::services::auth_sig::SubjectPublicKeyInfo;
     use crate::services::tokens::Quantity;
-    use crate::AccountNumber;
+    use crate::{AccountNumber, TimePointSec};
 
     #[action]
     fn init() {
@@ -130,6 +130,12 @@ mod service {
     /// Called synchronously by other services to retrieve the specified invite record
     #[action]
     fn getInvite(inviteId: u32) -> Option<super::InviteRecord> {
+        unimplemented!()
+    }
+
+    /// Gets the expiration date of the specified invite
+    #[action]
+    fn getExpDate(inviteId: u32) -> TimePointSec {
         unimplemented!()
     }
 

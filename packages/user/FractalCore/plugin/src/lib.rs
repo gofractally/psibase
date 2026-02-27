@@ -10,13 +10,18 @@ use bindings::exports::fractal_core::plugin::user_guild::Guest as UserGuild;
 
 use bindings::host::types::types::Error;
 
-use psibase::define_trust;
+use psibase::{define_trust, fracpack::Pack};
 mod errors;
 mod propose;
 
 use bindings::fractals::plugin as FractalsPlugin;
 
 use trust::{assert_authorized, FunctionName};
+
+use crate::bindings::host::{
+    self,
+    common::store::{Bucket, Database},
+};
 
 define_trust! {
     descriptions {
@@ -29,6 +34,7 @@ define_trust! {
         Medium => "
             - Joining the fractal
             - Registering for a guild evaluation
+            - Create and delete guild member invites
             - Unregistering from guild evaluation
             - Applying to join a guild
             - Attesting guild membership for a fractal member
@@ -45,15 +51,14 @@ define_trust! {
             - Resign, remove or set a new Guild representative
             - Set ranked guilds
             - Set minimum scorers required to enable consensus rewards
-            - Conclude membership applications
             - Set token init and guild ranking threshold
             ",
     }
     functions {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
-        Medium => [apply_guild, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
-        High => [attest, con_membership_app, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
+        Medium => [apply_guild, delete_guild_invite, invite_member, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
+        High => [attest, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -104,17 +109,6 @@ impl AdminFractal for FractalCorePlugin {
 }
 
 impl AdminGuild for FractalCorePlugin {
-    fn con_membership_app(
-        guild_account: String,
-        member: String,
-        accepted: bool,
-    ) -> Result<(), Error> {
-        assert_authorized(FunctionName::con_membership_app)?;
-        propose::guild(&guild_account)?;
-
-        FractalsPlugin::admin_guild::con_membership_app(&guild_account, &member, accepted)
-    }
-
     fn set_rank_ordering_threshold(guild_account: String, threshold: u8) -> Result<(), Error> {
         assert_authorized(FunctionName::set_rank_ordering_threshold)?;
         propose::guild(&guild_account)?;
@@ -254,11 +248,50 @@ impl UserGuild for FractalCorePlugin {
         FractalsPlugin::user_guild::apply_guild(&guild_account, &app)
     }
 
+    fn delete_guild_invite(invite_id: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::delete_guild_invite)?;
+        FractalsPlugin::user_guild::delete_guild_invite(invite_id)
+    }
+
+    fn invite_member(
+        guild_account: String,
+        num_seats: u16,
+        pre_attest: bool,
+    ) -> Result<String, Error> {
+        assert_authorized(FunctionName::invite_member)?;
+        FractalsPlugin::user_guild::invite_member(&guild_account, num_seats, pre_attest)
+    }
+
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {
         assert_authorized(FunctionName::register_candidacy)?;
         FractalsPlugin::user_guild::register_candidacy(&guild_account, active)
     }
 
+    fn draft_application(guild_account: String, description: String) -> Result<(), Error> {
+        let bucket = Self::draft_bucket();
+        bucket.set(&guild_account, &description.packed());
+
+        Ok(())
+    }
+
+    fn push_application(guild_account: String) -> Result<(), Error> {
+        let bucket = Self::draft_bucket();
+
+        let packed_data = bucket
+            .get(&guild_account)
+            .ok_or(errors::ErrorType::StorageError(format!(
+                "Application draft for guild {} does not exist",
+                guild_account
+            )))?;
+
+        let extra_info = String::from_utf8(packed_data)
+            .map_err(|error| errors::ErrorType::StorageError(error.to_string()))?;
+
+        FractalsPlugin::user_guild::set_guild_app_info(&guild_account, &extra_info)?;
+        bucket.delete(&guild_account);
+
+        Ok(())
+    }
     fn attest_membership_app(
         guild_account: String,
         applicant: String,
@@ -271,6 +304,19 @@ impl UserGuild for FractalCorePlugin {
             &applicant,
             &comment,
             endorses,
+        )
+    }
+}
+
+impl FractalCorePlugin {
+    fn draft_bucket() -> Bucket {
+        use host::common::store::{Bucket, DbMode::Transactional, StorageDuration::Persistent};
+        Bucket::new(
+            Database {
+                mode: Transactional,
+                duration: Persistent,
+            },
+            "drafts",
         )
     }
 }

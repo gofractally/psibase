@@ -109,6 +109,11 @@ namespace
 
 Quantity Invite::getInvCost(uint16_t numAccounts)
 {
+   if (!to<VirtualServer>().is_billing_enabled())
+   {
+      return 0;
+   }
+
    auto create_action_reserve = get_create_action_reserve();
    auto buffer_reserve        = get_std_buffer_reserve();
 
@@ -296,6 +301,14 @@ void Invite::delInvite(uint32_t inviteId)
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)
 {
    return Tables(getReceiver(), KvMode::read).open<InviteTable>().get(inviteId);
+}
+
+psibase::TimePointSec Invite::getExpDate(uint32_t inviteId)
+{
+   auto cid    = getInvite(inviteId)->cid;
+   auto expiry = to<Credentials>().get_expiry_date(cid);
+   check(expiry.has_value(), inviteCorrupted.data());
+   return *expiry;
 }
 
 PSIBASE_DISPATCH(UserService::InviteNs::Invite)

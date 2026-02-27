@@ -45,6 +45,9 @@ interface inviter {
     /// creation in more detail, for example by creating the invite server-side and 
     /// registering the creator service to receive hooks when the invite gets updated.
     /// 
+    /// IMPORTANT: This plugin function WILL charge the logged-in user for the cost of the 
+    /// invite, and the amount will be credited to the caller app.
+    /// 
     /// Parameters
     /// * `num-accounts`: The number of accounts that will be created using the invite
     ///

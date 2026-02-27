@@ -58,9 +58,9 @@ define_trust! {
         High => "",
     }
     functions {
-        None => [import_invite_token, prepare_new_invite, is_active_invite],
+        None => [import_invite_token, is_active_invite],
         Low => [delete_invite, reject_active_invite],
-        Medium => [generate_invite],
+        Medium => [generate_invite, prepare_new_invite],
         High => [],
     }
 }
@@ -196,19 +196,52 @@ fn get_invite_cost(num_accounts: u16) -> Result<String, HostTypes::Error> {
     Ok(cost.getInviteCost)
 }
 
+fn prepare_new_invite_impl(
+    num_accounts: u16,
+    creator_app: String,
+) -> Result<(String, NewInviteDetails, String), HostTypes::Error> {
+    let keypair = keyvault::generate_unmanaged_keypair()?;
+    let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
+
+    let invite_id: u32 = rand::rng().random();
+    let invite_token = encode_invite_token(invite_id, symmetric_key);
+
+    let sys = Tokens::helpers::fetch_network_token()?;
+    let min_cost = if sys.is_some() {
+        get_invite_cost(num_accounts)?
+    } else {
+        "0".to_string()
+    };
+
+    let fingerprint = psibase::sha256(&keyvault::to_der(&keypair.public_key)?)
+        .0
+        .to_vec();
+
+    let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
+    if sys.is_some() && min_cost_u64 > 0 {
+        Tokens::user::credit(sys.unwrap(), &creator_app, &min_cost, "Create an invite")?;
+    }
+
+    Ok((
+        invite_token,
+        NewInviteDetails {
+            invite_id,
+            fingerprint,
+            encrypted_secret: secret,
+        },
+        min_cost,
+    ))
+}
+
 impl Inviter for InvitePlugin {
     fn generate_invite() -> Result<String, HostTypes::Error> {
         assert_authorized_with_whitelist(
             trust::FunctionName::generate_invite,
             vec!["homepage".into()],
         )?;
-        let (invite_token, details, min_cost) = Self::prepare_new_invite(1)?;
-        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
+        let (invite_token, details, min_cost) = prepare_new_invite_impl(1, get_receiver())?;
 
-        if min_cost_u64 > 0 {
-            let sys = Tokens::helpers::fetch_network_token().unwrap().unwrap();
-            Tokens::user::credit(sys, &get_receiver(), &min_cost, "Create an invite")?;
-        }
+        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
 
         Transact::add_action_to_transaction(
             createInvite::ACTION_NAME,
@@ -232,32 +265,8 @@ impl Inviter for InvitePlugin {
         num_accounts: u16,
     ) -> Result<(String, NewInviteDetails, String), HostTypes::Error> {
         assert_authorized(trust::FunctionName::prepare_new_invite)?;
-        let keypair = keyvault::generate_unmanaged_keypair()?;
-        let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
-        let invite_id: u32 = rand::rng().random();
-        let invite_token = encode_invite_token(invite_id, symmetric_key);
-
-        let sys = Tokens::helpers::fetch_network_token()?;
-        let min_cost = if sys.is_some() {
-            get_invite_cost(num_accounts)?
-        } else {
-            "0".to_string()
-        };
-
-        let fingerprint = psibase::sha256(&keyvault::to_der(&keypair.public_key)?)
-            .0
-            .to_vec();
-
-        Ok((
-            invite_token,
-            NewInviteDetails {
-                invite_id,
-                fingerprint,
-                encrypted_secret: secret,
-            },
-            min_cost,
-        ))
+        prepare_new_invite_impl(num_accounts, Client::get_sender())
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {

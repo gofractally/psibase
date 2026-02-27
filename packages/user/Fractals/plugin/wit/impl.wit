@@ -7,6 +7,8 @@ world impl {
     include evaluations:plugin/imports;
     include permissions:plugin/imports;
     include accounts:plugin/imports;
+    include invite:plugin/imports;
+    include base64:plugin/imports;
 
 
     export admin-guild;

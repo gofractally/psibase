@@ -20,6 +20,7 @@
         "lucide-react": "^0.475.0",
         "nuqs": "^2.4.3",
         "react": "^19.1.0",
+        "react-confetti-explosion": "^3.0.3",
         "react-dom": "^19.1.0",
         "react-easy-sort": "^1.6.0",
         "react-router-dom": "^6.26.1",
