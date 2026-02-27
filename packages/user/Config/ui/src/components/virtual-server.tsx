@@ -256,7 +256,7 @@ export const VirtualServer = () => {
                                 <div>
                                     <LabelWithInfo
                                         label="Net bandwidth"
-                                        tooltip="for P2P traffic, Tx traffic, and Query traffic"
+                                        tooltip="Configures the total network bandwidth available to the virtual server"
                                     />
                                     <div className="mt-1 flex items-center gap-2">
                                         <field.TextField
@@ -286,7 +286,7 @@ export const VirtualServer = () => {
                                 <div>
                                     <LabelWithInfo
                                         label="Total storage"
-                                        tooltip="Total storage space (objective + subjective)"
+                                        tooltip="Configures the total disk space available to the virtual server"
                                     />
                                     <div className="mt-1 flex items-center gap-2">
                                         <field.TextField
