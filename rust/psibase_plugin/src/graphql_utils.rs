@@ -51,7 +51,13 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
 fn json_to_graphql_literal(value: &Value) -> String {
     match value {
         Value::String(s) => {
-            format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+            format!(
+                "\"{}\"",
+                s.replace('\\', "\\\\")
+                    .replace('"', "\\\"")
+                    .replace('\n', "\\n")
+                    .replace('\r', "\\r")
+            )
         }
         Value::Number(n) => n.to_string(),
         Value::Bool(b) => b.to_string(),
