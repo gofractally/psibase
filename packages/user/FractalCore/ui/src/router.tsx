@@ -16,7 +16,9 @@ import { ApplicationDetail } from "./pages/guilds/application-detail";
 import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
-import { Membership } from "./pages/guilds/membership";
+import { GuildMembershipLayout } from "./pages/guilds/membership/_layout";
+import { GuildApplicants } from "./pages/guilds/membership/applicants";
+import { GuildMembers } from "./pages/guilds/membership/members";
 import { GuildOverview } from "./pages/guilds/overview";
 
 export const router = createBrowserRouter([
@@ -80,9 +82,19 @@ export const router = createBrowserRouter([
                         path: "membership",
                         element: (
                             <ProtectedRoute>
-                                <Membership />
+                                <GuildMembershipLayout />
                             </ProtectedRoute>
                         ),
+                        children: [
+                            {
+                                path: "members",
+                                element: <GuildMembers />,
+                            },
+                            {
+                                path: "applicants",
+                                element: <GuildApplicants />,
+                            },
+                        ],
                     },
                     {
                         path: "evaluations",

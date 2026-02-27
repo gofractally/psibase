@@ -30,7 +30,7 @@ function getGuildMemberRoleLabel(
     return null;
 }
 
-export const Members = () => {
+export const GuildMembers = () => {
     const { data: guild } = useGuild();
     const { data: scores } = useScores(guild?.account);
 

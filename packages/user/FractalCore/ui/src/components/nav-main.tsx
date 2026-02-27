@@ -107,7 +107,7 @@ export function getMenuGroups(
                     {
                         title: "Membership",
                         icon: Contact,
-                        path: `/guild/${membership.guild.account}/membership`,
+                        path: `/guild/${membership.guild.account}/membership/members`,
                     },
                     {
                         title: "Evaluations",
@@ -145,7 +145,7 @@ export function getMenuGroups(
                 {
                     title: "Membership",
                     icon: Contact,
-                    path: `/guild/${guild.account}/membership`,
+                    path: `/guild/${guild.account}/membership/members`,
                 },
             ],
         });

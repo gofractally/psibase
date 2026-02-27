@@ -24,7 +24,7 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-export const Applicants = () => {
+export const GuildApplicants = () => {
     const [showGuildModal, setShowGuildModal] = useState(false);
 
     const navigate = useNavigate();
