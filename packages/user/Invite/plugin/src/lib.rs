@@ -87,6 +87,41 @@ fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
     base64::url::encode(data.as_slice())
 }
 
+fn prepare_new_invite_impl(
+    num_accounts: u16,
+    service_name: String,
+) -> Result<(String, u32, Vec<u8>, String), HostTypes::Error> {
+    let keypair = keyvault::generate_unmanaged_keypair()?;
+    let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
+
+    let invite_id: u32 = rand::rng().random();
+    let invite_token = encode_invite_token(invite_id, symmetric_key);
+
+    let sys = Tokens::helpers::fetch_network_token()?;
+    let min_cost = if sys.is_some() {
+        get_invite_cost(num_accounts)?
+    } else {
+        "0".to_string()
+    };
+
+    let fingerprint = psibase::sha256(&keyvault::to_der(&keypair.public_key)?)
+        .0
+        .to_vec();
+
+    let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
+    if sys.is_some() && min_cost_u64 > 0 {
+        Tokens::user::credit(sys.unwrap(), &service_name, &min_cost, "Create an invite")?;
+    }
+
+    let payload = InvPayload {
+        fingerprint,
+        secret,
+    }
+    .packed();
+
+    Ok((invite_token, invite_id, payload, min_cost))
+}
+
 impl Invitee for InvitePlugin {
     fn import_invite_token(token: String) -> Result<u32, HostTypes::Error> {
         assert_authorized(trust::FunctionName::import_invite_token)?;
@@ -202,7 +237,7 @@ impl Inviter for InvitePlugin {
             vec!["homepage".into()],
         )?;
         let (invite_token, invite_id, payload, min_cost) =
-            Self::prepare_new_invite(1, get_receiver())?;
+            prepare_new_invite_impl(1, get_receiver())?;
 
         let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
 
@@ -227,35 +262,7 @@ impl Inviter for InvitePlugin {
     ) -> Result<(String, u32, Vec<u8>, String), HostTypes::Error> {
         assert_authorized(trust::FunctionName::prepare_new_invite)?;
 
-        let keypair = keyvault::generate_unmanaged_keypair()?;
-        let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
-
-        let invite_id: u32 = rand::rng().random();
-        let invite_token = encode_invite_token(invite_id, symmetric_key);
-
-        let sys = Tokens::helpers::fetch_network_token()?;
-        let min_cost = if sys.is_some() {
-            get_invite_cost(num_accounts)?
-        } else {
-            "0".to_string()
-        };
-
-        let fingerprint = psibase::sha256(&keyvault::to_der(&keypair.public_key)?)
-            .0
-            .to_vec();
-
-        let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
-        if sys.is_some() && min_cost_u64 > 0 {
-            Tokens::user::credit(sys.unwrap(), &service_name, &min_cost, "Create an invite")?;
-        }
-
-        let payload = InvPayload {
-            fingerprint,
-            secret,
-        }
-        .packed();
-
-        Ok((invite_token, invite_id, payload, min_cost))
+        prepare_new_invite_impl(num_accounts, service_name)
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {
