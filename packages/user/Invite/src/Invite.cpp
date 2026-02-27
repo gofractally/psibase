@@ -109,6 +109,11 @@ namespace
 
 Quantity Invite::getInvCost(uint16_t numAccounts)
 {
+   if (!to<VirtualServer>().is_billing_enabled())
+   {
+      return 0;
+   }
+
    auto create_action_reserve = get_create_action_reserve();
    auto buffer_reserve        = get_std_buffer_reserve();
 
