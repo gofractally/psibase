@@ -254,3 +254,21 @@ TEST_CASE("Absolute symlink before ..")
    mount.mount((dir.path / "inner").string(), "/one/inner");
    CHECK(readFile(mount.open("/link/../../one/two")) == "2");
 }
+
+TEST_CASE(".. in mounted root")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one", "1");
+   Mount mount;
+   mount.mount(dir.path.string(), "/");
+   CHECK(readFile(mount.open("/../../one")) == "1");
+}
+
+TEST_CASE(".. in virtual root")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one", "1");
+   Mount mount;
+   mount.mount(dir.path.string(), "/subdir");
+   CHECK(readFile(mount.open("/subdir/../../../subdir/one")) == "1");
+}
