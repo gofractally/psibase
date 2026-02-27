@@ -1,45 +1,28 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
+import { zGuildApplicationListInstance } from "@/lib/zod/attestations";
 
 import { graphql } from "@shared/lib/graphql";
-import { Account, zAccount } from "@shared/lib/schemas/account";
-import { zDateTime } from "@shared/lib/schemas/date-time";
-
-export const zGuildApplicationListInstance = z
-    .object({
-        member: zAccount,
-        extraInfo: z.string(),
-        createdAt: zDateTime,
-        attestations: z
-            .object({
-                endorses: z.boolean(),
-                comment: z.string(),
-                attestee: zAccount,
-            })
-            .array(),
-    })
-    .nullable();
-
-export type GuildApplicationListInstance = z.infer<
-    typeof zGuildApplicationListInstance
->;
+import { Account } from "@shared/lib/schemas/account";
 
 export const getGuildApplication = async (
     guildAccount: Account,
-    member: Account,
+    applicant: Account,
 ) => {
     const res = await graphql(
         `
             {
-                guildApplication(guild: ${guildAccount}, member: "${member}") {
-                        member
+                guildApplication(guild: ${guildAccount}, applicant: "${applicant}") {
+                        applicant
                         extraInfo
                         createdAt
                         attestations {
-                            endorses
-                            comment
-                            attestee
+                            nodes {
+                                attester
+                                comment
+                                endorses
+                            }
                         }
                 }
             }

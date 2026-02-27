@@ -18,19 +18,19 @@ import {
 } from "@shared/shadcn/ui/card";
 
 export const ApplicationDetail = () => {
+    const [showModal, setShowModal] = useState(false);
+
     const { applicant } = useParams();
-    const guildAccount = useGuildAccount();
-    const guild = useGuild();
 
     const { data: currentUser } = useCurrentUser();
+    const guildAccount = useGuildAccount();
+    const guild = useGuild();
     const { data: application, isPending } = useGuildApplication(
         guildAccount,
         applicant,
     );
 
     const isSelf = currentUser == applicant;
-
-    const [showModal, setShowModal] = useState(false);
 
     if (application === null) {
         return (
@@ -82,23 +82,25 @@ export const ApplicationDetail = () => {
                     <CardContent>
                         <div className="flex flex-col gap-2">
                             {application?.attestations &&
-                            application?.attestations.length > 0 ? (
-                                application?.attestations.map((attest) => (
-                                    <div
-                                        key={attest.attestee}
-                                        className="flex justify-between px-2"
-                                    >
-                                        <div>
-                                            <div>{attest.attestee}</div>
-                                            <div>{attest.comment}</div>
+                            application?.attestations.nodes.length > 0 ? (
+                                application?.attestations.nodes.map(
+                                    (attest) => (
+                                        <div
+                                            key={attest.attester}
+                                            className="flex justify-between px-2"
+                                        >
+                                            <div>
+                                                <div>{attest.attester}</div>
+                                                <div>{attest.comment}</div>
+                                            </div>
+                                            <div>
+                                                {attest.endorses
+                                                    ? "For"
+                                                    : "Against"}
+                                            </div>
                                         </div>
-                                        <div>
-                                            {attest.endorses
-                                                ? "For"
-                                                : "Against"}
-                                        </div>
-                                    </div>
-                                ))
+                                    ),
+                                )
                             ) : (
                                 <EmptyBlock
                                     title="No attestations"
