@@ -11,8 +11,7 @@ impl Caller for AddToTxCaller {
     type ReturnType<T: UnpackOwned> = ();
 
     fn call_returns_nothing<Args: Pack>(&self, method: MethodNumber, args: Args) {
-        transact::plugin::intf::add_action_to_transaction(&method.to_string(), &args.packed())
-            .unwrap_or_else(|e| panic!("add_action_to_transaction failed: {e}"));
+        self.call::<(), _>(method, args);
     }
 
     fn call<Ret: UnpackOwned, Args: Pack>(&self, method: MethodNumber, args: Args) {
