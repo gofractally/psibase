@@ -1,3 +1,5 @@
+import type { Guild } from "@/lib/graphql/fractals/getGuild";
+
 import {
     Calendar,
     ChevronRight,
@@ -13,6 +15,7 @@ import {
 import { NavLink } from "react-router-dom";
 
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuild } from "@/hooks/use-guild";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
@@ -51,6 +54,7 @@ export interface SubMenuItem {
 
 export function getMenuGroups(
     memberships?: Array<{ guild: { account: string; displayName: string } }>,
+    guild?: Guild | null,
 ): MenuGroup[] {
     const fractalGroup: MenuGroup = {
         groupLabel: "Fractal",
@@ -119,17 +123,43 @@ export function getMenuGroups(
             })) || [],
     };
 
-    return [
+    const groups = [
         fractalGroup,
         ...(memberships && memberships.length > 0 ? [myGuildsGroup] : []),
     ];
+
+    if (
+        guild &&
+        !memberships?.some(
+            (membership) => membership.guild.account === guild.account,
+        )
+    ) {
+        groups.push({
+            groupLabel: `Guild: ${guild.displayName}`,
+            items: [
+                {
+                    title: "Overview",
+                    icon: Home,
+                    path: `/guild/${guild.account}`,
+                },
+                {
+                    title: "Membership",
+                    icon: Contact,
+                    path: `/guild/${guild.account}/membership`,
+                },
+            ],
+        });
+    }
+
+    return groups;
 }
 
 export function NavMain() {
     const { data: currentUser } = useCurrentUser();
     const { data: memberships } = useGuildMembershipsOfUser(currentUser);
+    const { data: guild } = useGuild();
 
-    const groups = getMenuGroups(memberships);
+    const groups = getMenuGroups(memberships, guild);
 
     const renderMenuItem = (item: MenuItem, basePath: string = "") => {
         const hasSubItems = item.subItems && item.subItems.length > 0;
