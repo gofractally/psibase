@@ -13,7 +13,7 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, fenix }:
-    flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;
@@ -36,28 +36,16 @@
             let
               base = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${version}";
             in
-            if pkgs.stdenv.hostPlatform.isDarwin then
-              (if pkgs.stdenv.hostPlatform.isAarch64 then
-                pkgs.fetchurl {
-                  url = "${base}/wasi-sdk-${version}.0-arm64-macos.tar.gz";
-                  sha256 = "sha256-4RVSkT4/meg01/59ob0IGrr3ZHWe12tgl6NMY/yDZl4=";
-                }
-              else
-                pkgs.fetchurl {
-                  url = "${base}/wasi-sdk-${version}.0-x86_64-macos.tar.gz";
-                  sha256 = "sha256-0N4v0+pcVwYO+ofkNWwWS+w2iZcvI4bwyaicWOEM7I0=";
-                })
+            if pkgs.stdenv.hostPlatform.isAarch64 then
+              pkgs.fetchurl {
+                url = "${base}/wasi-sdk-${version}.0-arm64-linux.tar.gz";
+                sha256 = "sha256-BSrXczl9yeWqmftM/vaUF15rHoG7KtHTyOez/IFEG3w=";
+              }
             else
-              (if pkgs.stdenv.hostPlatform.isAarch64 then
-                pkgs.fetchurl {
-                  url = "${base}/wasi-sdk-${version}.0-arm64-linux.tar.gz";
-                  sha256 = "sha256-BSrXczl9yeWqmftM/vaUF15rHoG7KtHTyOez/IFEG3w=";
-                }
-              else
-                pkgs.fetchurl {
-                  url = "${base}/wasi-sdk-${version}.0-x86_64-linux.tar.gz";
-                  sha256 = "sha256-h9HRooedE5zcYkuWjvrT1Kl7gHjN/5XmOsiOyv0aAXE=";
-                });
+              pkgs.fetchurl {
+                url = "${base}/wasi-sdk-${version}.0-x86_64-linux.tar.gz";
+                sha256 = "sha256-h9HRooedE5zcYkuWjvrT1Kl7gHjN/5XmOsiOyv0aAXE=";
+              };
 
           nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [
             pkgs.autoPatchelfHook
@@ -170,24 +158,12 @@
           gdb
         ];
 
-        darwinPackages = with pkgs; [
-          libiconv
-          darwin.apple_sdk.frameworks.Security
-          darwin.apple_sdk.frameworks.CoreFoundation
-          darwin.apple_sdk.frameworks.SystemConfiguration
-        ];
-
-        platformPackages =
-          if pkgs.stdenv.isDarwin
-          then darwinPackages
-          else linuxPackages;
-
       in
       {
         devShells.default = pkgs.mkShell {
           name = "psibase-dev";
 
-          packages = commonPackages ++ platformPackages;
+          packages = commonPackages ++ linuxPackages;
 
           WASI_SDK_PREFIX = "${wasiSdk}";
           WASI_SYSROOT = "${wasiSdk}/share/wasi-sysroot";
@@ -202,9 +178,6 @@
           CMAKE_IGNORE_PATH = "/usr/lib:/usr/lib64";
           CMAKE_SYSTEM_IGNORE_PATH = "/usr/lib:/usr/lib64";
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
-
-          EDITOR = "vim";
-          VISUAL = "vim";
 
           shellHook = ''
             export NIX_SHELL_DEPTH=$(("''${NIX_SHELL_DEPTH:-0}" + 1))
@@ -222,20 +195,6 @@
             export LIBRARY_PATH="${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
             export CMAKE_LIBRARY_PATH="${pkgs.icu}/lib''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
 
-            ${if pkgs.stdenv.isDarwin then ''
-            export LIBRARY_PATH="${pkgs.libiconv}/lib:$LIBRARY_PATH"
-            export MACOSX_DEPLOYMENT_TARGET="13.0"
-            if command -v xcrun &>/dev/null; then
-              export SDKROOT="$(xcrun --show-sdk-path)"
-              APPLE_CC="$(xcrun -find clang 2>/dev/null || echo "")"
-              APPLE_CXX="$(xcrun -find clang++ 2>/dev/null || echo "")"
-              if [[ -n "$APPLE_CC" ]]; then
-                export CC="$APPLE_CC"
-                export CXX="$APPLE_CXX"
-              fi
-            fi
-            '' else ""}
-
             # Discover psibase repo root and add built binaries to PATH so
             # tools like psinode / psibase are runnable from anywhere.
             if command -v git >/dev/null 2>&1; then
@@ -244,12 +203,9 @@
               PSIBASE_ROOT="$(pwd)"
             fi
             export PSIBASE_ROOT
-            if [ -d "$PSIBASE_ROOT/build/psidk/bin" ]; then
-              export PATH="$PSIBASE_ROOT/build/psidk/bin:$PATH"
-            fi
-            if [ -d "$PSIBASE_ROOT/build/rust/release" ]; then
-              export PATH="$PSIBASE_ROOT/build/rust/release:$PATH"
-            fi
+            export PATH="$PSIBASE_ROOT/build/psidk/bin:$PATH"
+            export PATH="$PSIBASE_ROOT/build/rust/release:$PATH"
+            export PATH="$PSIBASE_ROOT/build:$PATH"
 
             export CCACHE_DIR="''${CCACHE_DIR:-$HOME/.cache/ccache}"
             export SCCACHE_DIR="''${SCCACHE_DIR:-$HOME/.cache/sccache}"
@@ -260,10 +216,9 @@
             parse_git_branch() {
               git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
             }
-            export PS1="\[\033[01;32m\]psibase-nix\[\033[00m\]:\[\033[01;34m\]\w\[\033[32m\]\$(parse_git_branch)\[\033[00m\]\$ "
+            export PS1="🧱🔧 \[\033[01;32m\]psibase-nix\[\033[00m\]:\[\033[01;34m\]\w\[\033[32m\]\$(parse_git_branch)\[\033[00m\]\$ "
 
             if [ -n "$BASH_VERSION" ]; then
-              set -o vi
               if [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]]; then
                 source ${pkgs.bash-completion}/share/bash-completion/bash_completion
               fi
@@ -273,7 +228,9 @@
               if [[ -d "$PSIBASE_ROOT/nix" ]] && [[ -w "$PSIBASE_ROOT/nix" ]]; then
                 cat > "$_nix_bash_init" << 'NIX_BASH_INIT_EOF'
             set -o vi
-            [[ -r __BASH_COMPLETION__ ]] && source __BASH_COMPLETION__
+            if [[ -n "$BASH_VERSION" ]] && shopt -s progcomp 2>/dev/null; then
+              [[ -r __BASH_COMPLETION__ ]] && source __BASH_COMPLETION__
+            fi
             [[ -f "$HOME/.bashrc" ]] && . "$HOME/.bashrc"
             NIX_BASH_INIT_EOF
                 sed -i "s|__BASH_COMPLETION__|${pkgs.bash-completion}/share/bash-completion/bash_completion|g" "$_nix_bash_init"
