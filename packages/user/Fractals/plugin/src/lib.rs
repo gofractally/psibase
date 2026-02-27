@@ -424,8 +424,9 @@ impl UserGuild for FractallyPlugin {
         num_accounts: u16,
         pre_attest: bool,
     ) -> Result<String, Error> {
+        let fractal = get_guild(guild_account.clone())?.fractal.to_string();
         let (invite_token, invite_details, _) =
-            bindings::invite::plugin::inviter::prepare_new_invite(1)?;
+            bindings::invite::plugin::inviter::prepare_new_invite(1, &fractal)?;
 
         let finger_print: [u8; 32] = invite_details.fingerprint.try_into().unwrap();
 

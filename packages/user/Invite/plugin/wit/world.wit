@@ -50,6 +50,7 @@ interface inviter {
     /// 
     /// Parameters
     /// * `num-accounts`: The number of accounts that will be created using the invite
+    /// * `service-name`: The name of the service that will ultimately be used to create the invite
     ///
     /// Returns:
     /// * `invite-token` - should be kept private, can be used to accept the invite
@@ -58,7 +59,7 @@ interface inviter {
     /// * `min-cost` - The minimum cost of creating the invite for the specified number of 
     ///                accounts. This amount (at minimum) must be credited to the invite service 
     ///                before creating the invite.
-    prepare-new-invite: func(num-accounts: u16) -> result<tuple<invite-token, new-invite-details, min-cost>, error>;
+    prepare-new-invite: func(num-accounts: u16, service-name: string) -> result<tuple<invite-token, new-invite-details, min-cost>, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database.
