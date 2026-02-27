@@ -77,9 +77,7 @@ export const Members = () => {
                                     </TableCell>
                                     <TableCell>{member.score}</TableCell>
                                     <TableCell className="text-end">
-                                        {dayjs(member.createdAt).format(
-                                            "MMMM D, YYYY",
-                                        )}
+                                        {dayjs(member.createdAt).format("ll")}
                                     </TableCell>
                                 </TableRow>
                             );

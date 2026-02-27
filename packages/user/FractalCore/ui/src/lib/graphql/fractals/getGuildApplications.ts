@@ -6,15 +6,19 @@ import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
+export const zGuildAttestationListInstance = z.object({
+    attester: zAccount,
+    comment: z.string(),
+    endorses: z.boolean(),
+});
+
 export const zGuildApplicationListInstance = z.object({
-    member: zAccount,
+    applicant: zAccount,
     extraInfo: z.string(),
     createdAt: zDateTime,
-    attestations: z
-        .object({
-            endorses: z.boolean(),
-        })
-        .array(),
+    attestations: z.object({
+        nodes: zGuildAttestationListInstance.array(),
+    }),
 });
 
 export type GuildApplicationListInstance = z.infer<
@@ -27,11 +31,15 @@ export const getGuildApplications = async (guildAccount: Account) => {
             {
                 guildApplications(guild: ${guildAccount}) {
                     nodes {
-                        member
+                        applicant
                         extraInfo
                         createdAt
                         attestations {
-                            endorses
+                            nodes {
+                                attester
+                                comment
+                                endorses
+                            }
                         }
                     }
                 }
