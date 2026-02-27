@@ -48,7 +48,7 @@ psinode - The psibase blockchain server
 
 - `--mount` *directory*[:*mountpoint*]
 
-  Allows services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../administration.md#server-configuration).
+  Allows privileged node-local services to read files from a directory. If a mountpoint is provided, it determines the path that services use to access it. Otherwise the service paths will be the same as the host paths. The mountpoint must be an absolute path. This option may be specified any number of times. This option is not available over the [HTTP API](../administration.md#server-configuration).
 
 - `--service-threads` *num*
 
