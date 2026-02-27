@@ -1,4 +1,5 @@
 #include <psibase/ConfigFile.hpp>
+#include <psibase/LogSocket.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
 #include <psibase/RunQueue.hpp>
@@ -1360,9 +1361,12 @@ void run(const std::string&              db_path,
    }
 
    {
+      auto writer = system->sharedDatabase.createWriter();
+      system->sockets->set(*writer, SocketRow::log, makeLogSocket());
+
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;
-      auto               session = db.startWrite(system->sharedDatabase.createWriter());
+      auto               session = db.startWrite(std::move(writer));
       db.checkoutSubjective();
       load_environment(db);
       HostConfigRow hostConfig = toHostConfig(
@@ -2019,58 +2023,6 @@ void run(const std::string&              db_path,
    node.set_producer_id(producer);
    {
       atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
-   }
-
-   if (node.chain().get_head_state()->blockId() == Checksum256{} && peers.empty())
-   {
-      std::string xAdminSubdomain;
-      for (const auto& service : services)
-      {
-         if (service.root.string().find("services/x-admin") != std::string::npos)
-         {
-            if (service.host.ends_with('.'))
-            {
-               if (!hosts.empty())
-               {
-                  xAdminSubdomain = service.host + hosts.front();
-                  break;
-               }
-            }
-            else if (xAdminSubdomain.empty())
-            {
-               xAdminSubdomain = service.host;
-            }
-         }
-      }
-
-      if (!xAdminSubdomain.empty())
-      {
-         std::string protocol;
-         std::string port;
-         for (const auto& listen : http_config->listen)
-         {
-            if (const auto* spec = std::get_if<psibase::http::tcp_listen_spec<true>>(&listen))
-            {
-               protocol = "https://";
-               port     = std::to_string(spec->endpoint.port());
-               break;
-            }
-            else if (const auto* spec = std::get_if<psibase::http::tcp_listen_spec<false>>(&listen))
-            {
-               protocol = "http://";
-               port     = std::to_string(spec->endpoint.port());
-            }
-         }
-         xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
-      }
-
-      std::string message = "Node is not connected to any psibase network.";
-      if (!xAdminSubdomain.empty())
-      {
-         message += " Visit '" + xAdminSubdomain + "' for node setup.";
-      }
-
-      PSIBASE_LOG(node.chain().getLogger(), notice) << message;
    }
 
    chainContext.run();

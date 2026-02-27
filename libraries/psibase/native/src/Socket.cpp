@@ -275,7 +275,8 @@ void Sockets::add(Writer&                        writer,
    {
       std::lock_guard l{mutex};
       check(!stopped, "Shutting down");
-      if (auto pos = available.find_first(); pos != boost::dynamic_bitset<>::npos)
+      if (auto pos = available.find_next(SocketRow::unreservedStart - 1);
+          pos != boost::dynamic_bitset<>::npos)
       {
          socket->id   = pos;
          sockets[pos] = socket;
@@ -324,6 +325,7 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
       std::lock_guard l{mutex};
       check(!stopped, "Shutting down");
       check(fd >= 0, "invalid fd");
+      check(fd < SocketRow::unreservedStart, "Can only set reserved socket numbers");
       auto pos = static_cast<std::size_t>(fd);
       if (pos + 1 > available.size())
       {

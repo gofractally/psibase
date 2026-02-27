@@ -1,6 +1,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <debug_eos_vm/debug_eos_vm.hpp>
 #include <psibase/ActionContext.hpp>
+#include <psibase/LogSocket.hpp>
 #include <psibase/NativeFunctions.hpp>
 #include <psibase/Prover.hpp>
 #include <psibase/Socket.hpp>
@@ -302,12 +303,18 @@ struct test_chain
        : test_chain{state, {path, config, mode}}
    {
       if (mode != triedent::open_mode::read_only)
-         sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
+      {
+         sys->sockets->set(*writer, psibase::SocketRow::producer_multicast,
+                           std::make_shared<NullSocket>());
+         sys->sockets->set(*writer, psibase::SocketRow::log, psibase::makeLogSocket());
+      }
    }
 
    explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()}
    {
-      sys->sockets->set(*writer, 0, std::make_shared<NullSocket>());
+      sys->sockets->set(*writer, psibase::SocketRow::producer_multicast,
+                        std::make_shared<NullSocket>());
+      sys->sockets->set(*writer, psibase::SocketRow::log, psibase::makeLogSocket());
    }
 
    bool setFork(const psibase::Checksum256& id)
@@ -1812,7 +1819,8 @@ struct ConsoleLog
    std::string type   = "console";
    std::string filter = "Severity > critical";
    std::string format =
-       "[{TimeStamp}] [{Severity}] [{Host}]: {Message}{?: {TransactionId}}{?: {BlockId}: "
+       "[{TimeStamp}] [{Severity}] [{Host}]{?: [{Service}]}: {Message}{?: {TransactionId}}{?: "
+       "{BlockId}: "
        "{BlockHeader}}{?RequestMethod:: {RequestMethod} {RequestHost}{RequestTarget}{?: "
        "{ResponseStatus}{?: {ResponseBytes}}}}{?: {ResponseTime} µs}{Indent:4:{TraceConsole}}";
 };

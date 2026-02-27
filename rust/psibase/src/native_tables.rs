@@ -358,6 +358,23 @@ pub enum SocketInfo {
 
 #[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
+pub struct LogMessage {
+    pub message: String,
+    pub severity: u32,
+    pub service: Option<AccountNumber>,
+}
+
+impl LogMessage {
+    pub const DEBUG: u32 = 0;
+    pub const INFO: u32 = 1;
+    pub const NOTICE: u32 = 2;
+    pub const WARNING: u32 = 3;
+    pub const ERROR: u32 = 4;
+    pub const CRITICAL: u32 = 5;
+}
+
+#[derive(Debug, Clone, Pack, Unpack, ToSchema, Serialize, Deserialize)]
+#[fracpack(fracpack_mod = "fracpack")]
 pub struct SocketRow {
     fd: i32,
     info: SocketInfo,
@@ -366,6 +383,7 @@ pub struct SocketRow {
 impl SocketRow {
     // Well-known fds
     pub const PRODUCER_MULTICAST: i32 = 0;
+    pub const LOG: i32 = 1;
 
     pub const DB: DbId = DbId::NativeSubjective;
     pub fn key(&self) -> (NativeTable, NativeIndex, i32) {

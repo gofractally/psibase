@@ -1,5 +1,6 @@
 #include <services/local/XAdmin.hpp>
 
+#include <charconv>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/json/any.hpp>
@@ -265,6 +266,31 @@ namespace LocalService
          }
          return default_;
       }
+      std::uint32_t parseOption(const psio::json::any& opt, std::uint32_t default_)
+      {
+         if (auto* i = opt.get_if<std::int32_t>())
+         {
+            if (*i >= 0 &&
+                static_cast<std::uint32_t>(*i) <= std::numeric_limits<std::uint32_t>::max())
+               return static_cast<std::uint32_t>(*i);
+         }
+         if (auto* i = opt.get_if<std::int64_t>())
+         {
+            if (*i >= 0 &&
+                static_cast<std::uint64_t>(*i) <= std::numeric_limits<std::uint32_t>::max())
+               return static_cast<std::uint32_t>(*i);
+         }
+         else if (auto* s = opt.get_if<std::string>())
+         {
+            std::uint32_t result;
+            const char*   p   = s->data();
+            const char*   end = s->data() + s->size();
+            auto          res = std::from_chars(p, end, result);
+            if (res.ec == std::errc{} && res.ptr == end)
+               return result;
+         }
+         return default_;
+      }
 
       std::string parseOption(const psio::json::any& opt, std::string default_)
       {
@@ -307,6 +333,53 @@ namespace LocalService
          {
             return parseOption(opt, default_);
          }
+      }
+
+      std::optional<std::string> guessUrl(const psio::json::any& listen, std::string&& host)
+      {
+         std::string   proto;
+         std::uint16_t port;
+         if (auto* l = listen.get_if<psio::json::any_array>())
+         {
+            for (const auto& item : *l)
+            {
+               if (auto* o = item.get_if<psio::json::any_object>())
+               {
+                  std::string   newProto;
+                  std::uint32_t newPort = 0;
+                  for (const auto& [key, value] : *o)
+                  {
+                     if (key == "protocol")
+                     {
+                        newProto = parseOption(value, std::string());
+                     }
+                     else if (key == "port")
+                     {
+                        newPort = parseOption(value, static_cast<std::uint32_t>(65536));
+                     }
+                  }
+                  if ((newProto == "http" || newProto == "https") && newPort < 65536)
+                  {
+                     if (newPort == 0)
+                     {
+                        if (newProto == "http")
+                           newPort = 80;
+                        else if (newProto == "https")
+                           newPort = 443;
+                     }
+
+                     proto = std::move(newProto);
+                     port  = newPort;
+                     if (proto == "https")
+                        break;
+                  }
+               }
+            }
+         }
+         if (proto.empty())
+            return {};
+         else
+            return proto + "://" + std::move(host) + ':' + std::to_string(port);
       }
 
       struct PsinodeConfig
@@ -456,6 +529,8 @@ namespace LocalService
    void XAdmin::startSession()
    {
       check(getSender() == XHttp::service, "Wrong sender");
+      bool                       isBooted = chainIsBooted();
+      std::optional<std::string> setupMessage;
       PSIBASE_SUBJECTIVE_TX
       {
          HostConfigRow hostConfig = Native::session().open<HostConfigTable>().get({}).value();
@@ -469,6 +544,26 @@ namespace LocalService
          if (auto* peers = json.hostOption("peers"))
          {
             adminOpts.peers = parseOptionList(*peers, std::vector<std::string>());
+         }
+         if (!isBooted && adminOpts.peers.empty())
+         {
+            std::string message = "Node is not connected to any psibase network.";
+            if (!adminOpts.hosts.empty())
+            {
+               std::string xAdminSubdomain = XAdmin::service.str() + "." + adminOpts.hosts.front();
+               if (auto* listen = json.hostOption("listen"))
+               {
+                  if (auto url = guessUrl(*listen, std::move(xAdminSubdomain)))
+                  {
+                     message += " Visit '" + *url + "' for node setup.";
+                  }
+               }
+            }
+            setupMessage = std::move(message);
+         }
+         else
+         {
+            setupMessage.reset();
          }
          if (auto* config = json.serviceConfig())
          {
@@ -494,6 +589,10 @@ namespace LocalService
          open<AdminOptionsTable>().put(adminOpts);
       }
       recurse().to<XPeers>().onConfig();
+      if (setupMessage)
+      {
+         to<XHttp>().log(LogMessage::Severity::notice, std::move(*setupMessage));
+      }
    }
 
    AdminOptionsRow XAdmin::options()
