@@ -217,3 +217,15 @@ TEST_CASE("Nested mount with branch")
    CHECK(readFile(mount.open("/two/three/four")) == "4");
    CHECK(readFile(mount.open("/two/three/five/six")) == "6");
 }
+
+TEST_CASE("symlink to sibling directory")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "one" / "two" / "three", "3");
+   writeFile(dir.path / "four" / "five", "5");
+   std::filesystem::create_directory_symlink("two", dir.path / "one" / "link");
+   Mount mount;
+   mount.mount((dir.path / "one").string(), "/");
+   mount.mount((dir.path / "four").string(), "/two/four");
+   CHECK(readFile(mount.open("/link/three")) == "3");
+}

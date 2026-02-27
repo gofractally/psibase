@@ -68,7 +68,8 @@ namespace psibase
                   auto pos = mount->children.find(item);
                   if (pos != mount->children.end())
                   {
-                     mount = &pos->second;
+                     mount   = &pos->second;
+                     mountFd = Fd{-1};
                      return;
                   }
                   if (!mountFd && !mount->hostPath.empty())
