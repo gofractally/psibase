@@ -58,7 +58,7 @@ pub mod server {
     /// Parameters
     /// * `graphql`: The graphql data for the request
     pub fn post_graphql_get_json(graphql: &str) -> Result<String, Error> {
-        server::post_graphql_get_json(&graphql)
+        server::post_graphql_get_json(graphql)
     }
 }
 
