@@ -229,3 +229,16 @@ TEST_CASE("symlink to sibling directory")
    mount.mount((dir.path / "four").string(), "/two/four");
    CHECK(readFile(mount.open("/link/three")) == "3");
 }
+
+TEST_CASE("Symlink OOB above nested mount")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "oob" / "bad", "bad");
+   std::filesystem::create_directories(dir.path / "outer" / "one");
+   std::filesystem::create_directory_symlink(dir.path / "oob", dir.path / "outer" / "one" / "link");
+   writeFile(dir.path / "inner" / "two", "2");
+   Mount mount;
+   mount.mount((dir.path / "outer").string(), "/");
+   mount.mount((dir.path / "inner").string(), "/one/link/inner");
+   CHECK_THROWS_AS(readFile(mount.open("/one/link/bad")), std::system_error);
+}

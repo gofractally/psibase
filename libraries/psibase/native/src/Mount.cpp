@@ -16,10 +16,12 @@ namespace psibase
       template <typename Dir>
       struct PartialPath
       {
-         Dir*               mount;
          std::vector<Dir*>& mountpoints;
-         Fd                 mountFd{-1};
-         std::vector<Fd>    path;
+         Dir*               mount;
+         std::size_t        dirsBelowMount = 0;
+         // Contains file descriptors for [root mount, last dir]
+         // empty if `mount` is not below a mountpoint
+         std::vector<Fd> path;
          // This contains path components to be resolved
          // in reverse order
          std::vector<std::string> stack;
@@ -39,6 +41,83 @@ namespace psibase
             }
             std::ranges::reverse(stack | std::views::drop(initialSize));
          }
+         void addDir(Fd&& dir)
+         {
+            struct stat statbuf;
+            if (::fstat(dir.fd, &statbuf) != 0)
+               throw std::system_error{ENOENT, std::generic_category()};
+            auto type = statbuf.st_mode & S_IFMT;
+            if (type == S_IFLNK)
+            {
+               if (remainingSymlinks == 0)
+                  throw std::system_error(ELOOP, std::generic_category());
+               --remainingSymlinks;
+
+               std::string linkValue(statbuf.st_size ? statbuf.st_size + 1 : 256, '\0');
+               while (true)
+               {
+                  auto sz = ::readlinkat(dir.fd, "", linkValue.data(), linkValue.size());
+                  if (sz < 0)
+                     throw std::system_error{ENOENT, std::generic_category()};
+                  if (static_cast<std::size_t>(sz) == linkValue.size())
+                     linkValue.resize(linkValue.size() * 2);
+                  else
+                  {
+                     linkValue.resize(static_cast<std::size_t>(sz));
+                     break;
+                  }
+               }
+
+               if (!linkValue.ends_with('/'))
+                  linkValue.push_back('/');
+               if (linkValue.starts_with('/'))
+               {
+                  // absolute symlink: find longest matching prefix
+                  auto pos = std::ranges::find_if(mountpoints, [&](const auto& dir)
+                                                  { return linkValue.starts_with(dir->hostPath); });
+                  if (pos == mountpoints.end())
+                     throw std::system_error{ENOENT, std::generic_category()};
+                  mount          = *pos;
+                  dirsBelowMount = 0;
+                  path.clear();
+                  path.push_back(Fd{::open(mount->hostPath.c_str(), O_PATH | O_DIRECTORY)});
+                  linkValue = linkValue.substr(mount->hostPath.size());
+               }
+               else if (dirsBelowMount != 0)
+               {
+                  --dirsBelowMount;
+               }
+               symlinkEnd = std::min(symlinkEnd, stack.size());
+               push(linkValue);
+            }
+            else if (type == S_IFDIR)
+            {
+               path.push_back(std::move(dir));
+            }
+            else
+            {
+               throw std::system_error{ENOTDIR, std::generic_category()};
+            }
+         }
+         // If the file exists and is a directory, returns it
+         // If the file does not exist returns -1,
+         // Otherwise, throws std::system_error
+         // Does NOT dereference symbolic links
+         Fd requireDir(const Fd& parent, const std::string& name)
+         {
+            if (!parent)
+               return Fd{-1};
+            int result = ::openat(parent.fd, name.c_str(), O_PATH | O_DIRECTORY | O_NOFOLLOW);
+            if (result < 0)
+            {
+               // EINVAL catches the case where the filename is invalid
+               if (errno == ENOENT || errno == EINVAL)
+                  return Fd{-1};
+               else
+                  throw std::system_error{ENOTDIR, std::generic_category()};
+            }
+            return Fd{result};
+         }
          void addDir(std::string item)
          {
             if (item == ".")
@@ -46,93 +125,82 @@ namespace psibase
             }
             else if (item == "..")
             {
-               if (path.empty())
-               {
-                  mount   = mount->parent;
-                  mountFd = Fd{-1};
-                  if (symlinkEnd <= stack.size())
-                  {
-                     throw std::system_error{ENOENT, std::generic_category()};
-                  }
-               }
-               else
+               if (!path.empty())
                {
                   path.pop_back();
                }
-               return;
+               else if (mount->isMountpoint)
+               {
+                  // This can only happen after reading an absolute symlink
+                  // that points into a sub-mount.
+                  auto*             base = mount;
+                  std::vector<Dir*> dirs;
+                  do
+                  {
+                     dirs.push_back(base);
+                     base = base->parent;
+                  } while (!base->isMountpoint && base->parent != base);
+                  if (base->isMountpoint)
+                  {
+                     path.push_back(Fd{::open(mount->hostPath.c_str(), O_PATH | O_DIRECTORY)});
+                     for (Dir* d : dirs | std::views::reverse)
+                     {
+                        path.push_back(requireDir(path.back(), d->hostPath));
+                     }
+                     path.pop_back();
+                  }
+               }
+               if (dirsBelowMount == 0)
+               {
+                  // symlinks cannot leave a mount point
+                  if (mount->isMountpoint && symlinkEnd <= stack.size())
+                  {
+                     throw std::system_error{ENOENT, std::generic_category()};
+                  }
+                  mount = mount->parent;
+               }
+               else
+               {
+                  --dirsBelowMount;
+               }
             }
             else
             {
-               if (path.empty())
+               if (dirsBelowMount == 0)
                {
                   auto pos = mount->children.find(item);
                   if (pos != mount->children.end())
                   {
-                     mount   = &pos->second;
-                     mountFd = Fd{-1};
-                     return;
+                     mount = &pos->second;
                   }
-                  if (!mountFd && !mount->hostPath.empty())
+                  else
                   {
-                     mountFd = Fd{::open(mount->hostPath.c_str(), O_PATH | O_DIRECTORY)};
+                     ++dirsBelowMount;
                   }
-                  if (!mountFd)
-                  {
-                     throw std::system_error{ENOENT, std::generic_category()};
-                  }
-               }
-               int         prev = path.empty() ? mountFd.fd : path.back().fd;
-               auto        dir  = Fd{::openat(prev, item.c_str(), O_PATH | O_NOFOLLOW)};
-               struct stat statbuf;
-               if (::fstat(dir.fd, &statbuf) != 0)
-                  throw std::system_error{ENOENT, std::generic_category()};
-               auto type = statbuf.st_mode & S_IFMT;
-               if (type == S_IFLNK)
-               {
-                  if (remainingSymlinks == 0)
-                     throw std::system_error(ELOOP, std::generic_category());
-                  --remainingSymlinks;
-
-                  std::string linkValue(statbuf.st_size ? statbuf.st_size + 1 : 256, '\0');
-                  while (true)
-                  {
-                     auto sz = ::readlinkat(dir.fd, "", linkValue.data(), linkValue.size());
-                     if (sz < 0)
-                        throw std::system_error{ENOENT, std::generic_category()};
-                     if (static_cast<std::size_t>(sz) == linkValue.size())
-                        linkValue.resize(linkValue.size() * 2);
-                     else
-                     {
-                        linkValue.resize(static_cast<std::size_t>(sz));
-                        break;
-                     }
-                  }
-
-                  if (!linkValue.ends_with('/'))
-                     linkValue.push_back('/');
-                  if (linkValue.starts_with('/'))
-                  {
-                     // absolute symlink: find longest matching prefix
-                     auto pos =
-                         std::ranges::find_if(mountpoints, [&](const auto& dir)
-                                              { return linkValue.starts_with(dir->hostPath); });
-                     if (pos == mountpoints.end())
-                        throw std::system_error{ENOENT, std::generic_category()};
-                     mountFd = Fd{-1};
-                     mount   = *pos;
-                     path.clear();
-                     linkValue = linkValue.substr(mount->hostPath.size());
-                  }
-                  symlinkEnd = std::min(symlinkEnd, stack.size());
-                  push(linkValue);
-               }
-               else if (type == S_IFDIR)
-               {
-                  path.push_back(std::move(dir));
                }
                else
                {
-                  throw std::system_error{ENOTDIR, std::generic_category()};
+                  ++dirsBelowMount;
+               }
+               if (dirsBelowMount == 0 && mount->isMountpoint)
+               {
+                  // Entered a new mount point. TODO: This should be an error
+                  // if the host file exists but is not a directory.
+                  path.push_back(Fd{::open(mount->hostPath.c_str(), O_PATH | O_DIRECTORY)});
+               }
+               else if (!path.empty())
+               {
+                  // Following the host file
+                  const Fd& prev = path.back();
+                  auto fd = Fd{prev ? ::openat(prev.fd, item.c_str(), O_PATH | O_NOFOLLOW) : -1};
+                  if (!fd)
+                     path.push_back(std::move(fd));
+                  else
+                     addDir(std::move(fd));
+               }
+               if (dirsBelowMount != 0 && (path.empty() || !path.back()))
+               {
+                  throw std::system_error{ENOENT, std::generic_category()};
                }
             }
          }
@@ -140,21 +208,9 @@ namespace psibase
          {
             if (path.empty())
             {
-               auto pos = mount->children.find(item);
-               if (pos != mount->children.end())
-               {
-                  mount = &pos->second;
-                  return Fd{-1};
-               }
-               if (mount->hostPath.empty())
-                  return Fd{-1};
-               if (!mountFd && !mount->hostPath.empty())
-               {
-                  return Fd{::open((mount->hostPath + item).c_str(), O_RDONLY)};
-               }
+               throw std::system_error{ENOENT, std::generic_category()};
             }
-            auto prev = path.empty() ? mountFd.fd : path.back().fd;
-            return Fd{::openat(prev, item.c_str(), O_RDONLY)};
+            return Fd{::openat(path.back().fd, item.c_str(), O_RDONLY)};
          }
       };
       void validatePath(std::string_view path)
@@ -198,7 +254,7 @@ namespace psibase
                pos->second.parent = current;
                if (!current->hostPath.empty())
                {
-                  pos->second.hostPath = current->hostPath + std::string(item) + '/';
+                  pos->second.hostPath = std::string(item);
                }
             }
             current = &pos->second;
@@ -217,9 +273,9 @@ namespace psibase
          stack.pop_back();
          for (auto& [name, dir] : parent->children)
          {
-            if (!dir.isMountpoint)
+            if (dir.hostPath.empty())
             {
-               dir.hostPath = parent->hostPath + name + '/';
+               dir.hostPath = name;
                stack.push_back(&dir);
             }
          }
@@ -232,7 +288,9 @@ namespace psibase
          throw std::system_error{ENOENT, std::generic_category()};
       if (filename.contains('\0'))
          throw std::system_error{EINVAL, std::generic_category()};
-      PartialPath impl{&root, mountpoints};
+      PartialPath impl{mountpoints, &root};
+      if (root.isMountpoint)
+         impl.path.push_back(Fd{::open(root.hostPath.c_str(), O_PATH | O_DIRECTORY)});
       impl.push(filename);
       if (impl.stack.empty())
          return Fd(-1);
