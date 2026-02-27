@@ -50,6 +50,24 @@ namespace LocalService
                       psibase::CompositeKey<&PeerConnection::outgoing, &PeerConnection::socket>{}>;
    PSIO_REFLECT_TYPENAME(PeerConnectionTable)
 
+   // Accept p2p connections from these users
+   struct PeerUsernameRow
+   {
+      psibase::AccountNumber name;
+      PSIO_REFLECT(PeerUsernameRow, name)
+   };
+   using PeerUsernameTable = psibase::Table<PeerUsernameRow, &PeerUsernameRow::name>;
+   PSIO_REFLECT_TYPENAME(PeerUsernameTable)
+
+   struct UrlAuthRow
+   {
+      std::string url;
+      std::string token;
+      PSIO_REFLECT(UrlAuthRow, url, token)
+   };
+   using UrlAuthTable = psibase::Table<UrlAuthRow, &UrlAuthRow::url>;
+   PSIO_REFLECT_TYPENAME(UrlAuthTable)
+
    struct UrlRow
    {
       std::string   url;
@@ -94,6 +112,7 @@ namespace LocalService
    struct XPeers : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-peers"};
+      using Subjective              = psibase::SubjectiveTables<PeerUsernameTable, UrlAuthTable>;
       using Session                 = psibase::SessionTables<NodeIdTable,
                                                              ConnectionRequestTable,
                                                              PeerConnectionTable,
@@ -122,5 +141,5 @@ namespace LocalService
                 method(recvP2P, socket, data),
                 method(closeP2P, socket),
                 method(onTimer, timerId))
-   PSIBASE_REFLECT_TABLES(XPeers, XPeers::Session)
+   PSIBASE_REFLECT_TABLES(XPeers, XPeers::Subjective, XPeers::Session)
 }  // namespace LocalService

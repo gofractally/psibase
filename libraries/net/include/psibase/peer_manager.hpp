@@ -32,10 +32,7 @@ namespace psibase::net
          // The server is restarting
          restart
       };
-      connection_base()
-      {
-         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("p2p")));
-      }
+      connection_base() {}
       using read_handler  = std::function<void(const std::error_code&, std::vector<char>&&)>;
       using write_handler = std::function<void(const std::error_code&)>;
       virtual void async_write(std::vector<char>&&, write_handler) = 0;

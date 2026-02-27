@@ -15,7 +15,13 @@ namespace psibase::http
                        http_session_base::request_type&& req,
                        http_session_base&                send);
 
-   http_session_base::~http_session_base() = default;
+   http_session_base::~http_session_base()
+   {
+      if (!_moved)
+      {
+         PSIBASE_LOG(logger, debug) << "Connection closed";
+      }
+   }
    http_session_base::http_session_base(server_state& server) : server(server)
    {
       static_assert(limit > 0, "queue limit must be positive");

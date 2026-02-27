@@ -4,12 +4,14 @@ The `x-peers` service manages connections to other nodes.
 
 ## HTTP Endpoints
 
-| Method | URL           | Description                                                  |
-|--------|---------------|--------------------------------------------------------------|
-| `POST` | `/graphql`    | Handles GraphQL queries                                      |
-| `POST` | `/connect`    | Connects to another node                                     |
-| `POST` | `/disconnect` | Disconnects an existing peer connection                      |
-| `GET`  | `/p2p`        | WebSocket endpoint that accepts connections from other nodes |
+| Method | URL              | Description                                                      |
+|--------|------------------|------------------------------------------------------------------|
+| `POST` | `/graphql`       | Handles GraphQL queries                                          |
+| `POST` | `/connect`       | Connects to another node                                         |
+| `POST` | `/disconnect`    | Disconnects an existing peer connection                          |
+| `POST` | `/users`         | Changes whether a user account is allowed to peer with this node |
+| `POST` | `/authorization` | Sets a token to be passed with peering requests                  |
+| `GET`  | `/p2p`           | WebSocket endpoint that accepts connections from other nodes     |
 
 
 ### GraphQL
@@ -62,6 +64,24 @@ type Peer {
 |-------|--------|-----------------------------------|
 | `id`  | Number | The id of the connection to close |
 
+### users
+
+`/users` adds or removes a user from the list of accounts that are allowed to peer with this node.
+
+| Field     | Type    | Description                                 |
+|-----------|---------|---------------------------------------------|
+| `account` | String  | An on-chain account                         |
+| `accept`  | Boolean | Whether peering requests should be accepted |
+
+### authorization
+
+`/authorization` sets a token to be passed with outgoing peering requests to a specific peer.
+
+| Field   | Type           | Description                                              |
+|---------|----------------|----------------------------------------------------------|
+| `url`   | String         | The peer that the token should be used for               |
+| `token` | String or null | A bearer token to be passed in an `Authorization` header |
+
 ### p2p
 
-`/p2p` accepts incoming p2p connections. This requires the [`p2p` config option](../run-infrastructure/administration.md#server-configuration) to be enabled.
+`/p2p` accepts incoming p2p connections. This requires the [`p2p` config option](../run-infrastructure/administration.md#server-configuration) to be enabled or for the request to be from a whitelisted account.

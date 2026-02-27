@@ -4,11 +4,14 @@
 #include <psibase/dispatch.hpp>
 #include <psibase/serveGraphQL.hpp>
 #include <services/local/XAdmin.hpp>
+#include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XTimer.hpp>
+#include <services/system/RTransact.hpp>
 
 using namespace psibase;
 using namespace LocalService;
+using namespace SystemService;
 
 namespace
 {
@@ -31,6 +34,34 @@ namespace
       PSIO_REFLECT(DisconnectRequest, id)
    };
 
+   struct UserRequest
+   {
+      AccountNumber account;
+      bool          accept = true;
+      PSIO_REFLECT(UserRequest, account, accept)
+   };
+
+   struct AuthorizationRequest
+   {
+      std::string                url;
+      std::optional<std::string> token;
+      PSIO_REFLECT(AuthorizationRequest, url, token)
+   };
+
+   HttpReply error(HttpStatus status, std::string_view msg)
+   {
+      return HttpReply{.status = status, .contentType = "text/html", .body{msg.begin(), msg.end()}};
+   }
+
+   bool chainIsBooted()
+   {
+      auto mode   = KvMode::read;
+      auto prefix = std::span<const char>();
+      auto native = Native::Tables{to<XDb>().open(DbId::native, prefix, mode), mode};
+      auto row    = native.open<StatusTable>().get({});
+      return row && row->head;
+   }
+
    constexpr MicroSeconds timeoutBase  = std::chrono::seconds(30);
    constexpr MicroSeconds timeoutDelta = std::chrono::seconds(30);
    constexpr MicroSeconds timeoutMax   = std::chrono::seconds(300);
@@ -41,7 +72,10 @@ namespace
       auto urlTimers = XPeers{}.open<UrlTimerTable>();
       auto row       = urls.get(url);
       if (!row)
-         row = {url, 0, false, timeoutBase, MonotonicTimePointUSec::min(), std::nullopt};
+      {
+         auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+         row      = {url, 0, false, timeoutBase, now + timeoutBase, std::nullopt};
+      }
       if (row->timerId)
       {
          to<XTimer>().cancel(*row->timerId);
@@ -134,6 +168,14 @@ namespace
          local        = true;
          request.host = "x-peers.psibase.localhost";
          endpoint     = LocalEndpoint{peer};
+      }
+      auto authTable = XPeers{}.open<UrlAuthTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto auth = authTable.get(peer))
+         {
+            request.headers.push_back({"Authorization", "Bearer " + auth->token});
+         }
       }
       std::int32_t socket = to<XHttp>().websocket(request, std::move(tls), std::move(endpoint));
 
@@ -407,6 +449,31 @@ namespace
       }
    }
 
+   std::optional<HttpReply> checkP2PAuth(const HttpRequest& req)
+   {
+      std::optional<AccountNumber> user;
+      if (chainIsBooted())
+      {
+         user = to<RTransact>().getUser(req);
+      }
+      bool okay;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         okay = false;
+         if (user && XPeers{}.open<PeerUsernameTable>().get(*user))
+            okay = true;
+         else
+         {
+            auto options = to<XAdmin>().options();
+            if (options.p2p)
+               okay = true;
+         }
+      }
+      if (okay)
+         return {};
+      return error(user ? HttpStatus::forbidden : HttpStatus::unauthorized, "Not authorized");
+   }
+
    struct GQLPeerConnection
    {
       std::int32_t             id;
@@ -432,6 +499,15 @@ namespace
       PSIO_REFLECT(GQLPeerConnection, id, urls, hosts, method(endpoint))
    };
 
+   struct GQLUrl
+   {
+      std::string   url;
+      std::uint32_t refcount;
+      bool          hasToken() const { return XPeers{}.open<UrlAuthTable>().get(url).has_value(); }
+      bool          connected() const { return refcount != 0; }
+      PSIO_REFLECT(GQLUrl, url, method(hasToken), method(connected))
+   };
+
    struct Query
    {
       auto peers() const
@@ -443,7 +519,14 @@ namespace
                                          std::move(row.hosts)};
              }};
       }
-      PSIO_REFLECT(Query, method(peers))
+      auto urls() const
+      {
+         return TransformedConnection{
+             XPeers{}.open<UrlTable>().getIndex<0>(),
+             [](UrlRow&& row) { return GQLUrl{std::move(row.url), std::move(row.refcount)}; }};
+      }
+      auto users() const { return XPeers{}.open<PeerUsernameTable>().getIndex<0>(); }
+      PSIO_REFLECT(Query, method(peers), method(urls), method(users))
    };
 
 }  // namespace
@@ -456,50 +539,50 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
    auto target = request.path();
    if (target == "/p2p")
    {
-      auto options = to<XAdmin>().options();
-      if (options.p2p)
+      if (auto reply = checkP2PAuth(request))
+         return reply;
+
+      if (auto reply = webSocketHandshake(request))
       {
-         if (auto reply = webSocketHandshake(request))
+         if (auto origin = request.getHeader("origin"))
          {
-            if (auto origin = request.getHeader("origin"))
+            if (allowCorsSubdomains(request).empty())
             {
-               if (allowCorsSubdomains(request).empty())
-               {
-                  std::string_view msg{"Cross-origin request refused"};
-                  return HttpReply{.status      = HttpStatus::badRequest,
-                                   .contentType = "text/html",
-                                   .body{msg.begin(), msg.end()}};
-               }
+               std::string_view msg{"Cross-origin request refused"};
+               return HttpReply{.status      = HttpStatus::badRequest,
+                                .contentType = "text/html",
+                                .body{msg.begin(), msg.end()}};
             }
-            to<XHttp>().accept(*socket, *reply);
-            auto table = Native::session().open<SocketTable>();
-            auto peers = open<PeerConnectionTable>();
-            PSIBASE_SUBJECTIVE_TX
-            {
-               auto  row     = table.get(*socket).value();
-               auto& oldInfo = std::get<WebSocketInfo>(row.info);
-               row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
-               table.put(row);
-               peers.put({.socket     = *socket,
-                          .peerSocket = -1,
-                          .nodeId     = 0,
-                          .secure     = false,
-                          .local      = false,
-                          .outgoing   = false});
-               to<XHttp>().setCallback(*socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
-            }
-            to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
-            to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}));
-            return {};
          }
-         else
+         to<XHttp>().accept(*socket, *reply);
+         auto table = Native::session().open<SocketTable>();
+         auto peers = open<PeerConnectionTable>();
+         PSIBASE_SUBJECTIVE_TX
          {
-            std::string_view msg{"/p2p is a websocket endpoint"};
-            return HttpReply{.status      = HttpStatus::upgradeRequired,
-                             .contentType = "text/html",
-                             .body{msg.begin(), msg.end()},
-                             .headers = {{"Upgrade", "websocket"}}};
+            auto  row     = table.get(*socket).value();
+            auto& oldInfo = std::get<WebSocketInfo>(row.info);
+            row.info      = P2PSocketInfo{std::move(oldInfo.endpoint), std::move(oldInfo.tls)};
+            table.put(row);
+            peers.put({.socket     = *socket,
+                       .peerSocket = -1,
+                       .nodeId     = 0,
+                       .secure     = false,
+                       .local      = false,
+                       .outgoing   = false});
+            to<XHttp>().setCallback(*socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
          }
+         auto options = to<XAdmin>().options();
+         to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
+         to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}));
+         return {};
+      }
+      else
+      {
+         std::string_view msg{"/p2p is a websocket endpoint"};
+         return HttpReply{.status      = HttpStatus::upgradeRequired,
+                          .contentType = "text/html",
+                          .body{msg.begin(), msg.end()},
+                          .headers = {{"Upgrade", "websocket"}}};
       }
    }
 
@@ -566,6 +649,54 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
                           .body{msg.begin(), msg.end()},
                           .headers = allowCors(request, XAdmin::service)};
       }
+   }
+   else if (target == "/users")
+   {
+      if (request.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
+
+      auto body = psio::convert_from_json<UserRequest>(
+          std::string(request.body.begin(), request.body.end()));
+
+      auto table = open<PeerUsernameTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (body.accept)
+         {
+            table.put({body.account});
+         }
+         else
+         {
+            table.erase(body.account);
+         }
+      }
+      return HttpReply{.headers = allowCors(request, XAdmin::service)};
+   }
+   else if (target == "/authorization")
+   {
+      if (request.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+      if (request.method != "POST")
+         return HttpReply::methodNotAllowed(request);
+
+      auto body = psio::convert_from_json<AuthorizationRequest>(
+          std::string(request.body.begin(), request.body.end()));
+
+      auto table = open<UrlAuthTable>();
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (body.token)
+         {
+            table.put({body.url, *body.token});
+         }
+         else
+         {
+            table.erase(body.url);
+         }
+      }
+      return HttpReply{.headers = allowCors(request, XAdmin::service)};
    }
    else if (target == "/peers")
    {
@@ -651,7 +782,10 @@ void XPeers::onConfig()
       {
          auto url = urls.get(peer);
          if (!url)
-            url = {peer, 0, false, timeoutBase, MonotonicTimePointUSec::min(), std::nullopt};
+         {
+            auto now = std::chrono::time_point_cast<MicroSeconds>(std::chrono::steady_clock::now());
+            url      = {peer, 0, false, timeoutBase, now + timeoutBase, std::nullopt};
+         }
          if (!url->autoconnect)
          {
             url->autoconnect = true;
