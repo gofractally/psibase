@@ -425,13 +425,12 @@ impl UserGuild for FractallyPlugin {
         pre_attest: bool,
     ) -> Result<String, Error> {
         let fractal = get_guild(guild_account.clone())?.fractal.to_string();
-        let (invite_token, invite_id, invite_payload, _) =
-            bindings::invite::plugin::inviter::prepare_new_invite(1, &fractal)?;
+        let d = bindings::invite::plugin::inviter::prepare_new_invite(1, &fractal)?;
 
         let packed_args = fractals::action_structs::inv_g_member {
             guild: guild_account.as_str().into(),
-            invite_id,
-            invite_payload,
+            invite_id: d.invite_id,
+            invite_payload: d.payload,
             pre_attest,
             num_accounts,
         }
@@ -443,7 +442,7 @@ impl UserGuild for FractallyPlugin {
         )
         .unwrap();
 
-        Ok(invite_token)
+        Ok(d.invite_token)
     }
 
     fn register_candidacy(guild_account: String, active: bool) -> Result<(), Error> {

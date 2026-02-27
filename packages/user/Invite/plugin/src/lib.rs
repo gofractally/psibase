@@ -27,7 +27,9 @@ use host::common::{client as Client, client::get_receiver, server as Server};
 use host::crypto::keyvault;
 use host::types::types as HostTypes;
 use invite::plugin::{
-    invitee::Guest as Invitee, inviter::Guest as Inviter, redemption::Guest as Redemption,
+    invitee::Guest as Invitee,
+    inviter::{Guest as Inviter, InviteDetails},
+    redemption::Guest as Redemption,
 };
 use psibase::define_trust;
 use psibase::{
@@ -90,7 +92,7 @@ fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
 fn prepare_new_invite_impl(
     num_accounts: u16,
     service_name: String,
-) -> Result<(String, u32, Vec<u8>, String), HostTypes::Error> {
+) -> Result<InviteDetails, HostTypes::Error> {
     let keypair = keyvault::generate_unmanaged_keypair()?;
     let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
@@ -119,7 +121,12 @@ fn prepare_new_invite_impl(
     }
     .packed();
 
-    Ok((invite_token, invite_id, payload, min_cost))
+    Ok(InviteDetails {
+        invite_token,
+        invite_id,
+        payload,
+        min_cost,
+    })
 }
 
 impl Invitee for InvitePlugin {
@@ -236,8 +243,12 @@ impl Inviter for InvitePlugin {
             trust::FunctionName::generate_invite,
             vec!["homepage".into()],
         )?;
-        let (invite_token, invite_id, payload, min_cost) =
-            prepare_new_invite_impl(1, get_receiver())?;
+        let InviteDetails {
+            invite_token,
+            invite_id,
+            payload,
+            min_cost,
+        } = prepare_new_invite_impl(1, get_receiver())?;
 
         let min_cost_u64 = Decimal::from_str(&min_cost).unwrap().quantity.value;
 
@@ -259,7 +270,7 @@ impl Inviter for InvitePlugin {
     fn prepare_new_invite(
         num_accounts: u16,
         service_name: String,
-    ) -> Result<(String, u32, Vec<u8>, String), HostTypes::Error> {
+    ) -> Result<InviteDetails, HostTypes::Error> {
         assert_authorized(trust::FunctionName::prepare_new_invite)?;
 
         prepare_new_invite_impl(num_accounts, service_name)
