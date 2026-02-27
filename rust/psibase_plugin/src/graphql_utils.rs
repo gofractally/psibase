@@ -2,6 +2,7 @@
 #![allow(unused)]
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::VecDeque;
 
 pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
     let vars_json = serde_json::to_value(variables).expect("Failed to serialize GraphQL variables");
@@ -11,26 +12,13 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
     if let Some(open_brace) = result.find('{') {
         let prefix = &result[..open_brace];
         if let Some(open_paren) = prefix.find('(') {
-            let mut depth: u32 = 0;
-            let mut close_paren = open_paren;
-            for (i, ch) in result[open_paren..].char_indices() {
-                match ch {
-                    '(' => depth += 1,
-                    ')' => {
-                        depth -= 1;
-                        if depth == 0 {
-                            close_paren = open_paren + i;
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
+            if let Some(close_paren) = find_matching_paren(&result, open_paren) {
+                result = format!(
+                    "{}{}",
+                    result[..open_paren].trim_end(),
+                    &result[close_paren + 1..]
+                );
             }
-            result = format!(
-                "{}{}",
-                result[..open_paren].trim_end(),
-                &result[close_paren + 1..]
-            );
         }
     }
 
@@ -47,88 +35,179 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
     result
 }
 
-fn replace_variable(query: &str, name: &str, replacement: &str) -> String {
-    enum State {
-        Normal,
-        LineComment,
-        StringLit,
-        BlockString,
-    }
-    let pattern = format!("${}", name);
-    let mut result = String::with_capacity(query.len());
-    let mut i = 0;
-    let chars: Vec<char> = query.chars().collect();
-    let n = chars.len();
-    let mut state = State::Normal;
+enum LexState {
+    Normal,
+    LineComment,
+    StringLit,
+    BlockString,
+}
 
-    while i < n {
-        match &state {
-            State::Normal => {
-                if chars[i] == '#' {
-                    state = State::LineComment;
-                    result.push(chars[i]);
-                    i += 1;
-                } else if i + 2 < n && chars[i] == '"' && chars[i + 1] == '"' && chars[i + 2] == '"'
-                {
-                    state = State::BlockString;
-                    result.push_str("\"\"\"");
-                    i += 3;
-                } else if chars[i] == '"' {
-                    state = State::StringLit;
-                    result.push('"');
-                    i += 1;
-                } else if chars[i] == '$' && i + pattern.len() <= n {
-                    let chunk: String = chars[i..i + pattern.len()].iter().collect();
-                    if chunk == pattern {
-                        let next_ok = i + pattern.len() >= n || {
-                            let c = chars[i + pattern.len()];
-                            c != '_' && !c.is_ascii_alphanumeric()
-                        };
-                        if next_ok {
-                            result.push_str(replacement);
-                            i += pattern.len();
-                            continue;
-                        }
-                    }
-                    result.push(chars[i]);
-                    i += 1;
+struct GraphQLLexer {
+    chars: Vec<char>,
+    n: usize,
+    i: usize,
+    state: LexState,
+    pending: VecDeque<(usize, char, bool)>,
+}
+
+impl GraphQLLexer {
+    fn new(s: &str, start: usize) -> Self {
+        let chars: Vec<char> = s.chars().collect();
+        let n = chars.len();
+        Self {
+            chars,
+            n,
+            i: start,
+            state: LexState::Normal,
+            pending: VecDeque::new(),
+        }
+    }
+
+    fn next_raw(&mut self) -> Option<(usize, char, bool)> {
+        if let Some(item) = self.pending.pop_front() {
+            return Some(item);
+        }
+        let n = self.n;
+        let chars = &self.chars;
+        let i = &mut self.i;
+        let state = &mut self.state;
+        let pending = &mut self.pending;
+
+        if *i >= n {
+            return None;
+        }
+
+        let in_syntax = matches!(state, LexState::Normal);
+        let c = chars[*i];
+
+        match state {
+            LexState::Normal => {
+                if c == '#' {
+                    *state = LexState::LineComment;
+                    let idx = *i;
+                    *i += 1;
+                    Some((idx, c, true))
+                } else if *i + 2 < n && c == '"' && chars[*i + 1] == '"' && chars[*i + 2] == '"' {
+                    *state = LexState::BlockString;
+                    let idx = *i;
+                    pending.push_back((idx + 1, '"', true));
+                    pending.push_back((idx + 2, '"', true));
+                    *i += 3;
+                    Some((idx, c, true))
+                } else if c == '"' {
+                    *state = LexState::StringLit;
+                    let idx = *i;
+                    *i += 1;
+                    Some((idx, c, true))
                 } else {
-                    result.push(chars[i]);
-                    i += 1;
+                    let idx = *i;
+                    *i += 1;
+                    Some((idx, c, true))
                 }
             }
-            State::LineComment => {
-                result.push(chars[i]);
-                if chars[i] == '\n' || chars[i] == '\r' {
-                    state = State::Normal;
+            LexState::LineComment => {
+                let idx = *i;
+                if c == '\n' || c == '\r' {
+                    *state = LexState::Normal;
                 }
-                i += 1;
+                *i += 1;
+                Some((idx, c, false))
             }
-            State::StringLit => {
-                if chars[i] == '\\' && i + 1 < n {
-                    result.push(chars[i]);
-                    result.push(chars[i + 1]);
-                    i += 2;
-                } else if chars[i] == '"' {
-                    result.push('"');
-                    state = State::Normal;
-                    i += 1;
+            LexState::StringLit => {
+                let idx = *i;
+                if c == '\\' && *i + 1 < n {
+                    pending.push_back((*i + 1, chars[*i + 1], false));
+                    *i += 2;
+                    Some((idx, c, false))
+                } else if c == '"' {
+                    *state = LexState::Normal;
+                    *i += 1;
+                    Some((idx, c, false))
                 } else {
-                    result.push(chars[i]);
-                    i += 1;
+                    *i += 1;
+                    Some((idx, c, false))
                 }
             }
-            State::BlockString => {
-                if i + 2 < n && chars[i] == '"' && chars[i + 1] == '"' && chars[i + 2] == '"' {
-                    result.push_str("\"\"\"");
-                    state = State::Normal;
-                    i += 3;
+            LexState::BlockString => {
+                let idx = *i;
+                if *i + 2 < n && c == '"' && chars[*i + 1] == '"' && chars[*i + 2] == '"' {
+                    *state = LexState::Normal;
+                    pending.push_back((*i + 1, '"', false));
+                    pending.push_back((*i + 2, '"', false));
+                    *i += 3;
+                    Some((idx, c, false))
                 } else {
-                    result.push(chars[i]);
-                    i += 1;
+                    *i += 1;
+                    Some((idx, c, false))
                 }
             }
         }
+    }
+
+    fn next(&mut self) -> Option<(usize, char)> {
+        while let Some((i, c, in_syntax)) = self.next_raw() {
+            if in_syntax {
+                return Some((i, c));
+            }
+        }
+        None
+    }
+
+    fn peek_chars(&self, len: usize) -> Option<&[char]> {
+        if self.i + len <= self.n {
+            Some(&self.chars[self.i..self.i + len])
+        } else {
+            None
+        }
+    }
+
+    fn skip(&mut self, count: usize) {
+        for _ in 0..count {
+            self.next_raw();
+        }
+    }
+}
+
+fn find_matching_paren(s: &str, open_at: usize) -> Option<usize> {
+    let mut lexer = GraphQLLexer::new(s, open_at);
+    let mut depth: u32 = 0;
+
+    while let Some((i, c)) = lexer.next() {
+        if c == '(' {
+            depth += 1;
+        } else if c == ')' {
+            depth = depth.checked_sub(1)?;
+            if depth == 0 {
+                return Some(i);
+            }
+        }
+    }
+    None
+}
+
+fn replace_variable(query: &str, name: &str, replacement: &str) -> String {
+    let pattern = format!("${}", name);
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+    let plen = pattern_chars.len();
+    let mut result = String::with_capacity(query.len());
+    let mut lexer = GraphQLLexer::new(query, 0);
+
+    while let Some((_i, c, in_syntax)) = lexer.next_raw() {
+        if in_syntax && c == '$' {
+            if let Some(chunk) = lexer.peek_chars(plen - 1) {
+                let full_match = chunk == &pattern_chars[1..]
+                    && (lexer.i + plen - 1 >= lexer.n || {
+                        let next_c = lexer.chars[lexer.i + plen - 1];
+                        next_c != '_' && !next_c.is_ascii_alphanumeric()
+                    });
+                if full_match {
+                    result.push_str(replacement);
+                    lexer.skip(plen - 1);
+                    continue;
+                }
+            }
+        }
+        result.push(c);
     }
 
     result
@@ -288,6 +367,34 @@ mod tests {
         };
         let result = inline_variables(query, &vars);
         assert_eq!(result, "query GetUser { user(name: \"alice\") }");
+    }
+
+    #[test]
+    fn test_inline_variables_def_with_comment() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query = "query($id: Int! # id param\n) { f(id: $id) }";
+        let vars = Vars { id: 1 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(id: 1) }");
+    }
+
+    #[test]
+    fn test_inline_variables_def_with_string() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+            msg: String,
+        }
+        let query = "query($id: Int!, $msg: String = \"contains ) paren\") { f(id: $id, msg: $msg) }";
+        let vars = Vars {
+            id: 1,
+            msg: "hello".to_string(),
+        };
+        let result = inline_variables(query, &vars);
+        assert_eq!(result, "query { f(id: 1, msg: \"hello\") }");
     }
 
     #[test]
