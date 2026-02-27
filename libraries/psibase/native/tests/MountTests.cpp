@@ -243,6 +243,17 @@ TEST_CASE("Symlink OOB above nested mount")
    CHECK_THROWS_AS(readFile(mount.open("/one/link/bad")), std::system_error);
 }
 
+TEST_CASE("bad nested mount point")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "outer" / "one", "1");
+   writeFile(dir.path / "inner" / "two", "2");
+   Mount mount;
+   mount.mount((dir.path / "outer").string(), "/");
+   mount.mount((dir.path / "inner").string(), "/one");
+   CHECK_THROWS_AS(readFile(mount.open("/one/two")), std::system_error);
+}
+
 TEST_CASE("Absolute symlink before ..")
 {
    TempDirectory dir;
@@ -253,6 +264,31 @@ TEST_CASE("Absolute symlink before ..")
    mount.mount((dir.path / "outer").string(), "/");
    mount.mount((dir.path / "inner").string(), "/one/inner");
    CHECK(readFile(mount.open("/link/../../one/two")) == "2");
+}
+
+TEST_CASE("Absolute symlink before .. without parent")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "outer" / "one" / "two", "2");
+   writeFile(dir.path / "inner" / "three", "3");
+   std::filesystem::create_directory_symlink(dir.path / "inner", dir.path / "outer" / "link");
+   Mount mount;
+   mount.mount((dir.path / "outer").string(), "/outer");
+   mount.mount((dir.path / "inner").string(), "/one/inner");
+   CHECK(readFile(mount.open("/outer/link/../../outer/one/two")) == "2");
+}
+
+TEST_CASE("Absolute symlink before .. with bad parent")
+{
+   TempDirectory dir;
+   writeFile(dir.path / "outer" / "one" / "two", "2");
+   writeFile(dir.path / "outer" / "one" / "inner", "bad");
+   writeFile(dir.path / "inner" / "three", "3");
+   std::filesystem::create_directory_symlink(dir.path / "inner", dir.path / "outer" / "link");
+   Mount mount;
+   mount.mount((dir.path / "outer").string(), "/");
+   mount.mount((dir.path / "inner").string(), "/one/inner");
+   CHECK_THROWS_AS(readFile(mount.open("/link/../../one/two")), std::system_error);
 }
 
 TEST_CASE(".. in mounted root")

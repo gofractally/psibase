@@ -145,7 +145,7 @@ namespace psibase
                      path.push_back(Fd{::open(base->hostPath.c_str(), O_PATH | O_DIRECTORY)});
                      for (Dir* d : dirs | std::views::reverse)
                      {
-                        path.push_back(requireDir(path.back(), d->hostPath));
+                        path.push_back(requireDir(path.back(), d->name));
                      }
                      path.pop_back();
                   }
@@ -184,8 +184,9 @@ namespace psibase
                }
                if (dirsBelowMount == 0 && mount->isMountpoint)
                {
-                  // Entered a new mount point. TODO: This should be an error
-                  // if the host file exists but is not a directory.
+                  // Entered a new mount point.
+                  if (!path.empty())
+                     requireDir(path.back(), item);
                   path.push_back(Fd{::open(mount->hostPath.c_str(), O_PATH | O_DIRECTORY)});
                }
                else if (!path.empty())
@@ -252,10 +253,7 @@ namespace psibase
             if (inserted)
             {
                pos->second.parent = current;
-               if (!current->hostPath.empty())
-               {
-                  pos->second.hostPath = std::string(item);
-               }
+               pos->second.name   = item;
             }
             current = &pos->second;
          }
@@ -265,21 +263,6 @@ namespace psibase
       mountpoints.insert(pos, current);
       current->isMountpoint = true;
       current->hostPath     = std::move(hostpath);
-      std::vector<Dir*> stack;
-      stack.push_back(current);
-      while (!stack.empty())
-      {
-         auto parent = stack.back();
-         stack.pop_back();
-         for (auto& [name, dir] : parent->children)
-         {
-            if (dir.hostPath.empty())
-            {
-               dir.hostPath = name;
-               stack.push_back(&dir);
-            }
-         }
-      }
    }
 
    Fd Mount::open(std::string_view filename)

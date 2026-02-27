@@ -42,6 +42,7 @@ namespace psibase
      private:
       struct Dir
       {
+         std::string                name;
          std::string                hostPath;
          Dir*                       parent;
          bool                       isMountpoint;
