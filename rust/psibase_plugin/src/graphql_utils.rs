@@ -9,18 +9,7 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
 
     let mut result = query.to_string();
 
-    if let Some(open_brace) = result.find('{') {
-        let prefix = &result[..open_brace];
-        if let Some(open_paren) = prefix.find('(') {
-            if let Some(close_paren) = find_matching_paren(&result, open_paren) {
-                result = format!(
-                    "{}{}",
-                    result[..open_paren].trim_end(),
-                    &result[close_paren + 1..]
-                );
-            }
-        }
-    }
+    result = strip_var_definitions(&result);
 
     if let Value::Object(map) = vars_json {
         let mut vars: Vec<_> = map.into_iter().collect();
@@ -32,6 +21,70 @@ pub fn inline_variables<V: Serialize>(query: &str, variables: &V) -> String {
         }
     }
 
+    result
+}
+
+fn strip_var_definitions(s: &str) -> String {
+    const OPS: &[&str] = &["query", "mutation", "subscription"];
+    let mut lexer = GraphQLLexer::new(s, 0);
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+
+    while let Some((start, c)) = lexer.next() {
+        let op = match c {
+            'q' => "query",
+            'm' => "mutation",
+            's' => "subscription",
+            _ => continue,
+        };
+        let rest_len = op.len() - 1;
+        let Some(rest) = lexer.peek_chars(rest_len) else {
+            continue;
+        };
+        let full: String = rest.iter().collect();
+        if full != &op[1..] {
+            continue;
+        }
+        let after = lexer.i + rest_len;
+        if after < lexer.n {
+            let next_c = lexer.chars[after];
+            if next_c == '_' || next_c.is_ascii_alphanumeric() {
+                continue;
+            }
+        }
+        for _ in 0..op.len() - 1 {
+            lexer.next();
+        }
+        while let Some((idx, c)) = lexer.next() {
+            if c == '(' {
+                if let Some(close) = find_matching_paren(s, idx) {
+                    spans.push((idx, close));
+                }
+                break;
+            }
+            if c == '{' {
+                break;
+            }
+        }
+    }
+
+    let mut result = s.to_string();
+    for (open, close) in spans.into_iter().rev() {
+        let open_byte = s
+            .char_indices()
+            .nth(open)
+            .map(|(b, _)| b)
+            .unwrap_or(s.len());
+        let close_byte = s
+            .char_indices()
+            .nth(close + 1)
+            .map(|(b, _)| b)
+            .unwrap_or(s.len());
+        result = format!(
+            "{}{}",
+            result[..open_byte].trim_end(),
+            &result[close_byte..]
+        );
+    }
     result
 }
 
@@ -382,13 +435,90 @@ mod tests {
     }
 
     #[test]
+    fn test_inline_variables_fragment_before_query() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query = "fragment F on User { id } query GetUser($id: Int!) { user(id: $id) { ...F } }";
+        let vars = Vars { id: 42 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            "fragment F on User { id } query GetUser { user(id: 42) { ...F } }"
+        );
+    }
+
+    #[test]
+    fn test_inline_variables_description_before_query() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query =
+            r#""""Fetches a user by ID""" query GetUser($id: Int!) { user(id: $id) { id } }"#;
+        let vars = Vars { id: 42 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            r#""""Fetches a user by ID""" query GetUser { user(id: 42) { id } }"#
+        );
+    }
+
+    #[test]
+    fn test_inline_variables_comments_before_query() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query =
+            "# schema comment\n# another line\nquery GetUser($id: Int!) { user(id: $id) { id } }";
+        let vars = Vars { id: 42 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            "# schema comment\n# another line\nquery GetUser { user(id: 42) { id } }"
+        );
+    }
+
+    #[test]
+    fn test_inline_variables_combined_before_query() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let prefix = "\"\"\"Schema for users\"\"\" # Comment\nfragment F on User { id }\nmutation CreateUser { createUser { id } }\nquery GetUser";
+        let query = format!("{}($id: Int!) {{ user(id: $id) {{ ...F }} }}", prefix);
+        let vars = Vars { id: 42 };
+        let result = inline_variables(&query, &vars);
+        let expected = format!("{} {{ user(id: 42) {{ ...F }} }}", prefix);
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_inline_variables_other_operation_before_query() {
+        #[derive(serde::Serialize)]
+        struct Vars {
+            id: i32,
+        }
+        let query = "mutation CreateUser { createUser { id } } query GetUser($id: Int!) { user(id: $id) { id } }";
+        let vars = Vars { id: 42 };
+        let result = inline_variables(query, &vars);
+        assert_eq!(
+            result,
+            "mutation CreateUser { createUser { id } } query GetUser { user(id: 42) { id } }"
+        );
+    }
+
+    #[test]
     fn test_inline_variables_def_with_string() {
         #[derive(serde::Serialize)]
         struct Vars {
             id: i32,
             msg: String,
         }
-        let query = "query($id: Int!, $msg: String = \"contains ) paren\") { f(id: $id, msg: $msg) }";
+        let query =
+            "query($id: Int!, $msg: String = \"contains ) paren\") { f(id: $id, msg: $msg) }";
         let vars = Vars {
             id: 1,
             msg: "hello".to_string(),
