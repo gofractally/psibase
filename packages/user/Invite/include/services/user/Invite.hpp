@@ -62,7 +62,7 @@ namespace UserService
          /// If `useHooks` is true, the caller must be an account with a service deployed on it
          /// that implements the InviteHooks interface.
          uint32_t createInvite(uint32_t              inviteId,
-                               psibase::Checksum256  fingerprint,
+                               std::vector<uint8_t>  fingerprint,
                                uint16_t              numAccounts,
                                bool                  useHooks,
                                std::string           secret,

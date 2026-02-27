@@ -96,7 +96,7 @@ mod service {
     #[action]
     fn createInvite(
         inviteId: u32,
-        fingerprint: crate::Checksum256,
+        fingerprint: Vec<u8>,
         numAccounts: u16,
         useHooks: bool,
         secret: String,

@@ -210,9 +210,7 @@ impl Inviter for InvitePlugin {
             createInvite::ACTION_NAME,
             &createInvite {
                 inviteId: details.invite_id,
-                fingerprint: psibase::Checksum256::from(
-                    <[u8; 32]>::try_from(details.fingerprint.as_slice()).unwrap(),
-                ),
+                fingerprint: details.fingerprint,
                 numAccounts: 1,
                 useHooks: false,
                 secret: details.encrypted_secret,

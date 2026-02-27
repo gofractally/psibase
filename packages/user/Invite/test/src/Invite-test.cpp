@@ -70,8 +70,9 @@ namespace
 // Helper functions for tests
 auto createInvite = [](auto& user, const auto& pubKey)
 {
-   Checksum256 fingerprint = psibase::sha256(pubKey.data.data(), pubKey.data.size());
-   return user.createInvite(++inviteId, fingerprint, 1, false, "", 0);
+   Checksum256 fingerprint     = psibase::sha256(pubKey.data.data(), pubKey.data.size());
+   auto        fingerprint_vec = std::vector<uint8_t>{fingerprint.begin(), fingerprint.end()};
+   return user.createInvite(++inviteId, fingerprint_vec, 1, false, "", 0);
 };
 
 // - Auth

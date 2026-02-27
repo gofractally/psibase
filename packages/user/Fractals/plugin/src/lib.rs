@@ -428,11 +428,9 @@ impl UserGuild for FractallyPlugin {
         let (invite_token, invite_details, _) =
             bindings::invite::plugin::inviter::prepare_new_invite(1, &fractal)?;
 
-        let finger_print: [u8; 32] = invite_details.fingerprint.try_into().unwrap();
-
         let packed_args = fractals::action_structs::inv_g_member {
             guild: guild_account.as_str().into(),
-            finger_print: finger_print.into(),
+            finger_print: invite_details.fingerprint,
             invite_id: invite_details.invite_id,
             secret: invite_details.encrypted_secret,
             pre_attest,

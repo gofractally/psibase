@@ -462,7 +462,7 @@ pub mod service {
     fn inv_g_member(
         guild: AccountNumber,
         invite_id: u32,
-        finger_print: Checksum256,
+        finger_print: Vec<u8>,
         secret: String,
         num_accounts: u16,
         pre_attest: bool,

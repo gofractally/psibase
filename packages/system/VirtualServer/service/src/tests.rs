@@ -413,7 +413,7 @@ mod tests {
         invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .createInvite(
                 invite_id,
-                fingerprint,
+                fingerprint.to_vec(),
                 1,
                 false,
                 "".to_string(),

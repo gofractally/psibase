@@ -128,18 +128,22 @@ TID getSysToken()
    return sys_record->id;
 }
 
-uint32_t Invite::createInvite(uint32_t    inviteId,
-                              Checksum256 fingerprint,
-                              uint16_t    numAccounts,
-                              bool        useHooks,
-                              std::string secret,
-                              Quantity    resources)
+uint32_t Invite::createInvite(uint32_t             inviteId,
+                              std::vector<uint8_t> fingerprint,
+                              uint16_t             numAccounts,
+                              bool                 useHooks,
+                              std::string          secret,
+                              Quantity             resources)
 {
    auto sender    = getSender();
    auto isBilling = to<VirtualServer>().is_billing_enabled();
 
-   auto cid = to<Credentials>().issue(fingerprint,       //
-                                      ONE_WEEK.count(),  //
+   check(fingerprint.size() == 32, fprintInvalid.data());
+   Checksum256 fingerprint_checksum;
+   std::memcpy(fingerprint_checksum.data(), fingerprint.data(), 32);
+
+   auto cid = to<Credentials>().issue(fingerprint_checksum,  //
+                                      ONE_WEEK.count(),      //
                                       std::vector<MethodNumber>{"createAccount"_m});
 
    if (isBilling)

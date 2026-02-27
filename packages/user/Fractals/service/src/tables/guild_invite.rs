@@ -3,7 +3,7 @@ use async_graphql::ComplexObject;
 use psibase::{
     check, check_some, get_sender,
     services::{tokens::Quantity, virtual_server},
-    AccountNumber, Checksum256, Table, TimePointSec,
+    AccountNumber, Table, TimePointSec,
 };
 
 use crate::{
@@ -63,7 +63,7 @@ impl GuildInvite {
     pub fn add(
         guild: AccountNumber,
         invite_id: u32,
-        finger_print: Checksum256,
+        finger_print: Vec<u8>,
         secret: String,
         num_accounts: u16,
         pre_attest: bool,
