@@ -14,10 +14,8 @@ use db::*;
 use transact::plugin::hook_handlers::*;
 
 // Other plugins
-use host::common::{
-    self as Host, server as Server,
-    store::{self as Store},
-};
+use host::common::{self as Host, server as Server};
+use host::db::store as Store;
 use host::types::types::{self as HostTypes, BodyTypes};
 use virtual_server::plugin::transact as VirtualServer;
 
