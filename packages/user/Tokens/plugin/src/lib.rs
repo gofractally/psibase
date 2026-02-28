@@ -13,7 +13,6 @@ use Exports::{
 use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::FlagsType;
 use psibase_plugin::{trust::*, *};
-use std::str::FromStr;
 
 use tokens::{service::BalanceFlags, service::TokenFlags, Wrapper as Tokens};
 
@@ -42,16 +41,13 @@ impl TrustConfig for TokensPlugin {
     }
 }
 
-fn to_decimal(value: String) -> Decimal {
-    Decimal::from_str(value.as_str()).unwrap()
-}
-
 impl Issuer for TokensPlugin {
     #[psibase_plugin::authorized(Medium)]
     fn create(precision: u8, max_supply: String) -> Result<(), Error> {
-        let max_supply = to_decimal(max_supply);
         let precision = Precision::new(precision).unwrap();
-        Tokens::add_to_tx().create(precision, max_supply.quantity);
+        let max_supply = Quantity::from_str(&max_supply, precision)
+            .map_err(|e| Error::from(ErrorType::ConversionError(e.to_string())))?;
+        Tokens::add_to_tx().create(precision, max_supply);
 
         Ok(())
     }
