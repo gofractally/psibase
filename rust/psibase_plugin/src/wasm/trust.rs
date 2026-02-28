@@ -25,6 +25,11 @@
 //! }
 //! ```
 //!
+//! `TrustLevel` also includes `None` and `Max`, but descriptions are not used for these levels.
+//! - `None`: Not a trusted operation, and therefore no authorization required.
+//! - `Max`: Maximally trusted operation, so embedding always forbidden, and therefore no
+//!          authorization prompt will ever be shown.
+//!
 //! To better understand how to categorize functionality into trust levels, see the `permissions`
 //! plugin documentation.
 //!
@@ -40,16 +45,26 @@
 //! }
 //! ```
 //!
-//! Optionally, you can provide a whitelist of third-party callers that are pre-authorized to call
-//! this function on behalf of the user.
+//! The specified TrustLevel must be one of: `None`, `Low`, `Medium`, `High`, or `Max`.
+//!
+//! Optionally, you can provide a whitelist of comma-separated third-party callers that are
+//! pre-authorized to call this function on behalf of the user.
 //!
 //! ```ignore
-//! #[psibase_plugin::authorized(High, whitelist = ["trusted-app"])]
+//! #[psibase_plugin::authorized(High, whitelist = ["trusted-app-1", "trusted-app-2"])]
 //! fn my_high_trust_function() -> Result<(), Error> {
 //!     // ...
 //!     Ok(())
 //! }
-//! ```
+//!
+//! **ON RETURN TYPES**
+//!
+//! If your function returns a `Result`, the `authorized` macro will attempt to use the `?` operator to
+//! propagate authorization errors. If your function returns a value other than `Result`, the `authorized`
+//! macro will `.unwrap()` the authorization error, leading to a panic.
+//!
+//! If you use a `Result` type, your error type must be `psibase_plugin::Error` or implement
+//! `From<psibase_plugin::Error>`.
 
 use crate::types::Error;
 use crate::wasm::host;
