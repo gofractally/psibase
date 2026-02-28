@@ -4,12 +4,7 @@ import {
     ListenConfig,
     PsinodeConfigUI,
     PsinodeConfigUpdate,
-    ServiceConfig,
 } from "./interfaces";
-
-export const emptyService = (s: ServiceConfig) => {
-    return s.host == "" && s.root == "";
-};
 
 export const mergeSimple = <T>(prev: T, updated: T, user: T): T =>
     prev == updated ? user : updated;
@@ -243,11 +238,6 @@ export const mergeConfig = (
         producer: mergeSimple(prev.producer, updated.producer, user.producer),
         hosts: mergeList(prev.hosts, updated.hosts, user.hosts),
         listen: mergeList(prev.listen, updated.listen, user.listen),
-        services: mergeList(
-            prev.services.filter((item) => !emptyService(item)),
-            updated.services,
-            user.services,
-        ),
         loggers: mergeLoggers(prev.loggers, updated.loggers, user.loggers),
     };
 };
@@ -255,18 +245,9 @@ export const mergeConfig = (
 export const writeConfig = (input: PsinodeConfigUI): PsinodeConfigUpdate => ({
     ...input,
     listen: input.listen.map(writeListen),
-    services: input.services
-        .filter((s) => !emptyService(s))
-        .map((s) => ({
-            host: s.host,
-            root: s.root,
-        })),
     hosts: input.hosts.map((h) => h.host),
     loggers: writeLoggers(input.loggers),
 });
-
-export const defaultService = (root: string) =>
-    root ? root.substring(root.lastIndexOf("/") + 1) + "." : "";
 
 let nextId = 1;
 export const newId = (): string => {

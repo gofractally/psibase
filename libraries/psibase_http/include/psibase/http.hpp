@@ -219,14 +219,6 @@ namespace psibase::http
 
    std::string to_string(const listen_spec&);
 
-   struct native_content
-   {
-      std::filesystem::path path;
-      std::string           content_type;
-   };
-   using services_t =
-       std::map<std::string, std::map<std::string, native_content, std::less<>>, std::less<>>;
-
 #ifdef PSIBASE_ENABLE_SSL
    using tls_context_ptr = std::shared_ptr<boost::asio::ssl::context>;
 #endif
@@ -251,7 +243,6 @@ namespace psibase::http
       unlock_keyring_t    unlock_keyring    = {};
       lock_keyring_t      lock_keyring      = {};
       get_pkcs11_tokens_t get_pkcs11_tokens = {};
-      services_t          services;
       std::atomic<bool>   enable_transactions;
       // This contains some cached state that the reader thread might modify
       mutable std::atomic<http_status> status;
