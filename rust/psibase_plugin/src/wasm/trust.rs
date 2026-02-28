@@ -87,18 +87,18 @@ pub trait TrustConfig {
     where
         Self: Sized,
     {
-        Self::assert_authorized_with_whitelist(level, fn_name, vec![])
+        Self::assert_authorized_with_whitelist(level, fn_name, &[])
     }
 
     fn assert_authorized_with_whitelist(
         level: TrustLevel,
         fn_name: &str,
-        whitelist: Vec<String>,
+        whitelist: &[&str],
     ) -> Result<(), Error>
     where
         Self: Sized,
     {
-        assert_authorized_with_whitelist::<Self>(level, fn_name, &whitelist)
+        assert_authorized_with_whitelist::<Self>(level, fn_name, whitelist)
     }
 
     fn get_descriptions() -> (String, String, String) {
@@ -113,8 +113,9 @@ pub fn assert_authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Re
 pub fn assert_authorized_with_whitelist<T: TrustConfig>(
     level: TrustLevel,
     fn_name: &str,
-    whitelist: &[String],
+    whitelist: &[&str],
 ) -> Result<(), Error> {
+    let whitelist: Vec<String> = whitelist.iter().map(|s| s.to_string()).collect();
     let descriptions = T::get_descriptions();
     let authorized = permissions::api::is_authorized(
         &host::client::get_sender(),

@@ -31,10 +31,7 @@ pub fn authorized_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream
             <Self as psibase_plugin::trust::TrustConfig>::assert_authorized_with_whitelist(
                 psibase_plugin::trust::TrustLevel::#trust_level,
                 #fn_name_lit,
-                {
-                    let wl: Vec<String> = #whitelist_expr.iter().map(|s: &str| s.to_string()).collect();
-                    wl
-                },
+                #whitelist_expr,
             )#report;
         }
     } else {
