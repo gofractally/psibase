@@ -33,4 +33,4 @@ world = "impl"
 
 [package.metadata.component.bindings.with]
 "host:types/types" = "psibase_plugin::types"
-"host:common/store" = "psibase_plugin::host::store"
+"host:db/store" = "psibase_plugin::host::store"

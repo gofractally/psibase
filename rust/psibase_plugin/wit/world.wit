@@ -4,6 +4,7 @@ world plugin-imports {
     include host:types/imports;
     include host:common/imports;
     include host:crypto/imports;
+    include host:db/imports;
     include host:prompt/imports;
     
     import permissions:plugin/api;

@@ -68,7 +68,7 @@ pub mod server {
 /// was written. Another client running in a different context may or may not immediately see the
 /// result.
 pub mod store {
-    use crate::wasm::bindings::host::common::store;
+    use crate::wasm::bindings::host::db::store;
 
     pub use store::{Bucket, Database, DbMode, StorageDuration};
 }
