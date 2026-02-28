@@ -92,7 +92,16 @@ fn parse_authorized_args_from_tokens(
         }
 
         let first_elem = &tuple.elems[0];
-        let trust_level = if let syn::Expr::Path(path) = first_elem {
+        let trust_level = if let syn::Expr::Lit(expr_lit) = first_elem {
+            if matches!(expr_lit.lit, syn::Lit::Str(_)) {
+                return Err(syn::Error::new(
+                    first_elem.span(),
+                    format!("do not use quotes around the trust level in `{fn_name}`"),
+                ));
+            } else {
+                return Err(invalid_trust(first_elem.span(), fn_name, None));
+            }
+        } else if let syn::Expr::Path(path) = first_elem {
             if let Some(ident) = path.path.get_ident() {
                 let level_str = ident.to_string();
                 match level_str.as_str() {
@@ -146,6 +155,15 @@ fn parse_authorized_args_from_tokens(
                     format!("whitelist in `{fn_name}` requires an explicit trust level (None, Low, Medium, High, Max). Use e.g. #[authorized(Medium, whitelist = [...])]"),
                 ));
             }
+        }
+    }
+
+    if let Ok(syn::Expr::Lit(expr_lit)) = syn::parse2::<syn::Expr>(attr_tokens.clone()) {
+        if matches!(expr_lit.lit, syn::Lit::Str(_)) {
+            return Err(syn::Error::new(
+                expr_lit.span(),
+                format!("do not use quotes around the trust level in `{fn_name}`"),
+            ));
         }
     }
 
