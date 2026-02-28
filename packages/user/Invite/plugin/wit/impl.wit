@@ -2,6 +2,7 @@ package invite:plugin;
 
 world impl {
     include host:common/imports;
+    include host:db/imports;
     include host:crypto/imports;
     include transact:plugin/imports;
     include accounts:plugin/imports;

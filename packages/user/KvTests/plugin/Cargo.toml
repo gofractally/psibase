@@ -1,30 +1,25 @@
 [package]
-name = "permissions"
+name = "kvtests"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-psibase.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 wit-bindgen-rt.workspace = true
-chrono = "0.4"
 psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
 
 [package.metadata.component]
-package = "permissions:plugin"
+package = "kvtests:plugin"
 
 [package.metadata.component.target]
 world = "impl"
 
 [package.metadata.component.target.dependencies]
-"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-"host:prompt" = { path = "../../Host/plugin/prompt/wit/world.wit" }
-"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+"setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
+"chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }
