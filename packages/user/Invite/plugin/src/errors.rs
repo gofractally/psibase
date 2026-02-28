@@ -4,5 +4,5 @@ pub enum ErrorTypes {
     #[error("Graphql error: {0}")]
     QueryError(String),
     #[error("Error: Invite is no longer valid or expired")]
-    InviteNotValid = 4,
+    InviteNotValid,
 }
