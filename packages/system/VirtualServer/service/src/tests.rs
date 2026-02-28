@@ -12,7 +12,8 @@ mod tests {
         method_raw,
         services::{
             auth_sig::SubjectPublicKeyInfo,
-            credentials, http_server, invite,
+            credentials, http_server,
+            invite::{self, InvPayload},
             nft::Wrapper as Nft,
             staged_tx,
             tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
@@ -410,15 +411,14 @@ mod tests {
             .into_contents();
 
         let fingerprint = psibase::sha256(&inv_pubkey_der);
+        let payload = InvPayload {
+            fingerprint: fingerprint.to_vec(),
+            secret: "".to_string(),
+        }
+        .packed();
+
         invite::Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
-            .createInvite(
-                invite_id,
-                fingerprint,
-                1,
-                false,
-                "".to_string(),
-                min_cost.into(),
-            )
+            .createInvite(invite_id, payload, 1, false, min_cost.into())
             .get()?;
 
         // Create an account using the invite
