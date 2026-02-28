@@ -38,8 +38,9 @@ export const useLogoUploaded = () =>
             );
 
             const parsed = SiteConfigResponse.parse(res);
-            return parsed?.getContent.edges
-                .map((edge) => edge.node.path)
-                .includes("network_logo.svg");
+            const paths = parsed?.getContent.edges.map((edge) => edge.node.path) ?? [];
+            return paths.some(
+                (path) => path === "/network_logo.svg" || path.endsWith("network_logo.svg"),
+            );
         },
     });

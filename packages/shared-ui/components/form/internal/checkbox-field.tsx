@@ -23,9 +23,12 @@ export const CheckboxField = ({
 
     return (
         <div>
-            <div className="flex w-full">
+            <div className="flex w-full items-center gap-2">
                 <Label
-                    className={cn(isError && isBlurred && "text-destructive")}
+                    className={cn(
+                        isError && isBlurred && "text-destructive",
+                        "cursor-pointer",
+                    )}
                 >
                     {label}
                 </Label>

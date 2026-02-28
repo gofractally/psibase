@@ -1,4 +1,3 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
@@ -24,15 +23,15 @@ export const useSetProfile = () =>
                 service: "profiles",
                 intf: "api",
             }),
-        onSuccess: async (_, params) => {
+        onSuccess: async (_, params, _id, context) => {
             toast.success("Profile updated");
 
             const currentUser = zAccount.parse(
-                await queryClient.getQueryData(QueryKey.currentUser()),
+                await context.client.getQueryData(QueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");
 
-            queryClient.setQueryData(
+            context.client.setQueryData(
                 QueryKey.profile(currentUser),
                 (): z.infer<typeof ProfileResponse> => ({
                     profile: {
@@ -43,7 +42,7 @@ export const useSetProfile = () =>
                 }),
             );
 
-            queryClient.invalidateQueries({
+            context.client.invalidateQueries({
                 queryKey: QueryKey.profile(currentUser),
             });
         },

@@ -19,6 +19,7 @@ const QueryKey = {
     connectedAccounts: () => ["connectedAccounts"] as const,
     currentUser: () => ["currentUser"] as const,
     producers: () => ["producers"] as const,
+    userResources: () => ["userResources"] as const,
     mailbox: (mailbox: QueryableMailbox, user: string) =>
         [mailbox, user] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
