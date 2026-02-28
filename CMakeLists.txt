@@ -1138,7 +1138,7 @@ function(write_package_index target dir)
     add_custom_command(
         OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
     )
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()

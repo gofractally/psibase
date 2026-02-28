@@ -381,17 +381,28 @@ function(psibase_schema target)
         target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(Psibase::service).*>" Psibase::test)
     endif()
 
+    # Fix for parallel build race condition: write_service_info() depends on the schema JSON file,
+    # but cmake only tracks file dependencies when the file is listed in OUTPUT (not BYPRODUCTS).
+    # When a concrete path is provided, we use it in OUTPUT so cmake knows to wait for schema generation.
+    # The original code also incorrectly depended on ${target} instead of ${target}-schema-gen.
     if(ARGC GREATER_EQUAL 2)
+        # Concrete output path provided - can use in OUTPUT for proper dependency tracking
         set(_OUTFILE ${ARGV1})
+        add_custom_command(
+            OUTPUT ${_OUTFILE}
+            DEPENDS ${target}-schema-gen
+            COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
+        )
+        add_custom_target(${target}-schema ALL DEPENDS ${_OUTFILE})
     else()
+        # Generator expression - can't use in OUTPUT at configure time, use stamp file
         set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+        add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+            DEPENDS ${target}-schema-gen
+            COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
+            COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        )
+        add_custom_target(${target}-schema ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp)
     endif()
-
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
-        DEPENDS ${target}
-        COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
-        COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
-    )
-    add_custom_target(${target}-schema ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp)
 endfunction()
