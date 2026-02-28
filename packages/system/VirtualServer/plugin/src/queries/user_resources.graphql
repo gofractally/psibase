@@ -1,0 +1,7 @@
+query UserResources($user: AccountNumber!) {
+    userResources(user: $user) {
+        balance
+        bufferCapacity
+        autoFillThresholdPercent
+    }
+}

@@ -1,10 +1,12 @@
 //! This defines macros for the [fracpack crate](https://docs.rs/fracpack) and
 //! [psibase crate](https://docs.rs/psibase). See the documentation for those crates.
 
+use authorized_macro::authorized_attr_impl;
 use component_name_macro::component_name_macro_impl;
 use fracpack_macro::fracpack_macro_impl;
 use graphql_macro::{queries_macro_impl, table_query_macro_impl, table_query_subindex_macro_impl};
 use number_macro::{account_macro_impl, method_macro_impl};
+use plugin_error_macro::plugin_error_derive_impl;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use psibase_macros_lib::service_macro::service_macro_impl;
@@ -13,10 +15,12 @@ use schema_macro::schema_derive_macro;
 use test_case_macro::test_case_macro_impl;
 use to_key_macro::to_key_macro_impl;
 
+mod authorized_macro;
 mod component_name_macro;
 mod fracpack_macro;
 mod graphql_macro;
 mod number_macro;
+mod plugin_error_macro;
 mod schema_macro;
 mod test_case_macro;
 mod to_key_macro;
@@ -46,6 +50,77 @@ pub fn derive_unpack(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(ToKey, attributes(to_key))]
 pub fn derive_to_key(input: TokenStream) -> TokenStream {
     to_key_macro_impl(input)
+}
+
+/// # psibase_plugin::ErrorEnum
+///
+/// Allows psibase plugins to use a standard `thiserror::Error` enum, making it convertible
+/// to a standardized `host:types/types::Error` plugin error type. Standardizing on the error type
+/// allows chaining errors across plugin boundaries.
+///
+/// ## Usage
+///
+/// ### Step 1
+///
+/// Use the `host:types/types::Error` type as your `Error` variant for fallible plugin functions.
+/// ```wit
+/// # world.wit
+/// interface api {
+///     use host:types/types.{error};
+///     do-something: func() -> result<_, error>;
+/// }
+/// ```
+///
+/// ### Step 2
+///
+/// Tell wit-bindgen in your plugin to map `host:types/types` to `psibase_plugin::types`.
+/// If you're compiling your plugin using cargo-component, this is done via the following
+/// configuration in your `Cargo.toml`:
+///
+/// ```toml
+/// [package.metadata.component.bindings.with]
+/// "host:types/types" = "psibase_plugin::types"
+/// ```
+///
+/// ### Step 3
+///
+/// In your plugin rust code, add the `ErrorType` enum with the necessary macro derives:
+/// ```ignore
+/// #[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+/// #[repr(u32)]
+/// pub enum ErrorType {
+///     #[error("Parameter was invalid")]
+///     InvalidParameter = 1,
+///     #[error("Conversion error: {0}")]
+///     ConversionError(String),
+///     #[error("Custom error: {0}")]
+///     CustomError(String),
+/// ```
+///
+/// ### Step 4
+///
+/// Use the `ErrorType` enum in your plugin code:
+///
+/// ```ignore
+/// if something_is_wrong {
+///     return Err(ErrorType::CustomError("Something went wrong").into());
+/// }
+/// ```
+///
+#[proc_macro_error]
+#[proc_macro_derive(PluginError)]
+pub fn derive_plugin_error(input: TokenStream) -> TokenStream {
+    plugin_error_derive_impl(input)
+}
+
+/// # psibase_plugin::authorized
+///
+/// Allows psibase plugins to annotate their functions with trust levels and whitelists.
+/// For more information, see the [`psibase_plugin::trust`] documentation.
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn authorized(attr: TokenStream, item: TokenStream) -> TokenStream {
+    authorized_attr_impl(attr, item)
 }
 
 #[proc_macro_derive(ToSchema, attributes(schema, fracpack))]

@@ -30,7 +30,3 @@ crate-type = ["rlib"]
 virtual-server = { path = "service", version = "0.23.0" }
 virtual-server-plugin = { path = "plugin", version = "0.23.0" }
 psibase-system-workspace-hack.workspace = true
-
-[build-dependencies]
-virtual-server = { path = "service", version = "0.23.0" }
-async-graphql.workspace = true

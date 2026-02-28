@@ -1,0 +1,13 @@
+[package]
+name = "psibase_plugin"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+psibase.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+graphql_client = "0.16"
+wit-bindgen = "0.30.0"
+psibase-rust-workspace-hack.workspace = true

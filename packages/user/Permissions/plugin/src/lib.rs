@@ -12,15 +12,15 @@ use exports::permissions::plugin::{
     api::Guest as Api,
 };
 use permissions::plugin::types::{Descriptions, TrustLevel};
-use psibase::fracpack::{Pack, Unpack};
 
-use host::common::{
-    client as HostClient,
-    client::{get_active_app, get_receiver, get_sender},
+use psibase_plugin::{
+    host::{
+        client::{self as HostClient, get_active_app, get_receiver, get_sender},
+        prompt as HostPrompt,
+        store::StorageDuration,
+    },
+    *,
 };
-use host::db::store::StorageDuration;
-use host::prompt::api as HostPrompt;
-use host::types::types::Error;
 
 mod errors;
 use errors::*;
@@ -37,14 +37,14 @@ fn assert_admin() {
 impl PermsAdmin for PermissionsPlugin {
     fn get_context() -> PromptContext {
         assert_admin();
-        let context = HostPrompt::get_context().unwrap();
-        PackablePromptContext::unpacked(&context).unwrap().into()
+        HostPrompt::get_context::<PackablePromptContext>()
+            .unwrap()
+            .into()
     }
 
     fn approve(duration: ApprovalDuration) {
         assert_admin();
-        let context = HostPrompt::get_context().unwrap();
-        let context = PackablePromptContext::unpacked(&context).unwrap();
+        let context = HostPrompt::get_context::<PackablePromptContext>().unwrap();
 
         Permissions::set(
             &context.user,
@@ -126,16 +126,16 @@ impl Api for PermissionsPlugin {
             return Ok(true);
         }
 
-        let packed_context = PackablePromptContext {
-            user: user.to_string(),
-            caller: caller.to_string(),
-            callee: callee.to_string(),
-            level,
-            descriptions,
-        }
-        .packed();
-
-        HostPrompt::prompt("permissions", Some(&packed_context));
+        HostPrompt::prompt(
+            "permissions",
+            Some(&PackablePromptContext {
+                user: user.to_string(),
+                caller: caller.to_string(),
+                callee: callee.to_string(),
+                level,
+                descriptions,
+            }),
+        );
 
         if is_already_authorized(&user, &caller, &callee, level) {
             return Ok(true);
