@@ -1,4 +1,5 @@
 #include "services/system/CommonApi.hpp"
+#include "services/user/PluginInfo.hpp"
 
 #include <chrono>
 #include <psibase/dispatch.hpp>
@@ -121,6 +122,10 @@ namespace SystemService
          if (request.target == "/common/chainid")
          {
             return to_json(getStatus().chainId);
+         }
+         if (request.target.starts_with("/common/plugin-deps"))
+         {
+            return to<UserService::PluginInfo>().serveSys(request);
          }
       }
 

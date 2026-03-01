@@ -1,0 +1,25 @@
+[package]
+name = "plugin-info"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+flags = ["isPrivileged"]
+server = "plugin-info"
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wasm-compose = "0.224.0"
+wit-component = "0.224.0"
+wit-parser = "0.224.0"
+indexmap = "2.2.5"
+url = "2.5"
+psibase-user-workspace-hack.workspace = true
+
+[dev-dependencies]
+plugin-info-pkg = { path = "..", version = "0.23.0" }

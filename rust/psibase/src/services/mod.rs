@@ -20,6 +20,7 @@ pub mod invite;
 #[allow(non_snake_case)]
 pub mod nft;
 pub mod packages;
+pub mod plugin_info;
 pub mod producers;
 pub mod r_events;
 pub mod registry;

@@ -45,6 +45,7 @@ function(add suffix)
         Nft/include
         Nop/include
         Packages/include
+        PluginInfo/service/cpp/include
         Sites/include
         Symbol/include
         Tokens/include
@@ -69,6 +70,7 @@ if(DEFINED IS_WASM)
 
     add_subdirectory(BrotliSvc/test)
     add_subdirectory(Chainmail/test)
+    add_subdirectory(PluginInfo/service/cpp/test)
     add_subdirectory(Subgroups/service/cpp/test)
 endif()
 
