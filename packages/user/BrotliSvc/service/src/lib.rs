@@ -1,7 +1,7 @@
 /// A service that offers server-side Brotli decompression
 #[psibase::service]
 mod service {
-    use psibase::services::brotli_codec::brotli_impl;
+    use psibase::services::brotli_svc::brotli_impl;
 
     /// Decompresses a Brotli-compressed byte array
     #[action]
@@ -25,7 +25,7 @@ mod tests {
     const UNCOMPRESSED_STRING: &str = "Hello, world!!";
     const COMPRESSED_STRING: &str = "iwaASGVsbG8sIHdvcmxkISED";
 
-    // #[psibase::test_case(packages("BrotliCodec"))]
+    // #[psibase::test_case(packages("BrotliSvc"))]
     // fn test_compression(chain: psibase::Chain) -> Result<(), psibase::Error> {
     //     let content = String::from(UNCOMPRESSED_STRING).into_bytes();
     //     let compressed = Wrapper::push(&chain)
@@ -40,7 +40,7 @@ mod tests {
     //     Ok(())
     // }
 
-    #[psibase::test_case(packages("BrotliCodec"))]
+    #[psibase::test_case(packages("BrotliSvc"))]
     fn test_decompression(chain: psibase::Chain) -> Result<(), psibase::Error> {
         let compressed_bytes: Vec<u8> = URL_SAFE.decode(COMPRESSED_STRING).unwrap();
 

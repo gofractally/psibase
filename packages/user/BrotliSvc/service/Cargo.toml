@@ -1,14 +1,11 @@
 [package]
-name = "brotli-codec"
+name = "brotli-svc"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 homepage.workspace = true
 edition.workspace = true
 publish.workspace = true
-
-[package.metadata.psibase]
-plugin = "brotli-codec-plugin"
 
 [dependencies]
 brotli = { version = "7.0.0" }
@@ -19,4 +16,4 @@ serde.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
-brotli-codec-pkg = { path = "..", version = "0.23.0" }
+brotli-svc-pkg = { path = "..", version = "0.23.0" }

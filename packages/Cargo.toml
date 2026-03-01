@@ -9,6 +9,7 @@ members = [
     "system/Producers/plugin/",
     "user/Aes/plugin",
     "user/Base64/plugin",
+    "user/BrotliCodec/plugin",
     "user/ClientData/plugin",
     "user/Config/plugin",
     "user/FractalCore/plugin",

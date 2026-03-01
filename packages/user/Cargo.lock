@@ -459,41 +459,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "brotli-codec"
-version = "0.23.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "brotli",
- "brotli-codec-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "serde",
-]
-
-[[package]]
-name = "brotli-codec-pkg"
-version = "0.23.0"
-dependencies = [
- "brotli-codec",
- "brotli-codec-plugin",
- "psibase-user-workspace-hack",
- "serde",
-]
-
-[[package]]
-name = "brotli-codec-plugin"
-version = "0.23.0"
-dependencies = [
- "brotli",
- "brotli-codec",
- "brotli-codec-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "brotli-decompressor"
 version = "4.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -501,6 +466,27 @@ checksum = "a334ef7c9e23abf0ce748e8cd309037da93e606ad52eb372e4ce327a0dcfbdfd"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
+]
+
+[[package]]
+name = "brotli-svc"
+version = "0.23.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "brotli",
+ "brotli-svc-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+]
+
+[[package]]
+name = "brotli-svc-pkg"
+version = "0.23.0"
+dependencies = [
+ "brotli-svc",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
