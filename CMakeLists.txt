@@ -275,6 +275,7 @@ add_rs_component_workspace(packages/:Plugins
     auth-delegate
     auth-sig
     base64
+    brotli-codec
     kdf
     kvtests
     setcode
@@ -373,6 +374,17 @@ psibase_package(
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE base64
         DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
+    NAME BrotliCodec
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Brotli compression/decompression plugin"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    SERVICE brotli-codec
+        DATA ${Plugins_OUTPUT_FILE_brotli_codec} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
 
@@ -525,8 +537,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
-    PATH packages/user/BrotliCodec
+    OUTPUT ${SERVICE_DIR}/BrotliSvc.psi
+    PATH packages/user/BrotliSvc
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
@@ -1089,7 +1101,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
 )
@@ -1099,7 +1111,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
@@ -1119,7 +1131,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Packages used in the tester"
-    PACKAGE_DEPENDS AuthSig BrotliCodec Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS AuthSig BrotliCodec BrotliSvc Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
 psibase_package(
@@ -1144,7 +1156,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
+    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
@@ -1160,6 +1172,7 @@ install(
           ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
           ${SERVICE_DIR}/BrotliCodec.psi
+          ${SERVICE_DIR}/BrotliSvc.psi
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi

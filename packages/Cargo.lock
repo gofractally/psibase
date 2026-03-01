@@ -445,6 +445,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli-codec"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "brotli-decompressor"
 version = "4.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

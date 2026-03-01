@@ -165,7 +165,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliSvc'])
 
         foo = Foo()
 
@@ -185,7 +185,7 @@ class TestPsibase(unittest.TestCase):
 
     def do_test_upgrade(self, cluster, command, v2=False):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliSvc'])
 
         foo = Foo()
 
@@ -225,7 +225,7 @@ class TestPsibase(unittest.TestCase):
         self.assertIn('status: not installed', info)
         self.assertIn('Explorer', info)
 
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliSvc'])
 
         foo = Foo()
 
@@ -267,7 +267,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_list(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliSvc'])
 
         # A non-existent account should be an error
         for source in ['neminis', 'http://neminis.aaaaaaa123/']:
@@ -341,7 +341,7 @@ class TestPsibase(unittest.TestCase):
                 self.assertEqual(search('bar'), '')
                 self.assertEqual(search('foo', 'original'), 'foo 1.0.0\n')
             check_repo()
-            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliSvc'])
             check_repo()
             self.assertIn('Transact ', search('^transact$'))
 
@@ -365,7 +365,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_configure_sources(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliSvc'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
         with tempfile.TemporaryDirectory() as dir:

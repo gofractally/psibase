@@ -4,7 +4,7 @@ pub mod accounts;
 pub mod auth_delegate;
 pub mod auth_dyn;
 pub mod auth_sig;
-pub mod brotli_codec;
+pub mod brotli_svc;
 pub mod chainmail;
 pub mod common_api;
 pub mod cpu_limit;
