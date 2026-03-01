@@ -740,7 +740,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_sites} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "BrotliSvc(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
