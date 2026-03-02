@@ -80,13 +80,36 @@ namespace
    {
       return true;
    }
+   struct RequestLogInfo
+   {
+      RequestLogInfo(const HttpRequest& req)
+          : method(boost::log::attributes::constant(req.method)),
+            target(boost::log::attributes::constant(req.target)),
+            host(boost::log::attributes::constant(req.host))
+      {
+      }
+      void addTo(auto& logger) &&
+      {
+         logger.add_attribute("RequestMethod", std::move(method));
+         logger.add_attribute("RequestTarget", std::move(target));
+         logger.add_attribute("RequestHost", std::move(host));
+      }
+      boost::log::attribute method;
+      boost::log::attribute target;
+      boost::log::attribute host;
+   };
    template <typename Stream>
    struct HttpClientSocket : AutoCloseSocket, std::enable_shared_from_this<HttpClientSocket<Stream>>
    {
       template <typename... A>
-      explicit HttpClientSocket(boost::asio::io_context& context, server_state& server, A&&... a)
+      explicit HttpClientSocket(boost::asio::io_context& context,
+                                server_state&            server,
+                                RequestLogInfo&&         logInfo,
+                                A&&... a)
           : stream(boost::asio::make_strand(context), std::forward<A>(a)...), server(server)
       {
+         logger.add_attribute("Channel", boost::log::attributes::constant(std::string("http")));
+         std::move(logInfo).addTo(logger);
       }
       void do_write(std::shared_ptr<HttpClientSocket>&& self, HttpRequest&& req)
       {
@@ -169,6 +192,11 @@ namespace
              .body        = breply.body(),
          };
 
+         BOOST_LOG_SCOPED_LOGGER_TAG(self->logger, "ResponseStatus",
+                                     static_cast<unsigned>(reply.status));
+         BOOST_LOG_SCOPED_LOGGER_TAG(self->logger, "ResponseBytes",
+                                     static_cast<std::uint64_t>(reply.body.size()));
+
          for (auto&& header : breply)
          {
             reply.headers.push_back(
@@ -200,13 +228,13 @@ namespace
          {
             auto& atrace = trace.actionTraces.emplace_back();
             tc.execExport("recv", std::move(action), atrace);
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, debug) << action.service.str() << "::recv succeeded";
+            BOOST_LOG_SCOPED_LOGGER_TAG(self->logger, "Trace", std::move(trace));
+            PSIBASE_LOG(self->logger, info) << "Received HTTP reply";
          }
          catch (std::exception& e)
          {
-            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", std::move(trace));
-            PSIBASE_LOG(bc.trxLogger, warning)
+            BOOST_LOG_SCOPED_LOGGER_TAG(self->logger, "Trace", std::move(trace));
+            PSIBASE_LOG(self->logger, warning)
                 << action.service.str() << "::recv failed: " << e.what();
          }
       }
@@ -244,10 +272,13 @@ namespace
    };
 
    template <typename Stream, typename E, typename F>
-   void do_connect(std::shared_ptr<HttpClientSocket<Stream>>&& socket, E&& endpoints, F&& next)
+   void do_connect(std::shared_ptr<HttpClientSocket<Stream>>&& socket, E&& endpoint, F&& next)
    {
+      socket->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(
+                                                         to_string(toSocketEndpoint(endpoint))));
+      PSIBASE_LOG(socket->logger, debug) << "Sending HTTP request";
       auto& sock = get_lowest_layer(socket->stream);
-      sock.async_connect(std::forward<E>(endpoints),
+      sock.async_connect(std::forward<E>(endpoint),
                          [socket = std::move(socket), next = std::forward<F>(next)](
                              const std::error_code& ec) mutable { next(ec, std::move(socket)); });
    }
@@ -258,10 +289,30 @@ namespace
                             F&&                                         next)
    {
       auto& sock = get_lowest_layer(socket->stream);
-      sock.async_connect(std::forward<E>(endpoints),
-                         [socket = std::move(socket), next = std::forward<F>(next)](
-                             const std::error_code& ec, const auto& /*sock*/) mutable
-                         { next(ec, std::move(socket)); });
+      sock.async_connect(
+          std::forward<E>(endpoints),
+          [socket = std::move(socket), next = std::forward<F>(next)](const std::error_code& ec,
+                                                                     const auto& endpoint) mutable
+          {
+             if (!ec)
+             {
+                if constexpr (requires { toSocketEndpoint(endpoint); })
+                {
+                   socket->logger.add_attribute(
+                       "RemoteEndpoint",
+                       boost::log::attributes::constant(to_string(toSocketEndpoint(endpoint))));
+                }
+                else
+                {
+                   // Workaround: some versions of Boost seem to pass in an
+                   // iterator. 1.83 is okay. 1.87 fails without this.
+                   socket->logger.add_attribute(
+                       "RemoteEndpoint",
+                       boost::log::attributes::constant(to_string(toSocketEndpoint(*endpoint))));
+                }
+             }
+             next(ec, std::move(socket));
+          });
    }
 
    template <typename Stream, typename F>
@@ -269,6 +320,7 @@ namespace
                    StringEndpoint&&                            endpoint,
                    F&&                                         next)
    {
+      PSIBASE_LOG(socket->logger, debug) << "Sending HTTP request";
       auto [host, port] = split_port(endpoint.host);
       if (port.empty())
          port = "80";
@@ -295,6 +347,7 @@ namespace
    template <typename E, typename F>
    void dispatch_tls(boost::asio::io_context& context,
                      server_state&            state,
+                     RequestLogInfo&&         logInfo,
                      E&&                      endpoint,
                      std::string_view         hostport,
                      std::optional<TLSInfo>&& tls,
@@ -305,7 +358,7 @@ namespace
       {
          using tls_stream = boost::beast::ssl_stream<boost::beast::tcp_stream>;
          auto result      = std::make_shared<HttpClientSocket<tls_stream>>(
-             context, state, *state.http_config->tls_context);
+             context, state, std::move(logInfo), *state.http_config->tls_context);
          add(result);
          auto [host, _] = split_port(hostport);
          result->stream.set_verify_mode(boost::asio::ssl::verify_peer);
@@ -332,7 +385,8 @@ namespace
       }
       else
       {
-         auto result = std::make_shared<HttpClientSocket<boost::beast::tcp_stream>>(context, state);
+         auto result = std::make_shared<HttpClientSocket<boost::beast::tcp_stream>>(
+             context, state, std::move(logInfo));
          add(result);
          do_connect(std::move(result), std::forward<E>(endpoint), std::forward<F>(next));
       }
@@ -341,13 +395,14 @@ namespace
    template <typename F>
    void dispatch_endpoint(boost::asio::io_context& context,
                           server_state&            state,
+                          RequestLogInfo&&         logInfo,
                           const IPV4Endpoint&      endpoint,
                           std::string_view         host,
                           std::optional<TLSInfo>&& tls,
                           const auto&              add,
                           F&&                      next)
    {
-      return dispatch_tls(context, state,
+      return dispatch_tls(context, state, std::move(logInfo),
                           boost::asio::ip::tcp::endpoint(
                               boost::asio::ip::address_v4{endpoint.address.bytes}, endpoint.port),
                           host, std::move(tls), add, std::forward<F>(next));
@@ -356,13 +411,14 @@ namespace
    template <typename F>
    void dispatch_endpoint(boost::asio::io_context& context,
                           server_state&            state,
+                          RequestLogInfo&&         logInfo,
                           const IPV6Endpoint&      endpoint,
                           std::string_view         host,
                           std::optional<TLSInfo>&& tls,
                           const auto&              add,
                           F&&                      next)
    {
-      dispatch_tls(context, state,
+      dispatch_tls(context, state, std::move(logInfo),
                    boost::asio::ip::tcp::endpoint(
                        boost::asio::ip::address_v6{endpoint.address.bytes, endpoint.address.zone},
                        endpoint.port),
@@ -372,6 +428,7 @@ namespace
    template <typename F>
    void dispatch_endpoint(boost::asio::io_context& context,
                           server_state&            state,
+                          RequestLogInfo&&         logInfo,
                           const LocalEndpoint&     endpoint,
                           std::string_view         host,
                           std::optional<TLSInfo>&& tls,
@@ -380,7 +437,8 @@ namespace
    {
       if (tls)
          abortMessage("Local socket does not support TLS");
-      auto result = std::make_shared<HttpClientSocket<local_stream>>(context, state);
+      auto result =
+          std::make_shared<HttpClientSocket<local_stream>>(context, state, std::move(logInfo));
       add(result);
       do_connect(std::move(result), boost::asio::local::stream_protocol::endpoint(endpoint.path),
                  std::forward<F>(next));
@@ -394,12 +452,13 @@ void psibase::http::send_request(boost::asio::io_context&        context,
                                  std::optional<SocketEndpoint>&& endpoint,
                                  const std::function<void(const std::shared_ptr<Socket>&)>& add)
 {
-   auto host = req.host;
+   auto           host = req.host;
+   RequestLogInfo logInfo{req};
    auto next = [req = std::move(req), &state](const std::error_code& ec, auto&& socket) mutable
    {
       if (ec)
       {
-         PSIBASE_LOG(socket->logger, warning) << "Connection failed: " << ec.message();
+         PSIBASE_LOG(socket->logger, warning) << ec.message();
          socket->do_error(ec);
       }
       else
@@ -413,7 +472,7 @@ void psibase::http::send_request(boost::asio::io_context&        context,
    };
    if (!endpoint)
    {
-      return dispatch_tls(context, state,
+      return dispatch_tls(context, state, std::move(logInfo),
                           StringEndpoint{std::move(host),
                                          std::make_shared<boost::asio::ip::tcp::resolver>(context)},
                           host, std::move(tls), add, std::move(next));
@@ -423,8 +482,8 @@ void psibase::http::send_request(boost::asio::io_context&        context,
       return std::visit(
           [&](const auto& endpoint)
           {
-             return dispatch_endpoint(context, state, endpoint, host, std::move(tls), add,
-                                      std::move(next));
+             return dispatch_endpoint(context, state, std::move(logInfo), endpoint, host,
+                                      std::move(tls), add, std::move(next));
           },
           *endpoint);
    }

@@ -8,6 +8,7 @@
 #include <boost/type_erasure/is_empty.hpp>
 #include <fstream>
 #include <psibase/BlockContext.hpp>
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/Rpc.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/TransactionContext.hpp>
@@ -48,8 +49,7 @@ namespace psibase::http
 
    bool is_private_header(const std::string& name)
    {
-      std::string lower_name = name;
-      std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+      std::string lower_name = ToLower{}(name);
       return private_headers.find(lower_name) != private_headers.end();
    }
 
@@ -292,7 +292,6 @@ namespace psibase::http
             callback(std::forward<F>(f)),
             err(std::forward<E>(err))
       {
-         this->session->pause_read = true;
       }
       void autoCloseImpl(std::string message)
       {
@@ -405,6 +404,20 @@ namespace psibase::http
              [self = std::move(self), newSocket = std::move(newSocket), result = std::move(result),
               cl = std::move(cl)]() mutable
              {
+                auto& trace      = self->trace;
+                auto& queryTimes = self->queryTimes;
+                auto  endTime    = steady_clock::now();
+                auto& logger     = self->session->logger;
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));
+
+                // TODO: consider bundling into a single attribute
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "PackTime", queryTimes.packTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ServiceLoadTime", queryTimes.serviceLoadTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "DatabaseTime", queryTimes.databaseTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "WasmExecTime", queryTimes.wasmExecTime);
+                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "ResponseTime",
+                                            std::chrono::duration_cast<std::chrono::microseconds>(
+                                                endTime - queryTimes.startTime));
                 (*self->session)(
                     websocket_upgrade{}, std::move(self->req),
                     [newSocket = std::move(newSocket), cl = std::move(cl)](auto&& socket) mutable
@@ -607,16 +620,6 @@ namespace psibase::http
 
             runNativeHandlerJson(server.http_config->push_boot_async);
          }  // push_boot
-         else if (req_target == "/native/p2p" && websocket::is_upgrade(req) &&
-                  !boost::type_erasure::is_empty(server.http_config->accept_p2p_websocket))
-         {
-            if (forbidCrossOrigin())
-               return;
-            // Stop reading HTTP requests
-            send.pause_read = true;
-            send(websocket_upgrade{}, std::move(req), server.http_config->accept_p2p_websocket);
-            return;
-         }
          else if (req_target == "/native/admin/status")
          {
             if (req.method() == bhttp::verb::get)
@@ -667,38 +670,6 @@ namespace psibase::http
 
             // returns json list of {id:int,endpoint:string}
             runNativeHandlerJsonNoFail(server.http_config->get_peers);
-         }
-         else if (req_target == "/native/admin/connect" && server.http_config->connect)
-         {
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
-            }
-
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               send(builder.error(bhttp::status::unsupported_media_type,
-                                  "Content-Type must be application/json\n"));
-               return;
-            }
-
-            runNativeHandlerNoContent(server.http_config->connect);
-         }
-         else if (req_target == "/native/admin/disconnect" && server.http_config->disconnect)
-         {
-            if (req.method() != bhttp::verb::post)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
-            }
-
-            if (req[bhttp::field::content_type] != "application/json")
-            {
-               send(builder.error(bhttp::status::unsupported_media_type,
-                                  "Content-Type must be application/json\n"));
-               return;
-            }
-
-            runNativeHandlerNoContent(server.http_config->disconnect);
          }
          else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
          {
@@ -891,12 +862,6 @@ namespace psibase::http
                             system->sharedDatabase.createWriter(), true};
             bc.start();
 
-            SignedTransaction  trx;
-            TransactionTrace   trace;
-            TransactionContext tc{bc, trx, trace, DbMode::rpc()};
-            ActionTrace&       atrace        = trace.actionTraces.emplace_back();
-            auto               startExecTime = steady_clock::now();
-
             auto socket = makeHttpSocket(
                 std::move(req), send,
                 [builder](HttpReply&& reply)
@@ -915,45 +880,59 @@ namespace psibase::http
                 },
                 [builder](const std::string& message)
                 { return builder.error(bhttp::status::internal_server_error, message); });
-            system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
 
-            auto setStatus = psio::finally(
-                [&]
-                {
-                   auto endExecTime = steady_clock::now();
-
-                   socket->trace = std::move(trace);
-
-                   socket->queryTimes.packTime =
-                       std::chrono::duration_cast<std::chrono::microseconds>(startExecTime -
-                                                                             startTime);
-                   socket->queryTimes.serviceLoadTime =
-                       std::chrono::duration_cast<std::chrono::microseconds>(
-                           endExecTime - startExecTime - tc.getBillableTime());
-                   socket->queryTimes.databaseTime =
-                       std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
-                   socket->queryTimes.wasmExecTime =
-                       std::chrono::duration_cast<std::chrono::microseconds>(tc.getBillableTime() -
-                                                                             tc.databaseTime);
-                   socket->queryTimes.startTime = startTime;
-                });
-
-            try
             {
-               Action action{
-                   .sender  = AccountNumber(),
-                   .service = proxyServiceNum,
-                   .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
-               };
-               tc.execServe(action, atrace);
+               SignedTransaction  trx;
+               TransactionContext tc{bc, trx, socket->trace, DbMode::rpc()};
+               ActionTrace&       atrace        = socket->trace.actionTraces.emplace_back();
+               auto               startExecTime = steady_clock::now();
+
+               system->sockets->add(*bc.writer, socket, &tc.ownedSockets);
+               // these can't throw and should run iff sockets->add succeeds
+               send.pause_read = true;
+               auto setStatus  = psio::finally(
+                   [&]
+                   {
+                      auto endExecTime = steady_clock::now();
+
+                      socket->queryTimes.packTime =
+                          std::chrono::duration_cast<std::chrono::microseconds>(startExecTime -
+                                                                                 startTime);
+                      socket->queryTimes.serviceLoadTime =
+                          std::chrono::duration_cast<std::chrono::microseconds>(
+                              endExecTime - startExecTime - tc.getBillableTime());
+                      socket->queryTimes.databaseTime =
+                          std::chrono::duration_cast<std::chrono::microseconds>(tc.databaseTime);
+                      socket->queryTimes.wasmExecTime =
+                          std::chrono::duration_cast<std::chrono::microseconds>(
+                              tc.getBillableTime() - tc.databaseTime);
+                      socket->queryTimes.startTime = startTime;
+                   });
+
+               try
+               {
+                  Action action{
+                      .sender  = AccountNumber(),
+                      .service = proxyServiceNum,
+                      .rawData = psio::convert_to_frac(std::tuple(socket->id, std::move(data))),
+                  };
+                  tc.execServe(action, atrace);
+               }
+               catch (std::exception& e)
+               {
+                  socket->trace.error = e.what();
+               }
+               catch (...)
+               {
+                  socket->trace.error = "unknown error";
+               }
             }
-            catch (...)
+            // If the reply was deferred, send a separate log message for the
+            // call to serve. Otherwise, the trace is reported with the response.
+            if (!socket->replySent.load())
             {
-               // An error will be sent by the transaction context, if needed
-            }
-            if (!tc.ownedSockets.owns(*system->sockets, socket))
-            {
-               trace.error  = atrace.error;
+               auto trace = std::move(socket->trace);
+               socket->trace.error.reset();
                auto  error  = trace.error;
                auto& logger = send.logger;
                BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));

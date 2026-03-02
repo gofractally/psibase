@@ -241,21 +241,18 @@ namespace psibase::http
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
 #endif
-      push_boot_t            push_boot_async      = {};
-      accept_p2p_websocket_t accept_p2p_websocket = {};
-      shutdown_t             shutdown             = {};
-      get_config_t           get_perf             = {};
-      get_config_t           get_metrics          = {};
-      get_peers_t            get_peers            = {};
-      connect_t              connect              = {};
-      connect_t              disconnect           = {};
-      get_config_t           get_keys             = {};
-      generic_json_t         new_key              = {};
-      unlock_keyring_t       unlock_keyring       = {};
-      lock_keyring_t         lock_keyring         = {};
-      get_pkcs11_tokens_t    get_pkcs11_tokens    = {};
-      services_t             services;
-      std::atomic<bool>      enable_transactions;
+      push_boot_t         push_boot_async   = {};
+      shutdown_t          shutdown          = {};
+      get_config_t        get_perf          = {};
+      get_config_t        get_metrics       = {};
+      get_peers_t         get_peers         = {};
+      get_config_t        get_keys          = {};
+      generic_json_t      new_key           = {};
+      unlock_keyring_t    unlock_keyring    = {};
+      lock_keyring_t      lock_keyring      = {};
+      get_pkcs11_tokens_t get_pkcs11_tokens = {};
+      services_t          services;
+      std::atomic<bool>   enable_transactions;
       // This contains some cached state that the reader thread might modify
       mutable std::atomic<http_status> status;
 

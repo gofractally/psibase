@@ -1,5 +1,6 @@
 #include <services/local/XHttp.hpp>
 
+#include <psibase/HttpHeaders.hpp>
 #include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/webServices.hpp>
@@ -27,7 +28,7 @@ namespace
 
    bool matches(psio::view<const HttpHeader> header, std::string_view h)
    {
-      return std::ranges::equal(std::string_view{header.name()}, h, {}, ::tolower, ::tolower);
+      return iequal(header.name(), h);
    }
 
    std::string_view getRootHost(std::string_view host)
@@ -322,6 +323,10 @@ std::int32_t XHttp::websocket(HttpRequest                   request,
    {
       request.headers.push_back({"Sec-WebSocket-Key", randomWebSocketKey()});
    }
+   if (!request.getHeader("Sec-WebSocket-Version"))
+   {
+      request.headers.push_back({"Sec-WebSocket-Version", "13"});
+   }
    PSIBASE_SUBJECTIVE_TX
    {
       if (!codeTable.get(sender))
@@ -365,7 +370,7 @@ void XHttp::autoClose(std::int32_t socket, bool value)
    }
 }
 
-void XHttp::close(std::int32_t socket)
+void XHttp::asyncClose(std::int32_t socket)
 {
    auto sender   = getSender();
    auto requests = Session{}.open<ResponseHandlerTable>();
@@ -374,9 +379,8 @@ void XHttp::close(std::int32_t socket)
       auto row = requests.get(socket);
       if (!row || row->service != sender)
          abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
-      requests.remove(*row);
-      check(socketSetFlags(socket, SocketFlags::autoClose, SocketFlags::autoClose) == 0,
-            "Failed to set auto-close");
+      auto flags = SocketFlags::autoClose | SocketFlags::notifyClose;
+      check(socketSetFlags(socket, flags, flags) == 0, "Failed to set auto-close");
    }
 }
 
@@ -474,7 +478,7 @@ std::string XHttp::rootHost(psio::view<const std::string> host)
 void XHttp::startSession()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
-   to<XAdmin>().startSession();
+   recurse().to<XAdmin>().startSession();
 }
 
 #ifndef PSIBASE_GENERATE_SCHEMA
@@ -543,7 +547,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          return;
       }
    }
-   else if (rootHost != req.host() && std::string_view{req.target()} != "/native/p2p")
+   else if (rootHost != req.host())
    {
       if (!rootHost.empty())
       {
@@ -560,14 +564,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
       return;
    }
 
-   if (std::string_view{req.target()} == "/native/p2p")
-   {
-      auto opts = to<XAdmin>().options();
-      if (!opts.p2p)
-         sendNotFound(sock, req);
-      return;
-   }
-   else if (std::string_view{req.target()}.starts_with("/native/"))
+   if (std::string_view{req.target()}.starts_with("/native/"))
    {
       sendNotFound(sock, req);
       return;

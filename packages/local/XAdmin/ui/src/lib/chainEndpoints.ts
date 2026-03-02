@@ -6,7 +6,9 @@ import {
     getArrayBuffer,
     getJson,
     postArrayBufferGetJson,
+    postGraphQLGetJson,
     postJson,
+    postJsonGetJson,
     siblingUrl,
     throwIfError,
 } from "@psibase/common-lib";
@@ -19,22 +21,22 @@ import {
     psinodeConfigSchema,
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
-import { recursiveFetch } from "./recursiveFetch";
 import {
-    extractPackage,
     buildManifestPayload,
+    callPostinstall,
+    callPreinstall,
+    extractPackage,
     installAllServices,
     installDataFiles,
-    callPreinstall,
     installManifest,
-    callPostinstall,
 } from "./chainEndpoints/index";
+import { recursiveFetch } from "./recursiveFetch";
 
 export const Peer = z
     .object({
         id: z.number(),
+        urls: z.string().array(),
         endpoint: z.string(),
-        url: z.string().optional().nullable(),
     })
     .strict();
 
@@ -45,9 +47,14 @@ export type PeerType = z.infer<typeof Peer>;
 
 export const StateEnum = z.enum(["persistent", "backup", "transient"]);
 
-export const UIPeer = Peer.extend({
-    state: StateEnum,
-});
+export const UIPeer = z
+    .object({
+        id: z.number(),
+        endpoint: z.string(),
+        url: z.string().optional().nullable(),
+        state: StateEnum,
+    })
+    .strict();
 
 const schem = z.object({
     timestamp: z.string(),
@@ -83,7 +90,10 @@ export type TransactStatsType = z.infer<typeof TransactStats>;
 
 class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
-        return Peers.parse(await getJson("/native/admin/peers"));
+        const url = siblingUrl(null, "x-peers", "/graphql");
+        const query = "query { peers { edges { node { id urls endpoint } } } }";
+        const res: any = await postGraphQLGetJson(url, query);
+        return Peers.parse(res.data.peers.edges.map((e: any) => e.node));
     }
 
     public async getStatus(): Promise<string[]> {
@@ -164,16 +174,8 @@ class Chain {
             throw new Error(
                 `Failed to find peer with ID ${id} in existing peers`,
             );
-        await postJson("/native/admin/disconnect", { id });
-        await recursiveFetch(async () => {
-            const newPeers = await this.getPeers();
-            const isPeerExisting = newPeers.some(
-                (peer) =>
-                    peer.endpoint == foundPeer.endpoint &&
-                    peer.id == foundPeer.id,
-            );
-            return !isPeerExisting;
-        });
+        const url = siblingUrl(null, "x-peers", "/disconnect");
+        await postJson(url, { id });
     }
 
     public pushArrayBufferBoot(buffer: ArrayBufferLike) {
@@ -211,8 +213,13 @@ class Chain {
         await postJson("/shutdown", {});
     }
 
-    public async connect(config: { url: string }): Promise<any> {
-        return postJson("/native/admin/connect", config);
+    public async connect(config: {
+        url: string;
+    }): Promise<z.infer<typeof Peer>> {
+        const url = siblingUrl(null, "x-peers", "/connect");
+        const result = await postJsonGetJson(url, config);
+        result.urls = [url];
+        return Peer.parse(result);
     }
 
     public async performance() {
@@ -254,7 +261,6 @@ class Chain {
         return TransactStats.parse(await getJson(url));
     }
 
-
     public async installNodeLocalPackage(file: File): Promise<{
         success: boolean;
         installed: string[];
@@ -292,10 +298,7 @@ class Chain {
                 success: false,
                 installed,
                 failed: {
-                    name:
-                        notAttempted.length > 0
-                            ? notAttempted[0]
-                            : "unknown",
+                    name: notAttempted.length > 0 ? notAttempted[0] : "unknown",
                     error:
                         error instanceof Error ? error.message : String(error),
                 },

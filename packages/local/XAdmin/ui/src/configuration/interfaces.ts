@@ -79,7 +79,6 @@ export const psinodeConfigSchema = z
     .object({
         p2p: z.boolean(),
         peers: z.string().array(),
-        autoconnect: z.boolean().or(z.string()),
         pkcs11_modules: z.string().array(),
         tls: z.object({
             certificate: path,

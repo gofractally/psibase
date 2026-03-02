@@ -1,5 +1,5 @@
 function(add suffix)
-    add_local_service_full_malloc("${suffix}" XHttp src/XHttp.cpp)
+    add_local_service("${suffix}" XHttp src/XHttp.cpp)
 endfunction(add)
 
 conditional_add()

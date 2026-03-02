@@ -60,6 +60,7 @@ namespace psibase::http
       boost::beast::flat_buffer                  buffer;
       std::unique_ptr<boost::asio::steady_timer> _timer;
       bool                                       _closed = false;
+      bool                                       _moved  = false;
       std::chrono::steady_clock::time_point      _expiration;
 
       // The parser is stored in an optional container so we can

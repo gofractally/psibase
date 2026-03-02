@@ -10,13 +10,9 @@ use exports::host::auth::api::Guest as Api;
 use psibase::fracpack::{Pack, Unpack};
 
 use crate::bindings::{
-    accounts::plugin::api as Accounts,
     host::{
-        common::{
-            admin as HostAdmin,
-            store::Bucket,
-            store::{Database, DbMode, StorageDuration},
-        },
+        common::admin as HostAdmin,
+        db::store::{Bucket, Database, DbMode, StorageDuration},
         types::types::{BodyTypes, Error, PostRequest},
     },
     transact::plugin::auth as Transact,
@@ -72,13 +68,13 @@ impl Api for HostAuth {
         remove_active_query_token(&app, &user);
     }
 
-    fn get_active_query_token(app: String) -> Option<String> {
+    fn get_active_query_token(app: String, user: String) -> Option<String> {
         check_caller(
             &["host", "supervisor"],
             "get-active-query-token@host:auth/api",
         );
 
-        Bucket::new(DB, &bucket_id(&Accounts::get_current_user()?))
+        Bucket::new(DB, &bucket_id(&user))
             .get(&app)
             .map(|t| String::unpacked(&t).unwrap())
     }

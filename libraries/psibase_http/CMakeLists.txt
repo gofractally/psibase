@@ -17,7 +17,7 @@ add_library(psibase_http
     send_request.cpp
     websocket.cpp)
 target_include_directories(psibase_http PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(psibase_http PUBLIC psibase)
+target_link_libraries(psibase_http PUBLIC psibase psibase_net)
 
 if(ENABLE_SSL)
     target_compile_definitions(psibase_http PUBLIC PSIBASE_ENABLE_SSL)

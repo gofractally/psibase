@@ -1370,18 +1370,12 @@ struct callbacks
       BOOST_LOG_SCOPED_THREAD_TAG("TimeStamp", chain.getTimestamp());
       BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
 
-      psibase::TransactionTrace trace;
-      psibase::ActionTrace&     atrace = trace.actionTraces.emplace_back();
-
       psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
       bc.start();
-      psibase::SignedTransaction  trx;
-      psibase::TransactionContext tc{bc, trx, trace, psibase::DbMode::rpc()};
 
       std::int32_t fd;
 
       auto socket = std::make_shared<HttpSocket>();
-      chain.sys->sockets->add(*chain.writer, socket, &tc.ownedSockets);
       if (auto pos = std::ranges::find(state.sockets, nullptr); pos != state.sockets.end())
       {
          *pos = socket;
@@ -1394,16 +1388,17 @@ struct callbacks
          state.sockets.push_back(socket);
       }
 
-      auto startExecTime = std::chrono::steady_clock::now();
-
-      try
       {
+         psibase::SignedTransaction  trx;
+         psibase::TransactionContext tc{bc, trx, socket->trace, psibase::DbMode::rpc()};
+         psibase::ActionTrace&       atrace        = socket->trace.actionTraces.emplace_back();
+         auto                        startExecTime = std::chrono::steady_clock::now();
+
+         chain.sys->sockets->add(*chain.writer, socket, &tc.ownedSockets);
          auto setStatus = psio::finally(
              [&]
              {
                 auto endExecTime = std::chrono::steady_clock::now();
-
-                socket->trace = std::move(trace);
 
                 socket->queryTimes.packTime = std::chrono::duration_cast<std::chrono::microseconds>(
                     startExecTime - startTime);
@@ -1417,15 +1412,19 @@ struct callbacks
                                                                           tc.databaseTime);
                 socket->queryTimes.startTime = startTime;
              });
-         psibase::Action action{
-             .sender  = psibase::AccountNumber(),
-             .service = psibase::proxyServiceNum,
-             .rawData = psio::convert_to_frac(std::tuple(socket->id, req.unpack())),
-         };
-         tc.execServe(action, atrace);
-      }
-      catch (...)
-      {
+         try
+         {
+            psibase::Action action{
+                .sender  = psibase::AccountNumber(),
+                .service = psibase::proxyServiceNum,
+                .rawData = psio::convert_to_frac(std::tuple(socket->id, req.unpack())),
+            };
+            tc.execServe(action, atrace);
+         }
+         catch (std::exception& e)
+         {
+            socket->trace.error = e.what();
+         }
       }
 
       socket->chain = &chain;
@@ -1433,9 +1432,10 @@ struct callbacks
       {
          socket->logResponse();
       }
-      else if (!tc.ownedSockets.owns(*chain.sys->sockets, socket))
+      else
       {
-         trace.error  = atrace.error;
+         auto trace = std::move(socket->trace);
+         socket->trace.error.reset();
          auto  error  = trace.error;
          auto& logger = chain.logger;
          BOOST_LOG_SCOPED_LOGGER_TAG(logger, "Trace", std::move(trace));

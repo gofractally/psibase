@@ -24,56 +24,10 @@ namespace psibase::net
    {
       static constexpr unsigned type = 1;
       std::uint32_t             version;
-      NodeId                    id;
 
-      std::optional<std::uint64_t> connection_id;
-
-      std::string to_string() const
-      {
-         return "init: version=" + std::to_string(version) +
-                (connection_id ? " connection_id=" + std::to_string(*connection_id) : "");
-      }
+      std::string to_string() const { return "init: version=" + std::to_string(version); }
    };
-   PSIO_REFLECT(InitMessage, version, id, connection_id);
-
-   struct DuplicateConnectionMessage
-   {
-      static constexpr unsigned type = 7;
-      std::uint64_t             connection_id;
-      bool                      secure;
-
-      std::string to_string() const
-      {
-         return "duplicate connection: connection_id=" + std::to_string(connection_id) +
-                (secure ? " secure" : "");
-      }
-   };
-   PSIO_REFLECT(DuplicateConnectionMessage, connection_id, secure)
-
-   struct HostnamesMessage
-   {
-      static constexpr unsigned type = 8;
-      std::vector<std::string>  hosts;
-
-      std::string to_string() const
-      {
-         std::string result = "hostnames:";
-         for (const auto& host : hosts)
-         {
-            result += ' ';
-            result += host;
-         }
-         return result;
-      }
-   };
-   PSIO_REFLECT(HostnamesMessage, hosts)
-
-   struct HostnamesAck
-   {
-      static constexpr unsigned type = 9;
-      std::string               to_string() const { return "hostnames ack"; }
-   };
-   PSIO_REFLECT(HostnamesAck)
+   PSIO_REFLECT(InitMessage, version);
 
    template <typename T>
    concept has_block_id = requires(T& t) { t.block_id; };
@@ -85,11 +39,7 @@ namespace psibase::net
       auto& consensus() { return static_cast<Derived*>(this)->consensus(); }
       auto& chain() { return static_cast<Derived*>(this)->chain(); }
       auto& derived() { return static_cast<Derived*>(this)->network(); }
-      explicit routing_base(boost::asio::io_context& ctx)
-      {
-         std::random_device rng;
-         nodeId = std::uniform_int_distribution<NodeId>()(rng);
-      }
+      explicit routing_base(boost::asio::io_context& ctx) {}
       static const std::uint32_t protocol_version = 0;
       // This is used solely for type deduction
       auto get_message_impl()
@@ -99,8 +49,7 @@ namespace psibase::net
                  decltype(static_cast<Derived*>(this)->consensus())>::message_type,
              typename std::remove_cvref_t<
                  decltype(static_cast<Derived*>(this)->network())>::message_type,
-             std::variant<InitMessage, DuplicateConnectionMessage, HostnamesMessage,
-                          HostnamesAck>>{};
+             std::variant<InitMessage>>{};
       }
       std::string message_to_string(const auto& msg)
       {
@@ -121,10 +70,6 @@ namespace psibase::net
       void async_send(peer_id id, const Msg& msg, F&& f)
       {
          PSIBASE_LOG(peers().logger(id), debug) << "Sending message: " << message_to_string(msg);
-         if constexpr (std::is_same_v<Msg, HostnamesMessage>)
-         {
-            peers().start_hostname_update(id);
-         }
          peers().async_send(id, this->serialize_message(msg), std::forward<F>(f));
       }
       template <typename Msg>
@@ -133,23 +78,8 @@ namespace psibase::net
          return async_send(id, msg, [](const std::error_code&) {});
       }
       struct connection;
-      void connect(peer_id id)
-      {
-         async_send(id,
-                    InitMessage{.version = protocol_version, .id = nodeId, .connection_id = id});
-         async_send(id, HostnamesMessage{.hosts = myhosts});
-      }
+      void connect(peer_id id) { async_send(id, InitMessage{.version = protocol_version}); }
       void disconnect(peer_id id) {}
-      bool should_close_duplicate(NodeId id) { return nodeId <= id; }
-      void set_hostnames(const std::vector<std::string>& hosts)
-      {
-         myhosts = hosts;
-         derived().multicast(HostnamesMessage{.hosts = myhosts});
-      }
-      DuplicateConnectionMessage make_duplicate_message(std::uint64_t connection_id, bool secure)
-      {
-         return DuplicateConnectionMessage{connection_id, secure};
-      }
       template <template <typename...> class L, typename... T>
       static constexpr bool check_message_uniqueness(L<T...>*)
       {
@@ -233,26 +163,6 @@ namespace psibase::net
             peers().disconnect(peer);
             return;
          }
-         if (msg.id)
-         {
-            peers().set_node_id(peer, msg.id, msg.connection_id);
-         }
-      }
-      void recv(peer_id peer, const DuplicateConnectionMessage& msg)
-      {
-         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
-         peers().on_duplicate(peer, msg.connection_id, msg.secure);
-      }
-      void recv(peer_id peer, const HostnamesMessage& msg)
-      {
-         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
-         peers().set_hosts(peer, std::vector(msg.hosts));
-         async_send(peer, HostnamesAck{});
-      }
-      void recv(peer_id peer, const HostnamesAck& msg)
-      {
-         PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
-         peers().finish_hostname_update(peer);
       }
       template <typename T>
       void verify_signature(const SignedMessage<T>& msg)
@@ -304,8 +214,5 @@ namespace psibase::net
          PSIBASE_LOG(peers().logger(peer), debug) << "Received message: " << msg.to_string();
          consensus().recv(peer, msg);
       }
-      std::vector<std::string> myhosts;
-      unsigned                 unacked_hostnames = 0;
-      NodeId                   nodeId            = 0;
    };
 }  // namespace psibase::net
