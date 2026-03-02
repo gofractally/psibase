@@ -1,7 +1,7 @@
 use crate::*;
 
 use host::common::client as Client;
-use host::common::store as Store;
+use host::db::store as Store;
 
 use crate::bindings::base64::plugin as base64;
 use crate::types::CurrentDetailsResponse;

@@ -786,34 +786,6 @@ namespace psibase::http
          {
             auto [host, port] = split_port(req_host);
 
-            if (auto iter = server.http_config->services.find(host);
-                iter != server.http_config->services.end())
-            {
-               auto file = iter->second.find(req_target);
-               if (file != iter->second.end())
-               {
-                  if (req.method() == bhttp::verb::options)
-                  {
-                     return send(builder.okNoContent(true));
-                  }
-                  else if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
-                  {
-                     return send(builder.methodNotAllowed(req.target(), req.method_string(),
-                                                          "GET, OPTIONS, HEAD", true));
-                  }
-
-                  std::vector<char> contents;
-                  // read file
-                  auto          size = std::filesystem::file_size(file->second.path);
-                  std::ifstream in(file->second.path, std::ios_base::binary);
-                  l.unlock();
-                  contents.resize(size);
-                  in.read(contents.data(), contents.size());
-                  return send(builder.ok(std::move(contents), file->second.content_type.c_str(),
-                                         nullptr, true));
-               }
-            }
-
             auto        startTime = steady_clock::now();
             HttpRequest data;
             for (auto iter = req.begin(); iter != req.end(); ++iter)
