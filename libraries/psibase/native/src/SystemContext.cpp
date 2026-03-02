@@ -1,4 +1,5 @@
 #include <psibase/ActionContext.hpp>
+#include <psibase/Mount.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/Watchdog.hpp>
 
@@ -15,6 +16,7 @@ namespace psibase
       std::vector<std::unique_ptr<SystemContext>> systemContextCache;
       std::shared_ptr<WatchdogManager>            watchdogManager;
       std::shared_ptr<Sockets>                    sockets;
+      std::shared_ptr<Mount>                      mountpoints;
 
       // TODO: This assumes that systemContexts are always returned to the cache
       std::vector<SystemContext*> allSystemContexts;
@@ -23,7 +25,8 @@ namespace psibase
           : db{std::move(db)},
             wasmCache{std::move(wasmCache)},
             watchdogManager(std::make_shared<WatchdogManager>()),
-            sockets(std::make_shared<Sockets>(this->db))
+            sockets(std::make_shared<Sockets>(this->db)),
+            mountpoints(std::make_shared<Mount>())
       {
       }
    };
@@ -64,6 +67,11 @@ namespace psibase
       return impl->sockets;
    }
 
+   std::shared_ptr<Mount> SharedState::mountpoints()
+   {
+      return impl->mountpoints;
+   }
+
    bool SharedState::needGenesis() const
    {
       auto sharedDb = [&]
@@ -89,8 +97,12 @@ namespace psibase
       std::lock_guard<std::mutex> lock{impl->mutex};
       if (impl->systemContextCache.empty())
       {
-         auto result = std::make_unique<SystemContext>(
-             SystemContext{impl->db, impl->wasmCache, {}, impl->watchdogManager, impl->sockets});
+         auto result = std::make_unique<SystemContext>(SystemContext{impl->db,
+                                                                     impl->wasmCache,
+                                                                     {},
+                                                                     impl->watchdogManager,
+                                                                     impl->sockets,
+                                                                     impl->mountpoints});
          impl->allSystemContexts.push_back(result.get());
          return result;
       }

@@ -409,7 +409,7 @@ class Service(object):
         return self.api.graphql(self.service, query, token)
 
 _default_config = '''# psinode config
-service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
+mount  = $PSIBASE_DATADIR/packages
 
 http-timeout = 4
 %s
