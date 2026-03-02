@@ -208,9 +208,9 @@ class API:
         else:
             host = url.host
         return urllib3.util.Url(url.scheme, url.auth, host, url.port, path).url
-    def request(self, method, path, service=None, **kw):
+    def request(self, method, path, service=None, timeout=10, **kw):
         '''Makes an HTTP request and returns a Response. Other named parameters are passed through to requests.request.'''
-        return self.session.request(method, self._make_url(path, service), **kw)
+        return self.session.request(method, self._make_url(path, service), timeout=timeout, **kw)
     def head(self, path, service=None, **kw):
         '''HTTP HEAD request'''
         return self.request('HEAD', path, service, **kw)
@@ -613,7 +613,7 @@ class Node(API):
         self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def run_psibase(self, args, *, check=True, **kw):
         self._find_psibase()
-        result = subprocess.run([self.psibase] + args, check=check, **kw)
+        result = subprocess.run([self.psibase] + args, check=check, timeout=100, **kw)
         return result
     def unlock_softhsm(self):
         with self.get('/native/admin/keys/devices', service='x-admin') as reply:
