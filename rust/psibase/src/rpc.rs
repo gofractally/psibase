@@ -67,7 +67,7 @@ async fn as_json_or_fracpack<T: UnpackOwned + DeserializeOwned>(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, SimpleObject, InputObject)]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject, InputObject)]
 #[serde(rename_all = "camelCase")]
 #[graphql(input_name = "TaposRefBlockInput")]
 pub struct TaposRefBlock {

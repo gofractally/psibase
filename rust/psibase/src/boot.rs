@@ -117,7 +117,7 @@ pub fn get_initial_actions<
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
     compression_level: u32,
-    builder: &mut TransactionBuilder<F>,
+    builder: &mut TransactionBuilder<SignedTransaction, F>,
     schemas: &SchemaMap,
 ) -> Result<(), anyhow::Error> {
     let has_packages = true;
