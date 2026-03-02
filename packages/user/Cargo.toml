@@ -26,6 +26,8 @@ members = [
     "Identity",
     "Identity/service",
     "Identity/plugin",
+    "PluginInfo",
+    "PluginInfo/service",
     "Profiles",
     "Profiles/service",
     "Profiles/plugin",

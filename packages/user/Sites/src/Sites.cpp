@@ -1,4 +1,5 @@
 #include "services/user/Sites.hpp"
+#include "services/user/PluginInfo.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <psibase/HttpHeaders.hpp>
@@ -264,6 +265,15 @@ namespace SystemService
          }
       }
 
+      void pluginCache(std::string path)
+      {
+         if (path.ends_with(".wasm"))
+         {
+            // TODO: re-enable
+            //to<UserService::PluginInfo>().cachePlugin(getSender(), std::move(path));
+         }
+      }
+
       // returns true if the link target exists
       bool linkImpl(Sites::Tables&             tables,
                     std::string                path,
@@ -526,14 +536,14 @@ namespace SystemService
 
       Checksum256 contentHash = sha256(content.data(), content.size());
 
-      if (!linkImpl(tables, std::move(path), std::move(contentType), std::move(contentEncoding),
-                    contentHash))
+      if (!linkImpl(tables, path, std::move(contentType), std::move(contentEncoding), contentHash))
       {
          tables.open<SitesDataTable>().put({
              .hash = contentHash,
              .data = std::move(content),
          });
       }
+      pluginCache(std::move(path));
    }
 
    void Sites::hardlink(std::string                path,
@@ -543,11 +553,11 @@ namespace SystemService
    {
       Tables tables{};
 
-      if (!linkImpl(tables, std::move(path), std::move(contentType), std::move(contentEncoding),
-                    contentHash))
+      if (!linkImpl(tables, path, std::move(contentType), std::move(contentEncoding), contentHash))
       {
          abortMessage("Content must exist to use hardlink");
       }
+      pluginCache(std::move(path));
    }
 
    void Sites::remove(std::string path)
@@ -561,6 +571,7 @@ namespace SystemService
          auto refsTable = tables.open<SitesDataRefTable>();
          decRef(tables, refsTable, existing->contentHash);
       }
+      pluginCache(std::move(path));
    }
 
    bool Sites::isValidPath(AccountNumber site, std::string path)
