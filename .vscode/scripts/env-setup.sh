@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 WORKSPACE_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-BOOTSTRAP_MARKER="$WORKSPACE_ROOT/nix/.workspace-bootstrapped"
+BOOTSTRAP_MARKER="$WORKSPACE_ROOT/.vscode/.workspace-bootstrapped"
 
 if [ -f "$BOOTSTRAP_MARKER" ]; then
     echo "Workspace already bootstrapped; skipping. Remove $BOOTSTRAP_MARKER to rerun."
