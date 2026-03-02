@@ -64,7 +64,7 @@ export const parser = (): Promise<any> => {
 };
 
 let queryToken: string | undefined;
-export const setQueryToken = (token: string) => (queryToken = token);
+export const setQueryToken = (token: string | undefined) => (queryToken = token);
 
 export let chainId: string | undefined;
 const getChainId = (): Promise<string> => {

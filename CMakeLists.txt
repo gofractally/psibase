@@ -276,6 +276,7 @@ add_rs_component_workspace(packages/:Plugins
     auth-sig
     base64
     kdf
+    kvtests
     setcode
     clientdata
     invite
@@ -283,6 +284,7 @@ add_rs_component_workspace(packages/:Plugins
     permissions
     sites
     host-common
+    host-db
     host-prompt
     host-types
     host-auth
@@ -295,22 +297,7 @@ add_rs_component_workspace(packages/:Plugins
     producers
 )
 
-function(psinode_files target pfx)
-    add_custom_target(
-    ${target}
-    ALL
-    DEPENDS ${XAdmin_js_DEP} wasm
-    COMMAND rm -rf ${pfx}/share/psibase/services/x-admin
-    COMMAND mkdir -p ${pfx}/share/psibase/services/x-admin
-    COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/programs/psinode/config.in ${pfx}/share/psibase/config.in
-    COMMAND ${CMAKE_COMMAND} -E create_symlink ../../packages ${pfx}/share/psibase/services/x-admin/packages
-    )
-endfunction()
-
-psinode_files(psinode-share ${CMAKE_CURRENT_BINARY_DIR})
-
 include(GNUInstallDirs)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/services/x-admin/packages DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/services/x-admin COMPONENT ServerData)
 
 # Build service packages
 include(libraries/psibase/sdk/pack_service.cmake)
@@ -386,6 +373,17 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/Kvtests.psi
+    NAME Kvtests
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "KvStore tests"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    SERVICE kvtests
+        DATA ${Plugins_OUTPUT_FILE_kvtests} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Aes.psi
     NAME Aes
     VERSION ${PSIBASE_VERSION}.0
@@ -425,6 +423,7 @@ psibase_package(
     ACCOUNTS wasi # This name would be overshadowed
     SERVICE host
         DATA ${Plugins_OUTPUT_FILE_host_common} /common.wasm
+        DATA ${Plugins_OUTPUT_FILE_host_db} /db.wasm
         DATA ${Plugins_OUTPUT_FILE_host_prompt} /prompt.wasm
         DATA ${Plugins_OUTPUT_FILE_host_types} /types.wasm
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
@@ -1131,7 +1130,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
@@ -1168,6 +1167,7 @@ install(
           ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
           ${SERVICE_DIR}/Kdf.psi
+          ${SERVICE_DIR}/Kvtests.psi
           ${SERVICE_DIR}/Minimal.psi
           ${SERVICE_DIR}/Nft.psi
           ${SERVICE_DIR}/Nop.psi

@@ -1268,7 +1268,6 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-plugin-workspace-hack",
- "regex",
  "serde",
  "serde_json",
  "url",
@@ -1283,6 +1282,16 @@ dependencies = [
  "pem",
  "psibase",
  "psibase-plugin-workspace-hack",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "host-db"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-plugin-workspace-hack",
+ "regex",
  "wit-bindgen-rt",
 ]
 
@@ -1722,6 +1731,14 @@ dependencies = [
  "pbkdf2",
  "psibase-plugin-workspace-hack",
  "sha2",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "kvtests"
+version = "0.23.0"
+dependencies = [
+ "psibase-plugin-workspace-hack",
  "wit-bindgen-rt",
 ]
 

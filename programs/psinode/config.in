@@ -7,7 +7,7 @@ host     = psibase.localhost
 host     = psibase.127.0.0.1.sslip.io
 listen   = 8080
 # peer     = http://localhost:8080/
-service  = x-admin.:$PSIBASE_DATADIR/services/x-admin
+mount    = $PSIBASE_DATADIR/packages
 database-cache-size = 256MiB
 service-threads = 4
 

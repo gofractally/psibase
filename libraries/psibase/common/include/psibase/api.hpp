@@ -345,6 +345,12 @@ namespace psibase
       /// - `EACCES`: The socket is owned by another context
       PSIBASE_NATIVE(socketSetFlags)
       std::int32_t socketSetFlags(std::int32_t fd, SocketFlags mask, SocketFlags value);
+
+      /// Sets result to the contents of the file and returns the size.
+      ///
+      /// Returns -1 if the file cannot be opened for any reason
+      PSIBASE_NATIVE(readFile)
+      std::uint32_t readFile(const char* name, std::uint32_t len);
    }  // namespace raw
 
    /// Get result
