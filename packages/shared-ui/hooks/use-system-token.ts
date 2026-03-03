@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { graphql } from "@shared/lib/graphql";
+import { graphql, GraphQLUrlOptions } from "@shared/lib/graphql";
 import QueryKey from "@shared/lib/query-keys";
 
 export interface SystemTokenInfo {
@@ -25,7 +25,7 @@ interface TokenResponse {
 
 const NO_SYSTEM_TOKEN: SystemTokenInfo = { id: "", symbol: "" };
 
-export const useSystemToken = () => {
+export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
     return useQuery<SystemTokenInfo>({
         queryKey: QueryKey.systemToken(),
         queryFn: async (): Promise<SystemTokenInfo> => {
@@ -40,6 +40,7 @@ export const useSystemToken = () => {
 
                 const configRes = await graphql<ConfigResponse>(configQuery, {
                     service: "tokens",
+                    ...opts,
                 });
 
                 if (!configRes.config?.sysTid) {
@@ -58,6 +59,7 @@ export const useSystemToken = () => {
 
                 const tokenRes = await graphql<TokenResponse>(tokenQuery, {
                     service: "tokens",
+                    ...opts,
                 });
 
                 if (!tokenRes.token) {

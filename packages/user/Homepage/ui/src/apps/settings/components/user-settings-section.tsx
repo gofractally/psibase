@@ -27,7 +27,9 @@ export const UserSettingsSection = () => {
         isError: isUserResourcesError,
         error: userResourcesError,
     } = useUserResources(currentUser, { enabled: billingEnabled });
-    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
+    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken({
+        baseUrlIncludesSibling: false,
+    });
     const { mutateAsync: fillGasTank, isPending: isFilling } = useFillGasTank();
     const {
         mutateAsync: resizeAndFillGasTank,
