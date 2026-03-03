@@ -6,7 +6,6 @@ import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
-import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { EmptyBlock } from "@shared/components/empty-block";
@@ -30,9 +29,8 @@ export const GuildApplicants = () => {
     const navigate = useNavigate();
 
     const { data: currentUser } = useCurrentUser();
-    const { data: guild } = useGuild();
-    const { data: applications } = useGuildApplications(guild?.account);
     const guildAccount = useGuildAccount();
+    const { data: applications } = useGuildApplications(guildAccount);
     const { data: memberships, isPending } =
         useGuildMembershipsOfUser(currentUser);
 
@@ -66,11 +64,9 @@ export const GuildApplicants = () => {
                                 {applications.map((application) => (
                                     <TableRow
                                         key={application.applicant}
-                                        onClick={() => {
-                                            navigate(
-                                                `/guild/${guild?.account}/applications/${application.applicant}`,
-                                            );
-                                        }}
+                                        onClick={() =>
+                                            navigate(application.applicant)
+                                        }
                                     >
                                         <TableCell className="font-medium">
                                             <TableContact

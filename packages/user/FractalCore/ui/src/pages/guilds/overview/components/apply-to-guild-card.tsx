@@ -1,8 +1,10 @@
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
+import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuildMembership } from "@/hooks/fractals/use-guild-membership";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
@@ -14,6 +16,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const ApplyToGuildCard = () => {
     const [showModal, setShowModal] = useState(false);
+    const navigate = useNavigate();
 
     const guildAccount = useGuildAccount();
 
@@ -28,8 +31,14 @@ export const ApplyToGuildCard = () => {
         isPending: isPendingMembership,
         error: errorMembership,
     } = useGuildMembership(guildAccount, currentUser);
+    const {
+        data: application,
+        isPending: isPendingApplication,
+        error: errorApplication,
+    } = useGuildApplication(guildAccount, currentUser);
 
-    const isPending = isPendingCurrentUser || isPendingMembership;
+    const isPending =
+        isPendingCurrentUser || isPendingMembership || isPendingApplication;
 
     if (isPending) {
         return (
@@ -49,7 +58,7 @@ export const ApplyToGuildCard = () => {
         );
     }
 
-    const error = errorCurrentUser || errorMembership;
+    const error = errorCurrentUser || errorMembership || errorApplication;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -57,6 +66,40 @@ export const ApplyToGuildCard = () => {
 
     if (membership) {
         return null;
+    }
+
+    if (application) {
+        return (
+            <Card className="border-dashed">
+                <CardContent className="pt-6">
+                    <div className="flex flex-col items-center space-y-4 text-center">
+                        <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-full">
+                            <FileText className="text-muted-foreground h-6 w-6" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-semibold">
+                                Application Open
+                            </h3>
+                            <p className="text-muted-foreground mt-1 text-sm">
+                                You have a pending application to join this
+                                guild.
+                            </p>
+                        </div>
+                        <Button
+                            onClick={() => {
+                                navigate(
+                                    `/guild/${guildAccount}/membership/applicants/${currentUser}`,
+                                );
+                            }}
+                            size="lg"
+                            className="w-full sm:w-auto"
+                        >
+                            View application
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (

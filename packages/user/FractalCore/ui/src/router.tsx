@@ -105,7 +105,7 @@ export const router = createBrowserRouter([
                         ),
                     },
                     {
-                        path: "applications/:applicant",
+                        path: "membership/applicants/:applicant",
                         element: (
                             <ProtectedRoute>
                                 <ApplicationDetail />

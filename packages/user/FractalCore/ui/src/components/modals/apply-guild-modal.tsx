@@ -35,7 +35,9 @@ export const ApplyGuildModal = ({
             await applyGuild([guildAccount!, extraInfo]);
             openChange(false);
             formApi.reset();
-            navigate(`/guild/${guildAccount}/applications/${currentUser}`);
+            navigate(
+                `/guild/${guildAccount}/membership/applicants/${currentUser}`,
+            );
         },
         validators: {
             onChange: z.object({
