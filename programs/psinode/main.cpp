@@ -1469,10 +1469,8 @@ void run(const std::string&              db_path,
                  loggers::configure(config.loggers);
                  {
                     std::lock_guard l{http_config->mutex};
-                    http_config->hosts               = hosts;
-                    http_config->listen              = config.listen;
-                    http_config->enable_transactions = !hosts.empty();
-                    http_config->idle_timeout_us     = http_timeout.duration.count();
+                    http_config->listen          = config.listen;
+                    http_config->idle_timeout_us = http_timeout.duration.count();
                  }
                  tpool.setNumThreads(service_threads);
                  {
@@ -1527,14 +1525,12 @@ void run(const std::string&              db_path,
    if (!listen.empty())
    {
       // TODO: command-line options
-      http_config->num_threads         = 4;
-      http_config->max_request_size    = 20 * 1024 * 1024;
-      http_config->idle_timeout_us     = http_timeout.duration.count();
-      http_config->listen              = listen;
-      http_config->hosts               = hosts;
-      http_config->enable_transactions = !hosts.empty();
-      http_config->status              = http::http_status{
-                       .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
+      http_config->num_threads      = 4;
+      http_config->max_request_size = 20 * 1024 * 1024;
+      http_config->idle_timeout_us  = http_timeout.duration.count();
+      http_config->listen           = listen;
+      http_config->status           = http::http_status{
+                    .slow = system->sharedDatabase.isSlow(), .startup = 1, .needgenesis = 1};
 
       // TODO: speculative execution on non-producers
       http_config->push_boot_async =

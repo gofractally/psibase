@@ -596,9 +596,6 @@ namespace psibase::http
 
          if (req_target == "/native/admin/push_boot" && server.http_config->push_boot_async)
          {
-            if (!server.http_config->enable_transactions)
-               return send(builder.notFound(req.target()));
-
             if (req.method() != bhttp::verb::post)
             {
                return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
@@ -660,16 +657,6 @@ namespace psibase::http
             runNativeHandlerGenericNoFail(
                 server.http_config->get_metrics,
                 "application/openmetrics-text; version=1.0.0; charset=utf-8");
-         }
-         else if (req_target == "/native/admin/peers" && server.http_config->get_peers)
-         {
-            if (req.method() != bhttp::verb::get)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
-            }
-
-            // returns json list of {id:int,endpoint:string}
-            runNativeHandlerJsonNoFail(server.http_config->get_peers);
          }
          else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
          {
