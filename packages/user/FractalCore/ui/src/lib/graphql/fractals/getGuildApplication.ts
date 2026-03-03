@@ -32,7 +32,7 @@ export const getGuildApplication = async (
 
     return z
         .object({
-            guildApplication: zGuildApplicationListInstance,
+            guildApplication: zGuildApplicationListInstance.nullable(),
         })
         .parse(res).guildApplication;
 };
