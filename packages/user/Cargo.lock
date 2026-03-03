@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "prem-accounts"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "prem-accounts-pkg",
@@ -2413,7 +2413,7 @@ dependencies = [
 
 [[package]]
 name = "prem-accounts-pkg"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "prem-accounts",
  "prem-accounts-plugin",
@@ -2422,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "prem-accounts-plugin"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "pem",
  "prem-accounts",
@@ -2777,7 +2777,7 @@ dependencies = [
 
 [[package]]
 name = "r-prem-accts"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "async-graphql",
  "diff-adjust",

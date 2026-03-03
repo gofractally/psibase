@@ -64,6 +64,11 @@ export const App = () => {
         privateKey: string;
     } | null>(null);
     const { data: loggedInUser } = useLoggedInUser();
+    const [historyEvents, setHistoryEvents] = useState<
+        { account: string; action: string }[]
+    >([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
+    const [historyError, setHistoryError] = useState<string>("");
     const thisServiceName = "prem-accounts";
 
     useEffect(() => {
@@ -109,9 +114,111 @@ export const App = () => {
         }
     };
 
+    const loadHistoryEvents = async () => {
+        if (!loggedInUser) return;
+
+        setIsLoadingHistory(true);
+        setHistoryError("");
+
+        try {
+            const premAccountsGraphqlUrl = siblingUrl(
+                null,
+                thisServiceName,
+                "/graphql",
+            );
+
+            const allEvents: { account: string; action: string }[] = [];
+            let hasNextPage = true;
+            let afterCursor: string | null = null;
+
+            while (hasNextPage) {
+                const response = await fetch(premAccountsGraphqlUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        query: `
+                            query PremAccountEvents($owner: String!, $first: Int, $after: String) {
+                                premAccountEvents(owner: $owner, first: $first, after: $after) {
+                                    nodes {
+                                        account
+                                        action
+                                    }
+                                    pageInfo {
+                                        hasNextPage
+                                        endCursor
+                                    }
+                                }
+                            }
+                        `,
+                        variables: {
+                            owner: loggedInUser,
+                            first: 50,
+                            after: afterCursor,
+                        },
+                    }),
+                });
+
+                const data = (await response.json()) as {
+                    data?: {
+                        premAccountEvents?: {
+                            nodes?: Array<{
+                                account?: string;
+                                action?: string;
+                            } | null>;
+                            pageInfo?: {
+                                hasNextPage?: boolean;
+                                endCursor?: string | null;
+                            };
+                        };
+                    };
+                    errors?: Array<{ message: string }>;
+                };
+
+                if (data.errors && data.errors.length > 0) {
+                    throw new Error(data.errors[0].message);
+                }
+
+                const connection = data.data?.premAccountEvents;
+                if (!connection) {
+                    break;
+                }
+
+                const nodes = connection.nodes ?? [];
+                for (const node of nodes) {
+                    if (
+                        node &&
+                        typeof node.account === "string" &&
+                        typeof node.action === "string"
+                    ) {
+                        allEvents.push({
+                            account: node.account,
+                            action: node.action,
+                        });
+                    }
+                }
+
+                hasNextPage = connection.pageInfo?.hasNextPage ?? false;
+                afterCursor = connection.pageInfo?.endCursor ?? null;
+            }
+
+            setHistoryEvents(allEvents);
+        } catch (e) {
+            console.error("Failed to load history events:", e);
+            setHistoryEvents([]);
+            setHistoryError(
+                e instanceof Error
+                    ? e.message
+                    : "Failed to load history events",
+            );
+        } finally {
+            setIsLoadingHistory(false);
+        }
+    };
+
     useEffect(() => {
         if (loggedInUser) {
             loadBoughtNames();
+            loadHistoryEvents();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loggedInUser]);
@@ -275,6 +382,7 @@ export const App = () => {
             setMaxCost(defaultMaxCost);
             await loadPrices();
             await loadBoughtNames();
+            await loadHistoryEvents();
             
             // Clear success message after 5 seconds
             setTimeout(() => setBuySuccessMessage(""), 5000);
@@ -321,6 +429,7 @@ export const App = () => {
             setClaimSuccessNotification({ accountName, privateKey });
 
             await loadBoughtNames();
+            await loadHistoryEvents();
 
             setTimeout(() => setClaimSuccessMessage(""), 5000);
         } catch (e) {
@@ -474,6 +583,45 @@ export const App = () => {
                         </div>
                     </TabsContent>
                 </Tabs>
+
+                <div className="mt-8">
+                    <h2 className="text-lg font-semibold mb-3">History</h2>
+                    {!loggedInUser ? (
+                        <p className="text-gray-500">
+                            Log in to see your premium account history.
+                        </p>
+                    ) : isLoadingHistory ? (
+                        <p className="text-gray-500">Loading history...</p>
+                    ) : historyError ? (
+                        <p className="text-red-500">{historyError}</p>
+                    ) : historyEvents.length === 0 ? (
+                        <p className="text-gray-500">
+                            You don&apos;t have any history yet.
+                        </p>
+                    ) : (
+                        <div className="border rounded-md overflow-hidden">
+                            <div className="grid grid-cols-2 bg-muted px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                <div>Account</div>
+                                <div>Event</div>
+                            </div>
+                            <ul>
+                                {historyEvents.map((event, index) => (
+                                    <li
+                                        key={`${event.account}-${event.action}-${index}`}
+                                        className="grid grid-cols-2 px-4 py-2 text-sm border-t last:border-b-0"
+                                    >
+                                        <span className="font-mono">
+                                            {event.account}
+                                        </span>
+                                        <span className="capitalize">
+                                            {event.action}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
