@@ -189,7 +189,12 @@ impl User for TokensPlugin {
         let amount = Self::non_zero(token_id, amount)?;
         assert_authorized_with_whitelist(
             FunctionName::credit,
-            vec!["homepage".into(), "virtual-server".into(), "invite".into()],
+            vec![
+                "homepage".into(),
+                "virtual-server".into(),
+                "invite".into(),
+                "prem-accounts".into(),
+            ],
         )?;
 
         let packed_args = Actions::credit {
@@ -210,7 +215,10 @@ impl User for TokensPlugin {
         memo: String,
     ) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
-        assert_authorized_with_whitelist(FunctionName::uncredit, vec!["homepage".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::uncredit,
+            vec!["homepage".into(), "prem-accounts".into()],
+        )?;
 
         let packed_args = Actions::uncredit {
             amount,
