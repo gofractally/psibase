@@ -9,7 +9,16 @@ using namespace LocalService;
 
 void XBasic::startSession()
 {
-   if (auto htpasswd = readFile("/psibase/.htpasswd"))
+   auto envTable = Native::session(KvMode::read).open<EnvTable>();
+
+   std::optional<EnvRow> env;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      env = envTable.get(std::string("PSIBASE_PASSWD_FILE"));
+   }
+   if (!env)
+      return;
+   if (auto htpasswd = readFile(env->value))
    {
       auto passwords = open<PasswordTable>();
       PSIBASE_SUBJECTIVE_TX
