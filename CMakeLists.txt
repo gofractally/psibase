@@ -79,7 +79,7 @@ if(DEFINED WASI_SDK_PREFIX)
         DEPENDS ${wasm-deps}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/wasm/botan
         INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm/deps
-        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,raw_hash,auto_rng,sha2_64,getentropy --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasip1 -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory" --without-stack-protector --prefix=<INSTALL_DIR>
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure.py --cc-bin=${WASI_SDK_PREFIX}/bin/clang++ --cc=gcc --cpu=generic --os=none --ar-command=${WASI_SDK_PREFIX}/bin/llvm-ar --build-targets=static --with-sysroot-dir=${WASI_SDK_PREFIX}/share/wasi-sysroot --minimized-build --enable-modules=ecdsa,bcrypt,raw_hash,auto_rng,sha2_64,getentropy --with-os-feature=getentropy "--cxxflags=--target=wasm32-wasip1 -O3 -msign-ext -mnontrapping-fptoint -mbulk-memory" --without-stack-protector --prefix=<INSTALL_DIR>
         BUILD_COMMAND make -j${NUM_PROCS}
         INSTALL_COMMAND make install
     )
@@ -136,7 +136,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
-        Transact VerifySig XAdmin XDb XHttp XRun XSites XTimer XTransact
+        Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
         XPackages XPeers XProxy XSocketListService WSEcho XDelay)
@@ -971,7 +971,19 @@ psibase_package(
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
     DEPENDS wasm ${XAdmin_js_DEP}
-    PACKAGE_DEPENDS XHttp XSites
+    PACKAGE_DEPENDS XHttp XSites XBasic
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/XBasic.psi
+    NAME XBasic
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Supports HTTP Basic Authentication"
+    SERVICE x-basic
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/XBasic.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XBasic-schema.json
+        FLAGS isPrivileged
+    DEPENDS wasm
 )
 
 psibase_package(
@@ -1132,7 +1144,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
+    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1193,6 +1205,7 @@ install(
           ${SERVICE_DIR}/Workshop.psi
           ${SERVICE_DIR}/Config.psi
           ${SERVICE_DIR}/XAdmin.psi
+          ${SERVICE_DIR}/XBasic.psi
           ${SERVICE_DIR}/XDb.psi
           ${SERVICE_DIR}/XDefault.psi
           ${SERVICE_DIR}/XHttp.psi

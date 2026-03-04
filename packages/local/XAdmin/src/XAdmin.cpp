@@ -3,6 +3,7 @@
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/json/any.hpp>
+#include <services/local/XBasic.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XPeers.hpp>
@@ -493,6 +494,7 @@ namespace LocalService
          }
          open<AdminOptionsTable>().put(adminOpts);
       }
+      to<XBasic>().startSession();
       recurse().to<XPeers>().onConfig();
    }
 
@@ -528,6 +530,12 @@ namespace LocalService
                              .contentType = "text/html",
                              .body        = toVec("Not authorized")};
          }
+      }
+
+      {
+         auto basic = to<XBasic>().checkAuth(req, socket);
+         if (!basic)
+            return basic;
       }
 
       return HttpReply{.status      = HttpStatus::unauthorized,
