@@ -1,0 +1,14 @@
+{
+  "branchName": "main",
+  "projectName": "Sample PRD for verification",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Sample story: add a no-op action to a service",
+      "priority": 1,
+      "passes": false,
+      "skills": ["service-actions"],
+      "acceptance_criteria": ["Build passes", "Action callable"]
+    }
+  ]
+}

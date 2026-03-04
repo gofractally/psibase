@@ -41,6 +41,8 @@ cursor-agent "Convert projects/my-feature.md to prd.json following the template 
 
 Then move or copy the resulting `prd.json` into `ralph-work/`.
 
+**Quick verification:** Copy `templates/prd.sample.json` to `prd.json` and run `./ralph.sh --dry-run` to test prompt building without calling cursor-agent. See [VERIFICATION.md](VERIFICATION.md).
+
 ### 4. Create a branch
 
 Create and checkout the branch specified in your PRD's `branchName`:
@@ -55,13 +57,15 @@ git checkout -b ralph/my-feature
 ./ralph.sh
 ```
 
+Optional: run `./ralph.sh --dry-run` first to build the prompt and write it to `last_run/dry_run_prompt.md` without invoking cursor-agent (verifies config, branch, and skill injection).
+
 ### 6. Monitor
 
-Watch stdout for iteration progress, model used, and task status. Ralph will stop when:
-- All stories pass (outputs `<promise>COMPLETE</promise>`)
+Watch stdout for iteration progress, model used, and task status. Check `iteration.log` for a history of model, story, and result per iteration. Ralph will stop when:
+- All stories pass (agent outputs `<promise>COMPLETE</promise>` and script marks them complete)
 - `STORIES_PER_RUN` stories are completed
 - Max iterations reached
-- An escalation occurs (task fails 3 times)
+- An escalation occurs (agent outputs `<escalation>`, or 3 consecutive iterations without completion)
 
 ### 7. Handle escalations
 
@@ -74,10 +78,11 @@ If Ralph stops with an escalation report, check `reports/` for details, fix the 
 Ralph runs `cursor-agent` in a loop. Each iteration:
 
 1. Injects your PRD, progress log, and relevant skills into a prompt
-2. Asks the agent to pick the highest-priority story with `passes: false`
-3. Breaks it into subtasks, implements them, and runs quality checks
-4. On success: commits, updates `prd.json`, appends to `progress.txt`
-5. On 3 failed attempts: writes an escalation report and exits
+2. Targets the first story with `passes: false` (by priority order)
+3. Agent breaks it into subtasks, implements them, and runs quality checks
+4. On success (agent outputs `<promise>COMPLETE</promise>`): script marks that story `passes: true` in `prd.json`, appends to `iteration.log`, and continues
+5. On agent escalation (agent outputs `<escalation>...</escalation>`): script writes an escalation report and exits
+6. If 3 iterations in a row complete without COMPLETE or escalation: script writes an escalation report and exits (so you can fix blocking issues and re-run)
 
 ```mermaid
 flowchart LR
@@ -120,13 +125,16 @@ ai/
 │   └── [skill-name]/   # One dir per skill with SKILL.md
 ├── ralph-work/         # ← You are here
 │   ├── README.md       # This file
+│   ├── VERIFICATION.md # Phase 5: verification checklist and dry-run guide
 │   ├── ralph.conf      # Configuration
-│   ├── ralph.sh        # Main loop script
+│   ├── ralph.sh        # Main loop script (supports --dry-run)
 │   ├── prompt.md       # Template prompt for cursor-agent
 │   ├── prd.json        # Active PRD (created per project)
 │   ├── progress.txt    # Append-only progress log
+│   ├── iteration.log   # Per-iteration log (model, story, result)
 │   ├── state.json      # Loop state (auto-managed)
 │   ├── templates/      # PRD and user story templates
+│   │   └── prd.sample.json  # Sample PRD for dry-run verification
 │   ├── projects/       # Your PRD markdown files
 │   ├── reports/        # Escalation reports
 │   ├── archive/        # Archived previous runs
@@ -148,11 +156,11 @@ ai/
 
 ## Handling Escalations
 
-When Ralph stops due to a failed subtask (3 attempts):
+Ralph escalates in two cases: (1) the agent outputs an `<escalation>` block after 3 attempts at a subtask, or (2) the script sees 3 consecutive iterations without `<promise>COMPLETE</promise>` (no story completed).
 
 1. **Read the escalation report** in `reports/` (e.g. `reports/escalation-2025-03-04-143022.md`)
-2. **Fix the issue** in the codebase
-3. **Re-run** `./ralph.sh` — the loop will resume from where it left off
+2. **Fix the issue** in the codebase (or clarify the PRD if the agent was stuck)
+3. **Re-run** `./ralph.sh` — the loop resumes from the current state; `prd.json` and `state.json` are preserved
 4. **Add a lesson** — Consider adding a note to `ai/lessons-learned/` so future runs can avoid the same pitfall
 
 ---
@@ -174,8 +182,14 @@ When Ralph stops due to a failed subtask (3 attempts):
 | **Branch mismatch** | Checkout the branch from your PRD's `branchName` before running. |
 | **jq not found** | Install jq: `apt install jq` (Debian/Ubuntu) or `brew install jq` (macOS). |
 | **cursor-agent not found** | Ensure cursor-agent is on PATH. Run `cursor-agent --version` to verify. |
-| **Escalation loops** | The AI is stuck on the same issue. Read the report, fix the root cause manually, then re-run. |
+| **Escalation loops** | The AI is stuck. Either the agent reported `<escalation>` or the script hit 3 iterations without COMPLETE. Read the report and `iteration.log`, fix the root cause, then re-run. |
 | **prd.json not found** | Create or convert your PRD to `prd.json` in `ralph-work/` before running. |
+
+---
+
+## Verification
+
+See **[VERIFICATION.md](VERIFICATION.md)** for a Phase 5 checklist: prerequisites, dry-run steps (no cursor-agent), optional one-iteration run, and troubleshooting.
 
 ---
 

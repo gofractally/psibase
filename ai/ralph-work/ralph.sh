@@ -13,6 +13,7 @@ STATE_FILE="${SCRIPT_DIR}/state.json"
 LAST_RUN_DIR="${SCRIPT_DIR}/last_run"
 ARCHIVE_DIR="${SCRIPT_DIR}/archive"
 REPORTS_DIR="${SCRIPT_DIR}/reports"
+ITERATION_LOG="${SCRIPT_DIR}/iteration.log"
 SKILLS_DIR=""
 
 # Config defaults (overridden by ralph.conf)
@@ -30,7 +31,7 @@ show_help() {
     cat << 'EOF'
 Ralph - Autonomous AI coding loop for psibase development
 
-Usage: ralph.sh [--help]
+Usage: ralph.sh [--help] [--dry-run]
 
 Runs cursor-agent in a loop, processing user stories from prd.json until:
   - All stories pass (outputs <promise>COMPLETE</promise>)
@@ -52,9 +53,13 @@ Configuration: Edit ralph.conf in the same directory.
   SKILLS_DIR        Skills directory (default: WORKSPACE/ai/skills)
 
 Output:
+  - Iteration log: iteration.log (model, iteration, story, result per run)
   - Escalation reports: reports/escalation-YYYY-MM-DD-HHMMSS.md
   - State: state.json
   - Archives: archive/YYYY-MM-DD-feature-name/ (on branch switch)
+
+With --dry-run: builds the prompt (config, branch, skills injection) and writes it to
+  last_run/dry_run_prompt.md without calling cursor-agent. Use to verify setup.
 EOF
 }
 
@@ -235,6 +240,25 @@ write_escalation_report() {
 }
 
 # -----------------------------------------------------------------------------
+# Mark first incomplete story as passed in prd.json
+# -----------------------------------------------------------------------------
+mark_current_story_complete() {
+    local stories_key
+    stories_key=$(jq -r 'if .userStories != null then "userStories" else "stories" end' "$PRD_FILE" 2>/dev/null) || true
+    [[ -z "$stories_key" ]] && return 1
+    local idx
+    idx=$(jq -r --arg k "$stories_key" '
+        (.[$k] | to_entries | map(select(.value.passes != true)) | .[0].key) // empty
+    ' "$PRD_FILE" 2>/dev/null) || true
+    if [[ -z "$idx" ]]; then
+        return 0
+    fi
+    local tmp
+    tmp=$(mktemp)
+    jq --argjson idx "$idx" --arg k "$stories_key" '.[$k][$idx].passes = true' "$PRD_FILE" > "$tmp" && mv "$tmp" "$PRD_FILE"
+}
+
+# -----------------------------------------------------------------------------
 # Update state.json
 # -----------------------------------------------------------------------------
 update_state() {
@@ -265,6 +289,16 @@ update_state() {
 }
 
 # -----------------------------------------------------------------------------
+# Append one line to iteration log
+# -----------------------------------------------------------------------------
+log_iteration() {
+    local result="$1"
+    local story_id="${2:-}"
+    local story_title="${3:-}"
+    echo "$(date -Iseconds) | model=$MODEL | iteration=$iteration | story_id=$story_id | story_title=$story_title | result=$result" >> "$ITERATION_LOG"
+}
+
+# -----------------------------------------------------------------------------
 # Save last run for archiving
 # -----------------------------------------------------------------------------
 save_last_run() {
@@ -289,6 +323,15 @@ main() {
         exit 1
     fi
 
+    if [[ "${1:-}" == "--dry-run" ]]; then
+        mkdir -p "$LAST_RUN_DIR"
+        local dry_out="${LAST_RUN_DIR}/dry_run_prompt.md"
+        build_prompt > "$dry_out"
+        echo "Dry run: prompt built and written to $dry_out"
+        echo "  (branch check skipped; no cursor-agent invocation). Verify file contents and re-run without --dry-run to start the loop."
+        exit 0
+    fi
+
     verify_branch
 
     local branch_name
@@ -302,10 +345,18 @@ main() {
     stories_completed=$(jq -r '.stories_completed // 0' "$STATE_FILE" 2>/dev/null) || echo "0"
     local last_story_id
     last_story_id=$(jq -r '.last_story_id // empty' "$STATE_FILE" 2>/dev/null) || true
+    local consecutive_failures=0
 
     while [[ $iteration -lt $MAX_ITERATIONS ]]; do
         iteration=$((iteration + 1))
+
+        local first_story_id first_story_title
+        first_story_id=$(jq -r '(.userStories // .stories // []) | map(select(.passes != true)) | .[0].id // empty' "$PRD_FILE" 2>/dev/null) || true
+        first_story_title=$(jq -r '(.userStories // .stories // []) | map(select(.passes != true)) | .[0].title // "current story"' "$PRD_FILE" 2>/dev/null) || true
+        [[ -z "$first_story_title" ]] && first_story_title="current story"
+
         echo "[Model: $MODEL] Iteration $iteration of $MAX_ITERATIONS"
+        echo "  Task: $first_story_title"
 
         local prompt
         prompt=$(build_prompt)
@@ -316,12 +367,12 @@ main() {
         output=$(cursor-agent -p --trust --force --workspace "$WORKSPACE" --model "$MODEL" "$(cat "$tmp_prompt")" 2>&1) || true
         rm -f "$tmp_prompt"
 
-        local task_desc
-        task_desc=$(jq -r '.stories[0].title // "current story"' "$PRD_FILE" 2>/dev/null) || task_desc="current story"
-        echo "  Task: $task_desc"
-
         if echo "$output" | grep -q '<promise>COMPLETE</promise>'; then
+            mark_current_story_complete
+            last_story_id="$first_story_id"
             stories_completed=$((stories_completed + 1))
+            consecutive_failures=0
+            log_iteration "complete" "$first_story_id" "$first_story_title"
             echo "Success: Story complete ($stories_completed of $STORIES_PER_RUN)."
             save_last_run
             update_state "$iteration" "$stories_completed" "$last_story_id" "$branch_name"
@@ -329,15 +380,35 @@ main() {
                 echo "Stories per run ($STORIES_PER_RUN) reached. Stopping."
                 exit 0
             fi
-            # Continue loop for more stories
+            update_state "$iteration" "$stories_completed" "$last_story_id" "$branch_name"
+            sleep 2
+            continue
         fi
 
         local escalation_content
         escalation_content=$(echo "$output" | sed -n '/<escalation>/,/<\/escalation>/p' | sed '1d;$d' || true)
         if [[ -n "$escalation_content" ]]; then
+            log_iteration "escalation" "$first_story_id" "$first_story_title"
             write_escalation_report "$escalation_content" "$MAX_TASK_ATTEMPTS"
             save_last_run
             update_state "$iteration" "$stories_completed" "$last_story_id" "$branch_name"
+            exit 1
+        fi
+
+        consecutive_failures=$((consecutive_failures + 1))
+        log_iteration "no_complete" "$first_story_id" "$first_story_title"
+
+        if [[ $consecutive_failures -ge $MAX_TASK_ATTEMPTS ]]; then
+            local auto_escalation
+            auto_escalation="Three consecutive iterations ($consecutive_failures) completed without story completion.
+
+Last task: $first_story_title (id: $first_story_id)
+
+The agent did not output <promise>COMPLETE</promise> or <escalation>. Consider reviewing progress.txt and the last agent output, then fix blocking issues and re-run ralph.sh."
+            write_escalation_report "$auto_escalation" "$consecutive_failures"
+            save_last_run
+            update_state "$iteration" "$stories_completed" "$last_story_id" "$branch_name"
+            echo "Escalation: $MAX_TASK_ATTEMPTS attempts without completion. Report written."
             exit 1
         fi
 
