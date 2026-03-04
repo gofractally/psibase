@@ -12,23 +12,23 @@ interface types {
         expiry: string,
     }
 
-    type url = string;
-
-    record new-invite-details {
+    record invite-details {
+        invite-token: string,
         invite-id: u32,
-        fingerprint: list<u8>,
-        encrypted-secret: string,
+        payload: list<u8>,
+        min-cost: string,
     }
+
     type invite-token = string;
+    type url = string;
     type pubkey-der = list<u8>;
-    type min-cost = string;
 }
 
 
 /// Functionality exposed for the inviter
 interface inviter {
     use host:types/types.{error};
-    use types.{invite-token, new-invite-details, min-cost};
+    use types.{invite-details, invite-token};
 
     /// Allows a user to generate an invite token that can be used to invite someone (with 
     /// or without a preexisting account) to an application.
@@ -50,15 +50,17 @@ interface inviter {
     /// 
     /// Parameters
     /// * `num-accounts`: The number of accounts that will be created using the invite
+    /// * `service-name`: The name of the service that will ultimately be used to create the invite
     ///
     /// Returns:
     /// * `invite-token` - should be kept private, can be used to accept the invite
-    /// * `new-invite-details` - Contains values that should be used when calling `create-invite`
-    ///   on the invite service in order to correctly correspond to the `invite-token`.
+    /// * `invite-id` - An id that must be used when calling create-invite
+    /// * `payload` - A packed payload containing various important invite data, must be passed through
+    ///               to the service when calling create-invite
     /// * `min-cost` - The minimum cost of creating the invite for the specified number of 
     ///                accounts. This amount (at minimum) must be credited to the invite service 
     ///                before creating the invite.
-    prepare-new-invite: func(num-accounts: u16) -> result<tuple<invite-token, new-invite-details, min-cost>, error>;
+    prepare-new-invite: func(num-accounts: u16, service-name: string) -> result<invite-details, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
     /// from the database.

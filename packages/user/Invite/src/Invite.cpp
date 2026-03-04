@@ -43,7 +43,6 @@ namespace
          Actor<InviteHooks>{Invite::service, invite.inviter}.onInvAccept(invite.id, accepter);
       }
    }
-
 }  // namespace
 
 Invite::Invite(psio::shared_view_ptr<Action> action)
@@ -128,18 +127,25 @@ TID getSysToken()
    return sys_record->id;
 }
 
-uint32_t Invite::createInvite(uint32_t    inviteId,
-                              Checksum256 fingerprint,
-                              uint16_t    numAccounts,
-                              bool        useHooks,
-                              std::string secret,
-                              Quantity    resources)
+uint32_t Invite::createInvite(uint32_t             inviteId,
+                              std::vector<uint8_t> payload,
+                              uint16_t             numAccounts,
+                              bool                 useHooks,
+                              Quantity             resources)
 {
+   std::vector<char> payloadChars(payload.begin(), payload.end());
+   auto              invPayload  = psio::from_frac<InvPayload>(payloadChars);
+   auto              fingerprint = invPayload.fingerprint;
+
    auto sender    = getSender();
    auto isBilling = to<VirtualServer>().is_billing_enabled();
 
-   auto cid = to<Credentials>().issue(fingerprint,       //
-                                      ONE_WEEK.count(),  //
+   check(fingerprint.size() == 32, fprintInvalid.data());
+   Checksum256 fingerprint_checksum;
+   std::memcpy(fingerprint_checksum.data(), fingerprint.data(), 32);
+
+   auto cid = to<Credentials>().issue(fingerprint_checksum,  //
+                                      ONE_WEEK.count(),      //
                                       std::vector<MethodNumber>{"createAccount"_m});
 
    if (isBilling)
@@ -182,7 +188,7 @@ uint32_t Invite::createInvite(uint32_t    inviteId,
        .inviter     = sender,
        .numAccounts = numAccounts,
        .useHooks    = useHooks,
-       .secret      = secret,
+       .secret      = invPayload.secret,
    };
    inviteTable.put(invite);
 
@@ -267,7 +273,7 @@ void Invite::accept(uint32_t inviteId)
    hookOnInvAccept(*invite, accepter);
 }
 
-void Invite::delInvite(uint32_t inviteId)
+Quantity Invite::delInvite(uint32_t inviteId)
 {
    auto sender      = getSender();
    auto inviteTable = Tables().open<InviteTable>();
@@ -275,7 +281,8 @@ void Invite::delInvite(uint32_t inviteId)
    check(invite.has_value(), inviteDNE.data());
    check(invite->inviter == sender, unauthDelete.data());
 
-   auto sysRecord = to<Tokens>().getSysToken();
+   Quantity refund    = 0;
+   auto     sysRecord = to<Tokens>().getSysToken();
    if (sysRecord.has_value())
    {
       auto sys           = sysRecord->id;
@@ -286,9 +293,9 @@ void Invite::delInvite(uint32_t inviteId)
       {
          if (balanceRecord->value > 0)
          {
-            to<Tokens>().fromSub(sys, sub_account, balanceRecord->value);
-            to<Tokens>().credit(sys, invite->inviter, balanceRecord->value,
-                                "Unused invite tokens refunded");
+            refund = *balanceRecord;
+            to<Tokens>().fromSub(sys, sub_account, refund);
+            to<Tokens>().credit(sys, invite->inviter, refund, "Unused invite tokens refunded");
          }
       }
    }
@@ -296,6 +303,8 @@ void Invite::delInvite(uint32_t inviteId)
    inviteTable.remove(*invite);
    to<Credentials>().consume(invite->cid);
    emit().history().updated(invite->id, getSender(), InviteEventType::deleted);
+
+   return refund;
 }
 
 optional<InviteRecord> Invite::getInvite(uint32_t inviteId)
