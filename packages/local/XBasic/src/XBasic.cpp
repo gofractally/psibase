@@ -27,8 +27,7 @@ void XBasic::startSession()
    }
 }
 
-std::optional<HttpReply> XBasic::checkAuth(const HttpRequest&          req,
-                                           std::optional<std::int32_t> socket)
+AuthResult XBasic::checkAuth(const HttpRequest& req, std::optional<std::int32_t> socket)
 {
    if (auto header = req.getHeader("authorization"))
    {
@@ -45,7 +44,7 @@ std::optional<HttpReply> XBasic::checkAuth(const HttpRequest&          req,
             if (row->password)
             {
                if (*row->password == auth->password())
-                  return std::nullopt;
+                  return Auth::LocalUsername{std::move(row->username)};
             }
             else
             {
@@ -56,13 +55,13 @@ std::optional<HttpReply> XBasic::checkAuth(const HttpRequest&          req,
                   {
                      passwords.put(*row);
                   }
-                  return std::nullopt;
+                  return Auth::LocalUsername{std::move(row->username)};
                }
             }
          }
       }
    }
-   return HttpReply{.status = HttpStatus::unauthorized};
+   return Auth::Unauthenticated{{"Basic realm=\"psibase\", charset=\"UTF-8\""}};
 }
 
 PSIBASE_DISPATCH(XBasic)

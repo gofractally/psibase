@@ -3,6 +3,7 @@
 #include <psibase/Rpc.hpp>
 #include <psibase/Service.hpp>
 #include <psibase/Table.hpp>
+#include <services/local/XAdmin.hpp>
 
 namespace LocalService
 {
@@ -21,9 +22,8 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-basic"};
       using Session                 = psibase::SessionTables<PasswordTable>;
-      void                              startSession();
-      std::optional<psibase::HttpReply> checkAuth(const psibase::HttpRequest& req,
-                                                  std::optional<std::int32_t> socket);
+      void       startSession();
+      AuthResult checkAuth(const psibase::HttpRequest& req, std::optional<std::int32_t> socket);
    };
    PSIO_REFLECT(XBasic, method(startSession), method(checkAuth, request, socket))
    PSIBASE_REFLECT_TABLES(XBasic, XBasic::Session)
