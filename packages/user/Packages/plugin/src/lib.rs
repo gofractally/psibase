@@ -25,7 +25,7 @@ use psibase::services::packages::PackageSource;
 use psibase::{
     get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
     EssentialServices, InstalledPackageInfo, PackageDisposition, PackageManifest, PackagedService,
-    SchemaMap, SignedTransaction, StagedUpload, Tapos, Transaction, TransactionBuilder,
+    SchemaMap, StagedUpload, TransactionBuilder,
 };
 
 use psibase::services::{
@@ -272,13 +272,14 @@ fn get_accounts_to_create(
 }
 
 fn apply_packages<
-    F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
-    G: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
+    R,
+    F: Fn(Vec<Action>) -> Result<R, anyhow::Error>,
+    G: Fn(Vec<Action>) -> Result<R, anyhow::Error>,
 >(
     ops: Vec<types::PackageOpFull>,
     mut uploader: StagedUpload,
-    out: &mut TransactionBuilder<F>,
-    files: &mut TransactionBuilder<G>,
+    out: &mut TransactionBuilder<R, F>,
+    files: &mut TransactionBuilder<R, G>,
     sender: AccountNumber,
     compression_level: u32,
 ) -> Result<(), HostTypes::Error> {
@@ -339,19 +340,6 @@ fn apply_packages<
     Ok(())
 }
 
-fn make_transaction(actions: Vec<Action>) -> SignedTransaction {
-    let transaction = Transaction {
-        tapos: Tapos::default(),
-        actions,
-        claims: Vec::new(),
-    };
-
-    SignedTransaction {
-        transaction: transaction.packed().into(),
-        proofs: Vec::new(),
-    }
-}
-
 impl Queries for PackagesPlugin {
     fn get_installed_packages() -> Result<Vec<types::Meta>, HostTypes::Error> {
         Ok(get_installed_packages()?
@@ -408,16 +396,15 @@ impl PrivateApi for PackagesPlugin {
 
         let sender: AccountNumber = owner.parse().unwrap();
 
-        let build_transaction =
-            |mut actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-                let index = index_cell.get();
-                index_cell.set(index + 1);
-                actions.insert(
-                    0,
-                    PackagesService::Wrapper::pack_from(sender).checkOrder(id.clone(), index),
-                );
-                Ok(make_transaction(actions))
-            };
+        let build_transaction = |mut actions: Vec<Action>| -> Result<Vec<u8>, anyhow::Error> {
+            let index = index_cell.get();
+            index_cell.set(index + 1);
+            actions.insert(
+                0,
+                PackagesService::Wrapper::pack_from(sender).checkOrder(id.clone(), index),
+            );
+            Ok(actions.packed())
+        };
 
         let action_limit: usize = 1024 * 1024;
 
@@ -433,9 +420,7 @@ impl PrivateApi for PackagesPlugin {
 
         let mut upload_builder = TransactionBuilder::new(
             action_limit,
-            |actions: Vec<Action>| -> Result<SignedTransaction, anyhow::Error> {
-                Ok(make_transaction(actions))
-            },
+            |actions: Vec<Action>| -> Result<Vec<u8>, anyhow::Error> { Ok(actions.packed()) },
         );
         apply_packages(
             packages,
@@ -455,13 +440,13 @@ impl PrivateApi for PackagesPlugin {
         let mut upload_transactions = Vec::new();
         for (_label, group, _carry) in upload_builder.finish().unwrap() {
             for tx in group {
-                upload_transactions.push(tx.transaction.0)
+                upload_transactions.push(tx)
             }
         }
         let mut install_transactions = Vec::new();
         for (_label, group, _carry) in trx_builder.finish().unwrap() {
             for tx in group {
-                install_transactions.push(tx.transaction.0)
+                install_transactions.push(tx)
             }
         }
         Ok((upload_transactions, install_transactions))
@@ -470,8 +455,8 @@ impl PrivateApi for PackagesPlugin {
     fn push_data(tx: Vec<u8>) {
         assert_caller_config_or_self("push_data");
 
-        let tx = Transaction::unpacked(&tx).unwrap();
-        for action in tx.actions {
+        let tx = <Vec<Action>>::unpacked(&tx).unwrap();
+        for action in tx {
             if action.service == SitesService::SERVICE && action.method == method!("storeSys") {
                 let data =
                     SitesService::action_structs::storeSys::unpacked(&action.rawData).unwrap();
@@ -499,11 +484,8 @@ impl PrivateApi for PackagesPlugin {
     fn propose_install(tx: Vec<u8>) -> Result<(), HostTypes::Error> {
         assert_caller_config_or_self("propose_install");
 
-        let tx = Transaction::unpacked(&tx).unwrap();
-        StagedTx::propose(
-            &tx.actions.into_iter().map(|a| a.into()).collect::<Vec<_>>(),
-            true,
-        )
+        let tx = <Vec<Action>>::unpacked(&tx).unwrap();
+        StagedTx::propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {
