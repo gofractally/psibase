@@ -102,9 +102,9 @@ A user story describes **what’s needed** in natural language, e.g. "Add a new 
 
 ---
 
-## 6. Planned Area Skills for Psibase (Phase 3)
+## 6. Area Skills for Psibase (Phase 3 — Implemented)
 
-Stories refer to **area** names. Each area’s SKILL.md is structured with **action subsections** (e.g. ### Skill: add-table, ### Skill: add-field).
+Stories refer to **area** names. Each area’s SKILL.md is structured with **action subsections** (e.g. ### Skill: add-table, ### Skill: add-field). The following area skills exist under `ai/skills/` with full SKILL.md content.
 
 | Area skill | Description | Example actions (subsections in SKILL.md) |
 |------------|-------------|-------------------------------------------|
