@@ -105,6 +105,9 @@ namespace LocalService
       /// will be called.
       void asyncClose(std::int32_t socket);
 
+      /// Writes a message to the server log
+      void log(psibase::LogMessage::Severity severity, std::string msg);
+
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
 
@@ -120,6 +123,7 @@ namespace LocalService
                 method(accept, socket, reply, callback, err),
                 method(setCallback, socket, callback, err),
                 method(asyncClose, socket),
+                method(log, severity, msg),
                 method(rootHost, host),
                 method(startSession))
 
