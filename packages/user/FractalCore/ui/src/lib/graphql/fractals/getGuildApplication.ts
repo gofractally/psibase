@@ -12,14 +12,18 @@ export const zGuildApplicationListInstance = z
         applicant: zAccount,
         extraInfo: z.string(),
         createdAt: zDateTime,
+        score: z.object({
+            current: z.number(),
+            required: z.number()
+        }),
         attestations: z.object({
             nodes: z
-            .object({
-                endorses: z.boolean(),
-                comment: z.string(),
-                attester: zAccount,
-            })
-            .array()
+                .object({
+                    endorses: z.boolean(),
+                    comment: z.string(),
+                    attester: zAccount,
+                })
+                .array()
         }),
     })
     .nullable();
@@ -37,6 +41,10 @@ export const getGuildApplication = async (
             {
                 guildApplication(guild: ${guildAccount}, applicant: "${applicant}") {
                         applicant
+                        score {
+                            current
+                            required
+                        }
                         extraInfo
                         createdAt
                         attestations {

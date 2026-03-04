@@ -53,6 +53,8 @@ pub mod constants {
     // before he can make himself a candidate again.
     pub const DEFAULT_CANDIDACY_COOLDOWN: u32 = ONE_WEEK;
     pub const MAX_CANDIDACY_COOLDOWN: u32 = ONE_YEAR / 4;
+
+    pub const GUILD_ATTEST_THRESHOLD: u8 = 3;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]

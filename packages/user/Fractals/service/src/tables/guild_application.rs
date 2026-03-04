@@ -1,10 +1,13 @@
-use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
+use async_graphql::{connection::Connection, SimpleObject};
 
 use psibase::{check_none, check_some, get_sender, AccountNumber, RawKey, Table, TableQuery};
 
-use crate::tables::tables::{
-    Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
+use crate::{
+    constants::GUILD_ATTEST_THRESHOLD,
+    tables::tables::{
+        Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
+    },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -48,7 +51,7 @@ impl GuildApplication {
     }
 
     fn check_attests(&self) {
-        let passed = self.attestations_score() >= 3;
+        let passed = self.attestations_score() >= (GUILD_ATTEST_THRESHOLD as i16);
         if passed {
             GuildMember::add(self.guild, self.applicant);
             self.remove()
@@ -62,9 +65,8 @@ impl GuildApplication {
                 (self.guild, self.applicant, AccountNumber::new(0))
                     ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
             )
-            .fold(0i16, |acc, e| {
-                acc.saturating_add(if e.endorses { 1 } else { -1 })
-            })
+            .map(|e| if e.endorses { 1 } else { -1 })
+            .sum()
     }
 
     pub fn attest(&self, comment: String, endorses: bool) {
@@ -99,6 +101,12 @@ impl GuildApplication {
     }
 }
 
+#[derive(SimpleObject)]
+pub struct ApplicationScore {
+    pub current: i16,
+    pub required: i16,
+}
+
 #[ComplexObject]
 impl GuildApplication {
     pub async fn guild(&self) -> Guild {
@@ -122,5 +130,12 @@ impl GuildApplication {
         .after(after)
         .query()
         .await
+    }
+
+    pub async fn score(&self) -> ApplicationScore {
+        ApplicationScore {
+            current: self.attestations_score(),
+            required: GUILD_ATTEST_THRESHOLD as i16,
+        }
     }
 }

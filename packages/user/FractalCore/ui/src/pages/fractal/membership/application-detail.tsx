@@ -54,10 +54,13 @@ export const ApplicationDetail = () => {
             <div className="flex flex-col gap-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 justify-between">
+                            <div className="text-xl font-semibold">
+                                {applicant || "Loading..."}
+                            </div>
                             <div>
-                                <div className="text-xl font-semibold">
-                                    {applicant || "Loading..."}
+                                <div>
+                                    {application?.score.current} / {application?.score.required}
                                 </div>
                             </div>
                         </CardTitle>
@@ -80,15 +83,15 @@ export const ApplicationDetail = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-col gap-2">
-                            {application?.attestations &&
-                            application?.attestations.length > 0 ? (
-                                application?.attestations.map((attest) => (
+                            {application?.attestations.nodes &&
+                                application?.attestations.nodes.length > 0 ? (
+                                application?.attestations.nodes.map((attest) => (
                                     <div
-                                        key={attest.attestee}
+                                        key={attest.attester}
                                         className="flex justify-between px-2"
                                     >
                                         <div>
-                                            <div>{attest.attestee}</div>
+                                            <div>{attest.attester}</div>
                                             <div>{attest.comment}</div>
                                         </div>
                                         <div>
@@ -105,8 +108,8 @@ export const ApplicationDetail = () => {
                                         isSelf
                                             ? undefined
                                             : () => {
-                                                  setShowModal(true);
-                                              }
+                                                setShowModal(true);
+                                            }
                                     }
                                     buttonLabel="Create attestation"
                                     description="No attestations have been made in favour or against this application."
