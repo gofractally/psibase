@@ -760,7 +760,8 @@ namespace LocalService
             auto sz = raw::readFile(path.data(), path.size());
             if (sz == -1)
                return {};
-            result.body = getResult();
+            result.body    = getResult();
+            result.headers = allowCors(req, {XAdmin::service, AccountNumber{"config"}});
             return result;
          }
       }
