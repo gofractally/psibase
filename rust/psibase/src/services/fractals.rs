@@ -4,7 +4,6 @@ pub mod Service {
     use crate::services::auth_dyn::policy::DynamicAuthPolicy;
     use crate::services::transact::ServiceMethod;
     use crate::AccountNumber;
-    use crate::Checksum256;
     use crate::Memo;
 
     /// Creates a new account and fractal.
