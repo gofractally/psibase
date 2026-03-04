@@ -761,7 +761,7 @@ namespace LocalService
             if (sz == -1)
                return {};
             result.body    = getResult();
-            result.headers = allowCors(req, {XAdmin::service, AccountNumber{"config"}});
+            result.headers = allowCors(req, AccountNumber{"config"});
             return result;
          }
       }
