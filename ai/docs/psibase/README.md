@@ -1,8 +1,8 @@
 # Psibase Knowledge Base (AI-Focused)
 
-> **Status**: Phase 2 — This documentation will be written in Phase 2 of the AI coding workflow project.
+> **Status**: Phase 2 complete. The documents below are available for AI and human reference.
 
-This directory will contain thorough, AI-focused documentation about psibase app development, covering:
+This directory contains AI-focused documentation about psibase app development, covering:
 
 - **Architecture overview**: How services, plugins, UIs, and query services relate
 - **Rust service development**: Tables, actions, events, fracpack, account numbers
@@ -15,15 +15,15 @@ This directory will contain thorough, AI-focused documentation about psibase app
 
 All documentation references the official psibase docs at `doc/src/` and uses examples from the codebase (primarily `packages/user/`).
 
-## Planned Documents
+## Documents
 
 | Document | Description |
 |----------|-------------|
-| `architecture.md` | Full-stack architecture overview with diagrams |
-| `rust-services.md` | Writing Rust services (tables, actions, events, queries) |
-| `plugins.md` | Plugin development (WIT, WASM components, Supervisor) |
-| `ui-development.md` | UI patterns (React, Supervisor API, plugin calls) |
-| `build-system.md` | CMake/make build system, adding packages |
-| `testing.md` | Available testing infrastructure and patterns |
-| `gotchas.md` | Psibase-specific pitfalls and how to avoid them |
-| `quick-reference.md` | Cheat sheet for common operations |
+| [architecture.md](architecture.md) | Full-stack architecture overview with diagrams |
+| [rust-services.md](rust-services.md) | Writing Rust services (tables, actions, events, queries) |
+| [plugins.md](plugins.md) | Plugin development (WIT, WASM components, Supervisor) |
+| [ui-development.md](ui-development.md) | UI patterns (React, Supervisor API, plugin calls) |
+| [build-system.md](build-system.md) | CMake/make build system, adding packages |
+| [testing.md](testing.md) | Available testing infrastructure and patterns |
+| [gotchas.md](gotchas.md) | Psibase-specific pitfalls and when to escalate |
+| [quick-reference.md](quick-reference.md) | Cheat sheet for common operations |
