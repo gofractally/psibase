@@ -271,7 +271,10 @@ impl Inviter for InvitePlugin {
         num_accounts: u16,
         service_name: String,
     ) -> Result<InviteDetails, HostTypes::Error> {
-        assert_authorized(trust::FunctionName::prepare_new_invite)?;
+        assert_authorized_with_whitelist(
+            trust::FunctionName::prepare_new_invite,
+            vec!["fractals".to_string()],
+        )?;
 
         prepare_new_invite_impl(num_accounts, service_name)
     }
