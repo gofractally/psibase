@@ -12,12 +12,14 @@ import {
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
 
-export const AttestGuildMemberModal = ({
+export const ModalAttest = ({
     show,
     openChange,
+    endorses = false,
 }: {
     show: boolean;
     openChange: (show: boolean) => void;
+    endorses: boolean;
 }) => {
     const { mutateAsync: attest } = useAttestMembershipApp();
 
@@ -28,9 +30,8 @@ export const AttestGuildMemberModal = ({
     const form = useAppForm({
         defaultValues: {
             comment: "",
-            endorses: true,
         },
-        onSubmit: async ({ formApi, value: { comment, endorses } }) => {
+        onSubmit: async ({ formApi, value: { comment } }) => {
             await attest([guildAccount!, applicant!, comment, endorses]);
             openChange(false);
             formApi.reset();
@@ -38,7 +39,6 @@ export const AttestGuildMemberModal = ({
         validators: {
             onChange: z.object({
                 comment: z.string(),
-                endorses: z.boolean(),
             }),
         },
     });
@@ -47,7 +47,9 @@ export const AttestGuildMemberModal = ({
         <Dialog open={show} onOpenChange={openChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Apply for Guild Membership</DialogTitle>
+                    <DialogTitle>
+                        {endorses ? "Endorse" : "Object to"} applicant
+                    </DialogTitle>
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -61,16 +63,14 @@ export const AttestGuildMemberModal = ({
                                 <field.TextField label="Comment" />
                             )}
                         />
-                        <form.AppField
-                            name="endorses"
-                            children={(field) => (
-                                <field.CheckboxField label="Endorse" />
-                            )}
-                        />
 
                         <form.AppForm>
                             <form.SubmitButton
-                                labels={["Attest", "Attesting"]}
+                                labels={
+                                    endorses
+                                        ? ["Endorse", "Endorsing"]
+                                        : ["Object", "Objecting"]
+                                }
                             />
                         </form.AppForm>
                     </form>

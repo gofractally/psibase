@@ -1,8 +1,8 @@
 import dayjs from "dayjs";
+import { UserCheck, UserX } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { AttestGuildMemberModal } from "@/components/modals/attest-guild-member-modal";
 import { PageContainer } from "@/components/page-container";
 
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
@@ -15,10 +15,6 @@ import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    ButtonGroup,
-    ButtonGroupSeparator,
-} from "@shared/shadcn/ui/button-group";
 import {
     CardAction,
     CardContent,
@@ -37,19 +33,18 @@ import {
 
 import { AlertConfirmAcceptApplication } from "./components/alert-confirm-accept-application";
 import { AlertConfirmRejectApplication } from "./components/alert-confirm-reject-application";
+import { ModalAttest } from "./components/modal-attest";
 
 export const ApplicationDetail = () => {
-    const [showModal, setShowModal] = useState(false);
+    const [endorsing, setEndorsing] = useState(false);
+    const [objecting, setObjecting] = useState(false);
 
     const { applicant } = useParams();
 
     const { data: currentUser } = useCurrentUser();
     const guildAccount = useGuildAccount();
     const guild = useGuild();
-    const { data: application, isPending } = useGuildApplication(
-        guildAccount,
-        applicant,
-    );
+    const { data: application } = useGuildApplication(guildAccount, applicant);
 
     const isSelf = currentUser == applicant;
 
@@ -70,9 +65,15 @@ export const ApplicationDetail = () => {
 
     return (
         <PageContainer className="space-y-4">
-            <AttestGuildMemberModal
-                openChange={(e) => setShowModal(e)}
-                show={showModal}
+            <ModalAttest
+                endorses={true}
+                openChange={(show) => setEndorsing(show)}
+                show={endorsing}
+            />
+            <ModalAttest
+                endorses={false}
+                openChange={(show) => setObjecting(show)}
+                show={objecting}
             />
             <GlowingCard>
                 <CardHeader>
@@ -88,24 +89,17 @@ export const ApplicationDetail = () => {
                         Application to join{" "}
                         {guild.data?.displayName || "this guild"}
                     </CardDescription>
-                    <CardAction>
-                        <ButtonGroup>
-                            <AlertConfirmRejectApplication
-                                applicant={applicant}
-                            >
-                                <Button variant="destructive" size="sm">
-                                    Reject
-                                </Button>
-                            </AlertConfirmRejectApplication>
-                            <ButtonGroupSeparator />
-                            <AlertConfirmAcceptApplication
-                                applicant={applicant}
-                            >
-                                <Button variant="outline" size="sm">
-                                    Accept
-                                </Button>
-                            </AlertConfirmAcceptApplication>
-                        </ButtonGroup>
+                    <CardAction className="flex gap-2">
+                        <AlertConfirmRejectApplication applicant={applicant}>
+                            <Button variant="destructive" size="sm">
+                                Reject (temp)
+                            </Button>
+                        </AlertConfirmRejectApplication>
+                        <AlertConfirmAcceptApplication applicant={applicant}>
+                            <Button variant="outline" size="sm">
+                                Accept (temp)
+                            </Button>
+                        </AlertConfirmAcceptApplication>
                     </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -134,6 +128,22 @@ export const ApplicationDetail = () => {
                     <CardDescription>
                         Endorsements and objections submitted by guild members.
                     </CardDescription>
+                    <CardAction className="flex gap-2">
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setObjecting(true)}
+                        >
+                            <UserX data-icon="inline-start" /> Object
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEndorsing(true)}
+                        >
+                            <UserCheck data-icon="inline-start" /> Endorse
+                        </Button>
+                    </CardAction>
                 </CardHeader>
                 <CardContent>
                     {application?.attestations?.nodes.length ? (
@@ -179,16 +189,7 @@ export const ApplicationDetail = () => {
                     ) : (
                         <EmptyBlock
                             title="No attestations"
-                            onButtonClick={
-                                isSelf
-                                    ? undefined
-                                    : () => {
-                                          setShowModal(true);
-                                      }
-                            }
-                            buttonLabel="Create attestation"
                             description="No attestations have been made in favour or against this application."
-                            isLoading={isPending}
                         />
                     )}
                 </CardContent>
