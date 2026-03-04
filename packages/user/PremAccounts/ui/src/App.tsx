@@ -369,7 +369,7 @@ export const App = () => {
                 intf: "api",
                 method: "buy",
                 // TODO: replace max-cost
-                                params: [accountName, maxCost],
+                params: [accountName, maxCost],
             });
             
             // Show success message
@@ -456,18 +456,7 @@ export const App = () => {
                         <TabsTrigger value="buy">Buy</TabsTrigger>
                         <TabsTrigger value="purchased-names">Purchased Names</TabsTrigger>
                     </TabsList>
-                    
-                    {(buySuccessMessage || claimSuccessMessage) && (
-                        <div className="mt-4">
-                            {buySuccessMessage && (
-                                <p className="text-green-600 font-medium">{buySuccessMessage}</p>
-                            )}
-                            {claimSuccessMessage && (
-                                <p className="text-green-600 font-medium">{claimSuccessMessage}</p>
-                            )}
-                        </div>
-                    )}
-                    
+
                     <TabsContent value="buy" className="mt-6">
                         <div className="grid grid-cols-6">
                             <div className="col-span-6 grid grid-cols-6">
@@ -504,29 +493,6 @@ export const App = () => {
                                     placeholder={defaultMaxCost}
                                 />
                             </div>
-                            
-                            {accountName.length > 0 && accountName.length <= 9 && (
-                                <div className="col-span-6 mt-4">
-                                    {accountExists === true && (
-                                        <p className="text-red-500">Account name already exists</p>
-                                    )}
-                                    {accountExists === false && price !== null && (
-                                        <p className="text-green-600">
-                                            Buy for {formatPrice(price, systemToken?.precision, systemToken?.symbol)}
-                                        </p>
-                                    )}
-                                    {accountExists === false && price === null && (
-                                        <p className="text-gray-500">Loading price...</p>
-                                    )}
-                                </div>
-                            )}
-
-                            {error && (
-                                <div className="col-span-6 mt-4">
-                                    <p className="text-red-500">{error}</p>
-                                </div>
-                            )}
-
                             <div className="col-span-6 mt-6 font-medium">
                                 <Button
                                     type="button"
@@ -536,6 +502,46 @@ export const App = () => {
                                     {isLoading ? "Processing..." : "Buy"}
                                 </Button>
                             </div>
+
+                            <div className="col-span-6 mt-4 min-h-[3rem] flex items-center">
+                                {error && (
+                                    <p className="text-red-500">{error}</p>
+                                )}
+                                {!error && buySuccessMessage && (
+                                    <p className="text-green-600 font-medium">
+                                        {buySuccessMessage}
+                                    </p>
+                                )}
+                                {!error &&
+                                    !buySuccessMessage &&
+                                    accountName.length > 0 &&
+                                    accountName.length <= 9 && (
+                                        <div>
+                                            {accountExists === true && (
+                                                <p className="text-red-500">
+                                                    Account name already exists
+                                                </p>
+                                            )}
+                                            {accountExists === false &&
+                                                price !== null && (
+                                                    <p className="text-green-600">
+                                                        Buy for{" "}
+                                                        {formatPrice(
+                                                            price,
+                                                            systemToken?.precision,
+                                                            systemToken?.symbol,
+                                                        )}
+                                                    </p>
+                                                )}
+                                            {accountExists === false &&
+                                                price === null && (
+                                                    <p className="text-gray-500">
+                                                        Loading price...
+                                                    </p>
+                                                )}
+                                        </div>
+                                    )}
+                            </div>
                         </div>
                     </TabsContent>
                     
@@ -544,7 +550,9 @@ export const App = () => {
                             {isLoadingNames ? (
                                 <p className="text-gray-500">Loading your purchased names...</p>
                             ) : boughtNames.length === 0 ? (
-                                <p className="text-gray-500">You haven't purchased any account names yet.</p>
+                                <p className="text-gray-500">
+                                    You have no purchased accounts that haven't yet been claimed.
+                                </p>
                             ) : (
                                 <ul className="space-y-2">
                                     {boughtNames.map((name) => (
@@ -562,6 +570,13 @@ export const App = () => {
                                     ))}
                                 </ul>
                             )}
+                            <div className="mt-4 min-h-[2.5rem] flex items-center">
+                                {claimSuccessMessage && (
+                                    <p className="text-green-600 font-medium">
+                                        {claimSuccessMessage}
+                                    </p>
+                                )}
+                            </div>
                             {claimSuccessNotification && (
                                 <div className="mt-4 rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/50 p-4">
                                     <p className="text-green-700 dark:text-green-300 font-medium mb-2">
