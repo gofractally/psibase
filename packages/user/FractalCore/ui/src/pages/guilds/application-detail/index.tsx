@@ -14,7 +14,13 @@ import { GlowingCard } from "@shared/components/glowing-card";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
+import { Button } from "@shared/shadcn/ui/button";
 import {
+    ButtonGroup,
+    ButtonGroupSeparator,
+} from "@shared/shadcn/ui/button-group";
+import {
+    CardAction,
     CardContent,
     CardDescription,
     CardHeader,
@@ -28,6 +34,9 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+
+import { AlertConfirmAcceptApplication } from "./components/alert-confirm-accept-application";
+import { AlertConfirmRejectApplication } from "./components/alert-confirm-reject-application";
 
 export const ApplicationDetail = () => {
     const [showModal, setShowModal] = useState(false);
@@ -76,8 +85,28 @@ export const ApplicationDetail = () => {
                         {isSelf && <Badge variant="secondary">You</Badge>}
                     </CardTitle>
                     <CardDescription>
-                        Application to join {guild.data?.displayName || "this guild"}
+                        Application to join{" "}
+                        {guild.data?.displayName || "this guild"}
                     </CardDescription>
+                    <CardAction>
+                        <ButtonGroup>
+                            <AlertConfirmRejectApplication
+                                applicant={applicant}
+                            >
+                                <Button variant="destructive" size="sm">
+                                    Reject
+                                </Button>
+                            </AlertConfirmRejectApplication>
+                            <ButtonGroupSeparator />
+                            <AlertConfirmAcceptApplication
+                                applicant={applicant}
+                            >
+                                <Button variant="outline" size="sm">
+                                    Accept
+                                </Button>
+                            </AlertConfirmAcceptApplication>
+                        </ButtonGroup>
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid gap-2 text-sm">
@@ -117,32 +146,34 @@ export const ApplicationDetail = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {application.attestations.nodes.map((attest) => (
-                                    <TableRow key={attest.attester}>
-                                        <TableCell className="font-medium">
-                                            <TableContact
-                                                account={attest.attester}
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={
-                                                    attest.endorses
-                                                        ? "default"
-                                                        : "destructive"
-                                                }
-                                            >
-                                                {attest.endorses
-                                                    ? "For"
-                                                    : "Against"}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {attest.comment ||
-                                                "No comment provided."}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {application.attestations.nodes.map(
+                                    (attest) => (
+                                        <TableRow key={attest.attester}>
+                                            <TableCell className="font-medium">
+                                                <TableContact
+                                                    account={attest.attester}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    variant={
+                                                        attest.endorses
+                                                            ? "default"
+                                                            : "destructive"
+                                                    }
+                                                >
+                                                    {attest.endorses
+                                                        ? "For"
+                                                        : "Against"}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">
+                                                {attest.comment ||
+                                                    "No comment provided."}
+                                            </TableCell>
+                                        </TableRow>
+                                    ),
+                                )}
                             </TableBody>
                         </Table>
                     ) : (

@@ -12,7 +12,7 @@ import { Judicial } from "./pages/fractal/governance/judicial";
 import { Legislative } from "./pages/fractal/governance/legislative";
 import { Guilds } from "./pages/fractal/guilds/index";
 import { Overview } from "./pages/fractal/overview/index";
-import { ApplicationDetail } from "./pages/guilds/application-detail";
+import { ApplicationDetail } from "./pages/guilds/application-detail/index";
 import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
