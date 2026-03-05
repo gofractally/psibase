@@ -17,6 +17,7 @@
 *.pem
 build
 build-*
+!ai/skills/build-*
 CMakeCache.txt
 CMakeFiles
 compile_commands.json
