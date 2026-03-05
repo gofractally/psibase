@@ -350,13 +350,18 @@ main() {
     while [[ $iteration -lt $MAX_ITERATIONS ]]; do
         iteration=$((iteration + 1))
 
-        local first_story_id first_story_title
+        local first_story_id first_story_title first_story_ac_count
         first_story_id=$(jq -r '(.userStories // .stories // []) | map(select(.passes != true)) | .[0].id // empty' "$PRD_FILE" 2>/dev/null) || true
         first_story_title=$(jq -r '(.userStories // .stories // []) | map(select(.passes != true)) | .[0].title // "current story"' "$PRD_FILE" 2>/dev/null) || true
+        first_story_ac_count=$(jq -r '(.userStories // .stories // []) | map(select(.passes != true)) | .[0].acceptance_criteria | length // 0' "$PRD_FILE" 2>/dev/null) || true
         [[ -z "$first_story_title" ]] && first_story_title="current story"
 
         echo "[Model: $MODEL] Iteration $iteration of $MAX_ITERATIONS"
-        echo "  Task: $first_story_title"
+        if [[ -n "$first_story_id" ]]; then
+            echo "  Task: $first_story_id - $first_story_title (acceptance criteria: $first_story_ac_count)"
+        else
+            echo "  Task: $first_story_title (acceptance criteria: $first_story_ac_count)"
+        fi
 
         local prompt
         prompt=$(build_prompt)
