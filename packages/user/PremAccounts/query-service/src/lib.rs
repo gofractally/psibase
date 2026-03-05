@@ -29,6 +29,14 @@ mod service {
         }
     }
 
+    #[derive(SimpleObject)]
+    struct MarketStatus {
+        /// Account name length (1–10) for this market
+        pub length: u8,
+        /// Whether the market accepts new purchases
+        pub enabled: bool,
+    }
+
     struct Query {
         user: Option<AccountNumber>,
     }
@@ -47,6 +55,19 @@ mod service {
 
     #[Object]
     impl Query {
+        /// Returns a list of markets (by account name length) and their enabled/disabled statuses.
+        async fn marketsStatus(&self) -> Vec<MarketStatus> {
+            let auctions_table = AuctionsTable::read();
+            let mut out = Vec::new();
+            for length in 1..=10u8 {
+                if let Some(auction) = auctions_table.get_index_pk().get(&length) {
+                    let enabled = auction.enabled.unwrap_or(true);
+                    out.push(MarketStatus { length, enabled });
+                }
+            }
+            out
+        }
+
         /// Get prices for account name lengths 1-9
         /// Returns array where index 0 = price for length-1 names, index 8 = price for length-9 names
         async fn getPrices(&self) -> Vec<u64> {

@@ -18,6 +18,8 @@ pub mod tables {
     pub struct Auction {
         pub length: u8,
         pub nft_id: u32,
+        /// Whether this market accepts new purchases. None = enabled (backward compat).
+        pub enabled: Option<bool>,
     }
 
     impl Auction {
@@ -108,7 +110,13 @@ pub mod service {
                 50000,           // dec_ppm (5% = 50000 ppm)
             );
 
-            auctions_table.put(&Auction { length, nft_id }).unwrap();
+            auctions_table
+                .put(&Auction {
+                    length,
+                    nft_id,
+                    enabled: Some(true),
+                })
+                .unwrap();
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
@@ -171,6 +179,11 @@ pub mod service {
         let auction = check_some(
             auctions_table.get_index_pk().get(&length),
             "auction not found for this length",
+        );
+
+        check(
+            auction.enabled != Some(false),
+            "market is disabled for this account name length",
         );
 
         let current_price = DiffAdjust::call().get_diff(auction.nft_id);
@@ -258,14 +271,21 @@ pub mod service {
         purchased_accounts_table.remove(&purchased_account);
     }
 
+    /// Update whether a market (by account name length) is enabled for new purchases.
     #[action]
-    fn enable_market(length: u8, initial_price: u64, target_sales: u32, floor_price: u64) {
+    fn update_market_status(length: u8, enable: bool) {
         check_init();
-    }
-
-    #[action]
-    fn disable_market(length: u8) {
-        check_init();
+        check(
+            length >= 1 && length <= 10,
+            "length must be 1-10",
+        );
+        let auctions_table = AuctionsTable::new();
+        let mut auction = check_some(
+            auctions_table.get_index_pk().get(&length),
+            "auction not found for this length",
+        );
+        auction.enabled = Some(enable);
+        auctions_table.put(&auction).unwrap();
     }
 
     pub const BOUGHT: u8 = 0;

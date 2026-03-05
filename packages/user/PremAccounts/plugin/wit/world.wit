@@ -18,6 +18,8 @@ interface api {
     use host:types/types.{error};
     buy: func(account: string, max-cost: string) -> result<_, error>;
     claim: func(account: string) -> result<string, error>;
+    /// Enable or disable a market by account name length (1-10).
+    update-market-status: func(length: u8, enable: bool) -> result<_, error>;
 }
 
 interface queries {

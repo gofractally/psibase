@@ -1,0 +1,26 @@
+## Codebase Patterns
+
+(Add reusable patterns here when discovered.)
+
+---
+
+## 2026-03-05 - US-002
+Model: (agent)
+- Implemented PremAccounts market status: table field, action, GraphQL query, plugin function; build verified.
+- Files changed:
+  - packages/user/PremAccounts/service/src/lib.rs (Auction.enabled, update_market_status, buy check, init)
+  - packages/user/PremAccounts/query-service/src/lib.rs (MarketStatus, marketsStatus query)
+  - packages/user/PremAccounts/plugin/wit/world.wit (update-market-status in api)
+  - packages/user/PremAccounts/plugin/src/lib.rs (update_market_status impl)
+  - packages/user/PremAccounts/plugin/src/bindings.rs (Guest trait + _export_update_market_status_cabi + __post_return_update_market_status + macro export)
+- Subtasks completed:
+  - Task at hand [attempt #1]: Verify full-repo baseline build → Success (make install from build/)
+  - Task at hand [attempt #1]: Add enabled Option<bool> to Auction table; update_market_status action → Success
+  - Task at hand [attempt #1]: Add marketsStatus GraphQL query → Success
+  - Task at hand [attempt #1]: Add updateMarketStatus to plugin (WIT + Rust + bindings) → Success
+  - Task at hand [attempt #1]: Run PremAccounts build and make PremAccounts → Success
+- **Learnings for future iterations:**
+  - PremAccounts plugin bindings (bindings.rs) are checked-in; WIT changes require manually adding the new method to the Guest trait, _export_*_cabi, __post_return_*, and the __export_*_cabi macro. Pattern: (i32, i32) for (u8, bool) with arg0 as u8 and _rt::bool_lift(arg1 as u8).
+  - cargo psibase test -p prem-accounts failed with "service 'sites' aborted with message: Invalid path" — appears unrelated to PremAccounts code changes; possibly test env/harness.
+
+---

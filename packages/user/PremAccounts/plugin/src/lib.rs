@@ -107,6 +107,12 @@ impl Api for PremAccountsPlugin {
         // TOOD: error handling: cleanup if something fails
         Ok(keypair.private_key)
     }
+
+    fn update_market_status(length: u8, enable: bool) -> Result<(), Error> {
+        let packed = prem_accounts::action_structs::update_market_status { length, enable }.packed();
+        add_action_to_transaction("update_market_status", &packed)
+            .map_err(|_| ErrorType::AccountPurchaseFailed("update_market_status failed".into()).into())
+    }
 }
 
 #[derive(serde::Deserialize, Debug)]
