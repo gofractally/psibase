@@ -256,6 +256,61 @@ namespace LocalService
          return false;
       }
 
+      bool parseOption(std::string_view name, auto& iter, auto end, bool& result)
+      {
+         if (iter != end && parseOption(name, *iter, result))
+         {
+            ++iter;
+            return true;
+         }
+         else
+         {
+            return false;
+         }
+      }
+
+      bool parseOption(std::string_view name, auto& iter, auto end, std::vector<std::string>& value)
+      {
+         auto pos = iter;
+         if (pos == end)
+            return false;
+         if (!pos->starts_with(name))
+            return false;
+
+         auto arg = std::string_view{*pos}.substr(name.size());
+         if (arg.empty())
+         {
+            ++pos;
+            if (pos == end)
+               return false;
+            value.push_back(std::string(*pos));
+         }
+         else if (name.size() == 2)
+         {
+            value.push_back(std::string(arg));
+         }
+         else if (arg.starts_with('='))
+         {
+            value.push_back(std::string(arg.substr(1)));
+         }
+         else
+         {
+            return false;
+         }
+         ++pos;
+
+         iter = pos;
+         return true;
+      }
+      bool parseOption(std::string_view name1,
+                       std::string_view name2,
+                       auto&            iter,
+                       auto             end,
+                       auto&            value)
+      {
+         return parseOption(name1, iter, end, value) || parseOption(name2, iter, end, value);
+      }
+
       bool parseOption(const psio::json::any& opt, bool default_)
       {
          if (auto* b = opt.get_if<bool>())
@@ -500,13 +555,15 @@ namespace LocalService
                {
                   adminConfig.hosts = psio::convert_from_json<std::vector<std::string>>(
                       psio::convert_to_json(entry.value));
-                  host.push_back(std::move(entry));
+                  entry.key = "host";
+                  service.push_back(std::move(entry));
                }
                else if (entry.key == "peers")
                {
                   adminConfig.peers = psio::convert_from_json<std::vector<std::string>>(
                       psio::convert_to_json(entry.value));
-                  host.push_back(std::move(entry));
+                  entry.key = "peer";
+                  service.push_back(std::move(entry));
                }
                else
                {
@@ -573,18 +630,39 @@ namespace LocalService
                {
                   adminOpts.p2p = parseOptionList(entry.value, false);
                }
+               else if (entry.key == "host")
+               {
+                  adminOpts.hosts = parseOptionList(entry.value, std::vector<std::string>());
+               }
+               else if (entry.key == "peer")
+               {
+                  adminOpts.peers = parseOptionList(entry.value, std::vector<std::string>());
+               }
                else
                {
                   abortMessage(std::format("Unknown option: {}", entry.key));
                }
             }
          }
-         for (const auto& opt : json.serviceArgv())
          {
-            if (!parseOption("--p2p", opt, adminOpts.p2p))
+            // Buffer list options that should hide config file options
+            AdminOptionsRow cli;
+            auto            opts = json.serviceArgv();
+            auto            iter = opts.begin();
+            auto            end  = opts.end();
+            while (iter != end)
             {
-               abortMessage(std::format("Unknown option: {}", opt));
+               if (!parseOption("-o", "--host", iter, end, cli.hosts) &&
+                   !parseOption("--peer", iter, end, cli.peers) &&
+                   !parseOption("--p2p", iter, end, adminOpts.p2p))
+               {
+                  abortMessage(std::format("Unknown option: {}", *iter));
+               }
             }
+            if (!cli.hosts.empty())
+               adminOpts.hosts = std::move(cli.hosts);
+            if (!cli.peers.empty())
+               adminOpts.peers = std::move(cli.peers);
          }
          open<AdminOptionsTable>().put(adminOpts);
       }
