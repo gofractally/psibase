@@ -338,7 +338,10 @@ main() {
     branch_name=$(jq -r '.branchName' "$PRD_FILE")
     archive_if_branch_switch "$branch_name"
 
-    mkdir -p "$REPORTS_DIR" "$ARCHIVE_DIR"
+    mkdir -p "$REPORTS_DIR" "$ARCHIVE_DIR" "$LAST_RUN_DIR"
+    local run_log="${LAST_RUN_DIR}/run.log"
+    exec > >(tee "$run_log") 2>&1
+    echo "Logging to $run_log — to monitor progress in another terminal, run: tail -f $run_log"
 
     local iteration=0
     local stories_completed
