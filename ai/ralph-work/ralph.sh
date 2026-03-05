@@ -337,12 +337,15 @@ main() {
     local branch_name
     branch_name=$(jq -r '.branchName' "$PRD_FILE")
     archive_if_branch_switch "$branch_name"
+    local safe_branch
+    safe_branch=$(echo "$branch_name" | tr '/' '-' | tr -cd '[:alnum:]-_')
+    [[ -z "$safe_branch" ]] && safe_branch="branch"
 
     mkdir -p "$REPORTS_DIR" "$ARCHIVE_DIR" "$LAST_RUN_DIR"
     local run_log="${LAST_RUN_DIR}/run.log"
     exec > >(tee "$run_log") 2>&1
     echo "Logging to $run_log — to monitor progress in another terminal, run: tail -f $run_log"
-    echo "Each iteration's agent output is written to ${LAST_RUN_DIR}/current_iteration.log — tail -f that file to see what the agent is doing."
+    echo "Each iteration's agent output is written to ${LAST_RUN_DIR}/${safe_branch}-iteration-<N>.log — tail -f that file to see what the agent is doing."
 
     local iteration=0
     local stories_completed
@@ -372,8 +375,10 @@ main() {
         local tmp_prompt
         tmp_prompt=$(mktemp)
         printf '%s' "$prompt" > "$tmp_prompt"
+        local agent_log="${LAST_RUN_DIR}/${safe_branch}-iteration-${iteration}.log"
+        echo "  Agent output: tail -f $agent_log"
         local output
-        output=$(cursor-agent -p --trust --force --workspace "$WORKSPACE" --model "$MODEL" "$(cat "$tmp_prompt")" 2>&1 | tee "${LAST_RUN_DIR}/current_iteration.log") || true
+        output=$(cursor-agent -p --trust --force --workspace "$WORKSPACE" --model "$MODEL" "$(cat "$tmp_prompt")" 2>&1 | tee "$agent_log") || true
         rm -f "$tmp_prompt"
 
         if echo "$output" | grep -q '<promise>COMPLETE</promise>'; then
