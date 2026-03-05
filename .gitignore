@@ -8,6 +8,7 @@
 .cursor
 .cursorignore
 .cursorrules
+.direnv
 *.a
 *.log
 *.o
@@ -29,6 +30,7 @@ vite.config.ts.timestamp-*.mjs
 .pnpm-store
 .env
 .envrc
+nix/.nix-develop-bashrc
 psinode_db
 psinode_db_secure
 /db
@@ -40,6 +42,7 @@ target/
 **/install-state.gz
 .clangd
 AGENTS.md
+<<<<<<< HEAD
 # AI coding system related
 AGENTS.mds/
 ai/ralph-work/last_run/

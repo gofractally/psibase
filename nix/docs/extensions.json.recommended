@@ -1,0 +1,21 @@
+{
+  "recommendations": [
+    "actboy168.tasks",
+    "rioj7.command-variable",
+    "arcanis.vscode-zipfs",
+    "bradlc.vscode-tailwindcss",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "llvm-vs-code-extensions.vscode-clangd",
+    "tdennis4496.cmantic",
+    "fill-labs.dependi",
+    "tamasfe.even-better-toml",
+    "rust-lang.rust-analyzer",
+    "vadimcn.vscode-lldb",
+    "bytecodealliance.wit-idl",
+    "bierner.markdown-mermaid",
+    "eamodio.gitlens",
+    "github.vscode-github-actions",
+    "ms-python.python"
+  ]
+}

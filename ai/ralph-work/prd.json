@@ -1,14 +1,41 @@
 {
-  "branchName": "main",
-  "projectName": "Sample PRD for verification",
+  "branchName": "ralph/prem-accounts-market-enable",
+  "projectName": "PremAccounts Market Config",
   "stories": [
     {
-      "id": "US-001",
-      "title": "Sample story: add a no-op action to a service",
+      "id": "US-002",
+      "title": "PremAccounts supports stopping and restarting name markets",
       "priority": 1,
       "passes": false,
-      "skills": ["service-actions"],
-      "acceptance_criteria": ["Build passes", "Action callable"]
+      "skills": [
+        "service-tables",
+        "service-actions",
+        "service-graphql",
+        "plugin-wasm",
+        "build-system"
+      ],
+      "acceptance_criteria": [
+        "PremAccounts query service supports a marketsStatus GraphQL query that returns a list of markets and their enabled/disabled statuses",
+        "PremAccounts plugin has updateMarketStatus(market name length, enable bool) to enable/disable a market",
+        "PremAccounts service has update_market_status action (market name length, enable bool) that updates the market status in the service table",
+        "PremAccounts service markets table has a new field tracking market status, updated by update_market_status and exposed via GraphQL",
+        "PremAccounts-related services/plugins are wired into the existing build system so that the repository build (for example via make and cargo-psibase build) succeeds without errors"
+      ]
+    },
+    {
+      "id": "US-001",
+      "title": "Markets can be explicitly started and stopped from the Config app",
+      "priority": 2,
+      "passes": false,
+      "skills": [
+        "ui-supervisor-integration",
+        "plugin-wasm"
+      ],
+      "acceptance_criteria": [
+        "Config UI has a new Premium Market Config tab",
+        "Config UI Market Config tab shows a list with columns 'Market (account name length)' and 'Status'; Market lists lengths 1–10, Status shows enabled/disabled",
+        "User can stop and restart a particular market from the PremAccounts/Config UI"
+      ]
     }
   ]
 }
