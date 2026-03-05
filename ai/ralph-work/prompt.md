@@ -36,11 +36,12 @@ The loop has already verified that the git branch matches the PRD `branchName`; 
 3. Break that story into narrowly-scoped subtasks (e.g., "add function X to plugin", "verify plugin builds", "fix build error Y")
 4. For each subtask, track attempts using the format: `Task at hand [attempt #N]: <specific task description>`
 5. Implement the subtask
-6. Run quality checks:
-   - Build: use `make <package>` from the build directory for full packages; services are built with `cargo build`, plugins with `cargo component build` / `cargo-psibase build` (see ai/docs/psibase/ and doc/src for details)
-   - Tests: Run relevant tests if available (see ai/skills/ for testing guidance)
+6. Run quality checks — **a story is never complete while relevant builds/tests are failing**:
+   - **Baseline build before changing code** (for a new story or major refactor): run the smallest relevant build target first (e.g. `make <package>`, `cargo psibase build`, or `cargo component build`) *before* you edit files. Capture only a filtered summary of the output (for example by piping through a tool that keeps lines matching `error`, `failed`, `warning`, or `success`) and record whether the branch is already red. If this baseline build fails, do not modify code; instead, escalate and explain that the build was already broken.
+   - **Build after changes**: after each meaningful change, re-run the same minimal build targets (package-level `make`, `cargo psibase build`, or `cargo component build`). If failures clearly relate to your changes, treat that as a failed subtask and iterate up to 3 attempts. If failures look unrelated (or match the baseline failure), stop and escalate rather than trying to “fix the whole repo”.
+   - **Tests**: run any directly relevant tests if available (e.g. `cargo psibase test` for services you touched). Consider the story incomplete while those tests are failing.
 7. If a subtask fails 3 times, output an escalation block and STOP (see Escalation below)
-8. If all subtasks for the story succeed:
+8. If all subtasks for the story succeed **and the relevant builds/tests are green**:
    - Commit changes with message: `feat: [Story ID] - [Story Title]`
    - Append progress to `progress.txt`
    - Output `<promise>COMPLETE</promise>` when the story is done. The loop will automatically set `passes: true` for that story in prd.json.
@@ -62,6 +63,8 @@ The loop has already verified that the git branch matches the PRD `branchName`; 
 ## When to Escalate (Ask the User)
 
 - Package/build configuration issues that persist after 2 attempts
+- Baseline build or test failures that occur **before you make any changes** (branch is already red)
+- Build/test failures that appear unrelated to the files/targets you’ve touched (for example, they match the baseline failure or affect distant packages)
 - WIT interface design decisions
 - Ambiguous requirements in the PRD
 - Authentication or authorization model decisions
@@ -70,7 +73,7 @@ The loop has already verified that the git branch matches the PRD `branchName`; 
 
 ## Escalation Format
 
-If a subtask fails 3 times, output this block and STOP:
+If a subtask fails 3 times, or you determine the build/test is broken in a way that predates or is clearly unrelated to your changes, output this block and STOP:
 
 ```
 <escalation>
@@ -78,6 +81,7 @@ Task: <task description>
 Attempt 1: <what was tried> → <result>
 Attempt 2: <what was tried> → <result>
 Attempt 3: <what was tried> → <result>
+Baseline build: <commands run, whether it already failed, and a filtered summary of the logs>
 Suggestion: <what the user should investigate>
 </escalation>
 ```
@@ -136,8 +140,9 @@ After completing a user story, check if ALL stories have `passes: true`.
 
 - Work on **ONE story** per iteration
 - Track **EVERY subtask attempt** with `Task at hand [attempt #N]: <description>`
+- Always run at least a minimal build for the code you touch; treat failing builds/tests as blockers for story completion
 - **NEVER exceed 3 attempts** on the same subtask — escalate instead
-- Commit only when quality checks pass
+- Commit only when quality checks pass (builds/tests green for the relevant targets)
 - Do NOT mock or placeholder-implement things unless explicitly told to
 - Do NOT assume code is unimplemented — search the codebase first
 - When in doubt about psibase specifics, **escalate rather than guess**
