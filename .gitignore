@@ -40,3 +40,10 @@ target/
 **/install-state.gz
 .clangd
 AGENTS.md
+# AI coding system related
+AGENTS.mds/
+ai/ralph-work/last_run/
+ai/ralph-work/reports/
+ai/ralph-work/state.json
+config/
+data/
