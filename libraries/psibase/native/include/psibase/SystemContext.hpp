@@ -7,6 +7,7 @@ namespace psibase
 {
    struct WatchdogManager;
    struct Sockets;
+   struct Mount;
 
    struct SystemContext
    {
@@ -15,6 +16,7 @@ namespace psibase
       std::vector<ExecutionMemory>     executionMemories;
       std::shared_ptr<WatchdogManager> watchdogManager;
       std::shared_ptr<Sockets>         sockets;
+      std::shared_ptr<Mount>           mountpoints;
 
       void setNumMemories(size_t n)
       {
@@ -41,6 +43,7 @@ namespace psibase
       bool needGenesis() const;
 
       std::shared_ptr<Sockets> sockets();
+      std::shared_ptr<Mount>   mountpoints();
 
       std::unique_ptr<SystemContext> getSystemContext();
       void                           addSystemContext(std::unique_ptr<SystemContext> context);

@@ -84,6 +84,12 @@ mod service {
         unimplemented!()
     }
 
+    /// Writes a message to the server log
+    #[action]
+    fn log(severity: u32, msg: String) {
+        unimplemented!()
+    }
+
     /// Returns the root host for a given host
     #[action]
     fn rootHost(host: String) -> String {

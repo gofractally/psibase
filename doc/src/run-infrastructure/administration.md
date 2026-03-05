@@ -111,7 +111,6 @@ The [x-admin](../default-apps/x-admin.md#http-endpoints) and [x-peers](../defaul
 | `tls.certificate`        | String            | The path to the server's certificate chain in PEM format                                                                                                                                                  |
 | `tls.key`                | String            | The path to the file containing the private key for the server's certificate in PEM format                                                                                                                |
 | `tls.trustfiles`         | Array             | A list of files containing trusted root CAs in PEM format.                                                                                                                                                |
-| `services`               | Array             | A list of built in services. `host` is the virtual hostname for the service. If `host` ends with `.` the global `host` will be appended to it. `root` is a directory containing the content to be served. |
 | `http_timeout`           | Number            | The timeout in microseconds before the server closes idle connections. If it is null or missing, connections do not time out.                                                                             |
 | `loggers`                | Object            | A description of the [destinations for log records](#logging)                                                                                                                                             |
 
@@ -135,12 +134,6 @@ Example:
         "key": "psibase.key",
         "trustfiles": []
     },
-    "services": [
-        {
-            "host": "x-admin.",
-            "root": "/usr/share/psibase/services/x-admin"
-        }
-    ],
     "loggers": {
         "console": {
             "type": "console",

@@ -264,6 +264,23 @@ namespace psibase
    };
    using LogTruncateTable = Table<LogTruncateRow, SingletonKey{}>;
 
+   struct LogMessage
+   {
+      enum class Severity : std::uint32_t
+      {
+         debug,
+         info,
+         notice,
+         warning,
+         error,
+         critical,
+      };
+      std::string                  message;
+      Severity                     severity = Severity::info;
+      std::optional<AccountNumber> service;
+      PSIO_REFLECT(LogMessage, severity, message, service)
+   };
+
    using SocketKeyType = std::tuple<std::uint16_t, std::uint8_t, std::int32_t>;
    auto socketPrefix() -> KeyPrefixType;
    auto socketKey(std::int32_t fd) -> SocketKeyType;
@@ -271,6 +288,8 @@ namespace psibase
    {
       // Well-known fds
       static constexpr std::int32_t producer_multicast = 0;
+      static constexpr std::int32_t log                = 1;
+      static constexpr std::int32_t unreservedStart    = 2;
 
       std::int32_t fd;
       SocketInfo   info;

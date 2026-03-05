@@ -181,16 +181,27 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    private getActiveQueryToken(): string {
+    private getActiveQueryToken(): string | undefined {
         assertTruthy(this.parentOrigination, "Parent origination corrupted");
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
+        const user = this.supervisorCall(
+            getCallArgs("accounts", "plugin", "api", "getCurrentUser", []),
+        );
+        
+        if (!user) 
+        {
+            return undefined;
+        }
+        
         const token = this.supervisorCall(
             getCallArgs("host", "auth", "api", "getActiveQueryToken", [
                 this.parentOrigination.app,
+                user,
             ]),
         );
         return token;
+        
     }
 
     constructor() {

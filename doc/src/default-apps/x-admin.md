@@ -1,6 +1,6 @@
 # x-admin
 
-The adminstrator service is hosted on localhost by default as a [Builtin Service](#builtin-services). It provides tools for monitoring and controlling the server.
+The adminstrator service provides tools for monitoring and controlling the server.
 
 ## Authentication
 
@@ -23,7 +23,7 @@ The name that the server uses to produce blocks. It must be a valid [account nam
 
 ### Host
 
-The root host name for services. If it is empty, only builtin services will be available.
+The root host name for services. If it is empty, the HTTP API will not be usable.
 
 ### Port
 
@@ -32,22 +32,6 @@ The TCP port on which the server listens. The server must be restarted for a cha
 ### Logger
 
 See [Logging](../run-infrastructure/configuration/logging.md) for a list of the available logger types and their parameters.
-
-### Builtin Services
-
-`psinode` will serve content directly from the filesystem when the request's host matches the host of a builtin service. A builtin service hides a chain service with the same name.
-
-Builtin services have significant limitations. On-chain services should be preferred unless the service requires access to the admin API (the administrator service) or needs to be available before the chain is booted.
-
-Builtin services can only serve the following files types:
-
-- `.html`
-- `.svg`
-- `.js`
-- `.mjs`
-- `.css`
-- `.ttf`
-- `.wasm`
 
 ## HTTP Endpoints
 
