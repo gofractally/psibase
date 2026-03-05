@@ -12,9 +12,23 @@
 
 #### Full build (entire repo, required baseline)
 
-- **CMake / make (baseline):** Build the entire repo by entering the `build` dir and running CMake (if necessary) and then `make`. Use `.vscode/scripts/build.sh` only as a reference for the correct CMake options and generator; do not depend on it being present.
-- **Baseline-first rule:** Before doing any feature work for a story, run a full-repo CMake/make build as a **baseline**. If this baseline build fails, treat that as a **hard stop**: do not modify code for the feature; instead, escalate with the baseline failure details so the build can be fixed first.
-- **Logging pattern (to save tokens):** When running the full build, send the complete build output to a **temporary log file** (for example by piping through `tee` to a file created with `mktemp`), and only print a **filtered view** to stdout that keeps lines containing high-signal terms like `error`, `failed`, `warning`, or `success`. This keeps token usage low while still preserving full build details on disk if further inspection is needed.
+- **Correct baseline command sequence:** The full-repo baseline is **not** plain `make`. Do the following from the repo root.
+  1. **Ensure the build directory is configured.** If `build/` does not exist or has not been configured, run from repo root:
+     ```bash
+     mkdir -p build && cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+       -DCMAKE_BUILD_TYPE=Release \
+       -DBUILD_DEBUG_WASM=ON \
+       -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+       -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+       -DCMAKE_INSTALL_PREFIX="psidk" ..
+     ```
+  2. **Build and install.** From inside `build/`, run:
+     ```bash
+     make install -j$(($(nproc) / 3))
+     ```
+     (Use at least `-j1` if the divisor would be 0.) Do **not** use plain `make` with no target and no `-j`; the canonical full build is `make install -j<N>` with the CMake options above.
+- **Baseline-first rule:** Before doing any feature work for a story, run this full-repo baseline (configure with cmake if needed, then `make install -j<N>`). If this baseline build fails, treat that as a **hard stop**: do not modify code for the feature; instead, escalate with the baseline failure details so the build can be fixed first.
+- **Logging pattern (to save tokens):** When running the full build, send the complete build output to a **temporary log file** (e.g. pipe through `tee` to a file from `mktemp`), and only print a **filtered view** to stdout (e.g. lines matching `error`, `failed`, `warning`, or `success`). This keeps token usage low while preserving full build details on disk.
 
 #### Build a particular component
 
@@ -64,13 +78,14 @@ Refs: `ai/docs/psibase/build-system.md`, `doc/src/development/services/rust-serv
 
 - **Placeholder crates:** Do not rely on `cargo install psibase psinode psitest` from crates.io; use repo-built or SDK executables.
 - **Plugin target:** Plugins may use a different wasm target than services; confirm in the plugin’s Cargo.toml or CI.
-- **Baseline failures are hard stops:** If the initial full-repo CMake/make build (run before you start feature work) fails, do not proceed with implementing the story. Record the failure (including a filtered summary of the log) and escalate so the build can be fixed first.
+- **Plain `make` is not the full-repo baseline:** Running only `cd build && make` (no cmake options, no `make install -j<N>`) does not match the project’s canonical full build and can yield different results. Always use the documented baseline: configure with the given cmake flags if needed, then `make install -j<N>`.
+- **Baseline failures are hard stops:** If the initial full-repo baseline (cmake + `make install -j<N>`) fails, do not proceed with implementing the story. Record the failure (including a filtered summary of the log) and escalate so the build can be fixed first.
 
 ---
 
 ## Verification
 
-- **Required full rebuild:** A **successful full-repo rebuild** from the existing build directory, using CMake/make, is required for work to be considered complete. You do not need to wipe the build directory; just reconfigure if necessary and ensure `make` finishes without errors.
+- **Required full rebuild:** A **successful full-repo rebuild** from the build directory is required for work to be considered complete: run the same baseline as above (cmake with the required options if the dir was not yet configured, then `make install -j<N>`). You do not need to wipe the build directory; just ensure the baseline command sequence finishes without errors.
 - **Package-level checks:** In addition to the full-repo build, run the smallest relevant package or component builds (for example `make <pkg>`, `cargo-psibase build`, or `cargo component build`) while developing to get faster feedback.
 - **Tests:** Where available, run `cargo psibase test` for the packages you touched and/or CTest from the build dir. Treat failing tests as blockers for completion until they pass or are explicitly escalated.
 
