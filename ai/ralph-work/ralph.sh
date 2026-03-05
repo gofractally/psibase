@@ -342,6 +342,7 @@ main() {
     local run_log="${LAST_RUN_DIR}/run.log"
     exec > >(tee "$run_log") 2>&1
     echo "Logging to $run_log — to monitor progress in another terminal, run: tail -f $run_log"
+    echo "Each iteration's agent output is written to ${LAST_RUN_DIR}/current_iteration.log — tail -f that file to see what the agent is doing."
 
     local iteration=0
     local stories_completed
@@ -372,7 +373,7 @@ main() {
         tmp_prompt=$(mktemp)
         printf '%s' "$prompt" > "$tmp_prompt"
         local output
-        output=$(cursor-agent -p --trust --force --workspace "$WORKSPACE" --model "$MODEL" "$(cat "$tmp_prompt")" 2>&1) || true
+        output=$(cursor-agent -p --trust --force --workspace "$WORKSPACE" --model "$MODEL" "$(cat "$tmp_prompt")" 2>&1 | tee "${LAST_RUN_DIR}/current_iteration.log") || true
         rm -f "$tmp_prompt"
 
         if echo "$output" | grep -q '<promise>COMPLETE</promise>'; then
