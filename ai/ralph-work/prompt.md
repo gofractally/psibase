@@ -143,6 +143,7 @@ After completing a user story, check if ALL stories have `passes: true`.
 - Always run at least a minimal build for the code you touch; treat failing builds/tests as blockers for story completion
 - **NEVER exceed 3 attempts** on the same subtask — escalate instead
 - Commit only when quality checks pass (builds/tests green for the relevant targets)
+- **Do NOT assume backward compatibility is required.** Only consider or implement backward compatibility if the PRD explicitly requires it. Otherwise, do not spend any effort on maintaining backward compatibility.
 - Do NOT mock or placeholder-implement things unless explicitly told to
 - Do NOT assume code is unimplemented — search the codebase first
 - When in doubt about psibase specifics, **escalate rather than guess**
