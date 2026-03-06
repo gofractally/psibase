@@ -3,7 +3,7 @@ use async_graphql::ComplexObject;
 use psibase::{
     check, check_some, get_sender,
     services::{tokens::Quantity, virtual_server},
-    AccountNumber, Table, TimePointSec,
+    AccountNumber, Memo, Table, TimePointSec,
 };
 
 use crate::{
@@ -44,22 +44,6 @@ impl GuildInvite {
         }
     }
 
-    fn charge_invite_fee_from_sender(cost: Quantity) {
-        let tokens = Tokens::call();
-        let inviter = get_sender();
-
-        let system_token_id = Tokens::call().getSysToken().unwrap().id;
-
-        tokens.debit(system_token_id, inviter, cost, "Invite fee".into());
-        tokens.credit(
-            system_token_id,
-            psibase::services::invite::SERVICE,
-            cost,
-            "Invite fee".into(),
-        );
-        tokens.reject(system_token_id, inviter, "Invite fee dust return".into());
-    }
-
     pub fn add(
         guild: AccountNumber,
         invite_id: u32,
@@ -78,9 +62,13 @@ impl GuildInvite {
         );
 
         let invite_cost = Self::invite_cost(num_accounts);
-        if invite_cost.value > 0 {
-            Self::charge_invite_fee_from_sender(invite_cost)
-        }
+
+        Self::debit_and_credit(
+            get_sender(),
+            psibase::services::invite::SERVICE,
+            invite_cost,
+            "Invite fee".into(),
+        );
 
         Invite::call().createInvite(invite_id, invite_payload, num_accounts, true, invite_cost);
 
@@ -110,8 +98,29 @@ impl GuildInvite {
         self.remove()
     }
 
+    fn debit_and_credit(from: AccountNumber, to: AccountNumber, amount: Quantity, memo: Memo) {
+        if amount.value > 0 {
+            let tokens = Tokens::call();
+
+            let system_token = check_some(
+                tokens.getSysToken(),
+                "expected system token to issue refund",
+            )
+            .id;
+            tokens.debit(system_token, from, amount, "".into());
+            tokens.credit(system_token, to, amount, memo);
+            tokens.reject(system_token, from, "Unused amount".into());
+        }
+    }
+
     fn remove(&self) {
-        Invite::call().delInvite(self.id);
+        let refund = Invite::call().delInvite(self.id);
+        Self::debit_and_credit(
+            Invite::SERVICE,
+            self.inviter,
+            refund,
+            "Invite refund".into(),
+        );
         GuildInviteTable::read_write().remove(&self)
     }
 

@@ -424,8 +424,11 @@ impl UserGuild for FractallyPlugin {
         num_accounts: u16,
         pre_attest: bool,
     ) -> Result<String, Error> {
-        let fractal = get_guild(guild_account.clone())?.fractal.to_string();
-        let d = bindings::invite::plugin::inviter::prepare_new_invite(1, &fractal)?;
+        let guild = get_guild(guild_account.clone())?;
+        guild.assert_authorized(FunctionName::invite_member)?;
+
+        let d =
+            bindings::invite::plugin::inviter::prepare_new_invite(1, &guild.fractal.to_string())?;
 
         let packed_args = fractals::action_structs::inv_g_member {
             guild: guild_account.as_str().into(),

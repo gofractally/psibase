@@ -275,6 +275,7 @@ impl UserGuild for FractalCorePlugin {
     }
 
     fn push_application(guild_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::apply_guild)?;
         let bucket = Self::draft_bucket();
 
         let packed_data = bucket
