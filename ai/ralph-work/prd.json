@@ -6,7 +6,7 @@
       "id": "US-002",
       "title": "PremAccounts supports stopping and restarting name markets",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "skills": [
         "service-tables",
         "service-actions",
@@ -26,7 +26,7 @@
       "id": "US-001",
       "title": "Markets can be explicitly started and stopped from the Config app",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "skills": [
         "ui-supervisor-integration",
         "plugin-wasm"
@@ -35,6 +35,50 @@
         "Config UI has a new Premium Market Config tab",
         "Config UI Market Config tab shows a list with columns 'Market (account name length)' and 'Status'; Market lists lengths 1–10, Status shows enabled/disabled",
         "User can stop and restart a particular market from the PremAccounts/Config UI"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Add a GraphQL query test for PremAccounts",
+      "priority": 3,
+      "passes": false,
+      "skills": [
+        "service-testing",
+        "service-graphql"
+      ],
+      "acceptance_criteria": [
+        "PremAccounts (or its query service) has at least one test that drives the GraphQL endpoint via serveSys in a psibase::test_case",
+        "Test seeds chain state via actions, builds an HttpRequest for POST /graphql, calls serveSys, and asserts on response (no errors, expected data)",
+        "Test runs with cargo psibase test and passes"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Add a test per PremAccounts service action",
+      "priority": 4,
+      "passes": true,
+      "skills": [
+        "service-testing",
+        "service-actions"
+      ],
+      "acceptance_criteria": [
+        "Each PremAccounts service action (e.g. update_market_status) has a corresponding psibase::test_case that pushes the action and asserts on return value or table state",
+        "Tests use Table::with_service where needed to read tables; use chain.start_block() when reusing same action in same block",
+        "All action tests run with cargo psibase test and pass"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Add minimal UI tests on a launched local chain",
+      "priority": 5,
+      "passes": true,
+      "skills": [
+        "chain-launch"
+      ],
+      "acceptance_criteria": [
+        "A minimal integration test (or script) launches psinode with a test config, boots the chain (cargo psibase install for relevant packages), and curls the PremAccounts/Config UI subdomain",
+        "Test asserts HTTP 200 and that the response contains expected initial content (e.g. HTML) for the default/initial state of the page(s) under test",
+        "No user interaction or browser automation required; initially-served state only"
       ]
     }
   ]
