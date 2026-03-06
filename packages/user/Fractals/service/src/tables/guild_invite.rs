@@ -63,7 +63,7 @@ impl GuildInvite {
 
         let invite_cost = Self::invite_cost(num_accounts);
 
-        Self::debit_and_credit(
+        Self::debit_then_credit(
             get_sender(),
             psibase::services::invite::SERVICE,
             invite_cost,
@@ -98,7 +98,7 @@ impl GuildInvite {
         self.remove()
     }
 
-    fn debit_and_credit(from: AccountNumber, to: AccountNumber, amount: Quantity, memo: Memo) {
+    fn debit_then_credit(from: AccountNumber, to: AccountNumber, amount: Quantity, memo: Memo) {
         if amount.value > 0 {
             let tokens = Tokens::call();
 
@@ -115,7 +115,7 @@ impl GuildInvite {
 
     fn remove(&self) {
         let refund = Invite::call().delInvite(self.id);
-        Self::debit_and_credit(
+        Self::debit_then_credit(
             Invite::SERVICE,
             self.inviter,
             refund,
