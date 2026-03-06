@@ -3,6 +3,8 @@ export const queryKeys = {
     configUpdate: ["configUpdate"] as const,
     connect: ["connect"] as const,
     importKey: ["importKey"] as const,
+    configNetworkVariables: ["config", "networkVariables"] as const,
+    configServerSpecs: ["config", "serverSpecs"] as const,
     packages: ["packages"] as const,
     peers: ["peers"] as const,
     producers: ["producers"] as const,

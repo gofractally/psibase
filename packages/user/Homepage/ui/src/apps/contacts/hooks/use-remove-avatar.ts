@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
-import { useCacheBust } from "@/hooks/use-cache-bust";
+import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
