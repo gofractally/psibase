@@ -12,7 +12,6 @@ namespace UserService
    namespace InviteNs
    {
       using namespace psibase;
-      using SystemService::Credentials;
 
       struct InviteEvent
       {
@@ -34,7 +33,7 @@ namespace UserService
 
          auto expiryDate() const -> std::optional<TimePointSec>
          {
-            return to<Credentials>().get_expiry_date(cid);
+            return to<Invite>().getExpDate(this->inviteId);
          }
          PSIO_REFLECT(InviteDetails,
                       inviteId,

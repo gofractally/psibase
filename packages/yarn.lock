@@ -1917,6 +1917,7 @@ __metadata:
     lucide-react: "npm:^0.475.0"
     nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
+    react-confetti-explosion: "npm:^3.0.3"
     react-dom: "npm:^19.1.0"
     react-easy-sort: "npm:^1.6.0"
     react-router-dom: "npm:^6.26.1"
@@ -10780,6 +10781,16 @@ __metadata:
     react: ^18.x
     react-dom: ^18.x
   checksum: 10c0/28f96b2f6dae73a8ed4e5e4b2df588bbb8ae761b162e1ef34f614e27ee0d9d577917313285bf4fa3aa839eb2a3692bec03e580363ec8d7eaf34340d8461a9ad3
+  languageName: node
+  linkType: hard
+
+"react-confetti-explosion@npm:^3.0.3":
+  version: 3.0.3
+  resolution: "react-confetti-explosion@npm:3.0.3"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/19d5c8df436d0e06c13f1f553c17f2ebc888dc0f389ed13de98356ea07cb71af352f9baa66ead00c30af9ec40f546152440af8774564167f3680af5444485c84
   languageName: node
   linkType: hard
 
