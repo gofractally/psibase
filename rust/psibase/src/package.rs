@@ -42,7 +42,8 @@ custom_error! {
     DependencyCycle = "Cycle in service dependencies",
     UnknownFileType{path:String} = "Cannot determine Mime-Type for {path}",
     UnknownAccount{name:AccountNumber} = "Account {name} not defined in meta.json",
-    AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
+    ServiceConflict{name: AccountNumber, old: String, new: String} = "The service {name} is defined by more than one package: {old}, {new}",
+    FileConflict{name: AccountNumber, filename: String, old: String, new: String} = "The file {name}:{filename} is defined by more than one package: {old}, {new}",
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
     PackageNotFound{package: String} = "The package {package} was not found",
@@ -665,23 +666,27 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 
     // Returns accounts that must be defined by either this package or its
-    // immediate dependencies
-    pub fn get_required_accounts(&mut self) -> Result<Vec<AccountNumber>, anyhow::Error> {
-        let mut result = vec![];
+    // immediate dependencies. The first group can be any account, the second
+    // must be services
+    pub fn get_required_accounts(
+        &mut self,
+    ) -> Result<(Vec<AccountNumber>, Vec<AccountNumber>), anyhow::Error> {
+        let mut accounts = vec![];
+        let mut services = vec![];
 
         for account in self.get_accounts() {
             if !self.has_service(*account) {
-                result.push(accounts::SERVICE)
+                services.push(accounts::SERVICE)
             }
         }
 
         if !self.data.is_empty() {
-            result.push(sites::SERVICE);
+            services.push(sites::SERVICE);
         }
 
         for (_, _, info) in &self.services {
             if let Some(_) = &info.server {
-                result.push(http_server::SERVICE)
+                services.push(http_server::SERVICE)
             }
         }
 
@@ -689,15 +694,18 @@ impl<R: Read + Seek> PackagedService<R> {
             let actions: Vec<PrettyAction> =
                 serde_json::de::from_str(&std::io::read_to_string(file)?)?;
             for act in actions {
-                result.push(act.sender);
-                result.push(act.service);
+                accounts.push(act.sender);
+                services.push(act.service);
             }
         }
 
-        result.sort_unstable_by(|a, b| a.value.cmp(&b.value));
-        result.dedup();
+        accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        accounts.dedup();
 
-        Ok(result)
+        services.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        services.dedup();
+
+        Ok((accounts, services))
     }
 
     // returns accounts whose schemas are required
@@ -1023,18 +1031,37 @@ impl PackageManifest {
     }
 }
 
-// Two packages shall not create the same account
-// Accounts used in any way during installation must be part of the package or
+// Two packages shall not create the same service or data file
+// Services used in any way during installation must be part of the package or
 // its direct dependencies
 pub fn validate_dependencies<T: Read + Seek>(
     packages: &mut [PackagedService<T>],
 ) -> Result<(), anyhow::Error> {
-    let mut accounts: HashMap<AccountNumber, String> = HashMap::new();
-    for p in &packages[..] {
+    let mut accounts: HashMap<AccountNumber, HashSet<String>> = HashMap::new();
+    let mut services: HashMap<AccountNumber, String> = HashMap::new();
+    let mut files: HashMap<PackageDataFile, String> = HashMap::new();
+    for p in &mut packages[..] {
         for account in p.get_accounts() {
-            match accounts.entry(*account) {
-                hash_map::Entry::Occupied(entry) => Err(Error::AccountConflict {
+            accounts
+                .entry(*account)
+                .or_insert_with(|| HashSet::new())
+                .insert(p.meta.name.clone());
+        }
+        for (account, _, _) in &p.services {
+            match services.entry(*account) {
+                hash_map::Entry::Occupied(entry) => Err(Error::ServiceConflict {
                     name: *account,
+                    old: entry.get().to_string(),
+                    new: p.meta.name.clone(),
+                })?,
+                hash_map::Entry::Vacant(entry) => entry.insert(p.meta.name.clone()),
+            };
+        }
+        for file in p.manifest_data() {
+            match files.entry(file) {
+                hash_map::Entry::Occupied(entry) => Err(Error::FileConflict {
+                    name: entry.key().account,
+                    filename: entry.key().filename.to_string(),
                     old: entry.get().to_string(),
                     new: p.meta.name.clone(),
                 })?,
@@ -1043,8 +1070,30 @@ pub fn validate_dependencies<T: Read + Seek>(
         }
     }
     for p in &mut packages[..] {
-        for account in p.get_required_accounts()? {
-            if let Some(package) = accounts.get(&account) {
+        let (required_accounts, required_services) = p.get_required_accounts()?;
+        for account in required_accounts {
+            if let Some(packages) = accounts.get(&account) {
+                if !packages.contains(&p.meta.name)
+                    && !p
+                        .meta
+                        .depends
+                        .iter()
+                        .any(|dep| packages.contains(&dep.name))
+                {
+                    Err(Error::MissingDepPackage {
+                        name: p.meta.name.clone(),
+                        dep: packages.iter().next().unwrap().clone(),
+                    })?;
+                }
+            } else {
+                Err(Error::MissingDepAccount {
+                    name: account,
+                    package: p.meta.name.clone(),
+                })?
+            }
+        }
+        for account in required_services {
+            if let Some(package) = services.get(&account) {
                 if &p.meta.name != package && !p.meta.depends.iter().any(|dep| &dep.name == package)
                 {
                     Err(Error::MissingDepPackage {
