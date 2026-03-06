@@ -18,9 +18,8 @@ use bindings::fractals::plugin as FractalsPlugin;
 
 use trust::{assert_authorized, FunctionName};
 
-use crate::bindings::host::{
-    self,
-    common::store::{Bucket, Database},
+use crate::bindings::host::common::store::{
+    Bucket, Database, DbMode::Transactional, StorageDuration::Persistent,
 };
 
 define_trust! {
@@ -311,7 +310,6 @@ impl UserGuild for FractalCorePlugin {
 
 impl FractalCorePlugin {
     fn draft_bucket() -> Bucket {
-        use host::common::store::{Bucket, DbMode::Transactional, StorageDuration::Persistent};
         Bucket::new(
             Database {
                 mode: Transactional,
