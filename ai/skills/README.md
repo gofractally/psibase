@@ -55,9 +55,11 @@ ai/skills/
 ├── wit-interfaces/
 │   ├── SKILL.md       # sections: define-interface, world-vs-impl, extend-wit, etc.
 │   └── gotchas.md
-└── service-testing/
-    ├── SKILL.md       # sections: write-service-test, simulated-chain, etc.
-    └── examples/
+├── service-testing/
+│   ├── SKILL.md       # sections: write-service-test, test-query-service, run-tests
+│   └── examples/
+└── chain-launch/
+    └── SKILL.md       # sections: launch-local-node, boot-chain-for-testing, verify-ui-serveable
 ```
 
 ---
@@ -116,7 +118,8 @@ Stories refer to **area** names. Each area’s SKILL.md is structured with **act
 | `ui-supervisor-integration` | UI talking to plugins via Supervisor | call-plugin, preload-plugins, handle-transactions |
 | `build-system` | CMake/make, adding packages, build debugging | add-package, make-targets, debug-build |
 | `wit-interfaces` | WIT for WASM components (world.wit, impl.wit) | define-interface, world-vs-impl, extend-wit |
-| `service-testing` | Testing services (simulated chain, etc.) | write-service-test, run-tests |
+| `service-testing` | Testing services (simulated chain, etc.) | write-service-test, test-query-service, run-tests |
+| `chain-launch` | Launch local node, boot chain, verify UI serveable (curl) | launch-local-node, boot-chain-for-testing, verify-ui-serveable |
 
 When authoring a story, set `skills` to the **area(s)** that match: e.g. `"skills": ["plugin-wasm"]` or `["service-tables", "service-actions"]`. The agent uses the story text to pick the right action subsection inside each area doc.
 

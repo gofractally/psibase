@@ -40,6 +40,7 @@ The loop has already verified that the git branch matches the PRD `branchName`; 
    - **Baseline full-repo build before changing code** (for a new story or major refactor): *before* you edit files, run the **exact baseline command sequence** defined in the build-system skill (ai/skills/build-system/): configure the build dir with the required cmake flags if needed, then run `make install -j<N>` from the build directory — **do not** use plain `make` with no options. Send the full build output to a temporary log file and print only a filtered summary to stdout (e.g. lines containing `error`, `failed`, `warning`, or `success`). Record whether the branch is already red. If this baseline fails, do not modify code; instead, escalate and explain that the build was already broken.
    - **Build after changes**: after each meaningful change, re-run the smallest relevant build targets for fast feedback (e.g. `make <package>`, `cargo-psibase build`, or `cargo component build`), and re-run the **same full-repo baseline** (cmake + `make install -j<N>`) as needed before considering the story complete. If failures clearly relate to your changes, treat that as a failed subtask and iterate up to 3 attempts. If failures look unrelated (or match the baseline failure), stop and escalate rather than trying to “fix the whole repo”.
    - **Tests**: run any directly relevant tests if available (e.g. `cargo psibase test` for services you touched). Consider the story incomplete while those tests are failing.
+   - **UI serveable from chain**: If the story involves **UI work**, verify that the changed UI is serveable from the chain before marking the story complete. Test any URL that is the **default/initial state** of a page—e.g. the app’s primary page, subpages, or any path—with **no user interaction** assumed (initially-served content only; no data from the backend that depends on prior user actions). Use the **chain-launch** skill: launch a local node (psinode with test config), boot the chain (`cargo psibase install` from the package), then curl the relevant path on the service subdomain (e.g. `curl -H "Host: <service>.psibase.localhost" http://127.0.0.1:8080/` or the specific path) and assert HTTP 200 and expected content (e.g. HTML). See `ai/skills/chain-launch/` for the exact steps.
 7. If a subtask fails 3 times, output an escalation block and STOP (see Escalation below)
 8. If all subtasks for the story succeed **and the relevant builds/tests are green**:
    - Commit changes with message: `feat: [Story ID] - [Story Title]`
@@ -99,6 +100,7 @@ The loop injects skill docs based on the story’s `skills` array (or `type`/`ca
 - **Build system** (add package, make targets, debug): `build-system/`
 - **WIT interfaces** (world.wit, impl.wit, extend): `wit-interfaces/`
 - **Service testing** (simulated chain, tests): `service-testing/`
+- **Chain launch** (launch node, boot chain, verify UI serveable with curl): `chain-launch/`
 
 Also read relevant **AGENTS.md** files for the areas you’re editing, and check `ai/lessons-learned/` for any lessons relevant to your current task.
 

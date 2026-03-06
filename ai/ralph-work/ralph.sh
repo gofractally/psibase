@@ -152,7 +152,7 @@ archive_if_branch_switch() {
 # Build prompt with injected content
 # -----------------------------------------------------------------------------
 # Map story type/category to area-based skill subdir names (for when "skills" array is absent)
-SKILL_TYPE_MAP="service:service-tables plugin:plugin-wasm ui:ui-supervisor-integration query:service-graphql build:build-system test:service-testing wit:wit-interfaces config:build-system"
+SKILL_TYPE_MAP="service:service-tables plugin:plugin-wasm ui:ui-supervisor-integration query:service-graphql build:build-system test:service-testing wit:wit-interfaces config:build-system integration:chain-launch chain:chain-launch"
 
 build_prompt() {
     local prd_content progress_content skill_content
