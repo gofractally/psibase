@@ -39,6 +39,59 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
 ---
 
+## Skill: test-query-service
+
+1. Add a `#[psibase::test_case(...)]` in the **service crate** (or a dedicated test crate) that depends on the service. Use `packages("PackageName")` or `services("server-name")` so the query service is deployed to the simulated chain.
+2. Seed data via **normal actions**, not by writing tables directly. For example, call `Wrapper::push(&chain).storeMessage(...).get()?` or whatever actions your GraphQL resolvers rely on.
+3. Construct a minimal `HttpRequest` that represents a GraphQL call to your service’s `/graphql` endpoint:
+   - Method: `POST`
+   - Path: `/graphql` (or the path your `serveSys` uses)
+   - Body: JSON `{"query": "...", "variables": { ... }}` encoded as bytes
+   - Headers: at least `Content-Type: application/json`
+4. Call the service’s HTTP entrypoint instead of resolvers directly:
+   - `let reply = service::serveSys(request).expect("GraphQL reply");`
+   - Decode the `HttpReply` body as JSON into a `struct` like `{ data: T, errors: Option<Vec<GraphQLError>> }` using `serde`.
+5. Assert on **protocol-level behavior**:
+   - The reply is present and has a successful status / content type.
+   - `errors` is empty (or matches the expected error condition).
+   - `data` contains the expected fields, counts, and values (including `pageInfo` and `edges` for connection-style queries).
+6. For pagination or subindex queries, run multiple GraphQL operations in the same test:
+   - First call with `first: N` and assert `pageInfo.hasNextPage` and the contents of `edges`.
+   - Second call with `after: endCursor` and assert that you see the next page of results.
+
+Example shape (pseudocode, not exact types):
+
+```rust
+#[psibase::test_case(packages("ExampleQuery"))]
+fn test_messages_query(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    // Seed state via actions
+    chain.new_account(account!("alice"))?;
+    Wrapper::push_from(&chain, account!("alice"))
+        .storeMessage(account!("alice"), "hello".into())
+        .get()?;
+
+    // Build a minimal GraphQL HttpRequest to /graphql
+    let request = build_graphql_request(
+        "/graphql",
+        r#"{ messages(first: 10) { edges { node { content } } } }"#,
+        None::<serde_json::Value>,
+    );
+
+    // Drive the GraphQL handler through serveSys
+    let reply = service::serveSys(request).expect("GraphQL reply");
+    let response: GraphqlResponse<MessagesData> = decode_graphql_reply(reply)?;
+
+    assert!(response.errors.is_none());
+    assert_eq!(response.data.messages.edges.len(), 1);
+    assert_eq!(response.data.messages.edges[0].node.content, "hello");
+    Ok(())
+}
+```
+
+You may factor helpers like `build_graphql_request` and `decode_graphql_reply` into a small internal testing module to keep individual tests focused on **what** they assert, not on HTTP/JSON boilerplate.
+
+---
+
 ## Skill: run-tests
 
 - **Single package:** From the package root (where `[package.metadata.psibase]` is), run `cargo psibase test`. This builds the service and tests and runs psitest.
