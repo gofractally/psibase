@@ -5,10 +5,11 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
+import { upsertUserToCache } from "@shared/hooks/use-contacts";
+import SharedQueryKey from "@shared/lib/query-keys";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { LocalContact, zLocalContact } from "../types";
-import { upsertUserToCache } from "./use-contacts";
 
 export const useCreateContact = () => {
     const queryClient = useQueryClient();
@@ -31,7 +32,7 @@ export const useCreateContact = () => {
             );
             upsertUserToCache(username, newContact);
             queryClient.invalidateQueries({
-                queryKey: QueryKey.contacts(username),
+                queryKey: SharedQueryKey.contacts(username),
             });
         },
         onError: (error, _, context) => {
