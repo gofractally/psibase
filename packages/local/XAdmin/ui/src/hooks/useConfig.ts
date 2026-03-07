@@ -23,10 +23,6 @@ const transformConfigServerToUI = (
             host,
             key: host + index.toString(),
         })),
-        services: serverConfig.services.map((service, index) => ({
-            ...service,
-            key: service.host + service.root + index.toString(),
-        })),
     };
 };
 
