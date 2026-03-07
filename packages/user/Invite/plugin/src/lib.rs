@@ -251,8 +251,10 @@ impl Inviter for InvitePlugin {
 impl HookActionsSender for InvitePlugin {
     fn on_actions_sender(service: String, method: String) -> Result<Option<String>, Error> {
         let create_account_method =
-            MethodNumber::from(Invite::action_structs::createAccount::ACTION_NAME).to_string();
-        if service == Invite::SERVICE.to_string() && method == create_account_method {
+            MethodNumber::from(Invite::action_structs::createAccount::ACTION_NAME);
+        if service == Invite::SERVICE.to_string()
+            && MethodNumber::from(method.as_str()) == create_account_method
+        {
             return Ok(Some(CREDENTIAL_SENDER.to_string()));
         } else {
             println!(
