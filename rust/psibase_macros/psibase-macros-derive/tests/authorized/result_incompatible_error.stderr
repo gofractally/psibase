@@ -1,0 +1,19 @@
+error[E0277]: `?` couldn't convert the error to `String`
+  --> tests/authorized/result_incompatible_error.rs:25:25
+   |
+25 |     #[authorized(Medium)]
+   |     --------------------^
+   |     |                   |
+   |     |                   the trait `From<i32>` is not implemented for `String`
+   |     this can't be annotated with `?` because it has type `Result<_, i32>`
+   |
+   = note: the question mark operation (`?`) implicitly performs a conversion on the error value using the `From` trait
+   = help: the following other types implement trait `From<T>`:
+             `String` implements `From<&String>`
+             `String` implements `From<&mut str>`
+             `String` implements `From<&str>`
+             `String` implements `From<Box<str>>`
+             `String` implements `From<Cow<'_, str>>`
+             `String` implements `From<char>`
+   = note: required for `Result<(), String>` to implement `FromResidual<Result<Infallible, i32>>`
+   = note: this error originates in the attribute macro `authorized` (in Nightly builds, run with -Z macro-backtrace for more info)
