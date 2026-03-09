@@ -36,8 +36,9 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-http"};
 
-      using Session =
-          psibase::SessionTables<PendingRequestTable, ResponseHandlerTable, RegServTable>;
+      using Subjective = psibase::SubjectiveTables<RegServTable>;
+
+      using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
 
       static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)
       {
@@ -145,7 +146,7 @@ namespace LocalService
                 method(serveSys, request, socket),
                 method(startSession))
 
-   PSIBASE_REFLECT_TABLES(XHttp, XHttp::Session)
+   PSIBASE_REFLECT_TABLES(XHttp, XHttp::Subjective, XHttp::Session)
 
    inline psibase::AccountNumber XHttp::getService(const psibase::HttpRequest& req)
    {
