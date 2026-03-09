@@ -1,4 +1,5 @@
 #include <psibase/NativeFunctions.hpp>
+#include <psibase/serviceState.hpp>
 
 #include <atomic>
 #include <boost/multi_index/key.hpp>
@@ -404,6 +405,12 @@ namespace psibase
          check((impl->code.flags & (isLocal | CodeRow::isReplacement)) != isLocal,
                "on-chain service cannot sudo when calling a node-local service");
       }
+
+      // Set host action context so native code (e.g. Db) and any code path
+      // that reads getSender()/getReceiver() sees the current action's sender
+      // and receiver. Critical for nested calls (e.g. http_server -> Db).
+      internal::sender   = actionContext.action.sender;
+      internal::receiver = actionContext.action.service;
 
       impl->exec(actionContext, [&] {  //
          (*impl->backend.backend)(impl->getAltStack(), *impl, "env", "called",

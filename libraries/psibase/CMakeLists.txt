@@ -204,6 +204,7 @@ function(add suffix)
             native/src/BucketSet.cpp
             native/src/ConfigFile.cpp
             native/src/ExecutionContext.cpp
+            native/src/serviceState.cpp
             native/src/ForkDb.cpp
             native/src/log.cpp
             native/src/Mount.cpp

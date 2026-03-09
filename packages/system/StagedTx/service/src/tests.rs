@@ -6,54 +6,6 @@ mod tests {
     use psibase::fracpack::Pack;
     use psibase::services::nft as Nft;
     use psibase::*;
-    use serde::Deserialize;
-    use serde_json::Value;
-    use Nft::Nft as NftRecord;
-
-    #[derive(Deserialize)]
-    struct Response {
-        data: Data,
-    }
-
-    #[derive(Deserialize)]
-    struct Data {
-        userNfts: UserNfts,
-    }
-
-    #[derive(Deserialize)]
-    struct UserNfts {
-        edges: Vec<Edge>,
-    }
-
-    #[derive(Deserialize)]
-    #[allow(dead_code)]
-    struct Edge {
-        node: NftRecord,
-    }
-
-    fn get_nr_nfts(chain: &Chain, user: AccountNumber) -> Result<usize, psibase::Error> {
-        let res: Value = chain.graphql(
-            Nft::SERVICE,
-            &format!(
-                r#"
-                query UserNfts {{
-                    userNfts(user: "{}") {{
-                        edges {{
-                            node {{
-                                id
-                                issuer
-                                owner
-                            }}
-                        }}
-                    }}
-                }}"#,
-                user
-            ),
-        )?;
-
-        let response_root: Response = serde_json::from_value(res)?;
-        Ok(response_root.data.userNfts.edges.len())
-    }
 
     #[psibase::test_case(packages("StagedTx", "Nft", "AuthSig"))]
     fn test_propose(chain: psibase::Chain) -> Result<(), psibase::Error> {
@@ -65,7 +17,10 @@ mod tests {
         let bob = AccountNumber::from("bob");
         chain.new_account(bob).unwrap();
 
-        assert_eq!(get_nr_nfts(&chain, bob)?, 0);
+        // Find next free NFT id (boot or other packages may already use 1)
+        let next_id = (1..)
+            .find(|&id| !Nft::Wrapper::push(&chain).exists(id).get().unwrap())
+            .unwrap();
 
         Wrapper::push_from(&chain, alice)
             .propose(
@@ -79,7 +34,11 @@ mod tests {
             )
             .get()?;
 
-        assert_eq!(get_nr_nfts(&chain, bob)?, 1);
+        chain.finish_block();
+
+        // After execution, bob owns the minted NFT
+        let nft = Nft::Wrapper::push(&chain).getNft(next_id).get()?;
+        assert_eq!(nft.owner, bob);
 
         Ok(())
     }

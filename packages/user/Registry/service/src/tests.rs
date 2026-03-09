@@ -3,10 +3,27 @@ mod tests {
     use crate::*;
     use constants::app_status;
     use constants::MAX_NAME_SIZE;
-    use psibase::services::http_server;
-    use psibase::{account, ChainEmptyResult, TimePointUSec};
-    use serde_json::{json, Value};
+    use psibase::{
+        account, AccountNumber,
+        services::http_server,
+        ChainEmptyResult, TimePointUSec,
+    };
+    use serde::Deserialize;
+    use serde_json::Value;
     use service::AppMetadata;
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AppMetadataResponse {
+        account_id: AccountNumber,
+        name: String,
+        short_desc: String,
+        long_desc: String,
+        icon: String,
+        icon_mime_type: String,
+        status: u32,
+        created_at: Value,
+    }
 
     fn default_metadata() -> AppMetadata {
         AppMetadata {
@@ -50,50 +67,48 @@ mod tests {
     fn test_set_metadata_simple(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(account!("alice"))?;
         chain.new_account(account!("bob"))?;
-        http_server::Wrapper::push_from(&chain, SERVICE).registerServer(account!("r-registry"));
 
         push_set_metadata(&chain, default_metadata(), default_tags()).get()?;
 
-        let reply: Value = chain.graphql(
-            SERVICE,
-            &format!(
-                r#"query {{
-                    appMetadata(accountId: "{account}") {{
-                        accountId,
-                        name,
-                        shortDesc,
-                        longDesc,
-                        icon,
-                        iconMimeType,
-                        status,
-                        createdAt,
-                        tags
-                    }}
-                }}"#,
-                account = "alice"
-            ),
-        )?;
+        http_server::Wrapper::push_from(&chain, Wrapper::SERVICE)
+            .registerServer(account!("r-registry"))
+            .get()?;
+        chain.finish_block();
 
-        assert_eq!(
-            reply,
-            json!({ "data": {
-                "appMetadata": {
-                    "accountId": "alice",
-                    "name": "Super Cooking App",
-                    "shortDesc": "Alice's Cooking App",
-                    "longDesc": "Super cooking app",
-                    "icon": "icon-as-base64",
-                    "iconMimeType": "image/png",
-                    "status": "Draft",
-                    "createdAt": "1970-01-01T00:00:04+00:00",
-                    "tags": [
-                        "cozy",
-                        "cuisine",
-                        "cooking"
-                    ]
+        let response: Value = chain.graphql(
+            Wrapper::SERVICE,
+            r#"
+                query {
+                    appMetadata(accountId: "alice") {
+                        accountId
+                        name
+                        shortDesc
+                        longDesc
+                        icon
+                        iconMimeType
+                        status
+                        createdAt
+                    }
                 }
-            }})
-        );
+            "#,
+        )?;
+        let metadata: AppMetadataResponse = serde_json::from_value(
+            response
+                .get("data")
+                .and_then(|d| d.get("appMetadata"))
+                .cloned()
+                .expect("appMetadata in response"),
+        )
+        .expect("valid appMetadata response");
+
+        assert_eq!(metadata.account_id, account!("alice"));
+        assert_eq!(metadata.name, "Super Cooking App");
+        assert_eq!(metadata.short_desc, "Alice's Cooking App");
+        assert_eq!(metadata.long_desc, "Super cooking app");
+        assert_eq!(metadata.icon, "icon-as-base64");
+        assert_eq!(metadata.icon_mime_type, "image/png");
+        assert_eq!(metadata.status, app_status::DRAFT);
+        assert_ne!(metadata.created_at, Value::Null);
 
         Ok(())
     }

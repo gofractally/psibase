@@ -229,6 +229,7 @@ mod tests {
                 fee_receiver: tokens,
             },
         )?;
+        chain.finish_block();
 
         let config = get_billing_config(&chain)?;
         assert!(config.feeReceiver == tokens.to_string());
@@ -260,6 +261,7 @@ mod tests {
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .buy_res(min_resource_buffer.into())
             .get()?;
+        chain.finish_block();
         assert_eq!(
             get_user_resources(&chain, PRODUCER_ACCOUNT, &token_prod)?
                 .balance
@@ -300,6 +302,7 @@ mod tests {
         Wrapper::push_from(&chain, PRODUCER_ACCOUNT)
             .buy_res_for(min_resource_buffer.into(), alice, Some("".into()))
             .get()?;
+        chain.finish_block();
         assert_eq!(
             get_user_resources(&chain, alice, &token_a)?
                 .balance
@@ -349,6 +352,7 @@ mod tests {
                 fee_receiver: tokens,
             },
         )?;
+        chain.finish_block();
 
         // Alice give prod some tokens
         tokens::Wrapper::push_from(&chain, alice)
@@ -373,6 +377,7 @@ mod tests {
             enable_billing::ACTION_NAME.into(),
             enable_billing { enabled: true },
         )?;
+        chain.finish_block();
 
         Ok(())
     }
