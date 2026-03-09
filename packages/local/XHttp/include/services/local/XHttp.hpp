@@ -9,6 +9,8 @@ namespace LocalService
 {
    using SystemService::PendingRequestRow;
    using SystemService::PendingRequestTable;
+   using SystemService::RegisteredServiceRow;
+   using SystemService::RegServTable;
 
    enum class SocketType : std::uint8_t
    {
@@ -33,7 +35,8 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-http"};
 
-      using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
+      using Session =
+          psibase::SessionTables<PendingRequestTable, ResponseHandlerTable, RegServTable>;
 
       static psibase::AccountNumber getService(std::string_view host, std::string_view rootHost)
       {
@@ -111,6 +114,10 @@ namespace LocalService
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
 
+      /// handles requests to the x-http subdomain
+      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
+          -> std::optional<psibase::HttpReply>;
+
       /// Called by the host at the beginning of a session
       void startSession();
    };
@@ -125,6 +132,7 @@ namespace LocalService
                 method(asyncClose, socket),
                 method(log, severity, msg),
                 method(rootHost, host),
+                method(serveSys, request, socket),
                 method(startSession))
 
    PSIBASE_REFLECT_TABLES(XHttp, XHttp::Session)

@@ -994,6 +994,7 @@ psibase_package(
     SERVICE x-http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XHttp-schema.json
+        SERVER x-http
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1006,6 +1007,7 @@ psibase_package(
     SERVICE x-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPackages-schema.json
+        SERVER x-packages
         FLAGS isPrivileged
     DEPENDS wasm
 )

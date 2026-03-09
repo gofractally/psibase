@@ -488,6 +488,35 @@ void XHttp::startSession()
    recurse().to<XAdmin>().startSession();
 }
 
+auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
+    -> std::optional<HttpReply>
+{
+   check(getSender() == XHttp::service, "Wrong sender");
+
+   if (auto reply = to<XAdmin>().checkAuth(req, socket))
+      return reply;
+
+   if (req.method == "OPTIONS")
+      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+
+   auto target = req.path();
+   if (target == "/register_server")
+   {
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+
+      auto body = psio::convert_from_json<RegisteredServiceRow>(
+          std::string(req.body.begin(), req.body.end()));
+      PSIBASE_SUBJECTIVE_TX
+      {
+         open<RegServTable>().put(body);
+      }
+      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+   }
+
+   return {};
+}
+
 #ifndef PSIBASE_GENERATE_SCHEMA
 
 extern "C" [[clang::export_name("serve")]] void serve()
@@ -509,48 +538,59 @@ extern "C" [[clang::export_name("serve")]] void serve()
 
    if (auto service = XHttp::getService(req.host(), rootHost); service != AccountNumber{})
    {
-      // Handle local service subdomains
-      auto                   codeTable = Native::subjective(KvMode::read).open<CodeTable>();
-      std::optional<CodeRow> row;
+      auto codeTable   = Native::subjective(KvMode::read).open<CodeTable>();
+      auto serverTable = XHttp{}.open<RegServTable>();
+      auto code        = std::optional<CodeRow>{};
+      auto server      = std::optional<RegisteredServiceRow>{};
       PSIBASE_SUBJECTIVE_TX
       {
-         row = codeTable.get(service);
+         server = serverTable.get(service);
+         code   = codeTable.get(service);
       }
-      if (row && !(row->flags & CodeRow::isReplacement))
+      // Required for bootstrapping
+      if (!server && service == XHttp::service)
+         server = {service, service};
+
+      std::optional<HttpReply> reply;
+      owned.put({.socket = sock, .owner = service});
+
+      // Handle registered servers
+      if (server)
       {
-         owned.put({.socket = sock, .owner = service});
-         auto reply = psibase::Actor<ServerInterface>(XHttp::service, service)
-                          .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
-
-         if (!reply && owned.get(sock))
+         reply = psibase::Actor<ServerInterface>(XHttp::service, server->service)
+                     .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
+         if (!owned.get(sock))
+            return;
+      }
+      // Local services try x-sites
+      if (!reply && code && !(code->flags & CodeRow::isReplacement))
+      {
+         if (service == XAdmin::service && std::string_view{req.target()}.starts_with("/native/"))
          {
-            if (service == XAdmin::service &&
-                std::string_view{req.target()}.starts_with("/native/"))
-            {
+            return;
+         }
+         PSIBASE_SUBJECTIVE_TX
+         {
+            code = codeTable.get(XSites::service);
+         }
+         if (code)
+         {
+            reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
+                        .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
+
+            if (!owned.get(sock))
                return;
-            }
-            PSIBASE_SUBJECTIVE_TX
-            {
-               row = codeTable.get(XSites::service);
-            }
-            if (row)
-            {
-               reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
-                           .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
-            }
          }
 
-         if (owned.get(sock))
+         if (!reply)
          {
-            if (reply)
-            {
-               psibase::socketSend(sock, psio::to_frac(std::move(*reply)));
-            }
-            else
-            {
-               sendNotFound(sock, req);
-            }
+            sendNotFound(sock, req);
+            return;
          }
+      }
+      if (reply)
+      {
+         psibase::socketSend(sock, psio::to_frac(std::move(*reply)));
          return;
       }
    }
