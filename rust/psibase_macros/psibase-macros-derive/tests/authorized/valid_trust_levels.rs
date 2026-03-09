@@ -2,26 +2,9 @@ use psibase_macros_derive::authorized;
 
 #[path = "types_mock.rs"]
 mod psibase_plugin;
+use psibase_plugin::PluginAuthorized;
 
-struct MyPlugin;
-
-impl psibase_plugin::trust::TrustConfig for MyPlugin {
-    fn assert_authorized(
-        _level: psibase_plugin::trust::TrustLevel,
-        _fn_name: &str,
-    ) -> Result<(), String> {
-        Ok(())
-    }
-    fn assert_authorized_with_whitelist(
-        _level: psibase_plugin::trust::TrustLevel,
-        _fn_name: &str,
-        _whitelist: &[&str],
-    ) -> Result<(), String> {
-        Ok(())
-    }
-}
-
-impl MyPlugin {
+impl PluginAuthorized {
     #[authorized(None)]
     fn trust_none() -> Result<(), String> {
         Ok(())
@@ -49,9 +32,9 @@ impl MyPlugin {
 }
 
 fn main() {
-    let _ = MyPlugin::trust_none();
-    let _ = MyPlugin::trust_low();
-    let _ = MyPlugin::trust_medium();
-    let _ = MyPlugin::trust_high();
-    let _ = MyPlugin::trust_max();
+    assert!(PluginAuthorized::trust_none().is_ok());
+    assert!(PluginAuthorized::trust_low().is_ok());
+    assert!(PluginAuthorized::trust_medium().is_ok());
+    assert!(PluginAuthorized::trust_high().is_ok());
+    assert!(PluginAuthorized::trust_max().is_ok());
 }

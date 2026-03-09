@@ -2,26 +2,23 @@ use psibase_macros_derive::authorized;
 
 #[path = "types_mock.rs"]
 mod psibase_plugin;
+use psibase_plugin::{PluginAuthorized, PluginInvalid, PluginNotAuthorized};
 
-struct MyPlugin;
-
-impl psibase_plugin::trust::TrustConfig for MyPlugin {
-    fn assert_authorized(
-        _level: psibase_plugin::trust::TrustLevel,
-        _fn_name: &str,
-    ) -> Result<(), String> {
-        Ok(())
-    }
-    fn assert_authorized_with_whitelist(
-        _level: psibase_plugin::trust::TrustLevel,
-        _fn_name: &str,
-        _whitelist: &[&str],
-    ) -> Result<(), String> {
-        Ok(())
+impl PluginAuthorized {
+    #[authorized(High)]
+    fn returns_nothing() {
+        let _x = 1 + 1;
     }
 }
 
-impl MyPlugin {
+impl PluginNotAuthorized {
+    #[authorized(High)]
+    fn returns_nothing() {
+        let _x = 1 + 1;
+    }
+}
+
+impl PluginInvalid {
     #[authorized(High)]
     fn returns_nothing() {
         let _x = 1 + 1;
@@ -29,5 +26,10 @@ impl MyPlugin {
 }
 
 fn main() {
-    MyPlugin::returns_nothing();
+    PluginAuthorized::returns_nothing();
+
+    let _ = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    assert!(std::panic::catch_unwind(|| PluginNotAuthorized::returns_nothing()).is_err());
+    assert!(std::panic::catch_unwind(|| PluginInvalid::returns_nothing()).is_err());
 }

@@ -47,21 +47,30 @@ pub fn authorized_attr_impl(attr: TokenStream, item: TokenStream) -> TokenStream
         quote! { .unwrap() }
     };
 
-    let auth_check = if let Some(whitelist_expr) = whitelist_tokens {
+    let auth_call = if let Some(whitelist_expr) = whitelist_tokens {
         quote! {
-            <Self as psibase_plugin::trust::TrustConfig>::assert_authorized_with_whitelist(
+            <Self as psibase_plugin::trust::TrustConfig>::authorized_with_whitelist(
                 psibase_plugin::trust::TrustLevel::#trust_level,
                 #fn_name_lit,
                 #whitelist_expr,
-            )#report;
+            )
         }
     } else {
         quote! {
-            <Self as psibase_plugin::trust::TrustConfig>::assert_authorized(
+            <Self as psibase_plugin::trust::TrustConfig>::authorized(
                 psibase_plugin::trust::TrustLevel::#trust_level,
                 #fn_name_lit,
-            )#report;
+            )
         }
+    };
+
+    let auth_check = quote! {
+        let __auth_result: Result<(), _> = match #auth_call {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(psibase_plugin::trust::unauthorized_error(#fn_name_lit)),
+            Err(e) => Err(e),
+        };
+        (__auth_result)#report;
     };
 
     let original_body = &function.block;
