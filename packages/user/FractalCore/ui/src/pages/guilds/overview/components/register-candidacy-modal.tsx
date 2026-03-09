@@ -40,7 +40,7 @@ export const RegisterCandidacyModal = ({
     });
 
     const userWaitSeconds = membership
-        ? Math.abs(dayjs(membership.candidacyEligibleFrom).unix() - now)
+        ? dayjs(membership.candidacyEligibleFrom).unix() - now
         : 0;
 
     return (
