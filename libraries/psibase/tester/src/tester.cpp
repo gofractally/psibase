@@ -143,18 +143,6 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
 
 namespace
 {
-   psibase::HttpRequest registerServer(LocalService::RegisteredServiceRow server)
-   {
-      std::string          rootHost("", 1);
-      psibase::HttpRequest req{.host        = LocalService::XHttp::service.str() + "." + rootHost,
-                               .method      = "POST",
-                               .target      = "/register_server",
-                               .contentType = "application/json"};
-      psio::vector_stream  stream{req.body};
-      to_json(server, stream);
-      return req;
-   }
-
    void loadLocalServices(psibase::TestChain& self)
    {
       using namespace psibase;
@@ -168,9 +156,9 @@ namespace
       DirectoryRegistry        registry{packagesDir};
       std::vector<std::string> packageNames{"XDefault"};
       auto                     packages = registry.resolve(packageNames);
-
-      auto requests = std::vector<HttpRequest>();
-      auto servers  = std::vector<RegisteredServiceRow>();
+      std::vector<HttpRequest> requests;
+      std::vector<HttpRequest> early_requests;
+      const std::string        rootHost("", 1);
       tester::raw::checkoutSubjective(self.nativeHandle());
       for (const auto& info : packages)
       {
@@ -197,15 +185,18 @@ namespace
 
             if (serviceInfo.server)
             {
-               auto server = LocalService::RegisteredServiceRow{account, *serviceInfo.server};
+               psibase::HttpRequest req{.host = LocalService::XHttp::service.str() + "." + rootHost,
+                                        .method      = "POST",
+                                        .target      = "/register_server",
+                                        .contentType = "application/json"};
+               psio::vector_stream  stream{req.body};
+               to_json(LocalService::RegisteredServiceRow{account, *serviceInfo.server}, stream);
                if (account == XPackages::service)
-                  servers.push_back(server);
+                  early_requests.push_back(std::move(req));
                else
-                  requests.push_back(registerServer(server));
+                  requests.push_back(std::move(req));
             }
          }
-
-         std::string rootHost("", 1);
 
          for (const auto& [account, header] : package.data)
          {
@@ -241,18 +232,11 @@ namespace
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");
 
-      // Set up HTTP servers that we use directly, first
+      auto checkReply = [](const auto& request, const auto& reply)
       {
-         auto serverReqs = servers | std::views::transform(registerServer);
-         requests.insert(requests.begin(), serverReqs.begin(), serverReqs.end());
-      }
-
-      for (const auto& request : requests)
-      {
-         auto reply = self.http(request);
          if (reply.status != HttpStatus::ok)
          {
-            auto message = std::format("PUT {} returned {}", request.target,
+            auto message = std::format("{} {} returned {}", request.method, request.target,
                                        static_cast<std::uint16_t>(reply.status));
             if (reply.contentType.starts_with("text/"))
             {
@@ -261,6 +245,15 @@ namespace
             }
             abortMessage(message);
          }
+      };
+
+      for (const auto& request : early_requests)
+      {
+         checkReply(request, self.http(request));
+      }
+      for (const auto& request : requests)
+      {
+         checkReply(request, self.http(request));
       }
    }
 
