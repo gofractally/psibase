@@ -61,15 +61,17 @@
 //!
 //! If your function returns a `Result`, the `authorized` macro will attempt to use the `?` operator to
 //! propagate authorization errors. If your function returns a value other than `Result`, the `authorized`
-//! macro will `.unwrap()` the authorization error, leading to a panic.
+//! macro will `.unwrap()` any authorization errors, leading to a panic.
 //!
-//! If you use a `Result` type, your error type must be `psibase_plugin::Error` or implement
+//! If you use a `Result` type, your inner error type must be `psibase_plugin::Error` or implement
 //! `From<psibase_plugin::Error>`.
 
-use crate::types::Error;
+use crate::types::{Error, PluginId};
 use crate::wasm::host;
 use crate::wasm::permissions;
 pub use crate::wasm::permissions::types::TrustLevel;
+
+const UNAUTHORIZED_CODE: u32 = 900;
 
 pub struct Capabilities {
     pub low: &'static [&'static str],
@@ -95,25 +97,36 @@ impl Capabilities {
     }
 }
 
+pub fn unauthorized_error(fn_name: &str) -> Error {
+    Error {
+        code: UNAUTHORIZED_CODE,
+        producer: PluginId {
+            service: host::client::get_receiver(),
+            plugin: "plugin".to_string(),
+        },
+        message: format!("Unauthorized call to: {fn_name}"),
+    }
+}
+
 pub trait TrustConfig {
     fn capabilities() -> Capabilities;
 
-    fn assert_authorized(level: TrustLevel, fn_name: &str) -> Result<(), Error>
+    fn authorized(level: TrustLevel, fn_name: &str) -> Result<bool, Error>
     where
         Self: Sized,
     {
-        Self::assert_authorized_with_whitelist(level, fn_name, &[])
+        Self::authorized_with_whitelist(level, fn_name, &[])
     }
 
-    fn assert_authorized_with_whitelist(
+    fn authorized_with_whitelist(
         level: TrustLevel,
         fn_name: &str,
         whitelist: &[&str],
-    ) -> Result<(), Error>
+    ) -> Result<bool, Error>
     where
         Self: Sized,
     {
-        assert_authorized_with_whitelist::<Self>(level, fn_name, whitelist)
+        authorized_with_whitelist::<Self>(level, fn_name, whitelist)
     }
 
     fn get_descriptions() -> (String, String, String) {
@@ -121,26 +134,22 @@ pub trait TrustConfig {
     }
 }
 
-pub fn assert_authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Result<(), Error> {
-    assert_authorized_with_whitelist::<T>(level, fn_name, &[])
+pub fn authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
+    authorized_with_whitelist::<T>(level, fn_name, &[])
 }
 
-pub fn assert_authorized_with_whitelist<T: TrustConfig>(
+pub fn authorized_with_whitelist<T: TrustConfig>(
     level: TrustLevel,
     fn_name: &str,
     whitelist: &[&str],
-) -> Result<(), Error> {
+) -> Result<bool, Error> {
     let whitelist: Vec<String> = whitelist.iter().map(|s| s.to_string()).collect();
     let descriptions = T::get_descriptions();
-    let authorized = permissions::api::is_authorized(
+    Ok(permissions::api::is_authorized(
         &host::client::get_sender(),
         level,
         &descriptions,
         fn_name,
         &whitelist,
-    )?;
-    if !authorized {
-        panic!("Unauthorized call to: {fn_name}");
-    }
-    Ok(())
+    )?)
 }

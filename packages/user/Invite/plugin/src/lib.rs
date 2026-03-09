@@ -94,12 +94,15 @@ impl Invitee for InvitePlugin {
     /// If there is an active invite, reject it
     fn reject_active_invite() {
         let app = host::client::get_active_app();
-        trust::assert_authorized_with_whitelist::<Self>(
+        let auth = trust::authorized_with_whitelist::<Self>(
             TrustLevel::Low,
             "reject_active_invite",
             &[app.as_str()],
         )
         .unwrap();
+        if !auth {
+            panic!("{}", trust::unauthorized_error("reject_active_invite"));
+        }
 
         InviteTokensTable::reject_active();
     }
