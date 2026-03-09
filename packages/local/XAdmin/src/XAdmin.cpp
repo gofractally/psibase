@@ -602,26 +602,6 @@ namespace LocalService
          {
             adminOpts.peers = parseOptionList(*peers, std::vector<std::string>());
          }
-         if (!isBooted && adminOpts.peers.empty())
-         {
-            std::string message = "Node is not connected to any psibase network.";
-            if (!adminOpts.hosts.empty())
-            {
-               std::string xAdminSubdomain = XAdmin::service.str() + "." + adminOpts.hosts.front();
-               if (auto* listen = json.hostOption("listen"))
-               {
-                  if (auto url = guessUrl(*listen, std::move(xAdminSubdomain)))
-                  {
-                     message += " Visit '" + *url + "' for node setup.";
-                  }
-               }
-            }
-            setupMessage = std::move(message);
-         }
-         else
-         {
-            setupMessage.reset();
-         }
          if (auto* config = json.serviceConfig())
          {
             for (const auto& entry : *config)
@@ -663,6 +643,26 @@ namespace LocalService
                adminOpts.hosts = std::move(cli.hosts);
             if (!cli.peers.empty())
                adminOpts.peers = std::move(cli.peers);
+         }
+         if (!isBooted && adminOpts.peers.empty())
+         {
+            std::string message = "Node is not connected to any psibase network.";
+            if (!adminOpts.hosts.empty())
+            {
+               std::string xAdminSubdomain = XAdmin::service.str() + "." + adminOpts.hosts.front();
+               if (auto* listen = json.hostOption("listen"))
+               {
+                  if (auto url = guessUrl(*listen, std::move(xAdminSubdomain)))
+                  {
+                     message += " Visit '" + *url + "' for node setup.";
+                  }
+               }
+            }
+            setupMessage = std::move(message);
+         }
+         else
+         {
+            setupMessage.reset();
          }
          open<AdminOptionsTable>().put(adminOpts);
       }
