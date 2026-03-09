@@ -313,6 +313,19 @@ namespace psibase
       return {};
    }
 
+   std::vector<HttpHeader> allowCors(const HttpRequest&                req,
+                                     const std::vector<AccountNumber>& accounts,
+                                     bool                              hostIsSubdomain)
+   {
+      for (auto account : accounts)
+      {
+         auto headers = allowCors(req, account, hostIsSubdomain);
+         if (!headers.empty())
+            return headers;
+      }
+      return {};
+   }
+
    std::vector<HttpHeader> allowCorsSubdomains(const HttpRequest& req, bool hostIsSubdomain)
    {
       if (auto origin = req.getHeader("origin");

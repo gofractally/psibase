@@ -2368,6 +2368,18 @@ namespace psibase::loggers
          };
       };
 
+      template <>
+      auto make_simple_filter_factory<AccountNumber>()
+      {
+         return [](boost::log::attribute_name name, std::string_view op, std::string_view value)
+         {
+            AccountNumber account{value};
+            check(account != AccountNumber{}, "Invalid account");
+            return make_filter_impl(name, op, account, "=", std::equal_to<>(),
+                                    "!=", std::not_equal_to<>());
+         };
+      };
+
       auto make_alias_filter_factory(boost::log::attribute_name name)
       {
          return [name](boost::log::attribute_name /*name*/, std::string_view& trailing)
@@ -2537,6 +2549,25 @@ namespace psibase::loggers
          };
       }
 
+      template <>
+      auto make_simple_formatter_factory<AccountNumber>()
+      {
+         return [](boost::log::attribute_name name, std::string_view spec)
+         {
+            if (!spec.empty())
+            {
+               throw std::runtime_error("Unexpected format spec for " + name.string());
+            }
+            return [name](auto& rec, auto& stream)
+            {
+               if (auto attr = boost::log::extract<AccountNumber>(name, rec))
+               {
+                  stream << attr->str();
+               }
+            };
+         };
+      }
+
       // name must refer to a string with static storage duration
       template <typename T>
       void add_attribute(std::string_view name)
@@ -2562,6 +2593,21 @@ namespace psibase::loggers
          formatter_parser::global_formatters.try_emplace(name, boost::log::attribute_name(),
                                                          std::forward<F>(f));
       }
+
+      auto make_message_formatter = [](boost::log::attribute_name name, std::string_view spec)
+      {
+         if (!spec.empty())
+         {
+            throw std::runtime_error("std::format not supported yet");
+         }
+         return [name](auto& rec, auto& stream)
+         {
+            if (auto attr = boost::log::extract<std::string>(name, rec))
+            {
+               stream << sanitize(*attr);
+            }
+         };
+      };
 
       auto make_escape_formatter = [](auto name, std::string_view spec)
       {
@@ -2701,6 +2747,11 @@ namespace psibase::loggers
          core->add_global_attribute("Process", boost::log::attributes::current_process_name());
          core->add_global_attribute("ProcessId", boost::log::attributes::current_process_id());
 
+         filter_parser::global_filters.try_emplace("Message",
+                                                   make_simple_filter_factory<std::string>());
+         formatter_parser::global_formatters.try_emplace(
+             "Message", boost::log::attribute_name{"Message"}, make_message_formatter);
+
          add_attribute<std::string>("Message");
          add_attribute<level>("Severity");
          add_attribute<std::chrono::system_clock::time_point>("TimeStamp");
@@ -2709,6 +2760,7 @@ namespace psibase::loggers
          add_attribute<Checksum256>("TransactionId");
          add_attribute<std::string>("Process");
          add_attribute<std::string>("Channel");
+         add_attribute<AccountNumber>("Service");
          add_attribute<std::string>("Host");
          add_attribute<int>("PeerId");
          add_attribute<boost::log::process_id>("ProcessId");
@@ -3192,6 +3244,18 @@ namespace psibase::loggers
          boost::log::core::get()->add_sink(impl->sink);
          impl->registered = true;
       }
+   }
+
+   std::string sanitize(std::string message)
+   {
+      for (char& ch : message)
+      {
+         if (static_cast<unsigned char>(ch) < 32 && ch != '\t' || ch == 127)
+         {
+            ch = ' ';
+         }
+      }
+      return message;
    }
 
 }  // namespace psibase::loggers
