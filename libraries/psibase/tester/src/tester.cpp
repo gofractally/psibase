@@ -185,12 +185,12 @@ namespace
 
             if (serviceInfo.server)
             {
-               psibase::HttpRequest req{.host = LocalService::XHttp::service.str() + "." + rootHost,
-                                        .method      = "POST",
-                                        .target      = "/register_server",
-                                        .contentType = "application/json"};
-               psio::vector_stream  stream{req.body};
-               to_json(LocalService::RegisteredServiceRow{account, *serviceInfo.server}, stream);
+               HttpRequest         req{.host        = XHttp::service.str() + "." + rootHost,
+                                       .method      = "POST",
+                                       .target      = "/register_server",
+                                       .contentType = "application/json"};
+               psio::vector_stream stream{req.body};
+               to_json(RegisteredServiceRow{account, *serviceInfo.server}, stream);
                if (account == XPackages::service)
                   early_requests.push_back(std::move(req));
                else
