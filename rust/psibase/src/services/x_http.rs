@@ -105,6 +105,11 @@ mod service {
         unimplemented!()
     }
 
+    #[action]
+    fn serveSys(req: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
+        unimplemented!()
+    }
+
     /// Called by the host at the beginning of a session
     #[action]
     fn startSession() {
