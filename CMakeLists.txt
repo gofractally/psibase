@@ -1020,6 +1020,7 @@ psibase_package(
     SERVICE x-peers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPeers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPeers-schema.json
+        SERVER x-peers
         FLAGS isPrivileged
     DEPENDS wasm
 )
