@@ -1,4 +1,4 @@
-import { Loader2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { useJoinFractal } from "@/hooks/fractals/use-join-fractal";
 
@@ -6,6 +6,7 @@ import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent } from "@shared/shadcn/ui/card";
+import { Spinner } from "@shared/shadcn/ui/spinner";
 
 export const JoinFractalCard = ({
     fractalAccount,
@@ -41,7 +42,7 @@ export const JoinFractalCard = ({
                         disabled={!fractalAccount || isPending}
                         className="w-full sm:w-auto"
                     >
-                        {isPending && <Loader2 className="animate-spin" />}
+                        {isPending && <Spinner data-icon="inline-start" />}
                         Apply
                     </Button>
                 </div>
