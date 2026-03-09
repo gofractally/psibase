@@ -363,6 +363,18 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file3.txt', 'x-foo'), 'added')
 
     @testutil.psinode_test
+    def test_local_install_with_server(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.run_psibase(['install', '--local'] + a.node_args() + ['XWithServer', '--package-source', testutil.test_packages()])
+        # Should use the registered server, not the service
+        with a.get('/id', service='x-server') as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), "x-r-server")
+        # If no server is registered, requests should return 404
+        with a.get('/id', service='x-r-server') as reply:
+            self.assertEqual(reply.status_code, 404)
+
+    @testutil.psinode_test
     def test_configure_sources(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
