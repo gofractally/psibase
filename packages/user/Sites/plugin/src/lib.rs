@@ -62,7 +62,7 @@ impl Sites for SitesPlugin {
     fn upload(file: File, compression_quality: u8) -> Result<(), Error> {
         assert_authorized_with_whitelist(
             FunctionName::upload,
-            vec!["workshop".into(), "branding".into()],
+            vec!["workshop".into(), "profiles".into()],
         )?;
 
         validate_compression_quality(compression_quality)?;
