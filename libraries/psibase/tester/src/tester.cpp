@@ -143,10 +143,22 @@ void psibase::expect(TransactionTrace t, const std::string& expected, bool alway
 
 namespace
 {
+   psibase::HttpRequest registerServer(LocalService::RegisteredServiceRow server)
+   {
+      std::string          rootHost("", 1);
+      psibase::HttpRequest req{.host        = LocalService::XHttp::service.str() + "." + rootHost,
+                               .method      = "POST",
+                               .target      = "/register_server",
+                               .contentType = "application/json"};
+      psio::vector_stream  stream{req.body};
+      to_json(server, stream);
+      return req;
+   }
+
    void loadLocalServices(psibase::TestChain& self)
    {
       using namespace psibase;
-      using LocalService::XPackages;
+      using namespace LocalService;
       auto prefix = psio::convert_to_key(codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
@@ -156,7 +168,9 @@ namespace
       DirectoryRegistry        registry{packagesDir};
       std::vector<std::string> packageNames{"XDefault"};
       auto                     packages = registry.resolve(packageNames);
-      std::vector<HttpRequest> requests;
+
+      auto requests = std::vector<HttpRequest>();
+      auto servers  = std::vector<RegisteredServiceRow>();
       tester::raw::checkoutSubjective(self.nativeHandle());
       for (const auto& info : packages)
       {
@@ -180,6 +194,15 @@ namespace
                 .code     = std::move(code),
             };
             self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+
+            if (serviceInfo.server)
+            {
+               auto server = LocalService::RegisteredServiceRow{account, *serviceInfo.server};
+               if (account == XPackages::service)
+                  servers.push_back(server);
+               else
+                  requests.push_back(registerServer(server));
+            }
          }
 
          std::string rootHost("", 1);
@@ -217,6 +240,12 @@ namespace
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");
+
+      // Set up HTTP servers that we use directly, first
+      {
+         auto serverReqs = servers | std::views::transform(registerServer);
+         requests.insert(requests.begin(), serverReqs.begin(), serverReqs.end());
+      }
 
       for (const auto& request : requests)
       {
