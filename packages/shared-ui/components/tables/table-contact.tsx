@@ -8,12 +8,14 @@ export const TableContact = ({ account }: { account: string }) => {
         data: currentUser,
         isPending: isPendingCurrentUser,
         isError: isErrorCurrentUser,
+        error: errorCurrentUser,
     } = useCurrentUser();
 
     const {
         data: contacts,
         isPending: isPendingContacts,
         isError: isErrorContacts,
+        error: errorContacts,
     } = useContacts(currentUser);
 
     if (isPendingCurrentUser || isPendingContacts) {
@@ -26,6 +28,8 @@ export const TableContact = ({ account }: { account: string }) => {
     }
 
     if (isErrorCurrentUser || isErrorContacts) {
+        console.error(errorCurrentUser);
+        console.error(errorContacts);
         return <div>{account}</div>;
     }
 
