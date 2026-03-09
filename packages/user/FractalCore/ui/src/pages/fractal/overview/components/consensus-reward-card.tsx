@@ -68,9 +68,7 @@ export const ConsensusRewardCard = () => {
                                     Claim now
                                 </Button>
                             ) : (
-                                `${nextClaimTime.format(
-                                    "MMMM D, YYYY [at] h:mm A z",
-                                )} (${humanize(nextClaimTime.diff(dayjs()))})`
+                                `${nextClaimTime.format("llll")} (${humanize(nextClaimTime.diff(dayjs()))})`
                             )}
                         </span>
                     </div>
