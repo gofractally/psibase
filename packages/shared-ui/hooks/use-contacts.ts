@@ -5,7 +5,7 @@ import { z } from "zod";
 import { supervisor } from "../lib/supervisor";
 import { queryClient } from "../lib/queryClient";
 import QueryKey from "../lib/query-keys";
-import { zAccount } from "../lib/schemas/account";
+import { zAccount, type Account } from "../lib/schemas/account";
 
 export const zLocalContact = z.object({
     account: zAccount,
@@ -22,7 +22,7 @@ export type LocalContact = z.infer<typeof zLocalContact>;
 export type ProcessedContact = z.infer<typeof zProcessedContact>;
 
 export const queryContacts = (
-    username: z.infer<typeof zAccount> | null | undefined,
+    username: Account | null | undefined,
 ) =>
     queryOptions({
         queryKey: QueryKey.contacts(username),
@@ -38,7 +38,7 @@ export const queryContacts = (
     });
 
 export const useContacts = (
-    username?: z.infer<typeof zAccount> | null | undefined,
+    username?: Account | null | undefined,
     options?: QueryOptions<
         LocalContact[],
         Error,
@@ -51,7 +51,7 @@ export const useContacts = (
 };
 
 export const upsertUserToCache = (
-    username: z.infer<typeof zAccount>,
+    username: Account,
     contact: LocalContact,
 ) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
@@ -72,8 +72,8 @@ export const upsertUserToCache = (
 };
 
 export const removeUserFromCache = (
-    username: z.infer<typeof zAccount>,
-    account: z.infer<typeof zAccount>,
+    username: Account,
+    account: Account,
 ) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
         if (data) {
