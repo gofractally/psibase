@@ -137,9 +137,7 @@ class AdminGuild extends PluginInterface {
     get removeGuildRep() {
         return this._call<[guildAccount: Account]>("removeGuildRep");
     }
-    get conMembershipApp() {
-        return this._call<[guildAccount: Account, member: Account, accepted: boolean]>("conMembershipApp");
-    }
+
 }
 
 class UserGuild extends PluginInterface {
