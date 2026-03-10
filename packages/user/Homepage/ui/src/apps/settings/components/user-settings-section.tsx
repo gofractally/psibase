@@ -85,7 +85,7 @@ export const UserSettingsSection = () => {
     };
 
     const isDisabled =
-        !billingEnabled || isPending || isLoadingResources;
+        !systemToken || isPending || isLoadingResources;
 
     return (
         <div className="space-y-6">
