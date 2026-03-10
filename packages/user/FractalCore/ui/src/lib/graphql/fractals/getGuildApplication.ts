@@ -1,56 +1,38 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
-import { zDateTime } from "@/lib/zod/DateTime";
+import { zGuildApplicationListInstance } from "@/lib/zod/attestations";
 
-import { Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
-
-export const zGuildApplicationListInstance = z
-    .object({
-        member: zAccount,
-        extraInfo: z.string(),
-        createdAt: zDateTime,
-        attestations: z
-            .object({
-                endorses: z.boolean(),
-                comment: z.string(),
-                attestee: zAccount,
-            })
-            .array(),
-    })
-    .nullable();
-
-export type GuildApplicationListInstance = z.infer<
-    typeof zGuildApplicationListInstance
->;
+import { graphql } from "@shared/lib/graphql";
+import { Account } from "@shared/lib/schemas/account";
 
 export const getGuildApplication = async (
     guildAccount: Account,
-    member: Account,
+    applicant: Account,
 ) => {
     const res = await graphql(
         `
             {
-                guildApplication(guild: ${guildAccount}, member: "${member}") {
-                        member
+                guildApplication(guild: ${guildAccount}, applicant: "${applicant}") {
+                        applicant
                         extraInfo
                         createdAt
                         attestations {
-                            endorses
-                            comment
-                            attestee
+                            nodes {
+                                attester
+                                comment
+                                endorses
+                            }
                         }
                 }
             }
         `,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return z
         .object({
-            guildApplication: zGuildApplicationListInstance,
+            guildApplication: zGuildApplicationListInstance.nullable(),
         })
         .parse(res).guildApplication;
 };

@@ -470,6 +470,13 @@ void XHttp::setCallback(std::int32_t          socket,
    }
 }
 
+void XHttp::log(LogMessage::Severity severity, std::string msg)
+{
+   socketSend(SocketRow::log,
+              psio::to_frac(LogMessage{
+                  .message = std::move(msg), .severity = severity, .service = getSender()}));
+}
+
 std::string XHttp::rootHost(psio::view<const std::string> host)
 {
    return std::string(getRootHost(host));

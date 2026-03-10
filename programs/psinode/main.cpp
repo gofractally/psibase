@@ -1,4 +1,5 @@
 #include <psibase/ConfigFile.hpp>
+#include <psibase/LogSocket.hpp>
 #include <psibase/Mount.hpp>
 #include <psibase/OpenSSLProver.hpp>
 #include <psibase/PKCS11Prover.hpp>
@@ -975,10 +976,8 @@ struct PsinodeServiceConfig
 
 struct PsinodeConfig
 {
-   std::vector<std::string> peers;
    AccountNumber            producer;
    std::vector<std::string> pkcs11_modules;
-   std::vector<std::string> hosts;
    std::vector<listen_spec> listen;
    TLSConfig                tls;
    Timeout                  http_timeout;
@@ -987,28 +986,17 @@ struct PsinodeConfig
 
    static bool isNative(std::string_view name)
    {
-      constexpr std::string_view opts[] = {"peers",
-                                           "producer",
-                                           "pkcs11-modules",
-                                           "host",
-                                           "listen",
-                                           "tls-key",
-                                           "tls-cert",
-                                           "tls-trustfile",
-                                           "http-timeout",
-                                           "service-threads",
-                                           "key",
-                                           "database-cache-size",
-                                           "mount"};
+      constexpr std::string_view opts[] = {
+          "producer", "pkcs11-modules",      "listen",       "tls-key",
+          "tls-cert", "tls-trustfile",       "http-timeout", "service-threads",
+          "key",      "database-cache-size", "mount"};
       return std::ranges::find(opts, name) != std::end(opts) || name.starts_with("logger.") ||
              name.starts_with("service.");
    }
 };
 PSIO_REFLECT(PsinodeConfig,
-             peers,
              producer,
              pkcs11_modules,
-             hosts,
              listen,
 #ifdef PSIBASE_ENABLE_SSL
              tls,
@@ -1019,12 +1007,6 @@ PSIO_REFLECT(PsinodeConfig,
 
 void to_config(const PsinodeConfig& config, ConfigFile& file)
 {
-   if (!config.peers.empty())
-   {
-      file.set(
-          "", "peer", config.peers, [](std::string_view text) { return std::string(text); },
-          "Peer URL's");
-   }
    if (config.producer != AccountNumber())
    {
       file.set("", "producer", config.producer.str(), "The name to use for block production");
@@ -1034,12 +1016,6 @@ void to_config(const PsinodeConfig& config, ConfigFile& file)
       file.set(
           "", "pkcs11-module", config.pkcs11_modules,
           [](std::string_view text) { return std::string(text); }, "PKCS #11 modules to load");
-   }
-   if (!config.hosts.empty())
-   {
-      file.set(
-          "", "host", config.hosts, [](std::string_view text) { return std::string(text); },
-          "The HTTP server's host name");
    }
    if (!config.listen.empty())
    {
@@ -1177,8 +1153,6 @@ void run(const std::string&              db_path,
          AccountNumber                   producer,
          std::shared_ptr<CompoundProver> prover,
          std::vector<std::string>&       pkcs11_modules,
-         const std::vector<std::string>& peers,
-         std::vector<std::string>&       hosts,
          std::vector<listen_spec>        listen,
          std::vector<MountArg>&          mountpoints,
          Timeout&                        http_timeout,
@@ -1233,17 +1207,18 @@ void run(const std::string&              db_path,
    }
 
    {
+      auto writer = system->sharedDatabase.createWriter();
+      system->sockets->set(*writer, SocketRow::log, makeLogSocket());
+
       Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
       SocketAutoCloseSet autoClose;
-      auto               session = db.startWrite(system->sharedDatabase.createWriter());
+      auto               session = db.startWrite(std::move(writer));
       db.checkoutSubjective();
       load_environment(db);
       HostConfigRow hostConfig = toHostConfig(
           PsinodeConfig{
-              .peers          = peers,
               .producer       = producer,
               .pkcs11_modules = pkcs11_modules,
-              .hosts          = hosts,
               .listen         = listen,
 #ifdef PSIBASE_ENABLE_SSL
               .tls =
@@ -1437,13 +1412,12 @@ void run(const std::string&              db_path,
           auto config = psio::convert_from_json<PsinodeConfig>(view.config().unpack());
        });
    node.chain().onChangeHostConfig(
-       [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
-        &service_threads, &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &system,
-        setPKCS11Libs]
+       [&chainContext, &node, &db_path, &runResult, &http_config, &http_timeout, &service_threads,
+        &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &system, setPKCS11Libs]
        {
           boost::asio::post(
               chainContext,
-              [&chainContext, &node, &db_path, &runResult, &http_config, &hosts, &http_timeout,
+              [&chainContext, &node, &db_path, &runResult, &http_config, &http_timeout,
                &service_threads, &tpool, &tls_cert, &tls_key, &root_ca, &pkcs11_modules, &system,
                setPKCS11Libs]
               {
@@ -1458,7 +1432,6 @@ void run(const std::string&              db_path,
                  setPKCS11Libs(config.pkcs11_modules);
                  node.set_producer_id(config.producer);
                  pkcs11_modules  = config.pkcs11_modules;
-                 hosts           = config.hosts;
                  http_timeout    = config.http_timeout;
                  service_threads = config.service_threads;
 #ifdef PSIBASE_ENABLE_SSL
@@ -1857,37 +1830,6 @@ void run(const std::string&              db_path,
       atomic_set_field(http_config->status, [](auto& status) { status.startup = false; });
    }
 
-   if (node.chain().get_head_state()->blockId() == Checksum256{} && peers.empty())
-   {
-      std::string message = "Node is not connected to any psibase network.";
-      if (!hosts.empty())
-      {
-         std::string xAdminSubdomain = "x-admin." + hosts.front();
-
-         std::string protocol;
-         std::string port;
-         for (const auto& listen : http_config->listen)
-         {
-            if (const auto* spec = std::get_if<psibase::http::tcp_listen_spec<true>>(&listen))
-            {
-               protocol = "https://";
-               port     = std::to_string(spec->endpoint.port());
-               break;
-            }
-            else if (const auto* spec = std::get_if<psibase::http::tcp_listen_spec<false>>(&listen))
-            {
-               protocol = "http://";
-               port     = std::to_string(spec->endpoint.port());
-            }
-         }
-         xAdminSubdomain = protocol + xAdminSubdomain + ":" + port;
-
-         message += " Visit '" + xAdminSubdomain + "' for node setup.";
-      }
-
-      PSIBASE_LOG(node.chain().getLogger(), notice) << message;
-   }
-
    chainContext.run();
 }
 
@@ -1906,9 +1848,7 @@ int main(int argc, char* argv[])
    std::string              producer = {};
    auto                     keys     = std::make_shared<CompoundProver>();
    std::vector<std::string> pkcs11_modules;
-   std::vector<std::string> hosts = {};
    std::vector<listen_spec> listen;
-   std::vector<std::string> peers;
    std::vector<MountArg>    mountpoints;
    std::vector<std::string> root_ca;
    std::string              tls_cert;
@@ -1928,11 +1868,8 @@ int main(int argc, char* argv[])
        "Name of this producer");
    opt("key,k", po::value(&keys->provers)->default_value({}, ""),
        "A private key to use for block production");
-   opt("host,o", po::value(&hosts)->value_name("name")->default_value({}, ""),
-       "Root host name for the http server");
    opt("listen,l", po::value(&listen)->default_value({}, "")->value_name("endpoint"),
        "TCP or local socket endpoint on which the server accepts connections");
-   opt("peer", po::value(&peers)->default_value({}, "")->value_name("URL"), "Peer endpoint");
    opt("mount",
        po::value(&mountpoints)
            ->composing()
@@ -2063,8 +2000,8 @@ int main(int argc, char* argv[])
       {
          restart.args.reset();
          run(db_path, db_template, DbConfig{db_cache_size}, AccountNumber{producer}, keys,
-             pkcs11_modules, peers, hosts, listen, mountpoints, http_timeout, service_threads,
-             root_ca, tls_cert, tls_key, extra_options, restart);
+             pkcs11_modules, listen, mountpoints, http_timeout, service_threads, root_ca, tls_cert,
+             tls_key, extra_options, restart);
          if (!restart.args || !restart.args->restart)
          {
             PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Shutdown";

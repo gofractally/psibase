@@ -7,9 +7,8 @@ import { supervisor } from "@/supervisor";
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@/lib/zod/Account";
 
+import { removeUserFromCache } from "@shared/hooks/use-contacts";
 import { toast } from "@shared/shadcn/ui/sonner";
-
-import { removeUserFromCache } from "./use-contacts";
 
 export const useDeleteContact = () =>
     useMutation({
