@@ -7,7 +7,6 @@ fn execute_query(
     query_fields: &str,
 ) -> serde_json::Value {
     let query = format!("query {{ {} {{ {} }} }}", query, query_fields);
-    println!("Query: {}", query);
     chain.graphql(service, &query).unwrap()
 }
 
