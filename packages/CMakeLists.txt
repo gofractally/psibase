@@ -3,14 +3,14 @@ enable_testing()
 function(add_sys_cargo_psibase_test name)
     add_test(
         NAME rs-test-${name}
-        COMMAND ${CMAKE_BINARY_DIR}/../rust/release/cargo-psibase test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/system/${name}/service/Cargo.toml --target-dir ${SYSTEM_WORKSPACE_TARGET} --psitest=${CMAKE_BINARY_DIR}/../psitest
+        COMMAND ${ROOT_BINARY_DIR}/rust/release/cargo-psibase test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/system/${name}/service/Cargo.toml --target-dir ${SYSTEM_WORKSPACE_TARGET} --psitest=${ROOT_BINARY_DIR}/psitest
     )
 endfunction()
 
 function(add_usr_cargo_psibase_test name)
     add_test(
         NAME rs-test-${name}
-        COMMAND ${CMAKE_BINARY_DIR}/../rust/release/cargo-psibase test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/user/${name}/service/Cargo.toml --target-dir ${USER_WORKSPACE_TARGET} --psitest=${CMAKE_BINARY_DIR}/../psitest
+        COMMAND ${ROOT_BINARY_DIR}/rust/release/cargo-psibase test --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/user/${name}/service/Cargo.toml --target-dir ${USER_WORKSPACE_TARGET} --psitest=${ROOT_BINARY_DIR}/psitest
     )
 endfunction()
 
