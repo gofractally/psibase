@@ -2,7 +2,9 @@
 
 #include <botan/bcrypt.h>
 #include <psibase/dispatch.hpp>
+#include <psibase/nativeTables.hpp>
 #include <services/local/BasicAuth.hpp>
+#include <services/local/XHttp.hpp>
 
 using namespace psibase;
 using namespace LocalService;
@@ -33,6 +35,12 @@ void XBasic::startSession()
             }
          }
       }
+   }
+   else
+   {
+      to<XHttp>().log(LogMessage::Severity::error,
+                      "Failed to read password file " + env->value +
+                          ". HTTP Basic Authentication will not be available.");
    }
 }
 
