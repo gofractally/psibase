@@ -36,7 +36,6 @@ export const router = createBrowserRouter([
                     </ProtectedRoute>
                 ),
             },
-
             {
                 path: "/invite",
                 element: (
