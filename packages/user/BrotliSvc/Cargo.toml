@@ -1,6 +1,6 @@
 [package]
-name = "brotli-codec-pkg"
-description = "Compression/decompression library"
+name = "brotli-svc-pkg"
+description = "Server-side interface for Brotli codec"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
@@ -9,19 +9,15 @@ rust-version.workspace = true
 publish.workspace = true
 
 [package.metadata.psibase]
-package-name = "BrotliCodec"
-services = ["brotli-codec"]
+package-name = "BrotliSvc"
+services = ["brotli-svc"]
 
 [package.metadata.psibase.dependencies]
-Supervisor = "0.23.0"
-Sites = "0.23.0"
 HttpServer = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
 
 [dependencies]
-brotli-codec = { path = "service", version = "0.23.0" }
-brotli-codec-plugin = { path = "plugin", version = "0.23.0" }
-serde = { version = "1.0", features = ["derive"] }
+brotli-svc = { path = "service", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true
