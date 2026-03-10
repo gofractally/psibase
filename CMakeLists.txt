@@ -29,6 +29,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 
+set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
+set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+
 add_subdirectory(native)
 add_subdirectory(rust)
 file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
@@ -172,6 +175,8 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
             -DPSITEST_EXECUTABLE=$<TARGET_FILE:psitest>
+            -DUSER_WORKSPACE_TARGET=${USER_WORKSPACE_TARGET}
+            -DSYSTEM_WORKSPACE_TARGET=${SYSTEM_WORKSPACE_TARGET}
         BUILD_BYPRODUCTS ${WASM_BYPRODUCTS}
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
@@ -303,8 +308,6 @@ include(GNUInstallDirs)
 include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
-set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
-set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
 set(PSIBASE_VERSION 0.23)
 
