@@ -16,7 +16,9 @@ from io import TextIOWrapper
 import subprocess
 
 class TestPackage:
-    def __init__(self, name, version, accounts=None, depends=None, description=None):
+    def __init__(self, name, version, scope=None, accounts=None, depends=None, description=None):
+        if scope is None:
+            scope = "network"
         if accounts is None:
             accounts = []
         if depends is None:
@@ -25,6 +27,7 @@ class TestPackage:
             description = "Test package"
         self.name = name
         self.version = version
+        self.scope = scope
         self.description = description
         self.accounts = accounts
         self._depends = depends
@@ -62,7 +65,7 @@ class TestPackage:
     def write(self, directory):
         filename = self.filename()
         package_filename = os.path.join(directory, filename)
-        meta = {'name': self.name, 'version': self.version, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts}
+        meta = {'name': self.name, 'version': self.version, 'scope': self.scope, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts}
         with zipfile.ZipFile(package_filename, 'w', zipfile.ZIP_DEFLATED) as archive:
             with archive.open('meta.json', 'w') as file:
                 json.dump(meta, TextIOWrapper(file, encoding='utf-8'))
@@ -117,9 +120,9 @@ class Foo:
 class XFoo:
     def __init__(self):
         self.wasm = make_wasm("x-foo")
-        self.foo10 = TestPackage('XFoo', '1.0.0', description='The original foo').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'original', 'file2.txt': 'deleted'})
-        self.foo11 = TestPackage('XFoo', '1.1.0', description='Minor version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'updated', 'file3.txt': 'added'})
-        self.foo20 = TestPackage('XFoo', '2.0.0', description='Major version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'version 2'})
+        self.foo10 = TestPackage('XFoo', '1.0.0', scope='local', description='The original foo').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        self.foo11 = TestPackage('XFoo', '1.1.0', scope='local', description='Minor version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'updated', 'file3.txt': 'added'})
+        self.foo20 = TestPackage('XFoo', '2.0.0', scope='local', description='Major version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'version 2'})
 
         self.original_wasm = make_wasm('original')
         self.updated_wasm = make_wasm('updated')

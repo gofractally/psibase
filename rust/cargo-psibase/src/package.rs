@@ -25,6 +25,7 @@ struct DataFiles {
 pub struct PsibaseMetadata {
     #[serde(rename = "package-name")]
     package_name: Option<String>,
+    scope: Option<String>,
     server: Option<String>,
     plugin: Option<String>,
     flags: Vec<String>,
@@ -314,18 +315,17 @@ pub async fn build_package(
         }
     }
 
-    let (package_name, package_version, package_description) = {
+    let (package_name, package_version, package_description, package_scope) = {
         let root = metadata.packages.get(service.unwrap()).unwrap();
         let root_meta: PsibaseMetadata = get_metadata(root)?;
-        if let Some(name) = root_meta.package_name {
-            (name, root.version.to_string(), root.description.clone())
-        } else {
-            (
-                root.name.clone(),
-                root.version.to_string(),
-                root.description.clone(),
-            )
-        }
+        let name = root_meta.package_name.unwrap_or_else(|| root.name.clone());
+        let scope = root_meta.scope.unwrap_or_else(|| "network".to_string());
+        (
+            name,
+            root.version.to_string(),
+            root.description.clone(),
+            scope,
+        )
     };
 
     let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
@@ -389,6 +389,7 @@ pub async fn build_package(
     let meta = Meta {
         name: package_name.to_string(),
         version: package_version.to_string(),
+        scope: package_scope,
         description: package_description.unwrap_or_else(|| package_name.to_string()),
         depends,
         accounts,

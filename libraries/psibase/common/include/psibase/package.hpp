@@ -24,13 +24,14 @@ namespace psibase
    {
       std::string                name;
       std::string                version;
+      std::string                scope;
       std::string                description;
       std::vector<PackageRef>    depends;
       std::vector<AccountNumber> accounts;
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO_REFLECT(PackageInfo, name, version, description, depends, accounts, sha256, file)
+   PSIO_REFLECT(PackageInfo, name, version, scope, description, depends, accounts, sha256, file)
 
    std::weak_ordering operator<=>(const PackageInfo&, const PackageInfo&);
 
