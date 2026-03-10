@@ -29,6 +29,7 @@ interface hook-handlers {
 
 world impl {
     include host:common/imports;
+    include host:db/imports;
     include clientdata:plugin/imports;
     include accounts:plugin/imports;
     include permissions:plugin/imports;

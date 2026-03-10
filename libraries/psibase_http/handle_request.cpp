@@ -596,9 +596,6 @@ namespace psibase::http
 
          if (req_target == "/native/admin/push_boot" && server.http_config->push_boot_async)
          {
-            if (!server.http_config->enable_transactions)
-               return send(builder.notFound(req.target()));
-
             if (req.method() != bhttp::verb::post)
             {
                return send(builder.methodNotAllowed(req.target(), req.method_string(), "POST"));
@@ -660,16 +657,6 @@ namespace psibase::http
             runNativeHandlerGenericNoFail(
                 server.http_config->get_metrics,
                 "application/openmetrics-text; version=1.0.0; charset=utf-8");
-         }
-         else if (req_target == "/native/admin/peers" && server.http_config->get_peers)
-         {
-            if (req.method() != bhttp::verb::get)
-            {
-               return send(builder.methodNotAllowed(req.target(), req.method_string(), "GET"));
-            }
-
-            // returns json list of {id:int,endpoint:string}
-            runNativeHandlerJsonNoFail(server.http_config->get_peers);
          }
          else if (req_target == "/native/admin/log" && websocket::is_upgrade(req))
          {
@@ -785,34 +772,6 @@ namespace psibase::http
          else
          {
             auto [host, port] = split_port(req_host);
-
-            if (auto iter = server.http_config->services.find(host);
-                iter != server.http_config->services.end())
-            {
-               auto file = iter->second.find(req_target);
-               if (file != iter->second.end())
-               {
-                  if (req.method() == bhttp::verb::options)
-                  {
-                     return send(builder.okNoContent(true));
-                  }
-                  else if (req.method() != bhttp::verb::get && req.method() != bhttp::verb::head)
-                  {
-                     return send(builder.methodNotAllowed(req.target(), req.method_string(),
-                                                          "GET, OPTIONS, HEAD", true));
-                  }
-
-                  std::vector<char> contents;
-                  // read file
-                  auto          size = std::filesystem::file_size(file->second.path);
-                  std::ifstream in(file->second.path, std::ios_base::binary);
-                  l.unlock();
-                  contents.resize(size);
-                  in.read(contents.data(), contents.size());
-                  return send(builder.ok(std::move(contents), file->second.content_type.c_str(),
-                                         nullptr, true));
-               }
-            }
 
             auto        startTime = steady_clock::now();
             HttpRequest data;

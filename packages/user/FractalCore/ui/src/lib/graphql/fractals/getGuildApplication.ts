@@ -1,36 +1,10 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@/lib/constants";
-import { zDateTime } from "@/lib/zod/DateTime";
+import { zGuildApplicationListInstance } from "@/lib/zod/attestations";
 
-import { Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../../graphql";
-
-export const zGuildApplicationListInstance = z
-    .object({
-        applicant: zAccount,
-        extraInfo: z.string(),
-        createdAt: zDateTime,
-        score: z.object({
-            current: z.number(),
-            required: z.number()
-        }),
-        attestations: z.object({
-            nodes: z
-                .object({
-                    endorses: z.boolean(),
-                    comment: z.string(),
-                    attester: zAccount,
-                })
-                .array()
-        }),
-    })
-    .nullable();
-
-export type GuildApplicationListInstance = z.infer<
-    typeof zGuildApplicationListInstance
->;
+import { graphql } from "@shared/lib/graphql";
+import { Account } from "@shared/lib/schemas/account";
 
 export const getGuildApplication = async (
     guildAccount: Account,
@@ -41,28 +15,24 @@ export const getGuildApplication = async (
             {
                 guildApplication(guild: ${guildAccount}, applicant: "${applicant}") {
                         applicant
-                        score {
-                            current
-                            required
-                        }
                         extraInfo
                         createdAt
                         attestations {
                             nodes {
-                                endorses
-                                comment
                                 attester
+                                comment
+                                endorses
                             }
                         }
                 }
             }
         `,
-        FRACTALS_SERVICE,
+        { service: FRACTALS_SERVICE },
     );
 
     return z
         .object({
-            guildApplication: zGuildApplicationListInstance,
+            guildApplication: zGuildApplicationListInstance.nullable(),
         })
         .parse(res).guildApplication;
 };

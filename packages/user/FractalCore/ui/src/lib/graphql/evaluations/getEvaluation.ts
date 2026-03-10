@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 import { EVALUATIONS_SERVICE, FRACTALS_SERVICE } from "@/lib/constants";
-import { graphql } from "@/lib/graphql";
 import { zUnix } from "@/lib/zod/Unix";
 
+import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const zEvaluation = z.object({
@@ -38,7 +38,7 @@ export const getEvaluation = async (id: number) => {
             numOptions
         } 
     }`,
-        EVALUATIONS_SERVICE,
+        { service: EVALUATIONS_SERVICE },
     );
 
     const response = z

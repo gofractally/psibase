@@ -1,15 +1,15 @@
-use crate::{Action, ActionGroup, ActionSink, SignedTransaction};
+use crate::{Action, ActionGroup, ActionSink};
 
-pub struct TransactionBuilder<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> {
+pub struct TransactionBuilder<R, F: Fn(Vec<Action>) -> Result<R, anyhow::Error>> {
     size: usize,
     action_limit: usize,
     actions: Vec<Action>,
-    transactions: Vec<(String, Vec<SignedTransaction>, bool)>,
+    transactions: Vec<(String, Vec<R>, bool)>,
     index: usize,
     f: F,
 }
 
-impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> TransactionBuilder<F> {
+impl<R, F: Fn(Vec<Action>) -> Result<R, anyhow::Error>> TransactionBuilder<R, F> {
     pub fn new(action_limit: usize, f: F) -> Self {
         TransactionBuilder {
             size: 0,
@@ -56,7 +56,7 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
     //   previous labels.
     // - If the carry bit is set, then previous labels had some actions
     //   that are in this (or a later) group.
-    pub fn finish(mut self) -> Result<Vec<(String, Vec<SignedTransaction>, bool)>, anyhow::Error> {
+    pub fn finish(mut self) -> Result<Vec<(String, Vec<R>, bool)>, anyhow::Error> {
         if self.index < self.transactions.len() {
             for new_group in &mut self.transactions[(self.index + 1)..] {
                 new_group.2 = false;
@@ -81,9 +81,7 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> Transaction
     }
 }
 
-impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> ActionSink
-    for TransactionBuilder<F>
-{
+impl<R, F: Fn(Vec<Action>) -> Result<R, anyhow::Error>> ActionSink for TransactionBuilder<R, F> {
     fn push_action<T: ActionGroup>(&mut self, act: T) -> Result<(), anyhow::Error> {
         self.push(act)
     }
@@ -92,7 +90,7 @@ impl<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>> ActionSink
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Tapos, Transaction};
+    use crate::{SignedTransaction, Tapos, Transaction};
     use fracpack::Pack;
 
     fn mkact(size: usize) -> Action {

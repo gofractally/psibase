@@ -1,0 +1,25 @@
+[package]
+name = "kvtests"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+wit-bindgen-rt.workspace = true
+psibase-plugin-workspace-hack.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "kvtests:plugin"
+
+[package.metadata.component.target]
+world = "impl"
+
+[package.metadata.component.target.dependencies]
+"host:db" = { path = "../../Host/plugin/db/wit/world.wit" }
+"host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
+"setcode:plugin" = { path = "../../../system/SetCode/plugin/wit/world.wit" }
+"chainmail:plugin" = { path = "../../Chainmail/plugin/wit/world.wit" }

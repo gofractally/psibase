@@ -4,12 +4,11 @@ import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useContacts } from "@/apps/contacts/hooks/use-contacts";
-
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { Avatar } from "@shared/components/avatar";
 import { withForm } from "@shared/components/form/app-form";
+import { useContacts } from "@shared/hooks/use-contacts";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
