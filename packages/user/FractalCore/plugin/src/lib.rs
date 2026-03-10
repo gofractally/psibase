@@ -18,7 +18,7 @@ use bindings::fractals::plugin as FractalsPlugin;
 
 use trust::{assert_authorized, FunctionName};
 
-use crate::bindings::host::common::store::{
+use crate::bindings::host::db::store::{
     Bucket, Database, DbMode::Transactional, StorageDuration::Persistent,
 };
 

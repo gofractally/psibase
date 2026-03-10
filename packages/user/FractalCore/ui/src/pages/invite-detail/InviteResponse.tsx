@@ -5,7 +5,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { useNavigate } from "react-router-dom";
 import { usePushApplication } from "@/hooks/use-push-application";
@@ -19,7 +19,7 @@ export const InviteResponse = () => {
 
 
     const { mutateAsync: pushApplication, isIdle, error } = usePushApplication(() => {
-        navigate(`/guild/${guild}/applications/${currentUser}`)
+        navigate(`/guild/${guild}/applicants/${currentUser}`)
     })
 
     useEffect(() => {

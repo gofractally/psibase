@@ -1,4 +1,4 @@
-import { zDateTime } from "@/lib/zod/DateTime";
+import { zDateTime } from "@shared/lib/schemas/date-time";
 import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 import z from "zod";
 

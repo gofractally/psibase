@@ -15,6 +15,10 @@ export const getGuildApplications = async (guildAccount: Account) => {
                         applicant
                         extraInfo
                         createdAt
+                        score {
+                            current
+                            required
+                        }
                         attestations {
                             nodes {
                                 attester
