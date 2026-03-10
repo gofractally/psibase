@@ -2,6 +2,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <psibase/base64.hpp>
 #include <psibase/check.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/jwt.hpp>
@@ -10,50 +11,12 @@
 #include <string>
 #include <string_view>
 
-#include "base64.hpp"
-
 namespace psibase
 {
-   namespace
+   std::string toBase64Url(unsigned char* data, std::size_t size)
    {
-      constexpr auto base64url_tab    = psibase::detail::base64Table('-', '_');
-      constexpr auto base64url_invtab = psibase::detail::invert(base64url_tab);
-   }  // namespace
-   std::string to_base64url(std::string_view s)
-   {
-      std::string result;
-      result.reserve((s.size() * 4 + 2) / 3);
-      psibase::detail::transcode<8, 6, true>(
-          s, [&](unsigned ch) { result.push_back(base64url_tab[ch]); });
-      return result;
+      return toBase64Url(std::string_view{reinterpret_cast<char*>(data), size});
    }
-   std::string to_base64url(unsigned char* data, std::size_t size)
-   {
-      return to_base64url(std::string_view{reinterpret_cast<char*>(data), size});
-   }
-   std::string from_base64url(std::string_view s)
-   {
-      std::string result;
-      result.reserve(s.size() * 3 / 4);
-      bool okay = psibase::detail::transcode<6, 8, false>(
-          s | std::ranges::views::transform(
-                  [](char ch)
-                  {
-                     if (auto result = base64url_invtab[static_cast<unsigned char>(ch)];
-                         result != -1)
-                     {
-                        return result;
-                     }
-                     else
-                     {
-                        abortMessage("Invalid base64 char");
-                     }
-                  }),
-          [&](unsigned ch) { result.push_back(static_cast<char>(ch)); });
-      psibase::check(okay, "Invalid padding");
-      return result;
-   }
-
    struct token_header
    {
       std::string typ{"JWT"};
@@ -75,22 +38,22 @@ namespace psibase
       std::string_view signing_input     = token.substr(0, end_payload);
 
       Checksum256 mac       = hmacSha256(key, signing_input);
-      auto        signature = from_base64url(encoded_signature);
+      auto        signature = fromBase64Url(encoded_signature);
       if (signature.size() != mac.size() ||
           std::memcmp(signature.data(), mac.data(), mac.size()) != 0)
          return std::nullopt;
 
-      auto header = psio::convert_from_json<token_header>(from_base64url(encoded_header));
+      auto header = psio::convert_from_json<token_header>(fromBase64Url(encoded_header));
       if (header != token_header{})
          return std::nullopt;
 
-      return from_base64url(encoded_payload);
+      return fromBase64Url(encoded_payload);
    }
    std::string encodeJWT(const JWTKey& key, std::string_view token)
    {
       std::string result =
-          to_base64url(psio::convert_to_json(token_header{})) + "." + to_base64url(token);
+          toBase64Url(psio::convert_to_json(token_header{})) + "." + toBase64Url(token);
       auto mac = hmacSha256(key, result);
-      return result + "." + to_base64url(mac.data(), mac.size());
+      return result + "." + toBase64Url(mac.data(), mac.size());
    }
 }  // namespace psibase
