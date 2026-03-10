@@ -14,22 +14,18 @@ mod tests {
     static TOKEN_STREAM: AccountNumber = account!("token-stream");
 
     fn get_balance(chain: &psibase::Chain, token_id: u32, account: AccountNumber) -> Quantity {
-        let result = Tokens::push(&chain)
+        Tokens::push(&chain)
             .getBalance(token_id, account)
             .get()
-            .unwrap();
-        chain.finish_block();
-        result
+            .unwrap()
     }
 
     fn get_stream(chain: &psibase::Chain, nft_id: u32) -> Stream {
-        let result = TokenStream::push(&chain)
+        TokenStream::push(&chain)
             .get_stream(nft_id)
             .get()
             .unwrap()
-            .unwrap();
-        chain.finish_block();
-        result
+            .unwrap()
     }
 
     fn tokens_credit(
