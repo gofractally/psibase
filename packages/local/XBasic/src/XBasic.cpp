@@ -46,11 +46,11 @@ void XBasic::startSession()
 
 AuthResult XBasic::checkAuth(const HttpRequest& req, std::optional<std::int32_t> socket)
 {
+   auto passwords = open<PasswordTable>();
    if (auto header = req.getHeader("authorization"))
    {
       if (auto auth = parseBasicAuth(*header))
       {
-         auto                       passwords = open<PasswordTable>();
          std::optional<PasswordRow> row;
          PSIBASE_SUBJECTIVE_TX
          {
@@ -78,7 +78,15 @@ AuthResult XBasic::checkAuth(const HttpRequest& req, std::optional<std::int32_t>
          }
       }
    }
-   return Auth::Unauthenticated{{"Basic realm=\"psibase\", charset=\"UTF-8\""}};
+   bool hasAnyPassword;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      hasAnyPassword = !passwords.getIndex<0>().empty();
+   }
+   if (hasAnyPassword)
+      return Auth::Unauthenticated{{"Basic realm=\"psibase\", charset=\"UTF-8\""}};
+   else
+      return Auth::Unauthenticated{};
 }
 
 PSIBASE_DISPATCH(XBasic)
