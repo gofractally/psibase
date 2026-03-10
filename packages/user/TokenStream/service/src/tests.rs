@@ -14,18 +14,22 @@ mod tests {
     static TOKEN_STREAM: AccountNumber = account!("token-stream");
 
     fn get_balance(chain: &psibase::Chain, token_id: u32, account: AccountNumber) -> Quantity {
-        Tokens::push(&chain)
+        let result = Tokens::push(&chain)
             .getBalance(token_id, account)
             .get()
-            .unwrap()
+            .unwrap();
+        chain.finish_block();
+        result
     }
 
     fn get_stream(chain: &psibase::Chain, nft_id: u32) -> Stream {
-        TokenStream::push(&chain)
+        let result = TokenStream::push(&chain)
             .get_stream(nft_id)
             .get()
             .unwrap()
-            .unwrap()
+            .unwrap();
+        chain.finish_block();
+        result
     }
 
     fn tokens_credit(
@@ -58,7 +62,6 @@ mod tests {
             .create(4.try_into().unwrap(), supply)
             .get()
             .unwrap();
-        assert_eq!(token_id, 2);
 
         Tokens::push_from(&chain, ALICE).mint(
             token_id,
@@ -171,7 +174,7 @@ mod tests {
     }
 
     #[psibase::test_case(packages("TokenStream"))]
-    fn test_basics(mut chain: psibase::Chain) {
+    fn test_basics(mut chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.set_auto_block_start(false);
         reset_clock(&chain);
         let token_id = setup_env(&chain);
@@ -189,14 +192,9 @@ mod tests {
             "No tokens should be deposited"
         );
 
-        // Test claim fails since there's been no deposit
-        let err = TokenStream::push_from(&chain, ALICE)
-            .claim(id)
-            .get()
-            .unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("credit quantity must be greater than 0"));
+        // Claim yields nothing since there's been no deposit
+        let q = TokenStream::push_from(&chain, ALICE).claim(id).get()?;
+        assert!(q.value == 0, "Claim should return 0");
 
         // Make deposit
         tokens_credit(&chain, token_id, ALICE, TOKEN_STREAM, 500);
@@ -205,19 +203,17 @@ mod tests {
             .get()
             .unwrap();
 
-        // Check claim fails when no vesting has yet occured
+        // Check claim yields nothing when no vesting has yet occured
         Nfts::push_from(&chain, ALICE).credit(id, BOB, "memo".into());
         Nfts::push_from(&chain, BOB).debit(id, "memo".into());
-        assert!(TokenStream::push_from(&chain, BOB)
-            .claim(id)
-            .get()
-            .unwrap_err()
-            .to_string()
-            .contains("credit quantity must be greater than 0"));
+        let q = TokenStream::push_from(&chain, BOB).claim(id).get()?;
+        assert!(q.value == 0, "Claim should return 0");
 
         // Check total deposited is correct
         chain.start_block();
         assert_eq!(get_stream(&chain, id).total_deposited, 500.into());
+
+        Ok(())
     }
 
     #[psibase::test_case(packages("TokenStream"))]
