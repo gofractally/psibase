@@ -4,6 +4,7 @@
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/dispatch.hpp>
 #include <psio/json/any.hpp>
+#include <services/local/XBasic.hpp>
 #include <services/local/XDb.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/local/XPeers.hpp>
@@ -581,6 +582,71 @@ namespace LocalService
             XAdmin{}.open<AdminOptionsTable>().put(adminConfig);
          }
       }
+
+      AuthResult checkAuthChain(const HttpRequest& req, std::optional<std::int32_t> socket)
+      {
+         if (chainIsBooted())
+         {
+            if (auto user = to<RTransact>().getUser(req))
+            {
+               return Auth::Account{*user};
+            }
+            else
+            {
+               bool hasAccounts;
+               PSIBASE_SUBJECTIVE_TX
+               {
+                  if (!XAdmin{}.open<AdminAccountTable>().getIndex<0>().empty())
+                  {
+                     return Auth::Unauthenticated{{"Bearer realm=\"psibase\""}};
+                  }
+               }
+            }
+         }
+         return Auth::Unauthenticated{};
+      }
+
+      struct Authenticator
+      {
+         std::vector<HttpHeader> challenges;
+         bool                    hasUser = false;
+         bool                    operator()(Auth::Account&& account)
+         {
+            hasUser = true;
+            bool result;
+            PSIBASE_SUBJECTIVE_TX
+            {
+               result = XAdmin{}.open<AdminAccountTable>().get(account.value).has_value();
+            }
+            return result;
+         }
+         bool operator()(Auth::LocalUsername&& username)
+         {
+            hasUser = true;
+            return true;
+         }
+         bool operator()(Auth::Unauthenticated&& unauth)
+         {
+            for (auto& challenge : unauth.challenges)
+            {
+               challenges.push_back({"WWW-Authenticate", std::move(challenge)});
+            }
+            return false;
+         }
+         bool add(AuthResult&& result) { return std::visit(*this, std::move(result)); }
+         std::optional<HttpReply> getError() &&
+         {
+            if (hasUser)
+               return HttpReply{.status      = HttpStatus::forbidden,
+                                .contentType = "text/html",
+                                .body        = toVec("Not authorized")};
+            else
+               return HttpReply{.status      = HttpStatus::unauthorized,
+                                .contentType = "text/html",
+                                .body        = toVec("Not authorized"),
+                                .headers     = std::move(challenges)};
+         }
+      };
    }  // namespace
 
    void XAdmin::startSession()
@@ -601,26 +667,6 @@ namespace LocalService
          if (auto* peers = json.hostOption("peers"))
          {
             adminOpts.peers = parseOptionList(*peers, std::vector<std::string>());
-         }
-         if (!isBooted && adminOpts.peers.empty())
-         {
-            std::string message = "Node is not connected to any psibase network.";
-            if (!adminOpts.hosts.empty())
-            {
-               std::string xAdminSubdomain = XAdmin::service.str() + "." + adminOpts.hosts.front();
-               if (auto* listen = json.hostOption("listen"))
-               {
-                  if (auto url = guessUrl(*listen, std::move(xAdminSubdomain)))
-                  {
-                     message += " Visit '" + *url + "' for node setup.";
-                  }
-               }
-            }
-            setupMessage = std::move(message);
-         }
-         else
-         {
-            setupMessage.reset();
          }
          if (auto* config = json.serviceConfig())
          {
@@ -664,8 +710,29 @@ namespace LocalService
             if (!cli.peers.empty())
                adminOpts.peers = std::move(cli.peers);
          }
+         if (!isBooted && adminOpts.peers.empty())
+         {
+            std::string message = "Node is not connected to any psibase network.";
+            if (!adminOpts.hosts.empty())
+            {
+               std::string xAdminSubdomain = XAdmin::service.str() + "." + adminOpts.hosts.front();
+               if (auto* listen = json.hostOption("listen"))
+               {
+                  if (auto url = guessUrl(*listen, std::move(xAdminSubdomain)))
+                  {
+                     message += " Visit '" + *url + "' for node setup.";
+                  }
+               }
+            }
+            setupMessage = std::move(message);
+         }
+         else
+         {
+            setupMessage.reset();
+         }
          open<AdminOptionsTable>().put(adminOpts);
       }
+      to<XBasic>().startSession();
       recurse().to<XPeers>().onConfig();
       if (setupMessage)
       {
@@ -692,24 +759,19 @@ namespace LocalService
       if (isAdminSocket(socket, req))
          return {};
 
-      if (chainIsBooted())
-      {
-         if (auto user = to<RTransact>().getUser(req))
-         {
-            PSIBASE_SUBJECTIVE_TX
-            {
-               if (open<AdminAccountTable>().get(*user).has_value())
-                  return {};
-            }
-            return HttpReply{.status      = HttpStatus::forbidden,
-                             .contentType = "text/html",
-                             .body        = toVec("Not authorized")};
-         }
-      }
+      Authenticator authenticator;
+      HttpRequest   subrequest{.host        = req.host,
+                               .method      = req.method,
+                               .target      = req.target,
+                               .contentType = req.contentType,
+                               .headers     = req.headers};
 
-      return HttpReply{.status      = HttpStatus::unauthorized,
-                       .contentType = "text/html",
-                       .body        = toVec("Not authorized")};
+      if (authenticator.add(checkAuthChain(subrequest, socket)))
+         return std::nullopt;
+      if (authenticator.add(to<XBasic>().checkAuth(subrequest, socket)))
+         return std::nullopt;
+
+      return std::move(authenticator).getError();
    }
 
    bool XAdmin::isAdmin(std::optional<AccountNumber>          account,

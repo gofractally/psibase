@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
+import SharedQueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -30,7 +31,7 @@ export const useUpdateContact = () => {
             );
             if (currentUser) {
                 queryClient.invalidateQueries({
-                    queryKey: QueryKey.contacts(zAccount.parse(currentUser)),
+                    queryKey: SharedQueryKey.contacts(zAccount.parse(currentUser)),
                 });
             }
         },
