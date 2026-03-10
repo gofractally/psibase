@@ -12,6 +12,7 @@ function(add suffix)
         common/src/api.cpp
         common/src/block.cpp
         common/src/crypto.cpp
+        common/src/db.cpp
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
         common/src/Rpc.cpp
