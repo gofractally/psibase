@@ -164,6 +164,8 @@ namespace psibase
    inline constexpr uint32_t numIndependentDatabases =
        ((std::uint32_t)DbId::endIndependent) - ((std::uint32_t)DbId::beginIndependent);
 
+   std::string to_string(DbId);
+
    enum class KvMode : std::uint8_t
    {
       none      = 0,

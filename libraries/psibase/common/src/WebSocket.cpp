@@ -6,8 +6,7 @@
 #include <algorithm>
 #include <psibase/HttpHeaders.hpp>
 #include <psibase/api.hpp>
-
-#include "base64.hpp"
+#include <psibase/base64.hpp>
 
 using namespace psibase;
 
@@ -19,65 +18,6 @@ namespace
       return std::ranges::any_of(values, [value](std::string_view s) { return iequal(s, value); });
    }
 
-   constexpr auto base64tab    = psibase::detail::base64Table('+', '/');
-   constexpr auto base64invtab = psibase::detail::invert(base64tab);
-
-   void pad_base64(std::string& s)
-   {
-      switch (s.size() % 4)
-      {
-         case 0:
-            break;
-         case 2:
-            s += "==";
-            break;
-         case 3:
-            s.push_back('=');
-            break;
-         default:
-            assert(!"Wrong size");
-      }
-   }
-
-   std::string to_base64(std::span<const char> s)
-   {
-      std::string result;
-      result.reserve((s.size() + 2) / 3 * 4);
-      psibase::detail::transcode<8, 6, true>(s,
-                                             [&](unsigned ch) { result.push_back(base64tab[ch]); });
-      pad_base64(result);
-      return result;
-   }
-
-   // returns the decoded size if the argument is valid base64
-   std::optional<std::size_t> validate_base64(std::string_view s)
-   {
-      if (s.size() % 4 != 0)
-         return {};
-      std::size_t padding = 0;
-      if (s.ends_with('='))
-      {
-         s.remove_suffix(1);
-         ++padding;
-      }
-      if (s.ends_with('='))
-      {
-         s.remove_suffix(1);
-         ++padding;
-      }
-      for (unsigned char ch : s)
-      {
-         if (base64invtab[ch] == -1)
-            return {};
-      }
-      bool okay = psibase::detail::transcode<6, 8, false>(
-          s | std::ranges::views::transform([](unsigned char ch) { return base64invtab[ch]; }),
-          [&](unsigned ch) {});
-      if (!okay)
-         return {};
-      return (s.size() + padding) / 4 * 3 - padding;
-   }
-
    std::string acceptKey(std::string_view key)
    {
       std::array<char, SHA_DIGEST_LENGTH> hash;
@@ -87,7 +27,7 @@ namespace
       SHA1_Update(&ctx, (const unsigned char*)key.data(), key.size());
       SHA1_Update(&ctx, (const unsigned char*)suffix.data(), suffix.size());
       SHA1_Final((unsigned char*)hash.data(), &ctx);
-      return to_base64(hash);
+      return toBase64(hash);
    }
 
    std::optional<std::string_view> requestKey(const HttpRequest& request)
@@ -101,7 +41,7 @@ namespace
       auto key = request.getHeader("Sec-WebSocket-Key");
       if (!key)
          return {};
-      auto decoded_key_size = validate_base64(*key);
+      auto decoded_key_size = validateBase64(*key);
       if (!decoded_key_size || *decoded_key_size != 16)
          return {};
       auto version = request.getHeader("Sec-WebSocket-Version");
@@ -305,7 +245,7 @@ std::string psibase::randomWebSocketKey()
 {
    char buf[16];
    raw::getRandom(buf, sizeof(buf));
-   return to_base64(buf);
+   return toBase64(buf);
 }
 
 #endif
