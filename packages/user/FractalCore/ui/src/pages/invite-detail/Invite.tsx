@@ -110,7 +110,7 @@ export const Invite = () => {
         const description = isExpired
             ? `This invitation expired ${dayjs().to(expiry)} (${dayjs(
                 expiry,
-            ).format("YYYY/MM/DD HH:mm")}).`
+            ).format("YYYY/MM/DD h:mm A z")}).`
             : `${inviter} has invited you to apply to join the ${guildInvite.guild.displayName} guild in the ${guildInvite.guild.fractal.name} fractal.`;
 
         if (isExpired) {
