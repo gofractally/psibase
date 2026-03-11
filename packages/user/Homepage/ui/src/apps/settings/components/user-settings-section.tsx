@@ -19,17 +19,17 @@ export const UserSettingsSection = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
         useBillingConfig({baseUrlIncludesSibling: false});
-    const billingEnabled =
-        !isLoadingBillingConfig && billingConfig?.enabled === true;
+    const billingInited =
+        !isLoadingBillingConfig && !!billingConfig?.feeReceiver;
+    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken({
+        baseUrlIncludesSibling: false,
+    });
     const {
         data: userResources,
         isLoading: isLoadingResources,
         isError: isUserResourcesError,
         error: userResourcesError,
-    } = useUserResources(currentUser, { enabled: billingEnabled });
-    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken({
-        baseUrlIncludesSibling: false,
-    });
+    } = useUserResources(currentUser, { enabled: billingInited });
     const { mutateAsync: fillGasTank, isPending: isFilling } = useFillGasTank();
     const {
         mutateAsync: resizeAndFillGasTank,
@@ -85,7 +85,7 @@ export const UserSettingsSection = () => {
     };
 
     const isDisabled =
-        !systemToken || isPending || isLoadingResources;
+        !billingInited || isPending || isLoadingResources;
 
     return (
         <div className="space-y-6">
