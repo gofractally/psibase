@@ -45,6 +45,11 @@ export const appMenus: Menu[] = [
         path: "pending-transactions",
     },
     {
+        title: "Premium Market Config",
+        icon: Package,
+        path: "premium-market-config",
+    },
+    {
         title: "Settings",
         icon: Settings,
         path: "settings",

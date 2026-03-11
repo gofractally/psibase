@@ -5,6 +5,7 @@ import { ProtectedRoute } from "./components/protected-route";
 import { Loader } from "./pages/Loader";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";
+import { PremiumMarketConfig } from "./pages/premium-market-config";
 import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
 import { PendingTransactions } from "./pages/pending-transactions";
@@ -56,6 +57,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <PendingTransaction />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "premium-market-config",
+                element: (
+                    <ProtectedRoute>
+                        <PremiumMarketConfig />
                     </ProtectedRoute>
                 ),
             },

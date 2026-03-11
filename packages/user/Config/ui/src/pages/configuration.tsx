@@ -1,4 +1,3 @@
-import { useNetworkVariables } from "@/hooks/use-network-variables";
 import { useServerSpecs } from "@/hooks/use-server-specs";
 
 import {
@@ -36,16 +35,9 @@ const formatBps = (bps: number): string => {
 };
 
 export const Configuration = () => {
-    const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
-    const { data: networkVariables, isLoading: isLoadingVars } =
-        useNetworkVariables();
+    const { data: serverSpecs, isLoading } = useServerSpecs();
 
-    const isLoading = isLoadingSpecs || isLoadingVars;
-
-    const ramBytes =
-        serverSpecs && networkVariables
-            ? serverSpecs.storageBytes / networkVariables.memoryRatio
-            : undefined;
+    const ramBytes = serverSpecs?.recommendedMinMemoryBytes;
 
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">

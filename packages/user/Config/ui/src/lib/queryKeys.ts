@@ -22,6 +22,7 @@ const QueryKey = {
         ["transactionHistory", id] as const,
     sources: () => ["sources"] as const,
     candidates: () => ["candidates"] as const,
+    premiumMarkets: () => ["premiumMarkets"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
