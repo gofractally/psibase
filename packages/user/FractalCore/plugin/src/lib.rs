@@ -56,7 +56,7 @@ define_trust! {
     functions {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
-        Medium => [apply_guild, delete_guild_invite, invite_member, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, push_application, delete_guild_invite, invite_member, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
         High => [attest, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }

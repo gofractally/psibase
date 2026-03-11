@@ -442,7 +442,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `invite_id` - Unique ID of invite.
-    /// * `accepter` - Guild invitee will join.
+    /// * `accepter` - Account name which accepted the invite
     #[action]
     #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
