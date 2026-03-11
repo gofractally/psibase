@@ -93,15 +93,12 @@ namespace
       auto cpu_cost        = to<VirtualServer>().get_cpu_cost(CREATE_ACTION_CPU_NS);
       auto create_act_cost = (net_cost + cpu_cost);
       create_act_cost += create_act_cost / 10;  // 10% buffer for additional net/cpu leeway
-      create_act_cost += create_act_cost / 2;   // 50% buffer to allow resource cost increase
       return create_act_cost;
    }
 
    Quantity get_std_buffer_reserve()
    {
-      auto gas_tank_cost = to<VirtualServer>().std_buffer_cost();
-      gas_tank_cost += gas_tank_cost / 2;  // 50% buffer to allow resource cost increase
-      return gas_tank_cost;
+      return to<VirtualServer>().std_buffer_cost();
    }
 
 }  // namespace

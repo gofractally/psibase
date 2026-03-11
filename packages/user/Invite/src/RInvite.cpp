@@ -78,6 +78,8 @@ namespace UserService
                                          [](auto&& row) { return toInviteDetails(row); });
          }
 
+         /// This query returns the current cost of creating an invite, with a 50% buffer added to account for possible
+         /// resource cost increases between when the query is made and when the invite is created.
          auto getInviteCost(uint16_t numAccounts) const
          {
             auto sys = to<Tokens>().getSysToken();
@@ -86,6 +88,7 @@ namespace UserService
                return Decimal{Quantity{0ULL}, Precision{0}};
             }
             auto cost = to<Invite>().getInvCost(numAccounts);
+            cost += cost / 2;  // 50% buffer to allow resource cost increase
             return Decimal{cost, sys->precision};
          }
 
