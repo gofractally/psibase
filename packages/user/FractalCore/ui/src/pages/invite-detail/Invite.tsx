@@ -14,7 +14,7 @@ import { useDraftApplication } from "@/hooks/use-draft-application";
 import { getInvites } from "@/lib/graphql/fractals/getInvites";
 
 import { useAppForm } from "@shared/components/form/app-form";
-import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useConnectAccount } from "@/hooks/use-connect-account";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
