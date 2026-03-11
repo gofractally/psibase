@@ -57,7 +57,7 @@ class TestFetch(unittest.TestCase):
     def test_proxy(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath, "spin": 100000}) as reply:
             reply.raise_for_status()
@@ -72,7 +72,7 @@ class TestFetch(unittest.TestCase):
     def test_http(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         server = HTTPServer(('', 0), RequestHandler)
 
@@ -99,7 +99,7 @@ class TestFetch(unittest.TestCase):
 
         (a,) = cluster.complete(*testutil.generate_names(1), trustfile=certfile)
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         server = HTTPSServer(certfile)
 
@@ -126,7 +126,7 @@ class TestFetch(unittest.TestCase):
 
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         server = HTTPSServer(certfile)
 
