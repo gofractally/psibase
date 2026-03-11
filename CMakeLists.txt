@@ -142,7 +142,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XPeers XProxy XSocketListService WSEcho XDelay)
+        XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -1021,6 +1021,7 @@ psibase_package(
     SERVICE x-http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XHttp-schema.json
+        SERVER x-http
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1033,6 +1034,7 @@ psibase_package(
     SERVICE x-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPackages-schema.json
+        SERVER x-packages
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1045,6 +1047,7 @@ psibase_package(
     SERVICE x-peers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPeers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPeers-schema.json
+        SERVER x-peers
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1363,7 +1366,23 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XWithServer.psi
+    NAME XWithServer
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Local package with a separate query service"
+    SERVICE x-server
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/ServerId.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/ServerId-schema.json
+        SERVER x-r-server
+    SERVICE x-r-server
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/ServerId.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/ServerId-schema.json
+        DEPENDS wasm
+    PACKAGE_DEPENDS "XHttp(^${PSIBASE_VERSION}.0)"
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay XWithServer)
 
 ExternalProject_Add(
     rust

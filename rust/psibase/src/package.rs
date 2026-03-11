@@ -27,7 +27,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_packages};
+use crate::services::{x_admin, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -789,7 +789,19 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         _compression_level: u32,
     ) -> Result<(), anyhow::Error> {
-        for (account, index, _info) in &self.services {
+        for (account, index, info) in &self.services {
+            if let Some(server) = &info.server {
+                crate::as_text(
+                    client
+                        .post(x_http::SERVICE.url(base_url)?.join("/register_server")?)
+                        .body(serde_json::to_string(&x_http::RegisterServerRequest {
+                            service: *account,
+                            server: *server,
+                        })?)
+                        .header("Content-Type", "application/json"),
+                )
+                .await?;
+            }
             crate::as_text(
                 client
                     .put(
