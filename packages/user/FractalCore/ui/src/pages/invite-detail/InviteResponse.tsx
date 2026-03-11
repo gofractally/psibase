@@ -19,7 +19,7 @@ export const InviteResponse = () => {
 
 
     const { mutateAsync: pushApplication, isIdle, error } = usePushApplication(() => {
-        navigate(`/guild/${guild}/applicants/${currentUser}`)
+        navigate(`/guild/${guild}/membership/applicants/${currentUser}`)
     })
 
     useEffect(() => {
