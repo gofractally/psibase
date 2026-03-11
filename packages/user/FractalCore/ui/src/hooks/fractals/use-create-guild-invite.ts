@@ -7,5 +7,5 @@ export const useCreateGuildInvite = () =>
         loading: "Creating guild invite",
         error: "Failed creating guild invite",
         success: "Created guild invite",
-        isStagable: false
+        isStagable: false,
     });

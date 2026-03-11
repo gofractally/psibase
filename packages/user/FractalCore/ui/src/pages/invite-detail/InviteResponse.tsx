@@ -1,33 +1,36 @@
 import { CircleCheck, LoaderCircle } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { useGuildAccount } from "@/hooks/use-guild-account";
+import { usePushApplication } from "@/hooks/use-push-application";
+
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Card,
     CardDescription,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useGuildAccount } from "@/hooks/use-guild-account";
-import { useNavigate } from "react-router-dom";
-import { usePushApplication } from "@/hooks/use-push-application";
-import { useEffect } from "react";
 
 export const InviteResponse = () => {
-
     const guild = useGuildAccount();
     const { data: currentUser } = useCurrentUser();
     const navigate = useNavigate();
 
-
-    const { mutateAsync: pushApplication, isIdle, error } = usePushApplication(() => {
-        navigate(`/guild/${guild}/membership/applicants/${currentUser}`)
-    })
+    const {
+        mutateAsync: pushApplication,
+        isIdle,
+        error,
+    } = usePushApplication(() => {
+        navigate(`/guild/${guild}/membership/applicants/${currentUser}`);
+    });
 
     useEffect(() => {
         if (guild && isIdle) {
-            pushApplication([guild!])
+            pushApplication([guild!]);
         }
-    }, [isIdle, guild, pushApplication])
-
+    }, [isIdle, guild, pushApplication]);
 
     if (error) {
         <Card className="mx-auto mt-4 w-[350px]">
@@ -38,7 +41,7 @@ export const InviteResponse = () => {
                 <CardTitle>Failed to find invite / application</CardTitle>
                 <CardDescription>Malformed invite</CardDescription>
             </CardHeader>
-        </Card>
+        </Card>;
     }
 
     return (
@@ -50,5 +53,5 @@ export const InviteResponse = () => {
                 <CardTitle className="text-center">Loading...</CardTitle>
             </CardHeader>
         </Card>
-    )
+    );
 };

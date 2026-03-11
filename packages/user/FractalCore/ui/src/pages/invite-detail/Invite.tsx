@@ -10,8 +10,12 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
+import { useDraftApplication } from "@/hooks/use-draft-application";
+import { getInvites } from "@/lib/graphql/fractals/getInvites";
 
-
+import { useAppForm } from "@shared/components/form/app-form";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
     CardContent,
@@ -20,19 +24,8 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { zAccount } from '@shared/lib/schemas/account'
-import { useConnectAccount } from "@/hooks/use-connect-account";
-import { useDraftApplication } from "@/hooks/use-draft-application";
-import { useAppForm } from "@shared/components/form/app-form";
-import { getInvites } from "@/lib/graphql/fractals/getInvites";
-
 
 dayjs.extend(relativeTime);
-
-
-
-
-
 
 export const Invite = () => {
     const [searchParams] = useSearchParams();
@@ -49,19 +42,22 @@ export const Invite = () => {
     });
 
     const { mutateAsync: connectAccount } = useConnectAccount();
+
     const { mutateAsync: draftApplication } = useDraftApplication();
 
     const form = useAppForm({
         defaultValues: {
-            extraInfo: ''
+            extraInfo: "",
         },
         onSubmit: async ({ value: { extraInfo } }) => {
             const guild = zAccount.parse(invite?.guildInvite?.guild.account);
-            await draftApplication([guild, extraInfo])
-            await connectAccount(guild)
-        }
-    })
-
+            await draftApplication([guild, extraInfo]);
+            await connectAccount({
+                enabled: true,
+                returnPath: `/guild/${guild}/invite-response`,
+            });
+        },
+    });
 
     if (!token) {
         return (
@@ -86,12 +82,7 @@ export const Invite = () => {
                         <TriangleAlert className="h-12 w-12" />
                     </div>
                     <CardTitle>Error.</CardTitle>
-                    <CardDescription>
-                        {error.message}
-                    </CardDescription>
-                    <CardDescription>
-                        {error.message}
-                    </CardDescription>
+                    <CardDescription>{error.message}</CardDescription>
                 </CardHeader>
             </Card>
         );
@@ -110,7 +101,8 @@ export const Invite = () => {
         const { guildInvite, vanillaInvite } = invite!;
 
         const now = new Date().valueOf();
-        const isExpired = vanillaInvite.expiryDate.valueOf() < now || guildInvite == null;
+        const isExpired =
+            vanillaInvite.expiryDate.valueOf() < now || guildInvite == null;
         const expiry = vanillaInvite.expiryDate;
 
         const inviter = guildInvite?.inviter;
@@ -120,7 +112,6 @@ export const Invite = () => {
                 expiry,
             ).format("YYYY/MM/DD HH:mm")}).`
             : `${inviter} has invited you to apply to join the ${guildInvite.guild.displayName} guild in the ${guildInvite.guild.fractal.name} fractal.`;
-
 
         if (isExpired) {
             return (
@@ -140,7 +131,6 @@ export const Invite = () => {
                 </Card>
             );
         } else {
-
             return (
                 <Card className="mx-auto mt-4 w-[350px]">
                     <CardHeader>
@@ -154,14 +144,14 @@ export const Invite = () => {
                         <form
                             onSubmit={(e) => {
                                 e.preventDefault();
-                                form.handleSubmit()
+                                form.handleSubmit();
                             }}
                         >
                             <form.AppField
                                 name="extraInfo"
-                                children={(field) => (<field.TextField
-                                    label="Description"
-                                />)}
+                                children={(field) => (
+                                    <field.TextField label="Description" />
+                                )}
                             />
                             <form.AppForm>
                                 <form.SubmitButton
@@ -170,8 +160,7 @@ export const Invite = () => {
                             </form.AppForm>
                         </form>
                     </CardContent>
-                    <CardFooter className="flex justify-between">
-                    </CardFooter>
+                    <CardFooter className="flex justify-between"></CardFooter>
                 </Card>
             );
         }
