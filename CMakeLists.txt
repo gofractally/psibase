@@ -929,14 +929,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/TestFractal.psi
-    NAME TestFractal
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "A test fractal"
-    PACKAGE_DEPENDS "FractalCore(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION})" "Fractals(^${PSIBASE_VERSION})"
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
@@ -1082,7 +1074,7 @@ psibase_package(
     DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1137,7 +1129,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore FractalGen Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
 
 install(
@@ -1190,7 +1182,6 @@ install(
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
-          ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
