@@ -146,6 +146,7 @@ export const Invite = () => {
                                 e.preventDefault();
                                 form.handleSubmit();
                             }}
+                            className="flex flex-col gap-2"
                         >
                             <form.AppField
                                 name="extraInfo"

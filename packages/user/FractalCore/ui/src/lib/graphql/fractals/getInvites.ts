@@ -1,15 +1,16 @@
 import { supervisor } from "@shared/lib/supervisor";
+
 import { getGuildInvite } from "./getGuildInvite";
 import { getInviteById } from "./getInviteById";
-
+import z from "zod";
 
 export const getInvites = async (token: string) => {
-    const inviteId = await supervisor.functionCall({
+    const inviteId = z.number().int().parse(await supervisor.functionCall({
         service: "invite",
         intf: "invitee",
         method: "importInviteToken",
         params: [token],
-    });
+    }));
 
     const [guildInvite, vanillaInvite] = await Promise.all([
         getGuildInvite(inviteId),
@@ -24,8 +25,7 @@ export const getInvites = async (token: string) => {
             : "fractals service";
 
         throw new Error(
-            `Invite ${inviteId} no longer exists on the ${serviceName}. ` +
-            `Please contact ${inviter} for a new invite.`
+            `Invite ${inviteId} no longer exists on the ${serviceName}. Please contact ${inviter} for a new invite.`,
         );
     }
 

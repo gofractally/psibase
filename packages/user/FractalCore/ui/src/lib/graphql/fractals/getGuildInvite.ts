@@ -1,27 +1,28 @@
-import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 import z from "zod";
-import { zDateTime } from "@shared/lib/schemas/date-time";
-import { zAccount } from '@shared/lib/schemas/account'
 
+import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
+
+import { zAccount } from "@shared/lib/schemas/account";
+import { zDateTime } from "@shared/lib/schemas/date-time";
 
 const zGuildInviteDetailsResponse = z.object({
     data: z.object({
-        guildInvite: z.object({
-            createdAt: zDateTime,
-            inviter: zAccount,
-            guild: z.object({
-                account: zAccount,
-                bio: z.string(),
-                displayName: z.string(),
-                fractal: z.object({
-                    name: z.string()
-                })
+        guildInvite: z
+            .object({
+                createdAt: zDateTime,
+                inviter: zAccount,
+                guild: z.object({
+                    account: zAccount,
+                    bio: z.string(),
+                    displayName: z.string(),
+                    fractal: z.object({
+                        name: z.string(),
+                    }),
+                }),
             })
-        }).nullable(),
+            .nullable(),
     }),
 });
-
-
 
 export const getGuildInvite = async (inviteId: number) => {
     const response = await postGraphQLGetJson(
@@ -44,5 +45,4 @@ export const getGuildInvite = async (inviteId: number) => {
         `,
     );
     return zGuildInviteDetailsResponse.parse(response).data.guildInvite;
-}
-
+};
