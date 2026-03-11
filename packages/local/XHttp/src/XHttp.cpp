@@ -505,6 +505,9 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
       if (req.method != "POST")
          return HttpReply::methodNotAllowed(req);
 
+      if (req.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+
       auto body = psio::convert_from_json<RegisteredServiceRow>(
           std::string(req.body.begin(), req.body.end()));
       PSIBASE_SUBJECTIVE_TX

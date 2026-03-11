@@ -798,7 +798,7 @@ impl<R: Read + Seek> PackagedService<R> {
                             service: *account,
                             server: *server,
                         })?)
-                        .header("Content-Type", "application/wasm"),
+                        .header("Content-Type", "application/json"),
                 )
                 .await?;
             }
