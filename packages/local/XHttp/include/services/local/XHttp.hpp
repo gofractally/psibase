@@ -90,6 +90,22 @@ namespace LocalService
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void autoClose(std::int32_t socket, bool value);
 
+      /// Allow another service to send a response to a socket
+      ///
+      /// Auto-close must be enabled and the current owner of the
+      /// socket must be the sender. If local is false, then the
+      /// reply is expected to come through http-server.
+      void giveSocket(std::int32_t socket, psibase::AccountNumber account, bool local);
+
+      /// Take back ownership of a socket
+      ///
+      /// autoClose must not have been disabled after the sender called
+      /// `giveSocket`. local must be true if it was true for the corresponding
+      /// call to `giveSocket`.
+      ///
+      /// Returns true if taking ownership was successful
+      bool takeSocket(std::int32_t socket, bool local);
+
       /// Sends an HTTP response
       ///
       /// The socket must have autoClose enabled
@@ -137,6 +153,8 @@ namespace LocalService
                 method(sendRequest, request, tls, endpoint),
                 method(websocket, request, tls, endpoint),
                 method(autoClose, socket, value),
+                method(giveSocket, socket, service, local),
+                method(takeSocket, socket, local),
                 method(sendReply, socket, response),
                 method(accept, socket, reply, callback, err),
                 method(setCallback, socket, callback, err),

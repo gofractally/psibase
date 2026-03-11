@@ -31,6 +31,7 @@ target_mapped_include_directories(services_local INTERFACE
     XHttp/include
     XPackages/include
     XPeers/include
+    XProxy/include
     XRun/include
     XSites/include
     XTimer/include
@@ -44,6 +45,7 @@ if(DEFINED IS_WASM)
     add_subdirectory(XHttp)
     add_subdirectory(XPackages)
     add_subdirectory(XPeers)
+    add_subdirectory(XProxy)
     add_subdirectory(XRun)
     add_subdirectory(XSites)
     add_subdirectory(XTimer)

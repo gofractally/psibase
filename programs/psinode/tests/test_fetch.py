@@ -59,7 +59,7 @@ class TestFetch(unittest.TestCase):
 
         XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
 
-        with a.post('/set_origin_server', service='x-proxy', json={"host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath, "spin": 100000}) as reply:
+        with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"x-admin.%s" % a.hostname, "endpoint": a.socketpath, "spin": 100000}) as reply:
             reply.raise_for_status()
 
         with a.get('/config', service='x-proxy') as reply:
@@ -79,7 +79,7 @@ class TestFetch(unittest.TestCase):
         t = threading.Thread(target=server.serve_forever)
         t.start()
         try:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1]}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1]}) as reply:
                 reply.raise_for_status()
 
             with a.get('/', service='x-proxy') as reply:
@@ -106,7 +106,7 @@ class TestFetch(unittest.TestCase):
         t = threading.Thread(target=server.serve_forever)
         t.start()
         try:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
                 reply.raise_for_status()
 
             with a.get('/', service='x-proxy') as reply:
@@ -133,7 +133,7 @@ class TestFetch(unittest.TestCase):
         t = threading.Thread(target=server.serve_forever)
         t.start()
         try:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.server_address[1], "tls": {}}) as reply:
                 reply.raise_for_status()
 
             with a.get('/', service='x-proxy', timeout=4) as reply:

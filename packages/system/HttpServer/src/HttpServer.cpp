@@ -116,20 +116,30 @@ namespace SystemService
          to<XHttp>().sendReply(socket, result);
       }
 
-      using Temporary = TemporaryTables<PendingRequestTable>;
+      struct TempPendingRequestRow
+      {
+         std::int32_t                              socket;
+         psibase::AccountNumber                    owner;
+         std::optional<std::vector<AccountNumber>> prevOwners;
+         PSIO_REFLECT(TempPendingRequestRow, socket, owner, prevOwners)
+      };
+      using TempPendingRequestTable =
+          psibase::Table<TempPendingRequestRow, &TempPendingRequestRow::socket>;
+
+      using Temporary = TemporaryTables<TempPendingRequestTable>;
    }  // namespace
 
    void HttpServer::deferReply(std::int32_t socket)
    {
       auto sender = getSender();
-      auto owned  = Temporary{}.open<PendingRequestTable>();
+      auto owned  = Temporary{}.open<TempPendingRequestTable>();
       auto row    = owned.getIndex<0>().get(socket);
       if (row && row->owner == sender)
       {
          PSIBASE_SUBJECTIVE_TX
          {
             auto requests = HttpServer::Session{}.open<PendingRequestTable>();
-            requests.put(*row);
+            requests.put({row->socket, row->owner});
             owned.remove(*row);
             to<XHttp>().autoClose(socket, false);
          }
@@ -146,12 +156,12 @@ namespace SystemService
       PSIBASE_SUBJECTIVE_TX
       {
          auto requests = Session{}.open<PendingRequestTable>();
-         auto owned    = Temporary{}.open<PendingRequestTable>();
+         auto owned    = Temporary{}.open<TempPendingRequestTable>();
          auto row      = requests.get(socket);
          if (row && row->owner == sender)
          {
             requests.remove(*row);
-            owned.put(*row);
+            owned.put({row->socket, row->owner});
          }
          else
          {
@@ -166,7 +176,7 @@ namespace SystemService
    {
       bool okay   = false;
       auto sender = getSender();
-      auto owned  = Temporary{}.open<PendingRequestTable>();
+      auto owned  = Temporary{}.open<TempPendingRequestTable>();
       if (auto row = owned.get(socket))
       {
          if (row->owner == sender)
@@ -196,6 +206,58 @@ namespace SystemService
       sendReplyImpl(sender, socket, std::move(result));
    }
 
+   void HttpServer::giveSocket(std::int32_t socket, AccountNumber service)
+   {
+      auto sender = getSender();
+      auto owned  = Temporary{}.open<TempPendingRequestTable>();
+      if (sender == XHttp::service)
+      {
+         owned.put({.socket = socket, .owner = service});
+      }
+      else
+      {
+         auto row = owned.get(socket);
+         if (!row || row->owner != sender)
+            abortMessage(std::format("{} does not own socket {}", sender.str(), socket));
+         if (!row->prevOwners)
+            row->prevOwners.emplace();
+         row->prevOwners->push_back(sender);
+         row->owner = service;
+         if (std::ranges::contains(*row->prevOwners, service))
+            abortMessage("recursive transfer of socket");
+         owned.put(*row);
+      }
+   }
+
+   bool HttpServer::takeSocket(std::int32_t socket)
+   {
+      auto sender = getSender();
+      auto owned  = Temporary{}.open<TempPendingRequestTable>();
+      auto row    = owned.get(socket);
+      if (sender == XHttp::service)
+      {
+         if (!row)
+            return false;
+         owned.remove(*row);
+         return true;
+      }
+      else
+      {
+         if (!row || !row->prevOwners)
+            return false;
+
+         auto pos = std::ranges::find(*row->prevOwners, sender);
+         if (pos == row->prevOwners->end())
+            return false;
+         row->prevOwners->erase(pos, row->prevOwners->end());
+         if (row->prevOwners->empty())
+            row->prevOwners.reset();
+         row->owner = sender;
+         owned.put(*row);
+         return true;
+      }
+   }
+
    void HttpServer::serve(std::int32_t sock, HttpRequest req)
    {
       check(getSender() == XHttp::service, "Wrong sender");
@@ -213,7 +275,7 @@ namespace SystemService
       std::optional<HttpReply> result;
       psibase::AccountNumber   server;
 
-      auto owned = Temporary{getReceiver()}.open<PendingRequestTable>();
+      auto owned = Temporary{getReceiver()}.open<TempPendingRequestTable>();
 
       auto checkServer = [&](psibase::AccountNumber srv)
       {
