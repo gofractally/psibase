@@ -19,7 +19,7 @@ async function readPackageIndexGQL(url: string, account: string) {
     let done = false;
     const result = [];
     while (!done) {
-        const query = `query { packages(owner: "${account}", first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } edges { node { name version description depends { name version } accounts sha256 file } } } }`;
+        const query = `query { packages(owner: "${account}", first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } edges { node { name version scope description depends { name version } accounts sha256 file } } } }`;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const page = await postGraphQLGetJson<any>(
             url.replace(/\/?$/, "/graphql"),
@@ -27,7 +27,7 @@ async function readPackageIndexGQL(url: string, account: string) {
         );
 
         for (const edge of page.data.packages.edges) {
-            result.push(edge.node);
+            if (edge.node.scope != "local") result.push(edge.node);
         }
         cursorArg = `, after: "${page.data.packages.pageInfo.endCursor}"`;
         done = !page.data.packages.pageInfo.hasNextPage;
@@ -63,7 +63,10 @@ export async function getPackageIndex(owner: string) {
         } else if (source.url) {
             const url = source.url.replace(/\/?$/, "/index.json");
             const index = await getJson<PackageSchemaWithSha[]>(url);
-            result.push({ baseUrl: url, index });
+            result.push({
+                baseUrl: url,
+                index: index.filter((info) => info.scope != "local"),
+            });
         } else {
             console.log("Skipping invalid package source");
         }

@@ -977,6 +977,7 @@ psibase_package(
     NAME XAdmin
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Dashboard for node administrators"
+    LOCAL
     SERVICE x-admin
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XAdmin.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XAdmin-schema.json
@@ -994,6 +995,7 @@ psibase_package(
     NAME XBasic
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Supports HTTP Basic Authentication"
+    LOCAL
     SERVICE x-basic
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XBasic.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XBasic-schema.json
@@ -1006,6 +1008,7 @@ psibase_package(
     NAME XDb
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Manages access to subjective databases"
+    LOCAL
     SERVICE x-db
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XDb.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDb-schema.json
@@ -1018,6 +1021,7 @@ psibase_package(
     NAME XHttp
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Entry point for HTTP requests"
+    LOCAL
     SERVICE x-http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XHttp-schema.json
@@ -1031,6 +1035,7 @@ psibase_package(
     NAME XPackages
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Manages local packages"
+    LOCAL
     SERVICE x-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPackages-schema.json
@@ -1044,6 +1049,7 @@ psibase_package(
     NAME XPeers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Mangages p2p connections"
+    LOCAL
     SERVICE x-peers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPeers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPeers-schema.json
@@ -1057,6 +1063,7 @@ psibase_package(
     NAME XProxy
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Simple reverse proxy"
+    LOCAL
     SERVICE x-proxy
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
@@ -1069,6 +1076,7 @@ psibase_package(
     NAME XRun
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Wrapper around the host API to dispatch asynchronous tasks"
+    LOCAL
     SERVICE x-run
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XRun.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XRun-schema.json
@@ -1081,6 +1089,7 @@ psibase_package(
     NAME XSites
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Manages static content for local services"
+    LOCAL
     SERVICE x-sites
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XSites.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSites-schema.json
@@ -1092,6 +1101,7 @@ psibase_package(
     NAME XTimer
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Schedules asyncronous tasks"
+    LOCAL
     SERVICE x-timer
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XTimer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XTimer-schema.json
@@ -1104,6 +1114,7 @@ psibase_package(
     NAME XTransact
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Wrapper around the host API to apply transactions"
+    LOCAL
     SERVICE x-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XTransact-schema.json
@@ -1154,6 +1165,7 @@ psibase_package(
     NAME XDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
+    LOCAL
     PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact
 )
 
@@ -1335,6 +1347,7 @@ psibase_package(
     NAME XSocketList
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Lists active sockets"
+    LOCAL
     SERVICE x-sock-list
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService-schema.json
@@ -1348,6 +1361,7 @@ psibase_package(
     NAME WSEcho
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Accepts websocket connections and echos all messages"
+    LOCAL
     SERVICE x-echo
         WASM ${CMAKE_CURRENT_BINARY_DIR}/WSEcho.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/WSEcho-schema.json
@@ -1360,6 +1374,7 @@ psibase_package(
     NAME XDelay
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test for XTimer"
+    LOCAL
     SERVICE x-delay
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XDelay.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XDelay-schema.json
@@ -1372,6 +1387,7 @@ psibase_package(
     NAME XWithServer
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Local package with a separate query service"
+    LOCAL
     SERVICE x-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ServerId.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/ServerId-schema.json
