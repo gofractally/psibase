@@ -18,6 +18,8 @@ pub mod tables {
     pub struct Auction {
         pub length: u8,
         pub nft_id: u32,
+        // None = enabled by default; Some(false) explicitly disables the market
+        pub enabled: Option<bool>,
     }
 
     impl Auction {
@@ -96,7 +98,7 @@ pub mod service {
 
         // Create DiffAdjust records for account name lengths 1 through 9
         let auctions_table = AuctionsTable::new();
-        for length in 1..=9 {
+        for length in 1..=10 {
             // Create a DiffAdjust rate limiter for this length
             let nft_id = DiffAdjust::call().create(
                 INIT_DIFFICULTY, // initial_difficulty
@@ -108,7 +110,13 @@ pub mod service {
                 50000,           // dec_ppm (5% = 50000 ppm)
             );
 
-            auctions_table.put(&Auction { length, nft_id }).unwrap();
+            auctions_table
+                .put(&Auction {
+                    length,
+                    nft_id,
+                    enabled: Some(true),
+                })
+                .unwrap();
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
@@ -150,8 +158,8 @@ pub mod service {
 
         let length = account.len() as u8;
         check(
-            length >= 1 && length <= 9,
-            "account name must be 1-9 characters",
+            length >= 1 && length <= 10,
+            "account name must be 1-10 characters",
         );
 
         let sys_token = check_some(
@@ -172,6 +180,9 @@ pub mod service {
             auctions_table.get_index_pk().get(&length),
             "auction not found for this length",
         );
+
+        let is_enabled = auction.enabled.unwrap_or(true);
+        check(is_enabled, "market for this length is disabled");
 
         let current_price = DiffAdjust::call().get_diff(auction.nft_id);
 
@@ -259,13 +270,22 @@ pub mod service {
     }
 
     #[action]
-    fn enable_market(length: u8, initial_price: u64, target_sales: u32, floor_price: u64) {
+    fn update_market_status(length: u8, enable: bool) {
         check_init();
-    }
 
-    #[action]
-    fn disable_market(length: u8) {
-        check_init();
+        check(
+            length >= 1 && length <= 10,
+            "account name must be 1-10 characters",
+        );
+
+        let table = AuctionsTable::new();
+        let mut auction = check_some(
+            table.get_index_pk().get(&length),
+            "auction not found for this length",
+        );
+
+        auction.enabled = Some(enable);
+        table.put(&auction).unwrap();
     }
 
     pub const BOUGHT: u8 = 0;

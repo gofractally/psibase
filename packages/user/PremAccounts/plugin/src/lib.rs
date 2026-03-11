@@ -33,7 +33,7 @@ define_trust! {
     }
     functions {
         Low => [get_prices],
-        High => [buy, claim],
+        High => [buy, claim, update_market_status],
     }
 }
 
@@ -74,6 +74,15 @@ impl Api for PremAccountsPlugin {
             return Err(ErrorType::AccountPurchaseFailed(account.to_string()).into());
         }
         Ok(())
+    }
+
+    fn update_market_status(length: u8, enable: bool) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::update_market_status)?;
+
+        let packed_args = prem_accounts::action_structs::update_market_status { length, enable }.packed();
+
+        add_action_to_transaction("update_market_status", &packed_args)
+            .map_err(|_| ErrorType::AccountPurchaseFailed(format!("update_market_status({length}, {enable}) failed")).into())
     }
 
     fn claim(account: String) -> Result<String, Error> {

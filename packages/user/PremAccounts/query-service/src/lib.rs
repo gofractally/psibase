@@ -18,6 +18,14 @@ mod service {
         action: u8,
     }
 
+    #[derive(SimpleObject)]
+    struct MarketStatus {
+        /// Account name length (market identifier)
+        length: u8,
+        /// Whether this market is currently enabled
+        enabled: bool,
+    }
+
     #[ComplexObject]
     impl PremiumAccountEvent {
         pub async fn action(&self) -> String {
@@ -110,6 +118,21 @@ mod service {
                 .before(before)
                 .after(after)
                 .query()
+        }
+
+        /// Returns all premium name markets and whether each is enabled.
+        async fn marketsStatus(&self) -> Vec<MarketStatus> {
+            let auctions_table = AuctionsTable::read();
+            let mut markets = Vec::new();
+
+            for auction in auctions_table.get_index_pk().iter() {
+                markets.push(MarketStatus {
+                    length: auction.length,
+                    enabled: auction.enabled.unwrap_or(true),
+                });
+            }
+
+            markets
         }
     }
 
