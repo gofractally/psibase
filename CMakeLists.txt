@@ -1386,6 +1386,7 @@ psibase_package(
     NAME XWithServer
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Local package with a separate query service"
+    LOCAL
     SERVICE x-server
         WASM ${CMAKE_CURRENT_BINARY_DIR}/ServerId.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/ServerId-schema.json
