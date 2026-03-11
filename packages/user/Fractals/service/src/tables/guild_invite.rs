@@ -1,9 +1,8 @@
 use async_graphql::ComplexObject;
 
 use psibase::{
-    check, check_some, get_sender,
-    services::{tokens::Quantity, virtual_server},
-    AccountNumber, Memo, Table, TimePointSec,
+    check, check_some, get_sender, services::tokens::Quantity, AccountNumber, Memo, Table,
+    TimePointSec,
 };
 
 use crate::{
@@ -37,11 +36,7 @@ impl GuildInvite {
     }
 
     fn invite_cost(num_accounts: u16) -> Quantity {
-        if virtual_server::Wrapper::call().is_billing_enabled() {
-            psibase::services::invite::Wrapper::call().getInvCost(num_accounts)
-        } else {
-            0.into()
-        }
+        psibase::services::invite::Wrapper::call().getInvCost(num_accounts)
     }
 
     pub fn add(

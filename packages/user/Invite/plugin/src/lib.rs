@@ -89,10 +89,15 @@ fn encode_invite_token(invite_id: u32, symmetric_key: Vec<u8>) -> String {
     base64::url::encode(data.as_slice())
 }
 
+struct InviteDetailsInternal {
+    details: InviteDetails,
+    min_cost: String,
+}
+
 fn prepare_new_invite_impl(
     num_accounts: u16,
     service_name: String,
-) -> Result<InviteDetails, HostTypes::Error> {
+) -> Result<InviteDetailsInternal, HostTypes::Error> {
     let keypair = keyvault::generate_unmanaged_keypair()?;
     let (symmetric_key, secret) = create_secret(keypair.private_key.as_bytes());
 
@@ -121,10 +126,12 @@ fn prepare_new_invite_impl(
     }
     .packed();
 
-    Ok(InviteDetails {
-        invite_token,
-        invite_id,
-        payload,
+    Ok(InviteDetailsInternal {
+        details: InviteDetails {
+            invite_token,
+            invite_id,
+            payload,
+        },
         min_cost,
     })
 }
@@ -243,10 +250,13 @@ impl Inviter for InvitePlugin {
             trust::FunctionName::generate_invite,
             vec!["homepage".into()],
         )?;
-        let InviteDetails {
-            invite_token,
-            invite_id,
-            payload,
+        let InviteDetailsInternal {
+            details:
+                InviteDetails {
+                    invite_token,
+                    invite_id,
+                    payload,
+                },
             min_cost,
         } = prepare_new_invite_impl(1, get_receiver())?;
 
@@ -276,7 +286,7 @@ impl Inviter for InvitePlugin {
             vec!["fractals".to_string()],
         )?;
 
-        prepare_new_invite_impl(num_accounts, service_name)
+        Ok(prepare_new_invite_impl(num_accounts, service_name)?.details)
     }
 
     fn delete_invite(token: String) -> Result<(), HostTypes::Error> {

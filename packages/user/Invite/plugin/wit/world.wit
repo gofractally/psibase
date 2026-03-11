@@ -16,7 +16,6 @@ interface types {
         invite-token: string,
         invite-id: u32,
         payload: list<u8>,
-        min-cost: string,
     }
 
     type invite-token = string;
@@ -57,9 +56,6 @@ interface inviter {
     /// * `invite-id` - An id that must be used when calling create-invite
     /// * `payload` - A packed payload containing various important invite data, must be passed through
     ///               to the service when calling create-invite
-    /// * `min-cost` - The minimum cost of creating the invite for the specified number of 
-    ///                accounts. This amount (at minimum) must be credited to the invite service 
-    ///                before creating the invite.
     prepare-new-invite: func(num-accounts: u16, service-name: string) -> result<invite-details, error>;
 
     /// Used by the creator of an invite to delete it. Deleted invites are removed
