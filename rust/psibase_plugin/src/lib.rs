@@ -16,8 +16,6 @@ mod wasm {
     mod permissions;
     pub mod trust;
 
-    pub mod graphql;
-
     pub mod error_trait;
 
     mod transact;
@@ -32,8 +30,6 @@ pub use psibase::authorized;
 
 #[cfg(target_family = "wasm")]
 pub use psibase::PluginError as ErrorEnum;
-
-mod graphql_utils;
 
 /* TODO: Add modules for:
  * - host:prompt
