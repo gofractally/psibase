@@ -177,9 +177,11 @@ impl Chain {
             block_on(PackageList::new().resolve_changes(&registry, &package_names, false, true))
                 .unwrap();
         let mut requests = Vec::new();
+        let mut early_requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
+        let root_host = "\0";
         for op in packages {
             let PackageOp::Install(info) = op else {
                 panic!("Only install is expected when there are no existing packages")
@@ -206,9 +208,30 @@ impl Chain {
                 };
                 let key = code_by_hash_row.key();
                 self.kv_put(DbId::NativeSubjective, &key, &code_by_hash_row);
-            }
 
-            let root_host = "\0";
+                if let Some(server) = &info.server {
+                    let body: Vec<u8> =
+                        serde_json::to_string(&services::x_http::RegisterServerRequest {
+                            service: *account,
+                            server: *server,
+                        })
+                        .unwrap()
+                        .into();
+                    let req = HttpRequest {
+                        host: services::x_http::SERVICE.to_string() + "." + root_host,
+                        method: "POST".to_string(),
+                        target: "/register_server".to_string(),
+                        contentType: "application/json".to_string(),
+                        headers: vec![],
+                        body: body.into(),
+                    };
+                    if account == &services::x_packages::SERVICE {
+                        early_requests.push(req);
+                    } else {
+                        requests.push(req);
+                    }
+                }
+            }
 
             for (account, path, file) in package.data() {
                 let Some(mime_type) = mime_guess::from_path(&path).first() else {
@@ -247,6 +270,17 @@ impl Chain {
             unsafe { tester_raw::commitSubjective(self.chain_handle) },
             "Failed to commit changes",
         );
+        for request in early_requests {
+            let reply = self.http(&request).unwrap();
+            if reply.status != 200 {
+                panic!(
+                    "{} {} failed: {}",
+                    request.method,
+                    request.target,
+                    reply.text().unwrap()
+                );
+            }
+        }
         for request in requests {
             let reply = self.http(&request).unwrap();
             if reply.status != 200 {

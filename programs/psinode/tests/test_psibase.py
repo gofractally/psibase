@@ -168,7 +168,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo = Foo()
 
@@ -188,7 +188,7 @@ class TestPsibase(unittest.TestCase):
 
     def do_test_upgrade(self, cluster, command, v2=False):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo = Foo()
 
@@ -228,7 +228,7 @@ class TestPsibase(unittest.TestCase):
         self.assertIn('status: not installed', info)
         self.assertIn('Explorer', info)
 
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo = Foo()
 
@@ -270,7 +270,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_list(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         # A non-existent account should be an error
         for source in ['neminis', 'http://neminis.aaaaaaa123/']:
@@ -344,7 +344,7 @@ class TestPsibase(unittest.TestCase):
                 self.assertEqual(search('bar'), '')
                 self.assertEqual(search('foo', 'original'), 'foo 1.0.0\n')
             check_repo()
-            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+            a.boot(packages=['Minimal', 'Explorer', 'Sites'])
             check_repo()
             self.assertIn('Transact ', search('^transact$'))
 
@@ -366,9 +366,21 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file3.txt', 'x-foo'), 'added')
 
     @testutil.psinode_test
+    def test_local_install_with_server(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.run_psibase(['install', '--local'] + a.node_args() + ['XWithServer', '--package-source', testutil.test_packages()])
+        # Should use the registered server, not the service
+        with a.get('/id', service='x-server') as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), "x-r-server")
+        # If no server is registered, requests should return 404
+        with a.get('/id', service='x-r-server') as reply:
+            self.assertEqual(reply.status_code, 404)
+
+    @testutil.psinode_test
     def test_configure_sources(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
         xfoo10 = TestPackage('xfoo', '1.0.0', scope='local').service('x-foo', data={'file2.txt', 'data2'})

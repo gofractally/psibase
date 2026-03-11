@@ -29,6 +29,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/CTestTestfile.cmake)
 option(BUILD_STATIC "Build static binaries" OFF)
 option(ENABLE_SSL "Build psinode with TLS support" ON)
 
+set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
+set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
+
 add_subdirectory(native)
 add_subdirectory(rust)
 file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"native\" \"rust\")\n")
@@ -139,7 +142,7 @@ if(DEFINED WASI_SDK_PREFIX)
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService
         SubjectiveCounterService KeepSocketService Loop
-        XPackages XPeers XProxy XSocketListService WSEcho XDelay)
+        XPackages XPeers XProxy XSocketListService WSEcho XDelay ServerId)
     set(WASM_BYPRODUCTS)
     foreach(s ${SERVICES})
         list(APPEND WASM_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${s}.wasm ${CMAKE_CURRENT_BINARY_DIR}/${s}-schema.json)
@@ -172,6 +175,8 @@ if(DEFINED WASI_SDK_PREFIX)
             -DCMAKE_INSTALL_INCLUDEDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/include
             -DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_DATADIR}/wasi-sysroot/lib
             -DPSITEST_EXECUTABLE=$<TARGET_FILE:psitest>
+            -DUSER_WORKSPACE_TARGET=${USER_WORKSPACE_TARGET}
+            -DSYSTEM_WORKSPACE_TARGET=${SYSTEM_WORKSPACE_TARGET}
         BUILD_BYPRODUCTS ${WASM_BYPRODUCTS}
     )
     file(APPEND ${CMAKE_BINARY_DIR}/CTestTestfile.cmake "subdirs(\"wasm\")\n")
@@ -275,6 +280,7 @@ add_rs_component_workspace(packages/:Plugins
     auth-delegate
     auth-sig
     base64
+    brotli-codec
     kdf
     kvtests
     setcode
@@ -303,8 +309,6 @@ include(GNUInstallDirs)
 include(libraries/psibase/sdk/pack_service.cmake)
 
 set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
-set(USER_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/target)
-set(SYSTEM_WORKSPACE_TARGET ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/target)
 
 set(PSIBASE_VERSION 0.23)
 
@@ -358,6 +362,17 @@ psibase_package(
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE base64
         DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
+    NAME BrotliCodec
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Brotli compression/decompression plugin"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    SERVICE brotli-codec
+        DATA ${Plugins_OUTPUT_FILE_brotli_codec} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
 
@@ -510,8 +525,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/BrotliCodec.psi
-    PATH packages/user/BrotliCodec
+    OUTPUT ${SERVICE_DIR}/BrotliSvc.psi
+    PATH packages/user/BrotliSvc
     TARGET_DIR ${USER_WORKSPACE_TARGET}
 )
 
@@ -713,7 +728,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_sites} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "BrotliSvc(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1010,6 +1025,7 @@ psibase_package(
     SERVICE x-http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XHttp.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XHttp-schema.json
+        SERVER x-http
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1023,6 +1039,7 @@ psibase_package(
     SERVICE x-packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPackages-schema.json
+        SERVER x-packages
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1036,6 +1053,7 @@ psibase_package(
     SERVICE x-peers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XPeers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XPeers-schema.json
+        SERVER x-peers
         FLAGS isPrivileged
     DEPENDS wasm
 )
@@ -1096,7 +1114,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
 )
@@ -1106,7 +1124,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
@@ -1126,7 +1144,7 @@ psibase_package(
     NAME TestDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Packages used in the tester"
-    PACKAGE_DEPENDS AuthSig BrotliCodec Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
+    PACKAGE_DEPENDS AuthSig BrotliCodec BrotliSvc Db Events Minimal Nft Sites StagedTx Supervisor Symbol Tokens
 )
 
 psibase_package(
@@ -1152,7 +1170,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
+    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XRun XSites XTimer XTransact)
@@ -1168,6 +1186,7 @@ install(
           ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
           ${SERVICE_DIR}/BrotliCodec.psi
+          ${SERVICE_DIR}/BrotliSvc.psi
           ${SERVICE_DIR}/Chainmail.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
@@ -1362,7 +1381,23 @@ psibase_package(
     DEPENDS wasm
 )
 
-write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay)
+psibase_package(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test-packages/XWithServer.psi
+    NAME XWithServer
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Local package with a separate query service"
+    SERVICE x-server
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/ServerId.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/ServerId-schema.json
+        SERVER x-r-server
+    SERVICE x-r-server
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/ServerId.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/ServerId-schema.json
+        DEPENDS wasm
+    PACKAGE_DEPENDS "XHttp(^${PSIBASE_VERSION}.0)"
+)
+
+write_package_index(test-index ${CMAKE_CURRENT_BINARY_DIR}/test-packages PSubjective Counter AsyncQuery SubjectiveCounter KeepSocket Loop XProxy XSocketList WSEcho XDelay XWithServer)
 
 ExternalProject_Add(
     rust
