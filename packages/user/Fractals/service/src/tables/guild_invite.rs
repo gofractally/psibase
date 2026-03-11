@@ -107,7 +107,7 @@ impl GuildInvite {
                 "expected system token to issue refund",
             )
             .id;
-            tokens.debit(system_token, from, amount, memo);
+            tokens.debit(system_token, from, amount, memo.clone());
             tokens.credit(system_token, to, amount, memo);
             tokens.reject(system_token, from, "Unused amount".into());
         }
