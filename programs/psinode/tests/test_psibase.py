@@ -371,11 +371,22 @@ class TestPsibase(unittest.TestCase):
         a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
+        xfoo10 = TestPackage('xfoo', '1.0.0', scope='local').service('x-foo', data={'file2.txt', 'data2'})
         with tempfile.TemporaryDirectory() as dir:
-            path = os.path.join(dir, foo10.write(dir)["file"])
-            a.run_psibase(["publish", "-S", "root"] + a.node_args() + [path])
+            path1 = os.path.join(dir, foo10.write(dir)["file"])
+            path2 = os.path.join(dir, xfoo10.write(dir)["file"])
+            a.run_psibase(["publish", "-S", "root"] + a.node_args() + [path1, path2])
             a.push_action("root", "packages", "setSources", {"sources": [{"account":"root"}]})
             a.wait(new_block())
+            available = a.run_psibase(['list', '--available'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            print("list --available")
+            print(available)
+            # Local packages should not be included
+            self.assertNotIn('xfoo', available)
+            local = a.run_psibase(['list', '--local', '--available'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            print("list --local --available")
+            print(local)
+            self.assertIn('xfoo', local)
             a.run_psibase(['install'] + a.node_args() + ['foo'])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'data')
