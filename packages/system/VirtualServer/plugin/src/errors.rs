@@ -9,4 +9,6 @@ pub enum ErrorType {
     ConversionError(String),
     #[error("Percentage to PPM overflow")]
     Overflow,
+    #[error("Query error: {0}")]
+    QueryError(String),
 }

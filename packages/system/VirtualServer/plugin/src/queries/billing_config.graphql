@@ -1,5 +1,0 @@
-query BillingConfig {
-    getBillingConfig {
-        enabled
-    }
-}
