@@ -624,11 +624,11 @@ extern "C" [[clang::export_name("serve")]] void serve()
          server = {service, service};
 
       std::optional<HttpReply> reply;
-      owned.put({.socket = sock, .owner = service});
 
       // Handle registered servers
       if (server)
       {
+         owned.put({.socket = sock, .owner = server->server});
          reply = psibase::Actor<ServerInterface>(XHttp::service, server->server)
                      .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
          if (!owned.get(sock))
@@ -647,6 +647,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          }
          if (code)
          {
+            owned.put({.socket = sock, .owner = XSites::service});
             reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
                         .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
 
