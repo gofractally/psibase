@@ -14,7 +14,7 @@ mod service {
 
     /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
     #[action]
-    fn send(socket: i32, data: Vec<u8>) {
+    fn send(socket: i32, data: Vec<u8>, flags: u32) {
         unimplemented!()
     }
 

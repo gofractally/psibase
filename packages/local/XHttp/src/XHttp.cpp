@@ -160,8 +160,8 @@ extern "C" [[clang::export_name("recv")]] void recv()
    psibase::internal::receiver = XHttp::service;
    auto act                    = getCurrentActionView();
 
-   auto [socket, data] =
-       psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
+   auto [socket, data, flags] =
+       psio::view<const std::tuple<std::int32_t, std::vector<char>, std::uint32_t>>(act->rawData());
    // if this is a response to an HTTP request, send it to the owner
    auto                              requests = XHttp{}.open<ResponseHandlerTable>();
    std::optional<ResponseHandlerRow> row;
@@ -275,7 +275,7 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
 
 #endif
 
-void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
+void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags)
 {
    if (socket == producer_multicast)
    {
@@ -292,7 +292,7 @@ void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
       if (!row || row->service != getSender() || row->type != SocketType::websocket)
          abortMessage("Wrong sender");
    }
-   check(psibase::socketSend(socket, data) == 0, "socketSend failed");
+   check(psibase::socketSend(socket, data, flags) == 0, "socketSend failed");
 }
 
 std::int32_t XHttp::sendRequest(HttpRequest                   request,

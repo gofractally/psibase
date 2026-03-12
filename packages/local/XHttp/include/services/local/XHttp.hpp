@@ -57,7 +57,7 @@ namespace LocalService
       /// Sends a message to a socket
       ///
       /// HTTP sockets should use sendReply, instead.
-      void send(std::int32_t socket, psio::view<const std::vector<char>> data);
+      void send(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
 
       /// Sends an HTTP request and returns the new socket
       ///
@@ -149,7 +149,7 @@ namespace LocalService
       void startSession();
    };
    PSIO_REFLECT(XHttp,
-                method(send, socket, data),
+                method(send, socket, data, flags),
                 method(sendRequest, request, tls, endpoint),
                 method(websocket, request, tls, endpoint),
                 method(autoClose, socket, value),

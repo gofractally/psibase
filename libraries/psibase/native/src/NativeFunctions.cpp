@@ -1054,14 +1054,16 @@ namespace psibase
       return -static_cast<std::int32_t>(wasi_errno_nosys);
    }
 
-   int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
+   int32_t NativeFunctions::socketSend(int32_t                     fd,
+                                       eosio::vm::span<const char> msg,
+                                       std::uint32_t               flags)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
       return transactionContext.blockContext.systemContext.sockets->send(
-          *transactionContext.blockContext.writer, fd, msg);
+          *transactionContext.blockContext.writer, fd, msg, flags);
    }
 
    int32_t NativeFunctions::socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value)

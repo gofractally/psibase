@@ -68,7 +68,9 @@ namespace SystemService
                                " is not authorized to receive messages");
    }
 
-   void HttpServer::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
+   void HttpServer::recv(std::int32_t                        socket,
+                         psio::view<const std::vector<char>> data,
+                         std::uint32_t                       flags)
    {
       check(getSender() == XHttp::service, "Wrong sender");
       if (socket == producer_multicast)
@@ -85,7 +87,7 @@ namespace SystemService
       if (getSender() != act.service)
          psibase::abortMessage(getSender().str() + " cannot send messages to " + act.service.str());
       checkRecvAuth(act);
-      to<XHttp>().send(producer_multicast, psio::to_frac(act));
+      to<XHttp>().send(producer_multicast, psio::to_frac(act), 0);
    }
 
    namespace

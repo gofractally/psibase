@@ -51,7 +51,7 @@ namespace LocalService
       void onReply(std::int32_t socket, psibase::HttpReply reply);
       void onAccept(std::int32_t socket, psibase::HttpReply reply);
       void onError(std::int32_t socket, std::optional<psibase::HttpReply> reply);
-      void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
+      void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
       void close(std::int32_t socket);
    };
    PSIO_REFLECT(XProxy,
@@ -59,7 +59,7 @@ namespace LocalService
                 method(onReply, socket, reply),
                 method(onAccept, socket, reply),
                 method(onError, socket, reply),
-                method(recv, socket, data),
+                method(recv, socket, data, flags),
                 method(close, socket))
    PSIBASE_REFLECT_TABLES(XProxy, XProxy::Subjective, XProxy::Session)
 }  // namespace LocalService

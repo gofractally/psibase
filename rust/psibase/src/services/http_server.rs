@@ -64,7 +64,7 @@ mod service {
 
     /// Entry point for messages
     #[action]
-    fn recv(socket: i32, data: Hex<Vec<u8>>) {
+    fn recv(socket: i32, data: Hex<Vec<u8>>, flags: u32) {
         unimplemented!()
     }
     /// Entry point for HTTP requests

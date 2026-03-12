@@ -90,7 +90,7 @@ namespace SystemService
       void registerServer(psibase::AccountNumber server);
 
       // Entry point for messages
-      void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
+      void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
       // Entry point for HTTP requests
       void serve(std::int32_t socket, psibase::HttpRequest req);
 
@@ -105,7 +105,7 @@ namespace SystemService
                 method(giveSocket, socket, service),
                 method(takeSocket, socket),
                 method(registerServer, server),
-                method(recv, socket, data),
+                method(recv, socket, data, flags),
                 method(serve, socket, req),
                 method(rootHost, host))
 

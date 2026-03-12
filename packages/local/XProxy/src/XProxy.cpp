@@ -189,7 +189,9 @@ void XProxy::close(std::int32_t socket)
    }
 }
 
-void XProxy::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
+void XProxy::recv(std::int32_t                        socket,
+                  psio::view<const std::vector<char>> data,
+                  std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");
    auto                        table = open<WebSocketTable>();
@@ -199,7 +201,7 @@ void XProxy::recv(std::int32_t socket, psio::view<const std::vector<char>> data)
       row = table.get(socket);
    }
    if (row)
-      to<XHttp>().send(row->to, data);
+      to<XHttp>().send(row->to, data, flags);
 }
 
 PSIBASE_DISPATCH(XProxy)

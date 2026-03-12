@@ -148,7 +148,10 @@ void psibase::raw::kvRemove(KvHandle db, const char* key, uint32_t keyLen)
                                   fullKey.data(), fullKey.size());
 }
 
-std::int32_t psibase::raw::socketSend(std::int32_t fd, const void* data, std::size_t size)
+std::int32_t psibase::raw::socketSend(std::int32_t  fd,
+                                      const void*   data,
+                                      std::size_t   size,
+                                      std::uint32_t flags)
 {
    psibase::abortMessage("Tester does not support socketSend");
 }
