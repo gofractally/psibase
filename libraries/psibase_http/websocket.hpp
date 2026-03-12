@@ -12,6 +12,7 @@
 #include <psibase/BlockContext.hpp>
 #include <psibase/Socket.hpp>
 #include <psibase/SystemContext.hpp>
+#include <psibase/WebSocket.hpp>
 #include <psibase/db.hpp>
 #include <psibase/peer_manager.hpp>
 #include <psibase/serviceEntry.hpp>
@@ -57,6 +58,7 @@ namespace psibase::http
       {
          std::vector<char>                           data;
          std::function<void(const std::error_code&)> callback;
+         bool                                        binary = true;
       };
 
       explicit WebSocket(server_state& server, SocketInfo&& info);
@@ -83,8 +85,10 @@ namespace psibase::http
          impl->close(shared_from_this());
       }
       void onLock(CloseLock&& l) override { impl->onLock(std::move(l), shared_from_this()); }
-      void send(Writer&, std::span<const char> data) override
+      void send(Writer&, std::span<const char> data, std::uint32_t flags) override
       {
+         if (flags != WebSocketFlags::binary && flags != WebSocketFlags::text)
+            abortMessage("Invalid websocket flags: " + std::to_string(flags));
          std::vector<char> copy(data.begin(), data.end());
          bool              first;
          {
@@ -92,7 +96,7 @@ namespace psibase::http
             if (state != StateType::normal)
                return;
             first = impl && outbox.empty();
-            outbox.push_back({std::move(copy)});
+            outbox.push_back({.data = std::move(copy), .binary = flags == WebSocketFlags::binary});
          }
          PSIBASE_LOG(logger, debug) << "Sending message: " << data.size() << " bytes";
          if (first)
@@ -100,7 +104,7 @@ namespace psibase::http
             impl->startWrite(shared_from_this());
          }
       }
-      void handleMessage(CloseLock&& l);
+      void handleMessage(CloseLock&& l, bool binary);
       bool handleP2P();
       void error(const std::error_code& ec)
       {
@@ -306,7 +310,7 @@ namespace psibase::http
       }
       void writeLoop(std::shared_ptr<WebSocket>&& self)
       {
-         const std::vector<char>* data;
+         const WebSocket::QueueItem* item;
          {
             std::unique_lock l{self->mutex};
             if (self->state != WebSocket::StateType::normal)
@@ -319,11 +323,11 @@ namespace psibase::http
             }
             else
             {
-               data = &self->outbox.front().data;
+               item = &self->outbox.front();
             }
          }
-         stream.binary(true);
-         auto buffer = boost::asio::buffer(*data);
+         stream.binary(item->binary);
+         auto buffer = boost::asio::buffer(item->data);
          stream.async_write(
              buffer,
              [self = std::move(self)](const std::error_code& ec,
@@ -379,23 +383,24 @@ namespace psibase::http
                       return;
                    if (auto l = self->server.sharedState->sockets()->lockRecv(self))
                    {
-                      self->handleMessage(std::move(l));
-                      static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self));
+                      auto derived = static_cast<WebSocketImpl*>(self->impl.get());
+                      self->handleMessage(std::move(l), derived->stream.got_binary());
+                      derived->readLoop(std::move(self));
                    }
                 }
              });
       }
       void onLock(CloseLock&& l, std::shared_ptr<WebSocket>&& self) override
       {
-         boost::asio::post(
-             stream.get_executor(),
-             [l = std::move(l), self = std::move(self)]() mutable
-             {
-                if (self->handleP2P())
-                   return;
-                self->handleMessage(std::move(l));
-                static_cast<WebSocketImpl*>(self->impl.get())->readLoop(std::move(self));
-             });
+         boost::asio::post(stream.get_executor(),
+                           [l = std::move(l), self = std::move(self)]() mutable
+                           {
+                              if (self->handleP2P())
+                                 return;
+                              auto derived = static_cast<WebSocketImpl*>(self->impl.get());
+                              self->handleMessage(std::move(l), derived->stream.got_binary());
+                              derived->readLoop(std::move(self));
+                           });
       }
       Stream stream;
    };

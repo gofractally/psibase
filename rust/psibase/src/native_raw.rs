@@ -207,7 +207,7 @@ extern "C" {
     /// Errors:
     /// - `EBADF`: fd is not a valid file descriptor
     /// - `ENOTSOCK`: fd is not a socket
-    pub fn socketSend(fd: i32, data: *const u8, len: usize) -> i32;
+    pub fn socketSend(fd: i32, data: *const u8, len: usize, flags: u32) -> i32;
 
     /// Change flags on a socket. The mask determines which flags are set.
     ///
