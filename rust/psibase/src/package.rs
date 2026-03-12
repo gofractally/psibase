@@ -589,13 +589,16 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(new_account_action(accounts::SERVICE, account));
         if let Some(key) = key {
+            actions.push(new_account_action(accounts::SERVICE, account));
             actions.push(set_key_action(account, key));
             actions.push(set_auth_service_action(account, key.auth_service()));
-        } else {
+        } else if sender == producers::ROOT {
+            actions.push(new_account_action(accounts::SERVICE, account));
             actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
             actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
+        } else {
+            actions.push(auth_delegate::Wrapper::pack_from(sender).newAccount(account, sender));
         }
         Ok(())
     }
@@ -1606,12 +1609,6 @@ struct LocalPackageQuery {
     installed: LocalPackageConnection,
 }
 
-#[allow(non_snake_case)]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct NewAccountsQuery {
-    newAccounts: Vec<AccountNumber>,
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct PackagesEdge {
     node: PackageInfo,
@@ -1632,27 +1629,6 @@ struct PackagesQuery {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SourcesQuery {
     sources: Vec<packages::PackageSource>,
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub async fn get_accounts_to_create(
-    base_url: &reqwest::Url,
-    client: &mut reqwest::Client,
-    accounts: &[AccountNumber],
-    sender: AccountNumber,
-) -> Result<Vec<AccountNumber>, anyhow::Error> {
-    let result: NewAccountsQuery = crate::gql_query(
-        base_url,
-        client,
-        packages::SERVICE,
-        format!(
-            "query {{ newAccounts(accounts: {}, owner: {}) }}",
-            serde_json::to_string(accounts)?,
-            serde_json::to_string(&sender)?,
-        ),
-    )
-    .await?;
-    Ok(result.newAccounts)
 }
 
 #[cfg(not(target_family = "wasm"))]
