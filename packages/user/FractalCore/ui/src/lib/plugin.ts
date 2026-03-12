@@ -137,9 +137,7 @@ class AdminGuild extends PluginInterface {
     get removeGuildRep() {
         return this._call<[guildAccount: Account]>("removeGuildRep");
     }
-    get conMembershipApp() {
-        return this._call<[guildAccount: Account, member: Account, accepted: boolean]>("conMembershipApp");
-    }
+
 }
 
 class UserGuild extends PluginInterface {
@@ -148,6 +146,11 @@ class UserGuild extends PluginInterface {
     get applyGuild() {
         return this._call<[guildAccount: Account, app: string]>("applyGuild");
     }
+
+    get createGuildInvite() {
+        return this._call<[guildAccount: Account, preAttest: boolean]>("inviteMember");
+    }
+
     get attestMembershipApp() {
         return this._call<
             [
@@ -163,6 +166,14 @@ class UserGuild extends PluginInterface {
         return this._call<[guildAccount: Account, active: boolean]>(
             "registerCandidacy",
         );
+    }
+
+    get draftApplication() {
+        return this._call<[guildAccount: Account, description: string]>("draftApplication");
+    }
+
+    get pushApplication() {
+        return this._call<[guildAccount: Account]>("pushApplication");
     }
 }
 
