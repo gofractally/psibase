@@ -251,10 +251,6 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
    PSIBASE_SUBJECTIVE_TX
    {
       row = requests.get(socket.unpack());
-      if (row)
-      {
-         requests.remove(*row);
-      }
    }
 
    if (row)
@@ -263,6 +259,11 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
                   .service = row->service,
                   .method  = row->err,
                   .rawData = psio::to_frac(std::tuple(socket))});
+
+      PSIBASE_SUBJECTIVE_TX
+      {
+         requests.remove(*row);
+      }
       return;
    }
 
@@ -393,7 +394,8 @@ void XHttp::asyncClose(std::int32_t socket)
       if (!row || row->service != sender)
          abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
       auto flags = SocketFlags::autoClose | SocketFlags::notifyClose;
-      check(socketSetFlags(socket, flags, flags) == 0, "Failed to set auto-close");
+      // Ignore errors. This can fail if the socket is already closing.
+      socketSetFlags(socket, flags, flags);
    }
 }
 
