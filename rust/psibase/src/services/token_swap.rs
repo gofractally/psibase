@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::services::tokens::{Quantity, TID};
 use crate::AccountNumber;
@@ -83,11 +83,18 @@ pub fn find_path(
     let mut best: HashMap<TID, Quantity> = HashMap::new();
     best.insert(from, amount);
     let mut pred: HashMap<TID, (TID, usize)> = HashMap::new();
+    let mut visited: HashMap<TID, HashSet<TID>> = HashMap::new();
+    visited.insert(from, HashSet::from([from]));
 
     for _ in 0..max_hops {
         let mut candidates: HashMap<TID, (Quantity, (TID, usize))> = HashMap::new();
         for (i, pool) in all_pools.iter().enumerate() {
             if let Some(&amount_in) = best.get(&pool.token_a) {
+                if let Some(prev_visited) = visited.get(&pool.token_a) {
+                    if prev_visited.contains(&pool.token_b) {
+                        continue;
+                    }
+                }
                 let actual = swap(
                     amount_in,
                     pool.reserve_a,
@@ -103,6 +110,11 @@ pub fn find_path(
                 }
             }
             if let Some(&amount_in) = best.get(&pool.token_b) {
+                if let Some(prev_visited) = visited.get(&pool.token_b) {
+                    if prev_visited.contains(&pool.token_a) {
+                        continue;
+                    }
+                }
                 let actual = swap(
                     amount_in,
                     pool.reserve_b,
@@ -124,6 +136,12 @@ pub fn find_path(
             if new_amount > old_amount {
                 best.insert(target, new_amount);
                 pred.insert(target, predecessor);
+                let (prev, _) = predecessor;
+                if let Some(prev_visited) = visited.get(&prev) {
+                    let mut new_visited = prev_visited.clone();
+                    new_visited.insert(target);
+                    visited.insert(target, new_visited);
+                }
                 updated = true;
             }
         }
