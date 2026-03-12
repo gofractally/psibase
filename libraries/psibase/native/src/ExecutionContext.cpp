@@ -22,10 +22,11 @@ namespace psibase
    struct ExecutionContextImpl;
    using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
 #ifdef __x86_64__
-   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::jit_profile, VMOptions>;
+   using impl_t = eosio::vm::jit_profile;
 #else
-   using backend_t = eosio::vm::backend<rhf_t, eosio::vm::interpreter, VMOptions>;
+   using impl_t = eosio::vm::interpreter;
 #endif
+   using backend_t = eosio::vm::backend<rhf_t, impl_t, VMOptions>;
 
    // Rethrow with detailed info
    template <typename F>
@@ -119,7 +120,7 @@ namespace psibase
             return result;
          ind.modify(it, [&](auto& x) { result = std::move(x); });
          ind.erase(it);
-         result.backend->get_module().allocator.enable_code(true);
+         result.backend->get_module().allocator.enable_code(impl_t::is_jit);
          return result;
       }
    };
