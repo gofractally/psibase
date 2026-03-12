@@ -1,17 +1,18 @@
-import { Crown, User, Users } from "lucide-react";
+import { Crown, Pencil, User, Users } from "lucide-react";
+import { useState } from "react";
 import z from "zod";
+
+import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
 
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/getGuild";
 
-import { useChainId } from "@shared/hooks/use-chain-id";
-import { createIdenticon } from "@shared/lib/create-identicon";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
+import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
+
+import { ErrorCard } from "@shared/components/error-card";
+import { GlowingCard } from "@shared/components/glowing-card";
+import { Button } from "@shared/shadcn/ui/button";
+import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const zLeadership = z.enum(["RepAndCouncil", "RepOnly", "CouncilOnly"]);
@@ -31,70 +32,98 @@ export const GuildOverviewCard = ({
 }: {
     guildAccount?: string;
 }) => {
-    const { data: guild } = useGuild(guildAccount);
-    const { data: chainId } = useChainId();
-
+    const { data: guild, isPending, error } = useGuild(guildAccount);
     const leadershipStatus = getLeadershipStatus(guild);
+    const [metadataModalOpen, setMetadataModalOpen] = useState(false);
 
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <div className="bg-background text-sidebar-primary-foreground flex aspect-square size-10 items-center justify-center rounded-lg border">
-                        {chainId && guild?.account ? (
-                            <img
-                                src={createIdenticon(chainId + guild?.account)}
-                                alt={guild?.displayName || "Guild"}
-                                className="size-5"
-                            />
-                        ) : (
-                            <Skeleton className="size-5 rounded-lg" />
-                        )}
+    if (isPending) {
+        return (
+            <GlowingCard>
+                <CardHeader>
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="mt-1 h-4 w-28" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="mt-2 h-4 w-full" />
+                        <Skeleton className="mt-1 h-4 w-4/5" />
                     </div>
                     <div>
-                        <div className="text-xl font-semibold">
-                            {guild?.displayName || "Loading..."}
-                        </div>
-                        <div className="text-muted-foreground text-sm font-normal">
-                            {guild?.bio}
-                        </div>
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="mt-2 h-4 w-full" />
+                        <Skeleton className="mt-1 h-4 w-3/4" />
                     </div>
-                </CardTitle>
+                </CardContent>
+                <CardFooter className="flex items-center gap-2">
+                    <Skeleton className="size-4 shrink-0 rounded" />
+                    <Skeleton className="h-4 w-48" />
+                </CardFooter>
+            </GlowingCard>
+        );
+    }
+
+    if (error) {
+        return <ErrorCard error={error} />;
+    }
+
+    return (
+        <GlowingCard>
+            <CardHeader className="flex flex-row items-start justify-between gap-2">
+                <FractalGuildIdentifier
+                    name={guild?.displayName}
+                    account={guild?.account}
+                />
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setMetadataModalOpen(true)}
+                    aria-label="Edit guild metadata"
+                >
+                    <Pencil className="size-4" />
+                </Button>
             </CardHeader>
-            <CardContent>
-                <div className="space-y-3">
-                    <div className="flex justify-between px-2">
-                        <div>
-                            <h3 className="text-muted-foreground mb-1 text-sm font-medium">
-                                Mission
-                            </h3>
-                            <p className="text-sm leading-relaxed">
-                                {guild?.description || "No mission available."}
-                            </p>
-                        </div>
-                        <div className="text-muted-foreground flex items-center">
-                            Led by{" "}
-                            {guild?.rep
-                                ? `representative ${guild.rep.member}`
-                                : "council"}
-                            <div className="text-primary rounded-sm border">
-                                {leadershipStatus ==
-                                    zLeadership.Enum.RepOnly && (
-                                    <Crown className="h-7 w-7" />
-                                )}
-                                {leadershipStatus ==
-                                    zLeadership.Enum.RepAndCouncil && (
-                                    <User className="h-7 w-7" />
-                                )}
-                                {leadershipStatus ==
-                                    zLeadership.Enum.CouncilOnly && (
-                                    <Users className="h-7 w-7" />
-                                )}
-                            </div>
-                        </div>
-                    </div>
+            <SetGuildMetadataModal
+                show={metadataModalOpen}
+                openChange={setMetadataModalOpen}
+            />
+            <CardContent className="space-y-4">
+                <div>
+                    <h3 className="text-sm font-semibold">Description</h3>
+                    <p className="text-sm leading-relaxed">
+                        {guild?.bio || "No description available."}
+                    </p>
+                </div>
+                <div>
+                    <h3 className="text-sm font-semibold">Mission</h3>
+                    <p className="text-sm leading-relaxed">
+                        {guild?.description || "No mission available."}
+                    </p>
                 </div>
             </CardContent>
-        </Card>
+            <CardFooter className="flex items-center gap-2">
+                {leadershipStatus == zLeadership.Enum.RepOnly && (
+                    <Crown className="size-4 shrink-0" />
+                )}
+                {leadershipStatus == zLeadership.Enum.RepAndCouncil && (
+                    <User className="size-4 shrink-0" />
+                )}
+                {leadershipStatus == zLeadership.Enum.CouncilOnly && (
+                    <Users className="size-4 shrink-0" />
+                )}
+                <div className="text-muted-foreground text-sm">
+                    {guild?.rep ? (
+                        <>
+                            Led by representative{" "}
+                            <span className="text-primary font-medium">
+                                {guild.rep.member}
+                            </span>
+                        </>
+                    ) : (
+                        "Led by council"
+                    )}
+                </div>
+            </CardFooter>
+        </GlowingCard>
     );
 };

@@ -22,6 +22,35 @@ namespace
       auto row = Native::tablesDirect(KvMode::read).open<CodeTable>().get(sender);
       return row && (row->flags & CodeRow::isPrivileged);
    }
+   void dbError(AccountNumber sender, DbId db, std::string_view verb)
+   {
+      std::string message = sender.str() + " cannot ";
+      message += verb;
+      message += " db ";
+      message += to_string(db);
+      abortMessage(message);
+   }
+   void prefixError(AccountNumber sender, std::span<const char> prefix)
+   {
+      std::string message = sender.str() + " cannot write to another service's prefix";
+      if (prefix.size() >= sizeof(std::uint64_t))
+      {
+         std::uint64_t value;
+         auto          endService = prefix.begin() + sizeof(std::uint64_t);
+         std::reverse_copy(prefix.begin(), endService, reinterpret_cast<char*>(&value));
+         message += ": ";
+         message += AccountNumber{value}.str();
+         if (prefix.end() - endService >= sizeof(std::uint16_t))
+         {
+            auto          endTable = endService + sizeof(std::uint16_t);
+            std::uint16_t table;
+            std::reverse_copy(endService, endTable, reinterpret_cast<char*>(&table));
+            message += ':';
+            message += std::to_string(table);
+         }
+      }
+      abortMessage(message);
+   }
 }  // namespace
 
 UniqueKvHandle Db::open(DbId db, psio::view<const std::vector<char>> prefixView, KvMode mode)
@@ -35,7 +64,7 @@ UniqueKvHandle Db::open(DbId db, psio::view<const std::vector<char>> prefixView,
          auto expected = psio::convert_to_key(sender);
          if (!std::ranges::starts_with(prefix, expected))
          {
-            abortMessage("Cannot write to another service's prefix");
+            prefixError(sender, prefix);
          }
       }
    }
@@ -43,19 +72,19 @@ UniqueKvHandle Db::open(DbId db, psio::view<const std::vector<char>> prefixView,
    {
       if (isWrite(mode) && !isPrivileged(sender))
       {
-         abortMessage("Service cannot write this db");
+         dbError(sender, db, "write");
       }
    }
    else if (db == DbId::blockLog)
    {
       if (isWrite(mode))
       {
-         abortMessage("Service cannot write this db");
+         dbError(sender, db, "write");
       }
    }
    else
    {
-      abortMessage("Service cannot open this db");
+      dbError(sender, db, "open");
    }
 
    return UniqueKvHandle{psibase::kvOpen(db, prefix, mode)};

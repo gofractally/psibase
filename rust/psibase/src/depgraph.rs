@@ -352,6 +352,7 @@ impl<'a> DepGraph<'a> {
             self.add(PackageInfo {
                 name: meta.name.clone(),
                 version: meta.version.clone(),
+                scope: meta.scope.clone(),
                 description: meta.description.clone(),
                 depends: meta.depends.clone(),
                 accounts: meta.accounts.clone(),

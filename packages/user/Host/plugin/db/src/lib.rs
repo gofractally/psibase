@@ -33,7 +33,7 @@ impl Store for HostDb {
     fn clear_buffers() {
         use crate::bucket::host_buffer;
 
-        check_caller(&["transact"], "clear-buffers@host:common/store");
+        check_caller(&["transact"], "clear-buffers@host:db/store");
         host_buffer::clear_all();
     }
 
@@ -41,7 +41,7 @@ impl Store for HostDb {
         use crate::bucket::host_buffer;
         use crate::supervisor::bridge::database as HostDb;
 
-        check_caller(&["transact"], "flush@host:common/store");
+        check_caller(&["transact"], "flush@host:db/store");
 
         let buffer_data = host_buffer::drain_all(DbMode::Transactional);
 

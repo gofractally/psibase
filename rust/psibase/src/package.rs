@@ -1,7 +1,7 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
+    accounts, auth_delegate, brotli_svc::brotli_impl, http_server, packages, producers, setcode,
     sites, transact,
 };
 use crate::{
@@ -27,7 +27,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_packages};
+use crate::services::{x_admin, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -42,7 +42,8 @@ custom_error! {
     DependencyCycle = "Cycle in service dependencies",
     UnknownFileType{path:String} = "Cannot determine Mime-Type for {path}",
     UnknownAccount{name:AccountNumber} = "Account {name} not defined in meta.json",
-    AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
+    ServiceConflict{name: AccountNumber, old: String, new: String} = "The service {name} is defined by more than one package: {old}, {new}",
+    FileConflict{name: AccountNumber, filename: String, old: String, new: String} = "The file {name}:{filename} is defined by more than one package: {old}, {new}",
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
     PackageNotFound{package: String} = "The package {package} was not found",
@@ -101,11 +102,17 @@ pub struct PackageRef {
     pub version: String,
 }
 
+fn network_scope() -> String {
+    "network".to_string()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Meta {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -119,6 +126,7 @@ impl Meta {
         return PackageInfo {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -132,6 +140,8 @@ impl Meta {
 pub struct PackageInfo {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -149,20 +159,17 @@ impl PackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
-        if self.accounts.is_empty() {
-            None
-        } else {
-            Some(
-                self.accounts
-                    .iter()
-                    .any(|account| account.to_string().starts_with("x-")),
-            )
+        match self.scope.as_str() {
+            "local" => Some(true),
+            "network" => Some(false),
+            _ => None,
         }
     }
 }
@@ -182,6 +189,7 @@ impl InstalledPackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "network".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -204,6 +212,7 @@ impl LocalPackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "local".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -665,23 +674,27 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 
     // Returns accounts that must be defined by either this package or its
-    // immediate dependencies
-    pub fn get_required_accounts(&mut self) -> Result<Vec<AccountNumber>, anyhow::Error> {
-        let mut result = vec![];
+    // immediate dependencies. The first group can be any account, the second
+    // must be services
+    pub fn get_required_accounts(
+        &mut self,
+    ) -> Result<(Vec<AccountNumber>, Vec<AccountNumber>), anyhow::Error> {
+        let mut accounts = vec![];
+        let mut services = vec![];
 
         for account in self.get_accounts() {
             if !self.has_service(*account) {
-                result.push(accounts::SERVICE)
+                services.push(accounts::SERVICE)
             }
         }
 
         if !self.data.is_empty() {
-            result.push(sites::SERVICE);
+            services.push(sites::SERVICE);
         }
 
         for (_, _, info) in &self.services {
             if let Some(_) = &info.server {
-                result.push(http_server::SERVICE)
+                services.push(http_server::SERVICE)
             }
         }
 
@@ -689,15 +702,18 @@ impl<R: Read + Seek> PackagedService<R> {
             let actions: Vec<PrettyAction> =
                 serde_json::de::from_str(&std::io::read_to_string(file)?)?;
             for act in actions {
-                result.push(act.sender);
-                result.push(act.service);
+                accounts.push(act.sender);
+                services.push(act.service);
             }
         }
 
-        result.sort_unstable_by(|a, b| a.value.cmp(&b.value));
-        result.dedup();
+        accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        accounts.dedup();
 
-        Ok(result)
+        services.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        services.dedup();
+
+        Ok((accounts, services))
     }
 
     // returns accounts whose schemas are required
@@ -781,7 +797,19 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         _compression_level: u32,
     ) -> Result<(), anyhow::Error> {
-        for (account, index, _info) in &self.services {
+        for (account, index, info) in &self.services {
+            if let Some(server) = &info.server {
+                crate::as_text(
+                    client
+                        .post(x_http::SERVICE.url(base_url)?.join("/register_server")?)
+                        .body(serde_json::to_string(&x_http::RegisterServerRequest {
+                            service: *account,
+                            server: *server,
+                        })?)
+                        .header("Content-Type", "application/json"),
+                )
+                .await?;
+            }
             crate::as_text(
                 client
                     .put(
@@ -1023,18 +1051,37 @@ impl PackageManifest {
     }
 }
 
-// Two packages shall not create the same account
-// Accounts used in any way during installation must be part of the package or
+// Two packages shall not create the same service or data file
+// Services used in any way during installation must be part of the package or
 // its direct dependencies
 pub fn validate_dependencies<T: Read + Seek>(
     packages: &mut [PackagedService<T>],
 ) -> Result<(), anyhow::Error> {
-    let mut accounts: HashMap<AccountNumber, String> = HashMap::new();
-    for p in &packages[..] {
+    let mut accounts: HashMap<AccountNumber, HashSet<String>> = HashMap::new();
+    let mut services: HashMap<AccountNumber, String> = HashMap::new();
+    let mut files: HashMap<PackageDataFile, String> = HashMap::new();
+    for p in &mut packages[..] {
         for account in p.get_accounts() {
-            match accounts.entry(*account) {
-                hash_map::Entry::Occupied(entry) => Err(Error::AccountConflict {
+            accounts
+                .entry(*account)
+                .or_insert_with(|| HashSet::new())
+                .insert(p.meta.name.clone());
+        }
+        for (account, _, _) in &p.services {
+            match services.entry(*account) {
+                hash_map::Entry::Occupied(entry) => Err(Error::ServiceConflict {
                     name: *account,
+                    old: entry.get().to_string(),
+                    new: p.meta.name.clone(),
+                })?,
+                hash_map::Entry::Vacant(entry) => entry.insert(p.meta.name.clone()),
+            };
+        }
+        for file in p.manifest_data() {
+            match files.entry(file) {
+                hash_map::Entry::Occupied(entry) => Err(Error::FileConflict {
+                    name: entry.key().account,
+                    filename: entry.key().filename.to_string(),
                     old: entry.get().to_string(),
                     new: p.meta.name.clone(),
                 })?,
@@ -1043,8 +1090,30 @@ pub fn validate_dependencies<T: Read + Seek>(
         }
     }
     for p in &mut packages[..] {
-        for account in p.get_required_accounts()? {
-            if let Some(package) = accounts.get(&account) {
+        let (required_accounts, required_services) = p.get_required_accounts()?;
+        for account in required_accounts {
+            if let Some(packages) = accounts.get(&account) {
+                if !packages.contains(&p.meta.name)
+                    && !p
+                        .meta
+                        .depends
+                        .iter()
+                        .any(|dep| packages.contains(&dep.name))
+                {
+                    Err(Error::MissingDepPackage {
+                        name: p.meta.name.clone(),
+                        dep: packages.iter().next().unwrap().clone(),
+                    })?;
+                }
+            } else {
+                Err(Error::MissingDepAccount {
+                    name: account,
+                    package: p.meta.name.clone(),
+                })?
+            }
+        }
+        for account in required_services {
+            if let Some(package) = services.get(&account) {
                 if &p.meta.name != package && !p.meta.depends.iter().any(|dep| &dep.name == package)
                 {
                     Err(Error::MissingDepPackage {
@@ -1329,7 +1398,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))

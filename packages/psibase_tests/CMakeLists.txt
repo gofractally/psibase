@@ -41,6 +41,7 @@ function(add suffix)
     service(XProxy "${suffix}" src/XProxy.cpp)
     service(WSEcho "${suffix}" src/WSEcho.cpp)
     service(XDelay "${suffix}" src/XDelay.cpp)
+    service(ServerId "${suffix}" src/ServerId.cpp)
 endfunction(add)
 
 add_library(services_test INTERFACE)

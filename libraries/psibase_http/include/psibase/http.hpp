@@ -21,8 +21,6 @@ namespace psibase::http
    using push_boot_t =
        std::function<void(std::vector<char> packed_signed_transactions, push_transaction_callback)>;
 
-   using shutdown_t = std::function<void(std::vector<char>)>;
-
    using accept_p2p_websocket1 = boost::beast::websocket::stream<tcp_stream>;
 #ifdef PSIBASE_ENABLE_SSL
    using accept_p2p_websocket2 = boost::beast::websocket::stream<ssl_stream>;
@@ -38,17 +36,6 @@ namespace psibase::http
        boost::type_erasure::callable<void(accept_p2p_websocket2&&)>,
 #endif
        boost::type_erasure::callable<void(accept_p2p_websocket3&&)>>>;
-
-   struct peer_info
-   {
-      int                        id;
-      std::string                endpoint;
-      std::optional<std::string> url;
-   };
-   PSIO_REFLECT(peer_info, id, endpoint, url);
-   using get_peers_result   = std::vector<peer_info>;
-   using get_peers_callback = std::function<void(get_peers_result)>;
-   using get_peers_t        = std::function<void(get_peers_callback)>;
 
    using connect_result   = std::optional<std::string>;
    using connect_callback = std::function<void(connect_result)>;
@@ -229,21 +216,17 @@ namespace psibase::http
       uint32_t                 max_request_size = {};
       std::atomic<int64_t>     idle_timeout_us  = {};
       std::vector<listen_spec> listen           = {};
-      std::vector<std::string> hosts            = {};
 #ifdef PSIBASE_ENABLE_SSL
       tls_context_ptr tls_context = {};
 #endif
       push_boot_t         push_boot_async   = {};
-      shutdown_t          shutdown          = {};
       get_config_t        get_perf          = {};
       get_config_t        get_metrics       = {};
-      get_peers_t         get_peers         = {};
       get_config_t        get_keys          = {};
       generic_json_t      new_key           = {};
       unlock_keyring_t    unlock_keyring    = {};
       lock_keyring_t      lock_keyring      = {};
       get_pkcs11_tokens_t get_pkcs11_tokens = {};
-      std::atomic<bool>   enable_transactions;
       // This contains some cached state that the reader thread might modify
       mutable std::atomic<http_status> status;
 

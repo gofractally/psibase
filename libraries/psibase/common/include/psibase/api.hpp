@@ -842,6 +842,14 @@ namespace psibase
       }
       return 0;
    }
+
+   inline std::optional<std::vector<char>> readFile(std::string_view path)
+   {
+      auto sz = raw::readFile(path.data(), path.size());
+      if (sz == -1)
+         return std::nullopt;
+      return getResult(sz);
+   }
 }  // namespace psibase
 
 #undef PSIBASE_NATIVE

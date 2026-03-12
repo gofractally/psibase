@@ -51,7 +51,11 @@ interface api {
     ///     a sufficient permission level to use callee's plugin. If the caller has insufficient permissions, this 
     ///     function will attempt to prompt the user to consider the request.
     /// 
-    /// On successful execution, the return value represents whether the user is authorized or not.
+    /// # Return Values
+    /// 
+    /// - Ok(`true`): The caller is authorized to perform the action.
+    /// - Ok(`false`): The caller is not authorized to perform the action.
+    /// - Err: The permissions request was invalid (e.g. invalid caller, no user logged in to handle prompt, etc.)
     /// 
     /// # Arguments
     ///

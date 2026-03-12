@@ -1,3 +1,12 @@
+use crate::AccountNumber;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct RegisterServerRequest {
+    pub service: AccountNumber,
+    pub server: AccountNumber,
+}
+
 #[crate::service(name = "x-http", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
@@ -84,9 +93,20 @@ mod service {
         unimplemented!()
     }
 
+    /// Writes a message to the server log
+    #[action]
+    fn log(severity: u32, msg: String) {
+        unimplemented!()
+    }
+
     /// Returns the root host for a given host
     #[action]
     fn rootHost(host: String) -> String {
+        unimplemented!()
+    }
+
+    #[action]
+    fn serveSys(req: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
         unimplemented!()
     }
 

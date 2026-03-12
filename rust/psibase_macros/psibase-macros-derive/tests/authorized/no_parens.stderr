@@ -1,0 +1,7 @@
+error: invalid trust level in `my_fn`: expected one of None, Low, Medium, High, Max
+ --> tests/authorized/no_parens.rs:6:5
+  |
+6 |     #[authorized]
+  |     ^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `authorized` (in Nightly builds, run with -Z macro-backtrace for more info)

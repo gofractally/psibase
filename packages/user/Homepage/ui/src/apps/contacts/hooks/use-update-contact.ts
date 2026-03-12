@@ -4,6 +4,7 @@ import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
 import { zAccount } from "@shared/lib/schemas/account";
+import SharedQueryKey from "@shared/lib/query-keys";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -30,7 +31,7 @@ export const useUpdateContact = () => {
             );
             if (currentUser) {
                 queryClient.invalidateQueries({
-                    queryKey: QueryKey.contacts(zAccount.parse(currentUser)),
+                    queryKey: SharedQueryKey.contacts(zAccount.parse(currentUser)),
                 });
             }
         },

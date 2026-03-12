@@ -156,8 +156,8 @@ pub fn get_initial_actions<
         }
 
         let mut actions = Vec::new();
+        s.reg_server(&mut actions)?;
         if install_ui {
-            s.reg_server(&mut actions)?;
             s.store_data(&mut actions, None, compression_level)?;
         }
 

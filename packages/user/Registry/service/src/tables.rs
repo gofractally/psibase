@@ -195,8 +195,8 @@ pub mod impls {
     #[ComplexObject]
     impl AppMetadata {
         async fn tags(&self) -> Vec<String> {
-            let app_tags_table = AppTagsTable::new();
-            let tags_table = TagsTable::new();
+            let app_tags_table = AppTagsTable::read();
+            let tags_table = TagsTable::read();
 
             app_tags_table
                 .get_index_pk()
@@ -312,7 +312,7 @@ pub mod impls {
         }
 
         pub fn get(account_id: AccountNumber) -> Option<Self> {
-            let app_metadata_table = AppMetadataTable::new();
+            let app_metadata_table = AppMetadataTable::read();
             app_metadata_table.get_index_pk().get(&account_id)
         }
 

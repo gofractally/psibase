@@ -173,6 +173,20 @@ namespace psibase
       T                 value;
    };
 
+   template <typename T>
+   struct JsonBody
+   {
+      std::string       contentType() const { return "application/json"; }
+      std::vector<char> body() const
+      {
+         std::vector<char>   result;
+         psio::vector_stream stream{result};
+         to_json(value, stream);
+         return result;
+      }
+      T value;
+   };
+
    template <typename R>
    R unpackReply(HttpReply&& response)
    {

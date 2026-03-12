@@ -1,10 +1,8 @@
-use psibase::plugin_error;
-
-plugin_error! {
-    pub ErrorType<'a>
-    Unauthorized() => "Unauthorized",
-    QueryError(msg: String) => "Graphql error: {msg}",
-    AccountExists(msg: &'a str) => "[{msg}] Error: Account already exists",
-    InviteNotValid() => "Error: Invite is no longer valid or expired",
-    ConversionError(msg: String) => "Conversion error: {msg}",
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorTypes {
+    #[error("Graphql error: {0}")]
+    QueryError(String),
+    #[error("Error: Invite is no longer valid or expired")]
+    InviteNotValid,
 }
