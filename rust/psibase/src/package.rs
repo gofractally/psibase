@@ -1,7 +1,7 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
+    accounts, auth_delegate, brotli_svc::brotli_impl, http_server, packages, producers, setcode,
     sites, transact,
 };
 use crate::{
@@ -27,7 +27,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_packages};
+use crate::services::{x_admin, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -102,11 +102,17 @@ pub struct PackageRef {
     pub version: String,
 }
 
+fn network_scope() -> String {
+    "network".to_string()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Meta {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -120,6 +126,7 @@ impl Meta {
         return PackageInfo {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -133,6 +140,8 @@ impl Meta {
 pub struct PackageInfo {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -150,20 +159,17 @@ impl PackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
-        if self.accounts.is_empty() {
-            None
-        } else {
-            Some(
-                self.accounts
-                    .iter()
-                    .any(|account| account.to_string().starts_with("x-")),
-            )
+        match self.scope.as_str() {
+            "local" => Some(true),
+            "network" => Some(false),
+            _ => None,
         }
     }
 }
@@ -183,6 +189,7 @@ impl InstalledPackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "network".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -205,6 +212,7 @@ impl LocalPackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "local".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -789,7 +797,19 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         _compression_level: u32,
     ) -> Result<(), anyhow::Error> {
-        for (account, index, _info) in &self.services {
+        for (account, index, info) in &self.services {
+            if let Some(server) = &info.server {
+                crate::as_text(
+                    client
+                        .post(x_http::SERVICE.url(base_url)?.join("/register_server")?)
+                        .body(serde_json::to_string(&x_http::RegisterServerRequest {
+                            service: *account,
+                            server: *server,
+                        })?)
+                        .header("Content-Type", "application/json"),
+                )
+                .await?;
+            }
             crate::as_text(
                 client
                     .put(
@@ -1378,7 +1398,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))

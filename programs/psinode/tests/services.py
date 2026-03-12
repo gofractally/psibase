@@ -1,5 +1,6 @@
 from psinode import Action, PrivateKey, Transaction, TransactionError, Service
 import time
+import json
 
 class Tokens(Service):
     service = 'tokens'
@@ -77,6 +78,12 @@ class StagedTx(Service):
             txid = id_or_tx['txid']
         self.push_action(account, 'accept', {"id": id_,  "txid": txid}, keys=keys)
 
+class XHttp(Service):
+    service = 'x-http'
+    def register_server(self, service, server):
+        with self.post('/register_server', json={"service": service, "server": server}) as reply:
+            reply.raise_for_status()
+
 class XAdmin(Service):
     service = 'x-admin'
     def get_admin_accounts(self):
@@ -98,6 +105,13 @@ class XAdmin(Service):
         from zipfile import ZipFile
         with ZipFile(file) as package:
             for filename in package.namelist():
+                if filename.startswith('service/') and filename.endswith('.json'):
+                    service = filename.removeprefix('service/').removesuffix('.json')
+                    with package.open(filename) as f:
+                        info = json.load(f)
+                    server = info.get('server')
+                    if server is not None:
+                        XHttp(self.api).register_server(service, server)
                 if filename.startswith('service/') and filename.endswith('.wasm'):
                     service = filename.removeprefix('service/').removesuffix('.wasm')
                     with package.open(filename) as f:

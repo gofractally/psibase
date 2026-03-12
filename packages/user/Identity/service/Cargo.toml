@@ -7,7 +7,9 @@ publish.workspace = true
 
 [package.metadata.psibase]
 plugin = "identity-plugin"
+server = "identity"
 data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [{ sender = "identity", service = "identity", method = "init" }]
 
 [dependencies]
 psibase_macros.workspace = true

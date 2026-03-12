@@ -146,7 +146,7 @@ namespace
    void loadLocalServices(psibase::TestChain& self)
    {
       using namespace psibase;
-      using LocalService::XPackages;
+      using namespace LocalService;
       auto prefix = psio::convert_to_key(codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
@@ -157,6 +157,8 @@ namespace
       std::vector<std::string> packageNames{"XDefault"};
       auto                     packages = registry.resolve(packageNames);
       std::vector<HttpRequest> requests;
+      std::vector<HttpRequest> early_requests;
+      const std::string        rootHost("", 1);
       tester::raw::checkoutSubjective(self.nativeHandle());
       for (const auto& info : packages)
       {
@@ -180,9 +182,21 @@ namespace
                 .code     = std::move(code),
             };
             self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
-         }
 
-         std::string rootHost("", 1);
+            if (serviceInfo.server)
+            {
+               HttpRequest         req{.host        = XHttp::service.str() + "." + rootHost,
+                                       .method      = "POST",
+                                       .target      = "/register_server",
+                                       .contentType = "application/json"};
+               psio::vector_stream stream{req.body};
+               to_json(RegisteredServiceRow{account, *serviceInfo.server}, stream);
+               if (account == XPackages::service)
+                  early_requests.push_back(std::move(req));
+               else
+                  requests.push_back(std::move(req));
+            }
+         }
 
          for (const auto& [account, header] : package.data)
          {
@@ -218,12 +232,11 @@ namespace
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");
 
-      for (const auto& request : requests)
+      auto checkReply = [](const auto& request, const auto& reply)
       {
-         auto reply = self.http(request);
          if (reply.status != HttpStatus::ok)
          {
-            auto message = std::format("PUT {} returned {}", request.target,
+            auto message = std::format("{} {} returned {}", request.method, request.target,
                                        static_cast<std::uint16_t>(reply.status));
             if (reply.contentType.starts_with("text/"))
             {
@@ -232,6 +245,15 @@ namespace
             }
             abortMessage(message);
          }
+      };
+
+      for (const auto& request : early_requests)
+      {
+         checkReply(request, self.http(request));
+      }
+      for (const auto& request : requests)
+      {
+         checkReply(request, self.http(request));
       }
    }
 

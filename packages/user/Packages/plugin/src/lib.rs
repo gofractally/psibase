@@ -59,6 +59,7 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
         psibase::PackageInfo {
             name: value.name,
             version: value.version,
+            scope: value.scope,
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value
@@ -77,6 +78,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
         types::PackageInfo {
             name: value.name,
             version: value.version,
+            scope: value.scope,
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
@@ -101,6 +103,7 @@ impl From<psibase::Meta> for types::Meta {
         types::Meta {
             name: value.name,
             version: value.version,
+            scope: value.scope,
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
