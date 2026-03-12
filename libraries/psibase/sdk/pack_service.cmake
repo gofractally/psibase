@@ -392,15 +392,20 @@ function(psibase_schema target)
 
     if(ARGC GREATER_EQUAL 2)
         set(_OUTFILE ${ARGV1})
+        set(_EXTRA_OUTPUTS ${_OUTFILE})
     else()
         set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+        set(_EXTRA_OUTPUTS "")
     endif()
 
+    # Stamp file is always an OUTPUT because _OUTFILE may contain a generator expression
+    # (not allowed in OUTPUT). When a concrete path is provided, it is added as an additional
+    # OUTPUT so the Makefile generator creates a rule for it and downstream DEPENDS are satisfied.
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
-        DEPENDS ${target}
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp ${_EXTRA_OUTPUTS}
+        DEPENDS ${target}-schema-gen
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
-        COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
     )
     add_custom_target(${target}-schema ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp)
 endfunction()
