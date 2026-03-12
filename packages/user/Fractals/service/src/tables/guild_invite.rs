@@ -59,10 +59,9 @@ impl GuildInvite {
         let invite_cost = Self::invite_cost(num_accounts);
 
         Self::debit_then_credit(
-            get_sender(),
-            psibase::services::invite::SERVICE,
+            (get_sender(), "Invite fee".into()),
+            (psibase::services::invite::SERVICE, Memo::empty()),
             invite_cost,
-            "Invite fee".into(),
         );
 
         Invite::call().createInvite(invite_id, invite_payload, num_accounts, true, invite_cost);
@@ -93,28 +92,29 @@ impl GuildInvite {
         self.remove()
     }
 
-    fn debit_then_credit(from: AccountNumber, to: AccountNumber, amount: Quantity, memo: Memo) {
-        if amount.value > 0 {
-            let tokens = Tokens::call();
-
-            let system_token = check_some(
-                tokens.getSysToken(),
-                "expected system token to issue refund",
-            )
-            .id;
-            tokens.debit(system_token, from, amount, memo.clone());
-            tokens.credit(system_token, to, amount, memo);
-            tokens.reject(system_token, from, "Unused amount".into());
+    fn debit_then_credit(from: (AccountNumber, Memo), to: (AccountNumber, Memo), amount: Quantity) {
+        if amount.value == 0 {
+            return;
         }
+        let tokens = Tokens::call();
+
+        let system_token = check_some(
+            tokens.getSysToken(),
+            "expected system token to issue refund",
+        )
+        .id;
+
+        tokens.debit(system_token, from.0, amount, from.1);
+        tokens.credit(system_token, to.0, amount, to.1);
+        tokens.reject(system_token, from.0, "Unused amount".into());
     }
 
     fn remove(&self) {
         let refund = Invite::call().delInvite(self.id);
         Self::debit_then_credit(
-            Invite::SERVICE,
-            self.inviter,
+            (Invite::SERVICE, Memo::empty()),
+            (self.inviter, "Invite refund".into()),
             refund,
-            "Invite refund".into(),
         );
         GuildInviteTable::read_write().remove(&self)
     }
