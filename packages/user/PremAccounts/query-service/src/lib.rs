@@ -2,8 +2,10 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
-    use diff_adjust::tables::RateLimitTable;
+    // HEY! When interacting with antoher service, don't add dep to local crate: communicate through `psibase` crate
+    // use diff_adjust::tables::RateLimitTable;
     use prem_accounts::tables::{AuctionsTable, PurchasedAccountsTable};
+    use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -61,20 +63,11 @@ mod service {
             let auctions_table = AuctionsTable::read();
             let mut prices = Vec::new();
 
+            // TODO: return auction tuples (<length>, <price>)
             for length in 1..=9 {
                 if let Some(auction) = auctions_table.get_index_pk().get(&length) {
                     // Get the rate limit and calculate current difficulty
-                    if let Some(mut rate_limit) =
-                        RateLimitTable::read().get_index_pk().get(&auction.nft_id)
-                    {
-                        // Update difficulty if needed (this calculates the current difficulty)
-                        let current_difficulty = rate_limit.check_difficulty_decrease();
-                        prices.push(current_difficulty);
-                    } else {
-                        prices.push(0);
-                    }
-                } else {
-                    prices.push(0);
+                    prices.push(DiffAdjust::call().get_diff(auction.nft_id));
                 }
             }
 

@@ -2487,6 +2487,7 @@ version = "0.23.0"
 dependencies = [
  "prem-accounts",
  "prem-accounts-plugin",
+ "psibase-user-workspace-hack",
  "r-prem-accts",
 ]
 
@@ -2872,7 +2873,6 @@ name = "r-prem-accts"
 version = "0.23.0"
 dependencies = [
  "async-graphql",
- "diff-adjust",
  "prem-accounts",
  "psibase",
  "psibase-user-workspace-hack",

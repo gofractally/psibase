@@ -1,6 +1,6 @@
 [package]
 name = "prem-accounts-pkg"             # Crate name
-description = "An example application"
+description = "Establishes markets for the purchase of short account names"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -16,6 +16,10 @@ services = ["prem-accounts"]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
 Permissions = "0.23.0"
+Tokens = "0.23.0"
+Nft = "0.23.0"
+Transact = "0.23.0"
+Events = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
@@ -24,3 +28,4 @@ crate-type = ["rlib"]
 prem-accounts = { path = "service", version = "0.23.0" }
 r-prem-accts = { path = "query-service", version = "0.23.0" }
 prem-accounts-plugin = { path = "plugin", version = "0.23.0" }
+psibase-user-workspace-hack.workspace = true

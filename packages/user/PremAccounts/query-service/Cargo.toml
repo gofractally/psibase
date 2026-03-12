@@ -12,6 +12,5 @@ serde.workspace = true
 serde_json.workspace = true
 serde-aux.workspace = true
 prem-accounts = { path = "../service", version = "0.23.0" }
-diff-adjust = { path = "../../DiffAdjust/service", version = "0.23.0" }
 async-graphql.workspace = true
 psibase-user-workspace-hack.workspace = true
