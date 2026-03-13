@@ -289,9 +289,16 @@ namespace psibase
          return std::forward<Self>(self);
       }
       template <typename Self>
-      Self&& token(this Self&& self, std::string_view token)
+      Self&& auth_bearer(this Self&& self, std::string_view token)
       {
          self._headers.push_back({"Authorization", std::format("Bearer {}", token)});
+         return std::forward<Self>(self);
+      }
+      template <typename Self>
+      Self&& auth_bearer(this Self&& self, std::optional<std::string_view> token)
+      {
+         if (token)
+            self._headers.push_back({"Authorization", std::format("Bearer {}", *token)});
          return std::forward<Self>(self);
       }
       template <typename Self>
@@ -305,7 +312,9 @@ namespace psibase
       };
 
       template <typename R = Default, typename Self>
-      decltype(auto) get(this Self&& self, std::string target, std::vector<HttpHeader> headers = {})
+      decltype(auto) get(this Self&&             self,
+                         std::string_view        target,
+                         std::vector<HttpHeader> headers = {})
       {
          return std::forward<Self>(self).template request<R>(AccountNumber{}, "GET", target,
                                                              EmptyBody{}, std::move(headers));
@@ -313,7 +322,7 @@ namespace psibase
       template <typename R = Default, typename Self>
       decltype(auto) get(this Self&&             self,
                          AccountNumber           account,
-                         std::string             target,
+                         std::string_view        target,
                          std::vector<HttpHeader> headers = {})
       {
          return std::forward<Self>(self).template request<R>(account, "GET", target, EmptyBody{},
@@ -322,7 +331,7 @@ namespace psibase
       template <typename R = Default, typename Self, HttpRequestBody T>
       decltype(auto) post(this Self&&             self,
                           AccountNumber           account,
-                          std::string             target,
+                          std::string_view        target,
                           const T&                body,
                           std::vector<HttpHeader> headers = {})
       {
@@ -331,7 +340,7 @@ namespace psibase
       }
       template <typename R = Default, typename Self, HttpRequestBody T>
       decltype(auto) post(this Self&&             self,
-                          std::string             target,
+                          std::string_view        target,
                           const T&                body,
                           std::vector<HttpHeader> headers = {})
       {
@@ -341,7 +350,7 @@ namespace psibase
       template <typename R = Default, typename Self, HttpRequestBody T>
       decltype(auto) put(this Self&&             self,
                          AccountNumber           account,
-                         std::string             target,
+                         std::string_view        target,
                          const T&                body,
                          std::vector<HttpHeader> headers = {})
       {
@@ -350,7 +359,7 @@ namespace psibase
       }
       template <typename R = Default, typename Self, HttpRequestBody T>
       decltype(auto) put(this Self&&             self,
-                         std::string             target,
+                         std::string_view        target,
                          const T&                body,
                          std::vector<HttpHeader> headers = {})
       {
@@ -597,19 +606,7 @@ namespace psibase
                            const T&                        data,
                            std::optional<std::string_view> token = std::nullopt) const
       {
-         HttpRequest req{.host   = account.str() + ".psibase.io",
-                         .method = "POST",
-                         .target{target},
-                         .contentType = "application/json"};
-         if (token)
-         {
-            req.headers.push_back(
-                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
-         }
-         psio::vector_stream stream{req.body};
-         using psio::to_json;
-         to_json(data, stream);
-         return req;
+         return HttpRequestBuilder{}.auth_bearer(token).post(account, target, JsonBody{data});
       }
 
       /**
@@ -621,17 +618,7 @@ namespace psibase
                            const T&                        data,
                            std::optional<std::string_view> token = std::nullopt) const
       {
-         HttpRequest req{.host   = account.str() + ".psibase.io",
-                         .method = "POST",
-                         .target{target},
-                         .contentType = data.contentType(),
-                         .body        = data.body()};
-         if (token)
-         {
-            req.headers.push_back(
-                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
-         }
-         return req;
+         return HttpRequestBuilder{}.auth_bearer(token).post(account, target, data);
       }
 
       /**
@@ -641,13 +628,7 @@ namespace psibase
                           std::string_view                target,
                           std::optional<std::string_view> token = std::nullopt) const
       {
-         HttpRequest req{.host = account.str() + ".psibase.io", .method = "GET", .target{target}};
-         if (token)
-         {
-            req.headers.push_back(
-                {.name = "Authorization", .value = std::string("Bearer ") + std::string(*token)});
-         }
-         return req;
+         return HttpRequestBuilder{}.auth_bearer(token).get(account, target);
       }
 
       HttpClient http(AccountNumber account = {}, std::vector<HttpHeader> headers = {});
