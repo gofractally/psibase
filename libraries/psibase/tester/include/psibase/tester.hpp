@@ -158,6 +158,12 @@ namespace psibase
       { t.body() } -> std::convertible_to<std::vector<char>>;
    };
 
+   template <typename T>
+   concept HttpReplyBody = requires(std::vector<char>&& t) {
+      { T::contentType() } -> std::convertible_to<std::string>;
+      { T::unpack(std::move(t)) };
+   };
+
    struct GraphQLBody
    {
       std::string       contentType() const { return "application/graphql"; }
@@ -176,15 +182,27 @@ namespace psibase
    template <typename T>
    struct JsonBody
    {
-      std::string       contentType() const { return "application/json"; }
-      std::vector<char> body() const
+      static std::string contentType() { return "application/json"; }
+      std::vector<char>  body() const
       {
          std::vector<char>   result;
          psio::vector_stream stream{result};
          to_json(value, stream);
          return result;
       }
+      static JsonBody unpack(std::vector<char> data)
+      {
+         data.push_back('\0');
+         psio::json_token_stream stream(data.data());
+         return {psio::from_json<T>(stream)};
+      }
       T value;
+   };
+
+   struct EmptyBody
+   {
+      std::string       contentType() const { return {}; }
+      std::vector<char> body() const { return {}; }
    };
 
    template <typename R>
@@ -209,11 +227,19 @@ namespace psibase
                             std::to_string(static_cast<std::uint16_t>(response.status)));
             }
          }
-         if (response.contentType != "application/json")
-            abortMessage("Wrong Content-Type " + response.contentType);
-         response.body.push_back('\0');
-         psio::json_token_stream stream(response.body.data());
-         return psio::from_json<R>(stream);
+         if constexpr (HttpReplyBody<R>)
+         {
+            if (response.contentType != R::contentType())
+               abortMessage("Wrong Content-Type " + response.contentType);
+            return R::unpack(std::move(response.body));
+         }
+         else
+         {
+            if (response.contentType == "application/json")
+               return JsonBody<R>::unpack(std::move(response.body)).value;
+            else
+               abortMessage("Wrong Content-Type " + response.contentType);
+         }
       }
    }
 
@@ -242,6 +268,169 @@ namespace psibase
          return unpackReply<R>(std::move(*reply));
       }
    };
+
+   class HttpRequestBuilder
+   {
+     public:
+      HttpRequestBuilder(AccountNumber account = {}, std::vector<HttpHeader> headers = {})
+          : _account(account), _headers(headers)
+      {
+      }
+      template <typename Self>
+      Self&& header(this Self&& self, HttpHeader header)
+      {
+         self._headers.push_back(std::move(header));
+         return std::forward<Self>(self);
+      }
+      template <typename Self>
+      Self&& header(this Self&& self, std::string_view name, std::string_view value)
+      {
+         self._headers.push_back({std::string{name}, std::string{value}});
+         return std::forward<Self>(self);
+      }
+      template <typename Self>
+      Self&& token(this Self&& self, std::string_view token)
+      {
+         self._headers.push_back({"Authorization", std::format("Bearer {}", token)});
+         return std::forward<Self>(self);
+      }
+      template <typename Self>
+      Self&& account(this Self&& self, AccountNumber account)
+      {
+         self._account = account;
+      }
+
+      struct Default
+      {
+      };
+
+      template <typename R = Default, typename Self>
+      decltype(auto) get(this Self&& self, std::string target, std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(AccountNumber{}, "GET", target,
+                                                             EmptyBody{}, std::move(headers));
+      }
+      template <typename R = Default, typename Self>
+      decltype(auto) get(this Self&&             self,
+                         AccountNumber           account,
+                         std::string             target,
+                         std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(account, "GET", target, EmptyBody{},
+                                                             std::move(headers));
+      }
+      template <typename R = Default, typename Self, HttpRequestBody T>
+      decltype(auto) post(this Self&&             self,
+                          AccountNumber           account,
+                          std::string             target,
+                          const T&                body,
+                          std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(account, "POST", target, body,
+                                                             std::move(headers));
+      }
+      template <typename R = Default, typename Self, HttpRequestBody T>
+      decltype(auto) post(this Self&&             self,
+                          std::string             target,
+                          const T&                body,
+                          std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(AccountNumber{}, "POST", target, body,
+                                                             std::move(headers));
+      }
+      template <typename R = Default, typename Self, HttpRequestBody T>
+      decltype(auto) put(this Self&&             self,
+                         AccountNumber           account,
+                         std::string             target,
+                         const T&                body,
+                         std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(account, "PUT", target, body,
+                                                             std::move(headers));
+      }
+      template <typename R = Default, typename Self, HttpRequestBody T>
+      decltype(auto) put(this Self&&             self,
+                         std::string             target,
+                         const T&                body,
+                         std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(AccountNumber{}, "PUT", target, body,
+                                                             std::move(headers));
+      }
+
+      template <typename R = Default, typename Self>
+      decltype(auto) request(this Self&&             self,
+                             std::string_view        method,
+                             std::string_view        target,
+                             std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(AccountNumber{}, method, target,
+                                                             EmptyBody{}, std::move(headers));
+      }
+
+      template <typename R = Default, typename Self>
+      decltype(auto) request(this Self&&             self,
+                             AccountNumber           account,
+                             std::string_view        method,
+                             std::string_view        target,
+                             std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(account, method, target, EmptyBody{},
+                                                             std::move(headers));
+      }
+
+      template <typename R = Default, typename Self, HttpRequestBody T>
+      decltype(auto) request(this Self&&             self,
+                             std::string_view        method,
+                             std::string_view        target,
+                             const T&                body,
+                             std::vector<HttpHeader> headers = {})
+      {
+         return std::forward<Self>(self).template request<R>(AccountNumber{}, method, target, body,
+                                                             std::move(headers));
+      }
+
+      template <typename R = Default, HttpRequestBody T>
+      auto request(AccountNumber           account,
+                   std::string_view        method,
+                   std::string_view        target,
+                   const T&                body,
+                   std::vector<HttpHeader> headers = {})
+      {
+         return HttpRequest{.host = buildHost(account),
+                            .method{method},
+                            .target{target},
+                            .contentType = body.contentType(),
+                            .headers     = buildHeaders(std::move(headers)),
+                            .body        = body.body()};
+      }
+
+     private:
+      std::string buildHost(AccountNumber account)
+      {
+         if (account == AccountNumber{})
+            account = _account;
+         if (account == AccountNumber{})
+            return "psibase.io";
+         else
+            return account.str() + ".psibase.io";
+      }
+      std::vector<HttpHeader> buildHeaders(std::vector<HttpHeader>&& extra)
+      {
+         if (_headers.empty())
+            return std::move(extra);
+         else
+         {
+            auto result = _headers;
+            result.insert(result.begin(), std::move_iterator{extra.begin()},
+                          std::move_iterator{extra.end()});
+            return result;
+         }
+      }
+      AccountNumber           _account;
+      std::vector<HttpHeader> _headers;
+   };
+   class HttpClient;
 
    /**
     * Manages a chain.
@@ -461,6 +650,9 @@ namespace psibase
          return req;
       }
 
+      HttpClient http(AccountNumber account = {}, std::vector<HttpHeader> headers = {});
+      HttpClient http(std::vector<HttpHeader> headers);
+
       /**
        * Runs a query and returns the response
        */
@@ -625,6 +817,34 @@ namespace psibase
       }
    };  // TestChain
 
+   class HttpClient : public HttpRequestBuilder
+   {
+     public:
+      HttpClient(TestChain& chain, AccountNumber account = {}, std::vector<HttpHeader> headers = {})
+          : HttpRequestBuilder{account, std::move(headers)}, _chain(&chain)
+      {
+      }
+      template <typename R = HttpReply, HttpRequestBody T>
+      auto request(AccountNumber           account,
+                   std::string_view        method,
+                   std::string_view        target,
+                   const T&                body,
+                   std::vector<HttpHeader> headers = {})
+      {
+         auto req = HttpRequestBuilder::request(account, method, target, body, std::move(headers));
+         if constexpr (std::is_same_v<R, Default>)
+         {
+            return _chain->http(req);
+         }
+         else
+         {
+            return _chain->http<R>(req);
+         }
+      }
+
+     private:
+      TestChain* _chain;
+   };
 }  // namespace psibase
 
 template <>
