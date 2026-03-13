@@ -61,6 +61,7 @@ namespace psibase
       void regServer(std::vector<Action>& actions);
       void postinstall(std::vector<Action>& actions, std::span<const PackagedService> packages);
       void commitInstall(std::vector<Action>& actions, AccountNumber sender);
+      bool needsUI();
 
       std::vector<char> manifest();
 
