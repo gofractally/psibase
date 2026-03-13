@@ -27,7 +27,7 @@ TEST_CASE("Test XSites")
    auto             xsites = t.http(XSites::service);
    CHECK(xsites.put("/test", TextBody{"test"}).status == HttpStatus::ok);
    CHECK(xsites.get<TextBody>("/test").value == "test");
-   CHECK(t.http().get(XHttp::service, "/test").status == HttpStatus::notFound);
-   CHECK(t.http().put(HttpServer::service, "/wrong-service", TextBody{"test"}).status ==
+   CHECK(t.get(XHttp::service, "/test").status == HttpStatus::notFound);
+   CHECK(t.put(HttpServer::service, "/wrong-service", TextBody{"test"}).status ==
          HttpStatus::notFound);
 }

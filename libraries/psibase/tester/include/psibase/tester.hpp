@@ -328,7 +328,7 @@ namespace psibase
          return std::forward<Self>(self).template request<R>(account, "GET", target, EmptyBody{},
                                                              std::move(headers));
       }
-      template <typename R = Default, typename Self, HttpRequestBody T>
+      template <typename R = Default, typename Self, typename T>
       decltype(auto) post(this Self&&             self,
                           AccountNumber           account,
                           std::string_view        target,
@@ -338,7 +338,7 @@ namespace psibase
          return std::forward<Self>(self).template request<R>(account, "POST", target, body,
                                                              std::move(headers));
       }
-      template <typename R = Default, typename Self, HttpRequestBody T>
+      template <typename R = Default, typename Self, typename T>
       decltype(auto) post(this Self&&             self,
                           std::string_view        target,
                           const T&                body,
@@ -347,7 +347,7 @@ namespace psibase
          return std::forward<Self>(self).template request<R>(AccountNumber{}, "POST", target, body,
                                                              std::move(headers));
       }
-      template <typename R = Default, typename Self, HttpRequestBody T>
+      template <typename R = Default, typename Self, typename T>
       decltype(auto) put(this Self&&             self,
                          AccountNumber           account,
                          std::string_view        target,
@@ -357,7 +357,7 @@ namespace psibase
          return std::forward<Self>(self).template request<R>(account, "PUT", target, body,
                                                              std::move(headers));
       }
-      template <typename R = Default, typename Self, HttpRequestBody T>
+      template <typename R = Default, typename Self, typename T>
       decltype(auto) put(this Self&&             self,
                          std::string_view        target,
                          const T&                body,
@@ -388,7 +388,7 @@ namespace psibase
                                                              std::move(headers));
       }
 
-      template <typename R = Default, typename Self, HttpRequestBody T>
+      template <typename R = Default, typename Self, typename T>
       decltype(auto) request(this Self&&             self,
                              std::string_view        method,
                              std::string_view        target,
@@ -399,22 +399,33 @@ namespace psibase
                                                              std::move(headers));
       }
 
-      template <typename R = Default, HttpRequestBody T>
+      template <typename R = Default, typename T>
       auto request(AccountNumber           account,
                    std::string_view        method,
                    std::string_view        target,
                    const T&                body,
                    std::vector<HttpHeader> headers = {})
       {
+         decltype(auto) wrapped = wrapBody(body);
          return HttpRequest{.host = buildHost(account),
                             .method{method},
                             .target{target},
-                            .contentType = body.contentType(),
+                            .contentType = wrapped.contentType(),
                             .headers     = buildHeaders(std::move(headers)),
-                            .body        = body.body()};
+                            .body        = wrapped.body()};
       }
 
      private:
+      template <typename T>
+      decltype(auto) wrapBody(const T& body)
+      {
+         return JsonBody<const T&>(body);
+      }
+      template <HttpRequestBody T>
+      decltype(auto) wrapBody(const T& body)
+      {
+         return body;
+      }
       std::string buildHost(AccountNumber account)
       {
          if (account == AccountNumber{})
@@ -598,21 +609,9 @@ namespace psibase
       void runAll();
 
       /**
-       * Creates a POST request with a JSON body
-       */
-      template <typename T>
-      HttpRequest makePost(AccountNumber                   account,
-                           std::string_view                target,
-                           const T&                        data,
-                           std::optional<std::string_view> token = std::nullopt) const
-      {
-         return HttpRequestBuilder{}.auth_bearer(token).post(account, target, JsonBody{data});
-      }
-
-      /**
        * Creates a POST request
        */
-      template <HttpRequestBody T>
+      template <typename T>
       HttpRequest makePost(AccountNumber                   account,
                            std::string_view                target,
                            const T&                        data,
@@ -662,6 +661,12 @@ namespace psibase
             std::optional<std::string_view> token = std::nullopt)
       {
          return http<R>(makeGet(account, target, token));
+      }
+
+      template <typename R = HttpReply, typename T>
+      R put(AccountNumber account, std::string_view target, const T& data)
+      {
+         return http<R>(HttpRequestBuilder{}.put(account, target, data));
       }
 
       /**
@@ -805,7 +810,7 @@ namespace psibase
           : HttpRequestBuilder{account, std::move(headers)}, _chain(&chain)
       {
       }
-      template <typename R = HttpReply, HttpRequestBody T>
+      template <typename R = HttpReply, typename T>
       auto request(AccountNumber           account,
                    std::string_view        method,
                    std::string_view        target,
