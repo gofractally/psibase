@@ -295,13 +295,6 @@ namespace psibase
          return std::forward<Self>(self);
       }
       template <typename Self>
-      Self&& auth_bearer(this Self&& self, std::optional<std::string_view> token)
-      {
-         if (token)
-            self._headers.push_back({"Authorization", std::format("Bearer {}", *token)});
-         return std::forward<Self>(self);
-      }
-      template <typename Self>
       Self&& account(this Self&& self, AccountNumber account)
       {
          self._account = account;
@@ -608,28 +601,6 @@ namespace psibase
        */
       void runAll();
 
-      /**
-       * Creates a POST request
-       */
-      template <typename T>
-      HttpRequest makePost(AccountNumber                   account,
-                           std::string_view                target,
-                           const T&                        data,
-                           std::optional<std::string_view> token = std::nullopt) const
-      {
-         return HttpRequestBuilder{}.auth_bearer(token).post(account, target, data);
-      }
-
-      /**
-       * Creates a GET request
-       */
-      HttpRequest makeGet(AccountNumber                   account,
-                          std::string_view                target,
-                          std::optional<std::string_view> token = std::nullopt) const
-      {
-         return HttpRequestBuilder{}.auth_bearer(token).get(account, target);
-      }
-
       HttpClient http(AccountNumber account = {}, std::vector<HttpHeader> headers = {});
       HttpClient http(std::vector<HttpHeader> headers);
 
@@ -652,7 +623,10 @@ namespace psibase
              const T&                        data,
              std::optional<std::string_view> token = std::nullopt)
       {
-         return http<R>(makePost(account, target, data, token));
+         auto builder = HttpRequestBuilder{};
+         if (token)
+            builder.auth_bearer(*token);
+         return http<R>(builder.post(account, target, data));
       }
 
       template <typename R = HttpReply>
@@ -660,7 +634,10 @@ namespace psibase
             std::string_view                target,
             std::optional<std::string_view> token = std::nullopt)
       {
-         return http<R>(makeGet(account, target, token));
+         auto builder = HttpRequestBuilder{};
+         if (token)
+            builder.auth_bearer(*token);
+         return http<R>(builder.get(account, target));
       }
 
       template <typename R = HttpReply, typename T>
@@ -678,11 +655,11 @@ namespace psibase
       template <typename T>
       AsyncHttpReply asyncPost(AccountNumber account, std::string_view target, const T& data)
       {
-         return asyncHttp(makePost(account, target, data));
+         return asyncHttp(HttpRequestBuilder{}.post(account, target, data));
       }
       AsyncHttpReply asyncGet(AccountNumber account, std::string_view target)
       {
-         return asyncHttp(makeGet(account, target));
+         return asyncHttp(HttpRequestBuilder{}.get(account, target));
       }
 
       template <typename Action>
