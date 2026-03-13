@@ -331,33 +331,6 @@ mod service {
         return Quantity::new(UserSettings::get_default_buffer_capacity());
     }
 
-    fn bill(user: AccountNumber, amount: u64, sub_account: Option<String>) {
-        if amount == 0 {
-            return;
-        }
-
-        if let Some(config) = BillingConfig::get() {
-            let sys = config.sys;
-
-            let balance = UserSettings::get_resource_balance(user, sub_account.clone());
-            let amt = Quantity::new(amount);
-
-            if balance < amt {
-                let err = format!("{} has insufficient resource balance", user);
-                abort_message(&err);
-            }
-
-            let sub_key = if let Some(ref sub) = sub_account {
-                UserSettings::to_sub_account_key(user, sub)
-            } else {
-                user.to_string()
-            };
-
-            Tokens::call().fromSub(sys, sub_key, amt);
-            Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
-        }
-    }
-
     /// Set the network bandwidth pricing thresholds
     ///
     /// Configures the idle and congested thresholds used by the pricing algorithm
@@ -505,16 +478,19 @@ mod service {
             "[useNetSys] Unauthorized",
         );
 
-        let mut cost = NetPricing::consume(amount_bytes);
+        let amount_bits = check_some(amount_bytes.checked_mul(8), "network usage overflow");
+        let cost = NetPricing::consume(
+            amount_bits,
+            user,
+            tx_cache::get_sub(user),
+            is_billing_enabled(),
+        );
 
-        if !is_billing_enabled() {
-            cost = 0
-        }
-        bill(user, cost, tx_cache::get_sub(user));
-
+        let amount = to_i64(amount_bytes, "Consumed network bandwidth");
+        let cost = to_i64(cost, "Consumed network bandwidth cost");
         Wrapper::emit()
             .history()
-            .consumed(user, resources::NET, amount_bytes, cost);
+            .consumed(user, resources::NET, amount, cost);
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -529,7 +505,20 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let mut cost = CpuPricing::consume(amount_ns);
+        let cost = CpuPricing::consume(
+            amount_ns,
+            user,
+            tx_cache::get_sub(user),
+            is_billing_enabled(),
+        );
+
+        let amount = to_i64(amount_ns, "Consumed CPU");
+        let cost = to_i64(cost, "Consumed CPU cost");
+        Wrapper::emit()
+            .history()
+            .consumed(user, resources::CPU, amount, cost);
+    }
+
 
         if !is_billing_enabled() {
             cost = 0
@@ -624,8 +613,9 @@ mod service {
             .or_else(|| serve_graphiql(&request))
     }
 
+    // Schema uses consumption language, but negative values indicate free/refund
     #[event(history)]
-    fn consumed(account: AccountNumber, resource: u8, amount: u64, cost: u64) {}
+    fn consumed(account: AccountNumber, resource: u8, amount: i64, cost: i64) {}
 
     #[event(history)]
     fn subsidized(

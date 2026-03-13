@@ -45,9 +45,12 @@ impl NetPricing {
         Self::update_net(|net| net.num_blocks_to_average = num_blocks);
     }
 
-    pub fn consume(amount_bytes: u64) -> u64 {
-        let amount_bits = check_some(amount_bytes.checked_mul(8), "network usage overflow");
-
+    pub fn consume(
+        amount_bits: u64,
+        user: AccountNumber,
+        sub_account: Option<String>,
+        billing_enabled: bool,
+    ) -> u64 {
         let price = Cell::new(0u64);
         let billable_unit = Cell::new(0u64);
 
@@ -64,7 +67,15 @@ impl NetPricing {
         // Round up to the nearest billable unit
         let amount_units = (amount_bits + billable_unit - 1) / billable_unit;
 
-        check_some(amount_units.checked_mul(price), "network usage overflow")
+        let mut cost: u64 = check_some(amount_units.checked_mul(price), "network usage overflow");
+
+        if !billing_enabled {
+            cost = 0;
+        }
+
+        bill_user(user, cost, sub_account);
+
+        cost
     }
 
     pub fn new_block() -> u32 {

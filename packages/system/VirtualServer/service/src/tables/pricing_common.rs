@@ -1,7 +1,8 @@
+use crate::tables::tables::*;
 use async_graphql::SimpleObject;
 use psibase::services::diff_adjust::Wrapper as DiffAdjust;
 use psibase::services::nft::Wrapper as Nft;
-use psibase::services::tokens::{Decimal, Precision};
+use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
 use psibase::*;
 
 pub const PPM: u128 = 1_000_000;
@@ -144,4 +145,27 @@ pub fn avg_usage_pct_str(usage_history: &[u64], capacity: u64) -> String {
     let avg = usage_history.iter().sum::<u64>() / usage_history.len() as u64;
     let ppm = ratio_to_ppm(avg, capacity) as u64;
     Decimal::new(ppm.into(), Precision::new(4).unwrap()).to_string()
+}
+
+pub fn bill_user(user: AccountNumber, cost: u64, sub_account: Option<String>) {
+    if cost == 0 {
+        return;
+    }
+    let config = BillingConfig::get_assert();
+    let sys = config.sys;
+
+    let balance = UserSettings::get_resource_balance(user, sub_account.clone());
+    let amt = Quantity::new(cost);
+
+    if balance < amt {
+        abort_message(&format!("{} has insufficient resource balance", user));
+    }
+
+    let user_key = match sub_account {
+        Some(ref sub) => UserSettings::to_sub_account_key(user, sub),
+        None => user.to_string(),
+    };
+
+    Tokens::call().fromSub(sys, user_key, amt);
+    Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
 }

@@ -42,7 +42,12 @@ impl CpuPricing {
         Self::update_cpu(|cpu| cpu.num_blocks_to_average = num_blocks);
     }
 
-    pub fn consume(amount_ns: u64) -> u64 {
+    pub fn consume(
+        amount_ns: u64,
+        user: AccountNumber,
+        sub_account: Option<String>,
+        billing_enabled: bool,
+    ) -> u64 {
         let price = Cell::new(0u64);
         let billable_unit = Cell::new(0u64);
 
@@ -59,7 +64,15 @@ impl CpuPricing {
         // Round up to the nearest billable unit
         let amount_units = (amount_ns + billable_unit - 1) / billable_unit;
 
-        check_some(amount_units.checked_mul(price), "CPU usage overflow")
+        let mut cost = check_some(amount_units.checked_mul(price), "CPU usage overflow");
+
+        if !billing_enabled {
+            cost = 0;
+        }
+
+        bill_user(user, cost, sub_account);
+
+        cost
     }
 
     pub fn new_block() -> u32 {
