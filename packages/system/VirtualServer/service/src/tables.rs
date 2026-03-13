@@ -147,24 +147,33 @@ pub mod tables {
         pub capacity: u64,
     }
 
-    #[table(name = "NetPricingTable", index = 6)]
+    /// Pricing configuration for a bandwidth-like resource (one that has a max
+    /// capacity per unit time and uses the DiffAdjust algorithm to adjust price
+    /// based on congestion).
+    #[table(name = "BandwidthPricingTable", index = 6)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
-    pub struct NetPricing {
+    pub struct BandwidthPricing {
+        #[primary_key]
+        pub resource_id: u16,
+
+        /// Human-readable name for this resource (used in error messages)
+        #[graphql(skip)]
+        pub name: String,
+
         /// The number of blocks over which to compute the average usage
         pub num_blocks_to_average: u8,
 
         #[graphql(skip)]
-        /// The actual history of network bandwidth usage over the last
-        /// `num_blocks_to_average` blocks
+        /// The actual usage history over the last `num_blocks_to_average` blocks
         pub usage_history: Vec<u64>,
 
         #[graphql(skip)]
-        /// The network bandwidth usage in bits per second for the current block
-        pub current_usage_bps: u64,
+        /// The usage consumed during the current block
+        pub current_usage: u64,
 
         #[graphql(skip)]
-        /// The ID Of the diff adjust object used to calculate price
+        /// The ID of the diff adjust object used to calculate price
         pub diff_adjust_id: u32,
 
         /// The approximate amount of time it takes to double the price when congested
@@ -173,63 +182,18 @@ pub mod tables {
         /// The approximate amount of time it takes to halve the price when idle
         pub halving_time_sec: u32,
 
-        /// This is some number of bits that represents the smallest unit of billable
-        /// network bandwidth. Consumed network bandwidth is rounded up to the nearest
-        /// billable unit.
+        /// The smallest unit of billable resource consumption. Consumed amount
+        /// is rounded up to the nearest billable unit.
         pub billable_unit: u64,
-    }
-
-    impl NetPricing {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "CpuPricingTable", index = 7)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
-    #[graphql(complex)]
-    pub struct CpuPricing {
-        /// The number of blocks over which to compute the average usage
-        pub num_blocks_to_average: u8,
-
-        #[graphql(skip)]
-        /// The actual history of CPU time usage over the last
-        /// `num_blocks_to_average` blocks
-        pub usage_history: Vec<u64>,
-
-        #[graphql(skip)]
-        /// The CPU time usage in nanoseconds for the current block
-        pub current_usage_ns: u64,
-
-        #[graphql(skip)]
-        /// The ID Of the diff adjust object used to calculate price
-        pub diff_adjust_id: u32,
-
-        /// The approximate amount of time it takes to double the price when congested
-        pub doubling_time_sec: u32,
-
-        /// The approximate amount of time it takes to halve the price when idle
-        pub halving_time_sec: u32,
-
-        /// This is some number of nanoseconds that represents the smallest unit of
-        /// billable CPU time. Consumed CPU time is rounded up to the nearest billable unit.
-        pub billable_unit: u64,
-    }
-
-    impl CpuPricing {
-        #[primary_key]
-        fn pk(&self) {}
     }
 }
 
+mod bandwidth_pricing;
 mod billing_config;
-mod cpu_pricing;
-mod net_pricing;
 mod network_specs;
 mod network_variables;
-mod pricing_common;
 mod server_specs;
 mod user_settings;
 
+pub use bandwidth_pricing::*;
 pub use user_settings::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
-
-pub use pricing_common::*;

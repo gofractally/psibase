@@ -1,7 +1,11 @@
-use crate::tables::tables::{
-    BillingConfig, BillingConfigTable, CpuPricing, NetPricing, NetworkSpecs, NetworkSpecsTable,
-    NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable, UserSettings,
+use crate::{
+    service::{CPU, NET},
+    tables::tables::{
+        BandwidthPricing, BillingConfig, BillingConfigTable, NetworkSpecs, NetworkSpecsTable,
+        NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable, UserSettings,
+    },
 };
+
 use async_graphql::{connection::Connection, *};
 use psibase::{
     is_auth,
@@ -239,13 +243,13 @@ impl Query {
     }
 
     /// Returns the data related to pricing of network bandwidth
-    async fn network_pricing(&self) -> Option<NetPricing> {
-        NetPricing::get()
+    async fn network_pricing(&self) -> Option<BandwidthPricing> {
+        BandwidthPricing::get(NET)
     }
 
     /// Returns the data related to pricing of CPU time
-    async fn cpu_pricing(&self) -> Option<CpuPricing> {
-        CpuPricing::get()
+    async fn cpu_pricing(&self) -> Option<BandwidthPricing> {
+        BandwidthPricing::get(CPU)
     }
 
     /// Returns information related to the user's resource buffer.

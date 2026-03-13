@@ -92,6 +92,10 @@ mod service {
     use psibase::{abort_message, *};
     use std::cmp::min;
 
+    // Bandwidth-pricing resource IDs
+    pub const NET: u16 = 0;
+    pub const CPU: u16 = 1;
+
     #[action]
     fn init() {
         if InitRow::is_init() {
@@ -106,8 +110,8 @@ mod service {
         Transact::call().resMonitoring(true);
 
         // Initialize network resource consumption tracking
-        NetPricing::initialize();
-        CpuPricing::initialize();
+        BandwidthPricing::initialize(NET, "Network bandwidth", 5, 600, 1800, 8);
+        BandwidthPricing::initialize(CPU, "CPU", 5, 600, 1800, 1_000_000);
 
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
@@ -346,7 +350,7 @@ mod service {
     #[action]
     fn net_thresholds(idle_ppm: u32, congested_ppm: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetPricing::set_thresholds(idle_ppm, congested_ppm);
+        BandwidthPricing::get_assert(NET).set_thresholds(idle_ppm, congested_ppm);
     }
 
     /// Set the network bandwidth price change rates
@@ -360,7 +364,7 @@ mod service {
     #[action]
     fn net_rates(doubling_time_sec: u32, halving_time_sec: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetPricing::set_change_rates(doubling_time_sec, halving_time_sec);
+        BandwidthPricing::get_assert(NET).set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
     /// Sets the number of blocks over which to compute the average network usage.
@@ -370,7 +374,7 @@ mod service {
     fn net_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
         check(num_blocks > 0, "Number of blocks must be greater than 0");
-        NetPricing::set_num_blocks_to_average(num_blocks);
+        BandwidthPricing::get_assert(NET).set_num_blocks_to_average(num_blocks);
     }
 
     /// Sets the size of the billable unit of network bandwidth.
@@ -379,7 +383,7 @@ mod service {
     #[action]
     fn net_min_unit(bits: u64) {
         check(get_sender() == get_service(), "Unauthorized");
-        NetPricing::set_billable_unit(bits);
+        BandwidthPricing::get_assert(NET).set_billable_unit(bits);
     }
 
     /// Returns the current cost (in system tokens) of consuming the specified amount of network
@@ -387,16 +391,14 @@ mod service {
     #[action]
     fn get_net_cost(bytes: u64) -> Quantity {
         let bits = bytes * 8;
-        let net_pricing = NetPricing::get();
-        if net_pricing.is_none() {
+        let Some(pricing) = BandwidthPricing::get(NET) else {
             return Quantity::new(0);
-        }
+        };
 
-        let net_pricing = net_pricing.unwrap();
-        let billable_unit = net_pricing.get_billable_unit();
+        let billable_unit = pricing.get_billable_unit();
         let amount_units = (bits + billable_unit - 1) / billable_unit;
 
-        return Quantity::new(net_pricing.price() * amount_units);
+        Quantity::new(pricing.price() * amount_units)
     }
 
     /// Set the CPU pricing thresholds
@@ -414,7 +416,7 @@ mod service {
     #[action]
     fn cpu_thresholds(idle_ppm: u32, congested_ppm: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        CpuPricing::set_thresholds(idle_ppm, congested_ppm);
+        BandwidthPricing::get_assert(CPU).set_thresholds(idle_ppm, congested_ppm);
     }
 
     /// Set the CPU price change rates
@@ -428,7 +430,7 @@ mod service {
     #[action]
     fn cpu_rates(doubling_time_sec: u32, halving_time_sec: u32) {
         check(get_sender() == get_service(), "Unauthorized");
-        CpuPricing::set_change_rates(doubling_time_sec, halving_time_sec);
+        BandwidthPricing::get_assert(CPU).set_change_rates(doubling_time_sec, halving_time_sec);
     }
 
     /// Sets the number of blocks over which to compute the average CPU usage.
@@ -438,7 +440,7 @@ mod service {
     fn cpu_blocks_avg(num_blocks: u8) {
         check(get_sender() == get_service(), "Unauthorized");
         check(num_blocks > 0, "Number of blocks must be greater than 0");
-        CpuPricing::set_num_blocks_to_average(num_blocks);
+        BandwidthPricing::get_assert(CPU).set_num_blocks_to_average(num_blocks);
     }
 
     /// Sets the size of the billable unit of CPU time.
@@ -447,23 +449,25 @@ mod service {
     #[action]
     fn cpu_min_unit(ns: u64) {
         check(get_sender() == get_service(), "Unauthorized");
-        CpuPricing::set_billable_unit(ns);
+        BandwidthPricing::get_assert(CPU).set_billable_unit(ns);
     }
 
     /// Returns the current cost (in system tokens) of consuming the specified amount of
     /// CPU time
     #[action]
     fn get_cpu_cost(ns: u64) -> Quantity {
-        let cpu_pricing = CpuPricing::get();
-        if cpu_pricing.is_none() {
+        let Some(pricing) = BandwidthPricing::get(CPU) else {
             return Quantity::new(0);
-        }
+        };
 
-        let cpu_pricing = cpu_pricing.unwrap();
-        let billable_unit = cpu_pricing.get_billable_unit();
+        let billable_unit = pricing.get_billable_unit();
         let amount_units = (ns + billable_unit - 1) / billable_unit;
 
-        Quantity::new(cpu_pricing.price() * amount_units)
+        Quantity::new(pricing.price() * amount_units)
+    }
+
+    fn to_i64(amount: u64, context: &str) -> i64 {
+        i64::try_from(amount).unwrap_or_else(|_| abort_message(&format!("{} overflow", context)))
     }
 
     /// Called by the system to indicate that the specified user has consumed a
@@ -479,7 +483,7 @@ mod service {
         );
 
         let amount_bits = check_some(amount_bytes.checked_mul(8), "network usage overflow");
-        let cost = NetPricing::consume(
+        let cost = BandwidthPricing::get_assert(NET).consume(
             amount_bits,
             user,
             tx_cache::get_sub(user),
@@ -505,7 +509,7 @@ mod service {
             "[useCpuSys] Unauthorized",
         );
 
-        let cost = CpuPricing::consume(
+        let cost = BandwidthPricing::get_assert(CPU).consume(
             amount_ns,
             user,
             tx_cache::get_sub(user),
@@ -517,17 +521,6 @@ mod service {
         Wrapper::emit()
             .history()
             .consumed(user, resources::CPU, amount, cost);
-    }
-
-
-        if !is_billing_enabled() {
-            cost = 0
-        }
-        bill(user, cost, tx_cache::get_sub(user));
-
-        Wrapper::emit()
-            .history()
-            .consumed(user, resources::CPU, amount_ns, cost);
     }
 
     #[action]
@@ -543,8 +536,8 @@ mod service {
     fn notifyBlock(block_num: BlockNum) {
         check(get_sender() == Transact::SERVICE, "Unauthorized");
 
-        let net_usage = NetPricing::new_block();
-        let cpu_usage = CpuPricing::new_block();
+        let net_usage = BandwidthPricing::get_assert(NET).new_block();
+        let cpu_usage = BandwidthPricing::get_assert(CPU).new_block();
 
         // Emit the block usage stats every 10 blocks
         if block_num % 10 == 0 {
@@ -562,7 +555,7 @@ mod service {
             return None;
         }
 
-        let cpu_pricing = CpuPricing::get_assert();
+        let cpu_pricing = BandwidthPricing::get_assert(CPU);
         let res_balance = UserSettings::get_resource_balance(account, sub_account).value;
 
         let price_per_unit = cpu_pricing.price();
