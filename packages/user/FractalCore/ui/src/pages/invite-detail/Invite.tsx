@@ -47,11 +47,11 @@ export const Invite = () => {
 
     const form = useAppForm({
         defaultValues: {
-            extraInfo: "",
+            description: "",
         },
-        onSubmit: async ({ value: { extraInfo } }) => {
+        onSubmit: async ({ value: { description } }) => {
             const guild = zAccount.parse(invite?.guildInvite?.guild.account);
-            await draftApplication([guild, extraInfo]);
+            await draftApplication([guild, description]);
             await connectAccount({
                 enabled: true,
                 returnPath: `/guild/${guild}/invite-response`,
@@ -149,9 +149,9 @@ export const Invite = () => {
                             className="flex flex-col gap-2"
                         >
                             <form.AppField
-                                name="extraInfo"
+                                name="description"
                                 children={(field) => (
-                                    <field.TextField label="Description" />
+                                    <field.TextField label="Application description" />
                                 )}
                             />
                             <form.AppForm>
