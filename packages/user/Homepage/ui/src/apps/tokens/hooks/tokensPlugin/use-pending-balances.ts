@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { Quantity } from "@shared/lib/quantity";
 
