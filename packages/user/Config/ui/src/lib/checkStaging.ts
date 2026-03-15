@@ -1,6 +1,8 @@
 import z from "zod";
 
-import { getCurrentUser } from "@/hooks/useCurrentUser";
+import { getCurrentUser } from "@shared/hooks/use-current-user";
+
+import { queryClient } from "@/queryClient";
 
 import { getActorHistory } from "./getActorHistory";
 import { getStagedByProposer } from "./getStagedByProposer";
@@ -24,7 +26,7 @@ export const zTxStatus = z.discriminatedUnion("type", [zExecuted, zAwaiting]);
 export type TxStatus = z.infer<typeof zTxStatus>;
 
 export const checkLastTx = async (): Promise<z.infer<typeof zTxStatus>> => {
-    const currentUser = getCurrentUser()!;
+    const currentUser = getCurrentUser(queryClient)!;
 
     const actorHistory = await getActorHistory(currentUser);
     if (actorHistory.length == 0) {
