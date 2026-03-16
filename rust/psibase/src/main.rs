@@ -93,7 +93,8 @@ struct TxArgs {
 #[derive(Args, Debug)]
 #[clap(long_about = None)]
 struct SigArgs {
-    /// Sign with this key (repeatable)
+    /// Sign transactions with one or more keys.
+    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<AnyPrivateKey>,
 
