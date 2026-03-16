@@ -6,6 +6,7 @@ import dayjs from "dayjs";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { ErrorCard } from "@/components/error-card";
+import { PageContainer } from "@/components/page-container";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
@@ -14,15 +15,11 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import { getMemberLabel } from "@/lib/getMemberLabel";
 
+import { GlowingCard } from "@shared/components/glowing-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from "@shared/shadcn/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
@@ -67,29 +64,24 @@ export const MyMembership = () => {
     }
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg p-4 px-6">
-            <div className="flex h-9 items-center">
-                <h1 className="text-lg font-semibold">My membership</h1>
-            </div>
-            <div className="mt-3 space-y-6">
-                {isLoading || !chainId ? (
-                    <>
-                        <Skeleton className="h-44 w-full rounded-xl" />
-                        <Skeleton className="h-44 w-full rounded-xl" />
-                        <Skeleton className="h-44 w-full rounded-xl" />
-                    </>
-                ) : (
-                    <>
-                        <FractalOverviewCard
-                            fractal={fractal}
-                            fractalAccount={fractalAccount}
-                            chainId={chainId}
-                        />
-                        <MembershipStatusCard membership={membership} />
-                    </>
-                )}
-            </div>
-        </div>
+        <PageContainer className="space-y-6">
+            {isLoading || !chainId ? (
+                <>
+                    <Skeleton className="h-44 w-full rounded-xl" />
+                    <Skeleton className="h-44 w-full rounded-xl" />
+                    <Skeleton className="h-44 w-full rounded-xl" />
+                </>
+            ) : (
+                <>
+                    <FractalOverviewCard
+                        fractal={fractal}
+                        fractalAccount={fractalAccount}
+                        chainId={chainId}
+                    />
+                    <MembershipStatusCard membership={membership} />
+                </>
+            )}
+        </PageContainer>
     );
 };
 
@@ -103,7 +95,7 @@ const FractalOverviewCard = ({
     chainId: string;
 }) => {
     return (
-        <Card>
+        <GlowingCard>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <div className="flex w-full justify-between ">
@@ -153,7 +145,7 @@ const FractalOverviewCard = ({
                     </div>
                 </div>
             </CardContent>
-        </Card>
+        </GlowingCard>
     );
 };
 
@@ -165,7 +157,7 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
               ? getMemberLabel(membership.memberStatus)
               : "Loading...";
     return (
-        <Card>
+        <GlowingCard>
             <CardHeader>
                 <CardTitle className="text-lg">Membership status</CardTitle>
             </CardHeader>
@@ -204,6 +196,6 @@ const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
                     </>
                 )}
             </CardContent>
-        </Card>
+        </GlowingCard>
     );
 };
