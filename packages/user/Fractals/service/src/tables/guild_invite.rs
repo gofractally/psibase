@@ -8,7 +8,7 @@ use psibase::{
 use crate::{
     constants::MAX_GUILD_INVITES_PER_MEMBER,
     tables::tables::{
-        Guild, GuildApplication, GuildAttest, GuildInvite, GuildInviteTable, GuildMember,
+        Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember,
     },
 };
 use psibase::services::{
@@ -78,9 +78,9 @@ impl GuildInvite {
     }
 
     pub fn accept(&self, accepter: AccountNumber) {
-        GuildApplication::add(self.guild, accepter, "".to_string());
+        let application = GuildApplication::add(self.guild, accepter, "".to_string());
         if self.pre_attest {
-            GuildAttest::set(self.guild, accepter, self.inviter, "".to_string(), true);
+            application.attest("".to_string(), self.inviter, true);
         }
     }
 

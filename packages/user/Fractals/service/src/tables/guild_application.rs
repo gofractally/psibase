@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use async_graphql::{connection::Connection, SimpleObject};
 
-use psibase::{check_none, check_some, get_sender, AccountNumber, RawKey, Table, TableQuery};
+use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 
 use crate::{
     constants::GUILD_ATTEST_THRESHOLD,
@@ -23,13 +23,15 @@ impl GuildApplication {
         }
     }
 
-    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) {
+    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
         check_none(Self::get(guild, applicant), "application already exists");
         check_none(
             GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
-        Self::new(guild, applicant, extra_info).save();
+        let new_instance = Self::new(guild, applicant, extra_info);
+        new_instance.save();
+        new_instance
     }
 
     pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
@@ -86,8 +88,8 @@ impl GuildApplication {
             .sum()
     }
 
-    pub fn attest(&self, comment: String, endorses: bool) {
-        GuildAttest::set(self.guild, self.applicant, get_sender(), comment, endorses);
+    pub fn attest(&self, comment: String, attester: AccountNumber, endorses: bool) {
+        GuildAttest::set(self.guild, self.applicant, attester, comment, endorses);
         self.check_attests();
     }
 

@@ -11,7 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { useDraftApplication } from "@/hooks/use-draft-application";
-import { getInvites } from "@/lib/graphql/fractals/getInvites";
+import { getInvites, importToken } from "@/lib/graphql/fractals/getInvites";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { useConnectAccount } from "@/hooks/use-connect-account";
@@ -38,7 +38,7 @@ export const Invite = () => {
     } = useQuery({
         enabled: !!token,
         queryKey: ["invite", token],
-        queryFn: async () => getInvites(z.string().parse(token)),
+        queryFn: async () => importToken(z.string().parse(token)).then(getInvites),
     });
 
     const { mutateAsync: connectAccount } = useConnectAccount();

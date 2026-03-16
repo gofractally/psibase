@@ -46,7 +46,7 @@ export const InviteGuildMemberModal = ({
     );
 
     useEffect(() => {
-        if (show && !isSuccess) createGuildInvite([guildAccount!, true]);
+        if (show && !isSuccess) createGuildInvite([guildAccount!, 1, true]);
     }, [show, isSuccess, guildAccount, createGuildInvite]);
 
     const onCopyClick = async () => {
@@ -59,7 +59,6 @@ export const InviteGuildMemberModal = ({
             toast("Copied to clipboard.");
         } else {
             toast("Copying failed, not in secure context?");
-            createGuildInvite([guildAccount!, true]);
         }
     };
 
@@ -99,7 +98,7 @@ export const InviteGuildMemberModal = ({
                         size="sm"
                         variant="outline"
                         className="px-3"
-                        onClick={() => createGuildInvite([guildAccount!, true])}
+                        onClick={() => createGuildInvite([guildAccount!, 1, true])}
                     >
                         <span className="sr-only">Refresh</span>
                         <RefreshCcw className="h-4 w-4" />

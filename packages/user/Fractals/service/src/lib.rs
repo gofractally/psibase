@@ -68,11 +68,14 @@ pub mod service {
         },
     };
 
-    use psibase::services::{
-        auth_dyn::{self, policy::DynamicAuthPolicy},
-        transact::ServiceMethod,
-    };
     use psibase::*;
+    use psibase::{
+        get_sender,
+        services::{
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            transact::ServiceMethod,
+        },
+    };
 
     /// Creates a new account and fractal.
     ///
@@ -199,7 +202,11 @@ pub mod service {
         comment: String,
         endorses: bool,
     ) {
-        GuildApplication::get_assert(guild_account, applicant).attest(comment, endorses);
+        GuildApplication::get_assert(guild_account, applicant).attest(
+            comment,
+            get_sender(),
+            endorses,
+        );
     }
 
     /// Starts an evaluation for the specified guild.

@@ -4,13 +4,18 @@ import { getGuildInvite } from "./getGuildInvite";
 import { getInviteById } from "./getInviteById";
 import z from "zod";
 
-export const getInvites = async (token: string) => {
-    const inviteId = z.number().int().parse(await supervisor.functionCall({
+
+export const importToken = async (token: string): Promise<number> => {
+    return z.number().int().parse(await supervisor.functionCall({
         service: "invite",
         intf: "invitee",
         method: "importInviteToken",
         params: [token],
     }));
+
+}
+
+export const getInvites = async (inviteId: number) => {
 
     const [guildInvite, vanillaInvite] = await Promise.all([
         getGuildInvite(inviteId),
