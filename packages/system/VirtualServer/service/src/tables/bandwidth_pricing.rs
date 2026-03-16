@@ -1,17 +1,15 @@
-use crate::service::{CPU, NET};
+use crate::math_utils::*;
+use crate::service::{
+    get_resource_name,
+    resources::{CPU, NET},
+};
 use crate::tables::tables::*;
 use async_graphql::{ComplexObject, SimpleObject};
 use psibase::services::diff_adjust::Wrapper as DiffAdjust;
 use psibase::services::nft::Wrapper as Nft;
-use psibase::services::tokens::{Decimal, Precision, Quantity, Wrapper as Tokens};
+use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::*;
 use std::cell::Cell;
-
-pub const PPM: u128 = 1_000_000;
-
-pub fn ratio_to_ppm(num: u64, den: u64) -> u128 {
-    (num as u128 * PPM) / (den as u128)
-}
 
 // In DiffAdjust, we use the discrete compounding equation to relate total change to a rate of change
 //   over some interval.
@@ -48,16 +46,6 @@ pub fn time_to_rate_ppm(t: u32) -> u32 {
     (LN2_PPM + t / 2) / t
 }
 
-#[derive(SimpleObject)]
-pub struct Thresholds {
-    /// The percentage of average consumption below which the price of the
-    /// resource will decrease
-    pub idle_pct: String,
-    /// The percentage of average consumption above which the price of the
-    /// resource will increase
-    pub congested_pct: String,
-}
-
 fn create_diff_adjust(doubling_time_sec: u32, halving_time_sec: u32) -> u32 {
     const DEFAULT_INITIAL_DIFFICULTY: u64 = 1;
     const DEFAULT_FLOOR_DIFFICULTY: u64 = DEFAULT_INITIAL_DIFFICULTY;
@@ -78,16 +66,8 @@ fn create_diff_adjust(doubling_time_sec: u32, halving_time_sec: u32) -> u32 {
     diff_adjust_id
 }
 
-fn average(list: &[u64]) -> u64 {
-    if list.is_empty() {
-        return 0;
-    }
-    // Use u128 internally to avoid overflow on the sum
-    (list.iter().map(|&x| x as u128).sum::<u128>() / list.len() as u128) as u64
-}
-
-/// Updates the average_history with the specified current_usage, then zeroes out the current_usage.
-/// Increments the specified diff_adjust by the amount of the average usage in PPM (of total capacity).
+// Updates the average_history with the specified current_usage, then zeroes out the current_usage.
+// Increments the specified diff_adjust by the amount of the average usage in PPM (of total capacity).
 fn update_average_usage(
     usage_history: &mut Vec<u64>,
     last_block_usage: &mut u64,
@@ -113,42 +93,6 @@ fn update_average_usage(
     ppm
 }
 
-fn validate_thresholds(idle_ppm: u32, congested_ppm: u32) {
-    check(
-        idle_ppm < congested_ppm,
-        "idle ppm must be less than congested ppm",
-    );
-    check(idle_ppm > 0, "idle ppm must be greater than 0%");
-    check(
-        congested_ppm < PPM as u32,
-        "congested ppm must be less than 100%",
-    );
-}
-
-fn validate_change_rates(doubling_time_sec: u32, halving_time_sec: u32) {
-    check(
-        doubling_time_sec > 0,
-        "doubling time must be greater than 0",
-    );
-    check(halving_time_sec > 0, "halving time must be greater than 0");
-}
-
-fn get_thresholds_pct(diff_adjust_id: u32) -> Thresholds {
-    let (target_min, target_max) = DiffAdjust::call().get_targets(diff_adjust_id);
-    let ppm_to_pct = Precision::new(4).unwrap();
-
-    Thresholds {
-        idle_pct: Decimal::new((target_min as u64).into(), ppm_to_pct).to_string(),
-        congested_pct: Decimal::new((target_max as u64).into(), ppm_to_pct).to_string(),
-    }
-}
-
-fn avg_usage_pct_str(usage_history: &[u64], capacity: u64) -> String {
-    let avg = usage_history.iter().sum::<u64>() / usage_history.len() as u64;
-    let ppm = ratio_to_ppm(avg, capacity) as u64;
-    Decimal::new(ppm.into(), Precision::new(4).unwrap()).to_string()
-}
-
 pub fn bill_user(user: AccountNumber, cost: u64, sub_account: Option<String>) {
     if cost == 0 {
         return;
@@ -172,7 +116,7 @@ pub fn bill_user(user: AccountNumber, cost: u64, sub_account: Option<String>) {
     Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
 }
 
-fn capacity(resource_id: u16) -> u64 {
+fn capacity(resource_id: u8) -> u64 {
     let specs = NetworkSpecs::get_assert();
     match resource_id {
         NET => specs.net_bps,
@@ -183,8 +127,7 @@ fn capacity(resource_id: u16) -> u64 {
 
 impl BandwidthPricing {
     pub fn initialize(
-        resource_id: u16,
-        name: &str,
+        resource_id: u8,
         num_blocks_to_average: u8,
         doubling_time_sec: u32,
         halving_time_sec: u32,
@@ -192,7 +135,6 @@ impl BandwidthPricing {
     ) {
         let row = BandwidthPricing {
             resource_id,
-            name: name.to_string(),
             num_blocks_to_average,
             usage_history: Vec::new(),
             current_usage: 0,
@@ -204,7 +146,7 @@ impl BandwidthPricing {
         BandwidthPricingTable::read_write().put(&row).unwrap();
     }
 
-    fn update<F: FnOnce(&mut BandwidthPricing)>(resource_id: u16, f: F) {
+    fn update<F: FnOnce(&mut BandwidthPricing)>(resource_id: u8, f: F) {
         let table = BandwidthPricingTable::read_write();
         let mut row = check_some(
             table.get_index_pk().get(&resource_id),
@@ -214,12 +156,12 @@ impl BandwidthPricing {
         table.put(&row).unwrap();
     }
 
-    pub fn get_assert(resource_id: u16) -> Self {
+    pub fn get_assert(resource_id: u8) -> Self {
         let row = Self::get(resource_id);
         check_some(row, &format!("resource {} not initialized", resource_id))
     }
 
-    pub fn get(resource_id: u16) -> Option<Self> {
+    pub fn get(resource_id: u8) -> Option<Self> {
         BandwidthPricingTable::read()
             .get_index_pk()
             .get(&resource_id)
@@ -238,13 +180,11 @@ impl BandwidthPricing {
     ) -> u64 {
         let price = Cell::new(0u64);
         let billable_unit = Cell::new(0u64);
-        let name = Cell::new(String::new());
 
         Self::update(self.resource_id, |r| {
             r.current_usage += amount;
             price.set(r.price());
             billable_unit.set(r.billable_unit);
-            name.set(r.name.clone());
         });
 
         let billable_unit = billable_unit.get();
@@ -255,7 +195,7 @@ impl BandwidthPricing {
 
         let mut cost = check_some(
             amount_units.checked_mul(price),
-            &format!("{} usage overflow", name.into_inner()),
+            &format!("{} usage overflow", get_resource_name(self.resource_id)),
         );
 
         if !billing_enabled {
@@ -288,12 +228,25 @@ impl BandwidthPricing {
     }
 
     pub fn set_thresholds(&self, idle_ppm: u32, congested_ppm: u32) {
-        validate_thresholds(idle_ppm, congested_ppm);
+        check(
+            idle_ppm < congested_ppm,
+            "idle ppm must be less than congested ppm",
+        );
+        check(idle_ppm > 0, "idle ppm must be greater than 0%");
+        check(
+            congested_ppm < PPM as u32,
+            "congested ppm must be less than 100%",
+        );
+
         DiffAdjust::call().set_targets(self.diff_adjust_id, idle_ppm, congested_ppm);
     }
 
     pub fn set_change_rates(&self, doubling_time_sec: u32, halving_time_sec: u32) {
-        validate_change_rates(doubling_time_sec, halving_time_sec);
+        check(
+            doubling_time_sec > 0,
+            "doubling time must be greater than 0",
+        );
+        check(halving_time_sec > 0, "halving time must be greater than 0");
 
         Self::update(self.resource_id, |r| {
             r.doubling_time_sec = doubling_time_sec;
@@ -316,17 +269,33 @@ impl BandwidthPricing {
     }
 }
 
+#[derive(SimpleObject)]
+pub struct Thresholds {
+    /// The percentage of average consumption below which the price of the
+    /// resource will decrease
+    pub idle_pct: String,
+    /// The percentage of average consumption above which the price of the
+    /// resource will increase
+    pub congested_pct: String,
+}
+
 #[ComplexObject]
 impl BandwidthPricing {
     /// The resource usage as a percentage of total capacity averaged over the
     /// last `num_blocks_to_average` blocks
     pub async fn avg_usage_pct(&self) -> String {
-        avg_usage_pct_str(&self.usage_history, capacity(self.resource_id))
+        let avg = self.usage_history.iter().sum::<u64>() / self.usage_history.len() as u64;
+        let ppm = ratio_to_ppm(avg, capacity(self.resource_id)) as u64;
+        ppm_to_pct(ppm).to_string()
     }
 
     /// The threshold percentages below/above which the price will decrease/increase
     pub async fn thresholds(&self) -> Thresholds {
-        get_thresholds_pct(self.diff_adjust_id)
+        let (target_min, target_max) = DiffAdjust::call().get_targets(self.diff_adjust_id);
+        Thresholds {
+            idle_pct: ppm_to_pct(target_min as u64).to_string(),
+            congested_pct: ppm_to_pct(target_max as u64).to_string(),
+        }
     }
 
     /// The price per billable unit

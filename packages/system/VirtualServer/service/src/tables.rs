@@ -147,19 +147,16 @@ pub mod tables {
         pub capacity: u64,
     }
 
-    /// Pricing configuration for a bandwidth-like resource (one that has a max
-    /// capacity per unit time and uses the DiffAdjust algorithm to adjust price
-    /// based on congestion).
+    /// Pricing configuration for a bandwidth-like resource.
+    ///
+    /// A bandwidth-like resource is one that has a max capacity per unit time and uses
+    /// a "difficulty adjustment" algorithm to adjust price based on congestion.
     #[table(name = "BandwidthPricingTable", index = 6)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
     pub struct BandwidthPricing {
         #[primary_key]
-        pub resource_id: u16,
-
-        /// Human-readable name for this resource (used in error messages)
-        #[graphql(skip)]
-        pub name: String,
+        pub resource_id: u8,
 
         /// The number of blocks over which to compute the average usage
         pub num_blocks_to_average: u8,

@@ -1,5 +1,6 @@
 use crate::{
-    service::{CPU, NET},
+    math_utils::ppm_to_pct,
+    service::{get_measurement_unit, get_resource_name, resources},
     tables::tables::{
         BandwidthPricing, BillingConfig, BillingConfigTable, NetworkSpecs, NetworkSpecsTable,
         NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable, UserSettings,
@@ -10,19 +11,13 @@ use async_graphql::{connection::Connection, *};
 use psibase::{
     is_auth,
     services::{
-        tokens::{Decimal, Precision, Quantity, Wrapper as Tokens},
+        tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
     },
     AccountNumber, EventQuery, MethodNumber, Table,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
-
-pub mod resources {
-    pub const CPU: u8 = 0;
-    pub const NET: u8 = 1;
-    pub const _STORAGE: u8 = 2;
-}
 
 #[derive(Deserialize, SimpleObject)]
 #[graphql(complex)]
@@ -39,28 +34,14 @@ pub struct ConsumptionEvent {
     cost: u64,
 }
 
-impl ConsumptionEvent {
-    fn get_unit(&self) -> &'static str {
-        match self.resource {
-            resources::CPU => "ns",
-            resources::NET => "bytes",
-            _ => "Unknown",
-        }
-    }
-}
-
 #[ComplexObject]
 impl ConsumptionEvent {
     pub async fn resource(&self) -> &'static str {
-        match self.resource {
-            resources::CPU => "CPU",
-            resources::NET => "Net",
-            _ => "Unknown",
-        }
+        get_resource_name(self.resource)
     }
 
     pub async fn amount(&self) -> String {
-        format!("{} {}", self.amount, self.get_unit())
+        format!("{} {}", self.amount, get_measurement_unit(self.resource))
     }
 
     pub async fn cost(&self) -> Decimal {
@@ -108,18 +89,12 @@ pub struct BlockUsageEvent {
 impl BlockUsageEvent {
     /// The amount of network usage in the block as a percentage of total capacity
     pub async fn net_usage_pct(&self) -> Decimal {
-        Decimal::new(
-            Quantity::from(self.net_usage_ppm as u64),
-            Precision::new(4).unwrap(),
-        )
+        ppm_to_pct(self.net_usage_ppm as u64)
     }
 
     /// The amount of CPU usage in the block as a percentage of total capacity
     pub async fn cpu_usage_pct(&self) -> Decimal {
-        Decimal::new(
-            Quantity::from(self.cpu_usage_ppm as u64),
-            Precision::new(4).unwrap(),
-        )
+        ppm_to_pct(self.cpu_usage_ppm as u64)
     }
 }
 
@@ -244,12 +219,12 @@ impl Query {
 
     /// Returns the data related to pricing of network bandwidth
     async fn network_pricing(&self) -> Option<BandwidthPricing> {
-        BandwidthPricing::get(NET)
+        BandwidthPricing::get(resources::NET)
     }
 
     /// Returns the data related to pricing of CPU time
     async fn cpu_pricing(&self) -> Option<BandwidthPricing> {
-        BandwidthPricing::get(CPU)
+        BandwidthPricing::get(resources::CPU)
     }
 
     /// Returns information related to the user's resource buffer.

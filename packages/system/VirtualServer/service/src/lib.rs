@@ -4,6 +4,8 @@ pub mod rpc;
 pub mod tables;
 pub use crate::tables::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
 
+mod math_utils;
+
 mod tx_cache {
     use psibase::AccountNumber;
     use std::cell::{Cell, RefCell};
@@ -78,7 +80,6 @@ mod tx_cache {
 /// service to manage server specs, network variables, and billing parameters, as needed.
 #[psibase::service(name = "virtual-server", recursive = "true", tables = "tables::tables")]
 mod service {
-    use crate::rpc::resources;
     use crate::tables::tables::{UserSettings, *};
     use crate::tx_cache;
     use psibase::services::events;
@@ -92,9 +93,29 @@ mod service {
     use psibase::{abort_message, *};
     use std::cmp::min;
 
-    // Bandwidth-pricing resource IDs
-    pub const NET: u16 = 0;
-    pub const CPU: u16 = 1;
+    // Resource type IDs
+    pub mod resources {
+        pub const CPU: u8 = 0;
+        pub const NET: u8 = 1;
+        pub const _STORAGE: u8 = 2;
+    }
+    use resources::{CPU, NET};
+
+    pub fn get_resource_name(resource_id: u8) -> &'static str {
+        match resource_id {
+            CPU => "CPU",
+            NET => "Net",
+            _ => "Unknown",
+        }
+    }
+
+    pub fn get_measurement_unit(resource_id: u8) -> &'static str {
+        match resource_id {
+            CPU => "ns",
+            NET => "bytes",
+            _ => "Unknown",
+        }
+    }
 
     #[action]
     fn init() {
@@ -110,8 +131,8 @@ mod service {
         Transact::call().resMonitoring(true);
 
         // Initialize network resource consumption tracking
-        BandwidthPricing::initialize(NET, "Network bandwidth", 5, 600, 1800, 8);
-        BandwidthPricing::initialize(CPU, "CPU", 5, 600, 1800, 1_000_000);
+        BandwidthPricing::initialize(NET, 5, 600, 1800, 8);
+        BandwidthPricing::initialize(CPU, 5, 600, 1800, 1_000_000);
 
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
@@ -606,7 +627,7 @@ mod service {
             .or_else(|| serve_graphiql(&request))
     }
 
-    // Schema uses consumption language, but negative values indicate free/refund
+    // Negative values indicate free/refund
     #[event(history)]
     fn consumed(account: AccountNumber, resource: u8, amount: i64, cost: i64) {}
 
