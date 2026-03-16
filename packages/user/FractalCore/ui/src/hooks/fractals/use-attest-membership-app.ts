@@ -34,7 +34,7 @@ export const useAttestMembershipApp = () => {
             );
             if (guildApplication === null) {
                 toast.success(`${member} is now a member of the guild.`);
-                navigate(`/guild/${guildAccount}/members`);
+                navigate(`/guild/${guildAccount}/membership/members`);
             }
 
             queryClient.setQueryData(
