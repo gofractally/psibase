@@ -50,9 +50,26 @@ impl GuildApplication {
         self.save();
     }
 
+    fn meets_threshold(&self) -> bool {
+        let rep = Guild::get_assert(self.guild).rep;
+
+        let mut score: i16 = 0;
+        for attest in GuildAttestTable::read().get_index_pk().range(
+            (self.guild, self.applicant, AccountNumber::new(0))
+                ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
+        ) {
+            let includes_rep = rep.map_or(false, |rep| rep == attest.attester);
+            if includes_rep {
+                return true;
+            }
+            score += if attest.endorses { 1 } else { -1 };
+        }
+
+        score >= (GUILD_ATTEST_THRESHOLD as i16)
+    }
+
     fn check_attests(&self) {
-        let passed = self.attestations_score() >= (GUILD_ATTEST_THRESHOLD as i16);
-        if passed {
+        if self.meets_threshold() {
             GuildMember::add(self.guild, self.applicant);
             self.remove()
         }
