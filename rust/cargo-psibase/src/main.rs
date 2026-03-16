@@ -736,6 +736,9 @@ async fn install(
     let mut command = std::process::Command::new(&args.psibase);
 
     command.arg("install");
+    for key in &args.sign {
+        command.args(["--sign", key]);
+    }
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
