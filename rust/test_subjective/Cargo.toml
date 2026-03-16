@@ -19,5 +19,6 @@ crate-type = ["cdylib"]
 [dependencies]
 psibase_macros.workspace = true
 psibase.workspace = true
+psibase_service.workspace = true
 serde.workspace = true
 psibase-rust-workspace-hack.workspace = true

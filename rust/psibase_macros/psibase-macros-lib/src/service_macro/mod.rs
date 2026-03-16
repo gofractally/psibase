@@ -758,6 +758,7 @@ fn process_mod(
                 #[cfg(target_family = "wasm")]
                 mod service_wasm_interface {
                     fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
+                        psibase_service::force_use();
                         #dispatch_body
                         Ok(())
                     }

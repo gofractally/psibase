@@ -15,6 +15,7 @@ data = [{ src = "../ui", dst = "/" }]
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase-rust-workspace-hack.workspace = true
 serde.workspace = true
 tpack = { path = "../service", version = "0.23.0" }

@@ -20,6 +20,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "psimacrotest",
  "serde",
 ]
@@ -422,6 +423,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "psimacrotest",
  "serde",
 ]
@@ -1322,6 +1324,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2536,6 +2539,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "psimacrotest",
  "serde",
 ]
@@ -3342,6 +3346,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase_service"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+]
+
+[[package]]
 name = "psimacrotest"
 version = "0.23.0"
 dependencies = [
@@ -3463,6 +3475,7 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_service",
  "serde",
  "tpack",
 ]
@@ -4244,6 +4257,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
 ]
 
@@ -4387,6 +4401,7 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -4736,6 +4751,7 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_service",
  "serde",
  "test_package",
 ]

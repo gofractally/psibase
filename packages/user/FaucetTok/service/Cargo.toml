@@ -16,6 +16,7 @@ postinstall = [
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 
