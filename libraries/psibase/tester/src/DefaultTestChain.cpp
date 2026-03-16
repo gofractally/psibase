@@ -101,7 +101,7 @@ namespace
 
          s.regServer(actions);
 
-         if (installUI)
+         if (installUI || s.needsUI())
          {
             s.storeData(actions);
          }

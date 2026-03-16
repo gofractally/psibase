@@ -533,6 +533,14 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+    pub fn needs_ui(&mut self) -> bool {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let script: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file).unwrap()).unwrap();
+            return script.into_iter().any(|act| act.service == sites::SERVICE);
+        }
+        false
+    }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
         let mut result = HashMap::new();
