@@ -871,7 +871,7 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
 
             #[no_mangle]
             pub unsafe extern "C" fn getKey(dest: *mut u8, dest_size: u32) -> u32 {
-                tester_raw::getKey(dest, dest_size)
+                tester::polyfill::getKey(dest, dest_size)
             }
 
             #[no_mangle]

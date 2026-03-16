@@ -935,6 +935,21 @@ pub mod polyfill {
         return tester_raw::getSequential(get_selected_chain(), db, id);
     }
 
+    pub unsafe fn getKey(dest: *mut u8, dest_size: u32) -> u32 {
+        // copy the key into a temporary buffer to trim off the prefix
+        let prefix_size = tester_raw::KEY_PREFIX_LEN.with(|l| l.get());
+        let size = prefix_size + dest_size;
+        let mut tmp = Vec::with_capacity(size as usize);
+
+        let actual_size = tester_raw::getKey(tmp.as_mut_ptr(), size);
+        let truncated_size = std::cmp::min(size, actual_size);
+        tmp.set_len(truncated_size as usize);
+        assert!(actual_size >= prefix_size);
+        std::slice::from_raw_parts_mut(dest, (truncated_size - prefix_size) as usize)
+            .copy_from_slice(&tmp[prefix_size as usize..truncated_size as usize]);
+        actual_size - prefix_size
+    }
+
     pub unsafe fn kvGreaterEqual(
         db: KvHandle,
         key: *const u8,
@@ -943,6 +958,7 @@ pub mod polyfill {
     ) -> u32 {
         let bucket = KvBucket::from_handle(db);
         let full_key = bucket.key(key, key_len);
+        tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
         tester_raw::kvGreaterEqual(
             get_selected_chain(),
             bucket.db,
@@ -960,6 +976,7 @@ pub mod polyfill {
     ) -> u32 {
         let bucket = KvBucket::from_handle(db);
         let full_key = bucket.key(key, key_len);
+        tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
         tester_raw::kvLessThan(
             get_selected_chain(),
             bucket.db,
@@ -972,6 +989,7 @@ pub mod polyfill {
     pub unsafe fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
         let bucket = KvBucket::from_handle(db);
         let full_key = bucket.key(key, key_len);
+        tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
         tester_raw::kvMax(
             get_selected_chain(),
             bucket.db,
