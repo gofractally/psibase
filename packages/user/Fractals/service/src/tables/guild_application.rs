@@ -60,7 +60,7 @@ impl GuildApplication {
             (self.guild, self.applicant, AccountNumber::new(0))
                 ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
         ) {
-            let includes_rep = rep.map_or(false, |rep| rep == attest.attester);
+            let includes_rep = rep.map_or(false, |rep| rep == attest.attester && attest.endorses);
             if includes_rep {
                 return true;
             }
