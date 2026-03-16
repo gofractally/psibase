@@ -298,6 +298,7 @@ namespace psibase
       Self&& account(this Self&& self, AccountNumber account)
       {
          self._account = account;
+         return std::forward<Self>(self);
       }
 
       struct Default
