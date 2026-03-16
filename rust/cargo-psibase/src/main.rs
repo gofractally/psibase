@@ -53,7 +53,8 @@ enum PsibaseCommand {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Sign with this key (repeatable)
+    /// Sign transactions with one or more keys.
+    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<String>,
 
@@ -736,6 +737,9 @@ async fn install(
     let mut command = std::process::Command::new(&args.psibase);
 
     command.arg("install");
+    for key in &args.sign {
+        command.args(["--sign", key]);
+    }
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
