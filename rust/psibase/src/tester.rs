@@ -856,3 +856,157 @@ impl<'a> Caller for ChainPusher<'a> {
         ret
     }
 }
+
+#[cfg(target_family = "wasm")]
+#[allow(non_snake_case)]
+pub mod polyfill {
+    use crate::native_raw::{KvHandle, KvMode};
+    use crate::tester_raw;
+    use crate::tester_raw::get_selected_chain;
+    use crate::DbId;
+
+    struct KvBucket {
+        db: DbId,
+        prefix: Vec<u8>,
+        _mode: KvMode,
+    }
+    impl KvBucket {
+        unsafe fn new<'a>(db: DbId, prefix: Vec<u8>, mode: KvMode) -> &'a mut KvBucket {
+            let ptr = std::alloc::alloc(std::alloc::Layout::new::<KvBucket>()) as *mut KvBucket;
+            assert!(!ptr.is_null());
+            ptr.write(KvBucket {
+                db,
+                prefix,
+                _mode: mode,
+            });
+            &mut *ptr
+        }
+        unsafe fn key(&self, key: *const u8, len: u32) -> Vec<u8> {
+            let mut result = Vec::with_capacity(self.prefix.len() + len as usize);
+            result.extend_from_slice(&self.prefix);
+            result.extend_from_slice(std::slice::from_raw_parts(key, len as usize));
+            return result;
+        }
+        unsafe fn handle(&self) -> KvHandle {
+            KvHandle(self as *const KvBucket as usize as u32)
+        }
+        unsafe fn from_handle<'a>(handle: KvHandle) -> &'a mut KvBucket {
+            &mut *(handle.0 as usize as *mut KvBucket)
+        }
+    }
+
+    pub unsafe fn kvOpen(db: DbId, prefix: *const u8, len: u32, mode: KvMode) -> KvHandle {
+        KvBucket::new(
+            db,
+            std::slice::from_raw_parts(prefix, len as usize).to_owned(),
+            mode,
+        )
+        .handle()
+    }
+
+    pub unsafe fn kvOpenAt(
+        handle: KvHandle,
+        prefix: *const u8,
+        len: u32,
+        mode: KvMode,
+    ) -> KvHandle {
+        let src = KvBucket::from_handle(handle);
+        KvBucket::new(src.db, src.key(prefix, len), mode).handle()
+    }
+
+    pub unsafe fn kvClose(handle: KvHandle) {
+        let ptr = KvBucket::from_handle(handle) as *mut KvBucket;
+        ptr.drop_in_place();
+        std::alloc::dealloc(ptr as *mut u8, std::alloc::Layout::new::<KvBucket>());
+    }
+
+    pub unsafe fn kvGet(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvGet(
+            get_selected_chain(),
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+        )
+    }
+
+    pub unsafe fn getSequential(db: DbId, id: u64) -> u32 {
+        return tester_raw::getSequential(get_selected_chain(), db, id);
+    }
+
+    pub unsafe fn kvGreaterEqual(
+        db: KvHandle,
+        key: *const u8,
+        key_len: u32,
+        match_key_len: u32,
+    ) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvGreaterEqual(
+            get_selected_chain(),
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+            bucket.prefix.len() as u32 + match_key_len,
+        )
+    }
+
+    pub unsafe fn kvLessThan(
+        db: KvHandle,
+        key: *const u8,
+        key_len: u32,
+        match_key_len: u32,
+    ) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvLessThan(
+            get_selected_chain(),
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+            bucket.prefix.len() as u32 + match_key_len,
+        )
+    }
+
+    pub unsafe fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvMax(
+            get_selected_chain(),
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+        )
+    }
+
+    pub unsafe fn kvPut(
+        db: KvHandle,
+        key: *const u8,
+        key_len: u32,
+        value: *const u8,
+        value_len: u32,
+    ) {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvPut(
+            get_selected_chain(),
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+            value,
+            value_len,
+        )
+    }
+
+    pub unsafe fn kvRemove(db: KvHandle, key: *const u8, key_len: u32) {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvRemove(
+            get_selected_chain(),
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+        )
+    }
+}

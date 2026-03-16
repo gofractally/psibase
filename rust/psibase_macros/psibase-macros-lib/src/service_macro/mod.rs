@@ -859,7 +859,9 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
         mod psibase_tester_polyfill {
             #![allow(non_snake_case)]
             use #psibase_mod::tester_raw;
-            use #psibase_mod::DbId;
+            use #psibase_mod::tester;
+            use #psibase_mod::{DbId, KvMode};
+            use #psibase_mod::native_raw::KvHandle;
             use tester_raw::get_selected_chain;
 
             #[no_mangle]
@@ -883,39 +885,63 @@ fn gen_polyfill(psibase_mod: &proc_macro2::TokenStream) -> proc_macro2::TokenStr
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvGet(db: DbId, key: *const u8, key_len: u32) -> u32 {
-                tester_raw::kvGet(get_selected_chain(), db, key, key_len)
+            pub unsafe extern "C" fn kvOpen(db: DbId, key: *const u8, key_len: u32, mode: KvMode) -> KvHandle {
+                tester::polyfill::kvOpen(db, key, key_len, mode)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn psibase_proxy_kv_open(db: DbId, key: *const u8, key_len: u32, mode: KvMode) -> KvHandle {
+                tester::polyfill::kvOpen(db, key, key_len, mode)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvOpenAt(db: KvHandle, key: *const u8, key_len: u32, mode: KvMode) -> KvHandle {
+                tester::polyfill::kvOpenAt(db, key, key_len, mode)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvClose(handle: KvHandle) {
+                tester::polyfill::kvClose(handle)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvGet(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+                tester::polyfill::kvGet(db, key, key_len)
             }
 
             #[no_mangle]
             pub unsafe extern "C" fn getSequential(db: DbId, id: u64) -> u32 {
-                tester_raw::getSequential(get_selected_chain(), db, id)
+                tester::polyfill::getSequential(db, id)
             }
 
             #[no_mangle]
             pub unsafe extern "C" fn kvGreaterEqual(
-                db: DbId,
+                db: KvHandle,
                 key: *const u8,
                 key_len: u32,
                 match_key_size: u32,
             ) -> u32 {
-                tester_raw::kvGreaterEqual(get_selected_chain(), db, key, key_len, match_key_size)
+                tester::polyfill::kvGreaterEqual(db, key, key_len, match_key_size)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvLessThan(db: DbId, key: *const u8, key_len: u32, match_key_size: u32) -> u32 {
-                tester_raw::kvLessThan(get_selected_chain(), db, key, key_len, match_key_size)
+            pub unsafe extern "C" fn kvLessThan(db: KvHandle, key: *const u8, key_len: u32, match_key_size: u32) -> u32 {
+                tester::polyfill::kvLessThan(db, key, key_len, match_key_size)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvMax(db: DbId, key: *const u8, key_len: u32) -> u32 {
-                tester_raw::kvMax(get_selected_chain(), db, key, key_len)
+            pub unsafe extern "C" fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+                tester::polyfill::kvMax(db, key, key_len)
             }
 
             #[no_mangle]
-            pub unsafe extern "C" fn kvPut(db: DbId, key: *const u8, key_len: u32, value: *const u8, value_len: u32)
-            {
-                tester_raw::kvPut(get_selected_chain(), db, key, key_len, value, value_len)
+            pub unsafe extern "C" fn kvPut(db: KvHandle, key: *const u8, key_len: u32, value: *const u8, value_len: u32) {
+                tester::polyfill::kvPut(db, key, key_len, value, value_len)
+            }
+
+            #[no_mangle]
+            pub unsafe extern "C" fn kvRemove(db: KvHandle, key: *const u8, key_len: u32) {
+                tester::polyfill::kvRemove(db, key, key_len)
             }
 
             #[no_mangle]

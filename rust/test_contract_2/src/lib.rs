@@ -175,7 +175,7 @@ mod service {
 #[psibase::test_case(packages("TestContract2"))]
 fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
     use psibase::services::http_server;
-    use psibase::HttpBody;
+    use psibase::{HttpBody, Table};
     use serde_json::{json, Value};
     http_server::Wrapper::push_from(&chain, SERVICE).registerServer(SERVICE);
     let result = Wrapper::push(&chain).add(3, 4);
@@ -191,6 +191,9 @@ fn test_arith(chain: psibase::Chain) -> Result<(), psibase::Error> {
         reply,
         json!({ "data": { "answer": {"id": "example", "result": 7} } })
     );
+
+    let answer = service::AnswerTable::read().get_index_pk().get(&SERVICE);
+    assert_eq!(answer.unwrap().result, 7);
 
     let reply = chain
         .post(

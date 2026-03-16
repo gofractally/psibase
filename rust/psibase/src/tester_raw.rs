@@ -123,6 +123,7 @@ extern "C" {
         value: *const u8,
         value_len: u32,
     );
+    pub fn kvRemove(chain_handle: u32, db: crate::DbId, key: *const u8, key_len: u32);
 
     pub fn checkoutSubjective(chain_handle: u32);
     pub fn commitSubjective(chain_handle: u32) -> bool;
