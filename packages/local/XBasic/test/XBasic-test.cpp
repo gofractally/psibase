@@ -25,7 +25,7 @@ TEST_CASE("Basic auth")
    auto table = XBasic{}.open<PasswordTable>();
    table.put({"Aladdin", "$2b$05$fq6gX6Ze3Zb0MMmK8.DSge0.M47/V079Lxbre9k0L5snzcEIp1LXy"});
 
-   auto req = t.makeGet(XAdmin::service, "/config");
+   auto req = HttpRequestBuilder{}.get(XAdmin::service, "/config");
    req.headers.push_back({"X-Forwarded-For", "192.168.0.1"});
    SECTION("No auth")
    {
