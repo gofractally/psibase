@@ -17,3 +17,12 @@ done
 cd "$WORKSPACE_ROOT/packages"
 yarn
 yarn dlx @yarnpkg/sdks vscode
+
+# Symlink optional agent configuration(s)
+if [ ! -e "$WORKSPACE_ROOT/.cursor" ]; then
+    if [ -d "/root/agent-config/.cursor" ]; then
+        ln -s "/root/agent-config/.cursor" "$WORKSPACE_ROOT/.cursor"
+        printf '\nSymlinked /root/agent-config/.cursor to %s\n\n' "$WORKSPACE_ROOT/.cursor"
+        printf 'Config may take several minutes to load into cursor.\n\n'
+    fi
+fi
