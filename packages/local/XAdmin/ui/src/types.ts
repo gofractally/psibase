@@ -18,6 +18,7 @@ export interface PackageMeta {
 export interface PackageInfo extends PackageMeta {
     file: string;
     sha256: string;
+    scope?: string;
 }
 
 export type ServicesType = {
@@ -73,6 +74,7 @@ export const PackageInfoSchema = z.object({
     name: z.string(),
     sha256: z.string(),
     version: z.string(),
+    scope: z.string().optional(),
 });
 
 export const WrappedPackages = z
