@@ -1762,6 +1762,26 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
+    if to_install.is_empty() {
+        println!("Nothing to install.");
+        return Ok(());
+    }
+
+    let summary: Vec<String> = to_install
+        .iter()
+        .map(|op| match op {
+            PackageOp::Install(info) => format!("Installed {}-{}", info.name, info.version),
+            PackageOp::Replace(old, new) => {
+                if old.version == new.version {
+                    format!("Reinstalled {} {}", old.name, old.version)
+                } else {
+                    format!("Upgraded {} {} -> {}", old.name, old.version, new.version)
+                }
+            }
+            PackageOp::Remove(meta) => format!("Removed {}-{}", meta.name, meta.version),
+        })
+        .collect();
+
     if args.local {
         do_install_local(
             client,
@@ -1771,7 +1791,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.node_args,
             args.compression_level,
         )
-        .await
+        .await?;
     } else {
         do_install(
             client,
@@ -1784,8 +1804,12 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.key,
             args.compression_level,
         )
-        .await
+        .await?;
     }
+    for line in &summary {
+        println!("{}", line);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]
