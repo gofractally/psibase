@@ -14,7 +14,7 @@ import {
 } from "@/hooks/usePackages";
 import { chain } from "@/lib/chainEndpoints";
 import { queryKeys } from "@/lib/queryKeys";
-import { compareSemVer } from "@/lib/semver";
+import { compareSemVer } from "@shared/lib/semver";
 import type { PackageInfo } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
 
