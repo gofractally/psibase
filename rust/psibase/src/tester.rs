@@ -45,6 +45,7 @@ pub struct Chain {
     status: RefCell<Option<StatusRow>>,
     producing: Cell<bool>,
     is_auto_block_start: bool,
+    public: bool,
 }
 
 pub const PRODUCER_ACCOUNT: AccountNumber = AccountNumber::new(account_raw!("prod"));
@@ -55,9 +56,18 @@ impl Default for Chain {
     }
 }
 
+thread_local! {
+    static NUM_PUBLIC_CHAINS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
 impl Drop for Chain {
     fn drop(&mut self) {
         unsafe { tester_raw::destroyChain(self.chain_handle) }
+        if self.public {
+            NUM_PUBLIC_CHAINS.with(|cell| {
+                cell.set(cell.get() - 1);
+            })
+        }
         tester_raw::tester_clear_chain_for_db(self.chain_handle)
     }
 }
@@ -84,6 +94,31 @@ impl Chain {
     /// Shortcut for `Tester::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)`
     pub fn new() -> Chain {
         Self::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)
+    }
+
+    fn make_test_chain_prototype() -> Chain {
+        let result = Chain::create_impl(1 << 27, 1 << 27, 1 << 27, 1 << 27, false);
+        result.boot().unwrap();
+        result
+    }
+
+    /// Returns a booted chain with TestDefault installed
+    pub fn test_chain() -> Chain {
+        thread_local! {
+            static PROTOTYPE: Chain = Chain::make_test_chain_prototype();
+        }
+        println!("TESTER CREATE");
+        let mut result = PROTOTYPE.with(|proto| Chain {
+            chain_handle: unsafe { tester_raw::cloneChain(proto.chain_handle) },
+            status: proto.status.clone(),
+            producing: proto.producing.clone(),
+            is_auto_block_start: proto.is_auto_block_start,
+            public: true,
+        });
+        result.auto_select_chain();
+        result.start_session();
+        result.start_block();
+        result
     }
 
     /// Boot the tester chain with default services being deployed
@@ -131,23 +166,44 @@ impl Chain {
         Ok(())
     }
 
+    fn auto_select_chain(&mut self) {
+        if self.public {
+            let first = NUM_PUBLIC_CHAINS.with(|n| {
+                let old = n.get();
+                n.set(old + 1);
+                old == 0
+            });
+            if first {
+                self.select_chain()
+            }
+        }
+    }
+
     /// Create a new chain and make it active for database native functions.
     ///
     /// The arguments are the file sizes in bytes for the database's
     /// various files.
     pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
         println!("TESTER CREATE");
+        Self::create_impl(hot_bytes, warm_bytes, cool_bytes, cold_bytes, true)
+    }
+    fn create_impl(
+        hot_bytes: u64,
+        warm_bytes: u64,
+        cool_bytes: u64,
+        cold_bytes: u64,
+        public: bool,
+    ) -> Chain {
         let chain_handle =
             unsafe { tester_raw::createChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes) };
-        if chain_handle == 0 {
-            tester_raw::tester_select_chain_for_db(chain_handle)
-        }
         let mut result = Chain {
             chain_handle,
             status: None.into(),
             producing: false.into(),
             is_auto_block_start: true,
+            public,
         };
+        result.auto_select_chain();
         result.load_local_services();
         result.start_session();
         result
