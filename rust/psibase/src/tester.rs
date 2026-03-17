@@ -12,9 +12,9 @@ use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
     get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
     Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry, RunMode, Seconds,
-    SignedTransaction, StatusRow, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
-    TransactionTrace,
+    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry, PackagedService, RunMode,
+    SchemaMap, Seconds, SignedTransaction, StatusRow, Tapos, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
@@ -26,6 +26,8 @@ use psibase_macros::account_raw;
 use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -536,6 +538,97 @@ impl Chain {
         services::setcode::Wrapper::push_from(self, account)
             .setCode(account, 0, 0, code.to_vec().into())
             .get()
+    }
+
+    fn push_transactions(
+        &self,
+        transactions: Vec<(String, Vec<Vec<Action>>, bool)>,
+    ) -> Result<(), anyhow::Error> {
+        for (_label, group, _carry) in transactions {
+            for actions in group {
+                let mut trx = Transaction {
+                    tapos: Default::default(),
+                    actions: actions,
+                    claims: vec![],
+                };
+                self.fill_tapos(&mut trx, 2);
+                let trace = self.push(&SignedTransaction {
+                    transaction: trx.packed().into(),
+                    proofs: Default::default(),
+                });
+                ChainEmptyResult { trace }.get()?
+            }
+        }
+        Ok(())
+    }
+
+    fn load_schemas<R: Read + Seek>(
+        &self,
+        package: &mut PackagedService<R>,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        use crate::Table;
+        package.get_all_schemas(schemas)?;
+        let mut required = HashSet::new();
+        package.get_required_schemas(&mut required)?;
+        let index = services::packages::InstalledSchemaTable::read().get_index_pk();
+        for account in required {
+            if !schemas.contains_key(&account) {
+                let Some(schema) = index.get(&account) else {
+                    Err(anyhow!("Could not find schema for {account}"))?
+                };
+                schemas.insert(account, schema.schema);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn install<R: PackageRegistry>(
+        &self,
+        reg: &R,
+        packages: &[String],
+    ) -> Result<(), anyhow::Error> {
+        use crate::Table;
+        let installed_table = services::packages::InstalledPackageTable::read();
+        let mut installed = PackageList::new();
+        for p in &installed_table.get_index_pk() {
+            installed.insert_installed(p)
+        }
+        let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
+
+        let mut schemas = SchemaMap::new();
+        let sender = services::producers::ROOT;
+        const TARGET_SIZE: usize = 1024 * 1024;
+        const COMPRESSION_LEVEL: u32 = 4;
+        for op in packages {
+            match op {
+                PackageOp::Install(info) => {
+                    let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
+                    let mut package = block_on(reg.get_by_info(&info))?;
+                    self.load_schemas(&mut package, &mut schemas)?;
+                    builder.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                    let mut account_actions = vec![];
+                    package.install_accounts(&mut account_actions, None, sender, &None)?;
+                    builder.push_all(account_actions)?;
+                    let mut actions = vec![];
+                    package.install(
+                        &mut actions,
+                        None,
+                        sender,
+                        true,
+                        COMPRESSION_LEVEL,
+                        &mut schemas,
+                    )?;
+                    builder.push_all(actions)?;
+
+                    self.push_transactions(builder.finish()?)?;
+                }
+                _ => {
+                    unimplemented!("Replacing or removing packages")
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
