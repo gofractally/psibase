@@ -57,4 +57,3 @@ const parseSemVer = (version: string): SemVer => {
         build: match[5],
     };
 };
-
