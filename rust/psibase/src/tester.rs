@@ -12,9 +12,9 @@ use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
     get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
     Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry, PackagedService, RunMode,
-    SchemaMap, Seconds, SignedTransaction, StatusRow, Tapos, TimePointSec, TimePointUSec, ToKey,
-    Transaction, TransactionBuilder, TransactionTrace,
+    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, KvHandle, KvMode, PackageRegistry,
+    PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow, Table, TableRecord,
+    Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
@@ -478,6 +478,19 @@ impl Chain {
         tester_raw::tester_select_chain_for_db(self.chain_handle)
     }
 
+    pub fn open<R: TableRecord, T: Table<R>>(&self) -> T {
+        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let handle = unsafe {
+            KvHandle::from_raw(polyfill::open_in_chain(
+                self.chain_handle,
+                R::DB,
+                prefix,
+                KvMode::Read,
+            ))
+        };
+        T::from_handle(handle)
+    }
+
     pub fn kv_get_bytes(&self, db: DbId, key: &[u8]) -> Option<Vec<u8>> {
         let size =
             unsafe { tester_raw::kvGet(self.chain_handle, db, key.as_ptr(), key.len() as u32) };
@@ -571,7 +584,9 @@ impl Chain {
         package.get_all_schemas(schemas)?;
         let mut required = HashSet::new();
         package.get_required_schemas(&mut required)?;
-        let index = services::packages::InstalledSchemaTable::read().get_index_pk();
+        let index = self
+            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
+            .get_index_pk();
         for account in required {
             if !schemas.contains_key(&account) {
                 let Some(schema) = index.get(&account) else {
@@ -589,7 +604,7 @@ impl Chain {
         packages: &[String],
     ) -> Result<(), anyhow::Error> {
         use crate::Table;
-        let installed_table = services::packages::InstalledPackageTable::read();
+        let installed_table = self.open::<services::packages::InstalledPackage, services::packages::InstalledPackageTable>();
         let mut installed = PackageList::new();
         for p in &installed_table.get_index_pk() {
             installed.insert_installed(p)
@@ -959,15 +974,22 @@ pub mod polyfill {
     use crate::DbId;
 
     struct KvBucket {
+        chain_handle: u32,
         db: DbId,
         prefix: Vec<u8>,
         _mode: KvMode,
     }
     impl KvBucket {
-        unsafe fn new<'a>(db: DbId, prefix: Vec<u8>, mode: KvMode) -> &'a mut KvBucket {
+        unsafe fn new<'a>(
+            chain_handle: u32,
+            db: DbId,
+            prefix: Vec<u8>,
+            mode: KvMode,
+        ) -> &'a mut KvBucket {
             let ptr = std::alloc::alloc(std::alloc::Layout::new::<KvBucket>()) as *mut KvBucket;
             assert!(!ptr.is_null());
             ptr.write(KvBucket {
+                chain_handle,
                 db,
                 prefix,
                 _mode: mode,
@@ -988,8 +1010,18 @@ pub mod polyfill {
         }
     }
 
+    pub(crate) unsafe fn open_in_chain(
+        chain_handle: u32,
+        db: DbId,
+        prefix: Vec<u8>,
+        mode: KvMode,
+    ) -> KvHandle {
+        KvBucket::new(chain_handle, db, prefix, mode).handle()
+    }
+
     pub unsafe fn kvOpen(db: DbId, prefix: *const u8, len: u32, mode: KvMode) -> KvHandle {
         KvBucket::new(
+            get_selected_chain(),
             db,
             std::slice::from_raw_parts(prefix, len as usize).to_owned(),
             mode,
@@ -1004,7 +1036,7 @@ pub mod polyfill {
         mode: KvMode,
     ) -> KvHandle {
         let src = KvBucket::from_handle(handle);
-        KvBucket::new(src.db, src.key(prefix, len), mode).handle()
+        KvBucket::new(src.chain_handle, src.db, src.key(prefix, len), mode).handle()
     }
 
     pub unsafe fn kvClose(handle: KvHandle) {
@@ -1017,7 +1049,7 @@ pub mod polyfill {
         let bucket = KvBucket::from_handle(db);
         let full_key = bucket.key(key, key_len);
         tester_raw::kvGet(
-            get_selected_chain(),
+            bucket.chain_handle,
             bucket.db,
             full_key.as_ptr(),
             full_key.len() as u32,
@@ -1053,7 +1085,7 @@ pub mod polyfill {
         let full_key = bucket.key(key, key_len);
         tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
         tester_raw::kvGreaterEqual(
-            get_selected_chain(),
+            bucket.chain_handle,
             bucket.db,
             full_key.as_ptr(),
             full_key.len() as u32,
@@ -1071,7 +1103,7 @@ pub mod polyfill {
         let full_key = bucket.key(key, key_len);
         tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
         tester_raw::kvLessThan(
-            get_selected_chain(),
+            bucket.chain_handle,
             bucket.db,
             full_key.as_ptr(),
             full_key.len() as u32,
@@ -1084,7 +1116,7 @@ pub mod polyfill {
         let full_key = bucket.key(key, key_len);
         tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
         tester_raw::kvMax(
-            get_selected_chain(),
+            bucket.chain_handle,
             bucket.db,
             full_key.as_ptr(),
             full_key.len() as u32,
@@ -1101,7 +1133,7 @@ pub mod polyfill {
         let bucket = KvBucket::from_handle(db);
         let full_key = bucket.key(key, key_len);
         tester_raw::kvPut(
-            get_selected_chain(),
+            bucket.chain_handle,
             bucket.db,
             full_key.as_ptr(),
             full_key.len() as u32,
@@ -1114,7 +1146,7 @@ pub mod polyfill {
         let bucket = KvBucket::from_handle(db);
         let full_key = bucket.key(key, key_len);
         tester_raw::kvRemove(
-            get_selected_chain(),
+            bucket.chain_handle,
             bucket.db,
             full_key.as_ptr(),
             full_key.len() as u32,
