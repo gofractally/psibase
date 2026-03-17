@@ -4,12 +4,18 @@ use async_graphql::{connection::Connection, SimpleObject};
 use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 
 use crate::{
-    constants::GUILD_ATTEST_THRESHOLD,
+    constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
     tables::tables::{
         Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
     },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
+
+enum ApplicationStatus {
+    Accepted,
+    Rejected,
+    Pending,
+}
 
 impl GuildApplication {
     fn new(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
@@ -52,28 +58,49 @@ impl GuildApplication {
         self.save();
     }
 
-    fn meets_threshold(&self) -> bool {
-        let rep = Guild::get_assert(self.guild).rep;
+    fn application_status(&self) -> ApplicationStatus {
+        let mut score = 0i16;
+        let mut acceptors: Vec<AccountNumber> = Vec::new();
+        let mut rejectors: Vec<AccountNumber> = Vec::new();
 
-        let mut score: i16 = 0;
-        for attest in GuildAttestTable::read().get_index_pk().range(
+        for attestation in GuildAttestTable::read().get_index_pk().range(
             (self.guild, self.applicant, AccountNumber::new(0))
                 ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
         ) {
-            let includes_rep = rep.map_or(false, |rep| rep == attest.attester && attest.endorses);
-            if includes_rep {
-                return true;
+            if attestation.endorses {
+                score += 1;
+                acceptors.push(attestation.attester);
+            } else {
+                score -= 1;
+                rejectors.push(attestation.attester);
             }
-            score += if attest.endorses { 1 } else { -1 };
         }
 
-        score >= (GUILD_ATTEST_THRESHOLD as i16)
+        let auth = psibase::services::auth_dyn::Wrapper::call();
+
+        if score >= (GUILD_APP_ENDORSEMENT_THRESHOLD as i16)
+            || auth.isAuthSys(self.guild, acceptors, None, None)
+        {
+            ApplicationStatus::Accepted
+        } else if score <= -(GUILD_APP_REJECT_THRESHOLD as i16)
+            || auth.isAuthSys(self.guild, rejectors, None, None)
+        {
+            ApplicationStatus::Rejected
+        } else {
+            ApplicationStatus::Pending
+        }
     }
 
     fn check_attests(&self) {
-        if self.meets_threshold() {
-            GuildMember::add(self.guild, self.applicant);
-            self.remove()
+        match self.application_status() {
+            ApplicationStatus::Accepted => {
+                GuildMember::add(self.guild, self.applicant);
+                self.remove()
+            }
+            ApplicationStatus::Rejected => {
+                self.remove();
+            }
+            ApplicationStatus::Pending => {}
         }
     }
 
@@ -154,7 +181,7 @@ impl GuildApplication {
     pub async fn score(&self) -> ApplicationScore {
         ApplicationScore {
             current: self.attestations_score(),
-            required: GUILD_ATTEST_THRESHOLD as i16,
+            required: GUILD_APP_ENDORSEMENT_THRESHOLD as i16,
         }
     }
 }
