@@ -247,7 +247,7 @@ struct test_chain_ref
 
 struct NullSocket : psibase::Socket
 {
-   void                send(psibase::Writer&, std::span<const char> data) {}
+   void                send(psibase::Writer&, std::span<const char> data, std::uint32_t) {}
    psibase::SocketInfo info() const { return psibase::ProducerMulticastSocketInfo{}; }
 };
 
@@ -607,8 +607,10 @@ struct HttpSocket : psibase::AutoCloseSocket
       }
       sendImpl(psio::to_frac(reply));
    }
-   void send(psibase::Writer&, std::span<const char> data) override
+   void send(psibase::Writer&, std::span<const char> data, std::uint32_t flags) override
    {
+      if (flags != 0)
+         psibase::abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
       if (!response.empty())
          return;
       auto reply  = psio::view<const psibase::HttpReply>{data};

@@ -23,8 +23,10 @@ namespace
       // to an executor in onClose, the creator is responsible for
       // calling remove.
       void onClose(const std::optional<std::string>&) noexcept override {}
-      void send(Writer&, std::span<const char> data) override
+      void send(Writer&, std::span<const char> data, std::uint32_t flags) override
       {
+         if (flags != 0)
+            abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          auto reply = psio::from_frac<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
          {

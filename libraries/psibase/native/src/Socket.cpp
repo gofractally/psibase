@@ -253,7 +253,10 @@ void Sockets::shutdown()
    tmpsockets.clear();
 }
 
-std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char> buf)
+std::int32_t Sockets::send(Writer&               writer,
+                           std::int32_t          fd,
+                           std::span<const char> buf,
+                           std::uint32_t         flags)
 {
    std::shared_ptr<Socket> p;
    {
@@ -264,7 +267,7 @@ std::int32_t Sockets::send(Writer& writer, std::int32_t fd, std::span<const char
          return wasi_errno_badf;
    }
 
-   p->send(writer, buf);
+   p->send(writer, buf, flags);
    return 0;
 }
 void Sockets::add(Writer&                        writer,
