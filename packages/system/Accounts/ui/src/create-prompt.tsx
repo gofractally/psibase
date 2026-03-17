@@ -25,6 +25,7 @@ import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 
 import { CopyButton } from "./components/copy-button";
+import { DownloadKeyFileButton } from "./components/download-key-file-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
@@ -266,7 +267,7 @@ export const CreatePrompt = () => {
                                             }
                                             value={key}
                                             readOnly
-                                            className="pr-20"
+                                            className="pr-24"
                                             onFocus={(e) => e.target.select()}
                                         />
                                         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
@@ -277,6 +278,10 @@ export const CreatePrompt = () => {
                                                         !showPassword,
                                                     )
                                                 }
+                                            />
+                                            <DownloadKeyFileButton
+                                                pemContent={b64ToPem(key)}
+                                                filename={`${createdAccount}.pem`}
                                             />
                                             <CopyButton
                                                 text={key}

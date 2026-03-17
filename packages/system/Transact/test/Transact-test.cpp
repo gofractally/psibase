@@ -99,9 +99,8 @@ TEST_CASE("Test login")
 
       auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
                        .access_token;
-      auto req = t.makeGet(getUser, "/");
-      req.headers.push_back({"Authorization", "Bearer " + token});
-      auto user = t.http<std::optional<AccountNumber>>(req);
+      auto client = t.http(getUser).auth_bearer(token);
+      auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
    }
 
@@ -125,9 +124,8 @@ TEST_CASE("Test login")
 
       auto token = t.post<LoginReply>(Transact::service, "/login", FracPackBody{std::move(strx)})
                        .access_token;
-      auto req = t.makeGet(getUser, "/");
-      req.headers.push_back({"Authorization", "Bearer " + token});
-      auto user = t.http<std::optional<AccountNumber>>(req);
+      auto client = t.http(getUser).auth_bearer(token);
+      auto user   = client.get<std::optional<AccountNumber>>("/");
       CHECK(user == std::optional{alice});
    }
 }

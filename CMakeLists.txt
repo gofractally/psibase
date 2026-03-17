@@ -579,10 +579,7 @@ psibase_package(
         FLAGS isVerify
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
-    # This dependency is removed as a hack to get tests to pass in CICD.
-    # Test boots don't load UI elements, so the setCsp Permissions calls, fails
-    # "Permissions(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)"
 )
 
 set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi)

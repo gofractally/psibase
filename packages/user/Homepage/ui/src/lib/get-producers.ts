@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
-import { graphql } from "./graphql";
+import { graphql, GraphQLUrlOptions } from "@shared/lib/graphql";
 
 const zProducerReturn = z.object({
     name: zAccount,
@@ -14,7 +14,7 @@ const zProducerReturn = z.object({
 
 export type Producer = z.infer<typeof zProducerReturn>;
 
-export const getProducers = async (): Promise<Producer[]> => {
+export const getProducers = async (opts: GraphQLUrlOptions): Promise<Producer[]> => {
     const producers = await graphql(
         `
             {
@@ -27,7 +27,7 @@ export const getProducers = async (): Promise<Producer[]> => {
                 }
             }
         `,
-        "producers",
+        {service: "producers", ...opts},
     );
 
     const response = z

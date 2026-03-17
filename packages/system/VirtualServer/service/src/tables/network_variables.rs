@@ -12,6 +12,12 @@ impl NetworkVariables {
         let mut variables = Self::get();
         variables.block_replay_factor = vars.block_replay_factor;
         variables.per_block_sys_cpu_ns = vars.per_block_sys_cpu_ns;
+        variables.obj_storage_bytes = vars.obj_storage_bytes;
         NetworkVariablesTable::read_write().put(&variables).unwrap();
+
+        // Recompute derived network specs
+        if let Some(specs) = ServerSpecs::get() {
+            NetworkSpecs::set_from(&specs);
+        }
     }
 }

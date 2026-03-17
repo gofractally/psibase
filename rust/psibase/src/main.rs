@@ -9,13 +9,11 @@ use futures::{
     FutureExt, StreamExt,
 };
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{
-    accounts, auth_delegate, packages, sites, staged_tx, transact, x_packages,
-};
+use psibase::services::{packages, sites, staged_tx, transact, x_packages};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
-    get_accounts_to_create, get_installed_manifest, get_local_manifest, get_manifest,
-    get_package_sources, get_tapos_for_head, login_action, new_account_action, push_transaction,
+    get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
+    get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
     set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
     AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
@@ -93,7 +91,8 @@ struct TxArgs {
 #[derive(Args, Debug)]
 #[clap(long_about = None)]
 struct SigArgs {
-    /// Sign with this key (repeatable)
+    /// Sign transactions with one or more keys.
+    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<AnyPrivateKey>,
 
@@ -1518,39 +1517,6 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn create_accounts<F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>>(
-    accounts: Vec<AccountNumber>,
-    out: &mut TransactionBuilder<SignedTransaction, F>,
-    sender: AccountNumber,
-) -> Result<(), anyhow::Error> {
-    for account in accounts {
-        out.set_label(format!("Creating {}", account));
-        let group = vec![
-            accounts::Wrapper::pack().newAccount(account, account!("auth-any"), true),
-            auth_delegate::Wrapper::pack_from(account).setOwner(sender),
-            set_auth_service_action(account, auth_delegate::SERVICE),
-        ];
-        out.push(group)?;
-    }
-    Ok(())
-}
-
-fn get_package_accounts(ops: &[PackageOp]) -> Vec<AccountNumber> {
-    let mut accounts = Vec::new();
-    for op in ops {
-        match op {
-            PackageOp::Install(info) => {
-                accounts.extend_from_slice(&info.accounts);
-            }
-            PackageOp::Replace(_meta, info) => {
-                accounts.extend_from_slice(&info.accounts);
-            }
-            PackageOp::Remove(_meta) => {}
-        }
-    }
-    accounts
-}
-
 async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
@@ -1674,14 +1640,6 @@ async fn do_install<T: Read + Seek>(
     let action_limit: usize = 1024 * 1024;
 
     let mut trx_builder = TransactionBuilder::new(action_limit, build_transaction);
-    let new_accounts = get_accounts_to_create(
-        &node_args.api,
-        &mut client,
-        &get_package_accounts(&to_install),
-        sender,
-    )
-    .await?;
-    create_accounts(new_accounts, &mut trx_builder, sender)?;
 
     let uploader = StagedUpload::new(id.clone(), sig_args.proposer.map_or(sender, |s| s.into()));
 

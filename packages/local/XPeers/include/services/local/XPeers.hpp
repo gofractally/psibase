@@ -139,7 +139,7 @@ namespace LocalService
                 method(serveSys, request, socket),
                 method(onConfig),
                 method(onP2P, socket, reply),
-                method(errP2P, socekt, reply),
+                method(errP2P, socket, reply),
                 method(recvP2P, socket, data, flags),
                 method(closeP2P, socket),
                 method(onTimer, timerId))
