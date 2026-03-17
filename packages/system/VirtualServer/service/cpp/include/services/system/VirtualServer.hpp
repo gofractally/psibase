@@ -286,8 +286,8 @@ namespace SystemService
          {
             void consumed(psibase::AccountNumber account,
                           uint8_t                resource,
-                          uint64_t               amount,
-                          uint64_t               cost);
+                          int64_t                amount,
+                          int64_t                cost);
             void subsidized(psibase::AccountNumber purchaser,
                             psibase::AccountNumber recipient,
                             uint64_t               amount,

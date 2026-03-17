@@ -394,7 +394,7 @@ mod service {
     }
 
     #[event(history)]
-    fn consumed(account: AccountNumber, resource: u8, amount: u64, cost: u64) {}
+    fn consumed(account: AccountNumber, resource: u8, amount: i64, cost: i64) {}
 
     #[event(history)]
     fn subsidized(
