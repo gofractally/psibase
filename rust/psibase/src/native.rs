@@ -410,8 +410,8 @@ pub fn socket_open(
 }
 
 /// Send a message to a socket
-pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
-    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len()) };
+pub fn socket_send(fd: i32, data: &[u8], flags: u32) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len(), flags) };
     if err == 0 {
         Ok(())
     } else {

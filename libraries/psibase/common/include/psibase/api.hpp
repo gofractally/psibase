@@ -324,11 +324,16 @@ namespace psibase
       ///
       /// Returns 0 on success or an error code on failure
       ///
+      /// The interpretation of flags depends on the type of the socket
+      ///
       /// Errors:
       /// - `EBADF`: fd is not a valid file descriptor
       /// - `ENOTSOCK`: fd is not a socket
       PSIBASE_NATIVE(socketSend)
-      std::int32_t socketSend(std::int32_t fd, const void* data, std::size_t size);
+      std::int32_t socketSend(std::int32_t  fd,
+                              const void*   data,
+                              std::size_t   size,
+                              std::uint32_t flags);
 
       /// Change flags on a socket. The mask determines which flags are set.
       ///
@@ -806,12 +811,14 @@ namespace psibase
    ///
    /// Returns 0 on success. On failure returns -1 and sets errno.
    ///
+   /// The interpretation of flags depends on the type of the socket
+   ///
    /// Errors:
    /// - `EBADF`: fd is not a valid file descriptor
    /// - `ENOTSOCK`: fd is not a socket
-   inline int socketSend(int fd, std::span<const char> data)
+   inline int socketSend(int fd, std::span<const char> data, std::uint32_t flags = 0)
    {
-      if (auto err = raw::socketSend(fd, data.data(), data.size()))
+      if (auto err = raw::socketSend(fd, data.data(), data.size(), flags))
       {
          errno = err;
          return -1;
