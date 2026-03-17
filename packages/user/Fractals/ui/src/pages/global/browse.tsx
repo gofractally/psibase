@@ -28,43 +28,7 @@ export const Browse = () => {
 
     return (
         <PageContainer>
-            <GlowingCard>
-                <CardHeader>
-                    <CardTitle>Fractals</CardTitle>
-                </CardHeader>
-                <CardContent className="@container">
-                    {fractals && fractals.length > 0 && (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Fractal</TableHead>
-                                    <TableHead>Mission</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {fractals?.map((fractal) => (
-                                    <TableRow
-                                        key={fractal.account}
-                                        onClick={() => {
-                                            navigate(
-                                                `/fractal/${fractal.account}`,
-                                            );
-                                        }}
-                                        className="cursor-pointer"
-                                    >
-                                        <TableCell className="font-medium">
-                                            {fractal.name || fractal.account}
-                                        </TableCell>
-                                        <TableCell>{fractal.mission}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableCaption>A list of all fractals.</TableCaption>
-                        </Table>
-                    )}
-                </CardContent>
-            </GlowingCard>
-            {fractals?.length == 0 && (
+            {fractals?.length == 0 ? (
                 <EmptyBlock
                     title="No fractals"
                     description="No fractals have been created yet"
@@ -73,6 +37,48 @@ export const Browse = () => {
                         setShowModal(true);
                     }}
                 />
+            ) : (
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>Fractals</CardTitle>
+                    </CardHeader>
+                    <CardContent className="@container">
+                        {fractals && fractals.length > 0 && (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Fractal</TableHead>
+                                        <TableHead>Mission</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {fractals?.map((fractal) => (
+                                        <TableRow
+                                            key={fractal.account}
+                                            onClick={() => {
+                                                navigate(
+                                                    `/fractal/${fractal.account}`,
+                                                );
+                                            }}
+                                            className="cursor-pointer"
+                                        >
+                                            <TableCell className="font-medium">
+                                                {fractal.name ||
+                                                    fractal.account}
+                                            </TableCell>
+                                            <TableCell>
+                                                {fractal.mission}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                <TableCaption>
+                                    A list of all fractals.
+                                </TableCaption>
+                            </Table>
+                        )}
+                    </CardContent>
+                </GlowingCard>
             )}
             <CreateFractalModal
                 openChange={(e) => setShowModal(e)}
