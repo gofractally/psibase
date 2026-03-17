@@ -266,7 +266,7 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>, exports: &[&str]) -> Res
 async fn get_files(
     packages: &[&str],
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
-) -> Result<Vec<PathBuf>, Error> {
+) -> Result<Vec<(PathBuf, usize)>, Error> {
     let mut result = Vec::new();
     while let Some(line) = lines.next_line().await? {
         match serde_json::from_str::<cargo_metadata::Message>(&line)? {
@@ -274,13 +274,16 @@ async fn get_files(
                 print!("{}", msg.message.rendered.unwrap());
             }
             Message::CompilerArtifact(artifact) => {
-                if packages.contains(&artifact.package_id.repr.as_str()) {
+                if let Some(idx) = packages
+                    .iter()
+                    .position(|id| id == &artifact.package_id.repr.as_str())
+                {
                     result.extend(
                         artifact
                             .filenames
                             .iter()
-                            .map(|p| p.clone().into_std_path_buf())
-                            .filter(|p| p.as_path().extension().unwrap_or_default() == "wasm"),
+                            .map(|p| (p.clone().into_std_path_buf(), idx))
+                            .filter(|p| p.0.as_path().extension().unwrap_or_default() == "wasm"),
                     );
                 }
             }
@@ -353,6 +356,31 @@ fn check_psibase_version(metadata: &Metadata) {
     }
 }
 
+async fn process_from_output(
+    mut command: tokio::process::Child,
+    packages: &[&str],
+    poly: Option<&[u8]>,
+    exports: &[&str],
+) -> Result<Vec<(PathBuf, usize)>, Error> {
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files, _) =
+        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    let files = files?;
+    for f in &files {
+        process(&f.0, poly, exports)?
+    }
+
+    Ok(files)
+}
+
 async fn build(
     args: &Args,
     packages: &[&str],
@@ -360,8 +388,8 @@ async fn build(
     extra_args: &[&str],
     poly: Option<&[u8]>,
     exports: &[&str],
-) -> Result<Vec<PathBuf>, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
+) -> Result<Vec<(PathBuf, usize)>, Error> {
+    let command = tokio::process::Command::new(get_cargo())
         .envs(envs)
         .arg("rustc")
         .args(extra_args)
@@ -376,23 +404,7 @@ async fn build(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
-    let status = command.wait();
-    let (status, files, _) =
-        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
-
-    let status = status?;
-    if !status.success() {
-        exit(status.code().unwrap());
-    }
-
-    let files = files?;
-    for f in &files {
-        process(f, poly, exports)?
-    }
-
-    Ok(files)
+    process_from_output(command, packages, poly, exports).await
 }
 
 async fn build_schema(
@@ -430,11 +442,11 @@ async fn build_schema(
 
     let files = files?;
     for f in &files {
-        process(f, None, TESTER_EXPORTS)?
+        process(&f.0, None, TESTER_EXPORTS)?
     }
 
     let mut command = tokio::process::Command::new(&args.psitest)
-        .arg(&files[0])
+        .arg(&files[0].0)
         .arg("_psibase_get_schema")
         .arg("--show-output")
         .arg("--include-ignored")
@@ -473,7 +485,7 @@ async fn build_plugin(
     args: &Args,
     packages: &[&str],
     extra_args: &[&str],
-) -> Result<Vec<PathBuf>, Error> {
+) -> Result<Vec<(PathBuf, usize)>, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .arg("component")
         .arg("build")
@@ -690,37 +702,46 @@ async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> 
         test_info.push((id, index_file));
     }
 
+    let mut index_files = Vec::new();
+    let mut packages = Vec::new();
+
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
+        .env("CARGO_PSIBASE_TEST", "")
+        .arg("build")
+        .arg("--tests")
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
     for (id, index_file) in test_info {
         pretty("Test", "building unit tests...");
         let name = &metadata.packages.get(id).unwrap().name;
-        let tests = build(
-            args,
-            &[id],
-            vec![
-                ("CARGO_PSIBASE_TEST", ""),
-                (
-                    "CARGO_PSIBASE_PACKAGE_PATH",
-                    index_file.canonicalize()?.to_str().unwrap(),
-                ),
-            ],
-            &["--tests", "-p", name.as_str()],
-            None,
-            TESTER_EXPORTS,
-        )
-        .await?;
 
-        for test in tests {
-            pretty_path("Running", &test);
-            let mut command = std::process::Command::new(&args.psitest);
-            command.arg(test);
-            command.arg("--nocapture");
-            if let Some(ref filter) = opts.test_filter {
-                command.arg(filter);
-            }
-            let msg = format!("Failed running: {:?}", command);
-            if !command.status().context(msg.clone())?.success() {
-                return Err(anyhow! {msg});
-            }
+        index_files.push(index_file.canonicalize()?.into_os_string());
+        packages.push(id);
+        command.args(["-p", name.as_str()]);
+    }
+
+    let tests = process_from_output(command.spawn()?, &packages, None, TESTER_EXPORTS).await?;
+
+    for test in tests {
+        pretty_path("Running", &test.0);
+        let mut command = std::process::Command::new(&args.psitest);
+        command.env("CARGO_PSIBASE_PACKAGE_PATH", &index_files[test.1]);
+        command.arg(test.0);
+        command.arg("--nocapture");
+        if let Some(ref filter) = opts.test_filter {
+            command.arg(filter);
+        }
+        let msg = format!("Failed running: {:?}", command);
+        if !command.status().context(msg.clone())?.success() {
+            return Err(anyhow! {msg});
         }
     }
 

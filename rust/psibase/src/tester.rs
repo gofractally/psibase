@@ -12,9 +12,10 @@ use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
     get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
     Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, KvHandle, KvMode, PackageRegistry,
-    PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow, Table, TableRecord,
-    Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder, TransactionTrace,
+    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, JointRegistry, KvHandle, KvMode,
+    PackageRegistry, PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow,
+    Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder,
+    TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
@@ -27,7 +28,8 @@ use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
-use std::io::{Read, Seek};
+use std::fs::File;
+use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -125,6 +127,18 @@ impl Chain {
     pub fn boot(&self) -> Result<(), Error> {
         let default_services: Vec<String> = vec!["TestDefault".to_string()];
         self.boot_with(&Self::default_registry(), &default_services[..])
+    }
+
+    pub fn test_registry() -> JointRegistry<BufReader<File>> {
+        let mut registry = JointRegistry::new();
+        if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
+            for path in local_packages.split(':') {
+                println!("Loading registry: {}", path);
+                registry.push(DirectoryRegistry::new(path.into())).unwrap();
+            }
+        }
+        registry.push(Self::default_registry()).unwrap();
+        registry
     }
 
     pub fn default_registry() -> DirectoryRegistry {

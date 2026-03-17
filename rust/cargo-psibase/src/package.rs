@@ -350,7 +350,7 @@ pub async fn build_package(
                 plugin
             ))?
         };
-        data_sources.push((service, paths.pop().unwrap().into(), path.to_string()))
+        data_sources.push((service, paths.pop().unwrap().0.into(), path.to_string()))
     }
 
     let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();
@@ -376,7 +376,7 @@ pub async fn build_package(
         crate_to_account.insert(service, schema.service.clone());
         let service = schema.service.clone();
         info.schema = Some(schema);
-        service_wasms.push((service, info, paths.pop().unwrap()));
+        service_wasms.push((service, info, paths.pop().unwrap().0));
         accounts.push(service);
     }
 
