@@ -8,26 +8,28 @@
   "prettier.prettierPath": "packages/.yarn/sdks/prettier/index.cjs",
   "typescript.tsdk": "packages/.yarn/sdks/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  "rust-analyzer.linkedProjects": ["rust/Cargo.toml", "packages/user/Cargo.toml", "packages/system/Cargo.toml"],
+  "rust-analyzer.linkedProjects": ["rust/Cargo.toml", "packages/user/Cargo.toml", "packages/system/Cargo.toml", "packages/Cargo.toml"],
+  "editor.formatOnSave": true,
   "[markdown]": {
-    "files.trimTrailingWhitespace": false
+    "files.trimTrailingWhitespace": false,
+    "editor.formatOnSave": false,
+  },
+  "[cmake]": {
+    "editor.formatOnSave": false
   },
   "[cpp]": {
     "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
     "editor.tabSize": 3,
-    "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "file"
   },
   "[javascript, typescript, typescriptreact]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint",
     "editor.formatOnPaste": false,
     "editor.formatOnType": false,
-    "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "file"
   },
   "[rust]": {
-    "editor.defaultFormatter": "rust-lang.rust-analyzer",
-    "editor.formatOnSave": true
+    "editor.defaultFormatter": "rust-lang.rust-analyzer"
   },
   "eslint.validate": [
     "javascript",
