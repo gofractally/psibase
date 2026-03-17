@@ -22,6 +22,25 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    if (subdomain == getReceiver())
    {
       // Handle request to x-proxy
+      if (target == "/origin_servers")
+      {
+         if (auto reply = to<XAdmin>().checkAuth(req, socket))
+            return reply;
+         if (req.method != "GET")
+            return HttpReply::methodNotAllowed(req);
+         std::vector<OriginServerRow> result;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto table = open<OriginServerTable>();
+            for (auto row : table.getIndex<0>())
+               result.push_back(std::move(row));
+         }
+         HttpReply reply{.contentType = "application/json"};
+         psio::vector_stream stream{reply.body};
+         to_json(result, stream);
+         reply.headers = allowCors();
+         return reply;
+      }
       if (target == "/set_origin_server")
       {
          if (auto reply = to<XAdmin>().checkAuth(req, socket))

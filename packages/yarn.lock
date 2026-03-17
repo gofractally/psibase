@@ -2142,6 +2142,23 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@psibase/xproxy-ui@workspace:local/XProxy/ui":
+  version: 0.0.0-use.local
+  resolution: "@psibase/xproxy-ui@workspace:local/XProxy/ui"
+  dependencies:
+    "@psibase/common-lib": "workspace:*"
+    "@tanstack/react-query": "npm:^5.90.6"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    eslint: "npm:^9.15.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    typescript: "npm:^5.7.3"
+    vite: "npm:^5.4.1"
+  languageName: unknown
+  linkType: soft
+
 "@radix-ui/number@npm:1.1.1":
   version: 1.1.1
   resolution: "@radix-ui/number@npm:1.1.1"

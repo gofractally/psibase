@@ -1068,7 +1068,8 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
         SERVER x-proxy
-    DEPENDS wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XProxy/ui/dist/* /
+    DEPENDS wasm ${XProxy_js_DEP}
 )
 
 psibase_package(
