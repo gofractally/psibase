@@ -63,6 +63,20 @@ namespace SystemService
       /// Sends a reply
       void sendReply(std::int32_t socket, psibase::HttpReply response);
 
+      /// Allow another service to send a response to a socket
+      ///
+      /// The sender must be the current owner of the socket. As long as
+      /// `service` does not handle the request, `giveSocket` can be
+      /// reversed with `takeSocket`
+      void giveSocket(std::int32_t socket, psibase::AccountNumber service);
+      /// Take back ownership of a socket
+      ///
+      /// The socket must have been previously owned by the sender and
+      /// neither `sendReply` nor `deferReplay` can have been called on it.
+      ///
+      /// Returns true if taking ownership was successful
+      bool takeSocket(std::int32_t socket);
+
       /// Register sender's subdomain
       ///
       /// When requests to a subdomain cannot be filled by 'sites', then `http-server` will
@@ -76,7 +90,7 @@ namespace SystemService
       void registerServer(psibase::AccountNumber server);
 
       // Entry point for messages
-      void recv(std::int32_t socket, psio::view<const std::vector<char>> data);
+      void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
       // Entry point for HTTP requests
       void serve(std::int32_t socket, psibase::HttpRequest req);
 
@@ -88,8 +102,10 @@ namespace SystemService
                 method(deferReply, socket),
                 method(claimReply, socket),
                 method(sendReply, socket, response),
+                method(giveSocket, socket, service),
+                method(takeSocket, socket),
                 method(registerServer, server),
-                method(recv, socket, data),
+                method(recv, socket, data, flags),
                 method(serve, socket, req),
                 method(rootHost, host))
 

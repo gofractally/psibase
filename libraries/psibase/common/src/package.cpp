@@ -297,6 +297,25 @@ namespace psibase
    {
       return meta.accounts;
    }
+   bool PackagedService::needsUI()
+   {
+      if (postinstallScript)
+      {
+         auto contents = archive.getEntry(*postinstallScript).read();
+         contents.push_back('\0');
+         psio::json_token_stream   stream(contents.data());
+         std::vector<PrettyAction> tmp;
+         psio::from_json(tmp, stream);
+         for (const auto& action : tmp)
+         {
+            if (action.service == Sites::service)
+            {
+               return true;
+            }
+         }
+      }
+      return false;
+   }
    void PackagedService::postinstall(std::vector<Action>&             actions,
                                      std::span<const PackagedService> packages)
    {

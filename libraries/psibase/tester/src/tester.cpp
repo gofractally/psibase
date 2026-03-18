@@ -731,6 +731,15 @@ psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
    return asyncHttp(request).get();
 }
 
+psibase::HttpClient psibase::TestChain::http(AccountNumber account, std::vector<HttpHeader> headers)
+{
+   return {*this, account, std::move(headers)};
+}
+psibase::HttpClient psibase::TestChain::http(std::vector<HttpHeader> headers)
+{
+   return {*this, {}, std::move(headers)};
+}
+
 namespace
 {
    struct LoginInterface

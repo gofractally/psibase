@@ -36,6 +36,27 @@ mod service {
         unimplemented!()
     }
 
+    /// Allow another service to send a response to a socket
+    ///
+    /// The sender must be the current owner of the socket. As long as
+    /// `service` does not handle the request, `giveSocket` can be
+    /// reversed with `takeSocket`
+    #[action]
+    fn giveSocket(socket: i32, service: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Take back ownership of a socket
+    ///
+    /// The socket must have been previously owned by the sender and
+    /// neither `sendReply` nor `deferReplay` can have been called on it.
+    ///
+    /// Returns true if taking ownership was successful
+    #[action]
+    fn takeSocket(socket: i32) -> bool {
+        unimplemented!()
+    }
+
     #[action]
     fn registerServer(server: AccountNumber) {
         unimplemented!()
@@ -43,7 +64,7 @@ mod service {
 
     /// Entry point for messages
     #[action]
-    fn recv(socket: i32, data: Hex<Vec<u8>>) {
+    fn recv(socket: i32, data: Hex<Vec<u8>>, flags: u32) {
         unimplemented!()
     }
     /// Entry point for HTTP requests

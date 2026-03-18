@@ -1,10 +1,8 @@
 function(add suffix)
-    add_local_service("${suffix}" XSites src/XSites.cpp)
+    add_local_service("${suffix}" XProxy src/XProxy.cpp)
 endfunction(add)
 
 conditional_add()
-
-add_subdirectory(test)
 
 install(DIRECTORY include/ TYPE INCLUDE FILES_MATCHING PATTERN "*.hpp")
 

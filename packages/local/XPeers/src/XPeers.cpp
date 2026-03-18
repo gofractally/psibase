@@ -369,7 +369,7 @@ namespace
       }
       for (auto&& [peer, msg] : messages)
       {
-         to<XHttp>().send(peer, serializeMessage(msg));
+         to<XHttp>().send(peer, serializeMessage(msg), WebSocketFlags::binary);
       }
    }
 
@@ -393,10 +393,11 @@ namespace
       }
       for (auto&& [peer, msg] : messages)
       {
-         to<XHttp>().send(peer, serializeMessage(msg));
+         to<XHttp>().send(peer, serializeMessage(msg), WebSocketFlags::binary);
       }
       if (!outgoing)
-         to<XHttp>().send(socket, serializeMessage(CheckDuplicatesMessage{}));
+         to<XHttp>().send(socket, serializeMessage(CheckDuplicatesMessage{}),
+                          WebSocketFlags::binary);
    }
    // After we receive this on an outgoing connection, we know that
    // the peer has received our hostnames, so sending a DuplicateConnectionMessage
@@ -414,7 +415,7 @@ namespace
       }
       for (auto&& [peer, msg] : messages)
       {
-         to<XHttp>().send(peer, serializeMessage(msg));
+         to<XHttp>().send(peer, serializeMessage(msg), WebSocketFlags::binary);
       }
    }
    void recvMessage(std::int32_t socket, DuplicateConnectionMessage&& msg)
@@ -572,8 +573,10 @@ auto XPeers::serveSys(const HttpRequest& request, std::optional<std::int32_t> so
             to<XHttp>().setCallback(*socket, MethodNumber{"recvP2P"}, MethodNumber{"closeP2P"});
          }
          auto options = to<XAdmin>().options();
-         to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}));
-         to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}));
+         to<XHttp>().send(*socket, serializeMessage(IdMessage{myNodeId(), *socket}),
+                          WebSocketFlags::binary);
+         to<XHttp>().send(*socket, serializeMessage(HostnamesMessage{std::move(options.hosts)}),
+                          WebSocketFlags::binary);
          return {};
       }
       else
@@ -838,8 +841,10 @@ void XPeers::onP2P(std::int32_t socket, HttpReply reply)
       to_json(*replyBody, stream);
       to<XHttp>().sendReply(request->requestSocket, std::move(reply));
    }
-   to<XHttp>().send(socket, serializeMessage(IdMessage{myNodeId(), socket}));
-   to<XHttp>().send(socket, serializeMessage(HostnamesMessage{to<XAdmin>().options().hosts}));
+   to<XHttp>().send(socket, serializeMessage(IdMessage{myNodeId(), socket}),
+                    WebSocketFlags::binary);
+   to<XHttp>().send(socket, serializeMessage(HostnamesMessage{to<XAdmin>().options().hosts}),
+                    WebSocketFlags::binary);
 }
 
 void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
@@ -878,7 +883,9 @@ void XPeers::errP2P(std::int32_t socket, std::optional<HttpReply> reply)
    }
 }
 
-void XPeers::recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data)
+void XPeers::recvP2P(std::int32_t                        socket,
+                     psio::view<const std::vector<char>> data,
+                     std::uint32_t                       flags)
 {
    check(getSender() == XHttp::service, "Wrong sender");
    check(!data.empty(), "Invalid message");

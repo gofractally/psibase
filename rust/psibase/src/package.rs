@@ -533,6 +533,14 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+    pub fn needs_ui(&mut self) -> bool {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let script: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file).unwrap()).unwrap();
+            return script.into_iter().any(|act| act.service == sites::SERVICE);
+        }
+        false
+    }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
         let mut result = HashMap::new();
@@ -589,13 +597,16 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(new_account_action(accounts::SERVICE, account));
         if let Some(key) = key {
+            actions.push(new_account_action(accounts::SERVICE, account));
             actions.push(set_key_action(account, key));
             actions.push(set_auth_service_action(account, key.auth_service()));
-        } else {
+        } else if sender == producers::ROOT {
+            actions.push(new_account_action(accounts::SERVICE, account));
             actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
             actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
+        } else {
+            actions.push(auth_delegate::Wrapper::pack_from(sender).newAccount(account, sender));
         }
         Ok(())
     }
@@ -1606,12 +1617,6 @@ struct LocalPackageQuery {
     installed: LocalPackageConnection,
 }
 
-#[allow(non_snake_case)]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct NewAccountsQuery {
-    newAccounts: Vec<AccountNumber>,
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct PackagesEdge {
     node: PackageInfo,
@@ -1632,27 +1637,6 @@ struct PackagesQuery {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SourcesQuery {
     sources: Vec<packages::PackageSource>,
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub async fn get_accounts_to_create(
-    base_url: &reqwest::Url,
-    client: &mut reqwest::Client,
-    accounts: &[AccountNumber],
-    sender: AccountNumber,
-) -> Result<Vec<AccountNumber>, anyhow::Error> {
-    let result: NewAccountsQuery = crate::gql_query(
-        base_url,
-        client,
-        packages::SERVICE,
-        format!(
-            "query {{ newAccounts(accounts: {}, owner: {}) }}",
-            serde_json::to_string(accounts)?,
-            serde_json::to_string(&sender)?,
-        ),
-    )
-    .await?;
-    Ok(result.newAccounts)
 }
 
 #[cfg(not(target_family = "wasm"))]

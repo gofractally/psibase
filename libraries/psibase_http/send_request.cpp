@@ -206,7 +206,8 @@ namespace
          Action action{
              .sender  = AccountNumber(),
              .service = proxyServiceNum,
-             .rawData = psio::convert_to_frac(std::tuple(self->id, psio::to_frac(reply))),
+             .rawData = psio::convert_to_frac(
+                 std::tuple(self->id, psio::to_frac(reply), std::uint32_t(0))),
          };
 
          if (self->request && isWebSocketHandshake(*self->request, reply))
@@ -239,7 +240,7 @@ namespace
          }
       }
       void do_error(const std::error_code& ec) { server.sharedState->sockets()->asyncClose(*this); }
-      virtual void send(Writer&, std::span<const char>) override
+      virtual void send(Writer&, std::span<const char>, std::uint32_t) override
       {
          abortMessage("Cannot send additional requests through a client socket");
       }

@@ -611,6 +611,9 @@ class Node(API):
     def install(self, packages=[], sources=[]):
         '''installs a package'''
         self.run_psibase(['install'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
+    def install_local(self, packages=[], sources=[]):
+        '''installs a local package'''
+        self.run_psibase(['install', '--local'] + self.node_args() + ['--package-source=' + s for s in sources] + packages)
     def run_psibase(self, args, *, check=True, **kw):
         self._find_psibase()
         result = subprocess.run([self.psibase] + args, check=check, timeout=100, **kw)

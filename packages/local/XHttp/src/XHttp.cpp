@@ -14,6 +14,16 @@ using namespace SystemService;
 
 namespace
 {
+   struct TempPendingRequestRow
+   {
+      std::int32_t                              socket;
+      psibase::AccountNumber                    owner;
+      std::optional<std::vector<AccountNumber>> prevOwners;
+      PSIO_REFLECT(TempPendingRequestRow, socket, owner, prevOwners)
+   };
+   using TempPendingRequestTable =
+       psibase::Table<TempPendingRequestRow, &TempPendingRequestRow::socket>;
+
    // This is used to store outgoing HTTP requests before their callbacks are set.
    struct TempResponseHandlerRow
    {
@@ -24,7 +34,7 @@ namespace
    PSIO_REFLECT(TempResponseHandlerRow, socket, type, service)
    using TempResponseHandlerTable = Table<TempResponseHandlerRow, &TempResponseHandlerRow::socket>;
 
-   using Temporary = TemporaryTables<PendingRequestTable, TempResponseHandlerTable>;
+   using Temporary = TemporaryTables<TempPendingRequestTable, TempResponseHandlerTable>;
 
    bool matches(psio::view<const HttpHeader> header, std::string_view h)
    {
@@ -150,8 +160,8 @@ extern "C" [[clang::export_name("recv")]] void recv()
    psibase::internal::receiver = XHttp::service;
    auto act                    = getCurrentActionView();
 
-   auto [socket, data] =
-       psio::view<const std::tuple<std::int32_t, std::vector<char>>>(act->rawData());
+   auto [socket, data, flags] =
+       psio::view<const std::tuple<std::int32_t, std::vector<char>, std::uint32_t>>(act->rawData());
    // if this is a response to an HTTP request, send it to the owner
    auto                              requests = XHttp{}.open<ResponseHandlerTable>();
    std::optional<ResponseHandlerRow> row;
@@ -241,10 +251,6 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
    PSIBASE_SUBJECTIVE_TX
    {
       row = requests.get(socket.unpack());
-      if (row)
-      {
-         requests.remove(*row);
-      }
    }
 
    if (row)
@@ -253,6 +259,11 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
                   .service = row->service,
                   .method  = row->err,
                   .rawData = psio::to_frac(std::tuple(socket))});
+
+      PSIBASE_SUBJECTIVE_TX
+      {
+         requests.remove(*row);
+      }
       return;
    }
 
@@ -264,7 +275,7 @@ extern "C" [[clang::export_name("close")]] void closeSocket()
 
 #endif
 
-void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
+void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags)
 {
    if (socket == producer_multicast)
    {
@@ -281,7 +292,7 @@ void XHttp::send(std::int32_t socket, psio::view<const std::vector<char>> data)
       if (!row || row->service != getSender() || row->type != SocketType::websocket)
          abortMessage("Wrong sender");
    }
-   check(psibase::socketSend(socket, data) == 0, "socketSend failed");
+   check(psibase::socketSend(socket, data, flags) == 0, "socketSend failed");
 }
 
 std::int32_t XHttp::sendRequest(HttpRequest                   request,
@@ -347,8 +358,11 @@ void XHttp::autoClose(std::int32_t socket, bool value)
    auto sender = getSender();
    PSIBASE_SUBJECTIVE_TX
    {
-      auto requests = Session{}.open<PendingRequestTable>();
-      auto owned    = Temporary{}.open<PendingRequestTable>();
+      // PendingRequestTable is compatible with TempPendingRequestTable,
+      // and we want to remove prevOwners if it is present
+      using AltTemporary = TemporaryTables<PendingRequestTable>;
+      auto requests      = Session{}.open<PendingRequestTable>();
+      auto owned         = AltTemporary{}.open<PendingRequestTable>();
 
       auto from = value ? &requests : &owned;
       auto to   = value ? &owned : &requests;
@@ -380,14 +394,15 @@ void XHttp::asyncClose(std::int32_t socket)
       if (!row || row->service != sender)
          abortMessage(sender.str() + " cannot close socket " + std::to_string(socket));
       auto flags = SocketFlags::autoClose | SocketFlags::notifyClose;
-      check(socketSetFlags(socket, flags, flags) == 0, "Failed to set auto-close");
+      // Ignore errors. This can fail if the socket is already closing.
+      socketSetFlags(socket, flags, flags);
    }
 }
 
 void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
 {
    auto sender = getSender();
-   auto owned  = Temporary{}.open<PendingRequestTable>();
+   auto owned  = Temporary{}.open<TempPendingRequestTable>();
    if (auto row = owned.get(socket))
    {
       if (row->owner != sender)
@@ -408,10 +423,66 @@ void XHttp::sendReply(std::int32_t socket, const HttpReply& result)
    }
 }
 
+void XHttp::giveSocket(std::int32_t socket, AccountNumber service, bool local)
+{
+   auto sender = getSender();
+   auto owned  = Temporary{}.open<TempPendingRequestTable>();
+
+   auto row = owned.get(socket);
+   if (!row || row->owner != sender)
+      abortMessage(std::format("{} does not own socket {}", sender.str(), socket));
+   if (!row->prevOwners)
+      row->prevOwners.emplace();
+   row->prevOwners->push_back(sender);
+   if (std::ranges::contains(*row->prevOwners, service))
+      abortMessage("recursive transfer of socket");
+
+   // If service is a chain service, the response will be
+   // routed through http-server
+   if (!local)
+   {
+      row->owner = HttpServer::service;
+      owned.put(*row);
+      to<HttpServer>().giveSocket(socket, service);
+   }
+   else
+   {
+      row->owner = service;
+      owned.put(*row);
+   }
+}
+
+bool XHttp::takeSocket(std::int32_t socket, bool local)
+{
+   auto sender = getSender();
+   auto owned  = Temporary{}.open<TempPendingRequestTable>();
+   auto row    = owned.get(socket);
+
+   if (!row || !row->prevOwners)
+      return false;
+
+   auto pos = std::ranges::find(*row->prevOwners, sender);
+   if (pos == row->prevOwners->end())
+      return false;
+
+   if (local)
+   {
+      if (!to<HttpServer>().takeSocket(socket))
+         abortMessage("http-server::takeSocket failed");
+   }
+
+   row->prevOwners->erase(pos, row->prevOwners->end());
+   if (row->prevOwners->empty())
+      row->prevOwners.reset();
+   row->owner = sender;
+   owned.put(*row);
+   return true;
+}
+
 void XHttp::accept(std::int32_t socket, const psibase::HttpReply& reply)
 {
    auto sender   = getSender();
-   auto owned    = Temporary{}.open<PendingRequestTable>();
+   auto owned    = Temporary{}.open<TempPendingRequestTable>();
    auto handlers = Temporary{}.open<TempResponseHandlerTable>();
 
    if (auto row = owned.get(socket))
@@ -530,7 +601,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
    auto [sockview, req] = psio::view<const std::tuple<std::int32_t, HttpRequest>>(act->rawData());
    auto sock            = sockview.unpack();
 
-   auto owned    = Temporary{act->service(), KvMode::readWrite}.open<PendingRequestTable>();
+   auto owned    = Temporary{act->service(), KvMode::readWrite}.open<TempPendingRequestTable>();
    auto rootHost = getRootHost(req.host());
 
    if (rootHost.empty())
@@ -555,11 +626,11 @@ extern "C" [[clang::export_name("serve")]] void serve()
          server = {service, service};
 
       std::optional<HttpReply> reply;
-      owned.put({.socket = sock, .owner = service});
 
       // Handle registered servers
       if (server)
       {
+         owned.put({.socket = sock, .owner = server->server});
          reply = psibase::Actor<ServerInterface>(XHttp::service, server->server)
                      .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
          if (!owned.get(sock))
@@ -578,6 +649,7 @@ extern "C" [[clang::export_name("serve")]] void serve()
          }
          if (code)
          {
+            owned.put({.socket = sock, .owner = XSites::service});
             reply = psibase::Actor<ServerInterface>(XHttp::service, XSites::service)
                         .serveSys(req.unpack(), std::optional{sock}, std::nullopt);
 
