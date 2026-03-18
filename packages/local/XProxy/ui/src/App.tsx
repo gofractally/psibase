@@ -1,23 +1,46 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { siblingUrl } from "@psibase/common-lib";
+import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
+import { Button } from "@shared/shadcn/ui/button";
+import { Input } from "@shared/shadcn/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/shadcn/ui/select";
+import { Toaster, toast } from "@shared/shadcn/ui/sonner";
 
-type ProxyRow = { appName: string; origin: string; saved?: boolean };
+type Scheme = "http" | "https";
+type ProxyRow = {
+    appName: string;
+    scheme: Scheme;
+    host: string;
+    saved?: boolean;
+};
+
+type OriginServerResponse = {
+    subdomain: string;
+    host: string;
+    tls?: Record<string, never>;
+};
+
+function normalizeOriginRow(r: OriginServerResponse): ProxyRow {
+    const scheme: Scheme = r.tls ? "https" : "http";
+    let host = r.host.trim();
+
+    const slash = host.indexOf("/");
+    if (slash !== -1) host = host.slice(0, slash);
+    while (host.endsWith("/")) host = host.slice(0, -1);
+
+    return { appName: r.subdomain, scheme, host, saved: true };
+}
 
 async function fetchOriginServers(): Promise<ProxyRow[]> {
     const url = siblingUrl(null, "x-proxy", "/origin_servers");
     const res = await fetch(url);
     if (!res.ok) {
-        if (res.status === 401) throw new Error("Not authorized");
         throw new Error(await res.text());
     }
-    const data: { subdomain: string; host: string }[] = await res.json();
-    return data.map((r) => ({
-        appName: r.subdomain,
-        origin: r.host,
-        saved: true,
-    }));
+    const data: OriginServerResponse[] = await res.json();
+    return data.map(normalizeOriginRow);
 }
 
 async function saveRows(rows: ProxyRow[]): Promise<void> {
@@ -37,33 +60,48 @@ async function saveRows(rows: ProxyRow[]): Promise<void> {
         const originRes = await fetch(setOriginUrl, {
             ...opts,
             method: "POST",
-            body: JSON.stringify({ subdomain: row.appName, host: row.origin }),
+            body: (() => {
+                let host = row.host.trim();
+                const scheme = row.scheme;
+
+                const slash = host.indexOf("/");
+                if (slash !== -1) host = host.slice(0, slash);
+                while (host.endsWith("/")) host = host.slice(0, -1);
+
+                const body: {
+                    subdomain: string;
+                    host: string;
+                    tls?: Record<string, never>;
+                } = { subdomain: row.appName, host };
+                if (scheme === "https") body.tls = {};
+                return JSON.stringify(body);
+            })(),
         });
         if (!originRes.ok)
             throw new Error(`set_origin_server: ${await originRes.text()}`);
     }
 }
 
-export default function App() {
-    const queryClient = useQueryClient();
-    const {
-        data: initialRows,
-        isLoading,
-        error,
-    } = useQuery({ queryKey: ["origin_servers"], queryFn: fetchOriginServers });
-    const [rows, setRows] = useState<ProxyRow[]>([]);
+function ProxyEditor({
+    initialRows,
+    queryClient,
+}: {
+    initialRows: ProxyRow[];
+    queryClient: ReturnType<typeof useQueryClient>;
+}) {
+    const [rows, setRows] = useState<ProxyRow[]>(() =>
+        initialRows.map((r) => ({ ...r })),
+    );
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (initialRows !== undefined && rows.length === 0)
-            setRows(initialRows.map((r) => ({ ...r })));
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- only seed when initial load completes
-    }, [initialRows]);
-
     const addRow = () =>
-        setRows((prev) => [...prev, { appName: "", origin: "", saved: false }]);
-    const updateRow = (i: number, field: keyof ProxyRow, value: string) =>
+        setRows((prev) => [
+            ...prev,
+            { appName: "", scheme: "http", host: "", saved: false },
+        ]);
+    type EditableField = "appName" | "scheme" | "host";
+    const updateRow = (i: number, field: EditableField, value: string) =>
         setRows((prev) => {
             const next = [...prev];
             next[i] = { ...next[i], [field]: value };
@@ -78,22 +116,14 @@ export default function App() {
             await queryClient.invalidateQueries({
                 queryKey: ["origin_servers"],
             });
-            setMessage("Saved.");
+            toast("Saved.");
         } catch (e) {
-            setMessage(e instanceof Error ? e.message : "Save failed");
+            const msg = e instanceof Error ? e.message : "Save failed";
+            setMessage(msg);
         } finally {
             setSaving(false);
         }
     };
-
-    if (isLoading && rows.length === 0)
-        return <div className="p-4">Loading...</div>;
-    if (error)
-        return (
-            <div className="p-4">
-                Error: {error instanceof Error ? error.message : String(error)}
-            </div>
-        );
 
     return (
         <div className="max-w-2xl p-4">
@@ -101,44 +131,78 @@ export default function App() {
             <div className="mb-4 space-y-2">
                 {rows.map((row, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <input
-                            className="border-input placeholder:text-muted-foreground text-foreground dark:bg-input/30 flex-1 rounded border bg-transparent px-2 py-1 disabled:cursor-not-allowed disabled:opacity-60"
+                        <Input
                             placeholder="App name"
                             value={row.appName}
-                            onChange={(e) =>
-                                updateRow(i, "appName", e.target.value)
-                            }
+                            onChange={(e) => updateRow(i, "appName", e.target.value)}
                             disabled={row.saved}
                         />
-                        <input
-                            className="border-input placeholder:text-muted-foreground text-foreground dark:bg-input/30 flex-1 rounded border bg-transparent px-2 py-1"
-                            placeholder="Origin server"
-                            value={row.origin}
-                            onChange={(e) =>
-                                updateRow(i, "origin", e.target.value)
+                        <Select
+                            value={row.scheme}
+                            onValueChange={(v) =>
+                                updateRow(i, "scheme", v as Scheme)
                             }
+                        >
+                            <SelectTrigger className="w-24">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="http">http</SelectItem>
+                                <SelectItem value="https">https</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input
+                            placeholder="Host (host[:port])"
+                            value={row.host}
+                            onChange={(e) => updateRow(i, "host", e.target.value)}
                         />
                     </div>
                 ))}
             </div>
             <div className="flex gap-2">
-                <button
-                    type="button"
-                    className="rounded border px-3 py-1"
-                    onClick={addRow}
-                >
+                <Button variant="outline" size="sm" onClick={addRow} type="button">
                     Add row
-                </button>
-                <button
+                </Button>
+                <Button
                     type="button"
-                    className="bg-primary text-primary-foreground rounded border px-3 py-1"
                     onClick={onSave}
                     disabled={saving}
+                    size="sm"
                 >
                     {saving ? "Saving..." : "Save"}
-                </button>
+                </Button>
             </div>
-            {message && <p className="mt-2 text-sm">{message}</p>}
+            {message && (
+                <Alert className="mt-2" variant={message === "Saved." ? "default" : "destructive"}>
+                    <AlertDescription>{message}</AlertDescription>
+                </Alert>
+            )}
         </div>
+    );
+}
+
+export default function App() {
+    const queryClient = useQueryClient();
+    const {
+        data: initialRows,
+        isLoading,
+        error,
+    } = useQuery({ queryKey: ["origin_servers"], queryFn: fetchOriginServers });
+
+    if (isLoading && initialRows === undefined)
+        return <div className="p-4">Loading...</div>;
+    if (error)
+        return (
+            <div className="p-4">
+                Error: {error instanceof Error ? error.message : String(error)}
+            </div>
+        );
+    if (initialRows === undefined) return null;
+
+    return (
+        <>
+            <Toaster />
+            <ProxyEditor initialRows={initialRows} queryClient={queryClient} />
+        </>
     );
 }
