@@ -2,6 +2,7 @@ import { CircleCheck, LoaderCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useGuildMembership } from "@/hooks/fractals/use-guild-membership";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { usePushApplication } from "@/hooks/use-push-application";
 
@@ -12,14 +13,16 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { useGuildMembership } from "@/hooks/fractals/use-guild-membership";
 
 export const InviteResponse = () => {
     const guild = useGuildAccount();
     const { data: currentUser } = useCurrentUser();
     const navigate = useNavigate();
 
-    const { data: guildMembership, isFetchedAfterMount } = useGuildMembership(guild, currentUser);
+    const { data: guildMembership, isFetchedAfterMount } = useGuildMembership(
+        guild,
+        currentUser,
+    );
 
     useEffect(() => {
         if (guildMembership) {

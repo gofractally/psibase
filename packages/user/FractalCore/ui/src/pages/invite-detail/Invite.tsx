@@ -10,11 +10,11 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
+import { useConnectAccount } from "@/hooks/use-connect-account";
 import { useDraftApplication } from "@/hooks/use-draft-application";
 import { getInvites, importToken } from "@/lib/graphql/fractals/getInvites";
 
 import { useAppForm } from "@shared/components/form/app-form";
-import { useConnectAccount } from "@/hooks/use-connect-account";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
@@ -38,7 +38,8 @@ export const Invite = () => {
     } = useQuery({
         enabled: !!token,
         queryKey: ["invite", token],
-        queryFn: async () => importToken(z.string().parse(token)).then(getInvites),
+        queryFn: async () =>
+            importToken(z.string().parse(token)).then(getInvites),
     });
 
     const { mutateAsync: connectAccount } = useConnectAccount();
@@ -109,8 +110,8 @@ export const Invite = () => {
 
         const description = isExpired
             ? `This invitation expired ${dayjs().to(expiry)} (${dayjs(
-                expiry,
-            ).format("YYYY/MM/DD h:mm A z")}).`
+                  expiry,
+              ).format("YYYY/MM/DD h:mm A z")}).`
             : `${inviter} has invited you to apply to join the ${guildInvite.guild.displayName} guild in the ${guildInvite.guild.fractal.name} fractal.`;
 
         if (isExpired) {
@@ -151,7 +152,7 @@ export const Invite = () => {
                             <form.AppField
                                 name="description"
                                 children={(field) => (
-                                    <field.TextField label="Application description" />
+                                    <field.TextArea label="What additional information would you like to include with your application?" />
                                 )}
                             />
                             <form.AppForm>
