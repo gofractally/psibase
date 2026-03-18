@@ -134,10 +134,6 @@ pub mod service {
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
         let guild = Guild::get_assert(guild_account);
         let sender = get_sender();
-        check_some(
-            FractalMember::get(guild.fractal, sender),
-            "must be a member of a fractal to apply for its guild",
-        );
         GuildApplication::add(guild.account, sender, extra_info);
     }
 
