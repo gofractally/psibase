@@ -35,7 +35,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
             for (auto row : table.getIndex<0>())
                result.push_back(std::move(row));
          }
-         HttpReply reply{.contentType = "application/json"};
+         HttpReply           reply{.contentType = "application/json"};
          psio::vector_stream stream{reply.body};
          to_json(result, stream);
          reply.headers = allowCors();
@@ -59,6 +59,17 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          auto table = open<OriginServerTable>();
          auto row   = psio::convert_from_json<OriginServerRow>(
              std::string(req.body.begin(), req.body.end()));
+
+         if (row.host.empty() || row.host.find("://") != std::string::npos)
+         {
+            std::string_view msg{"Invalid host for origin server. Expected host[:port]\n"};
+            return HttpReply{
+                .status      = HttpStatus::badRequest,
+                .contentType = "text/html",
+                .body        = {msg.begin(), msg.end()},
+            };
+         }
+
          PSIBASE_SUBJECTIVE_TX
          {
             table.put(row);
@@ -69,6 +80,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    else
    {
       // Try the server registered in HttpServer
+      // This allows RPC calls to be handled by the registered server
       if (auto registered = HttpServer::Tables(HttpServer::service, KvMode::read)
                                 .open<RegServTable>()
                                 .get(subdomain))
