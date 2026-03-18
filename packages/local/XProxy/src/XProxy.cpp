@@ -2,6 +2,7 @@
 
 #include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <psibase/webServices.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
@@ -12,6 +13,25 @@ using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
 
+namespace
+{
+   struct Query
+   {
+      std::vector<OriginServerRow> originServers() const
+      {
+         std::vector<OriginServerRow> result;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto table = XProxy{}.open<OriginServerTable>();
+            for (auto row : table.getIndex<0>())
+               result.push_back(std::move(row));
+         }
+         return result;
+      }
+      PSIO_REFLECT(Query, method(originServers))
+   };
+}  // namespace
+
 std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
@@ -21,30 +41,14 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
 
    if (subdomain == getReceiver())
    {
-      // Handle request to x-proxy
-      if (target == "/origin_servers")
-      {
-         if (auto reply = to<XAdmin>().checkAuth(req, socket))
-            return reply;
-         if (req.method != "GET")
-            return HttpReply::methodNotAllowed(req);
-         std::vector<OriginServerRow> result;
-         PSIBASE_SUBJECTIVE_TX
-         {
-            auto table = open<OriginServerTable>();
-            for (auto row : table.getIndex<0>())
-               result.push_back(std::move(row));
-         }
-         HttpReply           reply{.contentType = "application/json"};
-         psio::vector_stream stream{reply.body};
-         to_json(result, stream);
-         reply.headers = allowCors();
+      if (auto reply = to<XAdmin>().checkAuth(req, socket))
          return reply;
-      }
+
+      if (auto result = serveGraphQL(req, Query{}))
+         return result;
+
       if (target == "/set_origin_server")
       {
-         if (auto reply = to<XAdmin>().checkAuth(req, socket))
-            return reply;
          if (req.method != "POST")
             return HttpReply::methodNotAllowed(req);
          if (req.contentType != "application/json")

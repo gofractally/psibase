@@ -7,6 +7,7 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/shadcn/ui/select";
 import { Toaster, toast } from "@shared/shadcn/ui/sonner";
+import { graphql } from "@shared/lib/graphql";
 
 type Scheme = "http" | "https";
 type ProxyRow = {
@@ -19,7 +20,7 @@ type ProxyRow = {
 type OriginServerResponse = {
     subdomain: string;
     host: string;
-    tls?: Record<string, never>;
+    tls?: Record<string, never> | null;
 };
 
 function normalizeOriginRow(r: OriginServerResponse): ProxyRow {
@@ -34,13 +35,19 @@ function normalizeOriginRow(r: OriginServerResponse): ProxyRow {
 }
 
 async function fetchOriginServers(): Promise<ProxyRow[]> {
-    const url = siblingUrl(null, "x-proxy", "/origin_servers");
-    const res = await fetch(url);
-    if (!res.ok) {
-        throw new Error(await res.text());
-    }
-    const data: OriginServerResponse[] = await res.json();
-    return data.map(normalizeOriginRow);
+    const data = await graphql<{ originServers: OriginServerResponse[] }>(
+        `
+        {
+            originServers {
+                subdomain
+                host
+                tls {}
+            }
+        }
+        `,
+        { service: "x-proxy" },
+    );
+    return data.originServers.map(normalizeOriginRow);
 }
 
 async function saveRows(rows: ProxyRow[]): Promise<void> {
