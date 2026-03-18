@@ -5,6 +5,10 @@ use cargo_metadata::Message;
 use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
+use futures::{
+    stream::{pending, FuturesUnordered},
+    StreamExt,
+};
 use psibase::{ExactAccountNumber, PackageInfo, Schema};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -80,6 +84,10 @@ struct Args {
     /// Build only the specified packages
     #[clap(short = 'p', long, global = true, value_name = "SPEC")]
     package: Vec<String>,
+
+    /// The number of jobs to run in parallel
+    #[clap(short = 'j', long, global = true, value_name = "N")]
+    jobs: Option<usize>,
 
     #[clap(subcommand)]
     command: Command,
@@ -353,6 +361,43 @@ fn check_psibase_version(metadata: &Metadata) {
             CARGO_PSIBASE_VERSION, psibase_version
         );
         warn("Version Mismatch", &version_mismatch_msg);
+    }
+}
+
+type JobAcquiredSender = tokio::sync::oneshot::Sender<std::io::Result<jobserver::Acquired>>;
+
+struct AsyncJobServer {
+    helper: jobserver::HelperThread,
+    queue: std::sync::mpsc::Sender<JobAcquiredSender>,
+}
+
+impl AsyncJobServer {
+    unsafe fn new(limit: Option<usize>) -> Result<AsyncJobServer, Error> {
+        let client = match jobserver::Client::from_env_ext(false).client {
+            Ok(client) => client,
+            Err(err) if matches!(err.kind(), jobserver::FromEnvErrorKind::NoEnvVar) => {
+                jobserver::Client::new(limit.unwrap_or_else(|| {
+                    std::thread::available_parallelism().map_or(1, |n| n.get())
+                }))?
+            }
+            Err(err) => Err(err)?,
+        };
+        let (sender, receiver) = std::sync::mpsc::channel::<JobAcquiredSender>();
+        let helper = client.into_helper_thread(move |aq| {
+            if let Ok(send_token) = receiver.recv() {
+                let _ = send_token.send(aq);
+            }
+        })?;
+        Ok(AsyncJobServer {
+            helper,
+            queue: sender,
+        })
+    }
+    async fn acquire(&self) -> Result<jobserver::Acquired, Error> {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        self.queue.send(send)?;
+        self.helper.request_token();
+        Ok(receive.await??)
     }
 }
 
@@ -656,7 +701,12 @@ fn get_test_packages<'a>(
     Ok(packages)
 }
 
-async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> Result<(), Error> {
+async fn test(
+    jobs: &AsyncJobServer,
+    args: &Args,
+    opts: &TestCommand,
+    metadata: &MetadataIndex<'_>,
+) -> Result<(), Error> {
     let mut test_packages: Vec<(&str, PackageSet)> = Vec::new();
     if args.package.is_empty() {
         for id in &*metadata.metadata.workspace_default_members {
@@ -730,21 +780,37 @@ async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> 
 
     let tests = process_from_output(command.spawn()?, &packages, None, TESTER_EXPORTS).await?;
 
+    let mut running = FuturesUnordered::new();
+
     for test in tests {
-        pretty_path("Running", &test.0);
-        let mut command = std::process::Command::new(&args.psitest);
-        command.env("CARGO_PSIBASE_PACKAGE_PATH", &index_files[test.1]);
-        command.arg(test.0);
-        command.arg("--nocapture");
-        if let Some(ref filter) = opts.test_filter {
-            command.arg(filter);
+        let fut = core::pin::pin!(jobs.acquire());
+        let mut acquiring = running.by_ref().chain(pending()).take_until(fut);
+        while let Some(res) = acquiring.next().await {
+            res?
         }
-        let msg = format!("Failed running: {:?}", command);
-        if !command.status().context(msg.clone())?.success() {
-            return Err(anyhow! {msg});
-        }
+        let acquired = acquiring.take_result().unwrap();
+        let index_files = &index_files;
+        running.push(async move {
+            let _acquired = acquired;
+            pretty_path("Running", &test.0);
+            let mut command = tokio::process::Command::new(&args.psitest);
+            command.env("CARGO_PSIBASE_PACKAGE_PATH", &index_files[test.1]);
+            command.arg(test.0);
+            command.arg("--nocapture");
+            if let Some(ref filter) = opts.test_filter {
+                command.arg(filter);
+            }
+            let msg = format!("Failed running: {:?}", command);
+            if !command.status().await.context(msg.clone())?.success() {
+                return Err(anyhow! {msg});
+            }
+            Ok(())
+        })
     }
 
+    while let Some(res) = running.next().await {
+        res?
+    }
     Ok(())
 }
 
@@ -823,6 +889,8 @@ async fn main2() -> Result<(), Error> {
         Args::parse()
     };
 
+    let jobs = unsafe { AsyncJobServer::new(args.jobs)? };
+
     let metadata = get_metadata(&args)?;
     check_psibase_version(&metadata);
 
@@ -892,7 +960,7 @@ async fn main2() -> Result<(), Error> {
             pretty("Done", "");
         }
         Command::Test(opts) => {
-            test(&args, opts, &MetadataIndex::new(&metadata)).await?;
+            test(&jobs, &args, opts, &MetadataIndex::new(&metadata)).await?;
             pretty("Done", "All tests passed");
         }
         Command::Install(opts) => {
