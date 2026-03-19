@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-import { queryKeys } from "@/lib/queryKeys";
+import { graphql } from "@shared/lib/graphql";
 
 interface ServerSpecs {
     bandwidthBps: number;
@@ -11,7 +10,7 @@ interface ServerSpecs {
 }
 
 const zServerSpecsResponse = z.union([
-    // Standard GraphQL response structure
+    // Standard GraphQL response shape: { data: { getServerSpecs: ... } }
     z.object({
         data: z.object({
             getServerSpecs: z.object({
@@ -21,7 +20,7 @@ const zServerSpecsResponse = z.union([
             }),
         }),
     }),
-    // Unwrapped query results
+    // Unwrapped query results: { getServerSpecs: ... }
     z.object({
         getServerSpecs: z.object({
             netBps: z.string().or(z.number()),
@@ -33,7 +32,7 @@ const zServerSpecsResponse = z.union([
 
 export const useServerSpecs = () => {
     return useQuery<ServerSpecs>({
-        queryKey: [...queryKeys.configServerSpecs],
+        queryKey: ["config", "serverSpecs"],
         queryFn: async () => {
             const query = `{
                 getServerSpecs {
@@ -42,22 +41,21 @@ export const useServerSpecs = () => {
                     recommendedMinMemoryBytes
                 }
             }`;
-            const res = await graphql(query, "virtual-server");
 
-            if (res && typeof res === "object" && "errors" in res) {
-                console.error("GraphQL errors:", res.errors);
-                throw new Error("GraphQL query failed");
-            }
+            const res = await graphql(query, { service: "virtual-server" });
 
             const response = zServerSpecsResponse.parse(res);
-            const specs = "data" in response 
-                ? response.data.getServerSpecs 
-                : response.getServerSpecs;
+            const specs =
+                "data" in response
+                    ? response.data.getServerSpecs
+                    : response.getServerSpecs;
 
             return {
                 bandwidthBps: Number(specs.netBps),
                 storageBytes: Number(specs.storageBytes),
-                recommendedMinMemoryBytes: Number(specs.recommendedMinMemoryBytes),
+                recommendedMinMemoryBytes: Number(
+                    specs.recommendedMinMemoryBytes,
+                ),
             };
         },
     });

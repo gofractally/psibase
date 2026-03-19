@@ -1,5 +1,5 @@
-import { useNetworkVariables } from "@/hooks/use-network-variables";
-import { useServerSpecs } from "@/hooks/use-server-specs";
+import { useNetworkVariables } from "@shared/hooks/use-network-variables";
+import { useServerSpecs } from "@shared/hooks/use-server-specs";
 
 import {
     Tabs,

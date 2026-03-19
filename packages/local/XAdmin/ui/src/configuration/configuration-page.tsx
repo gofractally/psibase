@@ -26,7 +26,7 @@ import {
 } from "@shared/shadcn/ui/tabs";
 
 import { useConfig, useConfigUpdate } from "../hooks/useConfig";
-import { useServerSpecs } from "../hooks/useServerSpecs";
+import { useServerSpecs } from "@shared/hooks/use-server-specs";
 import { Logger } from "../log/logger";
 import {
     PsinodeConfigUI,
