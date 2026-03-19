@@ -1,3 +1,5 @@
+import type { Account } from "@shared/lib/schemas/account";
+
 import { z } from "zod";
 
 import { Evaluation } from "./graphql/evaluations/getEvaluation";
@@ -5,7 +7,6 @@ import {
     UsersAndGroups,
     zResult,
 } from "./graphql/evaluations/getUsersAndGroups";
-import { Account } from "./zod/Account";
 import { zUnix } from "./zod/Unix";
 
 const zTimeStatus = z.enum([

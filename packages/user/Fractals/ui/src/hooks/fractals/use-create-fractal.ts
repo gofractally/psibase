@@ -4,10 +4,10 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { fractalsService } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
 
+import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { zAccountNameStatus } from "../use-account-status";
@@ -28,7 +28,7 @@ export const useCreateFractal = () =>
             await supervisor.functionCall({
                 method: "createFractal",
                 params: [fractalAccount, guildAccount, name, mission],
-                service: fractalsService,
+                service: FRACTALS_SERVICE,
                 intf: "adminFractal",
             });
         },

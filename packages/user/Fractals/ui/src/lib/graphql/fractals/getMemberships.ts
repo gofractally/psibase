@@ -2,8 +2,9 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { Account, zAccount } from "@/lib/zod/Account";
 import { zDateTime } from "@/lib/zod/DateTime";
+
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 import { graphql } from "../../graphql";
 

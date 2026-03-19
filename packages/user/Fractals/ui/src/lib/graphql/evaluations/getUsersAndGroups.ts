@@ -3,7 +3,8 @@ import { z } from "zod";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { graphql } from "@/lib/graphql";
-import { Account, zAccount } from "@/lib/zod/Account";
+
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zUser = z.object({
     user: zAccount,
@@ -82,7 +83,6 @@ export const getUsersAndGroups = async (
             }),
         })
         .parse(res);
-
 
     return zUsersAndGroupsResponse.parse({
         users: response.getUsers.nodes,
