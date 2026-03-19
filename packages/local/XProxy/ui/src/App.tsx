@@ -2,12 +2,19 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { siblingUrl } from "@psibase/common-lib";
+
+import { graphql } from "@shared/lib/graphql";
 import { Alert, AlertDescription } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@shared/shadcn/ui/select";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@shared/shadcn/ui/select";
 import { Toaster, toast } from "@shared/shadcn/ui/sonner";
-import { graphql } from "@shared/lib/graphql";
 
 type Scheme = "http" | "https";
 type ProxyRow = {
@@ -141,7 +148,9 @@ function ProxyEditor({
                         <Input
                             placeholder="App name"
                             value={row.appName}
-                            onChange={(e) => updateRow(i, "appName", e.target.value)}
+                            onChange={(e) =>
+                                updateRow(i, "appName", e.target.value)
+                            }
                             disabled={row.saved}
                         />
                         <Select
@@ -161,13 +170,20 @@ function ProxyEditor({
                         <Input
                             placeholder="Host (host[:port])"
                             value={row.host}
-                            onChange={(e) => updateRow(i, "host", e.target.value)}
+                            onChange={(e) =>
+                                updateRow(i, "host", e.target.value)
+                            }
                         />
                     </div>
                 ))}
             </div>
             <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={addRow} type="button">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addRow}
+                    type="button"
+                >
                     Add row
                 </Button>
                 <Button
@@ -180,7 +196,10 @@ function ProxyEditor({
                 </Button>
             </div>
             {message && (
-                <Alert className="mt-2" variant={message === "Saved." ? "default" : "destructive"}>
+                <Alert
+                    className="mt-2"
+                    variant={message === "Saved." ? "default" : "destructive"}
+                >
                     <AlertDescription>{message}</AlertDescription>
                 </Alert>
             )}
