@@ -34,7 +34,11 @@ namespace SystemService
       if (enable_print)
          std::printf("isAuthSys\n");
 
-      return true;
+      for (const auto& auth : authorizers)
+         if (auth == sender)
+            return true;
+
+      return false;
    }
 
    bool AuthAny::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
