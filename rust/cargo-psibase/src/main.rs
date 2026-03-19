@@ -13,7 +13,7 @@ use psibase::{ExactAccountNumber, PackageInfo, Schema};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
-use std::fs::{read, write, File, OpenOptions};
+use std::fs::{read, write, File};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
@@ -30,12 +30,7 @@ use package::*;
 /// The version of the cargo-psibase crate at compile time
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
-const SERVICE_ARGS_RUSTC: &[&str] = &[
-    "--",
-    "-C",
-    "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
-];
+const SERVICE_ARGS: &[&str] = &["--lib"];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
@@ -229,14 +224,17 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     Ok(())
 }
 
-fn process(filename: &PathBuf, polyfill: Option<&[u8]>, exports: &[&str]) -> Result<(), Error> {
-    let mut timestamp_file = filename.clone();
-    timestamp_file.as_mut_os_string().push(".cargo_psibase");
+fn process(
+    filename: &PathBuf,
+    polyfill: Option<&[u8]>,
+    exports: &[&str],
+) -> Result<PathBuf, Error> {
+    let output_file = filename.with_extension("polyfilled.wasm");
     let md = fs::metadata(filename)
         .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
-    if let Ok(md2) = fs::metadata(&timestamp_file) {
+    if let Ok(md2) = fs::metadata(&output_file) {
         if md2.modified().unwrap() >= md.modified().unwrap() {
-            return Ok(());
+            return Ok(output_file);
         }
     }
 
@@ -259,23 +257,29 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>, exports: &[&str]) -> Res
     pretty_path("Reoptimizing", filename);
     optimize(&mut dest_module)?;
 
-    write(filename, dest_module.emit_wasm())
+    write(&output_file, dest_module.emit_wasm())
         .with_context(|| format!("Failed to write {}", filename.display()))?;
 
-    OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(timestamp_file)?;
+    Ok(output_file)
+}
 
-    Ok(())
+#[derive(Debug)]
+struct ArtifactFile {
+    path: PathBuf,
+    package_index: usize,
+}
+
+#[derive(Debug, Default)]
+struct ArtifactList {
+    services: Vec<ArtifactFile>,
+    tests: Vec<ArtifactFile>,
 }
 
 async fn get_files(
     packages: &[&str],
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
-) -> Result<Vec<(PathBuf, usize)>, Error> {
-    let mut result = Vec::new();
+) -> Result<ArtifactList, Error> {
+    let mut result = ArtifactList::default();
     while let Some(line) = lines.next_line().await? {
         match serde_json::from_str::<cargo_metadata::Message>(&line)? {
             Message::CompilerMessage(msg) => {
@@ -286,13 +290,25 @@ async fn get_files(
                     .iter()
                     .position(|id| id == &artifact.package_id.repr.as_str())
                 {
-                    result.extend(
-                        artifact
-                            .filenames
-                            .iter()
-                            .map(|p| (p.clone().into_std_path_buf(), idx))
-                            .filter(|p| p.0.as_path().extension().unwrap_or_default() == "wasm"),
-                    );
+                    if artifact.profile.test {
+                        if let Some(path) = artifact.executable {
+                            result.tests.push(ArtifactFile {
+                                path: path.clone().into_std_path_buf(),
+                                package_index: idx,
+                            })
+                        }
+                    } else {
+                        result.services.extend(
+                            artifact
+                                .filenames
+                                .iter()
+                                .filter(|p| p.extension() == Some("wasm"))
+                                .map(|p| ArtifactFile {
+                                    path: p.clone().into_std_path_buf(),
+                                    package_index: idx,
+                                }),
+                        );
+                    }
                 }
             }
             _ => (),
@@ -404,9 +420,7 @@ impl AsyncJobServer {
 async fn process_from_output(
     mut command: tokio::process::Child,
     packages: &[&str],
-    poly: Option<&[u8]>,
-    exports: &[&str],
-) -> Result<Vec<(PathBuf, usize)>, Error> {
+) -> Result<ArtifactList, Error> {
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
     let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
     let status = command.wait();
@@ -418,9 +432,14 @@ async fn process_from_output(
         exit(status.code().unwrap());
     }
 
-    let files = files?;
-    for f in &files {
-        process(&f.0, poly, exports)?
+    let mut files = files?;
+    for f in &mut files.services {
+        let p = process(&f.path, Some(SERVICE_POLYFILL), SERVICE_EXPORTS)?;
+        f.path = p;
+    }
+    for f in &mut files.tests {
+        let p = process(&f.path, None, TESTER_EXPORTS)?;
+        f.path = p;
     }
 
     Ok(files)
@@ -431,12 +450,10 @@ async fn build(
     packages: &[&str],
     envs: Vec<(&str, &str)>,
     extra_args: &[&str],
-    poly: Option<&[u8]>,
-    exports: &[&str],
-) -> Result<Vec<(PathBuf, usize)>, Error> {
+) -> Result<Vec<ArtifactFile>, Error> {
     let command = tokio::process::Command::new(get_cargo())
         .envs(envs)
-        .arg("rustc")
+        .arg("build")
         .args(extra_args)
         .arg("--release")
         .arg("--target=wasm32-wasip1")
@@ -444,12 +461,11 @@ async fn build(
         .args(get_target_dir(args))
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
-        .args(SERVICE_ARGS_RUSTC)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
 
-    process_from_output(command, packages, poly, exports).await
+    Ok(process_from_output(command, packages).await?.services)
 }
 
 async fn build_schema(
@@ -458,7 +474,6 @@ async fn build_schema(
     extra_args: &[&str],
 ) -> Result<Schema, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
-        .envs(vec![("CARGO_PSIBASE_TEST", "")])
         .arg("test")
         .args(extra_args)
         .arg("--release")
@@ -469,7 +484,6 @@ async fn build_schema(
         .arg("--color=always")
         .arg("--lib")
         .arg("--no-run")
-        .args(SERVICE_ARGS_RUSTC)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -485,13 +499,14 @@ async fn build_schema(
         exit(status.code().unwrap());
     }
 
-    let files = files?;
-    for f in &files {
-        process(&f.0, None, TESTER_EXPORTS)?
+    let mut files = files?.tests;
+    for f in &mut files {
+        let p = process(&f.path, None, TESTER_EXPORTS)?;
+        f.path = p;
     }
 
     let mut command = tokio::process::Command::new(&args.psitest)
-        .arg(&files[0].0)
+        .arg(&files[0].path)
         .arg("_psibase_get_schema")
         .arg("--show-output")
         .arg("--include-ignored")
@@ -530,7 +545,7 @@ async fn build_plugin(
     args: &Args,
     packages: &[&str],
     extra_args: &[&str],
-) -> Result<Vec<(PathBuf, usize)>, Error> {
+) -> Result<Vec<ArtifactFile>, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .arg("component")
         .arg("build")
@@ -556,7 +571,7 @@ async fn build_plugin(
         exit(status.code().unwrap());
     }
 
-    Ok(files?)
+    Ok(files?.services)
 }
 
 async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
@@ -757,7 +772,6 @@ async fn test(
 
     let mut command = tokio::process::Command::new(get_cargo());
     command
-        .env("CARGO_PSIBASE_TEST", "")
         .arg("build")
         .arg("--tests")
         .arg("--release")
@@ -778,7 +792,9 @@ async fn test(
         command.args(["-p", name.as_str()]);
     }
 
-    let tests = process_from_output(command.spawn()?, &packages, None, TESTER_EXPORTS).await?;
+    let tests = process_from_output(command.spawn()?, &packages)
+        .await?
+        .tests;
 
     let mut running = FuturesUnordered::new();
 
@@ -792,10 +808,13 @@ async fn test(
         let index_files = &index_files;
         running.push(async move {
             let _acquired = acquired;
-            pretty_path("Running", &test.0);
+            pretty_path("Running", &test.path);
             let mut command = tokio::process::Command::new(&args.psitest);
-            command.env("CARGO_PSIBASE_PACKAGE_PATH", &index_files[test.1]);
-            command.arg(test.0);
+            command.env(
+                "CARGO_PSIBASE_PACKAGE_PATH",
+                &index_files[test.package_index],
+            );
+            command.arg(test.path);
             command.arg("--nocapture");
             if let Some(ref filter) = opts.test_filter {
                 command.arg(filter);
@@ -902,15 +921,7 @@ async fn main2() -> Result<(), Error> {
                     let package = &index.packages.get(id.repr.as_str()).unwrap().name;
                     let mut extra_args = SERVICE_ARGS.to_owned();
                     extra_args.extend(["-p", package.as_str()]);
-                    build(
-                        &args,
-                        &[id.repr.as_str()],
-                        vec![],
-                        &extra_args,
-                        Some(SERVICE_POLYFILL),
-                        SERVICE_EXPORTS,
-                    )
-                    .await?;
+                    build(&args, &[id.repr.as_str()], vec![], &extra_args).await?;
                 }
             } else {
                 for package in &args.package {
@@ -923,15 +934,7 @@ async fn main2() -> Result<(), Error> {
                         .repr;
                     let mut extra_args = SERVICE_ARGS.to_owned();
                     extra_args.extend(["-p", package.as_str()]);
-                    build(
-                        &args,
-                        &[id.as_str()],
-                        vec![],
-                        &extra_args,
-                        Some(SERVICE_POLYFILL),
-                        SERVICE_EXPORTS,
-                    )
-                    .await?;
+                    build(&args, &[id.as_str()], vec![], &extra_args).await?;
                 }
             }
             pretty("Done", "");

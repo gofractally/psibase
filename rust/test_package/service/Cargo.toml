@@ -11,11 +11,15 @@ publish.workspace = true
 
 [package.metadata.psibase]
 server = "r-tpack"
+plugin = "tpack-plugin"
 postinstall = [{ sender = "tpack", service = "tpack", method = "init" }]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 psibase.workspace = true

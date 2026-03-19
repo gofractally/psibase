@@ -1,6 +1,4 @@
-use crate::{
-    build, build_package_root, build_plugin, build_schema, Args, SERVICE_EXPORTS, SERVICE_POLYFILL,
-};
+use crate::{build, build_package_root, build_plugin, build_schema, Args};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -350,22 +348,14 @@ pub async fn build_package(
                 plugin
             ))?
         };
-        data_sources.push((service, paths.pop().unwrap().0.into(), path.to_string()))
+        data_sources.push((service, paths.pop().unwrap().path.into(), path.to_string()))
     }
 
     let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();
 
     let mut service_wasms = Vec::new();
     for (service, mut info, id) in services {
-        let mut paths = build(
-            args,
-            &[id.as_str()],
-            vec![],
-            &["--lib", "--crate-type=cdylib", "-p", &service],
-            Some(SERVICE_POLYFILL),
-            SERVICE_EXPORTS,
-        )
-        .await?;
+        let mut paths = build(args, &[id.as_str()], vec![], &["--lib", "-p", &service]).await?;
         if paths.len() != 1 {
             Err(anyhow!(
                 "Service {} should produce exactly one wasm target",
@@ -376,7 +366,7 @@ pub async fn build_package(
         crate_to_account.insert(service, schema.service.clone());
         let service = schema.service.clone();
         info.schema = Some(schema);
-        service_wasms.push((service, info, paths.pop().unwrap().0));
+        service_wasms.push((service, info, paths.pop().unwrap().path));
         accounts.push(service);
     }
 

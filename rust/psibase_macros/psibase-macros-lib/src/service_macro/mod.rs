@@ -44,9 +44,6 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if options.generate_schema.is_none() {
         options.generate_schema = options.dispatch.clone();
     }
-    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
-        options.dispatch = Some(false);
-    }
 
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
     let item = syn::parse2::<syn::Item>(item).unwrap();
@@ -754,6 +751,7 @@ fn process_mod(
         };
         if options.dispatch.unwrap() {
             items.push(parse_quote! {
+                #[cfg(not(test))]
                 #[automatically_derived]
                 #[cfg(target_family = "wasm")]
                 mod service_wasm_interface {
