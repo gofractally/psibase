@@ -657,17 +657,6 @@ extern "C" [[clang::export_name("serve")]] void serve()
                return;
          }
 
-         // If it's a request for a common asset, forward to regular http-server
-         if (!reply && std::string_view{req.target()}.starts_with(HttpServer::commonApiPrefix))
-         {
-            owned.put({.socket = sock, .owner = HttpServer::service});
-            act->sender()  = XHttp::service;
-            act->service() = HttpServer::service;
-            act->method()  = MethodNumber("serve");
-            psibase::call(act.data(), act.size());
-            return;
-         }
-
          if (!reply)
          {
             sendNotFound(sock, req);
