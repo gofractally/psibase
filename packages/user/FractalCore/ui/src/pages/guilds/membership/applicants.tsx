@@ -54,9 +54,11 @@ export const GuildApplicants = () => {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Account</TableHead>
-                                    <TableHead>Attestations</TableHead>
                                     <TableHead className="text-end">
                                         Application created
+                                    </TableHead>
+                                    <TableHead className="text-end">
+                                        Score
                                     </TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -73,16 +75,13 @@ export const GuildApplicants = () => {
                                                 account={application.applicant}
                                             />
                                         </TableCell>
-                                        <TableCell>
-                                            {
-                                                application.attestations.nodes
-                                                    .length
-                                            }
-                                        </TableCell>
                                         <TableCell className="text-end">
                                             {dayjs(
                                                 application.createdAt,
                                             ).format("llll")}
+                                        </TableCell>
+                                        <TableCell className="text-end">
+                                            {application.score.current} / {application.score.required}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -103,8 +102,8 @@ export const GuildApplicants = () => {
                         isGuildMember || isPending
                             ? undefined
                             : () => {
-                                  setShowGuildModal(true);
-                              }
+                                setShowGuildModal(true);
+                            }
                     }
                 />
             )}

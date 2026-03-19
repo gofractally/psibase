@@ -4,7 +4,10 @@ use psibase::{check, check_none, check_some, AccountNumber, Table};
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
 use crate::helpers::RollingBits16;
 use crate::scoring::{calculate_ema_u32, Fraction};
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember, GuildMemberTable};
+use crate::tables::tables::{
+    Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, GuildMember,
+    GuildMemberTable,
+};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 impl GuildMember {
@@ -91,7 +94,7 @@ impl GuildMember {
 
     // 3. Called when finishing an evaluation and taking the pending level to create the new score.
     pub fn apply_pending_level_to_score(&mut self, attended: bool) {
-        // Mark the members attendance by adding a bit to their bitset. 
+        // Mark the members attendance by adding a bit to their bitset.
         self.attendance = RollingBits16::from(self.attendance).push(attended).value();
         let pending_level = self.pending_level.take().unwrap();
 
@@ -124,6 +127,11 @@ impl GuildMember {
 
         for attest in members {
             table.remove(&attest);
+        }
+
+        let table = GuildInviteTable::read_write();
+        for application in GuildInvite::by_inviter(self.guild, self.member) {
+            table.remove(&application);
         }
 
         GuildMemberTable::read_write().remove(&self);

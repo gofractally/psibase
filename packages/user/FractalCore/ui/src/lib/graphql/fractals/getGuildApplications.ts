@@ -10,11 +10,15 @@ export const getGuildApplications = async (guildAccount: Account) => {
     const res = await graphql(
         `
             {
-                guildApplications(guild: ${guildAccount}) {
+                guildApplications(guild: "${guildAccount}") {
                     nodes {
                         applicant
                         extraInfo
                         createdAt
+                        score {
+                            current
+                            required
+                        }
                         attestations {
                             nodes {
                                 attester
