@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey from "@/lib/queryKeys";
 
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const zAccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
 const zGetAccountReturn = z

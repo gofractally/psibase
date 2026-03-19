@@ -1,4 +1,3 @@
-import { queryClient } from "@/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
 import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
@@ -8,6 +7,7 @@ import {
     getMembership,
 } from "@shared/domains/fractal/lib/graphql/getMembership";
 import { MemberStatus } from "@shared/domains/fractal/lib/schemas/MemberStatus";
+import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
 
 const queryFn = async (fractal: string, user: string) => {

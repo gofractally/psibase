@@ -1,4 +1,3 @@
-import { queryClient } from "@/queryClient";
 import { ChevronsUpDown, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +11,7 @@ import QueryKey from "@/lib/queryKeys";
 import { zFractal } from "@shared/domains/fractal/lib/graphql/getFractal";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { queryClient } from "@shared/lib/queryClient";
 import {
     DropdownMenu,
     DropdownMenuContent,
