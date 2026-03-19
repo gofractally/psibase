@@ -1,16 +1,15 @@
-import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
-import type { Membership } from "@/lib/graphql/fractals/getMembership";
+import type { FractalRes } from "../lib/graphql/getFractal";
+import type { Membership } from "../lib/graphql/getMembership";
 
 import dayjs from "dayjs";
-
-import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
-
-import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
+
+import { getMemberLabel } from "../lib/getMemberLabel";
+import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 export const OverviewCard = ({
     fractal,

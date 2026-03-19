@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
+import { FRACTALS_SERVICE } from "../constants";
+import { MemberStatus } from "../schemas/MemberStatus";
 
-import { Account, zAccount } from "@/lib/zod/Account";
-import { zDateTime } from "@/lib/zod/DateTime";
-import { MemberStatus } from "@/lib/zod/MemberStatus";
-
-import { graphql } from "../../graphql";
+import { graphql } from "@shared/lib/graphql";
+import { Account, zAccount } from "@shared/lib/schemas/account";
+import { zDateTime } from "@shared/lib/schemas/date-time";
 
 export const zMember = z
     .object({
@@ -34,7 +33,7 @@ export const getMembership = async (
 
         } 
     }`,
-        siblingUrl(null, "fractals", "/graphql"),
+        { service: FRACTALS_SERVICE },
     );
 
     return z

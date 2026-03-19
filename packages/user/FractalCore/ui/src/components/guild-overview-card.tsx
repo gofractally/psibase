@@ -2,15 +2,14 @@ import { Crown, Pencil, User, Users } from "lucide-react";
 import { useState } from "react";
 import z from "zod";
 
-import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
+import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
 
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/getGuild";
 
-import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
-
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";

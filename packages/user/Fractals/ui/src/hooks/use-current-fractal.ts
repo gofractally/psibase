@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 
-import { Account, zAccount } from "@/lib/zod/Account";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export const useCurrentFractal = (): Account | undefined => {
     const { fractalName } = useParams();

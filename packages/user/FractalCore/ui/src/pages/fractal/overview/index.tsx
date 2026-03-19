@@ -5,12 +5,12 @@ import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembership } from "@/hooks/fractals/use-membership";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { OverviewCard } from "@shared/domains/fractal/components/fractal-overview-card";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { ConsensusRewardCard } from "../overview/components/consensus-reward-card";
 import { JoinFractalCard } from "../overview/components/join-fractal-card";
-import { OverviewCard } from "../overview/components/overview-card";
 
 export const Overview = () => {
     const fractalAccount = useFractalAccount();

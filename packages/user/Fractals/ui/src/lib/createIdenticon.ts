@@ -1,7 +1,7 @@
+import type { Account } from "@shared/lib/schemas/account";
+
 import { identicon } from "@dicebear/collection";
 import { createAvatar } from "@dicebear/core";
-
-import { Account } from "./zod/Account";
 
 export const createIdenticon = (seed: string): string =>
     createAvatar(identicon, {
