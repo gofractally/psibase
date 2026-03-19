@@ -31,8 +31,7 @@ namespace
       PSIO_REFLECT(Query, method(originServers))
    };
 
-   template <HttpStatus status>
-   HttpReply makeError(std::string_view msg)
+   HttpReply makeError(HttpStatus status, std::string_view msg)
    {
       return {
           .status      = status,
@@ -46,9 +45,13 @@ namespace
       if (suffix.empty())
          return std::string(base);
       auto result = std::string(base);
-      if (!result.empty() && result.back() == '/' && suffix.front() == '/')
+      constexpr std::string_view slash{"/"};
+      const bool baseEndsWithSlash = !result.empty() && result.ends_with(slash);
+      const bool suffixStartsWithSlash = suffix.starts_with(slash);
+
+      if (baseEndsWithSlash && suffixStartsWithSlash)
          result.pop_back();
-      else if (!result.empty() && result.back() != '/' && suffix.front() != '/')
+      else if (!baseEndsWithSlash && !suffixStartsWithSlash)
          result.push_back('/');
       result.append(suffix.begin(), suffix.end());
       return result;
@@ -77,7 +80,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          if (req.contentType != "application/json")
          {
             std::string_view msg = "Content-Type must be application/json\n";
-            return makeError<HttpStatus::unsupportedMediaType>(msg);
+            return makeError(HttpStatus::unsupportedMediaType, msg);
          }
          auto table = open<OriginServerTable>();
          auto row   = psio::convert_from_json<OriginServerRow>(
@@ -86,7 +89,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          if (row.host.empty())
          {
             std::string_view msg{"Invalid host for origin server."};
-            return makeError<HttpStatus::badRequest>(msg);
+            return makeError(HttpStatus::badRequest, msg);
          }
 
          PSIBASE_SUBJECTIVE_TX
@@ -215,7 +218,7 @@ void XProxy::onError(std::int32_t socket, std::optional<psibase::HttpReply> repl
    if (!reply)
    {
       std::string_view msg{"Bad Gateway"};
-      reply = makeError<HttpStatus::badGateway>(msg);
+      reply = makeError(HttpStatus::badGateway, msg);
    }
    PSIBASE_SUBJECTIVE_TX
    {
