@@ -92,6 +92,7 @@ publish = false
 psibase = { path = "../../rust/psibase", version = "0.23.0" }
 psibase_macros = { path = "../../rust/psibase_macros", version = "0.23.0" }
 psibase_plugin = { path = "../../rust/psibase_plugin", version = "0.23.0" }
+psibase_service = { path = "../../rust/psibase_service", version = "0.23.0" }
 async-graphql = "=7.0.17"
 graphql_client = "0.16"
 serde = { version = "1.0.208", features = ["derive"] }

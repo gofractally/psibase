@@ -269,6 +269,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -642,6 +643,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2169,6 +2171,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase_service"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2241,6 +2251,7 @@ dependencies = [
  "auth-dyn",
  "psibase",
  "psibase-system-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2258,6 +2269,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "psibase-system-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
  "staged-tx",
@@ -2833,6 +2845,7 @@ dependencies = [
  "pem",
  "psibase",
  "psibase-system-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
  "sha2",
@@ -3416,6 +3429,7 @@ dependencies = [
  "psibase",
  "psibase-system-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "rand",
  "serde",
  "serde-aux",

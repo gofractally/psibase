@@ -1,4 +1,6 @@
-use crate::{build, build_package_root, build_plugin, build_schema, Args, SERVICE_POLYFILL};
+use crate::{
+    build, build_package_root, build_plugin, build_schema, Args, SERVICE_EXPORTS, SERVICE_POLYFILL,
+};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -361,6 +363,7 @@ pub async fn build_package(
             vec![],
             &["--lib", "--crate-type=cdylib", "-p", &service],
             Some(SERVICE_POLYFILL),
+            SERVICE_EXPORTS,
         )
         .await?;
         if paths.len() != 1 {
