@@ -2,8 +2,7 @@ import { Gavel } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,

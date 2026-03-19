@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { CreateFractalModal } from "@/components/create-fractal-modal";
-import { EmptyBlock } from "@/components/empty-block";
-import { PageContainer } from "@/components/page-container";
 
 import { useFractals } from "@/hooks/fractals/use-fractals";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,

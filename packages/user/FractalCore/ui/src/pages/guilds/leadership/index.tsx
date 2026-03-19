@@ -1,6 +1,5 @@
-import { PageContainer } from "@/components/page-container";
-
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 
 import { RemoveRepItem } from "./components/remove-rep-item";
