@@ -5,18 +5,17 @@ import dayjs from "dayjs";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { ErrorCard } from "@/components/error-card";
-import { PageContainer } from "@/components/page-container";
-
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { getMemberLabel } from "@shared/domains/fractal/lib/getMemberLabel";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";

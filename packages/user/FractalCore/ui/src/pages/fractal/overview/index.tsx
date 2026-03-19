@@ -1,11 +1,10 @@
-import { PageContainer } from "@/components/page-container";
-
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembership } from "@/hooks/fractals/use-membership";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { OverviewCard } from "@shared/domains/fractal/components/fractal-overview-card";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 

@@ -1,7 +1,6 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 
-import { PageContainer } from "@/components/page-container";
-
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import {
     Tabs,
     TabsContent,

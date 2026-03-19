@@ -1,13 +1,13 @@
 import dayjs from "dayjs";
 
 import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
-import { PageContainer } from "@/components/page-container";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 import { useGuild } from "@/hooks/use-guild";
 
 import { EmptyBlock } from "@shared/components/empty-block";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import {
     Table,
     TableBody,

@@ -6,12 +6,12 @@ import { useNavigate } from "react-router-dom";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
 import QueryKey from "@/lib/queryKeys";
 
 import { zFractal } from "@shared/domains/fractal/lib/graphql/getFractal";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     DropdownMenu,
     DropdownMenuContent,

@@ -3,8 +3,6 @@ import { UserCheck, UserX } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
@@ -12,6 +10,7 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";

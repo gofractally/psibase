@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useExpectCurrentUser } from "@/hooks/use-expect-current-user";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon } from "@/lib/createIdenticon";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -33,7 +33,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
     const refetchInterval = isAwaitingLogin ? 1000 : undefined;
 
-    const { data: currentUser } = useCurrentUser(refetchInterval);
+    const { data: currentUser } = useCurrentUser({ refetchInterval });
     const { data: connectedAccounts } = useConnectedAccounts();
 
     const isNoOptions = connectedAccounts.length == 0;

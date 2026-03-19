@@ -10,13 +10,14 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import { useConnectedAccounts } from "@/hooks/use-connected-accounts";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useLogout } from "@/hooks/use-logout";
 import { useSelectAccount } from "@/hooks/use-select-account";
 import { createIdenticon, generateAvatar } from "@/lib/createIdenticon";
 
+import { useTheme } from "@shared/components/theme-provider";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { cn } from "@shared/lib/utils";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import {
@@ -40,8 +41,6 @@ import {
     useSidebar,
 } from "@shared/shadcn/ui/sidebar";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-
-import { useTheme } from "./theme-provider";
 
 export function NavUser() {
     const { isMobile } = useSidebar();
