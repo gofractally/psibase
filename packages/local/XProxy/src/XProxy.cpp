@@ -30,6 +30,19 @@ namespace
       }
       PSIO_REFLECT(Query, method(originServers))
    };
+
+   std::string joinPath(std::string_view base, std::string_view suffix)
+   {
+      if (suffix.empty())
+         return std::string(base);
+      auto result = std::string(base);
+      if (!result.empty() && result.back() == '/' && suffix.front() == '/')
+         result.pop_back();
+      else if (!result.empty() && result.back() != '/' && suffix.front() != '/')
+         result.push_back('/');
+      result.append(suffix.begin(), suffix.end());
+      return result;
+   }
 }  // namespace
 
 std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
@@ -117,7 +130,16 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    }
    if (originServer)
    {
-      req.host = originServer->host;
+      if (auto originUrl = psibase::splitURL(originServer->host); !originUrl.scheme.empty())
+      {
+         if (!originUrl.host.empty())
+            req.host = originUrl.host;
+         req.target = joinPath(originUrl.path, req.target);
+      }
+      else
+      {
+         req.host = originServer->host;
+      }
       std::int32_t          upstream;
       psibase::MethodNumber callback;
       if (isWebSocketHandshake(req))
