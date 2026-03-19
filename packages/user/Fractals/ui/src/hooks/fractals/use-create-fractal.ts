@@ -1,13 +1,12 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-
-import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
 
 import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { zAccountNameStatus } from "../use-account-status";
