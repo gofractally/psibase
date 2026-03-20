@@ -186,7 +186,7 @@ impl AdminGuild for FractallyPlugin {
         assert_authorized(FunctionName::exile_member)?;
         let packed_args = fractals::action_structs::exile_member {
             duration_seconds,
-            member: member.parse().unwrap(),
+            account: member.parse().unwrap(),
         }
         .packed();
         add_action_to_transaction(
