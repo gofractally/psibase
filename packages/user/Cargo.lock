@@ -2478,6 +2478,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "prem-accounts"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "prem-accounts-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "prem-accounts-pkg"
+version = "0.23.0"
+dependencies = [
+ "prem-accounts",
+ "prem-accounts-plugin",
+ "r-prem-accts",
+]
+
+[[package]]
+name = "prem-accounts-plugin"
+version = "0.23.0"
+dependencies = [
+ "pem",
+ "prem-accounts",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2851,6 +2886,20 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-prem-accts"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "diff-adjust",
+ "prem-accounts",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde-aux",
  "serde_json",
 ]
 
@@ -3499,12 +3548,12 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "socket2"
-version = "0.6.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f4aa3ad99f2088c990dfa82d367e19cb29268ed67c574d10d0a4bfe71f07e0"
+checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

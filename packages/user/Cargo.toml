@@ -52,6 +52,10 @@ members = [
     "Nft/service",
     "Nft/plugin",
     "Nft/query-service",
+    "PremAccounts",
+    "PremAccounts/service",
+    "PremAccounts/query-service",
+    "PremAccounts/plugin",
 ]
 
 exclude = [

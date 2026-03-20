@@ -1,0 +1,31 @@
+package prem-accounts:plugin;
+
+interface admin {
+    use host:types/types.{error};
+
+    /// Enable the creation of n-letter account names (where n = `length`)
+    /// * `length` - Length of account name to start selling
+    /// * `initial-price` - Initial price (in network tokens)
+    /// * `target` - Target number to sell in 30-day period
+    /// * `floor-price` - Minimum price (in network tokens)
+    enable-market: func(length: u8, initial-price: u64, target-sales: u32, floor-price: u64) -> result<_, error>;
+
+    /// Disable new sales of an n-letter name market (where n = `length`)
+    disable-market: func(length: u8) -> result<_, error>;
+}
+
+interface api {
+    use host:types/types.{error};
+    buy: func(account: string, max-cost: string) -> result<_, error>;
+    claim: func(account: string) -> result<string, error>;
+}
+
+interface queries {
+    use host:types/types.{error};
+    get-prices: func() -> result<list<u64>, error>;
+}
+
+world imports {
+    import api;
+    import queries;
+}
