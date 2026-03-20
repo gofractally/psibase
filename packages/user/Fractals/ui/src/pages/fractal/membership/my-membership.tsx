@@ -1,7 +1,3 @@
-import { Link } from "react-router-dom";
-
-import { siblingUrl } from "@psibase/common-lib";
-
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
@@ -58,13 +54,12 @@ export const MyMembership = () => {
             {isLoading || !chainId ? (
                 <Skeleton className="h-48 w-full rounded-xl" />
             ) : (
-                <Link to={siblingUrl(null, fractalAccount)} target="_blank">
-                    <OverviewCard
-                        fractal={fractal}
-                        fractalAccount={fractalAccount}
-                        membership={membership}
-                    />
-                </Link>
+                <OverviewCard
+                    fractal={fractal}
+                    fractalAccount={fractalAccount}
+                    membership={membership}
+                    linksToFractal={true}
+                />
             )}
         </PageContainer>
     );
