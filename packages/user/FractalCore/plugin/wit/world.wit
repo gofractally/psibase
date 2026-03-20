@@ -4,7 +4,6 @@ package fractal-core:plugin;
 interface admin-fractal {
     use host:types/types.{error};
 
-    exile-member: func(member: string) -> result<_, error>;
     set-dist-interval: func(distribution-interval-sec: u32) -> result<_, error>;
     init-token: func() -> result<_, error>;
     set-ranked-guild-slots: func(slots-count: u8) -> result<_, error>;
@@ -17,7 +16,6 @@ interface admin-fractal {
 interface user-fractal {
     use host:types/types.{error};
 
-    join: func() -> result<_, error>;
     dist-token: func() -> result<_, error>;
 
 
@@ -56,6 +54,11 @@ interface admin-guild {
     remove-guild-rep: func(guild-account: string) -> result<_, error>;
 
     set-rank-ordering-threshold: func(guild-account: string, threshold: u8) -> result<_, error>;
+
+
+    exile-member: func(member: string, duration-seconds: u32) -> result<_, error>;
+    revoke-exile: func(guild-account: string, account: string) -> result<_, error>;
+
 
 }
 

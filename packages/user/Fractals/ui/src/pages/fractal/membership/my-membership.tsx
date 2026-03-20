@@ -1,21 +1,14 @@
 import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
-import type { Membership } from "@/lib/graphql/fractals/getMembership";
-
-import dayjs from "dayjs";
 
 import { siblingUrl } from "@psibase/common-lib";
 
 import { ErrorCard } from "@/components/error-card";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
-import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
-import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -23,17 +16,10 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const MyMembership = () => {
     const fractalAccount = useCurrentFractal();
-
-    const {
-        data: currentUser,
-        isLoading: isLoadingCurrentUser,
-        error: errorCurrentUser,
-    } = useCurrentUser();
 
     const {
         data: fractal,
@@ -42,25 +28,14 @@ export const MyMembership = () => {
     } = useFractal(fractalAccount);
 
     const {
-        data: membership,
-        isLoading: isLoadingMembership,
-        error: errorMembership,
-    } = useMembership(fractalAccount, currentUser);
-
-    const {
         data: chainId,
         isLoading: isLoadingChainId,
         error: errorChainId,
     } = useChainId();
 
-    const isLoading =
-        isLoadingCurrentUser ||
-        isLoadingFractal ||
-        isLoadingMembership ||
-        isLoadingChainId;
+    const isLoading = isLoadingFractal || isLoadingChainId;
 
-    const error =
-        errorCurrentUser || errorFractal || errorMembership || errorChainId;
+    const error = errorFractal || errorChainId;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -85,7 +60,6 @@ export const MyMembership = () => {
                             fractalAccount={fractalAccount}
                             chainId={chainId}
                         />
-                        <MembershipStatusCard membership={membership} />
                     </>
                 )}
             </div>
@@ -152,57 +126,6 @@ const FractalOverviewCard = ({
                         </p>
                     </div>
                 </div>
-            </CardContent>
-        </Card>
-    );
-};
-
-const MembershipStatusCard = ({ membership }: { membership?: Membership }) => {
-    const status =
-        membership == null
-            ? "Not a member"
-            : membership
-              ? getMemberLabel(membership.memberStatus)
-              : "Loading...";
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-lg">Membership status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Status</span>
-                    <Badge
-                        variant={
-                            status === "Not a member"
-                                ? "destructive"
-                                : "default"
-                        }
-                        className={
-                            status === "Not a member"
-                                ? "bg-destructive/10 text-destructive border-destructive/20"
-                                : ""
-                        }
-                    >
-                        {status}
-                    </Badge>
-                </div>
-
-                {membership && (
-                    <>
-                        <Separator />
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                                Member since
-                            </span>
-                            <span className="text-muted-foreground text-sm">
-                                {dayjs(membership.createdAt).format(
-                                    "MMMM D, YYYY",
-                                )}
-                            </span>
-                        </div>
-                    </>
-                )}
             </CardContent>
         </Card>
     );

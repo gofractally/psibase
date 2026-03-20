@@ -9,8 +9,8 @@ use crate::constants::{
 };
 use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
-    EvaluationInstance, Fractal, FractalMember, Guild, GuildFlags, GuildMember, GuildMemberTable,
-    GuildTable,
+    EvaluationInstance, Fractal, Guild, GuildExile, GuildFlags, GuildMember, GuildMemberTable,
+    GuildTable, RewardStream,
 };
 
 impl Guild {
@@ -50,6 +50,18 @@ impl Guild {
         self.get_setting(GuildFlags::RANK_ORDERING)
     }
 
+    pub fn exile_member(&self, exiled_member: AccountNumber, duration_seconds: u32) {
+        let guild_account = self.account;
+        let fractal_token = Fractal::get_assert(self.fractal).token_id;
+
+        if let Some(mut stream) = RewardStream::get(exiled_member, fractal_token) {
+            stream.withdraw_and_credit_owner();
+        }
+
+        GuildExile::add(guild_account, exiled_member, duration_seconds);
+        GuildMember::get_assert(guild_account, exiled_member).remove_by_exile();
+    }
+
     pub fn enable_rank_ordering(&mut self) {
         if self.rep.is_some() {
             self.remove_representative();
@@ -66,11 +78,6 @@ impl Guild {
         rep_role: AccountNumber,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
-
-        check_some(
-            FractalMember::get(fractal, rep),
-            "rep must be a member of the fractal",
-        );
 
         let new_guild_instance =
             Self::new(fractal, guild, rep, display_name, council_role, rep_role);
@@ -213,7 +220,10 @@ impl Guild {
     }
 
     pub fn set_representative(&mut self, new_representative: AccountNumber) {
-        FractalMember::get_assert(self.fractal, new_representative);
+        check_some(
+            GuildMember::get(self.account, new_representative),
+            "new representative must be a guild member",
+        );
 
         self.rep = Some(new_representative);
         self.save();

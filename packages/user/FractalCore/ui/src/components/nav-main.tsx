@@ -9,12 +9,11 @@ import {
     Landmark,
     LucideIcon,
     Scale,
-    Users,
     UsersRound,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
 import { useGuild } from "@/hooks/use-guild";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -68,11 +67,6 @@ export function getMenuGroups(
                 title: "Guilds",
                 icon: Landmark,
                 path: "/guilds",
-            },
-            {
-                title: "Members",
-                icon: Users,
-                path: "/members",
             },
             {
                 title: "Governance",
@@ -156,7 +150,7 @@ export function getMenuGroups(
 
 export function NavMain() {
     const { data: currentUser } = useCurrentUser();
-    const { data: memberships } = useGuildMembershipsOfUser(currentUser);
+    const { data: memberships } = useGuildMemberships(currentUser);
     const { data: guild } = useGuild();
 
     const groups = getMenuGroups(memberships, guild);

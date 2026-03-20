@@ -41,7 +41,6 @@ define_trust! {
             - Closing an evaluation cycle
         ",
         Medium => "
-            - Joining the fractal
             - Create and delete guild member invites
             - Registering for a guild evaluation
             - Unregistering from guild evaluation
@@ -64,9 +63,9 @@ define_trust! {
             ",
     }
     functions {
-        None => [exile_member, get_group_users, init_token, set_dist_interval],
+        None => [revoke_exile, exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
-        Medium => [apply_guild, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, register, register_candidacy, unregister],
         High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
@@ -168,19 +167,6 @@ impl AdminFractal for FractallyPlugin {
         )
     }
 
-    fn exile_member(member: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::exile_member)?;
-        let packed_args = fractals::action_structs::exile_member {
-            fractal: get_sender_app()?,
-            member: member.parse().unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::exile_member::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::set_dist_interval)?;
         let packed_args = fractals::action_structs::set_dist_int {
@@ -196,6 +182,32 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl AdminGuild for FractallyPlugin {
+    fn exile_member(member: String, duration_seconds: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::exile_member)?;
+        let packed_args = fractals::action_structs::exile_member {
+            duration_seconds,
+            account: member.parse().unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::exile_member::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn revoke_exile(guild_account: String, member: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::revoke_exile)?;
+        let packed_args = fractals::action_structs::revoke_exile {
+            account: member.parse().unwrap(),
+            guild: guild_account.parse().unwrap(),
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::revoke_exile::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account.clone())?;
 
@@ -355,15 +367,6 @@ impl AdminGuild for FractallyPlugin {
 }
 
 impl UserFractal for FractallyPlugin {
-    fn join() -> Result<(), Error> {
-        assert_authorized(FunctionName::join)?;
-        let packed_args = fractals::action_structs::join {
-            fractal: get_sender_app()?,
-        }
-        .packed();
-        add_action_to_transaction(fractals::action_structs::join::ACTION_NAME, &packed_args)
-    }
-
     fn dist_token() -> Result<(), Error> {
         assert_authorized(FunctionName::dist_token)?;
         let packed_args = fractals::action_structs::dist_token {

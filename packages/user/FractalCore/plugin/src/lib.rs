@@ -31,7 +31,6 @@ define_trust! {
             - Initialise fractal token
         ",
         Medium => "
-            - Joining the fractal
             - Registering for a guild evaluation
             - Create and delete guild member invites
             - Unregistering from guild evaluation
@@ -56,7 +55,7 @@ define_trust! {
     functions {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
-        Medium => [apply_guild, push_application, draft_application, delete_guild_invite, invite_member, attest_membership_app, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, push_application, draft_application, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
         High => [attest, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
@@ -85,13 +84,6 @@ impl AdminFractal for FractalCorePlugin {
         FractalsPlugin::admin_fractal::set_dist_interval(interval_seconds)
     }
 
-    fn exile_member(member_account: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::exile_member)?;
-        propose::judiciary()?;
-
-        FractalsPlugin::admin_fractal::exile_member(&member_account)
-    }
-
     fn set_token_threshold(threshold: u8) -> Result<(), Error> {
         assert_authorized(FunctionName::set_token_threshold)?;
         propose::judiciary()?;
@@ -113,6 +105,22 @@ impl AdminGuild for FractalCorePlugin {
         propose::guild(&guild_account)?;
 
         FractalsPlugin::admin_guild::set_rank_ordering_threshold(threshold)
+    }
+
+    fn exile_member(member_account: String, duration_seconds: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::exile_member)?;
+        // TODO: Is it the judiciary to call this? Or the guild leadership?
+        propose::judiciary()?;
+
+        FractalsPlugin::admin_guild::exile_member(&member_account, duration_seconds)
+    }
+
+    fn revoke_exile(guild_account: String, member_account: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::exile_member)?;
+        // TODO: Is it the judiciary to call this? Or the guild leadership?
+        propose::judiciary()?;
+
+        FractalsPlugin::admin_guild::revoke_exile(&guild_account, &member_account)
     }
 
     fn set_guild_rep(guild_account: String, rep: String) -> Result<(), Error> {
@@ -230,11 +238,6 @@ impl UserEval for FractalCorePlugin {
 }
 
 impl UserFractal for FractalCorePlugin {
-    fn join() -> Result<(), Error> {
-        assert_authorized(FunctionName::join)?;
-        FractalsPlugin::user_fractal::join()
-    }
-
     fn dist_token() -> Result<(), Error> {
         assert_authorized(FunctionName::dist_token)?;
         FractalsPlugin::user_fractal::dist_token()

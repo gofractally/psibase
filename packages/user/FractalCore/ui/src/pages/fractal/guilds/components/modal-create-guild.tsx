@@ -4,7 +4,7 @@ import {
     useCreateGuild,
     zParams as zCreateGuild,
 } from "@/hooks/fractals/use-create-guild";
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
@@ -27,7 +27,7 @@ export const ModalCreateGuild = ({
     const { mutateAsync: createGuild } = useCreateGuild();
 
     const { data: currentUser } = useCurrentUser();
-    const { refetch } = useGuildMembershipsOfUser(currentUser);
+    const { refetch } = useGuildMemberships(currentUser);
 
     const navigate = useNavigate();
 

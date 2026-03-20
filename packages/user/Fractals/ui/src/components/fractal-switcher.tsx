@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
-import { useMemberships } from "@/hooks/fractals/use-memberships";
+import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-memberships";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { createIdenticon } from "@/lib/createIdenticon";
@@ -37,9 +37,13 @@ export function AppSwitcher() {
     const navigate = useNavigate();
 
     const { data: currentUser } = useCurrentUser();
-    const { data: memberships, error } = useMemberships(currentUser);
+    const { data: memberships, error } = useGuildMembershipsOfUser(currentUser);
     const fractals = memberships
-        ? memberships.map((membership) => membership.fractalDetails)
+        ? memberships
+            .map((membership) => membership.guild.fractal)
+            .filter((item, index, arr) =>
+                arr.findIndex((i) => item.account == i.account) == index,
+            )
         : [];
 
     console.log({ fractals, error });

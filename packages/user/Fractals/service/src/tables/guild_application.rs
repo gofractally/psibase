@@ -3,6 +3,7 @@ use async_graphql::{connection::Connection, SimpleObject};
 
 use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 
+use crate::tables::tables::GuildExile;
 use crate::{
     constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
     tables::tables::{
@@ -35,6 +36,7 @@ impl GuildApplication {
             GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
+        check_none(GuildExile::get(guild, applicant), "account is in exile");
         let new_instance = Self::new(guild, applicant, extra_info);
         new_instance.save();
         new_instance

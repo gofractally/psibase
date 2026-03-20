@@ -1,4 +1,3 @@
-use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
@@ -8,9 +7,7 @@ use crate::constants::token_distributions::consensus_rewards::{
 use crate::constants::{
     token_distributions::TOKEN_SUPPLY, DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION,
 };
-use crate::tables::tables::{
-    Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
-};
+use crate::tables::tables::{Fractal, FractalTable, RewardConsensus};
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
@@ -19,8 +16,8 @@ use crate::tables::tables::Guild;
 
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
-use psibase::services::{accounts, fractals, sites, transact};
-use psibase::{check, get_sender, Action, RawKey, TableQuery};
+use psibase::services::{accounts, sites, transact};
+use psibase::{check, get_sender, Action};
 use psibase::{fracpack::Pack, services::auth_dyn};
 
 impl Fractal {
@@ -194,25 +191,6 @@ impl Fractal {
 
 #[ComplexObject]
 impl Fractal {
-    async fn memberships(
-        &self,
-        first: Option<i32>,
-        last: Option<i32>,
-        before: Option<String>,
-        after: Option<String>,
-    ) -> async_graphql::Result<Connection<RawKey, FractalMember>> {
-        TableQuery::subindex::<AccountNumber>(
-            FractalMemberTable::with_service(fractals::SERVICE).get_index_pk(),
-            &(self.account),
-        )
-        .first(first)
-        .last(last)
-        .before(before)
-        .after(after)
-        .query()
-        .await
-    }
-
     async fn legislature(&self) -> Guild {
         Guild::get_assert(self.legislature)
     }

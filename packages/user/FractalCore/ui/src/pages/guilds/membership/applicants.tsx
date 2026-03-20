@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { EmptyBlock } from "@shared/components/empty-block";
@@ -31,8 +31,7 @@ export const GuildApplicants = () => {
     const { data: currentUser } = useCurrentUser();
     const guildAccount = useGuildAccount();
     const { data: applications } = useGuildApplications(guildAccount);
-    const { data: memberships, isPending } =
-        useGuildMembershipsOfUser(currentUser);
+    const { data: memberships, isPending } = useGuildMemberships(currentUser);
 
     const isGuildMember = memberships?.some(
         (membership) => membership.guild.account == guildAccount,
@@ -81,7 +80,8 @@ export const GuildApplicants = () => {
                                             ).format("llll")}
                                         </TableCell>
                                         <TableCell className="text-end">
-                                            {application.score.current} / {application.score.required}
+                                            {application.score.current} /{" "}
+                                            {application.score.required}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -102,8 +102,8 @@ export const GuildApplicants = () => {
                         isGuildMember || isPending
                             ? undefined
                             : () => {
-                                setShowGuildModal(true);
-                            }
+                                  setShowGuildModal(true);
+                              }
                     }
                 />
             )}
