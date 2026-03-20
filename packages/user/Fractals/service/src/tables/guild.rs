@@ -190,12 +190,13 @@ impl Guild {
     pub fn guild_auth(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(
             self.rep.map_or(self.council_role, |_| self.rep_role),
+            true,
         )
     }
 
     pub fn rep_role_auth(&self) -> DynamicAuthPolicy {
         self.rep.map_or(DynamicAuthPolicy::impossible(), |rep| {
-            DynamicAuthPolicy::from_sole_authorizer(rep)
+            DynamicAuthPolicy::from_sole_authorizer(rep, true)
         })
     }
 
@@ -208,6 +209,7 @@ impl Guild {
                         .map(|auth| (auth.member, 1))
                         .collect(),
                     two_thirds_plus_one(council_members.len() as u8),
+                    true,
                 )
             })
     }

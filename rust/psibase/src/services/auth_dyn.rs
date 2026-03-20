@@ -20,36 +20,54 @@ pub mod policy {
     #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct DynamicAuthPolicy {
+        /// The total weight needed to authorize an action
         pub threshold: u8,
+
+        /// `can_delegate_auth` indicates whether the policy allows for delegation of authorization.
+        /// * If `true` - the specified accounts may be recursed into and authorized via their own delegated policy.
+        /// * If `false` - the specified accounts must directly authorize/reject the specified method.
+        pub can_delegate_auth: bool,
+
+        /// The accounts that are required to authorize/reject the specified method.
         pub authorizers: Vec<WeightedAuthorizer>,
     }
 
     impl DynamicAuthPolicy {
-        pub fn new(authorizers: Vec<WeightedAuthorizer>, threshold: u8) -> Self {
+        pub fn new(
+            authorizers: Vec<WeightedAuthorizer>,
+            threshold: u8,
+            can_delegate_auth: bool,
+        ) -> Self {
             Self {
                 authorizers,
                 threshold,
+                can_delegate_auth,
             }
         }
 
-        pub fn from_sole_authorizer(account: AccountNumber) -> Self {
-            Self::new(vec![WeightedAuthorizer::new(account, 1)], 1)
+        pub fn from_sole_authorizer(account: AccountNumber, can_delegate_auth: bool) -> Self {
+            Self::new(
+                vec![WeightedAuthorizer::new(account, 1)],
+                1,
+                can_delegate_auth,
+            )
         }
 
         pub fn impossible() -> Self {
-            Self::new(vec![], 1)
+            Self::new(vec![], 1, false)
         }
 
         pub fn from_weighted_authorizers(
             accounts: Vec<(AccountNumber, u8)>,
             threshold: u8,
+            can_delegate_auth: bool,
         ) -> Self {
             let authorizers = accounts
                 .into_iter()
                 .map(|(account, weight)| WeightedAuthorizer::new(account, weight))
                 .collect();
 
-            Self::new(authorizers, threshold)
+            Self::new(authorizers, threshold, can_delegate_auth)
         }
     }
 }

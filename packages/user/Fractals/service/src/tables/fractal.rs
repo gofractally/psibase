@@ -188,7 +188,7 @@ impl Fractal {
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
-        DynamicAuthPolicy::from_sole_authorizer(self.legislature)
+        DynamicAuthPolicy::from_sole_authorizer(self.legislature, true)
     }
 }
 

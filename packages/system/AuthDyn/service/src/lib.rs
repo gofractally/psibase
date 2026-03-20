@@ -211,17 +211,19 @@ pub mod service {
             return true;
         }
 
-        for weight_authorizer in to_check {
-            let is_auth = is_auth_other(
-                weight_authorizer.account,
-                authorizers.clone(),
-                auth_set.clone(),
-                is_approval,
-            );
-            if is_auth {
-                total_weight_approved += weight_authorizer.weight;
-                if total_weight_approved >= required_weight {
-                    return true;
+        if policy.can_delegate_auth {
+            for weight_authorizer in to_check {
+                let is_auth = is_auth_other(
+                    weight_authorizer.account,
+                    authorizers.clone(),
+                    auth_set.clone(),
+                    is_approval,
+                );
+                if is_auth {
+                    total_weight_approved += weight_authorizer.weight;
+                    if total_weight_approved >= required_weight {
+                        return true;
+                    }
                 }
             }
         }
