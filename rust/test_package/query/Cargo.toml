@@ -12,9 +12,6 @@ publish.workspace = true
 [package.metadata.psibase]
 data = [{ src = "../ui", dst = "/" }]
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 psibase.workspace = true
 psibase_service.workspace = true

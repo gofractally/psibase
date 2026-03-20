@@ -348,7 +348,7 @@ pub async fn build_package(
                 plugin
             ))?
         };
-        data_sources.push((service, paths.pop().unwrap().path.into(), path.to_string()))
+        data_sources.push((service, paths.pop().unwrap().into(), path.to_string()))
     }
 
     let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();

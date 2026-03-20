@@ -14,6 +14,7 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File};
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
@@ -228,13 +229,13 @@ fn process(
     filename: &PathBuf,
     polyfill: Option<&[u8]>,
     exports: &[&str],
-) -> Result<PathBuf, Error> {
-    let output_file = filename.with_extension("polyfilled.wasm");
+    output_file: &Path,
+) -> Result<(), Error> {
     let md = fs::metadata(filename)
         .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
-    if let Ok(md2) = fs::metadata(&output_file) {
+    if let Ok(md2) = fs::metadata(output_file) {
         if md2.modified().unwrap() >= md.modified().unwrap() {
-            return Ok(output_file);
+            return Ok(());
         }
     }
 
@@ -257,10 +258,10 @@ fn process(
     pretty_path("Reoptimizing", filename);
     optimize(&mut dest_module)?;
 
-    write(&output_file, dest_module.emit_wasm())
+    write(output_file, dest_module.emit_wasm())
         .with_context(|| format!("Failed to write {}", filename.display()))?;
 
-    Ok(output_file)
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -273,6 +274,7 @@ struct ArtifactFile {
 struct ArtifactList {
     services: Vec<ArtifactFile>,
     tests: Vec<ArtifactFile>,
+    dep_dirs: HashSet<PathBuf>,
 }
 
 async fn get_files(
@@ -286,6 +288,13 @@ async fn get_files(
                 print!("{}", msg.message.rendered.unwrap());
             }
             Message::CompilerArtifact(artifact) => {
+                for p in &artifact.filenames {
+                    if p.extension() == Some("rmeta") {
+                        if let Some(parent) = p.parent() {
+                            result.dep_dirs.insert(parent.as_std_path().to_path_buf());
+                        }
+                    }
+                }
                 if let Some(idx) = packages
                     .iter()
                     .position(|id| id == &artifact.package_id.repr.as_str())
@@ -298,17 +307,42 @@ async fn get_files(
                             })
                         }
                     } else {
-                        result.services.extend(
-                            artifact
-                                .filenames
-                                .iter()
-                                .filter(|p| p.extension() == Some("wasm"))
-                                .map(|p| ArtifactFile {
+                        for p in &artifact.filenames {
+                            if p.extension() == Some("rlib") {
+                                result.services.push(ArtifactFile {
                                     path: p.clone().into_std_path_buf(),
                                     package_index: idx,
-                                }),
-                        );
+                                })
+                            }
+                        }
                     }
+                }
+            }
+            _ => (),
+        }
+    }
+    Ok(result)
+}
+
+async fn get_wasm_files<F: Fn(&str) -> bool>(
+    filter: F,
+    mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
+) -> Result<Vec<PathBuf>, Error> {
+    let mut result = Vec::new();
+    while let Some(line) = lines.next_line().await? {
+        match serde_json::from_str::<cargo_metadata::Message>(&line)? {
+            Message::CompilerMessage(msg) => {
+                print!("{}", msg.message.rendered.unwrap());
+            }
+            Message::CompilerArtifact(artifact) => {
+                if filter(&artifact.package_id.repr) {
+                    result.extend(
+                        artifact
+                            .filenames
+                            .iter()
+                            .filter(|p| p.extension() == Some("wasm"))
+                            .map(|p| p.clone().into_std_path_buf()),
+                    );
                 }
             }
             _ => (),
@@ -434,15 +468,91 @@ async fn process_from_output(
 
     let mut files = files?;
     for f in &mut files.services {
-        let p = process(&f.path, Some(SERVICE_POLYFILL), SERVICE_EXPORTS)?;
+        let p = build_service(&f.path, &files.dep_dirs).await?;
         f.path = p;
     }
     for f in &mut files.tests {
-        let p = process(&f.path, None, TESTER_EXPORTS)?;
+        let p = f.path.with_extension(".polyfilled.wasm");
+        process(&f.path, None, TESTER_EXPORTS, &p)?;
         f.path = p;
     }
 
     Ok(files)
+}
+
+fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
+    let manifest = root.join("Cargo.toml");
+    let libsrc = root.join("src/lib.rs");
+    write!(
+        &mut File::create(&manifest)?,
+        "{}",
+        include_str!("service/Cargo.toml")
+    )?;
+    std::fs::create_dir(root.join("src"))?;
+    write!(
+        &mut File::create(libsrc)?,
+        "{}",
+        include_str!("service/src/lib.rs")
+    )?;
+    Ok(manifest)
+}
+
+async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBuf, Error> {
+    let tmp_crate = tempfile::tempdir()?;
+
+    let manifest = write_service_crate(tmp_crate.path())?;
+
+    let mut dep = OsString::from("service=");
+    dep.push(lib);
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
+        .arg("rustc")
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .arg("--manifest-path")
+        .arg(manifest)
+        .arg("--crate-type=cdylib")
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .arg("--")
+        .arg("--extern")
+        .arg(dep);
+    for dir in dep_dirs {
+        command.arg("-L");
+        let mut libpath = OsString::from("dependency=");
+        libpath.push(dir);
+        command.arg(libpath);
+    }
+
+    let mut command = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files, _) = tokio::join!(
+        status,
+        get_wasm_files(|_id| true, stdout),
+        print_messages(stderr),
+    );
+
+    let status = status?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    let files = files?;
+    assert!(files.len() == 1);
+    let output_file = lib.with_extension("wasm");
+    process(
+        &files[0],
+        Some(SERVICE_POLYFILL),
+        SERVICE_EXPORTS,
+        &output_file,
+    )?;
+    Ok(output_file)
 }
 
 async fn build(
@@ -501,7 +611,8 @@ async fn build_schema(
 
     let mut files = files?.tests;
     for f in &mut files {
-        let p = process(&f.path, None, TESTER_EXPORTS)?;
+        let p = f.path.with_extension(".polyfilled.wasm");
+        process(&f.path, None, TESTER_EXPORTS, &p)?;
         f.path = p;
     }
 
@@ -545,7 +656,7 @@ async fn build_plugin(
     args: &Args,
     packages: &[&str],
     extra_args: &[&str],
-) -> Result<Vec<ArtifactFile>, Error> {
+) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .arg("component")
         .arg("build")
@@ -563,15 +674,18 @@ async fn build_plugin(
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
     let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
     let status = command.wait();
-    let (status, files, _) =
-        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+    let (status, files, _) = tokio::join!(
+        status,
+        get_wasm_files(|id| packages.contains(&id), stdout),
+        print_messages(stderr),
+    );
 
     let status = status?;
     if !status.success() {
         exit(status.code().unwrap());
     }
 
-    Ok(files?.services)
+    Ok(files?)
 }
 
 async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {

@@ -18,9 +18,6 @@ postinstall = [{ sender = "tpack", service = "tpack", method = "init" }]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 psibase.workspace = true
 psibase_service.workspace = true

@@ -13,9 +13,6 @@ server = "r-staged-tx"
 plugin = "staged-tx-plugin"
 postinstall = [{ sender = "staged-tx", service = "staged-tx", method = "init" }]
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 async-graphql.workspace = true
 psibase.workspace = true
