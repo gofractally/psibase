@@ -39,7 +39,11 @@ export function AppSwitcher() {
     const { data: currentUser } = useCurrentUser();
     const { data: memberships, error } = useGuildMembershipsOfUser(currentUser);
     const fractals = memberships
-        ? memberships.map((membership) => membership.guild.fractal).filter((item, index, arr) => arr.findIndex(i => item.account == i.account))
+        ? memberships
+            .map((membership) => membership.guild.fractal)
+            .filter((item, index, arr) =>
+                arr.findIndex((i) => item.account == i.account) == index,
+            )
         : [];
 
     console.log({ fractals, error });
