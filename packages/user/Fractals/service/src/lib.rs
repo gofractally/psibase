@@ -20,7 +20,7 @@ pub mod constants {
 
     pub const MAX_GUILD_INVITES_PER_MEMBER: u8 = 5;
     pub const TOKEN_PRECISION: u8 = 4;
-    pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
+    pub const REWARD_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
     pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
     pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
     pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
@@ -61,12 +61,9 @@ pub mod constants {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::{
-        fractal_member::MemberStatus,
-        tables::{
-            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildInvite,
-            GuildMember, RewardConsensus,
-        },
+    use crate::tables::tables::{
+        EvaluationInstance, Fractal, Guild, GuildApplication, GuildExile, GuildInvite, GuildMember,
+        RewardConsensus,
     };
 
     use psibase::*;
@@ -100,7 +97,6 @@ pub mod service {
 
         Fractal::add(fractal_account, name, mission, guild_account);
 
-        FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
         Guild::add(
             fractal_account,
             guild_account,
@@ -270,35 +266,6 @@ pub mod service {
         fractal.set_token_threshold(threshold);
     }
 
-    /// Allows a user to join a fractal and immediately become a visa holder.
-    ///
-    /// Cannot be called by a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal to join.
-    #[action]
-    fn join(fractal: AccountNumber) {
-        let sender = get_sender();
-
-        check_none(
-            account_policy(sender),
-            "managed accounts cannot join a fractal",
-        );
-
-        // Give founding members (members joined prior to live token) immediate citizenship
-        // otherwise visa.
-        let is_live_token = RewardConsensus::get(fractal).is_some();
-        let member_status = if is_live_token {
-            MemberStatus::Visa
-        } else {
-            MemberStatus::Citizen
-        };
-
-        FractalMember::add(fractal, sender, member_status);
-
-        Wrapper::emit().history().joined_fractal(fractal, sender);
-    }
-
     /// Sets the schedule for an evaluation type within a fractal.
     ///
     /// # Arguments
@@ -426,10 +393,7 @@ pub mod service {
         rep_role: AccountNumber,
     ) {
         let sender = get_sender();
-        check(
-            FractalMember::get_assert(fractal, sender).is_citizen(),
-            "must be a citizen to create a guild",
-        );
+
         Guild::add(
             fractal,
             guild_account,
@@ -494,17 +458,28 @@ pub mod service {
         GuildApplication::get_assert(guild_account, get_sender()).set_extra_info(extra_info);
     }
 
-    /// Exile a fractal member.
+    /// Exile a guild member.
     ///
-    /// Must be called by judiciary.  
+    /// Must be called by the guild.  
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `member` - The fractal member to be exiled.
+    /// * `account` - Account to be exiled
+    /// * `duration_seconds` - Duration of exile in seconds.    
     #[action]
-    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
-        Fractal::get_assert(fractal).check_sender_is_judiciary();
-        FractalMember::get_assert(fractal, member).exile();
+    fn exile_member(account: AccountNumber, duration_seconds: u32) {
+        Guild::by_sender().exile_member(account, duration_seconds)
+    }
+
+    /// Revoke guild exile.
+    ///
+    /// Must be called by the guild if prior to expiry.  
+    ///
+    /// # Arguments
+    /// * `guild` - The guild the member was exiled from.
+    /// * `account` - The exiled account.
+    #[action]
+    fn revoke_exile(guild: AccountNumber, account: AccountNumber) {
+        GuildExile::get_assert(guild, account).revoke()
     }
 
     /// Set ranked guild slots.

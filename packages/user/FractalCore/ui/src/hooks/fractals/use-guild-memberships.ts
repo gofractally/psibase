@@ -5,7 +5,7 @@ import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
 
 import { useFractalAccount } from "./use-fractal-account";
 
-export const useGuildMembershipsOfUser = (user: OptionalAccount) => {
+export const useGuildMemberships = (user: OptionalAccount) => {
     const fractal = useFractalAccount();
     return useQuery({
         queryKey: QueryKey.guildMemberships(user),

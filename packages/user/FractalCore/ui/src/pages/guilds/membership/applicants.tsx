@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
-import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
+import { useGuildMemberships } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { EmptyBlock } from "@shared/components/empty-block";
@@ -32,7 +32,7 @@ export const GuildApplicants = () => {
     const guildAccount = useGuildAccount();
     const { data: applications } = useGuildApplications(guildAccount);
     const { data: memberships, isPending } =
-        useGuildMembershipsOfUser(currentUser);
+        useGuildMemberships(currentUser);
 
     const isGuildMember = memberships?.some(
         (membership) => membership.guild.account == guildAccount,

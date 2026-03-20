@@ -5,9 +5,7 @@ import {
     useCreateFractal,
     zParams as zCreateFractalSchema,
 } from "@/hooks/fractals/use-create-fractal";
-import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { isAccountAvailable } from "@/hooks/use-account-status";
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import {
@@ -16,6 +14,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
+import { queryClient } from "@/queryClient";
+import QueryKey from "@/lib/queryKeys";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const CreateFractalModal = ({
     show,
@@ -26,8 +27,7 @@ export const CreateFractalModal = ({
 }) => {
     const { mutateAsync: createFractal } = useCreateFractal();
 
-    const { data: currentUser } = useCurrentUser();
-    const { refetch } = useMemberships(currentUser);
+    const { data: currentUser } = useCurrentUser()
 
     const navigate = useNavigate();
 
@@ -42,7 +42,7 @@ export const CreateFractalModal = ({
             await createFractal(data.value);
             openChange(false);
             navigate(`/fractal/${data.value.fractalAccount}`);
-            refetch();
+            queryClient.invalidateQueries({ queryKey: QueryKey.memberships(currentUser) })
         },
         validators: {
             onChange: zCreateFractalSchema,

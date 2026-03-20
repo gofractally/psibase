@@ -7,7 +7,7 @@ use crate::constants::{DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
 use crate::helpers::fib::EXTERNAL_S;
 use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
-    Fractal, FractalMember, Guild, GuildMember, RewardConsensus, RewardConsensusTable, RewardStream,
+    Fractal, Guild, GuildMember, RewardConsensus, RewardConsensusTable, RewardStream,
 };
 
 use psibase::services::tokens::Quantity;
@@ -84,6 +84,9 @@ impl RewardConsensus {
 
     pub fn distribute_tokens(&mut self) {
         let claimed = self.reward_stream().withdraw();
+        if claimed.value == 0 {
+            return;
+        }
         // The first few indices of the fibonacci function have higher error than indices later in the curve,
         // so we offset the input to incur reduced error.
         const FIB_SCALE: u32 = EXTERNAL_S as u32;
@@ -91,6 +94,7 @@ impl RewardConsensus {
         const OFFSET: u32 = MAX_FIB - MAX_RANKED_GUILDS as u32;
 
         let mut tokens_to_recycle = 0_u64;
+        let token_id = self.reward_stream().token_id;
 
         let ranked_guild_slots = to_fixed_vec(
             self.ranked_guilds.clone(),
@@ -122,8 +126,8 @@ impl RewardConsensus {
                     tokens_to_recycle += member_dust;
 
                     for (membership, reward) in member_distributions {
-                        FractalMember::get_assert(self.fractal, membership.member)
-                            .deposit_stream(reward.into(), "Guild member reward".into());
+                        RewardStream::get_assert(membership.member, token_id)
+                            .deposit(reward.into(), "Guild member reward".into());
                     }
                 }
                 None => tokens_to_recycle += slot_distribution,
@@ -169,13 +173,13 @@ impl RewardConsensus {
     }
 
     fn reward_stream(&self) -> RewardStream {
-        RewardStream::get_assert(self.reward_stream_id)
+        RewardStream::get_by_stream_id(self.reward_stream_id).unwrap()
     }
 }
 
 #[ComplexObject]
 impl RewardConsensus {
     pub async fn stream(&self) -> RewardStream {
-        RewardStream::get_assert(self.reward_stream_id)
+        RewardStream::get_by_stream_id(self.reward_stream_id).unwrap()
     }
 }

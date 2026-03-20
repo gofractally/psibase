@@ -118,13 +118,27 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Exile a fractal member.
+    /// Exile a guild member.
+    ///
+    /// Must be called by the guild.  
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `member` - The fractal member to be exiled.
+    /// * `account` - Account to be exiled
+    /// * `duration_seconds` - Duration of exile in seconds.    
     #[action]
-    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
+    fn exile_member(account: AccountNumber, duration_seconds: u32) {
+        unimplemented!()
+    }
+
+    /// Revoke guild exile.
+    ///
+    /// Must be called by the guild if prior to expiry.  
+    ///
+    /// # Arguments
+    /// * `guild` - The guild the member was exiled from.
+    /// * `account` - The exiled account.
+    #[action]
+    fn revoke_exile(guild: AccountNumber, account: AccountNumber) {
         unimplemented!()
     }
 

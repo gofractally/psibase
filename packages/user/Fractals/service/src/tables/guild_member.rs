@@ -5,8 +5,8 @@ use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE
 use crate::helpers::RollingBits16;
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
-    Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, GuildMember,
-    GuildMemberTable,
+    Fractal, Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, GuildMember,
+    GuildMemberTable, RewardStream,
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
@@ -28,6 +28,10 @@ impl GuildMember {
 
     pub fn add(guild: AccountNumber, member: AccountNumber) -> Self {
         check_none(Self::get(guild, member), "guild member already exists");
+        let current_token_id = Fractal::get_assert(Guild::get_assert(guild).fractal).token_id;
+        // If this is the first guild they've joined under the current fractal, create a token stream for it.
+        RewardStream::get_or_add(member, current_token_id);
+
         let new_instance = Self::new(guild, member);
         new_instance.save();
         new_instance
@@ -119,6 +123,10 @@ impl GuildMember {
         }
         self.is_candidate = active;
         self.save();
+    }
+
+    pub fn remove_by_exile(&self) {
+        self.remove();
     }
 
     fn remove(&self) {

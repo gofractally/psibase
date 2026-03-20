@@ -1,6 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
 
-import { Members } from "@/pages/fractal/members";
 import { ActiveAndUpcoming } from "@/pages/guilds/evaluations/active-and-upcoming";
 import { Completed } from "@/pages/guilds/evaluations/completed";
 
@@ -55,14 +54,6 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <Judicial />
-                    </ProtectedRoute>
-                ),
-            },
-            {
-                path: "/members",
-                element: (
-                    <ProtectedRoute>
-                        <Members />
                     </ProtectedRoute>
                 ),
             },

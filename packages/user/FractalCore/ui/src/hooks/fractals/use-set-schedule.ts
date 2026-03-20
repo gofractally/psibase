@@ -5,13 +5,10 @@ import QueryKey from "@/lib/queryKeys";
 import { zUnix } from "@/lib/zod/Unix";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
-import { assertUser } from "@shared/hooks/use-current-user";
 import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
-
-import { setDefaultMembership } from "./use-membership";
 
 const zParams = z.object({
     guildAccount: zGuildAccount,
@@ -53,7 +50,6 @@ export const useSetSchedule = () =>
         onSuccess: (_, params) => {
             const { fractal, guildAccount } = zParams.parse(params);
 
-            setDefaultMembership(fractal, assertUser());
             queryClient.refetchQueries({
                 queryKey: QueryKey.fractal(fractal),
             });
