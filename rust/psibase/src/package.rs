@@ -1,14 +1,14 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use crate::services::auth_sig;
 use crate::services::{
     accounts, auth_delegate, brotli_svc::brotli_impl, http_server, packages, producers, setcode,
     sites, transact,
 };
 use crate::{
-    new_account_action, reg_server, schema_types, set_auth_service_action, set_code_action,
-    set_key_action, solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey,
-    Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString, Pack,
-    PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
+    reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
+    Action, AnyPublicKey, Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString,
+    Pack, PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -597,14 +597,14 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
+        if sender == producers::ROOT {
+            actions.push(accounts::Wrapper::pack_from(accounts::SERVICE).preapproveAcc(account));
+        }
         if let Some(key) = key {
-            actions.push(new_account_action(accounts::SERVICE, account));
-            actions.push(set_key_action(account, key));
-            actions.push(set_auth_service_action(account, key.auth_service()));
-        } else if sender == producers::ROOT {
-            actions.push(new_account_action(accounts::SERVICE, account));
-            actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
-            actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
+            actions.push(
+                auth_sig::Wrapper::pack_from(sender)
+                    .newAccount(account, key.key.rawData.0.clone().into()),
+            );
         } else {
             actions.push(auth_delegate::Wrapper::pack_from(sender).newAccount(account, sender));
         }

@@ -116,24 +116,9 @@ namespace SystemService
       }
 
       check(to<Accounts>().exists(owner), "owner account does not exist");
-      to<Accounts>().newAccount(name, AuthAny::service, true);
-      Action setOwner{
-          .sender  = name,
-          .service = service,
-          .method  = "setOwner"_m,
-          .rawData = psio::convert_to_frac(std::make_tuple(owner))  //
-      };
 
-      Action setAuth{
-          .sender  = name,
-          .service = Accounts::service,
-          .method  = "setAuthServ"_m,
-          .rawData = psio::convert_to_frac(std::make_tuple(service))  //
-      };
-
-      auto _ = recurse();
-      to<Transact>().runAs(std::move(setOwner), std::vector<ServiceMethod>{});
-      to<Transact>().runAs(std::move(setAuth), std::vector<ServiceMethod>{});
+      table.put(AuthDelegateRecord{.account = name, .owner = owner});
+      to<Accounts>().newAccount(name, AuthDelegate::service, true);
    }
 
 }  // namespace SystemService

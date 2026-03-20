@@ -5,6 +5,7 @@
 #include <psibase/nativeTables.hpp>
 #include <services/system/AuthAny.hpp>
 #include <services/system/Transact.hpp>
+#include "psibase/AccountNumber.hpp"
 
 static constexpr bool enable_print = false;
 
@@ -41,6 +42,18 @@ namespace SystemService
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
+   namespace
+   {
+      std::vector<psibase::AccountNumber> preapprovedAccounts = {};
+   }
+
+   void Accounts::preapproveAcc(AccountNumber name)
+   {
+      check(getSender() == getReceiver(), "unauthorized");
+
+      preapprovedAccounts.push_back(name);
+   }
+
    void Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
    {
       Tables tables{getReceiver()};
@@ -63,7 +76,7 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (getSender() != service)
+      if (getSender() != service && !std::ranges::contains(preapprovedAccounts, name))
       {
          check(!strName.starts_with("x-"),
                "The 'x-' account prefix is reserved for infrastructure providers");
