@@ -2,8 +2,8 @@ import * as React from "react";
 
 import { AppSwitcher } from "@/components/fractal-switcher";
 import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
 
+import { UserSidebarNavFooter } from "@shared/components/user-sidebar-nav-footer";
 import {
     Sidebar,
     SidebarContent,
@@ -22,7 +22,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <NavMain />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser />
+                <UserSidebarNavFooter />
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
