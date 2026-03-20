@@ -627,7 +627,7 @@ async fn build_schema(
 
     let mut files = files?.tests;
     for f in &mut files {
-        let p = f.path.with_extension(".polyfilled.wasm");
+        let p = f.path.with_extension("polyfilled.wasm");
         if f.path.is_newer_than(&p)? {
             process(&f.path, None, TESTER_EXPORTS, &p)?;
         }
