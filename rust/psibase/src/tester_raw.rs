@@ -22,6 +22,9 @@ extern "C" {
     /// Returns a chain handle
     pub fn createChain(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> u32;
 
+    /// Clones a chain. Should only be used for temporary chains.
+    pub fn cloneChain(chain_id: u32) -> u32;
+
     /// Destroy chain
     ///
     /// This destroys the chain and deletes its database from the filesystem.

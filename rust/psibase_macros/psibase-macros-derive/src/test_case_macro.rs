@@ -120,8 +120,8 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
             fn create_chain() -> Result<psibase::Chain, psibase::Error> {
                 use psibase::*;
 
-                let mut chain = psibase::Chain::new();
-                chain.boot_with(&#reg, &[#packages])?;
+                let mut chain = psibase::Chain::test_chain();
+                chain.install(&#reg, &[#packages])?;
 
                 Ok(chain)
             }

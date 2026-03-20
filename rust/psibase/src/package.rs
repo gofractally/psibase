@@ -174,15 +174,7 @@ impl PackageInfo {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct InstalledPackageInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    pub depends: Vec<PackageRef>,
-    pub accounts: Vec<AccountNumber>,
-    pub owner: AccountNumber,
-}
+pub type InstalledPackageInfo = packages::InstalledPackage;
 
 impl InstalledPackageInfo {
     pub fn meta(&self) -> Meta {
