@@ -5,11 +5,7 @@ import { AutoRedirectConfig } from "@psibase/common-lib";
 import { supervisor } from "@shared/lib/supervisor";
 
 export const useConnectAccount = (
-    options: UseMutationOptions<
-        void,
-        Error,
-        AutoRedirectConfig | undefined
-    > = {},
+    options: UseMutationOptions<void, Error, AutoRedirectConfig | void> = {},
 ) =>
     useMutation({
         mutationFn: async (autoRedirectConfig?) => {
@@ -20,7 +16,7 @@ export const useConnectAccount = (
                     method: "connectAccount",
                     params: [],
                 },
-                autoRedirectConfig,
+                autoRedirectConfig ?? undefined,
             );
         },
         ...options,
