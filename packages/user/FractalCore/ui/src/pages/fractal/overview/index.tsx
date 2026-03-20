@@ -12,11 +12,7 @@ import { OverviewCard } from "../overview/components/overview-card";
 export const Overview = () => {
     const fractalAccount = useFractalAccount();
 
-    const {
-        data: fractal,
-        isLoading,
-        error,
-    } = useFractal();
+    const { data: fractal, isLoading, error } = useFractal();
 
     if (error) {
         return <ErrorCard error={error} />;

@@ -2,7 +2,6 @@ import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
 
 import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
 
-
 import { GlowingCard } from "@shared/components/glowing-card";
 import { CardContent, CardHeader } from "@shared/shadcn/ui/card";
 
@@ -13,8 +12,6 @@ export const OverviewCard = ({
     fractal?: FractalRes;
     fractalAccount?: string;
 }) => {
-
-
     return (
         <GlowingCard>
             <CardHeader className="flex items-center justify-between gap-2">
@@ -31,7 +28,6 @@ export const OverviewCard = ({
                     {fractal?.fractal?.mission ?? "No mission available"}
                 </p>
             </CardContent>
-
         </GlowingCard>
     );
 };
