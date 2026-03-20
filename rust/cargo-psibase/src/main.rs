@@ -225,20 +225,31 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     Ok(())
 }
 
+trait MTime {
+    fn is_newer_than<T: AsRef<Path>>(&self, other: T) -> Result<bool, Error>;
+}
+
+impl<T: AsRef<Path>> MTime for T {
+    fn is_newer_than<U: AsRef<Path>>(&self, other: U) -> Result<bool, Error> {
+        let filename = self.as_ref();
+
+        let md = fs::metadata(filename)
+            .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
+        if let Ok(md2) = fs::metadata(other.as_ref()) {
+            if md2.modified().unwrap() >= md.modified().unwrap() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+}
+
 fn process(
     filename: &PathBuf,
     polyfill: Option<&[u8]>,
     exports: &[&str],
     output_file: &Path,
 ) -> Result<(), Error> {
-    let md = fs::metadata(filename)
-        .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
-    if let Ok(md2) = fs::metadata(output_file) {
-        if md2.modified().unwrap() >= md.modified().unwrap() {
-            return Ok(());
-        }
-    }
-
     let code = &read(filename).with_context(|| format!("Failed to read {}", filename.display()))?;
 
     let debug_build = false;
@@ -473,7 +484,9 @@ async fn process_from_output(
     }
     for f in &mut files.tests {
         let p = f.path.with_extension(".polyfilled.wasm");
-        process(&f.path, None, TESTER_EXPORTS, &p)?;
+        if f.path.is_newer_than(&p)? {
+            process(&f.path, None, TESTER_EXPORTS, &p)?;
+        }
         f.path = p;
     }
 
@@ -498,6 +511,10 @@ fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
 }
 
 async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBuf, Error> {
+    let output_file = lib.with_extension("wasm");
+    if !lib.is_newer_than(&output_file)? {
+        return Ok(output_file);
+    }
     let tmp_crate = tempfile::tempdir()?;
 
     let manifest = write_service_crate(tmp_crate.path())?;
@@ -545,7 +562,6 @@ async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBu
 
     let files = files?;
     assert!(files.len() == 1);
-    let output_file = lib.with_extension("wasm");
     process(
         &files[0],
         Some(SERVICE_POLYFILL),
@@ -612,7 +628,9 @@ async fn build_schema(
     let mut files = files?.tests;
     for f in &mut files {
         let p = f.path.with_extension(".polyfilled.wasm");
-        process(&f.path, None, TESTER_EXPORTS, &p)?;
+        if f.path.is_newer_than(&p)? {
+            process(&f.path, None, TESTER_EXPORTS, &p)?;
+        }
         f.path = p;
     }
 
