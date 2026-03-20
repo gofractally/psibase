@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-
 import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
 
@@ -43,7 +42,7 @@ export const getGuildMemberships = async (member: Account) => {
             }
         }
     `,
-        { service: 'fractals' },
+        { service: "fractals" },
     );
 
     return DataSchema.parse(res).guildMemberships.nodes;

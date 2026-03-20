@@ -1,4 +1,5 @@
 import type { FractalRes } from "@/lib/graphql/fractals/getFractal";
+
 import { siblingUrl } from "@psibase/common-lib";
 
 import { ErrorCard } from "@/components/error-card";
@@ -26,19 +27,15 @@ export const MyMembership = () => {
         error: errorFractal,
     } = useFractal(fractalAccount);
 
-
     const {
         data: chainId,
         isLoading: isLoadingChainId,
         error: errorChainId,
     } = useChainId();
 
-    const isLoading =
-        isLoadingFractal ||
-        isLoadingChainId;
+    const isLoading = isLoadingFractal || isLoadingChainId;
 
-    const error =
-        errorFractal || errorChainId;
+    const error = errorFractal || errorChainId;
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -133,4 +130,3 @@ const FractalOverviewCard = ({
         </Card>
     );
 };
-

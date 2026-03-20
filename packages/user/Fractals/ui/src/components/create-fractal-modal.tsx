@@ -1,3 +1,4 @@
+import { queryClient } from "@/queryClient";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -6,6 +7,8 @@ import {
     zParams as zCreateFractalSchema,
 } from "@/hooks/fractals/use-create-fractal";
 import { isAccountAvailable } from "@/hooks/use-account-status";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import QueryKey from "@/lib/queryKeys";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import {
@@ -14,9 +17,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { queryClient } from "@/queryClient";
-import QueryKey from "@/lib/queryKeys";
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const CreateFractalModal = ({
     show,
@@ -27,14 +27,14 @@ export const CreateFractalModal = ({
 }) => {
     const { mutateAsync: createFractal } = useCreateFractal();
 
-    const { data: currentUser } = useCurrentUser()
+    const { data: currentUser } = useCurrentUser();
 
     const navigate = useNavigate();
 
     const form = useAppForm({
         defaultValues: {
             fractalAccount: "",
-            guildAccount: '',
+            guildAccount: "",
             mission: "",
             name: "",
         },
@@ -42,7 +42,9 @@ export const CreateFractalModal = ({
             await createFractal(data.value);
             openChange(false);
             navigate(`/fractal/${data.value.fractalAccount}`);
-            queryClient.invalidateQueries({ queryKey: QueryKey.memberships(currentUser) })
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.memberships(currentUser),
+            });
         },
         validators: {
             onChange: zCreateFractalSchema,
@@ -126,7 +128,6 @@ export const CreateFractalModal = ({
                                 />
                             )}
                         />
-
 
                         <form.AppForm>
                             <form.SubmitButton
