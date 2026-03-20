@@ -186,17 +186,6 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Allows a user to join a fractal and immediately become a citizen.
-    ///
-    /// Cannot be called by a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal to join.
-    #[action]
-    fn join(fractal: AccountNumber) {
-        unimplemented!()
-    }
-
     /// Sets the schedule for an evaluation type within a fractal.
     ///
     /// # Arguments
