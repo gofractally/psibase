@@ -9,7 +9,6 @@ export type OptionalAccount = Account | undefined | null;
 export type OptionalNumber = number | undefined | null;
 
 const QueryKey = {
-    connectedAccounts: () => ["connectedAccounts"] as const,
     createFractal: () => ["createFractal"] as const,
     currentUser: () => ["currentUser"] as const,
     fractal: (account: OptionalAccount) => ["fractal", account] as const,
@@ -18,7 +17,6 @@ const QueryKey = {
     membership: (fractal: OptionalAccount, user: OptionalAccount) =>
         ["membership", fractal, user] as const,
     memberships: (user: OptionalAccount) => ["memberships", user] as const,
-    selectAccount: () => ["selectAccount"] as const,
     userAccount: (account: string | undefined) => ["userAccount", account],
 } as const satisfies Record<string, QueryKeyGenerator>;
 
