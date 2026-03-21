@@ -32,7 +32,7 @@ use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::{BufReader, Read, Seek};
+use std::io::{self, BufReader, Read, Seek, Write};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -336,6 +336,10 @@ struct InstallArgs {
     /// Instead of installing to the chain, install local packages to a single node
     #[clap(long)]
     local: bool,
+
+    /// Automatically accept install confirmation
+    #[clap(short = 'y', long)]
+    yes: bool,
 
     /// Configure compression level to use for uploaded files
     /// (1=fastest, 11=most compression)
@@ -1762,6 +1766,43 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         .resolve_changes(&package_registry, &packages, args.reinstall, args.local)
         .await?;
 
+    if to_install.is_empty() {
+        println!("Nothing to install.");
+        return Ok(());
+    }
+
+    let summary: Vec<String> = to_install
+        .iter()
+        .map(|op| match op {
+            PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
+            PackageOp::Replace(old, new) => {
+                if old.version == new.version {
+                    format!("Reinstall {} {}", old.name, old.version)
+                } else {
+                    format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
+                }
+            }
+            PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
+        })
+        .collect();
+
+    if !args.yes {
+        println!("The following changes will be applied:");
+        for line in &summary {
+            println!("  {}", line);
+        }
+        println!("Proceed? [y/N]");
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let trimmed = input.trim().to_ascii_lowercase();
+        if trimmed != "y" && trimmed != "yes" {
+            println!("Install aborted.");
+            return Ok(());
+        }
+    }
+
     if args.local {
         do_install_local(
             client,
@@ -1771,7 +1812,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.node_args,
             args.compression_level,
         )
-        .await
+        .await?;
     } else {
         do_install(
             client,
@@ -1784,8 +1825,10 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.key,
             args.compression_level,
         )
-        .await
+        .await?;
     }
+    println!("Install complete.");
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1720,12 +1720,20 @@ fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyho
     for package in packages {
         match package {
             PackageOp::Install(info) | PackageOp::Replace(_, info) => {
-                if info.is_local() == Some(!local) {
-                    Err(anyhow!(
-                        "{} is{} a local package",
-                        &info.name,
-                        if local { " not" } else { "" }
-                    ))?
+                match (info.is_local(), local) {
+                    (Some(true), false) => {
+                        Err(anyhow!(
+                            "The package you are installing, or one of its dependencies ({}), is a local package. Local packages must be installed with the `--local` flag.",
+                            &info.name
+                        ))?
+                    }
+                    (Some(false), true) => {
+                        Err(anyhow!(
+                            "The package you are installing, or one of its dependencies ({}), is not a local package. Remove the `--local` flag to install this package.",
+                            &info.name
+                        ))?
+                    }
+                    _ => {}
                 }
             }
             PackageOp::Remove(_) => {}
