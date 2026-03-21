@@ -1,9 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use crate::services::auth_sig;
 use crate::services::{
-    accounts, auth_delegate, brotli_svc::brotli_impl, http_server, packages, producers, setcode,
-    sites, transact,
+    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers,
+    setcode, sites, transact, verify_sig,
 };
 use crate::{
     reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
@@ -54,6 +53,7 @@ custom_error! {
     UnknownAction{service: AccountNumber, method: MethodNumber} = "{service} does not have an action called {method}",
     MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
     InvalidPackageSource = "Invalid package source",
+    InvalidVerifyService = "Invalid verify service",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -601,6 +601,9 @@ impl<R: Read + Seek> PackagedService<R> {
             actions.push(accounts::Wrapper::pack_from(accounts::SERVICE).preapproveAcc(account));
         }
         if let Some(key) = key {
+            if key.key.service != verify_sig::SERVICE {
+                return Err(Error::InvalidVerifyService)?;
+            }
             actions.push(
                 auth_sig::Wrapper::pack_from(sender)
                     .newAccount(account, key.key.rawData.0.clone().into()),
