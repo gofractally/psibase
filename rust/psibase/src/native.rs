@@ -180,6 +180,9 @@ impl KvHandle {
     pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe { psibase_proxy_kv_open(db, prefix.as_ptr(), prefix.len() as u32, mode) })
     }
+    pub unsafe fn from_raw(handle: native_raw::KvHandle) -> KvHandle {
+        KvHandle(handle)
+    }
     pub fn subtree(&self, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe {
             native_raw::kvOpenAt(self.0, prefix.as_ptr(), prefix.len() as u32, mode)
