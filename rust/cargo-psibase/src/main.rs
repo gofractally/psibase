@@ -508,8 +508,7 @@ impl AsyncJobServer {
     }
 }
 
-async fn process_from_output(
-    args: &Args,
+async fn wait_for_child(
     mut command: tokio::process::Child,
     packages: &[&str],
 ) -> Result<ArtifactList, Error> {
@@ -524,21 +523,7 @@ async fn process_from_output(
         exit(status.code().unwrap());
     }
 
-    let mut files = files?;
-    for f in &mut files.services {
-        let output_file = f.path.with_extension("wasm");
-        build_service(args, &f.path, &output_file, &files.dep_dirs).await?;
-        f.path = output_file;
-    }
-    for f in &mut files.tests {
-        let p = f.path.with_extension("polyfilled.wasm");
-        if f.path.is_newer_than(&p)? {
-            process(&f.path, None, TESTER_EXPORTS, &p)?;
-        }
-        f.path = p;
-    }
-
-    Ok(files)
+    files
 }
 
 fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
@@ -673,7 +658,14 @@ async fn build(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    Ok(process_from_output(args, command, packages).await?.services)
+    let mut files = wait_for_child(command, packages).await?;
+    for f in &mut files.services {
+        let output_file = f.path.with_extension("wasm");
+        build_service(args, &f.path, &output_file, &files.dep_dirs).await?;
+        f.path = output_file;
+    }
+
+    Ok(files.services)
 }
 
 async fn build_plugin(
@@ -930,13 +922,19 @@ async fn test(
         command.args(["-p", name.as_str()]);
     }
 
-    let tests = process_from_output(args, command.spawn()?, &packages)
-        .await?
-        .tests;
+    let mut files = wait_for_child(command.spawn()?, &packages).await?;
+
+    for f in &mut files.tests {
+        let p = f.path.with_extension("polyfilled.wasm");
+        if f.path.is_newer_than(&p)? {
+            process(&f.path, None, TESTER_EXPORTS, &p)?;
+        }
+        f.path = p;
+    }
 
     let mut running = FuturesUnordered::new();
 
-    for test in tests {
+    for test in files.tests {
         let fut = core::pin::pin!(jobs.acquire());
         let mut acquiring = running.by_ref().chain(pending()).take_until(fut);
         while let Some(res) = acquiring.next().await {
