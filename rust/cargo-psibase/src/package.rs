@@ -362,16 +362,13 @@ pub async fn build_package(
                 package.name
             ))?
         };
-        //let schema = build_schema(args, &[&id], &["-p", &service]).await?;
-        let service_path = paths.pop().unwrap().path;
-        // TODO: return this from build
-        let schema_path = service_path.with_extension("schema.json");
+        let paths = paths.pop().unwrap();
         let schema: Schema =
-            serde_json::from_str(&std::io::read_to_string(File::open(schema_path)?)?)?;
+            serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
         crate_to_account.insert(&package.name, schema.service.clone());
         let service = schema.service.clone();
         info.schema = Some(schema);
-        service_wasms.push((service, info, service_path));
+        service_wasms.push((service, info, paths.service));
         accounts.push(service);
     }
 

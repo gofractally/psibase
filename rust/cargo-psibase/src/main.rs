@@ -593,9 +593,9 @@ async fn build_service(
     args: &Args,
     lib: &Path,
     output_file: &Path,
+    schema_file: &Path,
     dep_dirs: &HashSet<PathBuf>,
 ) -> Result<(), Error> {
-    let schema_file = output_file.with_extension("schema.json");
     if !lib.is_newer_than((output_file, &schema_file))? {
         return Ok(());
     }
@@ -638,12 +638,18 @@ async fn build_service(
     Ok(())
 }
 
+struct ServiceArtifacts {
+    service: PathBuf,
+    schema: PathBuf,
+    _package_index: usize,
+}
+
 async fn build(
     args: &Args,
     packages: &[&Package],
     envs: Vec<(&str, &str)>,
     extra_args: &[&str],
-) -> Result<Vec<ArtifactFile>, Error> {
+) -> Result<Vec<ServiceArtifacts>, Error> {
     let command = tokio::process::Command::new(get_cargo())
         .envs(envs)
         .arg("build")
@@ -658,14 +664,20 @@ async fn build(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let mut files = wait_for_child(command, packages).await?;
-    for f in &mut files.services {
-        let output_file = f.path.with_extension("wasm");
-        build_service(args, &f.path, &output_file, &files.dep_dirs).await?;
-        f.path = output_file;
+    let files = wait_for_child(command, packages).await?;
+    let mut result = Vec::new();
+    for f in &files.services {
+        let service = f.path.with_extension("wasm");
+        let schema = service.with_extension("schema.json");
+        build_service(args, &f.path, &service, &schema, &files.dep_dirs).await?;
+        result.push(ServiceArtifacts {
+            service,
+            schema,
+            _package_index: f.package_index,
+        });
     }
 
-    Ok(files.services)
+    Ok(result)
 }
 
 async fn build_plugin(
