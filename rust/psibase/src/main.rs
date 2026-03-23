@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
-use dialoguer::Confirm;
+use dialoguer::{console::Term, Confirm};
 use flate2::write::GzEncoder;
 use fracpack::Pack;
 use futures::{
@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::{BufReader, IsTerminal, Read, Seek};
+use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -1789,12 +1789,12 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     }
 
     if !args.yes {
-        let can_prompt = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
-        if can_prompt {
+        let term = Term::stderr();
+        if term.is_term() {
             let proceed = Confirm::new()
                 .with_prompt("Proceed?")
                 .default(true)
-                .interact()?;
+                .interact_on(&term)?;
             if !proceed {
                 println!("Install aborted.");
                 return Ok(());
