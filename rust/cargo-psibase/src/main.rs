@@ -774,7 +774,7 @@ fn is_normal_dependency(dep: &NodeDep) -> bool {
 
 struct PackageSet<'a> {
     packages: Vec<&'a PackageId>,
-    visited: HashSet<&'a PackageId>,
+    visited: HashMap<&'a PackageId, usize>,
     metadata: &'a MetadataIndex<'a>,
 }
 
@@ -782,7 +782,7 @@ impl<'a> PackageSet<'a> {
     fn new(metadata: &'a MetadataIndex) -> Self {
         PackageSet {
             packages: Vec::new(),
-            visited: HashSet::new(),
+            visited: HashMap::new(),
             metadata,
         }
     }
@@ -790,7 +790,8 @@ impl<'a> PackageSet<'a> {
         if package::get_metadata(self.metadata.packages.get(id.repr.as_str()).unwrap())?
             .is_package()
         {
-            if self.visited.insert(id) {
+            if !self.visited.contains_key(id) {
+                self.visited.insert(id, self.packages.len());
                 self.packages.push(id);
                 return Ok(true);
             }
@@ -832,9 +833,7 @@ impl<'a> PackageSet<'a> {
 
         let mut index = Vec::new();
 
-        for p in &self.packages {
-            index.push(build_package(args, self.metadata, &p).await?);
-        }
+        index.extend(build_packages(args, self.metadata, &self.packages).await?);
         Ok(index)
     }
 }
@@ -886,19 +885,20 @@ async fn test(
         |p| p.as_path(),
     );
     let out_dir = target_dir.join("wasm32-wasip1/release/packages");
-    let mut built: HashMap<&PackageId, PackageInfo> = HashMap::new();
     let mut test_info = Vec::new();
     pretty("Packages", "building dependencies...");
+    let mut all_dependencies = PackageSet::new(metadata);
+    for (_, deps) in &test_packages {
+        for package in &deps.packages {
+            all_dependencies.try_insert(*package).unwrap();
+        }
+    }
+    let info = all_dependencies.build(args).await?;
+
     for (package, deps) in test_packages {
         let mut index = Vec::new();
         for p in &deps.packages {
-            if let Some(found) = built.get(p) {
-                index.push(found.clone());
-            } else {
-                let info = build_package(args, metadata, &p).await?;
-                built.insert(p, info.clone());
-                index.push(info);
-            }
+            index.push(info[all_dependencies.visited[*p]].clone());
         }
 
         // Write a package index specific to the crate
