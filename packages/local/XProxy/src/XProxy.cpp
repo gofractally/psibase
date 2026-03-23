@@ -45,15 +45,16 @@ namespace
       if (suffix.empty())
          return std::string(base);
       auto result = std::string(base);
-      constexpr std::string_view slash{"/"};
-      const bool baseEndsWithSlash = !result.empty() && result.ends_with(slash);
-      const bool suffixStartsWithSlash = suffix.starts_with(slash);
+
+      const bool baseEndsWithSlash     = base.ends_with('/');
+      const bool suffixStartsWithSlash = suffix.starts_with('/');
 
       if (baseEndsWithSlash && suffixStartsWithSlash)
          result.pop_back();
       else if (!baseEndsWithSlash && !suffixStartsWithSlash)
          result.push_back('/');
       result.append(suffix.begin(), suffix.end());
+
       return result;
    }
 }  // namespace
