@@ -18,6 +18,7 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
+use std::time::SystemTime;
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
 use walrus::{ExportItem, Module};
@@ -226,21 +227,58 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
 }
 
 trait MTime {
-    fn is_newer_than<T: AsRef<Path>>(&self, other: T) -> Result<bool, Error>;
-}
-
-impl<T: AsRef<Path>> MTime for T {
-    fn is_newer_than<U: AsRef<Path>>(&self, other: U) -> Result<bool, Error> {
-        let filename = self.as_ref();
-
-        let md = fs::metadata(filename)
-            .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
-        if let Ok(md2) = fs::metadata(other.as_ref()) {
-            if md2.modified().unwrap() >= md.modified().unwrap() {
+    fn oldest_mtime(&self) -> Result<SystemTime, Error> {
+        self.newest_mtime()
+    }
+    fn newest_mtime(&self) -> Result<SystemTime, Error>;
+    fn is_newer_than<T: MTime>(&self, other: T) -> Result<bool, Error> {
+        if let Ok(md2) = other.newest_mtime() {
+            if md2 >= self.oldest_mtime()? {
                 return Ok(false);
             }
         }
         Ok(true)
+    }
+}
+
+impl MTime for Path {
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        let md = fs::metadata(self)
+            .with_context(|| format!("Failed to get metadata for {}", self.display()))?;
+        Ok(md
+            .modified()
+            .with_context(|| format!("Failed to read mtime for {}", self.display()))?)
+    }
+}
+
+impl MTime for PathBuf {
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        self.as_path().newest_mtime()
+    }
+}
+
+impl<T: MTime> MTime for &T {
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        (*self).newest_mtime()
+    }
+}
+
+impl<T: MTime, const N: usize> MTime for [T; N] {
+    fn oldest_mtime(&self) -> Result<SystemTime, Error> {
+        let mut iter = self.iter();
+        let mut result = iter.next().unwrap().oldest_mtime()?;
+        for x in iter {
+            result = result.min(x.oldest_mtime()?)
+        }
+        Ok(result)
+    }
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        let mut iter = self.iter();
+        let mut result = iter.next().unwrap().newest_mtime()?;
+        for x in iter {
+            result = result.max(x.newest_mtime()?)
+        }
+        Ok(result)
     }
 }
 
@@ -463,6 +501,7 @@ impl AsyncJobServer {
 }
 
 async fn process_from_output(
+    args: &Args,
     mut command: tokio::process::Child,
     packages: &[&str],
 ) -> Result<ArtifactList, Error> {
@@ -479,11 +518,11 @@ async fn process_from_output(
 
     let mut files = files?;
     for f in &mut files.services {
-        let p = build_service(&f.path, &files.dep_dirs).await?;
+        let p = build_service(args, &f.path, &files.dep_dirs).await?;
         f.path = p;
     }
     for f in &mut files.tests {
-        let p = f.path.with_extension(".polyfilled.wasm");
+        let p = f.path.with_extension("polyfilled.wasm");
         if f.path.is_newer_than(&p)? {
             process(&f.path, None, TESTER_EXPORTS, &p)?;
         }
@@ -496,6 +535,7 @@ async fn process_from_output(
 fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
     let manifest = root.join("Cargo.toml");
     let libsrc = root.join("src/lib.rs");
+    let exesrc = root.join("src/main.rs");
     write!(
         &mut File::create(&manifest)?,
         "{}",
@@ -507,20 +547,19 @@ fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
         "{}",
         include_str!("service/src/lib.rs")
     )?;
+    write!(
+        &mut File::create(exesrc)?,
+        "{}",
+        include_str!("service/src/main.rs")
+    )?;
     Ok(manifest)
 }
 
-async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBuf, Error> {
-    let output_file = lib.with_extension("wasm");
-    if !lib.is_newer_than(&output_file)? {
-        return Ok(output_file);
-    }
-    let tmp_crate = tempfile::tempdir()?;
-
-    let manifest = write_service_crate(tmp_crate.path())?;
-
-    let mut dep = OsString::from("service=");
-    dep.push(lib);
+async fn build_service_impl(
+    manifest: &Path,
+    target: &str,
+    rustc_args: &[OsString],
+) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
     command
         .arg("rustc")
@@ -528,18 +567,11 @@ async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBu
         .arg("--target=wasm32-wasip1")
         .arg("--manifest-path")
         .arg(manifest)
-        .arg("--crate-type=cdylib")
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
+        .arg(target)
         .arg("--")
-        .arg("--extern")
-        .arg(dep);
-    for dir in dep_dirs {
-        command.arg("-L");
-        let mut libpath = OsString::from("dependency=");
-        libpath.push(dir);
-        command.arg(libpath);
-    }
+        .args(rustc_args);
 
     let mut command = command
         .stdout(Stdio::piped())
@@ -560,7 +592,35 @@ async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBu
         exit(status.code().unwrap());
     }
 
-    let files = files?;
+    files
+}
+
+async fn build_service(
+    args: &Args,
+    lib: &Path,
+    dep_dirs: &HashSet<PathBuf>,
+) -> Result<PathBuf, Error> {
+    let output_file = lib.with_extension("wasm");
+    let schema_file = output_file.with_extension("schema.json");
+    if !lib.is_newer_than([&output_file, &schema_file])? {
+        return Ok(output_file);
+    }
+    let tmp_crate = tempfile::tempdir()?;
+
+    let manifest = write_service_crate(tmp_crate.path())?;
+
+    let mut rustc_args = Vec::new();
+    rustc_args.push("--extern".into());
+    let mut dep = OsString::from("service=");
+    dep.push(lib);
+    rustc_args.push(dep);
+    for dir in dep_dirs {
+        rustc_args.push("-L".into());
+        let mut libpath = OsString::from("dependency=");
+        libpath.push(dir);
+        rustc_args.push(libpath);
+    }
+    let files = build_service_impl(&manifest, "--lib", &rustc_args).await?;
     assert!(files.len() == 1);
     process(
         &files[0],
@@ -568,6 +628,19 @@ async fn build_service(lib: &Path, dep_dirs: &HashSet<PathBuf>) -> Result<PathBu
         SERVICE_EXPORTS,
         &output_file,
     )?;
+    let schema_gen = build_service_impl(&manifest, "--bins", &rustc_args).await?;
+    assert!(schema_gen.len() == 1);
+    process(&schema_gen[0], None, TESTER_EXPORTS, &schema_gen[0])?;
+
+    let status = tokio::process::Command::new(&args.psitest)
+        .arg(&schema_gen[0])
+        .stdout(File::create(&schema_file)?)
+        .status()
+        .await?;
+
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
     Ok(output_file)
 }
 
@@ -591,7 +664,7 @@ async fn build(
         .stderr(Stdio::piped())
         .spawn()?;
 
-    Ok(process_from_output(command, packages).await?.services)
+    Ok(process_from_output(args, command, packages).await?.services)
 }
 
 async fn build_schema(
@@ -924,7 +997,7 @@ async fn test(
         command.args(["-p", name.as_str()]);
     }
 
-    let tests = process_from_output(command.spawn()?, &packages)
+    let tests = process_from_output(args, command.spawn()?, &packages)
         .await?
         .tests;
 

@@ -755,7 +755,10 @@ fn process_mod(
                 #[automatically_derived]
                 #[cfg(target_family = "wasm")]
                 pub mod service_wasm_interface {
+                    use super::super::*;
+                    pub use #psibase_mod as psibase;
                     pub use psibase_service;
+                    pub use super::#wrapper as Wrapper;
                     fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
                         #dispatch_body
                         Ok(())
