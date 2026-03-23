@@ -1081,24 +1081,27 @@ async fn main2() -> Result<(), Error> {
         }
         Command::Package {} => {
             let index = MetadataIndex::new(&metadata);
+            let mut ids = Vec::new();
             if args.package.is_empty() {
                 for id in &*metadata.workspace_default_members {
                     let package = index.packages.get(id.repr.as_str()).unwrap();
                     if package::get_metadata(package)?.is_package() {
-                        build_package(&args, &index, id).await?;
+                        ids.push(id);
                     }
                 }
             } else {
                 for package in &args.package {
-                    let id = &metadata
-                        .packages
-                        .iter()
-                        .find(|p| &p.name == package)
-                        .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                        .id;
-                    build_package(&args, &index, id).await?;
+                    ids.push(
+                        &metadata
+                            .packages
+                            .iter()
+                            .find(|p| &p.name == package)
+                            .ok_or_else(|| anyhow!("Could not find package {}", package))?
+                            .id,
+                    );
                 }
             }
+            build_packages(&args, &index, &ids).await?;
             pretty("Done", "");
         }
         Command::Test(opts) => {
