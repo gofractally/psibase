@@ -381,7 +381,7 @@ async fn get_files(
     Ok(result)
 }
 
-async fn get_wasm_files<F: Fn(&str) -> bool>(
+async fn get_wasm_files<F: Fn(&PackageId) -> bool>(
     filter: F,
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
 ) -> Result<Vec<PathBuf>, Error> {
@@ -392,7 +392,7 @@ async fn get_wasm_files<F: Fn(&str) -> bool>(
                 print!("{}", msg.message.rendered.unwrap());
             }
             Message::CompilerArtifact(artifact) => {
-                if filter(&artifact.package_id.repr) {
+                if filter(&artifact.package_id) {
                     result.extend(
                         artifact
                             .filenames
@@ -679,15 +679,11 @@ async fn build(args: &Args, packages: &[&Package]) -> Result<Vec<ServiceArtifact
     Ok(result)
 }
 
-async fn build_plugin(
-    args: &Args,
-    packages: &[&str],
-    extra_args: &[&str],
-) -> Result<Vec<PathBuf>, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
+async fn build_plugin(args: &Args, packages: &[&Package]) -> Result<Vec<PathBuf>, Error> {
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
         .arg("component")
         .arg("build")
-        .args(extra_args)
         .arg("--release")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
@@ -695,15 +691,19 @@ async fn build_plugin(
         .arg("--message-format=json-render-diagnostics")
         .arg("--color=always")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
+    for p in packages {
+        command.arg("-p");
+        command.arg(&p.name);
+    }
 
+    let mut command = command.spawn()?;
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
     let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
     let status = command.wait();
     let (status, files, _) = tokio::join!(
         status,
-        get_wasm_files(|id| packages.contains(&id), stdout),
+        get_wasm_files(|id| packages.iter().find(|p| &p.id == id).is_some(), stdout),
         print_messages(stderr),
     );
 

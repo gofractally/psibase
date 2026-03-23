@@ -42,14 +42,14 @@ impl PsibaseMetadata {
 }
 
 fn find_dep<'a>(
-    packages: &HashMap<&str, &Package>,
-    ids: &'a [PackageId],
+    packages: &HashMap<&str, &'a Package>,
+    ids: &[PackageId],
     name: &str,
-) -> Option<&'a PackageId> {
+) -> Option<&'a Package> {
     for id in ids {
         let p = packages.get(&id.repr.as_str()).unwrap();
         if &p.name == name {
-            return Some(id);
+            return Some(p);
         }
     }
     None
@@ -217,14 +217,14 @@ pub async fn build_package(
         let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
         if dep == &service.name {
             Ok(&service.id)
-        } else if let Some(id) = find_dep(&metadata.packages, &r.dependencies, dep) {
-            Ok(id)
-        } else if let Some(id) = find_dep(
+        } else if let Some(p) = find_dep(&metadata.packages, &r.dependencies, dep) {
+            Ok(&p.id)
+        } else if let Some(p) = find_dep(
             &metadata.packages,
             &metadata.metadata.workspace_members,
             dep,
         ) {
-            Ok(id)
+            Ok(&p.id)
         } else {
             Err(anyhow!("{} is not a dependency of {}", dep, service.name))
         }
@@ -288,14 +288,14 @@ pub async fn build_package(
                 }
             }
             if let Some(plugin) = pmeta.plugin {
-                let Some(id) = find_dep(
+                let Some(p) = find_dep(
                     &metadata.packages,
                     &metadata.metadata.workspace_members,
                     &plugin,
                 ) else {
                     return Err(anyhow!("{} is not a workspace member", plugin,));
                 };
-                plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
+                plugins.push((p, &package.name, "/plugin.wasm"));
             }
             for data in &pmeta.data {
                 let src = package.manifest_path.parent().unwrap().join(&data.src);
@@ -337,15 +337,15 @@ pub async fn build_package(
         .is_none()
         && plugins
             .iter()
-            .find(|(_, _, _, id)| id.as_str() == service.unwrap())
+            .find(|(p, _, _)| p.id.repr.as_str() == service.unwrap())
             .is_none();
 
-    for (plugin, service, path, id) in plugins {
-        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
+    for (plugin, service, path) in plugins {
+        let mut paths = build_plugin(args, &[plugin]).await?;
         if paths.len() != 1 {
             Err(anyhow!(
                 "Plugin {} should produce exactly one wasm target",
-                plugin
+                plugin.name
             ))?
         };
         data_sources.push((service, paths.pop().unwrap().into(), path.to_string()))
