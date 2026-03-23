@@ -15,6 +15,7 @@ postinstall = [
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 evaluations = { path = "../../Evaluations/service", version = "0.23.0" }
 async-graphql.workspace = true

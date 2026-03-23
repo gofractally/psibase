@@ -34,7 +34,7 @@ namespace psibase
    struct Socket
    {
       ~Socket();
-      virtual void       send(Writer&, std::span<const char>) = 0;
+      virtual void       send(Writer&, std::span<const char>, std::uint32_t flags) = 0;
       virtual bool       canAutoClose() const;
       virtual bool       supportsP2P() const;
       virtual SocketInfo info() const = 0;
@@ -110,7 +110,10 @@ namespace psibase
       std::mutex                           mutex;
       explicit Sockets(SharedDatabase sharedDb);
       void         shutdown();
-      std::int32_t send(Writer& writer, std::int32_t fd, std::span<const char> buf);
+      std::int32_t send(Writer&               writer,
+                        std::int32_t          fd,
+                        std::span<const char> buf,
+                        std::uint32_t         flags);
       void         add(Writer&                        writer,
                        const std::shared_ptr<Socket>& socket,
                        SocketAutoCloseSet*            owner = nullptr,

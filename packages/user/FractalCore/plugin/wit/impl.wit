@@ -6,6 +6,7 @@ world impl {
     include permissions:plugin/imports;
     include fractals:plugin/imports;
     include staged-tx:plugin/imports;
+    include host:db/imports;
 
 
     export admin-guild;

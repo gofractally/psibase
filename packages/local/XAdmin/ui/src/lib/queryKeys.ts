@@ -6,6 +6,8 @@ export const queryKeys = {
     configNetworkVariables: ["config", "networkVariables"] as const,
     configServerSpecs: ["config", "serverSpecs"] as const,
     packages: ["packages"] as const,
+    localPackages: ["localPackages"] as const,
+    installedLocalPackages: ["installedLocalPackages"] as const,
     peers: ["peers"] as const,
     producers: ["producers"] as const,
     statuses: ["statuses"] as const,

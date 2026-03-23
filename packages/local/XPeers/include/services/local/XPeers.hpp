@@ -129,7 +129,9 @@ namespace LocalService
       // Internal callbacks
       void onP2P(std::int32_t socket, psibase::HttpReply reply);
       void errP2P(std::int32_t socket, std::optional<psibase::HttpReply> reply);
-      void recvP2P(std::int32_t socket, psio::view<const std::vector<char>> data);
+      void recvP2P(std::int32_t                        socket,
+                   psio::view<const std::vector<char>> data,
+                   std::uint32_t                       flags);
       void closeP2P(std::int32_t socket);
       void onTimer(std::uint64_t timerId);
    };
@@ -137,8 +139,8 @@ namespace LocalService
                 method(serveSys, request, socket),
                 method(onConfig),
                 method(onP2P, socket, reply),
-                method(errP2P, socekt, reply),
-                method(recvP2P, socket, data),
+                method(errP2P, socket, reply),
+                method(recvP2P, socket, data, flags),
                 method(closeP2P, socket),
                 method(onTimer, timerId))
    PSIBASE_REFLECT_TABLES(XPeers, XPeers::Subjective, XPeers::Session)

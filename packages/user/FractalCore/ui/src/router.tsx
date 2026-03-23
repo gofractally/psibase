@@ -20,6 +20,8 @@ import { GuildMembershipLayout } from "./pages/guilds/membership/_layout";
 import { GuildApplicants } from "./pages/guilds/membership/applicants";
 import { GuildMembers } from "./pages/guilds/membership/members";
 import { GuildOverview } from "./pages/guilds/overview";
+import { Invite } from "./pages/invite-detail/Invite";
+import { InviteResponse } from "./pages/invite-detail/InviteResponse";
 
 export const router = createBrowserRouter([
     {
@@ -32,6 +34,12 @@ export const router = createBrowserRouter([
                     <ProtectedRoute>
                         <Overview />
                     </ProtectedRoute>
+                ),
+            },
+            {
+                path: "/invite",
+                element: (
+                    <Invite />
                 ),
             },
             {
@@ -75,6 +83,14 @@ export const router = createBrowserRouter([
                         element: (
                             <ProtectedRoute>
                                 <GuildOverview />
+                            </ProtectedRoute>
+                        ),
+                    },
+                    {
+                        path: "invite-response",
+                        element: (
+                            <ProtectedRoute>
+                                <InviteResponse />
                             </ProtectedRoute>
                         ),
                     },

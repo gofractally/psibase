@@ -21,16 +21,11 @@ export const useGuildMembership = (
         queryKey: QueryKey.guildMembership(guildAccount, memberAccount),
         enabled: !!memberAccount && !!guildAccount,
         queryFn: async () => {
-            try {
-                const res = await getGuildMembership(
-                    guildAccount!,
-                    memberAccount!,
-                );
-                return res;
-            } catch (e) {
-                console.error("bad", e);
-                throw new Error("f");
-            }
+            const res = await getGuildMembership(
+                guildAccount!,
+                memberAccount!,
+            );
+            return res;
         },
     });
 };

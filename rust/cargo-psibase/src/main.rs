@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::process::{exit, ExitCode, Stdio};
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
-use walrus::Module;
+use walrus::{ExportItem, Module};
 use wasm_opt::OptimizationOptions;
 
 mod link;
@@ -35,6 +35,9 @@ const SERVICE_ARGS_RUSTC: &[&str] = &[
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
+
+const SERVICE_EXPORTS: &[&str] = &["start", "called", "verify", "serve", "recv", "close"];
+const TESTER_EXPORTS: &[&str] = &["_start"];
 
 /// Build, test, and deploy psibase services
 #[derive(Parser, Debug)]
@@ -183,6 +186,19 @@ fn find_psitest() -> PathBuf {
     "psitest".to_string().into()
 }
 
+fn strip(code: &mut Module, fns: &[&str]) -> Result<(), Error> {
+    let mut ids = Vec::new();
+    for exp in code.exports.iter() {
+        if !matches!(exp.item, ExportItem::Function(_)) || !fns.contains(&exp.name.as_str()) {
+            ids.push(exp.id())
+        }
+    }
+    for id in ids {
+        code.exports.delete(id)
+    }
+    Ok(())
+}
+
 fn optimize(code: &mut Module) -> Result<(), Error> {
     let file = tempfile::NamedTempFile::new()?;
     code.emit_wasm_file(file.path())?;
@@ -205,7 +221,7 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     Ok(())
 }
 
-fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
+fn process(filename: &PathBuf, polyfill: Option<&[u8]>, exports: &[&str]) -> Result<(), Error> {
     let mut timestamp_file = filename.clone();
     timestamp_file.as_mut_os_string().push(".cargo_psibase");
     let md = fs::metadata(filename)
@@ -229,6 +245,8 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
         pretty_path("Polyfilling", filename);
         link_module(&polyfill_source_module, &mut dest_module)?;
     }
+
+    strip(&mut dest_module, exports)?;
 
     pretty_path("Reoptimizing", filename);
     optimize(&mut dest_module)?;
@@ -341,6 +359,7 @@ async fn build(
     envs: Vec<(&str, &str)>,
     extra_args: &[&str],
     poly: Option<&[u8]>,
+    exports: &[&str],
 ) -> Result<Vec<PathBuf>, Error> {
     let mut command = tokio::process::Command::new(get_cargo())
         .envs(envs)
@@ -370,7 +389,7 @@ async fn build(
 
     let files = files?;
     for f in &files {
-        process(f, poly)?
+        process(f, poly, exports)?
     }
 
     Ok(files)
@@ -411,7 +430,7 @@ async fn build_schema(
 
     let files = files?;
     for f in &files {
-        process(f, None)?
+        process(f, None, TESTER_EXPORTS)?
     }
 
     let mut command = tokio::process::Command::new(&args.psitest)
@@ -686,6 +705,7 @@ async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> 
             ],
             &["--tests", "-p", name.as_str()],
             None,
+            TESTER_EXPORTS,
         )
         .await?;
 
@@ -799,6 +819,7 @@ async fn main2() -> Result<(), Error> {
                         vec![],
                         &extra_args,
                         Some(SERVICE_POLYFILL),
+                        SERVICE_EXPORTS,
                     )
                     .await?;
                 }
@@ -819,6 +840,7 @@ async fn main2() -> Result<(), Error> {
                         vec![],
                         &extra_args,
                         Some(SERVICE_POLYFILL),
+                        SERVICE_EXPORTS,
                     )
                     .await?;
                 }

@@ -13,6 +13,10 @@ export const zGuildApplicationListInstance = z.object({
     applicant: zAccount,
     extraInfo: z.string(),
     createdAt: zDateTime,
+    score: z.object({
+        current: z.number().int(),
+        required: z.number().int()
+    }),
     attestations: z.object({
         nodes: zGuildAttestationListInstance.array(),
     }),
