@@ -308,7 +308,7 @@ pub async fn build_package(
                 }
                 data_sources.push((&package.name, src.into_std_path_buf(), dest));
             }
-            services.push((&package.name, info, &package.id.repr));
+            services.push((package, info));
             if let Some(actions) = &pmeta.postinstall {
                 postinstall.extend_from_slice(actions.as_slice());
             }
@@ -333,7 +333,7 @@ pub async fn build_package(
 
     let need_to_build_root = services
         .iter()
-        .find(|(_, _, id)| id.as_str() == service.unwrap())
+        .find(|(p, _)| p.id.repr.as_str() == service.unwrap())
         .is_none()
         && plugins
             .iter()
@@ -354,12 +354,12 @@ pub async fn build_package(
     let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();
 
     let mut service_wasms = Vec::new();
-    for (service, mut info, id) in services {
-        let mut paths = build(args, &[id.as_str()], vec![], &["--lib", "-p", &service]).await?;
+    for (package, mut info) in services {
+        let mut paths = build(args, &[package], vec![], &["--lib", "-p", &package.name]).await?;
         if paths.len() != 1 {
             Err(anyhow!(
                 "Service {} should produce exactly one wasm target",
-                service
+                package.name
             ))?
         };
         //let schema = build_schema(args, &[&id], &["-p", &service]).await?;
@@ -368,7 +368,7 @@ pub async fn build_package(
         let schema_path = service_path.with_extension("schema.json");
         let schema: Schema =
             serde_json::from_str(&std::io::read_to_string(File::open(schema_path)?)?)?;
-        crate_to_account.insert(service, schema.service.clone());
+        crate_to_account.insert(&package.name, schema.service.clone());
         let service = schema.service.clone();
         info.schema = Some(schema);
         service_wasms.push((service, info, service_path));

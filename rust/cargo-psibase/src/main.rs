@@ -2,7 +2,7 @@ use anyhow::Error;
 use anyhow::{anyhow, Context};
 use cargo_metadata::semver::Version;
 use cargo_metadata::Message;
-use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
+use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, Package, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
 use futures::{
@@ -335,7 +335,7 @@ struct ArtifactList {
 }
 
 async fn get_files(
-    packages: &[&str],
+    packages: &[&Package],
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
 ) -> Result<ArtifactList, Error> {
     let mut result = ArtifactList::default();
@@ -354,7 +354,7 @@ async fn get_files(
                 }
                 if let Some(idx) = packages
                     .iter()
-                    .position(|id| id == &artifact.package_id.repr.as_str())
+                    .position(|package| package.id == artifact.package_id)
                 {
                     if artifact.profile.test {
                         if let Some(path) = artifact.executable {
@@ -510,7 +510,7 @@ impl AsyncJobServer {
 
 async fn wait_for_child(
     mut command: tokio::process::Child,
-    packages: &[&str],
+    packages: &[&Package],
 ) -> Result<ArtifactList, Error> {
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
     let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
@@ -640,7 +640,7 @@ async fn build_service(
 
 async fn build(
     args: &Args,
-    packages: &[&str],
+    packages: &[&Package],
     envs: Vec<(&str, &str)>,
     extra_args: &[&str],
 ) -> Result<Vec<ArtifactFile>, Error> {
@@ -852,21 +852,21 @@ async fn test(
     opts: &TestCommand,
     metadata: &MetadataIndex<'_>,
 ) -> Result<(), Error> {
-    let mut test_packages: Vec<(&str, PackageSet)> = Vec::new();
+    let mut test_packages: Vec<(&Package, PackageSet)> = Vec::new();
     if args.package.is_empty() {
         for id in &*metadata.metadata.workspace_default_members {
-            test_packages.push((id.repr.as_str(), get_test_packages(metadata, &id.repr)?));
+            let p = metadata.packages.get(id.repr.as_str()).unwrap();
+            test_packages.push((*p, get_test_packages(metadata, &id.repr)?));
         }
     } else {
         for package in &args.package {
-            let id = &metadata
+            let p = &metadata
                 .metadata
                 .packages
                 .iter()
                 .find(|p| &p.name == package)
-                .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                .id;
-            test_packages.push((id.repr.as_str(), get_test_packages(metadata, &id.repr)?));
+                .ok_or_else(|| anyhow!("Could not find package {}", package))?;
+            test_packages.push((*p, get_test_packages(metadata, &p.id.repr)?));
         }
     }
 
@@ -878,7 +878,7 @@ async fn test(
     let mut built: HashMap<&PackageId, PackageInfo> = HashMap::new();
     let mut test_info = Vec::new();
     pretty("Packages", "building dependencies...");
-    for (id, deps) in test_packages {
+    for (package, deps) in test_packages {
         let mut index = Vec::new();
         for p in &deps.packages {
             if let Some(found) = built.get(p) {
@@ -891,10 +891,9 @@ async fn test(
         }
 
         // Write a package index specific to the crate
-        let index_file =
-            out_dir.join(metadata.packages.get(id).unwrap().name.clone() + "-index.json");
+        let index_file = out_dir.join(package.name.clone() + "-index.json");
         serde_json::to_writer(File::create(&index_file)?, &index)?;
-        test_info.push((id, index_file));
+        test_info.push((package, index_file));
     }
 
     let mut index_files = Vec::new();
@@ -913,12 +912,12 @@ async fn test(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    for (id, index_file) in test_info {
+    for (package, index_file) in test_info {
         pretty("Test", "building unit tests...");
-        let name = &metadata.packages.get(id).unwrap().name;
+        let name = &package.name;
 
         index_files.push(index_file.canonicalize()?.into_os_string());
-        packages.push(id);
+        packages.push(package);
         command.args(["-p", name.as_str()]);
     }
 
@@ -1054,23 +1053,21 @@ async fn main2() -> Result<(), Error> {
             if args.package.is_empty() {
                 let index = MetadataIndex::new(&metadata);
                 for id in &*metadata.workspace_default_members {
-                    let package = &index.packages.get(id.repr.as_str()).unwrap().name;
+                    let package = *index.packages.get(id.repr.as_str()).unwrap();
                     let mut extra_args = SERVICE_ARGS.to_owned();
-                    extra_args.extend(["-p", package.as_str()]);
-                    build(&args, &[id.repr.as_str()], vec![], &extra_args).await?;
+                    extra_args.extend(["-p", package.name.as_str()]);
+                    build(&args, &[package], vec![], &extra_args).await?;
                 }
             } else {
                 for package in &args.package {
-                    let id = &metadata
+                    let p = metadata
                         .packages
                         .iter()
                         .find(|p| &p.name == package)
-                        .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                        .id
-                        .repr;
+                        .ok_or_else(|| anyhow!("Could not find package {}", package))?;
                     let mut extra_args = SERVICE_ARGS.to_owned();
                     extra_args.extend(["-p", package.as_str()]);
-                    build(&args, &[id.as_str()], vec![], &extra_args).await?;
+                    build(&args, &[p], vec![], &extra_args).await?;
                 }
             }
             pretty("Done", "");
