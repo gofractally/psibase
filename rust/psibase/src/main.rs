@@ -33,7 +33,7 @@ use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::{BufReader, Read, Seek};
+use std::io::{BufReader, IsTerminal, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -1770,35 +1770,35 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
     if to_install.is_empty() {
         println!("Nothing to install.");
         return Ok(());
+    } else {
+        println!("The following changes will be applied:");
+        to_install
+            .iter()
+            .map(|op| match op {
+                PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
+                PackageOp::Replace(old, new) => {
+                    if old.version == new.version {
+                        format!("Reinstall {} {}", old.name, old.version)
+                    } else {
+                        format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
+                    }
+                }
+                PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
+            })
+            .for_each(|line| println!("  {}", line));
     }
 
-    let summary: Vec<String> = to_install
-        .iter()
-        .map(|op| match op {
-            PackageOp::Install(info) => format!("Install {}-{}", info.name, info.version),
-            PackageOp::Replace(old, new) => {
-                if old.version == new.version {
-                    format!("Reinstall {} {}", old.name, old.version)
-                } else {
-                    format!("Upgrade {} {} -> {}", old.name, old.version, new.version)
-                }
-            }
-            PackageOp::Remove(meta) => format!("Remove {}-{}", meta.name, meta.version),
-        })
-        .collect();
-
     if !args.yes {
-        println!("The following changes will be applied:");
-        for line in &summary {
-            println!("  {}", line);
-        }
-        let proceed = Confirm::new()
-            .with_prompt("Proceed?")
-            .default(true)
-            .interact()?;
-        if !proceed {
-            println!("Install aborted.");
-            return Ok(());
+        let can_prompt = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+        if can_prompt {
+            let proceed = Confirm::new()
+                .with_prompt("Proceed?")
+                .default(true)
+                .interact()?;
+            if !proceed {
+                println!("Install aborted.");
+                return Ok(());
+            }
         }
     }
 
