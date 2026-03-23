@@ -1933,7 +1933,9 @@ async fn do_install_local<T: Read + Seek>(
     node_args: &NodeArgs,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    let progress = make_spinner();
+    let progress = ProgressBar::new(to_install.len() as u64).with_style(
+        ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
+    );
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {
@@ -1995,6 +1997,7 @@ async fn do_install_local<T: Read + Seek>(
                     post_local_info(&node_args.api, &mut client, &info, "/postrm").await?;
                 }
             }
+            progress.inc(1);
         }
         Ok(())
     }
