@@ -9,8 +9,7 @@ use futures::{
     stream::{pending, FuturesUnordered},
     StreamExt,
 };
-use psibase::{ExactAccountNumber, PackageInfo, Schema};
-use regex::Regex;
+use psibase::{ExactAccountNumber, PackageInfo};
 use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::fs::{read, write, File};
@@ -257,9 +256,18 @@ impl MTime for PathBuf {
     }
 }
 
-impl<T: MTime> MTime for &T {
+impl<T: MTime + ?Sized> MTime for &T {
     fn newest_mtime(&self) -> Result<SystemTime, Error> {
         (*self).newest_mtime()
+    }
+}
+
+impl<T0: MTime, T1: MTime> MTime for (T0, T1) {
+    fn oldest_mtime(&self) -> Result<SystemTime, Error> {
+        Ok(self.0.oldest_mtime()?.min(self.1.oldest_mtime()?))
+    }
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        Ok(self.0.newest_mtime()?.max(self.1.newest_mtime()?))
     }
 }
 
@@ -518,8 +526,9 @@ async fn process_from_output(
 
     let mut files = files?;
     for f in &mut files.services {
-        let p = build_service(args, &f.path, &files.dep_dirs).await?;
-        f.path = p;
+        let output_file = f.path.with_extension("wasm");
+        build_service(args, &f.path, &output_file, &files.dep_dirs).await?;
+        f.path = output_file;
     }
     for f in &mut files.tests {
         let p = f.path.with_extension("polyfilled.wasm");
@@ -598,12 +607,12 @@ async fn build_service_impl(
 async fn build_service(
     args: &Args,
     lib: &Path,
+    output_file: &Path,
     dep_dirs: &HashSet<PathBuf>,
-) -> Result<PathBuf, Error> {
-    let output_file = lib.with_extension("wasm");
+) -> Result<(), Error> {
     let schema_file = output_file.with_extension("schema.json");
-    if !lib.is_newer_than([&output_file, &schema_file])? {
-        return Ok(output_file);
+    if !lib.is_newer_than((output_file, &schema_file))? {
+        return Ok(());
     }
     let tmp_crate = tempfile::tempdir()?;
 
@@ -641,7 +650,7 @@ async fn build_service(
     if !status.success() {
         exit(status.code().unwrap());
     }
-    Ok(output_file)
+    Ok(())
 }
 
 async fn build(
@@ -665,82 +674,6 @@ async fn build(
         .spawn()?;
 
     Ok(process_from_output(args, command, packages).await?.services)
-}
-
-async fn build_schema(
-    args: &Args,
-    packages: &[&str],
-    extra_args: &[&str],
-) -> Result<Schema, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
-        .arg("test")
-        .args(extra_args)
-        .arg("--release")
-        .arg("--target=wasm32-wasip1")
-        .args(get_manifest_path(args))
-        .args(get_target_dir(args))
-        .arg("--message-format=json-diagnostic-rendered-ansi")
-        .arg("--color=always")
-        .arg("--lib")
-        .arg("--no-run")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
-    let status = command.wait();
-    let (status, files, _) =
-        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
-
-    let status = status?;
-    if !status.success() {
-        exit(status.code().unwrap());
-    }
-
-    let mut files = files?.tests;
-    for f in &mut files {
-        let p = f.path.with_extension("polyfilled.wasm");
-        if f.path.is_newer_than(&p)? {
-            process(&f.path, None, TESTER_EXPORTS, &p)?;
-        }
-        f.path = p;
-    }
-
-    let mut command = tokio::process::Command::new(&args.psitest)
-        .arg(&files[0].path)
-        .arg("_psibase_get_schema")
-        .arg("--show-output")
-        .arg("--include-ignored")
-        .stdout(Stdio::piped())
-        .spawn()?;
-
-    let mut stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let status = command.wait();
-
-    let (status, schema) = tokio::join!(
-        status, //
-        async {
-            let re = Regex::new(r"^psibase-schema-gen-output: (.*)$").unwrap();
-            let mut schema = None;
-            while let Some(line) = stdout.next_line().await? {
-                if schema.is_none() {
-                    if let Some(cap) = re.captures(&line) {
-                        schema = Some(cap[1].to_owned());
-                    }
-                }
-            }
-            Ok::<_, Error>(schema)
-        },
-    );
-    let status = status?;
-    if !status.success() {
-        exit(status.code().unwrap());
-    }
-
-    Ok(serde_json::from_str::<Schema>(
-        &schema?.ok_or_else(|| anyhow!("Failed to generate schema"))?,
-    )?)
 }
 
 async fn build_plugin(
