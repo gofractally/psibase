@@ -1827,7 +1827,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         )
         .await?;
     }
-    println!("Install complete.");
     Ok(())
 }
 
@@ -1935,65 +1934,82 @@ async fn do_install_local<T: Read + Seek>(
     node_args: &NodeArgs,
     compression_level: u32,
 ) -> Result<(), anyhow::Error> {
-    for op in to_install {
-        match op {
-            PackageOp::Install(info) => {
-                let mut package = package_registry.get_by_info(&info).await?;
-                let info: LocalPackage = (&info).into();
-                post_local_info(&node_args.api, &mut client, &info, "/preinstall").await?;
-                put_local_manifest(&node_args.api, &mut client, &info, &mut package).await?;
-                package
-                    .install_local(&node_args.api, &mut client, compression_level)
-                    .await?;
-                post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
-            }
-            PackageOp::Replace(old, new) => {
-                let mut package = package_registry.get_by_info(&new).await?;
-                let old_info: LocalPackage = installed.get_by_name(&old.name)?.unwrap().into();
-                if old_info.sha256 == &new.sha256 {
-                    // The only reason to install a package that is identical
-                    // to the currently installed package is to fix corrupted
-                    // files. Nothing needs to be removed (in particular, the
-                    // manifest must not be removed), and we don't need
-                    // to keep track of partial success.
-                    let info: LocalPackage = (&new).into();
+    let progress = make_spinner();
+    progress.set_message("Installing packages");
+    let res: Result<(), anyhow::Error> = async {
+        for op in to_install {
+            match op {
+                PackageOp::Install(info) => {
+                    let mut package = package_registry.get_by_info(&info).await?;
+                    let info: LocalPackage = (&info).into();
+                    post_local_info(&node_args.api, &mut client, &info, "/preinstall").await?;
                     put_local_manifest(&node_args.api, &mut client, &info, &mut package).await?;
                     package
                         .install_local(&node_args.api, &mut client, compression_level)
                         .await?;
                     post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
-                } else {
+                }
+                PackageOp::Replace(old, new) => {
+                    let mut package = package_registry.get_by_info(&new).await?;
+                    let old_info: LocalPackage = installed.get_by_name(&old.name)?.unwrap().into();
+                    if old_info.sha256 == &new.sha256 {
+                        // The only reason to install a package that is identical
+                        // to the currently installed package is to fix corrupted
+                        // files. Nothing needs to be removed (in particular, the
+                        // manifest must not be removed), and we don't need
+                        // to keep track of partial success.
+                        let info: LocalPackage = (&new).into();
+                        put_local_manifest(&node_args.api, &mut client, &info, &mut package)
+                            .await?;
+                        package
+                            .install_local(&node_args.api, &mut client, compression_level)
+                            .await?;
+                        post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+                    } else {
+                        let old_manifest =
+                            get_local_manifest(&node_args.api, &mut client, &old_info.sha256)
+                                .await?;
+                        let new: LocalPackage = (&new).into();
+                        post_local_info(&node_args.api, &mut client, &new, "/preinstall").await?;
+                        put_local_manifest(&node_args.api, &mut client, &new, &mut package).await?;
+                        post_local_info(&node_args.api, &mut client, &old_info, "/prerm").await?;
+                        package
+                            .install_local(&node_args.api, &mut client, compression_level)
+                            .await?;
+                        old_manifest
+                            .upgrade_local(&node_args.api, &mut client, package.manifest())
+                            .await?;
+                        delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
+                        post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;
+                        post_local_info(&node_args.api, &mut client, &new, "/postinstall").await?;
+                    }
+                }
+                PackageOp::Remove(meta) => {
+                    let info: LocalPackage = installed.get_by_name(&meta.name)?.unwrap().into();
                     let old_manifest =
-                        get_local_manifest(&node_args.api, &mut client, &old_info.sha256).await?;
-                    let new: LocalPackage = (&new).into();
-                    post_local_info(&node_args.api, &mut client, &new, "/preinstall").await?;
-                    put_local_manifest(&node_args.api, &mut client, &new, &mut package).await?;
-                    post_local_info(&node_args.api, &mut client, &old_info, "/prerm").await?;
-                    package
-                        .install_local(&node_args.api, &mut client, compression_level)
-                        .await?;
+                        get_local_manifest(&node_args.api, &mut client, info.sha256).await?;
+                    post_local_info(&node_args.api, &mut client, &info, "/prerm").await?;
                     old_manifest
-                        .upgrade_local(&node_args.api, &mut client, package.manifest())
+                        .remove_local(&node_args.api, &mut client)
                         .await?;
-                    delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
-                    post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;
-                    post_local_info(&node_args.api, &mut client, &new, "/postinstall").await?;
+                    delete_local_manifest(&node_args.api, &mut client, &info).await?;
+                    post_local_info(&node_args.api, &mut client, &info, "/postrm").await?;
                 }
             }
-            PackageOp::Remove(meta) => {
-                let info: LocalPackage = installed.get_by_name(&meta.name)?.unwrap().into();
-                let old_manifest =
-                    get_local_manifest(&node_args.api, &mut client, info.sha256).await?;
-                post_local_info(&node_args.api, &mut client, &info, "/prerm").await?;
-                old_manifest
-                    .remove_local(&node_args.api, &mut client)
-                    .await?;
-                delete_local_manifest(&node_args.api, &mut client, &info).await?;
-                post_local_info(&node_args.api, &mut client, &info, "/postrm").await?;
-            }
+        }
+        Ok(())
+    }
+    .await;
+    match res {
+        Ok(()) => {
+            progress.finish_with_message("Ok");
+            Ok(())
+        }
+        Err(e) => {
+            progress.abandon();
+            Err(e)
         }
     }
-    Ok(())
 }
 
 async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
