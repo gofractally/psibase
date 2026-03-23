@@ -641,7 +641,7 @@ async fn build_service(
 struct ServiceArtifacts {
     service: PathBuf,
     schema: PathBuf,
-    _package_index: usize,
+    package_index: usize,
 }
 
 async fn build(args: &Args, packages: &[&Package]) -> Result<Vec<ServiceArtifacts>, Error> {
@@ -672,7 +672,7 @@ async fn build(args: &Args, packages: &[&Package]) -> Result<Vec<ServiceArtifact
         result.push(ServiceArtifacts {
             service,
             schema,
-            _package_index: f.package_index,
+            package_index: f.package_index,
         });
     }
 
@@ -833,7 +833,7 @@ impl<'a> PackageSet<'a> {
         let mut index = Vec::new();
 
         for p in &self.packages {
-            index.push(build_package(args, self.metadata, Some(&p.repr)).await?);
+            index.push(build_package(args, self.metadata, &p).await?);
         }
         Ok(index)
     }
@@ -895,7 +895,7 @@ async fn test(
             if let Some(found) = built.get(p) {
                 index.push(found.clone());
             } else {
-                let info = build_package(args, metadata, Some(p.repr.as_str())).await?;
+                let info = build_package(args, metadata, &p).await?;
                 built.insert(p, info.clone());
                 index.push(info);
             }
@@ -1085,7 +1085,7 @@ async fn main2() -> Result<(), Error> {
                 for id in &*metadata.workspace_default_members {
                     let package = index.packages.get(id.repr.as_str()).unwrap();
                     if package::get_metadata(package)?.is_package() {
-                        build_package(&args, &index, Some(id.repr.as_str())).await?;
+                        build_package(&args, &index, id).await?;
                     }
                 }
             } else {
@@ -1095,9 +1095,8 @@ async fn main2() -> Result<(), Error> {
                         .iter()
                         .find(|p| &p.name == package)
                         .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                        .id
-                        .repr;
-                    build_package(&args, &index, Some(id)).await?;
+                        .id;
+                    build_package(&args, &index, id).await?;
                 }
             }
             pretty("Done", "");

@@ -172,18 +172,18 @@ fn should_build_package(
 fn add_files<'a>(
     service: AccountNumber,
     src: &Path,
-    dest: &String,
+    dest: &str,
     out: &mut Vec<(AccountNumber, String, PathBuf)>,
 ) -> Result<(), anyhow::Error> {
     if src.is_file() {
-        out.push((service, dest.clone(), src.to_path_buf()));
+        out.push((service, dest.to_string(), src.to_path_buf()));
     } else if src.is_dir() {
         for entry in src.read_dir()? {
             let entry = entry?;
             add_files(
                 service,
                 &entry.path(),
-                &(dest.clone()
+                &(dest.to_string()
                     + "/"
                     + entry.file_name().to_str().ok_or_else(|| {
                         anyhow!(
@@ -198,125 +198,199 @@ fn add_files<'a>(
     Ok(())
 }
 
+pub struct PackageBuilder<'a> {
+    service_crates: Vec<&'a Package>,
+    service_info: Vec<ServiceInfo>,
+    // (plugin, service-crate, path)
+    plugins: Vec<(&'a Package, &'a str, String)>,
+    postinstall: Vec<PrettyAction>,
+    // (service-crate, src, dest)
+    data_sources: Vec<(&'a str, PathBuf, String)>,
+    depends: Vec<PackageRef>,
+}
+
+impl<'a> PackageBuilder<'a> {
+    pub fn new(
+        metadata: &'a MetadataIndex<'a>,
+        root: &PackageId,
+    ) -> Result<PackageBuilder<'a>, anyhow::Error> {
+        let mut depends_set = HashSet::new();
+        let mut visited = HashSet::new();
+        let mut queue = Vec::new();
+        let mut service_crates = Vec::new();
+        let mut service_info = Vec::new();
+        let mut plugins = Vec::new();
+        let mut postinstall = Vec::new();
+        let mut data_sources = Vec::new();
+
+        let get_dep = get_dep_type(|service, dep| {
+            let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
+            if dep == &service.name {
+                Ok(&service.id)
+            } else if let Some(p) = find_dep(&metadata.packages, &r.dependencies, dep) {
+                Ok(&p.id)
+            } else if let Some(p) = find_dep(
+                &metadata.packages,
+                &metadata.metadata.workspace_members,
+                dep,
+            ) {
+                Ok(&p.id)
+            } else {
+                Err(anyhow!("{} is not a dependency of {}", dep, service.name))
+            }
+        });
+
+        {
+            let package = metadata.packages.get(root.repr.as_str()).unwrap();
+            let meta = get_metadata(package)?;
+            if !meta.is_package() {
+                Err(anyhow!("{} is not a psibase package because it does not define package.metadata.psibase.package_name", package.name))?
+            }
+            if let Some(services) = &meta.services {
+                for s in services {
+                    let id: &str = &get_dep(package, &s)?.repr;
+                    if visited.insert(id) {
+                        queue.push(id);
+                    }
+                }
+            } else {
+                visited.insert(root.repr.as_str());
+                queue.push(root.repr.as_str());
+            }
+            // Add postinstall and dependencies from the root whether it is a service or not
+            if !visited.contains(root.repr.as_str()) {
+                if let Some(actions) = &meta.postinstall {
+                    postinstall.extend_from_slice(actions.as_slice());
+                }
+                for (k, v) in meta.dependencies {
+                    depends_set.insert(PackageRef {
+                        name: k,
+                        version: v,
+                    });
+                }
+            }
+        }
+
+        while !queue.is_empty() {
+            for service in std::mem::take(&mut queue) {
+                let Some(package) = metadata.packages.get(service) else {
+                    Err(anyhow!("Cannot find crate for service {}", service))?
+                };
+                let pmeta: PsibaseMetadata = get_metadata(package)?;
+                for (k, v) in pmeta.dependencies {
+                    depends_set.insert(PackageRef {
+                        name: k,
+                        version: v,
+                    });
+                }
+                let mut info = ServiceInfo {
+                    flags: pmeta.flags,
+                    server: None,
+                    schema: None,
+                };
+                if let Some(server) = pmeta.server {
+                    info.server = Some(server.parse()?);
+                    let server_package = &get_dep(package, &server)?.repr;
+                    if visited.insert(server_package) {
+                        queue.push(&server_package);
+                    }
+                }
+                if let Some(plugin) = pmeta.plugin {
+                    let Some(p) = find_dep(
+                        &metadata.packages,
+                        &metadata.metadata.workspace_members,
+                        &plugin,
+                    ) else {
+                        return Err(anyhow!("{} is not a workspace member", plugin,));
+                    };
+                    plugins.push((p, package.name.as_str(), "/plugin.wasm".to_string()));
+                }
+                for data in &pmeta.data {
+                    let src = package.manifest_path.parent().unwrap().join(&data.src);
+                    let mut dest = data.dst.clone();
+                    if !dest.starts_with('/') {
+                        dest = "/".to_string() + &dest;
+                    }
+                    if dest.ends_with('/') {
+                        dest.pop();
+                    }
+                    data_sources.push((package.name.as_str(), src.into_std_path_buf(), dest));
+                }
+                service_crates.push(*package);
+                service_info.push(info);
+                if let Some(actions) = &pmeta.postinstall {
+                    postinstall.extend_from_slice(actions.as_slice());
+                }
+            }
+        }
+
+        let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
+        depends.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Ok(PackageBuilder {
+            service_crates,
+            service_info,
+            plugins,
+            postinstall,
+            data_sources,
+            depends,
+        })
+    }
+}
+
+pub async fn build_services(
+    args: &Args,
+    packages: &[&Package],
+    service_info: Vec<ServiceInfo>,
+) -> Result<Vec<(AccountNumber, ServiceInfo, PathBuf)>, anyhow::Error> {
+    assert!(packages.len() == service_info.len());
+    let mut service_wasms = Vec::new();
+    let mut paths = build(args, packages).await?;
+
+    paths.sort_by_key(|p| p.package_index);
+    let mut error_index = paths.len();
+    for (i, path) in paths.iter().enumerate() {
+        if path.package_index != i {
+            error_index = path.package_index.min(i);
+            break;
+        }
+    }
+    if error_index < packages.len() {
+        Err(anyhow!(
+            "Service {} should produce exactly one wasm target",
+            packages[error_index].name
+        ))?
+    }
+
+    for (mut info, paths) in service_info.into_iter().zip(paths) {
+        let schema: Schema =
+            serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
+        let service = schema.service.clone();
+        info.schema = Some(schema);
+        service_wasms.push((service, info, paths.service));
+    }
+    Ok(service_wasms)
+}
+
 pub async fn build_package(
     args: &Args,
     metadata: &MetadataIndex<'_>,
-    service: Option<&str>,
+    root: &PackageId,
 ) -> Result<PackageInfo, anyhow::Error> {
-    let mut depends_set = HashSet::new();
+    let PackageBuilder {
+        service_crates,
+        service_info,
+        plugins,
+        postinstall,
+        mut data_sources,
+        depends,
+    } = PackageBuilder::new(metadata, root)?;
+
     let mut accounts: Vec<AccountNumber> = Vec::new();
-    let mut visited = HashSet::new();
-    let mut queue = Vec::new();
-    let mut services = Vec::new();
-    let mut plugins = Vec::new();
     let mut data_files = Vec::new();
-    let mut postinstall = Vec::new();
-    let mut data_sources = Vec::new();
-
-    let get_dep = get_dep_type(|service, dep| {
-        let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
-        if dep == &service.name {
-            Ok(&service.id)
-        } else if let Some(p) = find_dep(&metadata.packages, &r.dependencies, dep) {
-            Ok(&p.id)
-        } else if let Some(p) = find_dep(
-            &metadata.packages,
-            &metadata.metadata.workspace_members,
-            dep,
-        ) {
-            Ok(&p.id)
-        } else {
-            Err(anyhow!("{} is not a dependency of {}", dep, service.name))
-        }
-    });
-
-    if let Some(root) = service {
-        let package = metadata.packages.get(root).unwrap();
-        let meta = get_metadata(package)?;
-        if !meta.is_package() {
-            Err(anyhow!("{} is not a psibase package because it does not define package.metadata.psibase.package_name", package.name))?
-        }
-        if let Some(services) = &meta.services {
-            for s in services {
-                let id: &str = &get_dep(package, &s)?.repr;
-                if visited.insert(id) {
-                    queue.push(id);
-                }
-            }
-        } else {
-            visited.insert(root);
-            queue.push(root);
-        }
-        // Add postinstall and dependencies from the root whether it is a service or not
-        if !visited.contains(root) {
-            if let Some(actions) = &meta.postinstall {
-                postinstall.extend_from_slice(actions.as_slice());
-            }
-            for (k, v) in meta.dependencies {
-                depends_set.insert(PackageRef {
-                    name: k,
-                    version: v,
-                });
-            }
-        }
-    } else {
-        Err(anyhow!("Cannot package a virtual workspace"))?
-    }
-
-    while !queue.is_empty() {
-        for service in std::mem::take(&mut queue) {
-            let Some(package) = metadata.packages.get(service) else {
-                Err(anyhow!("Cannot find crate for service {}", service))?
-            };
-            let pmeta: PsibaseMetadata = get_metadata(package)?;
-            for (k, v) in pmeta.dependencies {
-                depends_set.insert(PackageRef {
-                    name: k,
-                    version: v,
-                });
-            }
-            let mut info = ServiceInfo {
-                flags: pmeta.flags,
-                server: None,
-                schema: None,
-            };
-            if let Some(server) = pmeta.server {
-                info.server = Some(server.parse()?);
-                let server_package = &get_dep(package, &server)?.repr;
-                if visited.insert(server_package) {
-                    queue.push(&server_package);
-                }
-            }
-            if let Some(plugin) = pmeta.plugin {
-                let Some(p) = find_dep(
-                    &metadata.packages,
-                    &metadata.metadata.workspace_members,
-                    &plugin,
-                ) else {
-                    return Err(anyhow!("{} is not a workspace member", plugin,));
-                };
-                plugins.push((p, &package.name, "/plugin.wasm"));
-            }
-            for data in &pmeta.data {
-                let src = package.manifest_path.parent().unwrap().join(&data.src);
-                let mut dest = data.dst.clone();
-                if !dest.starts_with('/') {
-                    dest = "/".to_string() + &dest;
-                }
-                if dest.ends_with('/') {
-                    dest.pop();
-                }
-                data_sources.push((&package.name, src.into_std_path_buf(), dest));
-            }
-            services.push((package, info));
-            if let Some(actions) = &pmeta.postinstall {
-                postinstall.extend_from_slice(actions.as_slice());
-            }
-        }
-    }
 
     let (package_name, package_version, package_description, package_scope) = {
-        let root = metadata.packages.get(service.unwrap()).unwrap();
+        let root = metadata.packages.get(root.repr.as_str()).unwrap();
         let root_meta: PsibaseMetadata = get_metadata(root)?;
         let name = root_meta.package_name.unwrap_or_else(|| root.name.clone());
         let scope = root_meta.scope.unwrap_or_else(|| "network".to_string());
@@ -328,17 +402,8 @@ pub async fn build_package(
         )
     };
 
-    let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
-    depends.sort_by(|a, b| a.name.cmp(&b.name));
-
-    let need_to_build_root = services
-        .iter()
-        .find(|(p, _)| p.id.repr.as_str() == service.unwrap())
-        .is_none()
-        && plugins
-            .iter()
-            .find(|(p, _, _)| p.id.repr.as_str() == service.unwrap())
-            .is_none();
+    let need_to_build_root = service_crates.iter().find(|p| &p.id == root).is_none()
+        && plugins.iter().find(|(p, _, _)| &p.id == root).is_none();
 
     for (plugin, service, path) in plugins {
         let mut paths = build_plugin(args, &[plugin]).await?;
@@ -348,33 +413,21 @@ pub async fn build_package(
                 plugin.name
             ))?
         };
-        data_sources.push((service, paths.pop().unwrap().into(), path.to_string()))
+        data_sources.push((service, paths.pop().unwrap().into(), path))
     }
 
-    let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();
+    let service_wasms = build_services(args, &service_crates, service_info).await?;
+    accounts.extend(service_wasms.iter().map(|p| p.0));
 
-    let mut service_wasms = Vec::new();
-    for (package, mut info) in services {
-        let mut paths = build(args, &[package]).await?;
-        if paths.len() != 1 {
-            Err(anyhow!(
-                "Service {} should produce exactly one wasm target",
-                package.name
-            ))?
-        };
-        let paths = paths.pop().unwrap();
-        let schema: Schema =
-            serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
-        crate_to_account.insert(&package.name, schema.service.clone());
-        let service = schema.service.clone();
-        info.schema = Some(schema);
-        service_wasms.push((service, info, paths.service));
-        accounts.push(service);
-    }
+    let crate_to_account: HashMap<&str, AccountNumber> = service_crates
+        .iter()
+        .zip(service_wasms.iter())
+        .map(|(p, (service, _, _))| (p.name.as_str(), *service))
+        .collect();
 
     if need_to_build_root {
         // Run cargo build at the root to pick up any build scripts
-        build_package_root(args, service.unwrap()).await?;
+        build_package_root(args, &root.repr).await?;
     }
 
     for (service, src, dest) in data_sources {
