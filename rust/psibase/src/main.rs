@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context};
 use chrono::{Duration, Utc};
 use clap::{Args, FromArgMatches, Parser, Subcommand};
+use dialoguer::Confirm;
 use flate2::write::GzEncoder;
 use fracpack::Pack;
 use futures::{
@@ -32,7 +33,7 @@ use std::cmp::Ordering;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs::{metadata, read_dir, File};
-use std::io::{self, BufReader, Read, Seek, Write};
+use std::io::{BufReader, Read, Seek};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -1791,13 +1792,11 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
         for line in &summary {
             println!("  {}", line);
         }
-        println!("Proceed? [y/N]");
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let trimmed = input.trim().to_ascii_lowercase();
-        if trimmed != "y" && trimmed != "yes" {
+        let proceed = Confirm::new()
+            .with_prompt("Proceed?")
+            .default(true)
+            .interact()?;
+        if !proceed {
             println!("Install aborted.");
             return Ok(());
         }
