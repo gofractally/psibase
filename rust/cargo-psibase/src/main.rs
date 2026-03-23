@@ -644,14 +644,9 @@ struct ServiceArtifacts {
     _package_index: usize,
 }
 
-async fn build(
-    args: &Args,
-    packages: &[&Package],
-    envs: Vec<(&str, &str)>,
-) -> Result<Vec<ServiceArtifacts>, Error> {
+async fn build(args: &Args, packages: &[&Package]) -> Result<Vec<ServiceArtifacts>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
     command
-        .envs(envs)
         .arg("build")
         .args(SERVICE_ARGS)
         .arg("--release")
@@ -1070,7 +1065,7 @@ async fn main2() -> Result<(), Error> {
                 let index = MetadataIndex::new(&metadata);
                 for id in &*metadata.workspace_default_members {
                     let package = *index.packages.get(id.repr.as_str()).unwrap();
-                    build(&args, &[package], vec![]).await?;
+                    build(&args, &[package]).await?;
                 }
             } else {
                 for package in &args.package {
@@ -1079,7 +1074,7 @@ async fn main2() -> Result<(), Error> {
                         .iter()
                         .find(|p| &p.name == package)
                         .ok_or_else(|| anyhow!("Could not find package {}", package))?;
-                    build(&args, &[p], vec![]).await?;
+                    build(&args, &[p]).await?;
                 }
             }
             pretty("Done", "");

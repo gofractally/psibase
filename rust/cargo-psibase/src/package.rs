@@ -355,7 +355,7 @@ pub async fn build_package(
 
     let mut service_wasms = Vec::new();
     for (package, mut info) in services {
-        let mut paths = build(args, &[package], vec![]).await?;
+        let mut paths = build(args, &[package]).await?;
         if paths.len() != 1 {
             Err(anyhow!(
                 "Service {} should produce exactly one wasm target",
