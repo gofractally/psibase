@@ -5,11 +5,11 @@
     &bull;
     <a href="#overview">Overview</a> &bull;
     <a href="#demo-deployment-%EF%B8%8F">Demo 🖥️</a> &bull;
-    <a href="#technical-docs-">Docs 📓</a> &bull;
+    <a href="#technical-docs-%EF%B8%8F">Docs 📓</a> &bull;
     <a href="#build-from-source-%EF%B8%8F">Build 🛠️</a> &bull;
     <a href="#running-psibase-infrastructure-">Run 🚀</a> &bull;
     <a href="#contribute-">Contribute 🧬</a> &bull;
-    <a href="#support-">Support 📱</a> &bull;
+    <a href="#support">Support 📱</a> &bull;
   </p>
 </div>
 
