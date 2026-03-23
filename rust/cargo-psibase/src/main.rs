@@ -648,12 +648,12 @@ async fn build(
     args: &Args,
     packages: &[&Package],
     envs: Vec<(&str, &str)>,
-    extra_args: &[&str],
 ) -> Result<Vec<ServiceArtifacts>, Error> {
-    let command = tokio::process::Command::new(get_cargo())
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
         .envs(envs)
         .arg("build")
-        .args(extra_args)
+        .args(SERVICE_ARGS)
         .arg("--release")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
@@ -661,10 +661,14 @@ async fn build(
         .arg("--message-format=json-diagnostic-rendered-ansi")
         .arg("--color=always")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
 
-    let files = wait_for_child(command, packages).await?;
+    for package in packages {
+        command.arg("-p");
+        command.arg(&package.name);
+    }
+
+    let files = wait_for_child(command.spawn()?, packages).await?;
     let mut result = Vec::new();
     for f in &files.services {
         let service = f.path.with_extension("wasm");
@@ -1066,9 +1070,7 @@ async fn main2() -> Result<(), Error> {
                 let index = MetadataIndex::new(&metadata);
                 for id in &*metadata.workspace_default_members {
                     let package = *index.packages.get(id.repr.as_str()).unwrap();
-                    let mut extra_args = SERVICE_ARGS.to_owned();
-                    extra_args.extend(["-p", package.name.as_str()]);
-                    build(&args, &[package], vec![], &extra_args).await?;
+                    build(&args, &[package], vec![]).await?;
                 }
             } else {
                 for package in &args.package {
@@ -1077,9 +1079,7 @@ async fn main2() -> Result<(), Error> {
                         .iter()
                         .find(|p| &p.name == package)
                         .ok_or_else(|| anyhow!("Could not find package {}", package))?;
-                    let mut extra_args = SERVICE_ARGS.to_owned();
-                    extra_args.extend(["-p", package.as_str()]);
-                    build(&args, &[p], vec![], &extra_args).await?;
+                    build(&args, &[p], vec![]).await?;
                 }
             }
             pretty("Done", "");
