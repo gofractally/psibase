@@ -8,23 +8,18 @@ import {
     verifyViteCache,
 } from "../../../vite.shared";
 
-const serviceDir = path.resolve(__dirname);
-
-verifyViteCache(serviceDir);
+const appDirectory = path.resolve(__dirname);
+verifyViteCache(appDirectory);
 
 // https://vitejs.dev/config/
 export default defineConfig((config) => ({
     plugins: [
         createSharedViteConfig({
-            projectDir: serviceDir,
             manualChunks: {
                 vendor: ["react", "react-dom", "react-router-dom"],
             },
         }),
-        createPsibaseConfig(config, {
-            service: "fractals",
-            serviceDir: serviceDir,
-        }),
+        createPsibaseConfig(config, { appDirectory }),
         ...getSharedUIPlugins(),
     ],
     build: {

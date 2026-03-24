@@ -13,7 +13,6 @@ const outDirParams = {
 };
 
 export interface SharedViteConfigOptions {
-    projectDir: string;
     manualChunks?: Record<string, string[]>;
     additionalManualChunks?: Record<string, string[]>;
     uiFramework?: string;
@@ -84,8 +83,7 @@ export function verifyViteCache(dirname: string) {
 
 export interface PsibaseConfigOptions {
     uiFramework?: string;
-    service: string;
-    serviceDir: string;
+    appDirectory: string;
     bundleCommonLib?: boolean;
     additionalAliases?: Array<{ find: string | RegExp; replacement: string }>;
 }
@@ -100,8 +98,7 @@ export function createPsibaseConfig(
 
     const {
         uiFramework = "react",
-        service,
-        serviceDir,
+        appDirectory,
         bundleCommonLib = false,
         additionalAliases = [],
     } = options;
@@ -113,7 +110,7 @@ export function createPsibaseConfig(
     const buildAliases: Alias[] = [
         {
             find: "@",
-            replacement: path.resolve(serviceDir, "./src"),
+            replacement: path.resolve(appDirectory, "./src"),
         },
         {
             find: /^\/common(?!\/(?:fonts))(.*)$/,
@@ -135,7 +132,6 @@ export function createPsibaseConfig(
         name: "psibase",
         config: () => ({
             server: {
-                host: `${service}.psibase.localhost`,
                 port: 8081,
             },
             build: {
