@@ -89,6 +89,7 @@ export interface PsibaseConfigOptions {
     isServing?: boolean;
     useHttps?: boolean;
     proxyPort?: number;
+    bundleCommonLib?: boolean;
     additionalAliases?: Array<{ find: string | RegExp; replacement: string }>;
     additionalProxyBypassConditions?: Array<(req: any) => boolean>;
     additionalProxies?: Record<
@@ -131,10 +132,15 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         isServing = false,
         useHttps = process.env.VITE_SECURE_LOCAL_DEV === "true",
         proxyPort = 8080,
+        bundleCommonLib = false,
         additionalAliases = [],
         additionalProxyBypassConditions = [],
         additionalProxies = [],
     } = options;
+
+    const commonLibSourcePath = path.resolve(
+        `${servicesDir}/user/CommonApi/common/packages/common-lib/src`,
+    );
 
     const buildAliases: Alias[] = [
         {
@@ -149,18 +155,18 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         },
         {
             find: /^@psibase\/common-lib.*$/,
-            replacement: "/common/common-lib.js",
+            replacement: bundleCommonLib
+                ? commonLibSourcePath
+                : "/common/common-lib.js",
         },
         ...additionalAliases,
     ];
 
-    if (isServing) {
-        // TODO: this is contradictory to the above L131
+    if (isServing && !bundleCommonLib) {
+        // TODO: this is contradictory to the above alias
         buildAliases.push({
             find: /^@psibase\/common-lib.*$/,
-            replacement: path.resolve(
-                `${servicesDir}/user/CommonApi/common/packages/common-lib/src`,
-            ),
+            replacement: commonLibSourcePath,
         });
     }
 
@@ -226,7 +232,9 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
                 rollupOptions: {
                     external: [
                         "/common/rootdomain.mjs",
-                        "/common/common-lib.js",
+                        ...(bundleCommonLib
+                            ? []
+                            : ["/common/common-lib.js"]),
                     ],
                     makeAbsoluteExternalsRelative: false,
                 },

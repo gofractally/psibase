@@ -25,6 +25,7 @@ export default defineConfig(({ command }) => ({
             serviceDir: serviceDir,
             isServing: command === "serve",
             useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
+            bundleCommonLib: true,
         }),
         ...getSharedUIPlugins(),
     ],
