@@ -13,11 +13,12 @@ namespace LocalService
 {
    struct OriginServerRow
    {
-      psibase::AccountNumber                 subdomain;
-      std::string                            host;
-      std::optional<psibase::TLSInfo>        tls;
-      std::optional<psibase::SocketEndpoint> endpoint;
-      PSIO_REFLECT(OriginServerRow, subdomain, host, tls, endpoint)
+      psibase::AccountNumber                  subdomain;
+      std::string                             host;
+      std::optional<psibase::TLSInfo>         tls;
+      std::optional<psibase::SocketEndpoint>  endpoint;
+      std::optional<std::vector<std::string>> bypassPrefixes;
+      PSIO_REFLECT(OriginServerRow, subdomain, host, tls, endpoint, bypassPrefixes)
    };
    using OriginServerTable = psibase::Table<OriginServerRow, &OriginServerRow::subdomain>;
    PSIO_REFLECT_TYPENAME(OriginServerTable)
@@ -46,8 +47,8 @@ namespace LocalService
       using Subjective              = psibase::SubjectiveTables<OriginServerTable>;
       using Session                 = psibase::SessionTables<ProxyTable, WebSocketTable>;
 
-      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
-          -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest        req,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
       void onReply(std::int32_t socket, psibase::HttpReply reply);
       void onAccept(std::int32_t socket, psibase::HttpReply reply);
       void onError(std::int32_t socket, std::optional<psibase::HttpReply> reply);

@@ -57,6 +57,18 @@ namespace
 
       return result;
    }
+
+   bool pathMatchesBypassPrefix(std::string_view path, const std::vector<std::string>& prefixes)
+   {
+      for (const auto& prefix : prefixes)
+      {
+         if (prefix.empty())
+            continue;
+         if (path.starts_with(prefix))
+            return true;
+      }
+      return false;
+   }
 }  // namespace
 
 std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
@@ -92,6 +104,9 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
             std::string_view msg{"Invalid host for origin server."};
             return makeError(HttpStatus::badRequest, msg);
          }
+
+         if (!row.bypassPrefixes.has_value())
+            row.bypassPrefixes = std::vector<std::string>{std::string{"/common"}};
 
          PSIBASE_SUBJECTIVE_TX
          {
@@ -136,6 +151,10 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    }
    if (originServer)
    {
+      if (originServer->bypassPrefixes &&
+          pathMatchesBypassPrefix(req.path(), *originServer->bypassPrefixes))
+         return {};
+
       if (auto originUrl = psibase::splitURL(originServer->host); !originUrl.scheme.empty())
       {
          if (!originUrl.host.empty())
