@@ -41,9 +41,6 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
     if options.dispatch.is_none() {
         options.dispatch = Some(true);
     }
-    if options.generate_schema.is_none() {
-        options.generate_schema = options.dispatch.clone();
-    }
 
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
     let item = syn::parse2::<syn::Item>(item).unwrap();
@@ -816,17 +813,6 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
-    let schema_gen = if options.generate_schema.unwrap() {
-        quote! {
-            #[test]
-            #[ignore]
-            fn _psibase_get_schema() {
-                #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
-            }
-        }
-    } else {
-        quote! {}
-    };
     let export_wasm_interface = if options.dispatch.unwrap() {
         quote! {
             #[cfg(not(test))]
@@ -854,8 +840,6 @@ fn process_mod(
 
         #export_wasm_interface
         #polyfill
-
-        #schema_gen
     }
     .into()
 } // process_mod
