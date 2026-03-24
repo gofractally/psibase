@@ -209,8 +209,9 @@ function ProxyEditor({
                     Reverse proxy
                 </h1>
                 <p className="text-muted-foreground mt-1 text-sm">
-                    Map subdomains to an upstream origin; path prefixes below
-                    are served on-chain instead of proxied.
+                    Point a subdomain at an upstream host. Requests whose path
+                    starts with a listed proxy bypass prefix are served from
+                    this network; everything else is forwarded upstream.
                 </p>
             </div>
             <div className="mb-6 flex flex-col gap-4">
