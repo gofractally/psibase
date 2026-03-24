@@ -19,7 +19,7 @@ import {
 import { Separator } from "@shared/shadcn/ui/separator";
 import { Toaster, toast } from "@shared/shadcn/ui/sonner";
 
-const DEFAULT_BYPASS_PREFIXES = ["/common"];
+const DEFAULT_BYPASS_PREFIXES = ["/common", "/plugin.wasm"];
 
 type Scheme = "http" | "https";
 type ProxyRow = {
