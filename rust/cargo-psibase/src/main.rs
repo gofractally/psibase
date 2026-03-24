@@ -645,7 +645,11 @@ struct ServiceArtifacts {
     package_index: usize,
 }
 
-async fn build(args: &Args, packages: &[&Package]) -> Result<Vec<ServiceArtifacts>, Error> {
+async fn build(
+    args: &Args,
+    packages: &[&Package],
+    extra: &[&PackageId],
+) -> Result<Vec<ServiceArtifacts>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
     command
         .arg("build")
@@ -662,6 +666,10 @@ async fn build(args: &Args, packages: &[&Package]) -> Result<Vec<ServiceArtifact
     for package in packages {
         command.arg("-p");
         command.arg(&package.name);
+    }
+    for package in extra {
+        command.arg("-p");
+        command.arg(&package.repr);
     }
 
     let files = wait_for_child(command.spawn()?, packages).await?;
@@ -714,29 +722,6 @@ async fn build_plugin(args: &Args, packages: &[&Package]) -> Result<Vec<PathBuf>
     }
 
     Ok(files?)
-}
-
-async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
-        .arg("rustc")
-        .args(&["-p", package])
-        .arg("--release")
-        .arg("--lib")
-        .arg("--target=wasm32-wasip1")
-        .args(get_manifest_path(args))
-        .args(get_target_dir(args))
-        .arg("--color=always")
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let status = command.wait().await?;
-
-    if !status.success() {
-        exit(status.code().unwrap());
-    }
-
-    Ok(())
 }
 
 fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {
@@ -1066,7 +1051,7 @@ async fn main2() -> Result<(), Error> {
                 let index = MetadataIndex::new(&metadata);
                 for id in &*metadata.workspace_default_members {
                     let package = *index.packages.get(id.repr.as_str()).unwrap();
-                    build(&args, &[package]).await?;
+                    build(&args, &[package], &[]).await?;
                 }
             } else {
                 for package in &args.package {
@@ -1075,7 +1060,7 @@ async fn main2() -> Result<(), Error> {
                         .iter()
                         .find(|p| &p.name == package)
                         .ok_or_else(|| anyhow!("Could not find package {}", package))?;
-                    build(&args, &[p]).await?;
+                    build(&args, &[p], &[]).await?;
                 }
             }
             pretty("Done", "");

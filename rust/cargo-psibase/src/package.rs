@@ -1,4 +1,4 @@
-use crate::{build, build_package_root, build_plugin, Args, ServiceArtifacts};
+use crate::{build, build_plugin, Args, ServiceArtifacts};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -530,6 +530,7 @@ pub async fn build_packages(
         }
     }
 
+    // Run cargo build at the root to pick up any build scripts
     let mut extra_roots = Vec::new();
     for root in roots {
         if !all_crates.insert(*root) {
@@ -553,13 +554,8 @@ pub async fn build_packages(
     }
 
     let flattened = FlattenServices::new(&builders);
-    let paths = build(args, &flattened.packages).await?;
+    let paths = build(args, &flattened.packages, &extra_roots).await?;
     let paths = flattened.split(paths)?;
-
-    for root in extra_roots {
-        // Run cargo build at the root to pick up any build scripts
-        build_package_root(args, &root.repr).await?;
-    }
 
     let mut result = Vec::new();
     for ((mut builder, paths), root) in builders.into_iter().zip(paths).zip(roots) {
