@@ -459,21 +459,36 @@ impl<'a> FlattenServices<'a> {
         result
     }
     fn split(
-        &self,
+        mut self,
         files: Vec<ServiceArtifacts>,
     ) -> Result<Vec<Vec<ServiceArtifacts>>, anyhow::Error> {
-        // This isn't strictly needed, but it helps detect errors
-        let files = sort_services(files, &self.packages)?;
         // Duplicate items as needed
         let mut expanded = Vec::new();
         for mut file in files {
-            let uses = &self.uses[&(self.packages[file.package_index] as *const Package)];
+            let Some(uses) = self
+                .uses
+                .remove(&(self.packages[file.package_index] as *const Package))
+            else {
+                Err(anyhow!(
+                    "Service {} should not produce more than one wasm target",
+                    self.packages[file.package_index].name
+                ))?
+            };
             for i in &uses[0..(uses.len() - 1)] {
                 file.package_index = *i;
                 expanded.push(file.clone());
             }
             file.package_index = *uses.last().unwrap();
             expanded.push(file);
+        }
+        // Verify that all packages are present
+        for package in &self.packages {
+            if self.uses.contains_key(&(*package as *const Package)) {
+                Err(anyhow!(
+                    "Service {} is expected to produce a wasm target",
+                    package.name
+                ))?
+            }
         }
         // Sort by package_index
         for i in 0..expanded.len() {
@@ -492,27 +507,6 @@ impl<'a> FlattenServices<'a> {
         }
         Ok(result)
     }
-}
-
-fn sort_services(
-    mut paths: Vec<ServiceArtifacts>,
-    packages: &[&Package],
-) -> Result<Vec<ServiceArtifacts>, anyhow::Error> {
-    paths.sort_by_key(|p| p.package_index);
-    let mut error_index = paths.len();
-    for (i, path) in paths.iter().enumerate() {
-        if path.package_index != i {
-            error_index = path.package_index.min(i);
-            break;
-        }
-    }
-    if error_index < packages.len() {
-        Err(anyhow!(
-            "Service {} should produce exactly one wasm target",
-            packages[error_index].name
-        ))?
-    }
-    Ok(paths)
 }
 
 pub async fn build_packages(
