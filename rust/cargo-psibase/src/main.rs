@@ -480,14 +480,21 @@ struct AsyncJobServer {
 
 impl AsyncJobServer {
     unsafe fn new(limit: Option<usize>) -> Result<AsyncJobServer, Error> {
+        use jobserver::FromEnvErrorKind::*;
         let client = match jobserver::Client::from_env_ext(false).client {
             Ok(client) => client,
-            Err(err) if matches!(err.kind(), jobserver::FromEnvErrorKind::NoEnvVar) => {
-                jobserver::Client::new(limit.unwrap_or_else(|| {
-                    std::thread::available_parallelism().map_or(1, |n| n.get())
-                }))?
-            }
-            Err(err) => Err(err)?,
+            Err(err) => match err.kind() {
+                NoEnvVar | NoJobserver | Unsupported => {
+                    jobserver::Client::new(limit.unwrap_or_else(|| {
+                        std::thread::available_parallelism().map_or(1, |n| n.get())
+                    }))?
+                }
+                CannotParse | CannotOpenPath | CannotOpenFd | NegativeFd => {
+                    eprintln!("{:}: {}", style("error").bold().red(), err);
+                    jobserver::Client::new(limit.unwrap_or(1))?
+                }
+                _ => Err(err)?,
+            },
         };
         let (sender, receiver) = std::sync::mpsc::channel::<JobAcquiredSender>();
         let helper = client.into_helper_thread(move |aq| {
