@@ -7,7 +7,7 @@ use crate::constants::{DEFAULT_RANKED_GUILD_SLOT_COUNT, MAX_RANKED_GUILDS};
 use crate::helpers::fib::EXTERNAL_S;
 use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
-    Fractal, Guild, GuildMember, RewardConsensus, RewardConsensusTable, RewardStream,
+    Fractal, Guild, Member, RewardConsensus, RewardConsensusTable, RewardStream,
 };
 
 use psibase::services::tokens::Quantity;
@@ -115,7 +115,7 @@ impl RewardConsensus {
             match guild {
                 Some(guild) => {
                     let (member_distributions, member_dust) = distribute_by_weight(
-                        GuildMember::memberships_of_guild(guild)
+                        Member::memberships_of_guild(guild)
                             .into_iter()
                             .filter(|member| member.score > 0)
                             .collect(),

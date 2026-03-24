@@ -3,11 +3,11 @@ use async_graphql::{connection::Connection, SimpleObject};
 
 use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 
-use crate::tables::tables::GuildExile;
+use crate::tables::tables::{Ban, Exile};
 use crate::{
     constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
     tables::tables::{
-        Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
+        Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, Member,
     },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -33,10 +33,14 @@ impl GuildApplication {
     pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
         check_none(Self::get(guild, applicant), "application already exists");
         check_none(
-            GuildMember::get(guild, applicant),
+            Member::get(guild, applicant),
             "user is already a guild member",
         );
-        check_none(GuildExile::get(guild, applicant), "account is in exile");
+        check_none(
+            Exile::get(guild, applicant),
+            "account is exiled by the fractal",
+        );
+        check_none(Ban::get(guild, applicant), "account is banned by the guild");
         let new_instance = Self::new(guild, applicant, extra_info);
         new_instance.save();
         new_instance
@@ -96,7 +100,7 @@ impl GuildApplication {
     fn check_attests(&self) {
         match self.application_status() {
             ApplicationStatus::Accepted => {
-                GuildMember::add(self.guild, self.applicant);
+                Member::add(self.guild, self.applicant);
                 self.remove()
             }
             ApplicationStatus::Rejected => {

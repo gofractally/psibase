@@ -5,7 +5,7 @@ use psibase::{check_some, get_service, AccountNumber, Table};
 
 use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
 use crate::helpers::assign_decreasing_levels;
-use crate::tables::tables::{Guild, GuildMember, GuildMemberTable, GuildTable};
+use crate::tables::tables::{Guild, GuildTable, Member, MemberTable};
 use crate::{
     helpers::parse_rank_to_accounts,
     tables::tables::{EvaluationInstance, EvaluationInstanceTable},
@@ -179,7 +179,7 @@ impl EvaluationInstance {
     }
 
     pub fn open_pending_levels(&self) {
-        let table = GuildMemberTable::read_write();
+        let table = MemberTable::read_write();
         table
             .get_index_pk()
             .range(
@@ -192,7 +192,7 @@ impl EvaluationInstance {
     }
 
     pub fn close_pending_levels(&self, forced_pending_level: Option<u8>) {
-        let guild_member_table = GuildMemberTable::read_write();
+        let guild_member_table = MemberTable::read_write();
 
         let evaluation_participants: HashSet<AccountNumber> = self
             .users(None)
@@ -222,7 +222,7 @@ impl EvaluationInstance {
     }
 
     pub fn award_group_scores(&self, group_number: u32, vanilla_group_result: Vec<u8>) {
-        let guild_member_table = GuildMemberTable::read_write();
+        let guild_member_table = MemberTable::read_write();
 
         let group_members: Vec<_> = self
             .users(Some(group_number))
@@ -245,7 +245,7 @@ impl EvaluationInstance {
             // Don't assume the evaluation group member is still a GuildMember,
             // maybe he was kicked in the mean time.
             if let Some(mut guild_member) =
-                GuildMember::get_from(&guild_member_table, self.guild, account)
+                Member::get_from(&guild_member_table, self.guild, account)
             {
                 let level_achieved = level_by_account.get(&account).copied();
                 if let Some(new_level) = level_achieved {

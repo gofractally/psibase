@@ -7,9 +7,7 @@ use psibase::{
 
 use crate::{
     constants::MAX_GUILD_INVITES_PER_MEMBER,
-    tables::tables::{
-        Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember,
-    },
+    tables::tables::{Guild, GuildApplication, GuildInvite, GuildInviteTable, Member},
 };
 use psibase::services::{
     invite::Wrapper as Invite, tokens::Wrapper as Tokens, transact::Wrapper as TransactSvc,
@@ -52,7 +50,7 @@ impl GuildInvite {
             "too many pending invites",
         );
         check_some(
-            GuildMember::get(guild, inviter),
+            Member::get(guild, inviter),
             "must be a member of guild to invite to it",
         );
 

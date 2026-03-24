@@ -62,7 +62,7 @@ pub mod constants {
 pub mod service {
 
     use crate::tables::tables::{
-        EvaluationInstance, Fractal, Guild, GuildApplication, GuildExile, GuildInvite, GuildMember,
+        EvaluationInstance, Exile, Fractal, Guild, GuildApplication, GuildInvite, Member,
         RewardConsensus,
     };
 
@@ -178,7 +178,7 @@ pub mod service {
     /// * `member` - Guild member to be kicked.
     #[action]
     fn guild_kick(member: AccountNumber) {
-        GuildMember::get_assert(get_sender(), member).kick();
+        Member::get_assert(get_sender(), member).kick();
     }
 
     /// Attest Guild Membership application
@@ -237,7 +237,7 @@ pub mod service {
     /// * `active`- True to become a candidate, False to retire
     #[action]
     fn reg_can(guild: AccountNumber, active: bool) {
-        GuildMember::get_assert(guild, get_sender()).set_candidacy(active);
+        Member::get_assert(guild, get_sender()).set_candidacy(active);
     }
 
     /// Set the candidacy cooldown period.
@@ -326,7 +326,7 @@ pub mod service {
         check_is_eval();
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
         check_some(
-            GuildMember::get(evaluation.guild, account),
+            Member::get(evaluation.guild, account),
             "account must be member of guild",
         );
     }
@@ -458,16 +458,17 @@ pub mod service {
         GuildApplication::get_assert(guild_account, get_sender()).set_extra_info(extra_info);
     }
 
-    /// Exile a guild member.
+    /// Exile a fractal member.
     ///
-    /// Must be called by the guild.  
+    /// Must be called by fractal leadership.  
     ///
     /// # Arguments
     /// * `account` - Account to be exiled
-    /// * `duration_seconds` - Duration of exile in seconds.    
     #[action]
-    fn exile_member(account: AccountNumber, duration_seconds: u32) {
-        Guild::by_sender().exile_member(account, duration_seconds)
+    fn exile_member(fractal: AccountNumber, account: AccountNumber) {
+        let mut fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_legislature();
+        fractal.exile_member(account);
     }
 
     /// Revoke guild exile.
@@ -479,7 +480,30 @@ pub mod service {
     /// * `account` - The exiled account.
     #[action]
     fn revoke_exile(guild: AccountNumber, account: AccountNumber) {
-        GuildExile::get_assert(guild, account).revoke()
+        Exile::get_assert(guild, account).remove()
+    }
+
+    /// Exile a guild member.
+    ///
+    /// Must be called by the guild.  
+    ///
+    /// # Arguments
+    /// * `account` - Account to be exiled
+    #[action]
+    fn ban_member(account: AccountNumber) {
+        Guild::by_sender().ban_member(account)
+    }
+
+    /// Revoke guild ban.
+    ///
+    /// Must be called by the guild if prior to expiry.  
+    ///
+    /// # Arguments
+    /// * `guild` - The guild the member was exiled from.
+    /// * `account` - The exiled account.
+    #[action]
+    fn revoke_ban(guild: AccountNumber, account: AccountNumber) {
+        Guild::by_sender().unban_member(account);
     }
 
     /// Set ranked guild slots.

@@ -29,7 +29,7 @@ interface admin-guild {
 
     set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
 
-    exile-member: func(member: string, duration-seconds: u32) -> result<_, error>;
+    exile-member: func(member: string) -> result<_, error>;
     revoke-exile: func(guild-account: string, account: string) -> result<_, error>;
 }
 

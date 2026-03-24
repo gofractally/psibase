@@ -7,7 +7,7 @@ use crate::constants::token_distributions::consensus_rewards::{
 use crate::constants::{
     token_distributions::TOKEN_SUPPLY, DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION,
 };
-use crate::tables::tables::{Fractal, FractalTable, RewardConsensus};
+use crate::tables::tables::{Exile, Fractal, FractalTable, Member, RewardConsensus};
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
@@ -186,6 +186,11 @@ impl Fractal {
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(self.legislature)
+    }
+
+    pub fn exile_member(&self, member: AccountNumber) {
+        Exile::add(self.account, member);
+        Member::remove_all_by_member(member);
     }
 }
 

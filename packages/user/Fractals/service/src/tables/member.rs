@@ -5,12 +5,12 @@ use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE
 use crate::helpers::RollingBits16;
 use crate::scoring::{calculate_ema_u32, Fraction};
 use crate::tables::tables::{
-    Fractal, Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, GuildMember,
-    GuildMemberTable, RewardStream,
+    Fractal, Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, Member,
+    MemberTable, RewardStream,
 };
 use psibase::services::transact::Wrapper as TransactSvc;
 
-impl GuildMember {
+impl Member {
     fn new(guild: AccountNumber, member: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
@@ -38,13 +38,11 @@ impl GuildMember {
     }
 
     pub fn get(guild: AccountNumber, member: AccountNumber) -> Option<Self> {
-        GuildMemberTable::read()
-            .get_index_pk()
-            .get(&(guild, member))
+        MemberTable::read().get_index_pk().get(&(guild, member))
     }
 
     pub fn get_from(
-        table: &GuildMemberTable,
+        table: &MemberTable,
         guild: AccountNumber,
         member: AccountNumber,
     ) -> Option<Self> {
@@ -60,21 +58,21 @@ impl GuildMember {
     }
 
     pub fn memberships_of_member(member: AccountNumber) -> Vec<Self> {
-        GuildMemberTable::read()
+        MemberTable::read()
             .get_index_by_member()
             .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
             .collect()
     }
 
     pub fn memberships_of_guild(guild: AccountNumber) -> Vec<Self> {
-        GuildMemberTable::read()
+        MemberTable::read()
             .get_index_pk()
             .range((guild, AccountNumber::from(0))..=(guild, AccountNumber::from(u64::MAX)))
             .collect()
     }
 
     pub fn remove_all_by_member(member: AccountNumber) {
-        let table = GuildMemberTable::read_write();
+        let table = MemberTable::read_write();
         for membership in Self::memberships_of_member(member) {
             table.remove(&membership);
         }
@@ -142,20 +140,20 @@ impl GuildMember {
             table.remove(&application);
         }
 
-        GuildMemberTable::read_write().remove(&self);
+        MemberTable::read_write().remove(&self);
     }
 
-    pub fn save_to(&self, table: &GuildMemberTable) {
+    pub fn save_to(&self, table: &MemberTable) {
         table.put(&self).expect("failed to save");
     }
 
     fn save(&self) {
-        self.save_to(&GuildMemberTable::read_write());
+        self.save_to(&MemberTable::read_write());
     }
 }
 
 #[ComplexObject]
-impl GuildMember {
+impl Member {
     pub async fn guild(&self) -> Guild {
         Guild::get_assert(self.guild)
     }

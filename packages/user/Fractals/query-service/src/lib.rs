@@ -5,8 +5,8 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalTable, Guild,
-        GuildApplication, GuildApplicationTable, GuildInvite, GuildInviteTable, GuildMember,
-        GuildMemberTable, GuildTable,
+        GuildApplication, GuildApplicationTable, GuildInvite, GuildInviteTable, GuildTable, Member,
+        MemberTable,
     };
     use psibase::{AccountNumber, *};
     use serde::{Deserialize, Deserializer};
@@ -249,8 +249,8 @@ mod service {
             &self,
             guild: AccountNumber,
             member: AccountNumber,
-        ) -> Option<GuildMember> {
-            GuildMemberTable::with_service(fractals::SERVICE)
+        ) -> Option<Member> {
+            MemberTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .get(&(guild, member))
         }
@@ -262,9 +262,9 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
+        ) -> async_graphql::Result<Connection<RawKey, Member>> {
             TableQuery::subindex::<AccountNumber>(
-                GuildMemberTable::with_service(fractals::SERVICE).get_index_pk(),
+                MemberTable::with_service(fractals::SERVICE).get_index_pk(),
                 &(guild),
             )
             .first(first)
@@ -315,9 +315,9 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
+        ) -> async_graphql::Result<Connection<RawKey, Member>> {
             TableQuery::subindex::<AccountNumber>(
-                GuildMemberTable::with_service(fractals::SERVICE).get_index_by_member(),
+                MemberTable::with_service(fractals::SERVICE).get_index_by_member(),
                 &(member),
             )
             .first(first)
@@ -332,8 +332,8 @@ mod service {
             &self,
             guild: AccountNumber,
             member: AccountNumber,
-        ) -> Option<GuildMember> {
-            GuildMemberTable::with_service(fractals::SERVICE)
+        ) -> Option<Member> {
+            MemberTable::with_service(fractals::SERVICE)
                 .get_index_pk()
                 .get(&(guild, member))
         }

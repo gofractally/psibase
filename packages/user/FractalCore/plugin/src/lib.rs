@@ -107,12 +107,12 @@ impl AdminGuild for FractalCorePlugin {
         FractalsPlugin::admin_guild::set_rank_ordering_threshold(threshold)
     }
 
-    fn exile_member(member_account: String, duration_seconds: u32) -> Result<(), Error> {
+    fn exile_member(member_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
         // TODO: Is it the judiciary to call this? Or the guild leadership?
         propose::judiciary()?;
 
-        FractalsPlugin::admin_guild::exile_member(&member_account, duration_seconds)
+        FractalsPlugin::admin_guild::exile_member(&member_account)
     }
 
     fn revoke_exile(guild_account: String, member_account: String) -> Result<(), Error> {

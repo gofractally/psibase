@@ -182,10 +182,9 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl AdminGuild for FractallyPlugin {
-    fn exile_member(member: String, duration_seconds: u32) -> Result<(), Error> {
+    fn exile_member(member: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
         let packed_args = fractals::action_structs::exile_member {
-            duration_seconds,
             account: member.parse().unwrap(),
         }
         .packed();

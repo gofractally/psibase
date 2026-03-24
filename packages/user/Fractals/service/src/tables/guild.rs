@@ -9,8 +9,8 @@ use crate::constants::{
 };
 use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
-    EvaluationInstance, Fractal, Guild, GuildExile, GuildFlags, GuildMember, GuildMemberTable,
-    GuildTable, RewardStream,
+    EvaluationInstance, Exile, Fractal, Guild, GuildFlags, GuildTable, Member, MemberTable,
+    RewardStream,
 };
 
 impl Guild {
@@ -50,7 +50,7 @@ impl Guild {
         self.get_setting(GuildFlags::RANK_ORDERING)
     }
 
-    pub fn exile_member(&self, exiled_member: AccountNumber, duration_seconds: u32) {
+    pub fn ban_member(&self, exiled_member: AccountNumber) {
         let guild_account = self.account;
         let fractal_token = Fractal::get_assert(self.fractal).token_id;
 
@@ -58,8 +58,8 @@ impl Guild {
             stream.withdraw_and_credit_owner();
         }
 
-        GuildExile::add(guild_account, exiled_member, duration_seconds);
-        GuildMember::get_assert(guild_account, exiled_member).remove_by_exile();
+        Exile::add(guild_account, exiled_member);
+        Member::get_assert(guild_account, exiled_member).remove_by_exile();
     }
 
     pub fn enable_rank_ordering(&mut self) {
@@ -83,7 +83,7 @@ impl Guild {
             Self::new(fractal, guild, rep, display_name, council_role, rep_role);
         new_guild_instance.save();
 
-        GuildMember::add(new_guild_instance.account, rep);
+        Member::add(new_guild_instance.account, rep);
 
         AuthDyn::call().newAccount(council_role);
         AuthDyn::call().newAccount(rep_role);
@@ -160,7 +160,7 @@ impl Guild {
     }
 
     pub fn active_member_count(&self) -> usize {
-        GuildMemberTable::read()
+        MemberTable::read()
             .get_index_pk()
             .range(
                 (self.account, AccountNumber::from(0))
@@ -170,8 +170,8 @@ impl Guild {
             .count()
     }
 
-    pub fn council_members(&self) -> Option<Vec<GuildMember>> {
-        let council: Vec<GuildMember> = GuildMemberTable::read()
+    pub fn council_members(&self) -> Option<Vec<Member>> {
+        let council: Vec<Member> = MemberTable::read()
             .get_index_by_score()
             .range(
                 (self.account, true, 0, AccountNumber::new(0))
@@ -189,9 +189,8 @@ impl Guild {
         }
     }
 
-    pub fn representative(&self) -> Option<GuildMember> {
-        self.rep
-            .map(|rep| GuildMember::get_assert(self.account, rep))
+    pub fn representative(&self) -> Option<Member> {
+        self.rep.map(|rep| Member::get_assert(self.account, rep))
     }
 
     pub fn guild_auth(&self) -> DynamicAuthPolicy {
@@ -221,7 +220,7 @@ impl Guild {
 
     pub fn set_representative(&mut self, new_representative: AccountNumber) {
         check_some(
-            GuildMember::get(self.account, new_representative),
+            Member::get(self.account, new_representative),
             "new representative must be a guild member",
         );
 
@@ -269,7 +268,7 @@ impl Guild {
             .map(|members| members.into_iter().map(|member| member.member).collect())
     }
 
-    pub async fn rep(&self) -> Option<GuildMember> {
+    pub async fn rep(&self) -> Option<Member> {
         self.representative()
     }
 }

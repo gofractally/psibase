@@ -1,11 +1,12 @@
+mod ban;
 mod evaluation_instance;
+mod exile;
 mod fractal;
 mod guild;
 mod guild_application;
 mod guild_attest;
-mod guild_exile;
 mod guild_invite;
-mod guild_member;
+mod member;
 mod reward_consensus;
 mod reward_stream;
 
@@ -94,10 +95,10 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildMemberTable", index = 3)]
+    #[table(name = "MemberTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
-    pub struct GuildMember {
+    pub struct Member {
         #[graphql(skip)]
         pub guild: AccountNumber,
         pub member: AccountNumber,
@@ -110,20 +111,20 @@ pub mod tables {
         pub attendance: u16,
     }
 
-    impl GuildMember {
+    impl Member {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
             (self.guild, self.member)
         }
 
         #[secondary_key(1)]
-        fn by_member(&self) -> (AccountNumber, AccountNumber) {
-            (self.member, self.guild)
+        fn by_score(&self) -> (AccountNumber, bool, u32, AccountNumber) {
+            (self.guild, self.is_candidate, self.score, self.member)
         }
 
         #[secondary_key(2)]
-        fn by_score(&self) -> (AccountNumber, bool, u32, AccountNumber) {
-            (self.guild, self.is_candidate, self.score, self.member)
+        fn by_member(&self) -> (AccountNumber, AccountNumber) {
+            (self.member, self.guild)
         }
     }
 
@@ -199,25 +200,24 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildExileTable", index = 7)]
+    #[table(name = "ExileTable", index = 7)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
-    pub struct GuildExile {
+    pub struct Exile {
         #[graphql(skip)]
-        pub guild: AccountNumber,
+        pub fractal: AccountNumber,
         pub member: AccountNumber,
-        pub expiry: psibase::TimePointSec,
     }
 
-    impl GuildExile {
+    impl Exile {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, AccountNumber) {
-            (self.guild, self.member)
+            (self.fractal, self.member)
         }
 
         #[secondary_key(1)]
         fn by_member(&self) -> (AccountNumber, AccountNumber) {
-            (self.member, self.guild)
+            (self.member, self.fractal)
         }
     }
 
@@ -252,5 +252,21 @@ pub mod tables {
         pub reward_stream_id: u32,
         pub ranked_guilds: Vec<AccountNumber>,
         pub ranked_guild_slot_count: u8,
+    }
+
+    #[table(name = "BanTable", index = 10)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[graphql(complex)]
+    pub struct Ban {
+        #[graphql(skip)]
+        pub guild: AccountNumber,
+        pub member: AccountNumber,
+    }
+
+    impl Ban {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.guild, self.member)
+        }
     }
 }
