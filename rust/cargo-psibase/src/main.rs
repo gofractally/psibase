@@ -306,13 +306,13 @@ fn process(
 
     if let Some(polyfill) = polyfill {
         let polyfill_source_module = config.parse(polyfill)?;
-        pretty_path("Polyfilling", filename);
+        pretty_path("Polyfilling", output_file);
         link_module(&polyfill_source_module, &mut dest_module)?;
     }
 
     strip(&mut dest_module, exports)?;
 
-    pretty_path("Reoptimizing", filename);
+    pretty_path("Reoptimizing", output_file);
     optimize(&mut dest_module)?;
 
     write(output_file, dest_module.emit_wasm())
@@ -569,17 +569,12 @@ async fn build_service_impl(
 
     let mut command = command
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()?;
 
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
     let status = command.wait();
-    let (status, files, _) = tokio::join!(
-        status,
-        get_wasm_files(|_id| true, stdout),
-        print_messages(stderr),
-    );
+    let (status, files) = tokio::join!(status, get_wasm_files(|_id| true, stdout),);
 
     let status = status?;
     if !status.success() {
