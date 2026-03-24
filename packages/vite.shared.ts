@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import type { Alias, Plugin, UserConfig } from "vite";
+import type { Alias, ConfigEnv, Plugin, UserConfig } from "vite";
 
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
@@ -74,7 +74,7 @@ export function createSharedViteConfig(
           };
 }
 
-export function verifyViteCache(dirname: any) {
+export function verifyViteCache(dirname: string) {
     // Ensure cache directory exists
     const cacheDir = path.resolve(dirname, ".vite-cache");
     if (!fs.existsSync(cacheDir)) {
@@ -86,56 +86,24 @@ export interface PsibaseConfigOptions {
     uiFramework?: string;
     service: string;
     serviceDir: string;
-    isServing?: boolean;
-    useHttps?: boolean;
-    proxyPort?: number;
     bundleCommonLib?: boolean;
     additionalAliases?: Array<{ find: string | RegExp; replacement: string }>;
-    additionalProxyBypassConditions?: Array<(req: any) => boolean>;
-    additionalProxies?: Record<
-        string,
-        {
-            target: string;
-            ws?: boolean;
-            timeout?: number;
-            rewrite?: (path: string) => string;
-        }
-    >;
-}
-
-interface ServerConfig {
-    host: string;
-    port: number;
-    proxy: {
-        "/": {
-            target: string;
-            changeOrigin: boolean;
-            secure: boolean;
-            autoRewrite: boolean;
-            timeout?: number;
-            bypass: (req: any, _res: any, _opt: any) => any;
-        };
-    };
-    https?: {
-        key: string;
-        cert: string;
-    };
 }
 
 const servicesDir = path.resolve(__dirname);
 
-export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
+export function createPsibaseConfig(
+    config: ConfigEnv,
+    options: PsibaseConfigOptions,
+): Plugin {
+    const isDevServer = config.command === "serve";
+
     const {
         uiFramework = "react",
         service,
         serviceDir,
-        isServing = false,
-        useHttps = process.env.VITE_SECURE_LOCAL_DEV === "true",
-        proxyPort = 8080,
         bundleCommonLib = false,
         additionalAliases = [],
-        additionalProxyBypassConditions = [],
-        additionalProxies = [],
     } = options;
 
     const commonLibSourcePath = path.resolve(
@@ -155,76 +123,21 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
         },
         {
             find: /^@psibase\/common-lib.*$/,
-            replacement: bundleCommonLib
-                ? commonLibSourcePath
-                : "/common/common-lib.js",
+            replacement:
+                isDevServer || bundleCommonLib
+                    ? commonLibSourcePath
+                    : "/common/common-lib.js",
         },
         ...additionalAliases,
     ];
 
-    if (isServing && !bundleCommonLib) {
-        // TODO: this is contradictory to the above alias
-        buildAliases.push({
-            find: /^@psibase\/common-lib.*$/,
-            replacement: commonLibSourcePath,
-        });
-    }
-
-    const baseServerConfig: ServerConfig = {
-        host: `${service}.psibase.127.0.0.1.sslip.io`,
-        port: 8081,
-        proxy: {
-            ...additionalProxies,
-            "/": {
-                target: `${useHttps ? "https" : "http"}://psibase.127.0.0.1.sslip.io:${proxyPort}/`,
-                changeOrigin: true,
-                secure: !useHttps,
-                autoRewrite: true,
-                timeout: 10000,
-                bypass: (req: any, _res: any, _opt: any) => {
-                    const host = req.headers.host || "";
-                    const subdomain = host.split(".")[0];
-                    const baseConditions = [
-                        subdomain === service,
-                        req.method !== "POST",
-                        req.headers.accept !== "application/json",
-                        !req.url.startsWith("/common"),
-                        !req.url.startsWith("/api"),
-                    ];
-                    return req.url === "/" ||
-                        [
-                            ...baseConditions,
-                            ...additionalProxyBypassConditions,
-                        ].every((condition) =>
-                            typeof condition === "function"
-                                ? condition(req)
-                                : condition,
-                        )
-                        ? req.url
-                        : undefined;
-                },
-            },
-        },
-    };
-
-    const pathToCerts: string = process.env.VITE_SECURE_PATH_TO_CERTS ?? "";
-
-    if (useHttps) {
-        baseServerConfig.https = {
-            key: fs.readFileSync(
-                `${pathToCerts}psibase.127.0.0.1.sslip.io+1-key.pem`,
-                "utf8",
-            ),
-            cert: fs.readFileSync(
-                `${pathToCerts}psibase.127.0.0.1.sslip.io+1.pem`,
-                "utf8",
-            ),
-        };
-    }
-
     return {
         name: "psibase",
         config: () => ({
+            server: {
+                host: `${service}.psibase.localhost`,
+                port: 8081,
+            },
             build: {
                 ...(uiFramework !== "svelte" ? outDirParams : {}),
                 assetsDir: "",
@@ -232,14 +145,11 @@ export function createPsibaseConfig(options: PsibaseConfigOptions): Plugin {
                 rollupOptions: {
                     external: [
                         "/common/rootdomain.mjs",
-                        ...(bundleCommonLib
-                            ? []
-                            : ["/common/common-lib.js"]),
+                        ...(bundleCommonLib ? [] : ["/common/common-lib.js"]),
                     ],
                     makeAbsoluteExternalsRelative: false,
                 },
             },
-            server: baseServerConfig,
             resolve: {
                 alias: buildAliases,
             },
