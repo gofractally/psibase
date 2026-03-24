@@ -13,7 +13,7 @@ const serviceDir = path.resolve(__dirname);
 verifyViteCache(serviceDir);
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig((config) => ({
     plugins: [
         createSharedViteConfig({
             projectDir: serviceDir,
@@ -21,11 +21,9 @@ export default defineConfig(({ command }) => ({
                 vendor: ["react", "react-dom", "react-router-dom"],
             },
         }),
-        createPsibaseConfig({
+        createPsibaseConfig(config, {
             service: "fractals",
             serviceDir: serviceDir,
-            isServing: command === "serve",
-            useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
         }),
         ...getSharedUIPlugins(),
     ],
