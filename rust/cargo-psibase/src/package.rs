@@ -434,6 +434,66 @@ impl<'a> PackageBuilder<'a> {
     }
 }
 
+#[derive(Default)]
+struct FlattenServices<'a> {
+    packages: Vec<&'a Package>,
+    uses: HashMap<*const Package, Vec<usize>>,
+    sizes: Vec<usize>,
+}
+
+impl<'a> FlattenServices<'a> {
+    fn new(builders: &'a Vec<PackageBuilder>) -> Self {
+        let mut result = FlattenServices::default();
+        let mut i = 0;
+        for builder in builders {
+            result.sizes.push(builder.service_crates.len());
+            for package in &builder.service_crates {
+                let v = result.uses.entry(*package as *const Package).or_default();
+                if v.is_empty() {
+                    result.packages.push(*package);
+                }
+                v.push(i);
+                i += 1;
+            }
+        }
+        result
+    }
+    fn split(
+        &self,
+        files: Vec<ServiceArtifacts>,
+    ) -> Result<Vec<Vec<ServiceArtifacts>>, anyhow::Error> {
+        // This isn't strictly needed, but it helps detect errors
+        let files = sort_services(files, &self.packages)?;
+        // Duplicate items as needed
+        let mut expanded = Vec::new();
+        for mut file in files {
+            let uses = &self.uses[&(self.packages[file.package_index] as *const Package)];
+            for i in &uses[0..(uses.len() - 1)] {
+                file.package_index = *i;
+                expanded.push(file.clone());
+            }
+            file.package_index = *uses.last().unwrap();
+            expanded.push(file);
+        }
+        // Sort by package_index
+        for i in 0..expanded.len() {
+            let j = expanded[i].package_index;
+            expanded.swap(i, j);
+        }
+        // Split into groups matching the original builders
+        let mut result = Vec::new();
+        let mut iter = expanded.into_iter();
+        for n in &self.sizes {
+            let mut group = Vec::with_capacity(*n);
+            for _ in 0..*n {
+                group.push(iter.next().unwrap())
+            }
+            result.push(group);
+        }
+        Ok(result)
+    }
+}
+
 fn sort_services(
     mut paths: Vec<ServiceArtifacts>,
     packages: &[&Package],
@@ -453,22 +513,6 @@ fn sort_services(
         ))?
     }
     Ok(paths)
-}
-
-fn split_services(
-    paths: Vec<ServiceArtifacts>,
-    template: &[PackageBuilder],
-) -> Vec<Vec<ServiceArtifacts>> {
-    let mut result = Vec::new();
-    let mut iter = paths.into_iter();
-    for builder in template {
-        let mut group = Vec::with_capacity(builder.service_crates.len());
-        for _ in 0..builder.service_crates.len() {
-            group.push(iter.next().unwrap())
-        }
-        result.push(group);
-    }
-    result
 }
 
 pub async fn build_packages(
@@ -514,17 +558,9 @@ pub async fn build_packages(
         }
     }
 
-    let all_service_crates: Vec<_> = builders
-        .iter()
-        .map(|b| &b.service_crates)
-        .flatten()
-        .map(|p| *p)
-        .collect();
-
-    let paths = split_services(
-        sort_services(build(args, &all_service_crates).await?, &all_service_crates)?,
-        &builders,
-    );
+    let flattened = FlattenServices::new(&builders);
+    let paths = build(args, &flattened.packages).await?;
+    let paths = flattened.split(paths)?;
 
     for root in extra_roots {
         // Run cargo build at the root to pick up any build scripts

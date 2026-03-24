@@ -638,6 +638,7 @@ async fn build_service(
     Ok(())
 }
 
+#[derive(Clone)]
 struct ServiceArtifacts {
     service: PathBuf,
     schema: PathBuf,
