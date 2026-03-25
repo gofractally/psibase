@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 
 import { ThemeProvider } from "@/components/theme-provider";
 
+import "@shared/styles/globals.css";
+
 import { Routing } from "./routing";
 
 export const queryClient = new QueryClient();

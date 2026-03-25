@@ -8,25 +8,13 @@ import {
     verifyViteCache,
 } from "../../../vite.shared";
 
-const serviceDir = path.resolve(__dirname);
+const appDirectory = path.resolve(__dirname);
+verifyViteCache(appDirectory);
 
-verifyViteCache(serviceDir);
-
-export default defineConfig(({ command }) => ({
+export default defineConfig((config) => ({
     plugins: [
-        createSharedViteConfig({
-            projectDir: serviceDir,
-            manualChunks: {
-                vendor: ["react", "react-dom"],
-            },
-        }),
-        createPsibaseConfig({
-            service: "x-proxy",
-            serviceDir: serviceDir,
-            isServing: command === "serve",
-            useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
-            bundleCommonLib: true,
-        }),
+        createSharedViteConfig(),
+        createPsibaseConfig(config, { appDirectory, bundleCommonLib: true }),
         ...getSharedUIPlugins(),
     ],
     build: {
