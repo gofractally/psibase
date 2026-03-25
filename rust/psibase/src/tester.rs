@@ -133,7 +133,6 @@ impl Chain {
         let mut registry = JointRegistry::new();
         if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
             for path in local_packages.split(':') {
-                println!("Loading registry: {}", path);
                 registry.push(DirectoryRegistry::new(path.into())).unwrap();
             }
         }
