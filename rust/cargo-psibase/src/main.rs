@@ -644,7 +644,10 @@ async fn build_service(
     }
     pretty(
         "Creating",
-        &format!("service {}", output_file.file_name().unwrap().display()),
+        &format!(
+            "service {}",
+            output_file.file_name().unwrap().to_string_lossy()
+        ),
     );
     let tmp_crate = tempfile::tempdir()?;
 
