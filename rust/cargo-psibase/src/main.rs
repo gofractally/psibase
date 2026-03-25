@@ -320,11 +320,13 @@ fn process(
     Ok(())
 }
 
-#[derive(Debug)]
-struct ArtifactFile {
-    path: PathBuf,
+#[derive(Debug, Clone)]
+struct PackageArtifact<T> {
+    value: T,
     package_index: usize,
 }
+
+type ArtifactFile = PackageArtifact<PathBuf>;
 
 #[derive(Debug, Default)]
 struct ArtifactList {
@@ -358,7 +360,7 @@ async fn get_files(
                     if artifact.profile.test {
                         if let Some(path) = artifact.executable {
                             result.tests.push(ArtifactFile {
-                                path: path.clone().into_std_path_buf(),
+                                value: path.clone().into_std_path_buf(),
                                 package_index: idx,
                             })
                         }
@@ -366,7 +368,7 @@ async fn get_files(
                         for p in &artifact.filenames {
                             if p.extension() == Some("rlib") {
                                 result.services.push(ArtifactFile {
-                                    path: p.clone().into_std_path_buf(),
+                                    value: p.clone().into_std_path_buf(),
                                     package_index: idx,
                                 })
                             }
@@ -380,8 +382,38 @@ async fn get_files(
     Ok(result)
 }
 
-async fn get_wasm_files<F: Fn(&PackageId) -> bool>(
-    filter: F,
+async fn get_plugin_files(
+    packages: &[&Package],
+    mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
+) -> Result<Vec<ArtifactFile>, Error> {
+    let mut result = Vec::new();
+    while let Some(line) = lines.next_line().await? {
+        match serde_json::from_str::<cargo_metadata::Message>(&line)? {
+            Message::CompilerMessage(msg) => {
+                print!("{}", msg.message.rendered.unwrap());
+            }
+            Message::CompilerArtifact(artifact) => {
+                if let Some(idx) = packages
+                    .iter()
+                    .position(|package| package.id == artifact.package_id)
+                {
+                    for p in &artifact.filenames {
+                        if p.extension() == Some("wasm") {
+                            result.push(ArtifactFile {
+                                value: p.clone().into_std_path_buf(),
+                                package_index: idx,
+                            })
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+    Ok(result)
+}
+
+async fn get_wasm_files(
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
 ) -> Result<Vec<PathBuf>, Error> {
     let mut result = Vec::new();
@@ -391,15 +423,13 @@ async fn get_wasm_files<F: Fn(&PackageId) -> bool>(
                 print!("{}", msg.message.rendered.unwrap());
             }
             Message::CompilerArtifact(artifact) => {
-                if filter(&artifact.package_id) {
-                    result.extend(
-                        artifact
-                            .filenames
-                            .iter()
-                            .filter(|p| p.extension() == Some("wasm"))
-                            .map(|p| p.clone().into_std_path_buf()),
-                    );
-                }
+                result.extend(
+                    artifact
+                        .filenames
+                        .iter()
+                        .filter(|p| p.extension() == Some("wasm"))
+                        .map(|p| p.clone().into_std_path_buf()),
+                );
             }
             _ => (),
         }
@@ -592,7 +622,7 @@ async fn build_service_impl(
 
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
     let status = command.wait();
-    let (status, files) = tokio::join!(status, get_wasm_files(|_id| true, stdout),);
+    let (status, files) = tokio::join!(status, get_wasm_files(stdout));
 
     let status = status?;
     if !status.success() {
@@ -660,11 +690,12 @@ async fn build_service(
 }
 
 #[derive(Clone)]
-struct ServiceArtifacts {
+struct ServicePaths {
     service: PathBuf,
     schema: PathBuf,
-    package_index: usize,
 }
+
+type ServiceArtifacts = PackageArtifact<ServicePaths>;
 
 async fn build(
     jobs: &AsyncJobServer,
@@ -700,7 +731,7 @@ async fn build(
     let mut running = FuturesUnordered::new();
     for f in &files.services {
         let acquired = jobs.acquire_with(&mut running).await?;
-        let service = f.path.with_extension("wasm");
+        let service = f.value.with_extension("wasm");
         let schema = service.with_extension("schema.json");
         {
             let service = service.clone();
@@ -708,12 +739,11 @@ async fn build(
             let files = &files;
             running.push(async move {
                 let _acquired = acquired;
-                build_service(args, &f.path, &service, &schema, &files.dep_dirs).await
+                build_service(args, &f.value, &service, &schema, &files.dep_dirs).await
             });
         }
         result.push(ServiceArtifacts {
-            service,
-            schema,
+            value: ServicePaths { service, schema },
             package_index: f.package_index,
         });
     }
@@ -723,7 +753,7 @@ async fn build(
     Ok(result)
 }
 
-async fn build_plugin(args: &Args, packages: &[&Package]) -> Result<Vec<PathBuf>, Error> {
+async fn build_plugins(args: &Args, packages: &[&Package]) -> Result<Vec<ArtifactFile>, Error> {
     let mut command = tokio::process::Command::new(get_cargo());
     command
         .arg("component")
@@ -747,7 +777,7 @@ async fn build_plugin(args: &Args, packages: &[&Package]) -> Result<Vec<PathBuf>
     let status = command.wait();
     let (status, files, _) = tokio::join!(
         status,
-        get_wasm_files(|id| packages.iter().find(|p| &p.id == id).is_some(), stdout),
+        get_plugin_files(packages, stdout),
         print_messages(stderr),
     );
 
@@ -964,10 +994,10 @@ async fn test(
         running.push(async move {
             let _acquired = acquired;
 
-            let p = test.path.with_extension("polyfilled.wasm");
-            if test.path.is_newer_than(&p)? {
+            let p = test.value.with_extension("polyfilled.wasm");
+            if test.value.is_newer_than(&p)? {
                 pretty_path("Reoptimizing", &p);
-                let src = test.path;
+                let src = test.value;
                 let dst = p.clone();
                 spawn_blocking(move || process(&src, None, TESTER_EXPORTS, &dst)).await??;
             }

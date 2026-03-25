@@ -1,4 +1,4 @@
-use crate::{build, build_plugin, Args, AsyncJobServer, ServiceArtifacts};
+use crate::{build, build_plugins, Args, AsyncJobServer, PackageArtifact};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -201,8 +201,8 @@ fn add_files<'a>(
 pub struct PackageBuilder<'a> {
     service_crates: Vec<&'a Package>,
     service_info: Vec<ServiceInfo>,
-    // (plugin, service-crate, path)
-    plugins: Vec<(&'a Package, &'a str, String)>,
+    plugin_crates: Vec<&'a Package>,
+    plugin_targets: Vec<(&'a str, String)>,
     postinstall: Vec<PrettyAction>,
     // (service-crate, src, dest)
     data_sources: Vec<(&'a str, PathBuf, String)>,
@@ -219,7 +219,8 @@ impl<'a> PackageBuilder<'a> {
         let mut queue = Vec::new();
         let mut service_crates = Vec::new();
         let mut service_info = Vec::new();
-        let mut plugins = Vec::new();
+        let mut plugin_crates = Vec::new();
+        let mut plugin_targets = Vec::new();
         let mut postinstall = Vec::new();
         let mut data_sources = Vec::new();
 
@@ -303,7 +304,8 @@ impl<'a> PackageBuilder<'a> {
                     ) else {
                         return Err(anyhow!("{} is not a workspace member", plugin,));
                     };
-                    plugins.push((p, package.name.as_str(), "/plugin.wasm".to_string()));
+                    plugin_crates.push(p);
+                    plugin_targets.push((package.name.as_str(), "/plugin.wasm".to_string()));
                 }
                 for data in &pmeta.data {
                     let src = package.manifest_path.parent().unwrap().join(&data.src);
@@ -330,7 +332,8 @@ impl<'a> PackageBuilder<'a> {
         Ok(PackageBuilder {
             service_crates,
             service_info,
-            plugins,
+            plugin_crates,
+            plugin_targets,
             postinstall,
             data_sources,
             depends,
@@ -347,7 +350,8 @@ impl<'a> PackageBuilder<'a> {
         let PackageBuilder {
             service_crates,
             service_info: _,
-            plugins: _,
+            plugin_crates: _,
+            plugin_targets: _,
             postinstall,
             data_sources,
             depends,
@@ -442,12 +446,12 @@ struct FlattenServices<'a> {
 }
 
 impl<'a> FlattenServices<'a> {
-    fn new(builders: &'a Vec<PackageBuilder>) -> Self {
+    fn new<I: IntoIterator<Item = &'a Vec<&'a Package>>>(packages: I) -> Self {
         let mut result = FlattenServices::default();
         let mut i = 0;
-        for builder in builders {
-            result.sizes.push(builder.service_crates.len());
-            for package in &builder.service_crates {
+        for group in packages {
+            result.sizes.push(group.len());
+            for package in group {
                 let v = result.uses.entry(*package as *const Package).or_default();
                 if v.is_empty() {
                     result.packages.push(*package);
@@ -458,10 +462,10 @@ impl<'a> FlattenServices<'a> {
         }
         result
     }
-    fn split(
+    fn split<T: Clone>(
         mut self,
-        files: Vec<ServiceArtifacts>,
-    ) -> Result<Vec<Vec<ServiceArtifacts>>, anyhow::Error> {
+        files: Vec<PackageArtifact<T>>,
+    ) -> Result<Vec<Vec<T>>, anyhow::Error> {
         // Duplicate items as needed
         let mut expanded = Vec::new();
         for mut file in files {
@@ -501,7 +505,7 @@ impl<'a> FlattenServices<'a> {
         for n in &self.sizes {
             let mut group = Vec::with_capacity(*n);
             for _ in 0..*n {
-                group.push(iter.next().unwrap())
+                group.push(iter.next().unwrap().value)
             }
             result.push(group);
         }
@@ -526,7 +530,7 @@ pub async fn build_packages(
         for service in &builder.service_crates {
             all_crates.insert(&service.id);
         }
-        for (plugin, _, _) in &builder.plugins {
+        for plugin in &builder.plugin_crates {
             all_crates.insert(&plugin.id);
         }
     }
@@ -539,22 +543,19 @@ pub async fn build_packages(
         }
     }
 
-    for builder in &mut builders {
-        for (plugin, service, path) in std::mem::take(&mut builder.plugins) {
-            let mut paths = build_plugin(args, &[plugin]).await?;
-            if paths.len() != 1 {
-                Err(anyhow!(
-                    "Plugin {} should produce exactly one wasm target",
-                    plugin.name
-                ))?
-            };
-            builder
-                .data_sources
-                .push((service, paths.pop().unwrap().into(), path))
+    let flat_plugins = FlattenServices::new(builders.iter().map(|b| &b.plugin_crates));
+    let plugin_paths = build_plugins(args, &flat_plugins.packages).await?;
+    let plugin_paths = flat_plugins.split(plugin_paths)?;
+    for (builder, plugins) in builders.iter_mut().zip(plugin_paths) {
+        for (plugin, (service, path)) in plugins
+            .into_iter()
+            .zip(std::mem::take(&mut builder.plugin_targets))
+        {
+            builder.data_sources.push((service, plugin, path));
         }
     }
 
-    let flattened = FlattenServices::new(&builders);
+    let flattened = FlattenServices::new(builders.iter().map(|b| &b.service_crates));
     let paths = build(&jobs, args, &flattened.packages, &extra_roots).await?;
     let paths = flattened.split(paths)?;
 
