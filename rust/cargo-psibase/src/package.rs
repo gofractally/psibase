@@ -1,4 +1,4 @@
-use crate::{build, build_plugin, Args, ServiceArtifacts};
+use crate::{build, build_plugin, Args, AsyncJobServer, ServiceArtifacts};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
@@ -510,6 +510,7 @@ impl<'a> FlattenServices<'a> {
 }
 
 pub async fn build_packages(
+    jobs: &AsyncJobServer,
     args: &Args,
     metadata: &MetadataIndex<'_>,
     roots: &[&PackageId],
@@ -554,7 +555,7 @@ pub async fn build_packages(
     }
 
     let flattened = FlattenServices::new(&builders);
-    let paths = build(args, &flattened.packages, &extra_roots).await?;
+    let paths = build(&jobs, args, &flattened.packages, &extra_roots).await?;
     let paths = flattened.split(paths)?;
 
     let mut result = Vec::new();

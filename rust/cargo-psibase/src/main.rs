@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use console::style;
 use futures::{
     stream::{pending, FuturesUnordered},
-    StreamExt,
+    Future, StreamExt, TryStreamExt,
 };
 use psibase::{ExactAccountNumber, PackageInfo};
 use std::collections::{HashMap, HashSet};
@@ -20,6 +20,7 @@ use std::process::{exit, ExitCode, Stdio};
 use std::time::SystemTime;
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
+use tokio::task::spawn_blocking;
 use walrus::{ExportItem, Module};
 use wasm_opt::OptimizationOptions;
 
@@ -513,6 +514,18 @@ impl AsyncJobServer {
         self.helper.request_token();
         Ok(receive.await??)
     }
+    // Like acquire, but waits on running as well
+    async fn acquire_with<Fut: Future<Output = Result<(), Error>>>(
+        &self,
+        running: &mut FuturesUnordered<Fut>,
+    ) -> Result<jobserver::Acquired, Error> {
+        let fut = core::pin::pin!(self.acquire());
+        let mut acquiring = running.by_ref().chain(pending()).take_until(fut);
+        while let Some(res) = acquiring.next().await {
+            res?
+        }
+        acquiring.take_result().unwrap()
+    }
 }
 
 async fn wait_for_child(
@@ -618,15 +631,21 @@ async fn build_service(
     }
     let files = build_service_impl(&manifest, "--lib", &rustc_args).await?;
     assert!(files.len() == 1);
-    process(
-        &files[0],
-        Some(SERVICE_POLYFILL),
-        SERVICE_EXPORTS,
-        &output_file,
-    )?;
+    let output_file_copy = output_file.to_owned();
+    spawn_blocking(move || {
+        process(
+            &files[0],
+            Some(SERVICE_POLYFILL),
+            SERVICE_EXPORTS,
+            &output_file_copy,
+        )
+    })
+    .await??;
     let schema_gen = build_service_impl(&manifest, "--bins", &rustc_args).await?;
     assert!(schema_gen.len() == 1);
-    process(&schema_gen[0], None, TESTER_EXPORTS, &schema_gen[0])?;
+    let schema_gen_file = schema_gen[0].clone();
+    spawn_blocking(move || process(&schema_gen_file, None, TESTER_EXPORTS, &schema_gen_file))
+        .await??;
 
     let status = tokio::process::Command::new(&args.psitest)
         .arg(&schema_gen[0])
@@ -648,6 +667,7 @@ struct ServiceArtifacts {
 }
 
 async fn build(
+    jobs: &AsyncJobServer,
     args: &Args,
     packages: &[&Package],
     extra: &[&PackageId],
@@ -676,16 +696,29 @@ async fn build(
 
     let files = wait_for_child(command.spawn()?, packages).await?;
     let mut result = Vec::new();
+
+    let mut running = FuturesUnordered::new();
     for f in &files.services {
+        let acquired = jobs.acquire_with(&mut running).await?;
         let service = f.path.with_extension("wasm");
         let schema = service.with_extension("schema.json");
-        build_service(args, &f.path, &service, &schema, &files.dep_dirs).await?;
+        {
+            let service = service.clone();
+            let schema = schema.clone();
+            let files = &files;
+            running.push(async move {
+                let _acquired = acquired;
+                build_service(args, &f.path, &service, &schema, &files.dep_dirs).await
+            });
+        }
         result.push(ServiceArtifacts {
             service,
             schema,
             package_index: f.package_index,
         });
     }
+
+    running.try_collect::<()>().await?;
 
     Ok(result)
 }
@@ -801,7 +834,7 @@ impl<'a> PackageSet<'a> {
         }
         Ok(())
     }
-    async fn build(&self, args: &Args) -> Result<Vec<PackageInfo>, Error> {
+    async fn build(&self, jobs: &AsyncJobServer, args: &Args) -> Result<Vec<PackageInfo>, Error> {
         pretty(
             "Packages",
             &self
@@ -821,7 +854,7 @@ impl<'a> PackageSet<'a> {
 
         let mut index = Vec::new();
 
-        index.extend(build_packages(args, self.metadata, &self.packages).await?);
+        index.extend(build_packages(jobs, args, self.metadata, &self.packages).await?);
         Ok(index)
     }
 }
@@ -881,7 +914,7 @@ async fn test(
             all_dependencies.try_insert(*package).unwrap();
         }
     }
-    let info = all_dependencies.build(args).await?;
+    let info = all_dependencies.build(jobs, args).await?;
 
     for (package, deps) in test_packages {
         let mut index = Vec::new();
@@ -933,12 +966,7 @@ async fn test(
     let mut running = FuturesUnordered::new();
 
     for test in files.tests {
-        let fut = core::pin::pin!(jobs.acquire());
-        let mut acquiring = running.by_ref().chain(pending()).take_until(fut);
-        while let Some(res) = acquiring.next().await {
-            res?
-        }
-        let acquired = acquiring.take_result().unwrap();
+        let acquired = jobs.acquire_with(&mut running).await?;
         let index_files = &index_files;
         running.push(async move {
             let _acquired = acquired;
@@ -961,13 +989,12 @@ async fn test(
         })
     }
 
-    while let Some(res) = running.next().await {
-        res?
-    }
+    running.try_collect::<()>().await?;
     Ok(())
 }
 
 async fn install(
+    jobs: &AsyncJobServer,
     args: &Args,
     opts: &InstallCommand,
     metadata: &MetadataIndex<'_>,
@@ -992,7 +1019,7 @@ async fn install(
         }
     }
     packages.resolve_dependencies()?;
-    let index = packages.build(args).await?;
+    let index = packages.build(jobs, args).await?;
 
     let mut command = std::process::Command::new(&args.psibase);
 
@@ -1053,7 +1080,7 @@ async fn main2() -> Result<(), Error> {
                 let index = MetadataIndex::new(&metadata);
                 for id in &*metadata.workspace_default_members {
                     let package = *index.packages.get(id.repr.as_str()).unwrap();
-                    build(&args, &[package], &[]).await?;
+                    build(&jobs, &args, &[package], &[]).await?;
                 }
             } else {
                 for package in &args.package {
@@ -1062,7 +1089,7 @@ async fn main2() -> Result<(), Error> {
                         .iter()
                         .find(|p| &p.name == package)
                         .ok_or_else(|| anyhow!("Could not find package {}", package))?;
-                    build(&args, &[p], &[]).await?;
+                    build(&jobs, &args, &[p], &[]).await?;
                 }
             }
             pretty("Done", "");
@@ -1089,7 +1116,7 @@ async fn main2() -> Result<(), Error> {
                     );
                 }
             }
-            build_packages(&args, &index, &ids).await?;
+            build_packages(&jobs, &args, &index, &ids).await?;
             pretty("Done", "");
         }
         Command::Test(opts) => {
@@ -1097,7 +1124,7 @@ async fn main2() -> Result<(), Error> {
             pretty("Done", "All tests passed");
         }
         Command::Install(opts) => {
-            install(&args, opts, &MetadataIndex::new(&metadata)).await?;
+            install(&jobs, &args, opts, &MetadataIndex::new(&metadata)).await?;
         }
     };
 
