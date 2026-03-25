@@ -307,13 +307,11 @@ fn process(
 
     if let Some(polyfill) = polyfill {
         let polyfill_source_module = config.parse(polyfill)?;
-        pretty_path("Polyfilling", output_file);
         link_module(&polyfill_source_module, &mut dest_module)?;
     }
 
     strip(&mut dest_module, exports)?;
 
-    pretty_path("Reoptimizing", output_file);
     optimize(&mut dest_module)?;
 
     write(output_file, dest_module.emit_wasm())
@@ -629,6 +627,7 @@ async fn build_service(
         libpath.push(dir);
         rustc_args.push(libpath);
     }
+    pretty_path("Service", &output_file);
     let files = build_service_impl(&manifest, "--lib", &rustc_args).await?;
     assert!(files.len() == 1);
     let output_file_copy = output_file.to_owned();
@@ -641,6 +640,7 @@ async fn build_service(
         )
     })
     .await??;
+    pretty_path("Schema", &schema_file);
     let schema_gen = build_service_impl(&manifest, "--bins", &rustc_args).await?;
     assert!(schema_gen.len() == 1);
     let schema_gen_file = schema_gen[0].clone();
@@ -944,8 +944,8 @@ async fn test(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    pretty("Test", "building unit tests...");
     for (package, index_file) in test_info {
-        pretty("Test", "building unit tests...");
         let name = &package.name;
 
         index_files.push(index_file.canonicalize()?.into_os_string());
@@ -958,6 +958,7 @@ async fn test(
     for f in &mut files.tests {
         let p = f.path.with_extension("polyfilled.wasm");
         if f.path.is_newer_than(&p)? {
+            pretty_path("Reoptimizing", &p);
             process(&f.path, None, TESTER_EXPORTS, &p)?;
         }
         f.path = p;
