@@ -9,14 +9,9 @@ namespace psibase
    /// An account number or name
    ///
    /// Psibase account numbers are 64-bit values which are compressed
-   /// from strings (names). Names may be 0 to 18 characters long and
-   /// contain the characters `a-z`, `0-9`, and `-` (hyphen).
-   /// Non-empty names must begin with a letter.
-   ///
-   /// There are some names which meet the above rules, but fail to
-   /// compress down to 64 bits. These names are invalid. Likewise,
-   /// there are some 64-bit integers which aren't the compressed
-   /// form of valid names; these are also invalid.
+   /// from strings (names). Names may be 0 to 10 characters long and
+   /// contain the characters `a-z`, `0-9`, and `-` (hyphen). Names
+   /// must not start or end with '-' or contain two consecutive '-'s
    ///
    /// The empty name `""` is value 0.
    struct AccountNumber
