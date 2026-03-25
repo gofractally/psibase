@@ -9,7 +9,7 @@ use crate::constants::{
 };
 use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
-    EvaluationInstance, Exile, Fractal, Guild, GuildFlags, GuildTable, Member, MemberTable,
+    Ban, EvaluationInstance, Exile, Fractal, Guild, GuildFlags, GuildTable, Member, MemberTable,
     RewardStream,
 };
 
@@ -60,6 +60,10 @@ impl Guild {
 
         Exile::add(guild_account, exiled_member);
         Member::get_assert(guild_account, exiled_member).remove_by_exile();
+    }
+
+    pub fn unban_member(&self, exiled_member: AccountNumber) {
+        Ban::get_assert(self.account, exiled_member).remove();
     }
 
     pub fn enable_rank_ordering(&mut self) {

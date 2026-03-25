@@ -192,6 +192,10 @@ impl Fractal {
         Exile::add(self.account, member);
         Member::remove_all_by_member(member);
     }
+
+    pub fn unexile_member(&self, member: AccountNumber) {
+        Exile::get_assert(self.account, member).remove();
+    }
 }
 
 #[ComplexObject]

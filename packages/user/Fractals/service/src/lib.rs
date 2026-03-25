@@ -62,8 +62,7 @@ pub mod constants {
 pub mod service {
 
     use crate::tables::tables::{
-        EvaluationInstance, Exile, Fractal, Guild, GuildApplication, GuildInvite, Member,
-        RewardConsensus,
+        EvaluationInstance, Fractal, Guild, GuildApplication, GuildInvite, Member, RewardConsensus,
     };
 
     use psibase::*;
@@ -170,15 +169,6 @@ pub mod service {
     #[action]
     fn set_g_desc(description: String) {
         Guild::by_sender().set_description(description);
-    }
-
-    /// Kick member from guild
-    ///
-    /// # Arguments
-    /// * `member` - Guild member to be kicked.
-    #[action]
-    fn guild_kick(member: AccountNumber) {
-        Member::get_assert(get_sender(), member).kick();
     }
 
     /// Attest Guild Membership application
@@ -466,8 +456,8 @@ pub mod service {
     /// * `account` - Account to be exiled
     #[action]
     fn exile_member(fractal: AccountNumber, account: AccountNumber) {
-        let mut fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
+        let fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_judiciary();
         fractal.exile_member(account);
     }
 
@@ -476,11 +466,13 @@ pub mod service {
     /// Must be called by the guild if prior to expiry.  
     ///
     /// # Arguments
-    /// * `guild` - The guild the member was exiled from.
+    /// * `fractal` - Fractal of exile.
     /// * `account` - The exiled account.
     #[action]
-    fn revoke_exile(guild: AccountNumber, account: AccountNumber) {
-        Exile::get_assert(guild, account).remove()
+    fn revoke_exile(fractal: AccountNumber, account: AccountNumber) {
+        let fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_judiciary();
+        fractal.unexile_member(account);
     }
 
     /// Exile a guild member.
@@ -488,7 +480,7 @@ pub mod service {
     /// Must be called by the guild.  
     ///
     /// # Arguments
-    /// * `account` - Account to be exiled
+    /// * `account` - Account to ban
     #[action]
     fn ban_member(account: AccountNumber) {
         Guild::by_sender().ban_member(account)
@@ -499,10 +491,9 @@ pub mod service {
     /// Must be called by the guild if prior to expiry.  
     ///
     /// # Arguments
-    /// * `guild` - The guild the member was exiled from.
     /// * `account` - The exiled account.
     #[action]
-    fn revoke_ban(guild: AccountNumber, account: AccountNumber) {
+    fn unban_member(account: AccountNumber) {
         Guild::by_sender().unban_member(account);
     }
 

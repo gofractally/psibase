@@ -24,7 +24,7 @@ impl Ban {
         check_some(Self::get(guild, member), "guild exile does not exist")
     }
 
-    pub fn unban(&self) {
+    pub fn remove(&self) {
         self.erase();
     }
 

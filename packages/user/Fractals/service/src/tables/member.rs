@@ -53,10 +53,6 @@ impl Member {
         check_some(Self::get(guild, member), "guild member does not exist")
     }
 
-    pub fn kick(&self) {
-        self.remove();
-    }
-
     pub fn memberships_of_member(member: AccountNumber) -> Vec<Self> {
         MemberTable::read()
             .get_index_by_member()
