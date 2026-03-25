@@ -19,7 +19,7 @@ export interface SharedViteConfigOptions {
 }
 
 export function createSharedViteConfig(
-    options: SharedViteConfigOptions,
+    options?: SharedViteConfigOptions,
 ): Plugin {
     const {
         uiFramework = "react",
@@ -27,7 +27,7 @@ export function createSharedViteConfig(
             vendor: ["react", "react-dom"],
         },
         additionalManualChunks = {},
-    } = options;
+    } = options ?? {};
 
     const rollupOptions = {
         cache: true,
