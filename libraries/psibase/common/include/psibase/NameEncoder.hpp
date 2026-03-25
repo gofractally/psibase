@@ -70,10 +70,7 @@ namespace psibase
          }
       }
 
-      constexpr T max() const
-      {
-         return numRegularChars * tailCounts[N - 1].withSep + tailCounts[N - 1].withoutSep;
-      }
+      constexpr T max() const { return numRegularChars * tailCounts[N - 1].withSep; }
 
       constexpr T encode(auto&& rng, T sepIdx) const
       {
@@ -110,7 +107,7 @@ namespace psibase
       template <typename F>
       constexpr F decode(T value, T sepIdx, F out) const
       {
-         if (value >= max())
+         if (value > max())
             return out;
          std::size_t maxlen    = N;
          bool        allowsSep = false;

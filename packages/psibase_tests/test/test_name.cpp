@@ -26,6 +26,11 @@ struct Encoding
       encoder.decode(value, sep, [&](std::size_t idx) { result.push_back(chars[idx]); });
       return result;
    }
+   std::uint64_t max() const
+   {
+      psibase::NameEncoder<std::uint64_t, maxlen> encoder{chars.size() - 1};
+      return encoder.max();
+   }
    bool isValid(std::string_view s) const
    {
       if (s.empty())
@@ -75,6 +80,7 @@ TEST_CASE("binary name 3", "[name]")
        "",  "0",   "0-0", "0-1", "00",  "000", "001", "01",  "010", "011",
        "1", "1-0", "1-1", "10",  "100", "101", "11",  "110", "111",
    };
+   CHECK(e.max() == expected.size() - 1);
    for (std::size_t i = 0; i < expected.size(); ++i)
    {
       CHECK(e.isValid(expected[i]));
@@ -93,6 +99,7 @@ TEST_CASE("binary name 4", "[name]")
        "10",   "10-0", "10-1", "100",  "1000", "1001", "101",  "1010", "1011", "11",   "11-0",
        "11-1", "110",  "1100", "1101", "111",  "1110", "1111",
    };
+   CHECK(e.max() == expected.size() - 1);
    for (std::size_t i = 0; i < expected.size(); ++i)
    {
       CHECK(e.isValid(expected[i]));
@@ -108,6 +115,7 @@ TEST_CASE("mid separator", "[name]")
        "",  "0",  "00",  "000", "001", "0-0", "0-1", "01",  "010", "011",
        "1", "10", "100", "101", "1-0", "1-1", "11",  "110", "111",
    };
+   CHECK(e.max() == expected.size() - 1);
    for (std::size_t i = 0; i < expected.size(); ++i)
    {
       CHECK(e.isValid(expected[i]));
@@ -128,6 +136,7 @@ TEST_CASE("large name test", "[name]")
       e.generate(buf, expected);
    }
    std::ranges::sort(expected);
+   CHECK(e.max() == expected.size() - 1);
    for (std::size_t i = 0; i < expected.size(); ++i)
    {
       CHECK(e.encode(expected[i]) == i);
