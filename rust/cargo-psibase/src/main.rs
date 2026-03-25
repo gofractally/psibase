@@ -642,6 +642,10 @@ async fn build_service(
     if !lib.is_newer_than((output_file, &schema_file))? {
         return Ok(());
     }
+    pretty(
+        "Creating",
+        &format!("service {}", output_file.file_name().unwrap().display()),
+    );
     let tmp_crate = tempfile::tempdir()?;
 
     let manifest = write_service_crate(tmp_crate.path())?;
@@ -657,7 +661,6 @@ async fn build_service(
         libpath.push(dir);
         rustc_args.push(libpath);
     }
-    pretty_path("Service", &output_file);
     let files = build_service_impl(&manifest, "--lib", &rustc_args).await?;
     assert!(files.len() == 1);
     let output_file_copy = output_file.to_owned();
@@ -670,7 +673,6 @@ async fn build_service(
         )
     })
     .await??;
-    pretty_path("Schema", &schema_file);
     let schema_gen = build_service_impl(&manifest, "--bins", &rustc_args).await?;
     assert!(schema_gen.len() == 1);
     let schema_gen_file = schema_gen[0].clone();
@@ -731,7 +733,8 @@ async fn build(
     let mut running = FuturesUnordered::new();
     for f in &files.services {
         let acquired = jobs.acquire_with(&mut running).await?;
-        let service = f.value.with_extension("wasm");
+        let name = &packages[f.package_index].name;
+        let service = f.value.with_file_name(format!("{name}.wasm"));
         let schema = service.with_extension("schema.json");
         {
             let service = service.clone();
