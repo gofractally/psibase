@@ -953,31 +953,31 @@ async fn test(
         command.args(["-p", name.as_str()]);
     }
 
-    let mut files = wait_for_child(command.spawn()?, &packages).await?;
-
-    for f in &mut files.tests {
-        let p = f.path.with_extension("polyfilled.wasm");
-        if f.path.is_newer_than(&p)? {
-            pretty_path("Reoptimizing", &p);
-            process(&f.path, None, TESTER_EXPORTS, &p)?;
-        }
-        f.path = p;
-    }
+    let files = wait_for_child(command.spawn()?, &packages).await?;
 
     let mut running = FuturesUnordered::new();
 
     for test in files.tests {
         let acquired = jobs.acquire_with(&mut running).await?;
         let index_files = &index_files;
+
         running.push(async move {
             let _acquired = acquired;
-            pretty_path("Running", &test.path);
+
+            let p = test.path.with_extension("polyfilled.wasm");
+            if test.path.is_newer_than(&p)? {
+                pretty_path("Reoptimizing", &p);
+                let src = test.path;
+                let dst = p.clone();
+                spawn_blocking(move || process(&src, None, TESTER_EXPORTS, &dst)).await??;
+            }
+            pretty_path("Running", &p);
             let mut command = tokio::process::Command::new(&args.psitest);
             command.env(
                 "CARGO_PSIBASE_PACKAGE_PATH",
                 &index_files[test.package_index],
             );
-            command.arg(test.path);
+            command.arg(p);
             command.arg("--nocapture");
             if let Some(ref filter) = opts.test_filter {
                 command.arg(filter);
