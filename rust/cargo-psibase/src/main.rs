@@ -552,7 +552,10 @@ impl AsyncJobServer {
         while let Some(res) = acquiring.next().await {
             res?
         }
-        acquiring.take_result().unwrap()
+        acquiring
+            .take_result()
+            .unwrap()
+            .with_context(|| format!("Failed to acquire job"))
     }
 }
 
@@ -566,7 +569,7 @@ async fn wait_for_child(
     let (status, files, _) =
         tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
 
-    let status = status?;
+    let status = status.with_context(|| format!("Failed to wait for child"))?;
     if !status.success() {
         exit(status.code().unwrap());
     }
@@ -745,7 +748,9 @@ async fn build(
             let files = &files;
             running.push(async move {
                 let _acquired = acquired;
-                build_service(args, &f.value, &service, &schema, &files.dep_dirs).await
+                build_service(args, &f.value, &service, &schema, &files.dep_dirs)
+                    .await
+                    .with_context(|| format!("Failed to build service {}", service.display()))
             });
         }
         result.push(ServiceArtifacts {
