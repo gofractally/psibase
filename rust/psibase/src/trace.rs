@@ -1,9 +1,11 @@
 use std::fmt;
 
-use crate::{Action, Hex, Pack};
-use fracpack::Unpack;
+use crate::{schema_types, AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap};
+use async_trait::async_trait;
+use fracpack::{CompiledSchema, Unpack};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -19,7 +21,7 @@ pub struct ActionTrace {
 
 impl fmt::Display for ActionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_action_trace(self, 0, f)
+        format_action_trace(&SchemaMap::new(), self, 0, f)
     }
 }
 
@@ -95,7 +97,7 @@ impl TransactionTrace {
 
 impl fmt::Display for TransactionTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_transaction_trace(self, 0, f)
+        format_transaction_trace(&SchemaMap::new(), self, 0, f)
     }
 }
 
@@ -144,39 +146,84 @@ fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fm
 }
 
 fn format_action_trace(
+    schemas: &SchemaMap,
     atrace: &ActionTrace,
     indent: usize,
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
+    let schema = schemas.get(&atrace.action.service);
+    let action_name = MethodString(atrace.action.method.to_string());
+    let (action_name, action_type) = schema
+        .and_then(|schema| schema.actions.get_key_value(&action_name))
+        .map_or((&action_name, None), |(name, action_type)| {
+            (name, Some(action_type))
+        });
+
     writeln!(f, "{:indent$}action:", "")?;
     writeln!(
         f,
         "{:indent$}    {} => {}::{}",
-        "", atrace.action.sender, atrace.action.service, atrace.action.method
+        "", atrace.action.sender, atrace.action.service, action_name
     )?;
-    writeln!(
-        f,
-        "{:indent$}    raw_retval: {} bytes",
-        "",
-        atrace.raw_retval.len()
-    )?;
+    if let Some(action_type) = action_type {
+        let custom = schema_types();
+        let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
+        if !atrace.action.rawData.is_empty() {
+            cschema.extend(&action_type.params);
+            if let Ok(args) = cschema.to_value(&action_type.params, &atrace.action.rawData) {
+                if let serde_json::Value::Object(args) = args {
+                    for (name, value) in args {
+                        write!(f, "{:indent$}    {}: ", "", name)?;
+                        format_pruned_json(f, &value)?;
+                        writeln!(f, "")?;
+                    }
+                } else {
+                    write!(f, "{:indent$}    args: ", "")?;
+                    format_pruned_json(f, &args)?;
+                    writeln!(f, "")?;
+                }
+            } else {
+                writeln!(f, "{:indent$}    args: <deserialization failed>", "")?;
+            }
+        }
+        if !atrace.raw_retval.is_empty() {
+            if let Some(result_type) = &action_type.result {
+                cschema.extend(result_type);
+                write!(f, "{:indent$}    retval: ", "",)?;
+                if let Ok(result) = &cschema.to_value(result_type, &atrace.raw_retval) {
+                    format_pruned_json(f, &result)?
+                } else {
+                    write!(f, "<deserialization failed>")?
+                }
+                writeln!(f, "")?;
+            }
+        }
+    } else {
+        writeln!(
+            f,
+            "{:indent$}    raw_retval: {} bytes",
+            "",
+            atrace.raw_retval.len()
+        )?;
+    }
     for inner in &atrace.inner_traces {
         match &inner.inner {
             InnerTraceEnum::ConsoleTrace(c) => format_console(c, indent + 4, f)?,
             InnerTraceEnum::EventTrace(e) => format_event(e, indent + 4, f)?,
-            InnerTraceEnum::ActionTrace(a) => format_action_trace(a, indent + 4, f)?,
+            InnerTraceEnum::ActionTrace(a) => format_action_trace(schemas, a, indent + 4, f)?,
         }
     }
     Ok(())
 }
 
 fn format_transaction_trace(
+    schemas: &SchemaMap,
     ttrace: &TransactionTrace,
     indent: usize,
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
     for a in &ttrace.action_traces {
-        format_action_trace(a, indent, f)?;
+        format_action_trace(schemas, a, indent, f)?;
     }
     if let Some(e) = &ttrace.error {
         write!(f, "{:indent$}error:     ", "")?;
@@ -223,4 +270,138 @@ impl TransactionTrace {
         format_transaction_error_stack(self, &mut result).unwrap();
         result
     }
+}
+
+#[async_trait(?Send)]
+pub trait SchemaFetcher {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error>;
+}
+
+pub struct DisplayTransactionTrace<'a> {
+    schemas: &'a HashMap<AccountNumber, Schema>,
+    trace: &'a TransactionTrace,
+}
+
+impl fmt::Display for DisplayTransactionTrace<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_transaction_trace(self.schemas, self.trace, 0, f)
+    }
+}
+
+pub struct ActionFormatter<F: SchemaFetcher> {
+    schemas: HashMap<AccountNumber, Schema>,
+    fetcher: F,
+}
+
+impl<F: SchemaFetcher> ActionFormatter<F> {
+    pub fn new(fetcher: F) -> Self {
+        ActionFormatter {
+            schemas: HashMap::new(),
+            fetcher,
+        }
+    }
+    pub async fn add_service(&mut self, service: AccountNumber) -> Result<(), anyhow::Error> {
+        use std::collections::hash_map::Entry::*;
+        match self.schemas.entry(service) {
+            Occupied(_) => {}
+            Vacant(entry) => {
+                entry.insert(self.fetcher.fetch_schema(service).await?);
+            }
+        }
+        Ok(())
+    }
+    pub async fn prepare_event_trace(&mut self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
+        Ok(())
+    }
+    pub async fn prepare_action_trace(
+        &mut self,
+        atrace: &ActionTrace,
+    ) -> Result<(), anyhow::Error> {
+        let mut res = self.add_service(atrace.action.service).await;
+        for inner in &atrace.inner_traces {
+            match &inner.inner {
+                InnerTraceEnum::EventTrace(e) => res = res.and(self.prepare_event_trace(e).await),
+                InnerTraceEnum::ActionTrace(a) => {
+                    res = res.and(Box::pin(self.prepare_action_trace(a)).await)
+                }
+                _ => {}
+            }
+        }
+        res
+    }
+    pub async fn prepare_transaction_trace(
+        &mut self,
+        ttrace: &TransactionTrace,
+    ) -> Result<(), anyhow::Error> {
+        let mut res = Ok(());
+        for a in &ttrace.action_traces {
+            res = res.and(self.prepare_action_trace(a).await)
+        }
+        res
+    }
+    pub fn display_transaction_trace<'a>(
+        &'a self,
+        ttrace: &'a TransactionTrace,
+    ) -> DisplayTransactionTrace<'a> {
+        DisplayTransactionTrace {
+            schemas: &self.schemas,
+            trace: ttrace,
+        }
+    }
+}
+
+fn format_truncated_list<
+    T,
+    L: IntoIterator<Item = T>,
+    F: Fn(&mut fmt::Formatter<'_>, T) -> fmt::Result,
+>(
+    writer: &mut fmt::Formatter<'_>,
+    value: L,
+    len: usize,
+    f: F,
+) -> fmt::Result {
+    for (i, item) in value.into_iter().enumerate() {
+        if i != 0 {
+            write!(writer, ",")?;
+        }
+        if i >= len {
+            write!(writer, "…")?;
+            break;
+        }
+        f(writer, item)?
+    }
+    Ok(())
+}
+
+fn format_pruned_json(
+    writer: &mut fmt::Formatter<'_>,
+    value: &serde_json::Value,
+) -> std::fmt::Result {
+    use serde_json::Value::*;
+    match value {
+        String(s) if s.len() > 20 => {
+            write!(
+                writer,
+                "{}",
+                serde_json::to_string(&(s[..s.ceil_char_boundary(20)].to_string() + "…")).unwrap()
+            )?;
+        }
+        Array(a) => {
+            write!(writer, "[")?;
+            format_truncated_list(writer, a, 5, |writer, item| {
+                format_pruned_json(writer, item)
+            })?;
+            write!(writer, "]")?;
+        }
+        Object(a) => {
+            write!(writer, "{{")?;
+            format_truncated_list(writer, a, 5, |writer, (k, v)| {
+                write!(writer, "{}:", serde_json::to_string(k).unwrap())?;
+                format_pruned_json(writer, v)
+            })?;
+            write!(writer, "}}")?;
+        }
+        value => write!(writer, "{}", serde_json::to_string(value).unwrap())?,
+    }
+    Ok(())
 }

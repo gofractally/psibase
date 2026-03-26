@@ -16,13 +16,13 @@ use psibase::{
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
     get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageInfo, PackageList,
-    PackageOp, PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService,
-    PrettyAction, SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
-    Version,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, ActionFormatter,
+    AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, JointRegistry, Meta, NullSchemaFetcher,
+    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference,
+    PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaMap, Seconds, ServiceInfo,
+    SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction,
+    TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1242,9 +1242,12 @@ async fn push_boot(
     if args.tx_args.console {
         progress.suspend(|| print!("{}", trace.console()));
     }
+    // TODO: At boot ALL the schemas can be loaded from packages
+    let mut afmt = ActionFormatter::new(NullSchemaFetcher);
     args.tx_args
         .trace
-        .error_for_trace(trace, Some(progress))
+        .error_for_trace(trace, Some(progress), &mut afmt)
+        .await
         .context("Failed to boot")
 }
 

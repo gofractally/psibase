@@ -1,6 +1,10 @@
-use crate::{services::transact, AccountNumber, SignedTransaction, TransactionTrace};
+use crate::{
+    services::{packages, transact},
+    AccountNumber, ActionFormatter, Schema, SchemaFetcher, SignedTransaction, TransactionTrace,
+};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
+use async_trait::async_trait;
 use custom_error::custom_error;
 use fracpack::{Pack, UnpackOwned};
 use indicatif::ProgressBar;
@@ -100,16 +104,20 @@ pub enum TraceFormat {
 }
 
 impl TraceFormat {
-    pub fn error_for_trace(
+    pub async fn error_for_trace<F: SchemaFetcher>(
         &self,
         trace: TransactionTrace,
         progress: Option<&ProgressBar>,
+        afmt: &mut ActionFormatter<F>,
     ) -> Result<(), anyhow::Error> {
         match self {
-            TraceFormat::Full => progress.suspend(|| -> Result<(), anyhow::Error> {
-                println!("{}", trace.to_string());
-                Ok(std::io::stdout().flush()?)
-            })?,
+            TraceFormat::Full => {
+                let _ = afmt.prepare_transaction_trace(&trace).await;
+                progress.suspend(|| -> Result<(), anyhow::Error> {
+                    println!("{}", afmt.display_transaction_trace(&trace));
+                    Ok(std::io::stdout().flush()?)
+                })?
+            }
             TraceFormat::Json => progress.suspend(|| -> Result<(), anyhow::Error> {
                 serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?;
                 println!("");
@@ -142,6 +150,34 @@ impl FromStr for TraceFormat {
             "json" => Ok(TraceFormat::Json),
             _ => Err(Error::UnknownTraceFormat)?,
         }
+    }
+}
+
+pub struct HttpSchemaFetcher<'a> {
+    client: &'a reqwest::Client,
+    base_url: &'a reqwest::Url,
+}
+
+#[async_trait(?Send)]
+impl<'a> SchemaFetcher for HttpSchemaFetcher<'a> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        as_json(
+            self.client.get(
+                packages::SERVICE
+                    .url(self.base_url)?
+                    .join(&format!("/schema?service={service}"))?,
+            ),
+        )
+        .await
+    }
+}
+
+pub struct NullSchemaFetcher;
+
+#[async_trait(?Send)]
+impl SchemaFetcher for NullSchemaFetcher {
+    async fn fetch_schema(&self, _service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        Err(anyhow::anyhow!("Schema fetching disabled"))
     }
 }
 
@@ -191,7 +227,11 @@ async fn push_transaction_impl(
             std::io::stdout().flush()
         })?;
     }
-    fmt.error_for_trace(trace, progress)
+    let mut afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url,
+    });
+    fmt.error_for_trace(trace, progress, &mut afmt).await
 }
 
 pub async fn push_transaction(
