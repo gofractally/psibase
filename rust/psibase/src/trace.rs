@@ -1,6 +1,10 @@
 use std::fmt;
 
-use crate::{schema_types, AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap};
+use crate::{
+    method, schema_types,
+    services::{db, transact},
+    AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap,
+};
 use async_trait::async_trait;
 use fracpack::{CompiledSchema, Unpack};
 use serde::{Deserialize, Serialize};
@@ -145,12 +149,21 @@ fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fm
     writeln!(f, "{:indent$}event", "")
 }
 
+fn hide_action(action: &Action) -> bool {
+    use crate as psibase;
+    action.service == db::SERVICE && action.method == method!("open")
+        || action.service == transact::SERVICE && action.method == method!("kvNotify")
+}
+
 fn format_action_trace(
     schemas: &SchemaMap,
     atrace: &ActionTrace,
     indent: usize,
     f: &mut fmt::Formatter<'_>,
 ) -> fmt::Result {
+    if hide_action(&atrace.action) {
+        return Ok(());
+    }
     let schema = schemas.get(&atrace.action.service);
     let action_name = MethodString(atrace.action.method.to_string());
     let (action_name, action_type) = schema
