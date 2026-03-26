@@ -195,7 +195,7 @@ impl OptionProgressBar for Option<&ProgressBar> {
     }
 }
 
-async fn push_transaction_impl(
+async fn push_transaction_impl<F: SchemaFetcher>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
@@ -203,6 +203,7 @@ async fn push_transaction_impl(
     console: bool,
     progress: Option<&ProgressBar>,
     wait_for: Option<String>,
+    afmt: &mut ActionFormatter<F>,
 ) -> Result<(), anyhow::Error> {
     let wait_for = wait_for
         .map(|wait| format!("?wait_for={}", wait))
@@ -227,11 +228,7 @@ async fn push_transaction_impl(
             std::io::stdout().flush()
         })?;
     }
-    let mut afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url,
-    });
-    fmt.error_for_trace(trace, progress, &mut afmt).await
+    fmt.error_for_trace(trace, progress, afmt).await
 }
 
 pub async fn push_transaction(
@@ -242,19 +239,33 @@ pub async fn push_transaction(
     console: bool,
     progress: Option<&ProgressBar>,
 ) -> Result<(), anyhow::Error> {
-    push_transaction_impl(base_url, client, packed, fmt, console, progress, None)
-        .await
-        .context("Failed to push transaction")?;
+    let mut afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url,
+    });
+    push_transaction_impl(
+        base_url,
+        client.clone(),
+        packed,
+        fmt,
+        console,
+        progress,
+        None,
+        &mut afmt,
+    )
+    .await
+    .context("Failed to push transaction")?;
     Ok(())
 }
 
-pub async fn push_transaction_optimistic(
+pub async fn push_transaction_optimistic<F: SchemaFetcher>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
     console: bool,
     progress: Option<&ProgressBar>,
+    afmt: &mut ActionFormatter<F>,
 ) -> Result<(), anyhow::Error> {
     push_transaction_impl(
         base_url,
@@ -264,6 +275,7 @@ pub async fn push_transaction_optimistic(
         console,
         progress,
         Some("applied".to_string()),
+        afmt,
     )
     .await
     .context("Failed to push transaction")?;

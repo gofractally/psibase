@@ -1194,6 +1194,12 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
+    let mut schemas = SchemaMap::new();
+    for package in &packages {
+        package.get_all_schemas(&mut schemas)?;
+    }
+    let mut afmt = ActionFormatter::with_schemas(schemas, NullSchemaFetcher);
+
     let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();
     let progress = ProgressBar::new((num_transactions + boot_transactions.len()) as u64)
         .with_style(ProgressStyle::with_template(
@@ -1201,7 +1207,14 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         )?);
 
     progress.set_message("Initializing chain");
-    push_boot(args, &client, boot_transactions.packed(), &progress).await?;
+    push_boot(
+        args,
+        &client,
+        boot_transactions.packed(),
+        &progress,
+        &mut afmt,
+    )
+    .await?;
     progress.inc(boot_transactions.len() as u64);
     for (label, transactions, _) in groups {
         progress.set_message(label);
@@ -1213,6 +1226,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
                 args.tx_args.trace,
                 args.tx_args.console,
                 Some(&progress),
+                &mut afmt,
             )
             .await?;
             progress.inc(1)
@@ -1228,6 +1242,7 @@ async fn push_boot(
     client: &reqwest::Client,
     packed: Vec<u8>,
     progress: &ProgressBar,
+    afmt: &mut ActionFormatter<NullSchemaFetcher>,
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
@@ -1242,11 +1257,9 @@ async fn push_boot(
     if args.tx_args.console {
         progress.suspend(|| print!("{}", trace.console()));
     }
-    // TODO: At boot ALL the schemas can be loaded from packages
-    let mut afmt = ActionFormatter::new(NullSchemaFetcher);
     args.tx_args
         .trace
-        .error_for_trace(trace, Some(progress), &mut afmt)
+        .error_for_trace(trace, Some(progress), afmt)
         .await
         .context("Failed to boot")
 }

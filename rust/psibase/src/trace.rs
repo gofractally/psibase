@@ -307,6 +307,9 @@ pub struct ActionFormatter<F: SchemaFetcher> {
 }
 
 impl<F: SchemaFetcher> ActionFormatter<F> {
+    pub fn with_schemas(schemas: SchemaMap, fetcher: F) -> Self {
+        ActionFormatter { schemas, fetcher }
+    }
     pub fn new(fetcher: F) -> Self {
         ActionFormatter {
             schemas: HashMap::new(),
