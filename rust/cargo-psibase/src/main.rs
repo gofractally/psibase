@@ -508,9 +508,9 @@ struct AsyncJobServer {
 }
 
 impl AsyncJobServer {
-    unsafe fn new(limit: Option<usize>) -> Result<AsyncJobServer, Error> {
+    fn new(client: jobserver::FromEnv, limit: Option<usize>) -> Result<AsyncJobServer, Error> {
         use jobserver::FromEnvErrorKind::*;
-        let client = match jobserver::Client::from_env_ext(false).client {
+        let client = match client.client {
             Ok(client) => client,
             Err(err) => match err.kind() {
                 NoEnvVar | NoJobserver | Unsupported => {
@@ -1098,7 +1098,7 @@ async fn install(
 }
 
 #[tokio::main]
-async fn main2() -> Result<(), Error> {
+async fn main2(jclient: jobserver::FromEnv) -> Result<(), Error> {
     let mut is_cargo_subcommand = false;
     if let Some(arg) = env::args().nth(1) {
         is_cargo_subcommand = arg == "psibase";
@@ -1111,11 +1111,7 @@ async fn main2() -> Result<(), Error> {
         Args::parse()
     };
 
-    if let Ok(makeflags) = std::env::var("MAKEFLAGS") {
-        println!("MAKEFLAGS: {}", makeflags)
-    }
-
-    let jobs = unsafe { AsyncJobServer::new(args.jobs)? };
+    let jobs = AsyncJobServer::new(jclient, args.jobs)?;
 
     let metadata = get_metadata(&args)?;
     check_psibase_version(&metadata);
@@ -1178,7 +1174,7 @@ async fn main2() -> Result<(), Error> {
 }
 
 fn main() -> ExitCode {
-    if let Err(e) = main2() {
+    if let Err(e) = main2(unsafe { jobserver::Client::from_env_ext(false) }) {
         println!("{:}: {:?}", style("error").bold().red(), e);
         ExitCode::FAILURE
     } else {
