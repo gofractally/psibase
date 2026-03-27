@@ -253,7 +253,7 @@ pub struct PrettyAction {
     pub sender: AccountNumber,
 
     /// Service to execute the action
-    pub service: AccountNumber,
+    pub service: String,
 
     /// Service method to execute
     pub method: MethodNumber,
@@ -265,15 +265,16 @@ pub struct PrettyAction {
 
 impl PrettyAction {
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let service = AccountNumber::from_exact(&self.service)?;
         let raw_data = match self.raw_data {
             Some(raw_data) => raw_data,
             None => {
-                let schema = schemas.get(&self.service).unwrap();
+                let schema = schemas.get(&service).unwrap();
                 let custom = schema_types();
                 let mut cschema = CompiledSchema::new(&schema.types, &custom);
                 let Some(act) = schema.actions.get(&MethodString(self.method.to_string())) else {
                     Err(Error::UnknownAction {
-                        service: self.service,
+                        service: service,
                         method: self.method,
                     })?
                 };
@@ -284,7 +285,7 @@ impl PrettyAction {
         };
         Ok(Action {
             sender: self.sender,
-            service: self.service,
+            service,
             method: self.method,
             rawData: raw_data,
         })
@@ -529,7 +530,9 @@ impl<R: Read + Seek> PackagedService<R> {
         if let Ok(file) = self.archive.by_name("script/postinstall.json") {
             let script: Vec<PrettyAction> =
                 serde_json::de::from_str(&std::io::read_to_string(file).unwrap()).unwrap();
-            return script.into_iter().any(|act| act.service == sites::SERVICE);
+            return script
+                .into_iter()
+                .any(|act| act.service.parse().unwrap_or(AccountNumber::new(0)) == sites::SERVICE);
         }
         false
     }
@@ -709,7 +712,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 serde_json::de::from_str(&std::io::read_to_string(file)?)?;
             for act in actions {
                 accounts.push(act.sender);
-                services.push(act.service);
+                services.push(act.service.parse()?);
             }
         }
 
@@ -732,7 +735,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 serde_json::de::from_str(&std::io::read_to_string(file)?)?;
             for act in actions {
                 if act.raw_data.is_none() {
-                    out.insert(act.service);
+                    out.insert(act.service.parse()?);
                 }
             }
         }

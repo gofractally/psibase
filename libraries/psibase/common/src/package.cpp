@@ -54,7 +54,7 @@ namespace psibase
       struct PrettyAction
       {
          AccountNumber                    sender;
-         AccountNumber                    service;
+         std::string                      service;
          MethodNumber                     method;
          std::optional<std::vector<char>> rawData;
          std::optional<psio::json::any>   data;
@@ -82,13 +82,16 @@ namespace psibase
 
       Action to_action(PrettyAction&& act, std::span<const PackagedService> packages)
       {
+         auto service = AccountNumber{act.service};
+         if (service == AccountNumber{})
+            abortMessage("Invalid service account " + act.service);
          if (act.rawData)
          {
-            return Action{act.sender, act.service, act.method, std::move(*act.rawData)};
+            return Action{act.sender, service, act.method, std::move(*act.rawData)};
          }
-         auto* schema = getSchema(packages, act.service);
+         auto* schema = getSchema(packages, service);
          if (!schema)
-            abortMessage("Cannot find schema for " + act.service.str());
+            abortMessage("Cannot find schema for " + act.service);
          auto pos = schema->actions.find(act.method.str());
          check(pos != schema->actions.end(), "Action not found");
          const auto&                        ty = pos->second.params;
@@ -96,7 +99,7 @@ namespace psibase
          auto*                              cty = cschema.get(ty.resolve(schema->types));
          if (!act.data)
             act.data = psio::json::any_object{};
-         Action              result{act.sender, act.service, act.method};
+         Action              result{act.sender, service, act.method};
          psio::vector_stream stream{result.rawData};
          to_frac(*cty, *act.data, stream, cschema.builtin);
          return result;
@@ -308,7 +311,7 @@ namespace psibase
          psio::from_json(tmp, stream);
          for (const auto& action : tmp)
          {
-            if (action.service == Sites::service)
+            if (AccountNumber{action.service} == Sites::service)
             {
                return true;
             }
