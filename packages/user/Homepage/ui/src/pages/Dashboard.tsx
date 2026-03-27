@@ -45,7 +45,7 @@ const apps: App[] = [
         title: "Doc",
         description: "Review technical documentation and guides.",
         icon: <Book className="h-6 w-6" />,
-        href: siblingUrl(null, "docs", null, false),
+        href: siblingUrl(null, "docs", null),
     },
 ];
 

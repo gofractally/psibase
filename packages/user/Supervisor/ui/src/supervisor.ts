@@ -34,7 +34,7 @@ import {
     setQueryToken,
 } from "./utils";
 
-const rootDomain = siblingUrl(null, null, null, true);
+const rootDomain = siblingUrl();
 
 // System plugins are always loaded, even if they are not used
 //   in a given call context.
@@ -81,14 +81,18 @@ export class Supervisor implements AppInterface {
             "Redundant setting parent origination",
         );
 
-        if (callerOrigin === rootDomain) {
+        const service = serviceFromOrigin(callerOrigin);
+
+        if (service === "homepage") {
+            // TODO: we should check if service == the dynamically configured "homepage" service in httpserver.
+            // If it is, then we can internally namespace this app as "homepage".
             this.parentOrigination = {
                 app: "homepage",
                 origin: callerOrigin,
             };
         } else {
             this.parentOrigination = {
-                app: serviceFromOrigin(callerOrigin),
+                app: service,
                 origin: callerOrigin,
             };
         }
@@ -188,12 +192,11 @@ export class Supervisor implements AppInterface {
         const user = this.supervisorCall(
             getCallArgs("accounts", "plugin", "api", "getCurrentUser", []),
         );
-        
-        if (!user) 
-        {
+
+        if (!user) {
             return undefined;
         }
-        
+
         const token = this.supervisorCall(
             getCallArgs("host", "auth", "api", "getActiveQueryToken", [
                 this.parentOrigination.app,
@@ -201,7 +204,6 @@ export class Supervisor implements AppInterface {
             ]),
         );
         return token;
-        
     }
 
     constructor() {
@@ -406,10 +408,7 @@ export class Supervisor implements AppInterface {
                         err.message,
                     );
                 } else {
-                    newError = new PluginErrorObject(
-                        err.producer,
-                        err.message,
-                    );
+                    newError = new PluginErrorObject(err.producer, err.message);
                 }
                 this.replyToParent(id, newError);
             } else {

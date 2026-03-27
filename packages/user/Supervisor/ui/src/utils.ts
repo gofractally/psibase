@@ -7,7 +7,7 @@ export const wasmFromUrl = async (url: string) => {
     let headers: [string, string][] = [];
     if (queryToken) {
         headers = [["Authorization", `Bearer ${queryToken}`]];
-    } 
+    }
     return fetch(url, {
         headers,
     })
@@ -64,7 +64,8 @@ export const parser = (): Promise<any> => {
 };
 
 let queryToken: string | undefined;
-export const setQueryToken = (token: string | undefined) => (queryToken = token);
+export const setQueryToken = (token: string | undefined) =>
+    (queryToken = token);
 
 export let chainId: string | undefined;
 const getChainId = (): Promise<string> => {
@@ -85,8 +86,7 @@ export const isString = (value: any): value is string => {
 export const isEmbedded: boolean = (() => {
     try {
         return (
-            window.top?.location.origin ===
-            siblingUrl(null, "supervisor", null, true)
+            window.top?.location.origin === siblingUrl(null, "supervisor", null)
         );
     } catch {
         return false;

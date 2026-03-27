@@ -1,19 +1,21 @@
-import { CircleAlert, Save, Trash, Upload } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { CircleAlert, Save, Trash, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
+
+import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
+import { useSetLogo } from "@/hooks/use-set-logo";
+import { useSetNetworkName } from "@/hooks/use-set-network-name";
+
 import { useAppForm } from "@shared/components/form/app-form";
 import { useBranding } from "@shared/hooks/use-branding";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
-
-import { useLogoUploaded } from "@/hooks/use-logo-uploaded";
-import { useSetLogo } from "@/hooks/use-set-logo";
-import { useSetNetworkName } from "@/hooks/use-set-network-name";
 
 /** Decode a data URL (e.g. data:image/svg+xml;base64,...) to raw bytes */
 function dataUrlToBytes(dataUrl: string): Uint8Array {
@@ -132,14 +134,13 @@ export const Branding = () => {
                                               null,
                                               "branding",
                                               "/network_logo.svg",
-                                              true,
                                           )
                                         : "");
                                 const hasDraft = !!field.state.value;
 
-                                const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (
-                                    event,
-                                ) => {
+                                const handleFileChange: React.ChangeEventHandler<
+                                    HTMLInputElement
+                                > = (event) => {
                                     const file = event.target.files?.[0];
                                     if (!file) return;
                                     if (file.type !== "image/svg+xml") {
@@ -193,14 +194,19 @@ export const Branding = () => {
                                                 className="hidden"
                                             />
                                             <logoForm.Subscribe
-                                                selector={(state) => state.isSubmitting}
+                                                selector={(state) =>
+                                                    state.isSubmitting
+                                                }
                                             >
                                                 {(isSubmitting) => (
                                                     <Button
                                                         type="submit"
                                                         variant="outline"
                                                         size="icon"
-                                                        disabled={!hasDraft || isSubmitting}
+                                                        disabled={
+                                                            !hasDraft ||
+                                                            isSubmitting
+                                                        }
                                                     >
                                                         <Save className="h-4 w-4" />
                                                     </Button>

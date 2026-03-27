@@ -63,9 +63,7 @@ export function ContactDetails({
     );
 
     const { data: currentUser } = useCurrentUser();
-    const { data: profile } = useProfile(contact?.account, true, {
-        baseUrlIncludesSibling: false,
-    });
+    const { data: profile } = useProfile(contact?.account, true, {});
 
     const { mutateAsync: updateContact } = useUpdateContact();
     const { mutateAsync: deleteContact } = useDeleteContact();

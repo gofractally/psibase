@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { getSupervisor, siblingUrl } from "@psibase/common-lib";
+
 import { ErrorCard } from "@shared/components/error-card";
 
 const supervisor = getSupervisor();
@@ -54,7 +55,7 @@ export const App = () => {
                 setActiveApp(promptDetails.activeApp);
 
                 const iframeUrl = new URL(
-                    siblingUrl(null, promptDetails.promptApp, null, true),
+                    siblingUrl(null, promptDetails.promptApp, null),
                 );
 
                 // The well-known path for the web platform is currently
@@ -81,8 +82,8 @@ export const App = () => {
             if (event.data === "finished") {
                 const rootDomain =
                     activeApp !== "homepage"
-                        ? new URL(siblingUrl(null, activeApp, returnPath, true))
-                        : new URL(siblingUrl(null, null, returnPath, true));
+                        ? new URL(siblingUrl(null, activeApp, returnPath))
+                        : new URL(siblingUrl(null, null, returnPath));
                 window.location.href = rootDomain.toString();
             }
         },
@@ -100,7 +101,12 @@ export const App = () => {
     if (error) {
         return (
             <div className="flex min-h-screen items-center justify-center">
-                <ErrorCard error={new Error(error)} title="Error" retryLabel="Go back" retry={() => window.history.back()} />
+                <ErrorCard
+                    error={new Error(error)}
+                    title="Error"
+                    retryLabel="Go back"
+                    retry={() => window.history.back()}
+                />
             </div>
         );
     }
