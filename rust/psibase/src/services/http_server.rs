@@ -62,6 +62,18 @@ mod service {
         unimplemented!()
     }
 
+    /// Set the homepage subdomain
+    #[action]
+    fn setHomepage(subdomain: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Gets the current homepage subdomain
+    #[action]
+    fn homepage() -> AccountNumber {
+        unimplemented!()
+    }
+
     /// Entry point for messages
     #[action]
     fn recv(socket: i32, data: Hex<Vec<u8>>, flags: u32) {

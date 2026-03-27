@@ -6,6 +6,15 @@
 
 namespace SystemService
 {
+   struct ConfigRow
+   {
+      psibase::AccountNumber previous;
+      psibase::AccountNumber homepageSubdomain;
+   };
+   PSIO_REFLECT(ConfigRow, previous, homepageSubdomain)
+   using ConfigTable = psibase::Table<ConfigRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(ConfigTable)
+
    struct PendingRequestRow
    {
       std::int32_t           socket;
@@ -40,15 +49,12 @@ namespace SystemService
    ///
    /// `psinode` calls this function on the `http-server` service whenever it receives
    /// an HTTP request that services may serve. This function does the actual routing.
-   /// `psinode` has a local option (TODO: implement) which may choose an alternative
-   /// routing service instead.
    struct HttpServer : psibase::Service
    {
       static constexpr auto service          = psibase::AccountNumber("http-server");
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
       static constexpr auto commonApiPrefix  = "/common/";
-      static constexpr auto homepageService  = psibase::AccountNumber("homepage");
-      using Tables                           = psibase::ServiceTables<RegServTable>;
+      using Tables                           = psibase::ServiceTables<RegServTable, ConfigTable>;
 
       using Session = psibase::SessionTables<PendingRequestTable>;
 
@@ -89,6 +95,12 @@ namespace SystemService
       /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
 
+      /// Set the homepage subdomain
+      void setHomepage(psibase::AccountNumber subdomain);
+
+      /// Gets the current homepage subdomain
+      psibase::AccountNumber homepage();
+
       // Entry point for messages
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
       // Entry point for HTTP requests
@@ -105,6 +117,8 @@ namespace SystemService
                 method(giveSocket, socket, service),
                 method(takeSocket, socket),
                 method(registerServer, server),
+                method(setHomepage, subdomain),
+                method(homepage),
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
                 method(rootHost, host))

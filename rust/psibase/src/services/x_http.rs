@@ -127,6 +127,18 @@ mod service {
         unimplemented!()
     }
 
+    /// Absolute URL for this socket and request (scheme, host, port, path).
+    #[action]
+    fn absoluteUrl(
+        socket: i32,
+        request: HttpRequest,
+        rootHost: String,
+        subdomain: Option<AccountNumber>,
+        includeTarget: bool,
+    ) -> String {
+        unimplemented!()
+    }
+
     #[action]
     fn serveSys(req: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
         unimplemented!()

@@ -1,11 +1,11 @@
 #include <psibase/dispatch.hpp>
-#include <psibase/nativeTables.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
 #include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/RTransact.hpp>
+#include "psibase/api.hpp"
 
 static constexpr bool enable_print = false;
 
@@ -30,7 +30,8 @@ namespace SystemService
              .get(server);
       }
 
-      AccountNumber getTargetService(const HttpRequest& req, std::string_view rootHost)
+      std::optional<AccountNumber> getTargetService(const HttpRequest& req,
+                                                    std::string_view   rootHost)
       {
          std::string serviceName;
 
@@ -44,10 +45,12 @@ namespace SystemService
 
          // root domain
          else
-            serviceName = HttpServer::homepageService.str();
+            return std::nullopt;
 
          return AccountNumber(serviceName);
       }
+
+      constexpr AccountNumber DEFAULT_HOMEPAGE = AccountNumber("network");
    }  // namespace
 
    void HttpServer::registerServer(AccountNumber server)
@@ -66,6 +69,35 @@ namespace SystemService
       if (!(act.service == RTransact::service && act.method == MethodNumber{"recv"}))
          psibase::abortMessage(act.service.str() + "::" + act.method.str() +
                                " is not authorized to receive messages");
+   }
+
+   void HttpServer::setHomepage(AccountNumber subdomain)
+   {
+      check(getSender() == getReceiver(), "Wrong sender");
+
+      auto table = Tables{getReceiver()}.open<ConfigTable>();
+      if (auto config = table.get({}))
+      {
+         if (config->homepageSubdomain == subdomain)
+            return;
+
+         table.put(
+             ConfigRow{.previous = config->homepageSubdomain, .homepageSubdomain = subdomain});
+      }
+
+      table.put(ConfigRow{.previous = DEFAULT_HOMEPAGE, .homepageSubdomain = subdomain});
+   }
+
+   AccountNumber HttpServer::homepage()
+   {
+      auto config =
+          HttpServer::Tables(HttpServer::service, KvMode::read).open<ConfigTable>().get({});
+
+      if (config)
+      {
+         return config->homepageSubdomain;
+      }
+      return DEFAULT_HOMEPAGE;
    }
 
    void HttpServer::recv(std::int32_t                        socket,
@@ -101,6 +133,7 @@ namespace SystemService
                                                      "Content-Encoding",
                                                      "Content-Security-Policy",
                                                      "ETag",
+                                                     "Location",
                                                      "Set-Cookie"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
@@ -266,13 +299,51 @@ namespace SystemService
 
       auto user = recurse().to<RTransact>().getUser(req);
 
+      auto config =
+          HttpServer::Tables(HttpServer::service, KvMode::read).open<ConfigTable>().get({});
+
       // Remove sensitive headers
       req.removeCookie("__HOST-SESSION");
       req.removeCookie("SESSION");
       std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
 
-      // First we check the registered server
-      auto                     service    = getTargetService(req, to<XHttp>().rootHost(req.host));
+      // Extract subdomain
+      auto root        = to<XHttp>().rootHost(req.host);
+      auto service_opt = getTargetService(req, root);
+
+      auto redirect = [&](const psibase::AccountNumber& subdomain)
+      {
+         auto loc  = to<XHttp>().absoluteUrl(sock, req, root,
+                                             std::optional<AccountNumber>{subdomain}, true);
+         auto hdrs = allowCors();
+         hdrs.push_back({"Location", loc});
+         HttpReply reply{.status      = HttpStatus::movedPermanently,
+                         .contentType = "text/html",
+                         .headers     = std::move(hdrs)};
+         std::format_to(std::back_inserter(reply.body),
+                        R"(<html><body><a href="{0}">{0}</a></body></html>)", loc);
+         sendReplyImpl(HttpServer::service, sock, std::move(reply));
+      };
+
+      // If the root host is requested directly, redirect to the homepage
+      if (!service_opt)
+      {
+         redirect(homepage());
+         return;
+      }
+      // If navigating to previous homepage, redirect to the new homepage
+      else if (config && service_opt.value() == config->previous)
+      {
+         redirect(config->homepageSubdomain);
+         return;
+      }
+
+      // If the requested subdomain is the homepage, reverse proxy to the homepage service
+      auto service = service_opt.value();
+      if (service == homepage())
+         service = AccountNumber{"homepage"};
+
+      // First check the registered server
       auto                     registered = getServer(service);
       std::optional<HttpReply> result;
       psibase::AccountNumber   server;
@@ -291,6 +362,7 @@ namespace SystemService
          result = checkServer(registered->server);
       }
 
+      // Otherwise, check the sites service
       if (!registered || (!result && owned.get(sock)))
       {
          result = checkServer("sites"_a);

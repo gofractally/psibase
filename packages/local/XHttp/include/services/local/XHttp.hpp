@@ -141,9 +141,16 @@ namespace LocalService
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
 
+      /// Absolute URL for this socket and request (scheme, host, port, path).
+      std::string absoluteUrl(std::int32_t                           socket,
+                              psio::view<const psibase::HttpRequest> request,
+                              psio::view<const std::string>          rootHost,
+                              std::optional<psibase::AccountNumber>  subdomain,
+                              bool                                   includeTarget);
+
       /// handles requests to the x-http subdomain
-      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
-          -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest        req,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
       /// Called by the host at the beginning of a session
       void startSession();
@@ -161,6 +168,7 @@ namespace LocalService
                 method(asyncClose, socket),
                 method(log, severity, msg),
                 method(rootHost, host),
+                method(absoluteUrl, socket, request, rootHost, subdomain, includeTarget),
                 method(serveSys, request, socket),
                 method(startSession))
 

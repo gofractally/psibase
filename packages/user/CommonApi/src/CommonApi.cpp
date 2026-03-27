@@ -6,6 +6,7 @@
 #include <psio/to_json.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/Transact.hpp>
+#include "psibase/check.hpp"
 
 static constexpr bool enable_print = false;
 
@@ -102,7 +103,9 @@ namespace SystemService
                 request.host[request.host.size() - rootHost.size() - 1] == '.')
                serviceName.assign(request.host.begin(), request.host.end() - rootHost.size() - 1);
             else
-               serviceName = HttpServer::homepageService.str();
+            {
+               abortMessage("Invalid host");
+            }
             return to_json(serviceName);
          }
          if (request.target == "/common/rootdomain")

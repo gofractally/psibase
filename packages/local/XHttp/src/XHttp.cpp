@@ -75,7 +75,8 @@ namespace
    std::string getUrl(psio::view<const HttpRequest> req,
                       std::int32_t                  socket,
                       std::string_view              rootHost,
-                      std::optional<AccountNumber>  subdomain = {})
+                      std::optional<AccountNumber>  subdomain     = {},
+                      bool                          includeTarget = false)
    {
       std::string              location;
       std::optional<SocketRow> socketRow;
@@ -109,7 +110,12 @@ namespace
          }
       }
       if (subdomain)
-         location += '/';
+      {
+         if (includeTarget)
+            location += req.target();
+         else
+            location += '/';
+      }
       else
          location += req.target();
       return location;
@@ -551,6 +557,18 @@ void XHttp::log(LogMessage::Severity severity, std::string msg)
 std::string XHttp::rootHost(psio::view<const std::string> host)
 {
    return std::string(getRootHost(host));
+}
+
+std::string XHttp::absoluteUrl(std::int32_t                  socket,
+                               psio::view<const HttpRequest> request,
+                               psio::view<const std::string> rootHost,
+                               std::optional<AccountNumber>  subdomain,
+                               bool                          includeTarget)
+{
+   check(getSender() == XHttp::service || getSender() == HttpServer::service,
+         "absoluteUrl may only be called by x-http or http-server");
+
+   return getUrl(request, socket, std::string_view{rootHost}, std::move(subdomain), includeTarget);
 }
 
 void XHttp::startSession()

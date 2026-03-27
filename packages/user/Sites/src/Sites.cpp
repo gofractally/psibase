@@ -54,11 +54,15 @@ namespace SystemService
          else if (isSubdomain(req, rootHost))
             serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
 
-         // root domain
-         else
-            serviceName = HttpServer::homepageService.str();
+         auto result = AccountNumber(serviceName);
 
-         return AccountNumber(serviceName);
+         // Reverse proxy the configured homepage subdomain to the homepage package
+         if (result == to<HttpServer>().homepage())
+         {
+            return AccountNumber{"homepage"};
+         }
+
+         return result;
       }
 
       // Checks for an extension to determine if it is a static asset
