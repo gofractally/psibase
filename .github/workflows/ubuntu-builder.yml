@@ -51,6 +51,13 @@ jobs:
           BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:$BUILDER_IMAGE_${{ matrix.ubuntu-version }}"
           echo $BUILDER_IMAGE
           bash ${GITHUB_WORKSPACE}/.github/scripts/build.sh ${GITHUB_WORKSPACE} "$BUILDER_IMAGE" ${{ matrix.ubuntu-version }}
+      - name: Fail if build left artifacts behind
+        run: |
+          if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+            echo "Build left the working tree dirty:"
+            git status --short --untracked-files=all
+            exit 1
+          fi
       - name: Publish packages
         if: fromJSON(env.can-publish) && matrix.ubuntu-version == '2404'
         env:
