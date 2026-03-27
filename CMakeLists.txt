@@ -771,7 +771,7 @@ psibase_package(
     NAME HttpServerPlugin
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A plugin for simplifying interactions with the HttpServer service"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
     SERVICE http-server
         DATA ${Plugins_OUTPUT_FILE_http_server} /plugin.wasm
     DEPENDS ${Plugins_DEP}
