@@ -2,6 +2,7 @@ package config:plugin;
 
 world impl {
     include host:common/imports;
+    include http-server:plugin/imports;
     include staged-tx:plugin/imports;
     include producers:plugin/imports;
     include branding:plugin/imports;
@@ -12,7 +13,6 @@ world impl {
     import tokens:plugin/admin;
     import packages:plugin/private-api;
     import symbol:plugin/admin;
-
 
     export branding;
     export producers;

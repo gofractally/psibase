@@ -71,8 +71,10 @@ impl Branding for ConfigPlugin {
 
     fn set_network_name(name: String) -> Result<(), Error> {
         set_propose_latch(Some("branding"))?;
-
         branding::plugin::api::set_network_name(&name);
+
+        set_propose_latch(Some("http-server"))?;
+        http_server::plugin::api::set_homepage_domain(&name);
         Ok(())
     }
 }
