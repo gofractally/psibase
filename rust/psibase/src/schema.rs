@@ -208,21 +208,35 @@ pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
     let registry = DirectoryRegistry::new(
         PathBuf::from(std::env::var("PSIBASE_DATADIR").unwrap()).join("packages"),
     );
-    let info = registry
-        .index()
-        .unwrap()
-        .into_iter()
-        .find(|info| info.accounts.contains(&my_schema.service))
-        .expect(&format!(
-            "Cannot find package containing {}",
-            my_schema.service
-        ));
-    let package = block_on(registry.get_by_info(&info)).unwrap();
+    let index = registry.index().unwrap();
     let mut accounts = HashSet::new();
     accounts.insert(my_schema.service);
     let mut schemas = SchemaMap::new();
-    package.get_schemas(&mut accounts, &mut schemas).unwrap();
-    let real_schema = schemas.get(&my_schema.service).unwrap();
+    let mut found_any = false;
+    for info in &index {
+        if info.accounts.contains(&my_schema.service) {
+            found_any = true;
+            let package = block_on(registry.get_by_info(info)).unwrap();
+            package.get_schemas(&mut accounts, &mut schemas).unwrap();
+        }
+    }
+    assert!(
+        found_any,
+        "Cannot find package containing {}",
+        my_schema.service
+    );
+    let real_schema = schemas.get(&my_schema.service).unwrap_or_else(|| {
+        let names: Vec<_> = index
+            .iter()
+            .filter(|i| i.accounts.contains(&my_schema.service))
+            .map(|i| i.name.as_str())
+            .collect();
+        panic!(
+            "no schema for service {} after loading {};",
+            my_schema.service,
+            names.join(", "),
+        )
+    });
     assert_schemas_equivalent(real_schema, &my_schema);
 }
 
