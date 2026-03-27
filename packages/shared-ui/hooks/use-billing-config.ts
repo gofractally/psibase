@@ -24,7 +24,7 @@ export const useBillingConfig = (options: GraphQLUrlOptions = {baseUrlIncludesSi
             `;
             const res = await graphql<BillingConfigResponse>(
                 query,
-                {service: "virtual-server", ...options},
+                {service: "vserver", ...options},
             );
 
             if (!res.getBillingConfig) {

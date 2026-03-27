@@ -14,7 +14,7 @@ namespace SystemService
 {
    struct Credentials : public psibase::Service
    {
-      static constexpr auto service           = psibase::AccountNumber("credentials");
+      static constexpr auto service           = psibase::AccountNumber("credential");
       static constexpr auto CREDENTIAL_SENDER = psibase::AccountNumber("cred-sys");
 
       void init();

@@ -5,7 +5,7 @@ mod events;
 mod service {
 
     use async_graphql::{connection::Connection, *};
-    use psibase::services::{nft::Wrapper as Nfts, tokens::TID};
+    use psibase::services::{http_server, nft::Wrapper as Nfts, tokens::TID};
 
     use psibase::*;
     use tokens::tables::tables::{UserPendingRecord, UserPendingTable};
@@ -411,7 +411,7 @@ mod service {
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         check(
-            get_sender() == AccountNumber::from("http-server"),
+            get_sender() == http_server::SERVICE,
             "permission denied: tokens::serveSys only callable by 'http-server'",
         );
 

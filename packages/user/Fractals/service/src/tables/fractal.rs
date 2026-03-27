@@ -56,7 +56,7 @@ impl Fractal {
             service: sites::SERVICE,
             method: sites::action_structs::setProxy::ACTION_NAME.into(),
             rawData: sites::action_structs::setProxy {
-                proxy: "fractal-core".into(),
+                proxy: "fractal-cr".into(),
             }
             .packed()
             .into(),

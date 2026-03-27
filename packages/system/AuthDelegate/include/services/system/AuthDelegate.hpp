@@ -32,7 +32,7 @@ namespace SystemService
    class AuthDelegate : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("auth-delegate");
+      static constexpr auto service = psibase::AccountNumber("auth-delg");
       using Tables                  = psibase::ServiceTables<AuthDelegateTable>;
 
       /// This is an implementation of the standard auth service interface defined in [SystemService::AuthInterface]

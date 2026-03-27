@@ -31,7 +31,7 @@ export const useNetworkVariables = () => {
                     objStorageBytes
                 }
             }`;
-            const res = await graphql(query, "virtual-server");
+            const res = await graphql(query, "vserver");
 
             const response = zNetworkVariablesResponse.parse(res);
 

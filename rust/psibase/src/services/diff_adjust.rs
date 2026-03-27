@@ -36,7 +36,7 @@
 //!   difficulty. The consumer is automatically set to the account that calls `create()` and cannot
 //!   be changed after creation. Initially, the creator is both admin and consumer, but the admin
 //!   role can be transferred via NFT ownership while the consumer remains fixed.
-#[crate::service(name = "diff-adjust", dispatch = false, psibase_mod = "crate")]
+#[crate::service(name = "diff-adj", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
 

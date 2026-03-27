@@ -262,7 +262,7 @@ impl Query {
         let condition = "account = ?".to_string();
         let param = account.to_string();
 
-        EventQuery::new("history.virtual-server.consumed")
+        EventQuery::new("history.vserver.consumed")
             .condition_with_params(condition, vec![param])
             .first(first)
             .last(last)
@@ -311,7 +311,7 @@ impl Query {
             params.push(recipient.to_string());
         }
 
-        EventQuery::new("history.virtual-server.bought")
+        EventQuery::new("history.vserver.bought")
             .condition_with_params(conditions.join(" AND "), params)
             .first(first)
             .last(last)
@@ -331,7 +331,7 @@ impl Query {
         before: Option<String>,
         after: Option<String>,
     ) -> async_graphql::Result<Connection<u64, BlockUsageEvent>> {
-        EventQuery::new("history.virtual-server.block_summary")
+        EventQuery::new("history.vserver.block_summary")
             .first(first)
             .last(last)
             .before(before)

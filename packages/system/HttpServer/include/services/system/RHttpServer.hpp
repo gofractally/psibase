@@ -6,7 +6,7 @@ namespace SystemService
 {
    struct RHttpServer : public psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber("rhttp-server");
+      static constexpr auto service = psibase::AccountNumber("r-http");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };

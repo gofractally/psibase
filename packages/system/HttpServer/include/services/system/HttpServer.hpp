@@ -44,7 +44,7 @@ namespace SystemService
    /// routing service instead.
    struct HttpServer : psibase::Service
    {
-      static constexpr auto service          = psibase::AccountNumber("http-server");
+      static constexpr auto service          = psibase::AccountNumber("http");
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
       static constexpr auto commonApiPrefix  = "/common/";
       static constexpr auto homepageService  = psibase::AccountNumber("homepage");

@@ -106,7 +106,7 @@ namespace
 
 }  // namespace
 
-// Tx can be staged on behalf of prods-strong and prods-weak
+// Tx can be staged on behalf of prods-str and prods-weak
 // Set the producers, verify they can be retrieved
 // Tx is executed/rejected only once the threshold is reached in both CFT and BFT
 SCENARIO("Producers")
@@ -133,10 +133,10 @@ SCENARIO("Producers")
       // Other accounts
       auto producers = t.from("producers"_a);
       auto weak      = "prods-weak"_a;
-      auto strong    = "prods-strong"_a;
+      auto strong    = "prods-str"_a;
       auto rando     = t.from(t.addAccount("rando"_a));
 
-      // Alice requires prods-strong
+      // Alice requires prods-str
       REQUIRE(alice.to<AuthDelegate>().setOwner(strong).succeeded());
       REQUIRE(alice.to<Accounts>().setAuthServ(AuthDelegate::service).succeeded());
 
@@ -248,7 +248,7 @@ SCENARIO("Producers")
                REQUIRE(accept.succeeded());
 
                THEN(
-                   "Alice (dependent on prods-strong) threshold was not reached, so has not minted "
+                   "Alice (dependent on prods-str) threshold was not reached, so has not minted "
                    "an NFT")
                {
                   REQUIRE(getNfts(t, alice.id) == 0);
@@ -333,7 +333,7 @@ SCENARIO("Producers")
                REQUIRE(accept2.succeeded());
 
                THEN(
-                   "Alice (dependent on prods-strong) threshold was not reached, so has not minted "
+                   "Alice (dependent on prods-str) threshold was not reached, so has not minted "
                    "an NFT")
                {
                   CHECK(getNfts(t, alice.id) == 0);
@@ -345,7 +345,7 @@ SCENARIO("Producers")
                       frank.with({frank_keys}).to<StagedTxService>().accept(proposeAliceId, txid);
                   REQUIRE(accept3.succeeded());
                   THEN(
-                      "Alice (dependent on prods-strong) threshold was reached, so has minted an "
+                      "Alice (dependent on prods-str) threshold was reached, so has minted an "
                       "NFT")
                   {
                      CHECK(getNfts(t, alice.id) == 1);

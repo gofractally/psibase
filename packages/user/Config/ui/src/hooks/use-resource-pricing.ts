@@ -72,7 +72,7 @@ export const useResourcePricing = () => {
 
             const res = await graphql(
                 query,
-                siblingUrl(null, "virtual-server", "/graphql"),
+                siblingUrl(null, "vserver", "/graphql"),
             );
             const parsed = zPricingResponse.parse(res);
 

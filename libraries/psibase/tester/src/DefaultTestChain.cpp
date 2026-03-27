@@ -110,7 +110,7 @@ namespace
       }
 
       transactor<Producers> psys{Producers::service, Producers::service};
-      std::vector<Producer> producerConfig = {{"firstproducer"_a, {}}};
+      std::vector<Producer> producerConfig = {{"firstprod"_a, {}}};
       actions.push_back(psys.setProducers(producerConfig));
 
       auto root = AccountNumber{"root"};
@@ -192,7 +192,7 @@ std::string TestChain::defaultPackageDir()
 
 void TestChain::boot(const std::vector<std::string>& names, bool installUI)
 {
-   auto registry = DirectoryRegistry(defaultPackageDir());
+   auto                         registry = DirectoryRegistry(defaultPackageDir());
    std::vector<PackagedService> packages;
    for (auto info : registry.resolve(names, essentialServices))
    {

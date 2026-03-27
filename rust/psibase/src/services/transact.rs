@@ -56,7 +56,7 @@ type CallbackType = u32;
 /// Services implement `auth_interface` by defining actions with
 /// identical signatures; there is no trait.
 #[crate::service(
-    name = "example-auth",
+    name = "i-auth",
     actions = "AuthActions",
     wrapper = "AuthWrapper",
     structs = "auth_action_structs",

@@ -23,7 +23,7 @@
       "objective": false,
       "action": {
         "sender": "",
-        "service": "event-index",
+        "service": "event-idx",
         "method": "onBlock",
         "rawData": "0000"
       }

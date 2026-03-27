@@ -371,7 +371,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Brotli compression/decompression plugin"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
-    SERVICE brotli-codec
+    SERVICE brotli
         DATA ${Plugins_OUTPUT_FILE_brotli_codec} /plugin.wasm
     DEPENDS ${Plugins_DEP}
 )
@@ -621,7 +621,7 @@ psibase_package(
     NAME AuthDelegate
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service that delegates authorization to another account"
-    SERVICE auth-delegate
+    SERVICE auth-delg
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate-schema.json
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
@@ -738,11 +738,11 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Producers-schema.json
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS isPrivileged
-        SERVER r-producers
-    SERVICE r-producers
+        SERVER r-prods
+    SERVICE r-prods
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RProducers-schema.json
-    ACCOUNTS prods-weak prods-strong
+    ACCOUNTS prods-weak prods-str
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
@@ -752,13 +752,13 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/HttpServer.psi
     NAME HttpServer
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "The `http-server` service routes HTTP requests to the appropriate service"
-    SERVICE http-server
+    DESCRIPTION "The `http` service routes HTTP requests to the appropriate service"
+    SERVICE http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/HttpServer-schema.json
-        SERVER rhttp-server
+        SERVER r-http
         FLAGS isPrivileged
-    SERVICE rhttp-server
+    SERVICE r-http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer-schema.json
     DEPENDS wasm
@@ -793,7 +793,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Events-schema.json
         SERVER r-events
-    SERVICE event-index
+    SERVICE event-idx
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
     SERVICE r-events
@@ -857,7 +857,7 @@ psibase_package(
     DESCRIPTION "Handler for client-side permissions"
     PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/postinstall.json
-    SERVICE permissions
+    SERVICE perms
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/ui/dist/* /
     DEPENDS ${Permissions_js_DEP}
@@ -926,7 +926,7 @@ psibase_package(
         "StagedTx(^${PSIBASE_VERSION})" 
         "Transact(^${PSIBASE_VERSION})"
         "Fractals(^${PSIBASE_VERSION})"
-    SERVICE fractal-core
+    SERVICE fractal-cr
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/FractalCore/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_fractal_core} /plugin.wasm
     DEPENDS ${FractalCore_js_DEP}
@@ -1265,7 +1265,7 @@ psibase_package(
     NAME PSubjective
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Test service for parallel access to the subjective database"
-    SERVICE psubjective
+    SERVICE psubj
         WASM ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/PSubjectiveService-schema.json
         FLAGS isPrivileged
@@ -1321,10 +1321,10 @@ psibase_package(
     NAME KeepSocket
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Accepts HTTP requests, but never returns a response"
-    SERVICE s-keep-sock
+    SERVICE s-keepsock
         WASM ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/KeepSocketService-schema.json
-        SERVER s-keep-sock
+        SERVER s-keepsock
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
     DEPENDS wasm
 )
@@ -1346,10 +1346,10 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Lists active sockets"
     LOCAL
-    SERVICE x-sock-list
+    SERVICE x-socklist
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XSocketListService-schema.json
-        SERVER x-sock-list
+        SERVER x-socklist
         FLAGS isPrivileged
     DEPENDS wasm
 )

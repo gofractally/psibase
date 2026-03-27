@@ -366,7 +366,7 @@ TEST_CASE("Test push_transaction")
       auto flags = GENERATE(values({CodeRow::isPrivileged}));
       INFO("flags: " << std::hex << flags);
       t.startBlock();
-      auto verifyFlags = t.addService(AccountNumber{"verify-flags"}, "VerifyFlagsService.wasm",
+      auto verifyFlags = t.addService(AccountNumber{"verify-flg"}, "VerifyFlagsService.wasm",
                                       flags | CodeRow::isVerify);
       t.startBlock();
       static_assert(std::same_as<decltype(flags), std::uint64_t>);
