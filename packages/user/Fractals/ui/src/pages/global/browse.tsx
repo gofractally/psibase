@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -8,6 +9,7 @@ import { useFractals } from "@/hooks/fractals/use-fractals";
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
@@ -27,7 +29,21 @@ export const Browse = () => {
     const [showModal, setShowModal] = useState(false);
 
     return (
-        <PageContainer>
+        <PageContainer className="space-y-4">
+            <CreateFractalModal
+                openChange={(e) => setShowModal(e)}
+                show={showModal}
+            />
+            <div className="flex justify-end">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowModal(true)}
+                >
+                    <Plus />
+                    <span className="hidden lg:inline">New Fractal</span>
+                </Button>
+            </div>
             {fractals?.length == 0 ? (
                 <EmptyBlock
                     title="No fractals"
@@ -40,7 +56,7 @@ export const Browse = () => {
             ) : (
                 <GlowingCard>
                     <CardHeader>
-                        <CardTitle>Fractals</CardTitle>
+                        <CardTitle>All Fractals</CardTitle>
                     </CardHeader>
                     <CardContent className="@container">
                         {fractals && fractals.length > 0 && (
@@ -80,10 +96,6 @@ export const Browse = () => {
                     </CardContent>
                 </GlowingCard>
             )}
-            <CreateFractalModal
-                openChange={(e) => setShowModal(e)}
-                show={showModal}
-            />
         </PageContainer>
     );
 };

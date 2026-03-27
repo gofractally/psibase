@@ -61,7 +61,7 @@ export function NavMain({
                         >
                             <NavLink to="/browse" end>
                                 <Search />
-                                <span>All fractals</span>
+                                <span>All Fractals</span>
                             </NavLink>
                         </SidebarMenuButton>
                         <SidebarMenuAction
@@ -80,7 +80,7 @@ export function NavMain({
 
             {fractals.length > 0 ? (
                 <SidebarGroup>
-                    <SidebarGroupLabel>My fractals</SidebarGroupLabel>
+                    <SidebarGroupLabel>My Fractals</SidebarGroupLabel>
                     <SidebarMenu>
                         {fractals.map((fractal) => {
                             const metadata = zFractal.safeParse(
