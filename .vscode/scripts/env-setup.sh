@@ -19,10 +19,18 @@ yarn
 yarn dlx @yarnpkg/sdks vscode
 
 # Symlink optional agent configuration(s)
-if [ ! -e "$WORKSPACE_ROOT/.cursor" ]; then
-    if [ -d "/root/agent-config/.cursor" ]; then
-        ln -s "/root/agent-config/.cursor" "$WORKSPACE_ROOT/.cursor"
-        printf '\nSymlinked /root/agent-config/.cursor to %s\n\n' "$WORKSPACE_ROOT/.cursor"
-        printf 'Config may take several minutes to load into cursor.\n\n'
+CONF_DIR=".cursor"
+if [ -L "$WORKSPACE_ROOT/$CONF_DIR" ]; then
+    printf '\nSkipping agent config dir symlink: %s already exists (symlink).\n\n' "$WORKSPACE_ROOT/$CONF_DIR"
+elif [ -e "$WORKSPACE_ROOT/$CONF_DIR" ]; then
+    printf '\nSkipping agent config dir symlink: %s already exists.\n\n' "$WORKSPACE_ROOT/$CONF_DIR"
+elif [ ! -d "/root/agent-config/$CONF_DIR" ]; then
+    printf '\nSkipping agent config dir symlink: /root/agent-config/%s is not available.\n\n' "$CONF_DIR"
+else
+    if ln -s "/root/agent-config/$CONF_DIR" "$WORKSPACE_ROOT/$CONF_DIR"; then
+        printf '\nSymlinked /root/agent-config/%s to %s\n\n' "$CONF_DIR" "$WORKSPACE_ROOT/$CONF_DIR"
+        printf 'Config may take several minutes to load.\n\n'
+    else
+        printf '\nFailed to symlink /root/agent-config/%s to %s.\n\n' "$CONF_DIR" "$WORKSPACE_ROOT/$CONF_DIR"
     fi
 fi
