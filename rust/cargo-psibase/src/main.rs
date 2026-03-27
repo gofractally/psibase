@@ -1111,6 +1111,10 @@ async fn main2() -> Result<(), Error> {
         Args::parse()
     };
 
+    if let Ok(makeflags) = std::env::var("MAKEFLAGS") {
+        println!("MAKEFLAGS: {}", makeflags)
+    }
+
     let jobs = unsafe { AsyncJobServer::new(args.jobs)? };
 
     let metadata = get_metadata(&args)?;
