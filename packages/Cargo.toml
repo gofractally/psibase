@@ -4,6 +4,7 @@ members = [
     "system/AuthAny/plugin/",
     "system/AuthDelegate/plugin/",
     "system/AuthSig/plugin/",
+    "system/HttpServer/plugin/",
     "system/Transact/plugin/",
     "system/SetCode/plugin/",
     "system/Producers/plugin/",

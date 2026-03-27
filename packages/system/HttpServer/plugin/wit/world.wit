@@ -1,0 +1,11 @@
+package http-server:plugin;
+
+interface api {
+
+    /// Sets the homepage subdomain
+    set-homepage-domain: func(subdomain: string);
+}
+
+world imports {
+    import api;
+}
