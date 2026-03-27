@@ -689,6 +689,7 @@ psibase_package(
     NAME Homepage
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network homepage"
+    ACCOUNTS network # default homepage subdomain
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
