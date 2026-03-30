@@ -6,8 +6,9 @@ use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, Package, Pa
 use clap::{Parser, Subcommand};
 use console::style;
 use futures::{
-    stream::{pending, FuturesUnordered},
-    Future, StreamExt, TryStreamExt,
+    future::{select, Either},
+    stream::FuturesUnordered,
+    Future, StreamExt,
 };
 use psibase::{ExactAccountNumber, PackageInfo};
 use std::collections::{HashMap, HashSet};
@@ -16,6 +17,7 @@ use std::fs::{read, write, File};
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::process::{exit, ExitCode, Stdio};
 use std::time::SystemTime;
 use std::{env, fs};
@@ -513,14 +515,14 @@ impl AsyncJobServer {
         let client = match client.client {
             Ok(client) => client,
             Err(err) => match err.kind() {
-                NoEnvVar | NoJobserver | Unsupported => {
-                    jobserver::Client::new(limit.unwrap_or_else(|| {
+                NoEnvVar | NoJobserver | Unsupported => jobserver::Client::new(
+                    limit.unwrap_or_else(|| {
                         std::thread::available_parallelism().map_or(1, |n| n.get())
-                    }))?
-                }
+                    }) - 1,
+                )?,
                 CannotParse | CannotOpenPath | CannotOpenFd | NegativeFd => {
                     eprintln!("{:}: {}", style("error").bold().red(), err);
-                    jobserver::Client::new(limit.unwrap_or(1))?
+                    jobserver::Client::new(limit.unwrap_or(1) - 1)?
                 }
                 _ => Err(err)?,
             },
@@ -542,20 +544,75 @@ impl AsyncJobServer {
         self.helper.request_token();
         Ok(receive.await??)
     }
-    // Like acquire, but waits on running as well
-    async fn acquire_with<Fut: Future<Output = Result<(), Error>>>(
-        &self,
-        running: &mut FuturesUnordered<Fut>,
-    ) -> Result<jobserver::Acquired, Error> {
-        let fut = core::pin::pin!(self.acquire());
-        let mut acquiring = running.by_ref().chain(pending()).take_until(fut);
-        while let Some(res) = acquiring.next().await {
-            res?
+}
+
+struct JobRunner<
+    Fut: Future<Output = Result<(), Error>>,
+    Acq: Future<Output = Result<jobserver::Acquired, Error>>,
+    F: Fn() -> Acq,
+> {
+    slots: u32,
+    acquire: F,
+    running: FuturesUnordered<Fut>,
+    acquired: Vec<jobserver::Acquired>,
+    pending: Option<Pin<Box<Acq>>>,
+}
+
+impl<
+        Fut: Future<Output = Result<(), Error>>,
+        Acq: Future<Output = Result<jobserver::Acquired, Error>>,
+        F: Fn() -> Acq,
+    > JobRunner<Fut, Acq, F>
+{
+    fn new(acquire: F) -> Self {
+        JobRunner {
+            slots: 1,
+            acquire,
+            running: FuturesUnordered::new(),
+            acquired: Vec::new(),
+            pending: None,
         }
-        acquiring
-            .take_result()
-            .unwrap()
-            .with_context(|| format!("Failed to acquire job"))
+    }
+    async fn push(&mut self, fut: Fut) -> Result<(), Error> {
+        if self.slots > 0 {
+            self.slots -= 1
+        } else {
+            let new_slot =
+                std::mem::take(&mut self.pending).unwrap_or_else(|| Box::pin((self.acquire)()));
+            if self.running.is_empty() {
+                self.acquired.push(
+                    new_slot
+                        .await
+                        .with_context(|| format!("Failed to acquire job"))?,
+                );
+                println!("first slot acquired")
+            } else {
+                match select(new_slot, self.running.next()).await {
+                    Either::Left((slot, _)) => {
+                        self.acquired
+                            .push(slot.with_context(|| format!("Failed to acquire job"))?);
+                        println!("slot acquired");
+                    }
+                    Either::Right((res, slot)) => {
+                        println!("job finished");
+                        res.unwrap()?;
+                        self.pending = Some(slot)
+                    }
+                }
+            }
+        }
+        self.running.push(fut);
+        Ok(())
+    }
+    async fn wait(&mut self) -> Result<(), Error> {
+        while let Some(res) = self.running.next().await {
+            res?;
+            if self.acquired.pop().is_none() {
+                self.slots += 1;
+            }
+        }
+        assert!(self.slots == 1);
+        Ok(())
     }
 }
 
@@ -736,9 +793,8 @@ async fn build(
     let files = wait_for_child(command.spawn()?, packages).await?;
     let mut result = Vec::new();
 
-    let mut running = FuturesUnordered::new();
+    let mut running = JobRunner::new(|| jobs.acquire());
     for f in &files.services {
-        let acquired = jobs.acquire_with(&mut running).await?;
         let name = &packages[f.package_index].name;
         let service = f.value.with_file_name(format!("{name}.wasm"));
         let schema = service.with_extension("schema.json");
@@ -746,12 +802,13 @@ async fn build(
             let service = service.clone();
             let schema = schema.clone();
             let files = &files;
-            running.push(async move {
-                let _acquired = acquired;
-                build_service(args, &f.value, &service, &schema, &files.dep_dirs)
-                    .await
-                    .with_context(|| format!("Failed to build service {}", service.display()))
-            });
+            running
+                .push(async move {
+                    build_service(args, &f.value, &service, &schema, &files.dep_dirs)
+                        .await
+                        .with_context(|| format!("Failed to build service {}", service.display()))
+                })
+                .await?;
         }
         result.push(ServiceArtifacts {
             value: ServicePaths { service, schema },
@@ -759,7 +816,7 @@ async fn build(
         });
     }
 
-    running.try_collect::<()>().await?;
+    running.wait().await?;
 
     Ok(result)
 }
@@ -996,42 +1053,41 @@ async fn test(
 
     let files = wait_for_child(command.spawn()?, &packages).await?;
 
-    let mut running = FuturesUnordered::new();
+    let mut running = JobRunner::new(|| jobs.acquire());
 
     for test in files.tests {
-        let acquired = jobs.acquire_with(&mut running).await?;
         let index_files = &index_files;
 
-        running.push(async move {
-            let _acquired = acquired;
-
-            let p = test.value.with_extension("polyfilled.wasm");
-            if test.value.is_newer_than(&p)? {
-                pretty_path("Reoptimizing", &p);
-                let src = test.value;
-                let dst = p.clone();
-                spawn_blocking(move || process(&src, None, TESTER_EXPORTS, &dst)).await??;
-            }
-            pretty_path("Running", &p);
-            let mut command = tokio::process::Command::new(&args.psitest);
-            command.env(
-                "CARGO_PSIBASE_PACKAGE_PATH",
-                &index_files[test.package_index],
-            );
-            command.arg(p);
-            command.arg("--nocapture");
-            if let Some(ref filter) = opts.test_filter {
-                command.arg(filter);
-            }
-            let msg = format!("Failed running: {:?}", command);
-            if !command.status().await.context(msg.clone())?.success() {
-                return Err(anyhow! {msg});
-            }
-            Ok(())
-        })
+        running
+            .push(async move {
+                let p = test.value.with_extension("polyfilled.wasm");
+                if test.value.is_newer_than(&p)? {
+                    pretty_path("Reoptimizing", &p);
+                    let src = test.value;
+                    let dst = p.clone();
+                    spawn_blocking(move || process(&src, None, TESTER_EXPORTS, &dst)).await??;
+                }
+                pretty_path("Running", &p);
+                let mut command = tokio::process::Command::new(&args.psitest);
+                command.env(
+                    "CARGO_PSIBASE_PACKAGE_PATH",
+                    &index_files[test.package_index],
+                );
+                command.arg(p);
+                command.arg("--nocapture");
+                if let Some(ref filter) = opts.test_filter {
+                    command.arg(filter);
+                }
+                let msg = format!("Failed running: {:?}", command);
+                if !command.status().await.context(msg.clone())?.success() {
+                    return Err(anyhow! {msg});
+                }
+                Ok(())
+            })
+            .await?
     }
 
-    running.try_collect::<()>().await?;
+    running.wait().await?;
     Ok(())
 }
 
