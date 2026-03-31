@@ -154,8 +154,8 @@ impl FromStr for TraceFormat {
 }
 
 pub struct HttpSchemaFetcher<'a> {
-    client: &'a reqwest::Client,
-    base_url: &'a reqwest::Url,
+    pub client: &'a reqwest::Client,
+    pub base_url: &'a reqwest::Url,
 }
 
 #[async_trait(?Send)]
@@ -231,18 +231,15 @@ async fn push_transaction_impl<'a, F: SchemaFetcher>(
     fmt.error_for_trace(trace, progress, afmt).await
 }
 
-pub async fn push_transaction(
+pub async fn push_transaction<'a, F: SchemaFetcher + 'a>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
     console: bool,
     progress: Option<&ProgressBar>,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
-    let mut afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url,
-    });
     push_transaction_impl(
         base_url,
         client.clone(),
@@ -251,14 +248,14 @@ pub async fn push_transaction(
         console,
         progress,
         None,
-        &mut afmt,
+        afmt,
     )
     .await
     .context("Failed to push transaction")?;
     Ok(())
 }
 
-pub async fn push_transaction_optimistic<'a, F: SchemaFetcher>(
+pub async fn push_transaction_optimistic<'a, F: SchemaFetcher + 'a>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
@@ -282,13 +279,14 @@ pub async fn push_transaction_optimistic<'a, F: SchemaFetcher>(
     Ok(())
 }
 
-pub async fn push_transactions(
+pub async fn push_transactions<'a, F: SchemaFetcher + 'a>(
     base_url: &Url,
     client: reqwest::Client,
     transaction_groups: Vec<(String, Vec<SignedTransaction>, bool)>,
     fmt: TraceFormat,
     console: bool,
     progress: &ProgressBar,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     let mut n = 0;
     for (label, transactions, carry) in transaction_groups {
@@ -305,6 +303,7 @@ pub async fn push_transactions(
                 fmt,
                 console,
                 Some(progress),
+                afmt,
             )
             .await;
 
