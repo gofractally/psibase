@@ -346,8 +346,8 @@ namespace SystemService
          return siteConfig && siteConfig->spa;
       }
 
-      std::optional<SitesContentRow> getContent(const psibase::AccountNumber& account,
-                                                const std::string&            target)
+      std::optional<SitesContentRow> getContentRow(const psibase::AccountNumber& account,
+                                                   const std::string&            target)
       {
          auto tables = Sites::Tables{getReceiver(), KvMode::read};
          auto isSpa  = useSpa(account);
@@ -376,7 +376,7 @@ namespace SystemService
             auto proxyTarget = getProxy(account);
             if (proxyTarget)
             {
-               content = getContent(*proxyTarget, target);
+               content = getContentRow(*proxyTarget, target);
             }
          }
 
@@ -400,7 +400,7 @@ namespace SystemService
          Tables tables{getReceiver(), KvMode::read};
          auto   target = request.path();
 
-         auto content = getContent(account, target);
+         auto content = getContentRow(account, target);
 
          if (content)
          {
@@ -566,7 +566,7 @@ namespace SystemService
    bool Sites::isValidPath(AccountNumber site, std::string path)
    {
       auto target  = normalizeTarget(path);
-      auto content = getContent(site, target);
+      auto content = getContentRow(site, target);
       return !!content;
    }
 
