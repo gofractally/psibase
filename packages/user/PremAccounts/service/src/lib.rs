@@ -14,10 +14,22 @@ pub mod tables {
     }
 
     #[table(name = "AuctionsTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Auction {
         pub length: u8,
         pub nft_id: u32,
+        /// When false, `buy` rejects new purchases for this name length; other actions are unchanged.
+        pub enabled: bool,
+    }
+
+    impl Default for Auction {
+        fn default() -> Self {
+            Self {
+                length: 0,
+                nft_id: 0,
+                enabled: true,
+            }
+        }
     }
 
     impl Auction {
@@ -108,7 +120,13 @@ pub mod service {
                 50000,           // dec_ppm (5% = 50000 ppm)
             );
 
-            auctions_table.put(&Auction { length, nft_id }).unwrap();
+            auctions_table
+                .put(&Auction {
+                    length,
+                    nft_id,
+                    enabled: true,
+                })
+                .unwrap();
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
@@ -172,6 +190,8 @@ pub mod service {
             auctions_table.get_index_pk().get(&length),
             "auction not found for this length",
         );
+
+        check(auction.enabled, "market is disabled");
 
         let current_price = DiffAdjust::call().get_diff(auction.nft_id);
 
@@ -259,13 +279,19 @@ pub mod service {
     }
 
     #[action]
-    fn enable_market(length: u8, initial_price: u64, target_sales: u32, floor_price: u64) {
+    fn update_market_status(length: u8, enable: bool) {
         check_init();
-    }
-
-    #[action]
-    fn disable_market(length: u8) {
-        check_init();
+        check(
+            length >= 1 && length <= 9,
+            "market name length must be 1-9",
+        );
+        let auctions_table = AuctionsTable::new();
+        let mut auction = check_some(
+            auctions_table.get_index_pk().get(&length),
+            "auction not found for this length",
+        );
+        auction.enabled = enable;
+        auctions_table.put(&auction).unwrap();
     }
 
     pub const BOUGHT: u8 = 0;

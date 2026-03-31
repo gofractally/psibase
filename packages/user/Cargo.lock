@@ -2495,6 +2495,7 @@ name = "prem-accounts"
 version = "0.23.0"
 dependencies = [
  "async-graphql",
+ "pem",
  "prem-accounts-pkg",
  "psibase",
  "psibase-user-workspace-hack",

@@ -707,6 +707,7 @@ cargo_psibase_package(
     PATH packages/user/PremAccounts
     TARGET_DIR ${USER_WORKSPACE_TARGET}
     DEPENDS ${PremAccounts_js_DEP}
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(

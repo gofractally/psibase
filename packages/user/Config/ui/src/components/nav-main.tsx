@@ -7,6 +7,7 @@ import {
     Settings,
     Server,
     DollarSign,
+    Store,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -55,6 +56,11 @@ export const appMenus: Menu[] = [
         title: "Resource Pricing",
         icon: DollarSign,
         path: "resource-pricing",
+    },
+    {
+        title: "Premium Market Config",
+        icon: Store,
+        path: "premium-market-config",
     },
     {
         title: "Settings",

@@ -1,21 +1,21 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { RouterProvider } from "react-router-dom";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { App } from "./App";
-import { ThemeProvider } from "@/components/theme-provider";
-import { LoginRequired } from "@/components";
+import { ThemeProvider } from "@shared/components/theme-provider";
+import { queryClient } from "@shared/lib/queryClient";
+import { Toaster } from "@shared/shadcn/ui/sonner";
 
-const queryClient = new QueryClient();
+import { router } from "./router";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-    <React.StrictMode>
-        <QueryClientProvider client={queryClient}>
-            <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-                <LoginRequired>
-                    <App />
-                </LoginRequired>
-            </ThemeProvider>
-        </QueryClientProvider>
-    </React.StrictMode>,
+createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+        <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+            <QueryClientProvider client={queryClient}>
+                <RouterProvider router={router} />
+                <Toaster />
+            </QueryClientProvider>
+        </ThemeProvider>
+    </StrictMode>,
 );

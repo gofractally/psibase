@@ -8,6 +8,12 @@ mod service {
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
+    #[derive(SimpleObject)]
+    struct MarketStatus {
+        length: u8,
+        enabled: bool,
+    }
+
     #[derive(Deserialize, SimpleObject)]
     #[graphql(complex)]
     struct PremiumAccountEvent {
@@ -71,6 +77,21 @@ mod service {
             }
 
             prices
+        }
+
+        /// Status (enabled/disabled) for each premium name-length market (lengths 1–9).
+        async fn marketsStatus(&self) -> Vec<MarketStatus> {
+            let auctions_table = AuctionsTable::read();
+            (1..=9u8)
+                .map(|length| {
+                    let enabled = auctions_table
+                        .get_index_pk()
+                        .get(&length)
+                        .map(|a| a.enabled)
+                        .unwrap_or(false);
+                    MarketStatus { length, enabled }
+                })
+                .collect()
         }
 
         /// Returns a list of account names (strings) bought but not yet claimed by the authenticated user

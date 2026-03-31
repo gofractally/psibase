@@ -23,4 +23,5 @@ serde_json.workspace = true
 psibase-user-workspace-hack.workspace = true
 
 [dev-dependencies]
+pem = "3.0"
 prem-accounts-pkg = { path = "..", version = "0.23.0" }

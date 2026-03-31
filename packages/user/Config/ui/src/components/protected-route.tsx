@@ -24,6 +24,8 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         if (currentUser === null) {
             setShowModal(true);
+        } else if (currentUser != null) {
+            setShowModal(false);
         }
     }, [currentUser]);
 
@@ -40,7 +42,7 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             }}
         >
             {children}
-            <DialogContent>
+            <DialogContent showCloseButton={false}>
                 <DialogHeader>
                     <DialogTitle>Login required</DialogTitle>
                     <DialogDescription>

@@ -7,6 +7,7 @@ world impl {
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
 
+    export admin;
     export api;
     export queries;
 }

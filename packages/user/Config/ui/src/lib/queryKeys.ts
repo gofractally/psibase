@@ -26,6 +26,7 @@ const QueryKey = {
     sources: () => ["sources"] as const,
     candidates: () => ["candidates"] as const,
     tokens: () => ["tokens"] as const,
+    premiumMarketsStatus: () => ["premAccounts", "marketsStatus"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

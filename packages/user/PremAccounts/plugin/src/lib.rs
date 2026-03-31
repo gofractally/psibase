@@ -2,8 +2,10 @@
 mod bindings;
 
 use bindings::auth_sig::plugin::keyvault as AuthSigKeyVault;
+use bindings::exports::prem_accounts::plugin::admin::Guest as Admin;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
+use bindings::host::common::client as HostClient;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::tokens::plugin::helpers as TokensHelpers;
@@ -38,6 +40,17 @@ define_trust! {
 }
 
 struct PremAccountsPlugin;
+
+impl Admin for PremAccountsPlugin {
+    fn update_market_status(length: u8, enable: bool) -> Result<(), Error> {
+        if HostClient::get_sender() != "config" {
+            return Err(ErrorType::UpdateMarketStatusCallerDenied.into());
+        }
+        let packed = prem_accounts::action_structs::update_market_status { length, enable }.packed();
+        add_action_to_transaction("update_market_status", &packed)?;
+        Ok(())
+    }
+}
 
 impl Api for PremAccountsPlugin {
     fn buy(account: String, max_cost: String) -> Result<(), Error> {

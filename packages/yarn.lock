@@ -11005,6 +11005,7 @@ __metadata:
     lucide-react: "npm:^0.475.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
+    react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
     vite: "npm:^5.4.1"
     zod: "npm:^3.24.2"
