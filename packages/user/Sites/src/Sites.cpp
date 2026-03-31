@@ -391,6 +391,25 @@ namespace SystemService
          return value->data;
       }
 
+      bool canDecompress(const std::string& encoding)
+      {
+         return get_decompressor(encoding).has_value();
+      }
+
+      std::vector<char> getUncompressedContent(const std::vector<char>& content,
+                                               const std::string&       encoding)
+      {
+         auto decompressor = get_decompressor(encoding);
+         if (!decompressor)
+         {
+            abortMessage("Requested encoding not supported.");
+         }
+         auto decompressorAccount = AccountNumber{*decompressor};
+         check(to<Accounts>().exists(decompressorAccount),
+               "[Fallback decompression error] Decompressor account not found");
+         return to<DecompressorInterface>(decompressorAccount).decompress(content);
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -480,10 +499,9 @@ namespace SystemService
                   }
                   else
                   {
-                     auto decompressor = get_decompressor(encoding);
                      // If identity is accepted and we can decompress the content, do that
                      // Otherwise, 406
-                     if (!is_accepted("identity") || !decompressor)
+                     if (!is_accepted("identity") || !canDecompress(encoding))
                      {
                         return make406("Requested encoding not supported.");
                      }
@@ -491,13 +509,7 @@ namespace SystemService
                      // Decompress the content (don't bother if it's a HEAD request)
                      if (request.method != "HEAD")
                      {
-                        auto decompressorAccount = AccountNumber{*decompressor};
-
-                        check(to<Accounts>().exists(decompressorAccount),
-                              "[Fallback decompression error] Decompressor account not found");
-
-                        Actor<DecompressorInterface> decoder(Sites::service, decompressorAccount);
-                        reply.body = decoder.decompress(std::move(reply.body));
+                        reply.body = getUncompressedContent(reply.body, encoding);
                      }
                   }
                }
