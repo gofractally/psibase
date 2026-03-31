@@ -383,6 +383,14 @@ namespace SystemService
          return content;
       }
 
+      std::vector<char> getRawData(const SitesContentRow& row)
+      {
+         auto table = Sites::Tables{Sites::service, KvMode::read}.open<SitesDataTable>();
+         auto value = table.get(row.contentHash);
+         check(value.has_value(), "Invariant failure: file content missing");
+         return value->data;
+      }
+
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request)
@@ -432,10 +440,7 @@ namespace SystemService
 
             if (request.method != "HEAD")
             {
-               auto index = tables.open<SitesDataTable>().getIndex<0>();
-               auto body  = index.get(content->contentHash);
-               check(body.has_value(), "Invariant failure: file content missing");
-               reply.body = std::move(body->data);
+               reply.body = getRawData(*content);
             }
 
             // RFC 7231
