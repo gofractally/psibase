@@ -1600,7 +1600,7 @@ async fn apply_packages<
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
-) -> Result<(), anyhow::Error> {
+) -> Result<SchemaMap, anyhow::Error> {
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
@@ -1667,7 +1667,7 @@ async fn apply_packages<
             }
         }
     }
-    Ok(())
+    Ok(schemas)
 }
 
 async fn do_install<T: Read + Seek>(
@@ -1720,7 +1720,7 @@ async fn do_install<T: Read + Seek>(
             )?)
         },
     );
-    apply_packages(
+    let schemas = apply_packages(
         &node_args.api,
         &mut client,
         &package_registry,
@@ -1738,10 +1738,13 @@ async fn do_install<T: Read + Seek>(
         trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
     }
 
-    let afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url: &node_args.api,
-    });
+    let afmt = ActionFormatter::with_schemas(
+        schemas,
+        HttpSchemaFetcher {
+            client: &client,
+            base_url: &node_args.api,
+        },
+    );
 
     let upload_transactions = upload_builder.finish()?;
     {
