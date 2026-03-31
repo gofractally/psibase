@@ -881,11 +881,13 @@ impl Chain {
     }
 }
 
+#[cfg(target_family = "wasm")]
 pub struct ChainDisplayTrace<'a> {
     chain: &'a Chain,
     trace: &'a TransactionTrace,
 }
 
+#[cfg(target_family = "wasm")]
 impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
@@ -894,10 +896,12 @@ impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
     }
 }
 
+#[cfg(target_family = "wasm")]
 struct ChainSchemaFetcher<'a> {
     chain: &'a Chain,
 }
 
+#[cfg(target_family = "wasm")]
 #[async_trait(?Send)]
 impl<'a> SchemaFetcher for ChainSchemaFetcher<'a> {
     async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
