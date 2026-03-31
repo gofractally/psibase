@@ -294,11 +294,13 @@ class Intf {
 //   components).
 export class ProxyPkg {
     namespace: string;
+    service: string;
     id: string;
     interfaces: Intf[];
 
-    constructor(ns: string, id: string) {
+    constructor(ns: string, service: string, id: string) {
         this.namespace = ns;
+        this.service = service;
         this.id = id;
         this.interfaces = [];
     }
@@ -316,7 +318,7 @@ export class ProxyPkg {
     };
 
     add = (intf: string, funcs: FuncShape[]) => {
-        this.interfaces.push(new Intf(this.namespace, this.id, intf, funcs));
+        this.interfaces.push(new Intf(this.service, this.id, intf, funcs));
     };
 
     getImportDetails = (): ImportDetails => {

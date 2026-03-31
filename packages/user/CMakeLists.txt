@@ -40,6 +40,7 @@ function(add suffix)
     add_library(services_user${suffix} INTERFACE)
     target_include_directories(services_user${suffix} INTERFACE
         CommonApi/include
+        DynLd/include
         Events/include
         Invite/include
         Nft/include
@@ -56,6 +57,7 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(CommonApi)
+    add_subdirectory(DynLd)
     add_subdirectory(Events)
     add_subdirectory(Explorer)
     add_subdirectory(Invite)

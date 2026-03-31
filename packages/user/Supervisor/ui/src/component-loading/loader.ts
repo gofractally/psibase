@@ -24,11 +24,35 @@ import shimCode from "./shims/shimWrapper.js?raw";
     random,
 };
 
+export interface ServiceMap {
+    [key: string]: string;
+}
+
+export function getPluginService(
+    services: ServiceMap | null,
+    namespace: string,
+): string {
+    if (services) {
+        if (namespace in services) {
+            return services[namespace];
+        } else {
+            throw new Error(`Cannot find service for ${namespace}`);
+        }
+    } else {
+        return namespace;
+    }
+}
+
 class ProxyPkgs {
     packages: ProxyPkg[] = [];
+    services: ServiceMap | null;
 
     [Symbol.iterator]() {
         return this.packages.values();
+    }
+
+    constructor(services: ServiceMap | null) {
+        this.services = services;
     }
 
     get = (ns: string, id: string): ProxyPkg => {
@@ -36,7 +60,7 @@ class ProxyPkgs {
         if (pkg) {
             return pkg;
         }
-        pkg = new ProxyPkg(ns, id);
+        pkg = new ProxyPkg(ns, getPluginService(this.services, ns), id);
         this.packages.push(pkg);
         return pkg;
     };
@@ -48,10 +72,10 @@ class ProxyPkgs {
     }
 }
 
-function getProxiedImports({
-    interfaces: allInterfaces,
-    funcs: freeFunctions,
-}: Functions): ImportDetails {
+function getProxiedImports(
+    { interfaces: allInterfaces, funcs: freeFunctions }: Functions,
+    services: ServiceMap | null,
+): ImportDetails {
     assert(
         freeFunctions.length === 0,
         `TODO: Plugins may not import freestanding functions.`,
@@ -68,7 +92,7 @@ function getProxiedImports({
         return new ImportDetails([], []);
     }
 
-    const packages = new ProxyPkgs();
+    const packages = new ProxyPkgs(services);
     for (const i of interfaces) {
         packages.get(i.namespace, i.package).add(i.name, i.funcs);
     }
@@ -152,12 +176,13 @@ export async function loadPlugin(
     wasmBytes: Uint8Array,
     pluginHost: HostInterface,
     api: ComponentAPI,
+    services: ServiceMap | null,
 ) {
     const imports = mergeImports(
         await Promise.all([
             getWasiImports(),
             privileged ? getPrivilegedImports() : new ImportDetails([], []),
-            getProxiedImports(api.importedFuncs),
+            getProxiedImports(api.importedFuncs, services),
         ]),
     );
     const pluginModule = await load(wasmBytes, imports, `${service}.plugin.js`);
