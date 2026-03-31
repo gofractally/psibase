@@ -322,15 +322,24 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Transact-schema.json
         FLAGS isPrivileged
         SERVER r-transact
-        DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
         FLAGS isPrivileged
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/TransactUI.psi
+    NAME TransactUI
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "UI to interact with the transact service"
+    SERVICE transact
+        DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" 
 )
 
 psibase_package(
@@ -736,7 +745,6 @@ psibase_package(
     SERVICE producers
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Producers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Producers-schema.json
-        DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS isPrivileged
         SERVER r-producers
     SERVICE r-producers
@@ -745,7 +753,18 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/ProducersUI.psi
+    NAME ProducersUI
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "UI to interact with the producers service"
+    SERVICE producers
+        DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+    PACKAGE_DEPENDS "Producers(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" 
 )
 
 psibase_package(
@@ -772,7 +791,6 @@ psibase_package(
     SERVICE setcode
         WASM ${CMAKE_CURRENT_BINARY_DIR}/SetCode.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SetCode-schema.json
-        DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
         FLAGS isPrivileged
         SERVER r-setcode
         INIT
@@ -780,8 +798,18 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RSetCode-schema.json
     DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/SetCodeUI.psi
+    NAME SetCodeUI
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "UI to interact with the setcode service"
+    SERVICE setcode
+        DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" 
 )
 
 psibase_package(
@@ -1126,8 +1154,9 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All development packages"
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact VirtualServer WebCrypto Workshop
+                    Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions
+                    Producers ProducersUI Profiles Registry Sites SetCode SetCodeUI StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream Transact TransactUI VirtualServer WebCrypto 
+                    Workshop
 )
 
 psibase_package(
@@ -1136,10 +1165,10 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
     PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
-                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
+                    Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions
+                    Producers ProducersUI Profiles Registry Sites SetCode SetCodeUI StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact TransactUI VirtualServer WebCrypto 
+                    Workshop
 )
-
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
@@ -1182,9 +1211,9 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions
+    Producers ProducersUI Profiles TestDefault HttpServer Registry Sites SetCode SetCodeUI StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact TransactUI 
+    Homepage VirtualServer WebCrypto Workshop Config XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1227,9 +1256,11 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/Producers.psi
+          ${SERVICE_DIR}/ProducersUI.psi
           ${SERVICE_DIR}/Profiles.psi
           ${SERVICE_DIR}/Registry.psi
           ${SERVICE_DIR}/SetCode.psi
+          ${SERVICE_DIR}/SetCodeUI.psi
           ${SERVICE_DIR}/Sites.psi
           ${SERVICE_DIR}/StagedTx.psi
           ${SERVICE_DIR}/Subgroups.psi
@@ -1241,6 +1272,7 @@ install(
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/TransactUI.psi
           ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi
