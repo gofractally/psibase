@@ -2,12 +2,7 @@ use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::token_distributions::consensus_rewards::{
-    INITIAL_REWARD_DISTRIBUTION, REMAINING_REWARD_DISTRIBUTION, REWARD_DISTRIBUTION,
-};
-use crate::constants::{
-    token_distributions::TOKEN_SUPPLY, DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION,
-};
+use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
 };
@@ -15,18 +10,17 @@ use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
 
+use psibase::services::fractals;
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
-use psibase::services::{accounts, fractals, sites, transact};
-use psibase::{check, get_sender, Action, RawKey, TableQuery, ToServiceSchema};
-use psibase::{fracpack::Pack, services::auth_dyn};
+use psibase::{check, get_sender, RawKey, TableQuery};
 
 impl Fractal {
     fn new(
         account: AccountNumber,
+        initial_occupation: AccountNumber,
         name: String,
         mission: String,
-        genesis_guild: AccountNumber,
     ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
@@ -39,42 +33,34 @@ impl Fractal {
             created_at: now,
             mission,
             name,
-            judiciary: genesis_guild,
-            legislature: genesis_guild,
-            token_init_threshold: DEFAULT_TOKEN_INIT_THRESHOLD,
+            judiciary: initial_occupation,
+            legislature: initial_occupation,
         }
     }
 
     fn create_account(&self) {
         let fractal_account = self.account;
-        accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
 
-        psibase::services::sites::Wrapper::call_as(fractal_account).setProxy("fractal-core".into());
-        psibase::services::auth_dyn::Wrapper::call_as(fractal_account)
+        use psibase::services::{accounts, auth_dyn, sites};
+        if !accounts::Wrapper::call().exists(fractal_account) {
+            accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
+        }
+
+        sites::Wrapper::call_as(fractal_account).setProxy("fractal-core".into());
+        auth_dyn::Wrapper::call_as(fractal_account)
             .set_mgmt(fractal_account, crate::Wrapper::SERVICE);
-
-        let set_auth_serv = Action {
-            sender: fractal_account,
-            service: accounts::SERVICE,
-            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: accounts::action_structs::setAuthServ {
-                authService: auth_dyn::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
+        accounts::Wrapper::call_as(fractal_account).setAuthServ(auth_dyn::Wrapper::SERVICE)
     }
 
     pub fn add(
         account: AccountNumber,
+        initial_occupation: AccountNumber,
         name: String,
         mission: String,
-        genesis_guild: AccountNumber,
     ) -> Self {
         check_none(Self::get(account), "fractal already exists");
-        let new_instance = Self::new(account, name, mission, genesis_guild);
+        let new_instance = Self::new(account, initial_occupation, name, mission);
+
         // Save the fractal first prior to creating an account for it
         // as AuthDyn expects `has_policy` to return true when setting the fractals
         // auth service to AuthDyn.
@@ -147,15 +133,6 @@ impl Fractal {
         //         "Consensus rewards for ranked evaluations".into(),
         //     );
         // }
-    }
-
-    pub fn set_token_threshold(&mut self, threshold: u8) {
-        check_none(
-            RewardConsensus::get(self.account),
-            "token has already been initialised",
-        );
-        self.token_init_threshold = threshold;
-        self.save();
     }
 
     fn save(&self) {

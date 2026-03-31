@@ -928,6 +928,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "de-facto"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "de-facto-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "de-facto-pkg"
+version = "0.23.0"
+dependencies = [
+ "de-facto",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"

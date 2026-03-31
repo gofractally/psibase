@@ -73,17 +73,16 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
-    /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
-        guild_account: AccountNumber,
         name: String,
         mission: String,
+        initial_occupation: AccountNumber,
     ) {
-        Fractal::add(fractal_account, name, mission, guild_account);
+        Fractal::add(fractal_account, initial_occupation, name, mission);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -123,7 +122,7 @@ pub mod service {
     fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
         let mut fractal = Fractal::get_assert(fractal);
         fractal.check_sender_is_legislature();
-        fractal.set_token_threshold(threshold);
+        // TODO: Figure out where to put this fractal.set_token_threshold(threshold);
     }
 
     /// Exile a fractal member.

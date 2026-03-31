@@ -1,0 +1,24 @@
+[package]
+name = "de-facto-pkg"                      # Crate name
+description = "Defacto fractal occupation"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "DeFacto"
+services = ["de-facto"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.23.0"
+Sites = "0.23.0"
+Permissions = "0.23.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+de-facto = { path = "service", version = "0.23.0" }

@@ -26,7 +26,6 @@ pub mod tables {
         #[graphql(skip)]
         pub judiciary: AccountNumber,
         pub token_id: TID,
-        pub token_init_threshold: u8,
     }
 
     #[table(name = "FractalMemberTable", index = 1)]

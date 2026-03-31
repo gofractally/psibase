@@ -114,9 +114,9 @@ impl AdminFractal for FractallyPlugin {
         assert_authorized(FunctionName::create_fractal)?;
         let packed_args = fractals::action_structs::create_fractal {
             fractal_account: fractal_account.parse().unwrap(),
-            guild_account: guild_account.parse().unwrap(),
             name,
             mission,
+            initial_occupation: "derp".into(),
         }
         .packed();
         add_action_to_transaction(
