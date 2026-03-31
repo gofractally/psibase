@@ -10,15 +10,17 @@
 
 use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
-    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
-    Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, KvHandle, KvMode, PackageRegistry,
-    PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow, Table, TableRecord,
-    Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder, TransactionTrace,
+    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, ActionFormatter,
+    BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error,
+    HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, KvHandle, KvMode,
+    PackageRegistry, PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds,
+    SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey,
+    Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
 use anyhow::anyhow;
+use async_trait::async_trait;
 use chrono::Utc;
 use fracpack::{Pack, Unpack, UnpackOwned};
 use futures::executor::block_on;
@@ -840,6 +842,10 @@ impl Chain {
         let login_reply: LoginReply = reply.json()?;
         Ok(login_reply.access_token)
     }
+
+    pub fn display_trace<'a>(&'a self, trace: &'a TransactionTrace) -> ChainDisplayTrace<'a> {
+        ChainDisplayTrace { chain: self, trace }
+    }
 }
 
 impl Chain {
@@ -860,6 +866,37 @@ impl Chain {
                 trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
             }
         }
+    }
+}
+
+pub struct ChainDisplayTrace<'a> {
+    chain: &'a Chain,
+    trace: &'a TransactionTrace,
+}
+
+impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
+        let _ = block_on(formatter.prepare_transaction_trace(self.trace));
+        write!(f, "{}", formatter.display_transaction_trace(self.trace))
+    }
+}
+
+struct ChainSchemaFetcher<'a> {
+    chain: &'a Chain,
+}
+
+#[async_trait(?Send)]
+impl<'a> SchemaFetcher for ChainSchemaFetcher<'a> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        let index = self
+            .chain
+            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
+            .get_index_pk();
+        index
+            .get(&service)
+            .map(|row| row.schema)
+            .ok_or_else(|| anyhow!("Could not find schema for {service}"))
     }
 }
 
