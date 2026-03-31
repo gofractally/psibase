@@ -590,6 +590,8 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "console",
+ "futures",
+ "jobserver",
  "psibase",
  "psibase-rust-workspace-hack",
  "regex",
@@ -2262,10 +2264,11 @@ checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 
 [[package]]
 name = "jobserver"
-version = "0.1.31"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2b099aaa34a9751c5bf0878add70444e1ed2dd73f347be99003d4577277de6e"
+checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
 dependencies = [
+ "getrandom 0.3.4",
  "libc",
 ]
 
@@ -3378,6 +3381,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]

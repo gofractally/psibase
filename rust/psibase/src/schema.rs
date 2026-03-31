@@ -381,8 +381,5 @@ pub fn create_schema<T: ToServiceSchema>() -> Schema {
 }
 
 pub fn print_schema_impl<T: ToServiceSchema>() {
-    println!(
-        "psibase-schema-gen-output: {}",
-        serde_json::to_string(&T::schema()).unwrap()
-    )
+    print!("{}", serde_json::to_string(&T::schema()).unwrap())
 }
