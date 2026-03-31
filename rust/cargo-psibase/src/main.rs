@@ -317,7 +317,7 @@ fn process(
     optimize(&mut dest_module)?;
 
     write(output_file, dest_module.emit_wasm())
-        .with_context(|| format!("Failed to write {}", filename.display()))?;
+        .with_context(|| format!("Failed to write {}", output_file.display()))?;
 
     Ok(())
 }
