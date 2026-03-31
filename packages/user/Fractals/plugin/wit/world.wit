@@ -19,8 +19,6 @@ interface user-fractal {
     dist-token: func() -> result<_, error>;
 }
 
-
-
 interface types {
     record guild {
         fractal: string,
@@ -53,5 +51,4 @@ world imports {
     import user-fractal;
     import queries;
     import types;
-
 }

@@ -37,6 +37,35 @@ pub mod Hooks {
     }
 }
 
+#[crate::service(
+    name = "occupation",
+    actions = "occu_actions",
+    wrapper = "occu_wrapper",
+    structs = "occu_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod Occupation {
+    use crate::AccountNumber;
+
+    #[action]
+    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> Option<bool> {
+        unimplemented!()
+    }
+
+    #[action]
+    fn is_supported(fractal: AccountNumber) -> bool {
+        unimplemented!()
+    }
+}
+
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {

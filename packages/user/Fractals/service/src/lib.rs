@@ -76,8 +76,6 @@ pub mod service {
     /// * `guild_account` - The account number for the associated guild.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
@@ -86,8 +84,6 @@ pub mod service {
         mission: String,
     ) {
         Fractal::add(fractal_account, name, mission, guild_account);
-
-        // specify the injection account?
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }

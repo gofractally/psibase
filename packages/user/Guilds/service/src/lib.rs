@@ -49,9 +49,18 @@ pub mod service {
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn get_weights(fractal: AccountNumber) -> Vec<u32> {
-        vec![1, 2, 3]
+    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
+        vec![("Barry".into(), 1)]
+    }
+
+    #[action]
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> Option<bool> {
+        None
+    }
+
+    #[action]
+    fn is_supported(fractal: AccountNumber) -> bool {
+        false
     }
 
     /// Set guild display name
