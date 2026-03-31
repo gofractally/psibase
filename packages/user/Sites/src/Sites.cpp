@@ -764,11 +764,25 @@ namespace SystemService
                                             return row;
                                          });
          }
+
+         auto getDetailsAt(AccountNumber account,
+                           std::string   path) const -> std::optional<SitesContentRow>
+         {
+            auto row = SystemService::getContentRow(account, normalizeTarget(path));
+            if (!row)
+            {
+               return std::nullopt;
+            }
+            SitesContentRow result = *row;
+            result.csp             = result.csp.value_or("");
+            return result;
+         }
       };
-      PSIO_REFLECT(Query,                        //
-                   method(getConfig, account),   //
-                   method(getContent, account),  //
-                   method(getDefaultCsp)         //
+      PSIO_REFLECT(Query,                                //
+                   method(getConfig, account),           //
+                   method(getContent, account),          //
+                   method(getDetailsAt, account, path),  //
+                   method(getDefaultCsp)                 //
       );
    }  // namespace
 
