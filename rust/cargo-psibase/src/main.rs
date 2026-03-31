@@ -521,7 +521,7 @@ impl AsyncJobServer {
                     }) - 1,
                 )?,
                 CannotParse | CannotOpenPath | CannotOpenFd | NegativeFd => {
-                    eprintln!("{:}: {}", style("error").bold().red(), err);
+                    eprintln!("{:}: {}", style("warning").bold().yellow(), "A jobserver was found in the environment, but it could not be accessed. Add '+' to parent make rule.");
                     jobserver::Client::new(limit.unwrap_or(1) - 1)?
                 }
                 _ => Err(err)?,
