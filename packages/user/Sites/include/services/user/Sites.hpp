@@ -110,6 +110,12 @@ namespace SystemService
       /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
       bool isValidPath(psibase::AccountNumber site, std::string path);
 
+      /// Get content metadata for a given site and path
+      std::optional<SitesContentRow> getDetails(psibase::AccountNumber site, std::string path);
+
+      /// Get content raw data from a site, optionally decompressing it
+      std::vector<char> getData(psibase::AccountNumber site, std::string path, bool decompress);
+
       /// Enables/disables single-page application mode.
       /// When enabled, all content requests return the root document.
       void enableSpa(bool enable);
@@ -150,6 +156,8 @@ namespace SystemService
                 method(hardlink, path, contentType, contentEncoding, contentHash),
                 method(remove, path),
                 method(isValidPath, site, path),
+                method(getDetails, site, path),
+                method(getData, site, path, decompress),
                 method(enableSpa, enable),
                 method(setCsp, path, csp),
                 method(deleteCsp, path),

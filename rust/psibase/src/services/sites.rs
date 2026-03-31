@@ -168,6 +168,18 @@ pub mod service {
     fn clearProxy() {
         unimplemented!()
     }
+
+    /// Get content metadata for a given site and path
+    #[action]
+    fn getDetails(site: AccountNumber, path: String) -> Option<SitesContentRow> {
+        unimplemented!()
+    }
+
+    /// Get content raw data from a site, optionally decompressing it
+    #[action]
+    fn getData(site: AccountNumber, path: String, decompress: bool) -> Vec<u8> {
+        unimplemented!()
+    }
 }
 
 #[test]

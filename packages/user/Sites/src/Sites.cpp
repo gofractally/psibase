@@ -587,6 +587,27 @@ namespace SystemService
       return !!content;
    }
 
+   std::optional<SitesContentRow> Sites::getDetails(AccountNumber site, std::string path)
+   {
+      return getContentRow(site, path);
+   }
+
+   std::vector<char> Sites::getData(AccountNumber site, std::string path, bool decompress)
+   {
+      auto content = getContentRow(site, path);
+      check(!!content, "Content not found");
+
+      if (!content->contentEncoding || !decompress)
+      {
+         return getRawData(*content);
+      }
+
+      check(canDecompress(*content->contentEncoding),
+            "Decompression of this content is not supported.");
+
+      return getUncompressedContent(getRawData(*content), *content->contentEncoding);
+   }
+
    void Sites::enableSpa(bool enable)
    {
       auto table = Tables{}.open<SiteConfigTable>();
