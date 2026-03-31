@@ -104,11 +104,11 @@ pub enum TraceFormat {
 }
 
 impl TraceFormat {
-    pub async fn error_for_trace<F: SchemaFetcher>(
+    pub async fn error_for_trace<'a, F: SchemaFetcher>(
         &self,
         trace: TransactionTrace,
         progress: Option<&ProgressBar>,
-        afmt: &mut ActionFormatter<F>,
+        afmt: &ActionFormatter<'a, F>,
     ) -> Result<(), anyhow::Error> {
         match self {
             TraceFormat::Full => {
@@ -195,7 +195,7 @@ impl OptionProgressBar for Option<&ProgressBar> {
     }
 }
 
-async fn push_transaction_impl<F: SchemaFetcher>(
+async fn push_transaction_impl<'a, F: SchemaFetcher>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
@@ -203,7 +203,7 @@ async fn push_transaction_impl<F: SchemaFetcher>(
     console: bool,
     progress: Option<&ProgressBar>,
     wait_for: Option<String>,
-    afmt: &mut ActionFormatter<F>,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     let wait_for = wait_for
         .map(|wait| format!("?wait_for={}", wait))
@@ -258,14 +258,14 @@ pub async fn push_transaction(
     Ok(())
 }
 
-pub async fn push_transaction_optimistic<F: SchemaFetcher>(
+pub async fn push_transaction_optimistic<'a, F: SchemaFetcher>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
     console: bool,
     progress: Option<&ProgressBar>,
-    afmt: &mut ActionFormatter<F>,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     push_transaction_impl(
         base_url,

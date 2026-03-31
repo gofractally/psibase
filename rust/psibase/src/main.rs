@@ -1242,7 +1242,7 @@ async fn push_boot(
     client: &reqwest::Client,
     packed: Vec<u8>,
     progress: &ProgressBar,
-    afmt: &mut ActionFormatter<NullSchemaFetcher>,
+    afmt: &mut ActionFormatter<'_, NullSchemaFetcher>,
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client

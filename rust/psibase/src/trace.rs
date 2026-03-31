@@ -5,11 +5,15 @@ use crate::{
     services::{db, transact},
     AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use fracpack::{CompiledSchema, Unpack};
+use futures::future::{FutureExt, LocalBoxFuture, Shared};
 use serde::{Deserialize, Serialize};
 use serde_aux::prelude::deserialize_number_from_string;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
 #[fracpack(fracpack_mod = "fracpack")]
@@ -291,48 +295,73 @@ pub trait SchemaFetcher {
 }
 
 pub struct DisplayTransactionTrace<'a> {
-    schemas: &'a HashMap<AccountNumber, Schema>,
+    schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
     trace: &'a TransactionTrace,
 }
 
 impl fmt::Display for DisplayTransactionTrace<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        format_transaction_trace(self.schemas, self.trace, 0, f)
+        format_transaction_trace(&self.schemas.borrow(), self.trace, 0, f)
     }
 }
 
-pub struct ActionFormatter<F: SchemaFetcher> {
-    schemas: HashMap<AccountNumber, Schema>,
+type PinType<'a> = LocalBoxFuture<'a, Result<(), Rc<Cell<anyhow::Error>>>>;
+
+struct ActionFormatterImpl<'a, F: SchemaFetcher + 'a> {
+    schemas: RefCell<HashMap<AccountNumber, Schema>>,
     fetcher: F,
+    pending: RefCell<HashMap<AccountNumber, Shared<PinType<'a>>>>,
 }
 
-impl<F: SchemaFetcher> ActionFormatter<F> {
+pub struct ActionFormatter<'a, F: SchemaFetcher + 'a> {
+    storage: Rc<ActionFormatterImpl<'a, F>>,
+}
+
+impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     pub fn with_schemas(schemas: SchemaMap, fetcher: F) -> Self {
-        ActionFormatter { schemas, fetcher }
-    }
-    pub fn new(fetcher: F) -> Self {
         ActionFormatter {
-            schemas: HashMap::new(),
-            fetcher,
+            storage: Rc::new(ActionFormatterImpl {
+                schemas: schemas.into(),
+                fetcher,
+                pending: RefCell::new(HashMap::new()),
+            }),
         }
     }
-    pub async fn add_service(&mut self, service: AccountNumber) -> Result<(), anyhow::Error> {
-        use std::collections::hash_map::Entry::*;
-        match self.schemas.entry(service) {
-            Occupied(_) => {}
-            Vacant(entry) => {
-                entry.insert(self.fetcher.fetch_schema(service).await?);
+    pub fn new(fetcher: F) -> Self {
+        Self::with_schemas(HashMap::new(), fetcher)
+    }
+    pub async fn add_service(&self, service: AccountNumber) -> Result<(), anyhow::Error> {
+        if !self.storage.schemas.borrow().contains_key(&service) {
+            let fut = self
+                .storage
+                .pending
+                .borrow_mut()
+                .entry(service)
+                .or_insert_with(|| {
+                    let storage = self.storage.clone();
+                    let fut = async move {
+                        let schema = storage
+                            .fetcher
+                            .fetch_schema(service)
+                            .await
+                            .map_err(|e| Rc::new(Cell::new(e)))?;
+                        storage.schemas.borrow_mut().insert(service, schema);
+                        Ok(())
+                    };
+                    let xxx: PinType = Box::pin(fut);
+                    xxx.shared()
+                })
+                .clone();
+            if let Err(e) = fut.await {
+                Err(e.replace(anyhow!("Failed to fetch schema")))?
             }
         }
         Ok(())
     }
-    pub async fn prepare_event_trace(&mut self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
+    pub async fn prepare_event_trace(&self, _etrace: &EventTrace) -> Result<(), anyhow::Error> {
         Ok(())
     }
-    pub async fn prepare_action_trace(
-        &mut self,
-        atrace: &ActionTrace,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn prepare_action_trace(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
         let mut res = self.add_service(atrace.action.service).await;
         for inner in &atrace.inner_traces {
             match &inner.inner {
@@ -346,7 +375,7 @@ impl<F: SchemaFetcher> ActionFormatter<F> {
         res
     }
     pub async fn prepare_transaction_trace(
-        &mut self,
+        &self,
         ttrace: &TransactionTrace,
     ) -> Result<(), anyhow::Error> {
         let mut res = Ok(());
@@ -355,12 +384,12 @@ impl<F: SchemaFetcher> ActionFormatter<F> {
         }
         res
     }
-    pub fn display_transaction_trace<'a>(
-        &'a self,
-        ttrace: &'a TransactionTrace,
-    ) -> DisplayTransactionTrace<'a> {
+    pub fn display_transaction_trace<'b>(
+        &'b self,
+        ttrace: &'b TransactionTrace,
+    ) -> DisplayTransactionTrace<'b> {
         DisplayTransactionTrace {
-            schemas: &self.schemas,
+            schemas: &self.storage.schemas,
             trace: ttrace,
         }
     }
