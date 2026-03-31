@@ -3,11 +3,7 @@
 mod service {
 
     use async_graphql::{connection::Connection, *};
-    use fractals::tables::tables::{
-        EvaluationInstance, EvaluationInstanceTable, Fractal, FractalMember, FractalMemberTable,
-        FractalTable, Guild, GuildApplication, GuildApplicationTable, GuildInvite,
-        GuildInviteTable, GuildMember, GuildMemberTable, GuildTable,
-    };
+    use fractals::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
     use psibase::{AccountNumber, *};
     use serde::{Deserialize, Deserializer};
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -162,125 +158,6 @@ mod service {
                 .get(&fractal)
         }
 
-        async fn guild_application(
-            &self,
-            guild: AccountNumber,
-            applicant: AccountNumber,
-        ) -> Option<GuildApplication> {
-            GuildApplicationTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .get(&(guild, applicant))
-        }
-
-        async fn guild_applications(
-            &self,
-            guild: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, GuildApplication>> {
-            TableQuery::subindex::<AccountNumber>(
-                GuildApplicationTable::with_service(fractals::SERVICE).get_index_pk(),
-                &(guild),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
-        }
-
-        async fn guild_invite(&self, id: u32) -> Option<GuildInvite> {
-            GuildInviteTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .get(&id)
-        }
-
-        async fn guild_invites(
-            &self,
-            guild: AccountNumber,
-            account: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, GuildInvite>> {
-            TableQuery::subindex::<u32>(
-                GuildInviteTable::with_service(fractals::SERVICE).get_index_by_member(),
-                &(guild, account),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
-        }
-
-        async fn guilds(
-            &self,
-            fractal: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, Guild>> {
-            TableQuery::subindex::<AccountNumber>(
-                GuildTable::with_service(fractals::SERVICE).get_index_by_fractal(),
-                &(fractal),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
-        }
-
-        async fn guild(&self, guild: AccountNumber) -> Option<Guild> {
-            GuildTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .get(&(guild))
-        }
-
-        async fn score_by_member(
-            &self,
-            guild: AccountNumber,
-            member: AccountNumber,
-        ) -> Option<GuildMember> {
-            GuildMemberTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .get(&(guild, member))
-        }
-
-        async fn scores(
-            &self,
-            guild: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
-            TableQuery::subindex::<AccountNumber>(
-                GuildMemberTable::with_service(fractals::SERVICE).get_index_pk(),
-                &(guild),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
-        }
-
-        async fn eval_by_id(&self, evaluation_id: u32) -> Option<EvaluationInstance> {
-            EvaluationInstanceTable::with_service(fractals::SERVICE)
-                .get_index_by_evaluation()
-                .get(&evaluation_id)
-        }
-
         async fn fractals(
             &self,
             first: Option<i32>,
@@ -336,36 +213,6 @@ mod service {
             .after(after)
             .query()
             .await
-        }
-
-        async fn guild_memberships(
-            &self,
-            member: AccountNumber,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
-            TableQuery::subindex::<AccountNumber>(
-                GuildMemberTable::with_service(fractals::SERVICE).get_index_by_member(),
-                &(member),
-            )
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-            .await
-        }
-
-        async fn guild_membership(
-            &self,
-            guild: AccountNumber,
-            member: AccountNumber,
-        ) -> Option<GuildMember> {
-            GuildMemberTable::with_service(fractals::SERVICE)
-                .get_index_pk()
-                .get(&(guild, member))
         }
 
         async fn members(

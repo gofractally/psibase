@@ -4,31 +4,11 @@ use psibase::{
 
 use crate::{
     constants::MEMBER_STREAM_HALF_LIFE,
-    tables::tables::{
-        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildMember,
-    },
+    tables::tables::{Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable},
 };
 
 use async_graphql::ComplexObject;
 use psibase::services::{token_stream::Wrapper as TokenStream, transact::Wrapper as TransactSvc};
-
-#[derive(PartialEq)]
-pub enum MemberStatus {
-    Visa = 1,
-    Citizen = 2,
-}
-
-pub type StatusU8 = u8;
-
-impl From<StatusU8> for MemberStatus {
-    fn from(status: StatusU8) -> Self {
-        match status {
-            1 => MemberStatus::Visa,
-            2 => MemberStatus::Citizen,
-            _ => abort_message("invalid member status"),
-        }
-    }
-}
 
 #[ComplexObject]
 impl FractalMember {
@@ -41,7 +21,7 @@ impl FractalMember {
 }
 
 impl FractalMember {
-    fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
+    fn new(fractal: AccountNumber, account: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let token_id = Fractal::get_assert(fractal).token_id;
@@ -50,19 +30,18 @@ impl FractalMember {
             account,
             fractal,
             created_at: now,
-            member_status: status as StatusU8,
             stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
         }
     }
 
-    pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
+    pub fn add(fractal: AccountNumber, account: AccountNumber) -> Self {
         check_none(
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
         );
         check_none(Self::get(fractal, account), "account is already a member");
 
-        let new_instance = Self::new(fractal, account, status);
+        let new_instance = Self::new(fractal, account);
         new_instance.save();
 
         new_instance
@@ -88,24 +67,12 @@ impl FractalMember {
         TokenStream::call().deposit(self.stream_id, amount);
     }
 
-    pub fn is_citizen(&self) -> bool {
-        MemberStatus::Citizen == self.member_status.into()
-    }
-
-    pub fn has_visa(&self) -> bool {
-        MemberStatus::Visa == self.member_status.into()
-    }
-
     pub fn exile(&self) {
         FractalExile::add(self.fractal, self.account);
         self.remove();
     }
 
     fn remove(&self) {
-        for guild_membership in GuildMember::memberships_of_member(self.account) {
-            guild_membership.kick()
-        }
-
         FractalMemberTable::read_write().remove(&self);
     }
 

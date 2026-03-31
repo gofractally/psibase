@@ -1,3 +1,42 @@
+#[crate::service(
+    name = "eval-hooks",
+    actions = "hooks_actions",
+    wrapper = "hooks_wrapper",
+    structs = "hooks_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod Hooks {
+    use crate::AccountNumber;
+
+    #[action]
+    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_grp_fin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_eval_fin(evaluation_id: u32) {
+        unimplemented!()
+    }
+}
+
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {

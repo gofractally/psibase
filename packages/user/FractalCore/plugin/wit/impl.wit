@@ -9,9 +9,6 @@ world impl {
     include host:db/imports;
 
 
-    export admin-guild;
     export admin-fractal;
-    export user-guild;
     export user-fractal;
-    export user-eval;
 }

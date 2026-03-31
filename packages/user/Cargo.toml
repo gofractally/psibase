@@ -52,6 +52,10 @@ members = [
     "Nft/service",
     "Nft/plugin",
     "Nft/query-service",
+    "Guilds",
+    "Guilds/service",
+    "Guilds/query-service",
+    "Guilds/plugin",
 ]
 
 exclude = [

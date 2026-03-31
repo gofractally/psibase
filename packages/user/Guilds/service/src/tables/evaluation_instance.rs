@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
+use ::evaluations::service::{Evaluation, EvaluationTable, User, UserTable};
+use psibase::services::evaluations;
 use psibase::{check_some, get_service, AccountNumber, Table};
 
 use crate::constants::GUILD_EVALUATION_GROUP_SIZE;
@@ -123,7 +124,7 @@ impl EvaluationInstance {
         let guild_instance = Guild::get_assert(guild);
 
         crate::Wrapper::emit().history().scheduled_evaluation(
-            guild_instance.fractal,
+            guild_instance.owner,
             guild,
             evaluation_id,
             registration,

@@ -15,12 +15,10 @@ use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
 
-use crate::tables::tables::Guild;
-
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::services::{accounts, fractals, sites, transact};
-use psibase::{check, get_sender, Action, RawKey, TableQuery};
+use psibase::{check, get_sender, Action, RawKey, TableQuery, ToServiceSchema};
 use psibase::{fracpack::Pack, services::auth_dyn};
 
 impl Fractal {
@@ -51,28 +49,9 @@ impl Fractal {
         let fractal_account = self.account;
         accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
 
-        let set_proxy = Action {
-            sender: fractal_account,
-            service: sites::SERVICE,
-            method: sites::action_structs::setProxy::ACTION_NAME.into(),
-            rawData: sites::action_structs::setProxy {
-                proxy: "fractal-core".into(),
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_policy = Action {
-            sender: fractal_account,
-            service: auth_dyn::SERVICE,
-            method: auth_dyn::action_structs::set_mgmt::ACTION_NAME.into(),
-            rawData: auth_dyn::action_structs::set_mgmt {
-                account: fractal_account,
-                manager: crate::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
+        psibase::services::sites::Wrapper::call_as(fractal_account).setProxy("fractal-core".into());
+        psibase::services::auth_dyn::Wrapper::call_as(fractal_account)
+            .set_mgmt(fractal_account, crate::Wrapper::SERVICE);
 
         let set_auth_serv = Action {
             sender: fractal_account,
@@ -85,8 +64,6 @@ impl Fractal {
             .into(),
         };
 
-        transact::Wrapper::call().runAs(set_proxy, vec![]);
-        transact::Wrapper::call().runAs(set_policy, vec![]);
         transact::Wrapper::call().runAs(set_auth_serv, vec![]);
     }
 
@@ -136,40 +113,40 @@ impl Fractal {
     }
 
     pub fn init_token(&self) {
-        let legislature_guild = Guild::get_assert(self.legislature);
+        // let legislature_guild = Guild::get_assert(self.legislature);
 
-        let reward_consensus = RewardConsensus::get(self.account);
+        // let reward_consensus = RewardConsensus::get(self.account);
 
-        let is_first_distribution = reward_consensus.is_none();
+        // let is_first_distribution = reward_consensus.is_none();
 
-        if is_first_distribution {
-            check(
-                legislature_guild.active_member_count() >= self.token_init_threshold.into(),
-                "active member count does not meet token init threshold",
-            );
-            RewardConsensus::add(self.account, INITIAL_REWARD_DISTRIBUTION.into());
-        } else {
-            check(
-                legislature_guild.is_rank_ordering(),
-                "cannot distribute remaining tokens until rank ordering is enabled",
-            );
+        // if is_first_distribution {
+        //     check(
+        //         legislature_guild.active_member_count() >= self.token_init_threshold.into(),
+        //         "active member count does not meet token init threshold",
+        //     );
+        //     RewardConsensus::add(self.account, INITIAL_REWARD_DISTRIBUTION.into());
+        // } else {
+        //     check(
+        //         legislature_guild.is_rank_ordering(),
+        //         "cannot distribute remaining tokens until rank ordering is enabled",
+        //     );
 
-            let reward_consensus = reward_consensus.unwrap();
+        //     let reward_consensus = reward_consensus.unwrap();
 
-            let supply = psibase::services::token_stream::Wrapper::call()
-                .get_stream(reward_consensus.reward_stream_id)
-                .unwrap();
-            let is_second_distrbution = supply.total_deposited < REWARD_DISTRIBUTION.into();
+        //     let supply = psibase::services::token_stream::Wrapper::call()
+        //         .get_stream(reward_consensus.reward_stream_id)
+        //         .unwrap();
+        //     let is_second_distrbution = supply.total_deposited < REWARD_DISTRIBUTION.into();
 
-            check(
-                is_second_distrbution,
-                "remaining consensus rewards already distributed",
-            );
-            reward_consensus.deposit(
-                REMAINING_REWARD_DISTRIBUTION.into(),
-                "Consensus rewards for ranked evaluations".into(),
-            );
-        }
+        //     check(
+        //         is_second_distrbution,
+        //         "remaining consensus rewards already distributed",
+        //     );
+        //     reward_consensus.deposit(
+        //         REMAINING_REWARD_DISTRIBUTION.into(),
+        //         "Consensus rewards for ranked evaluations".into(),
+        //     );
+        // }
     }
 
     pub fn set_token_threshold(&mut self, threshold: u8) {
@@ -211,14 +188,6 @@ impl Fractal {
         .after(after)
         .query()
         .await
-    }
-
-    async fn legislature(&self) -> Guild {
-        Guild::get_assert(self.legislature)
-    }
-
-    async fn judiciary(&self) -> Guild {
-        Guild::get_assert(self.judiciary)
     }
 
     async fn consensus_reward(&self) -> Option<RewardConsensus> {

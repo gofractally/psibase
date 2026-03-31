@@ -7,9 +7,7 @@ use psibase::{
 
 use crate::{
     constants::MAX_GUILD_INVITES_PER_MEMBER,
-    tables::tables::{
-        Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember,
-    },
+    tables::tables::{Guild, GuildApplication, GuildInvite, GuildInviteTable, GuildMember},
 };
 use psibase::services::{
     invite::Wrapper as Invite, tokens::Wrapper as Tokens, transact::Wrapper as TransactSvc,

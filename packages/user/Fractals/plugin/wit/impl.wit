@@ -11,11 +11,8 @@ world impl {
     include base64:plugin/imports;
 
 
-    export admin-guild;
-    export user-guild;
     export admin-fractal;
     export user-fractal;
-    export user-eval;
     export queries;
     export types;
 }

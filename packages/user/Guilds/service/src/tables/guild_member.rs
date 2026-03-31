@@ -2,8 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
-use crate::helpers::RollingBits16;
-use crate::scoring::{calculate_ema_u32, Fraction};
+use crate::helpers::{calculate_ema_u32, Fraction, RollingBits16};
 use crate::tables::tables::{
     Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, GuildMember,
     GuildMemberTable,
