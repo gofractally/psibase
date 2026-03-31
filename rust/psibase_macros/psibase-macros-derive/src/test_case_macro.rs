@@ -1,6 +1,5 @@
 use darling::FromMeta;
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use proc_macro_error::abort;
 use quote::quote;
 use std::collections::HashSet;
@@ -77,30 +76,6 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
     func.sig.inputs = Default::default();
     func.sig.output = ReturnType::Default;
 
-    let reg = if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
-        let mut load_registry = quote! {
-            let mut registry = psibase::JointRegistry::new();
-        };
-        for path in std::env::split_paths(&local_packages) {
-            let path = LitStr::new(path.as_os_str().to_str().unwrap(), Span::mixed_site());
-            load_registry = quote! {
-                #load_registry
-                registry.push(psibase::DirectoryRegistry::new(std::path::Path::new(#path).to_path_buf()))?;
-            }
-        }
-        quote! {
-            {
-                #load_registry
-                registry.push(psibase::Chain::default_registry())?;
-                registry
-            }
-        }
-    } else {
-        quote! {
-            psibase::Chain::default_registry()
-        }
-    };
-
     let mut block = *func.block;
 
     if !inputs.is_empty() {
@@ -121,7 +96,7 @@ fn process_fn(options: Options, mut func: ItemFn) -> TokenStream {
                 use psibase::*;
 
                 let mut chain = psibase::Chain::test_chain();
-                chain.install(&#reg, &[#packages])?;
+                chain.install(&psibase::Chain::test_registry(), &[#packages])?;
 
                 Ok(chain)
             }

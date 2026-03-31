@@ -1,14 +1,15 @@
 use psibase::{native_raw, services, DbId, KvHandle, KvMode};
 
-#[no_mangle]
-unsafe extern "C" fn psibase_proxy_kv_open_impl(
-    db: DbId,
+pub unsafe fn psibase_proxy_kv_open_impl(
+    db: u32,
     prefix: *const u8,
     prefix_len: u32,
-    mode: KvMode,
-) -> native_raw::KvHandle {
+    mode: u8,
+) -> u32 {
+    let db = *(&db as *const u32 as *const DbId);
+    let mode = *(&mode as *const u8 as *const KvMode);
     let prefix = std::slice::from_raw_parts(prefix, prefix_len as usize);
-    match db {
+    let result = match db {
         DbId::Service | DbId::WriteOnly | DbId::BlockLog | DbId::Native => KvHandle::import_raw(
             services::db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
         ),
@@ -16,7 +17,6 @@ unsafe extern "C" fn psibase_proxy_kv_open_impl(
             services::x_db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
         ),
         _ => native_raw::kvOpen(db, prefix.as_ptr(), prefix.len() as u32, mode),
-    }
+    };
+    *(&result as *const native_raw::KvHandle as *const u32)
 }
-
-pub fn force_use() {}
