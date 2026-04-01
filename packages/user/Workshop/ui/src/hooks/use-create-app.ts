@@ -6,8 +6,8 @@ import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { AccountNameStatus } from "./useAccountStatus";
-import { appMetadataQueryKey } from "./useAppMetadata";
+import { AccountNameStatus } from "./use-account-status";
+import { appMetadataQueryKey } from "./use-app-metadata";
 
 const Params = z.object({
     account: zAccount,

@@ -1,7 +1,7 @@
 import slugify from "slugify";
 import { z } from "zod";
 
-import { MessageType } from "@/hooks/useMessages";
+import { MessageType } from "@/hooks/use-messages";
 
 import { zAccount } from "@shared/lib/schemas/account";
 

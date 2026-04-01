@@ -3,13 +3,13 @@ import humanizeDuration from "humanize-duration";
 import { RefreshCcw } from "lucide-react";
 import React from "react";
 
-import { LoadingBlock } from "@/components/LoadingBlock";
+import { LoadingBlock } from "@/components/loading-block";
 
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useCurrentThreadId } from "@/hooks/useCurrentThreadId";
-import { useMail } from "@/hooks/useMail";
-import { useMessages } from "@/hooks/useMessages";
-import { getThreadIdentifier } from "@/lib/createThreadIdentifier";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useCurrentThreadId } from "@/hooks/use-current-thread-id";
+import { useMail } from "@/hooks/use-mail";
+import { useMessages } from "@/hooks/use-messages";
+import { getThreadIdentifier } from "@/lib/create-thread-identifier";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { createIdenticon } from "@shared/lib/create-identicon";

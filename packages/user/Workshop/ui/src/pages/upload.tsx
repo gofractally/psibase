@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 
 import { FileUploader } from "@/components/file-uploader";
 
+import { useCurrentApp } from "@/hooks/use-current-app";
 import { useRemovePath } from "@/hooks/use-remove-path";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useSiteConfig } from "@/hooks/useSiteConfig";
+import { useSiteConfig } from "@/hooks/use-site-config";
 import { zPath } from "@/lib/zod-types";
 
 import { EmptyBlock } from "@shared/components/empty-block";

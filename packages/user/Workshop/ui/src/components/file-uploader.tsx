@@ -1,5 +1,5 @@
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useUploadTree } from "@/hooks/useUploadTree";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useUploadTree } from "@/hooks/use-upload-tree";
 import { zPath } from "@/lib/zod-types";
 
 import { zAccount } from "@shared/lib/schemas/account";

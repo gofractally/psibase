@@ -1,8 +1,8 @@
 import { FolderUp, LifeBuoy, Settings } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { useAppMetadata } from "@/hooks/useAppMetadata";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
+import { useAppMetadata } from "@/hooks/use-app-metadata";
+import { useCurrentApp } from "@/hooks/use-current-app";
 
 import { cn } from "@shared/lib/utils";
 import {

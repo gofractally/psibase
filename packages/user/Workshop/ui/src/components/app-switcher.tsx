@@ -6,9 +6,9 @@ import {
     MetadataResponse,
     appMetadataQueryKey,
     useAppMetadata,
-} from "@/hooks/useAppMetadata";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useTrackedApps } from "@/hooks/useTrackedApps";
+} from "@/hooks/use-app-metadata";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useTrackedApps } from "@/hooks/use-tracked-apps";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { createIdenticon } from "@shared/lib/create-identicon";

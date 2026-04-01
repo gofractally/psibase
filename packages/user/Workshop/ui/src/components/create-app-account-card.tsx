@@ -1,5 +1,5 @@
 import { useCreateApp } from "@/hooks/use-create-app";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
+import { useCurrentApp } from "@/hooks/use-current-app";
 
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";

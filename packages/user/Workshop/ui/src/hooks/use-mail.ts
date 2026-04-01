@@ -6,7 +6,7 @@ import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { Message, MessageType } from "./useMessages";
+import { Message, MessageType } from "./use-messages";
 
 const BaseAction = z.object({
     app: zAccount,

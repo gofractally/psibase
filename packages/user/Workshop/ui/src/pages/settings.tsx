@@ -1,10 +1,10 @@
 import { ControlPanel } from "@/components/control-panel";
 import { MetaDataForm } from "@/components/metadata-form";
 
-import { useAccountStatus } from "@/hooks/useAccountStatus";
-import { useAppMetadata } from "@/hooks/useAppMetadata";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useSetMetadata } from "@/hooks/useSetMetadata";
+import { useAccountStatus } from "@/hooks/use-account-status";
+import { useAppMetadata } from "@/hooks/use-app-metadata";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useSetMetadata } from "@/hooks/use-set-metadata";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { Spinner } from "@shared/components/spinner";

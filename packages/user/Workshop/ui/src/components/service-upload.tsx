@@ -1,8 +1,8 @@
 import { ChangeEvent } from "react";
 
-import { useCodeHash } from "@/hooks/useCodeHash";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useSetServiceCode } from "@/hooks/useSetServiceCode";
+import { useCodeHash } from "@/hooks/use-code-hash";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useSetServiceCode } from "@/hooks/use-set-service-code";
 
 import { zAccount } from "@shared/lib/schemas/account";
 import { Card } from "@shared/shadcn/ui/card";

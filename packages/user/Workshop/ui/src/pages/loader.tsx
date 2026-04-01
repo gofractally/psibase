@@ -2,7 +2,7 @@ import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useTrackedApps } from "@/hooks/useTrackedApps";
+import { useTrackedApps } from "@/hooks/use-tracked-apps";
 
 import { useBranding } from "@shared/hooks/use-branding";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";

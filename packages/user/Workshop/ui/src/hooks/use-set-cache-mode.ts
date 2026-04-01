@@ -6,31 +6,31 @@ import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { SiteConfigResponse, siteConfigQueryKey } from "./useSiteConfig";
+import { SiteConfigResponse, siteConfigQueryKey } from "./use-site-config";
 
 const Params = z.object({
     account: zAccount,
-    enableSpa: z.boolean(),
+    enableCache: z.boolean(),
 });
 
-export const useSpa = () =>
+export const useSetCacheMode = () =>
     useMutation<null, Error, z.infer<typeof Params>>({
-        mutationKey: ["spa"],
+        mutationKey: ["cacheMode"],
         mutationFn: async (params) => {
-            const { account, enableSpa } = Params.parse(params);
+            const { account, enableCache } = Params.parse(params);
 
             await supervisor.functionCall({
-                method: "enableSpa",
-                params: [account, enableSpa],
+                method: "setCacheMode",
+                params: [account, enableCache],
                 service: "workshop",
                 intf: "app",
             });
 
             return null;
         },
-        onSuccess: (_, { account, enableSpa }) => {
+        onSuccess: (_, { account, enableCache }) => {
             toast.success(
-                `${enableSpa ? "Enabled" : "Disabled"} SPA on ${account}`,
+                `${enableCache ? "Enabled" : "Disabled"} cache on ${account}`,
             );
 
             queryClient.setQueryData(
@@ -42,7 +42,7 @@ export const useSpa = () =>
                             ...parsed,
                             getConfig: parsed.getConfig && {
                                 ...parsed.getConfig,
-                                spa: enableSpa,
+                                cache: enableCache,
                             },
                         };
                         return SiteConfigResponse.parse(newData);

@@ -6,7 +6,7 @@ import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-import { codeHashQueryKey } from "./useCodeHash";
+import { codeHashQueryKey } from "./use-code-hash";
 
 const Params = z.object({
     account: zAccount,

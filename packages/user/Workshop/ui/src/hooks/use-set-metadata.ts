@@ -7,7 +7,7 @@ import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { MetadataResponse, appMetadataQueryKey } from "./useAppMetadata";
+import { MetadataResponse, appMetadataQueryKey } from "./use-app-metadata";
 
 const Params = z.object({
     metadata: zMetadata,

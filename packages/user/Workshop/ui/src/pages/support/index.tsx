@@ -2,14 +2,14 @@ import dayjs from "dayjs";
 import relative from "dayjs/plugin/relativeTime";
 import { useNavigate } from "react-router-dom";
 
-import { LoadingBlock } from "@/components/LoadingBlock";
+import { LoadingBlock } from "@/components/loading-block";
 
-import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { useMessages } from "@/hooks/useMessages";
+import { useCurrentApp } from "@/hooks/use-current-app";
+import { useMessages } from "@/hooks/use-messages";
 import {
     getThreadIdentifier,
     removeReplyPrefix,
-} from "@/lib/createThreadIdentifier";
+} from "@/lib/create-thread-identifier";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { useChainId } from "@shared/hooks/use-chain-id";

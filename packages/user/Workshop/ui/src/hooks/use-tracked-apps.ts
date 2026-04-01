@@ -6,8 +6,8 @@ import { queryClient } from "@shared/lib/queryClient";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 import { wait } from "../lib/wait";
-import { appMetadataQueryKey, fetchMetadata } from "./useAppMetadata";
-import { useCurrentApp } from "./useCurrentApp";
+import { appMetadataQueryKey, fetchMetadata } from "./use-app-metadata";
+import { useCurrentApp } from "./use-current-app";
 
 const AppItem = z.object({
     account: zAccount,

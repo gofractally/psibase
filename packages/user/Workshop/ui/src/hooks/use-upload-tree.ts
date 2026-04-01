@@ -5,7 +5,7 @@ import { queryClient } from "@shared/lib/queryClient";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { SiteConfigResponse, siteConfigQueryKey } from "./useSiteConfig";
+import { SiteConfigResponse, siteConfigQueryKey } from "./use-site-config";
 
 const u8Schema = z.number().int().min(0).max(255);
 
