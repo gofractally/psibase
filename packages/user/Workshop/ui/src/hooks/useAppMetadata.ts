@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
-import { Account } from "@/lib/zodTypes";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
@@ -30,7 +31,7 @@ export const appMetadataQueryKey = (appName: string | undefined | null) => [
 ];
 
 export const fetchMetadata = async (account: string) => {
-    const appName = Account.parse(account);
+    const appName = zAccount.parse(account);
     try {
         const res = await graphql(
             `
@@ -71,6 +72,6 @@ export const useAppMetadata = (appName: string | undefined | null) =>
         queryKey: appMetadataQueryKey(appName),
         enabled: !!appName,
         queryFn: async () => {
-            return fetchMetadata(Account.parse(appName));
+            return fetchMetadata(zAccount.parse(appName));
         },
     });

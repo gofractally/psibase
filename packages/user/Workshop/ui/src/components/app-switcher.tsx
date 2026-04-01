@@ -1,4 +1,3 @@
-import { queryClient } from "@/queryClient";
 import { ChevronsUpDown, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -13,6 +12,7 @@ import { useTrackedApps } from "@/hooks/useTrackedApps";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { createIdenticon } from "@shared/lib/create-identicon";
+import { queryClient } from "@shared/lib/queryClient";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,

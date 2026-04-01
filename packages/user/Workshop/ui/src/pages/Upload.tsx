@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ChevronRight, File, Folder, Pencil, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -7,8 +8,9 @@ import { FileUploader } from "@/components/file-uploader";
 import { useRemovePath } from "@/hooks/use-remove-path";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
-import { Account, Path } from "@/lib/zodTypes";
+import { zPath } from "@/lib/zod-types";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -24,7 +26,6 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 import { toast } from "@shared/shadcn/ui/sonner";
 
-// @ts-ignore
 function Tree({
     item,
     isFolder = false,
@@ -205,7 +206,7 @@ export const Upload = () => {
     const handleDelete = (path: string) => {
         if (confirm(`Are you sure you want to delete ${path}?`)) {
             removePath.mutate({
-                account: Account.parse(currentApp),
+                account: zAccount.parse(currentApp),
                 path: path,
             });
         }
@@ -249,7 +250,7 @@ export const Upload = () => {
                                 variant="ghost"
                                 onClick={() => {
                                     setUploadPath(
-                                        Path.parse(
+                                        zPath.parse(
                                             window.prompt("Upload Path") ||
                                                 normalizedPath ||
                                                 "",

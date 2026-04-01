@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import { Account } from "@/lib/zodTypes";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const AccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
 const GetAccountReturn = z
@@ -38,7 +37,7 @@ export const useAccountStatus = (account: string | undefined) =>
     useQuery<z.infer<typeof AccountNameStatus>>({
         queryKey: ["userAccount", account],
         queryFn: async () => {
-            return isAccountAvailable(Account.parse(account));
+            return isAccountAvailable(zAccount.parse(account));
         },
         staleTime: 10000,
         enabled: !!account,

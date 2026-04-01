@@ -1,23 +1,22 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import { Account } from "@/lib/zodTypes";
+import { queryClient } from "@shared/lib/queryClient";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 import { Message, MessageType } from "./useMessages";
 
 const BaseAction = z.object({
-    app: Account,
+    app: zAccount,
 });
 
 const U64 = z.string();
 
 const Send = BaseAction.extend({
     method: z.literal("send"),
-    receiver: Account,
+    receiver: zAccount,
     subject: z.string(),
     body: z.string(),
 });

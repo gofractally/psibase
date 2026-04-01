@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
-import { Account } from "@/lib/zodTypes";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
@@ -11,14 +11,14 @@ import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src
 const CSPString = z.string();
 
 const Config = z.object({
-    account: Account,
+    account: zAccount,
     spa: z.boolean(),
     cache: z.boolean(),
     globalCsp: CSPString,
 });
 
 export const siteConfigQueryKey = (
-    account: z.infer<typeof Account> | undefined | null,
+    account: z.infer<typeof zAccount> | undefined | null,
 ) => ["siteConfig", account];
 
 export const SiteConfigResponse = z.object({
@@ -27,7 +27,7 @@ export const SiteConfigResponse = z.object({
         edges: z
             .object({
                 node: z.object({
-                    account: Account,
+                    account: zAccount,
                     path: z.string(),
                     contentType: z.string(),
                     hash: z.string(),
@@ -40,7 +40,7 @@ export const SiteConfigResponse = z.object({
 });
 
 export const useSiteConfig = (
-    account: z.infer<typeof Account> | undefined | null,
+    account: z.infer<typeof zAccount> | undefined | null,
 ) =>
     useQuery({
         queryKey: siteConfigQueryKey(account),

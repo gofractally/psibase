@@ -3,8 +3,8 @@ import { ChangeEvent } from "react";
 import { useCodeHash } from "@/hooks/useCodeHash";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useSetServiceCode } from "@/hooks/useSetServiceCode";
-import { Account } from "@/lib/zodTypes";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { Card } from "@shared/shadcn/ui/card";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
@@ -62,7 +62,7 @@ export const ServiceUpload = () => {
         const wasm = file.bytes;
 
         void (await uploadServiceCode({
-            account: Account.parse(currentApp),
+            account: zAccount.parse(currentApp),
             code: wasm,
         }));
     };

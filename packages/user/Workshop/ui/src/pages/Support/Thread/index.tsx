@@ -10,10 +10,10 @@ import { useCurrentThreadId } from "@/hooks/useCurrentThreadId";
 import { useMail } from "@/hooks/useMail";
 import { useMessages } from "@/hooks/useMessages";
 import { getThreadIdentifier } from "@/lib/createThreadIdentifier";
-import { Account } from "@/lib/zodTypes";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { createIdenticon } from "@shared/lib/create-identicon";
+import { zAccount } from "@shared/lib/schemas/account";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -75,7 +75,7 @@ export const Thread: React.FC = () => {
 
     const sendMessage = async (message: string) => {
         mailAction({
-            app: Account.parse(currentApp),
+            app: zAccount.parse(currentApp),
             body: message,
             method: "send",
             receiver: customer,

@@ -1,7 +1,8 @@
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useUploadTree } from "@/hooks/useUploadTree";
-import { Account, Path } from "@/lib/zodTypes";
+import { zPath } from "@/lib/zod-types";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { FileInput } from "./file-input";
@@ -29,12 +30,12 @@ export const FileUploader = ({ pathPrefix, onSuccess }: Props) => {
         try {
             const files = selectedFiles.map((file) => ({
                 contentType: file.contentType,
-                path: Path.parse(`${pathPrefix}${file.path}`),
+                path: zPath.parse(`${pathPrefix}${file.path}`),
                 content: file.bytes,
             }));
 
             void (await uploadFiles({
-                account: Account.parse(currentApp),
+                account: zAccount.parse(currentApp),
                 compressionQuality: 11,
                 files,
             }));

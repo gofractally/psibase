@@ -1,17 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import { Account } from "@/lib/zodTypes";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const Message = z.object({
     body: z.string(),
     datetime: z.string(),
     isSavedMsg: z.boolean(),
     msgId: z.bigint(),
-    receiver: Account,
-    sender: Account,
+    receiver: zAccount,
+    sender: zAccount,
     subject: z.string(),
 });
 

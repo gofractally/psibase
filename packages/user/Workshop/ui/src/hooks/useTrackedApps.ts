@@ -1,23 +1,21 @@
-import { queryClient } from "@/queryClient";
 import { useLocalStorage } from "@uidotdev/usehooks";
 import { useEffect } from "react";
 import { z } from "zod";
 
-import { Account } from "@/lib/zodTypes";
+import { queryClient } from "@shared/lib/queryClient";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
+import { wait } from "../lib/wait";
 import { appMetadataQueryKey, fetchMetadata } from "./useAppMetadata";
 import { useCurrentApp } from "./useCurrentApp";
-import { wait } from "./wait";
-
-type AccountType = z.infer<typeof Account>;
 
 const AppItem = z.object({
-    account: Account,
+    account: zAccount,
 });
 
 export const Apps = AppItem.array();
 
-const cacheApps = async (accountNames: z.infer<typeof Account>[]) => {
+const cacheApps = async (accountNames: z.infer<typeof zAccount>[]) => {
     for (const account of accountNames) {
         await wait(1000);
         queryClient.prefetchQuery({
@@ -65,7 +63,7 @@ export const useTrackedApps = () => {
         cacheApps(apps.map((app) => app.account));
     }, []);
 
-    const addApp = (newApp: AccountType): void => {
+    const addApp = (newApp: Account): void => {
         const isAlreadyExisting = apps.some((app) => app.account == newApp);
         if (isAlreadyExisting) {
             console.warn(
@@ -78,7 +76,7 @@ export const useTrackedApps = () => {
         );
     };
 
-    const removeApp = (appBeingRemoved: AccountType) => {
+    const removeApp = (appBeingRemoved: Account) => {
         const isExisting = apps.some((app) => app.account == appBeingRemoved);
 
         if (isExisting) {

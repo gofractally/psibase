@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
-import { Account } from "@/lib/zodTypes";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
@@ -15,11 +16,11 @@ export const ConfigResponse = z.object({
 });
 
 export const codeHashQueryKey = (
-    account: z.infer<typeof Account> | undefined | null,
+    account: z.infer<typeof zAccount> | undefined | null,
 ) => ["code", account];
 
 export const useCodeHash = (
-    account: z.infer<typeof Account> | undefined | null,
+    account: z.infer<typeof zAccount> | undefined | null,
 ) =>
     useQuery({
         queryKey: codeHashQueryKey(account),

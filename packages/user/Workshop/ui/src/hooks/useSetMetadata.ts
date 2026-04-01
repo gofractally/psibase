@@ -1,16 +1,17 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
+import { zMetadata } from "@/lib/zod-types";
 
-import { Account, Metadata } from "@/lib/zodTypes";
+import { queryClient } from "@shared/lib/queryClient";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 import { MetadataResponse, appMetadataQueryKey } from "./useAppMetadata";
 
 const Params = z.object({
-    metadata: Metadata,
-    account: Account,
+    metadata: zMetadata,
+    account: zAccount,
 });
 
 export const useSetMetadata = () =>

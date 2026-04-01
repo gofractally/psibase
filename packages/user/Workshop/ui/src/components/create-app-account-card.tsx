@@ -1,7 +1,7 @@
 import { useCreateApp } from "@/hooks/use-create-app";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
-import { Account } from "@/lib/zodTypes";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -32,7 +32,7 @@ export const CreateAppAccountCard = () => {
                     disabled={isPending}
                     onClick={() => {
                         createApp({
-                            account: Account.parse(currentApp),
+                            account: zAccount.parse(currentApp),
                             allowExistingAccount: true,
                         });
                     }}

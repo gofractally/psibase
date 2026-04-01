@@ -1,17 +1,15 @@
-import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import { Account } from "@/lib/zodTypes";
-
+import { queryClient } from "@shared/lib/queryClient";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { codeHashQueryKey } from "./useCodeHash";
 
 const Params = z.object({
-    account: Account,
+    account: zAccount,
     code: z.any(),
 });
 

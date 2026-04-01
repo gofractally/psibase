@@ -6,9 +6,9 @@ import { useAccountStatus } from "@/hooks/useAccountStatus";
 import { useAppMetadata } from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
-import { Account } from "@/lib/zodTypes";
 
 import { Spinner } from "@shared/components/spinner";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const Settings = () => {
     const currentApp = useCurrentApp();
@@ -56,8 +56,7 @@ export const Settings = () => {
                             metadata
                                 ? {
                                       name: metadata.name,
-                                      shortDesc:
-                                          metadata.shortDesc,
+                                      shortDesc: metadata.shortDesc,
                                       longDesc: metadata.longDesc,
                                       icon: metadata.icon,
                                       iconMimeType: metadata.iconMimeType,
@@ -70,7 +69,7 @@ export const Settings = () => {
                                 metadata: {
                                     ...x,
                                 },
-                                account: Account.parse(currentApp),
+                                account: zAccount.parse(currentApp),
                             });
                             return x;
                         }}
