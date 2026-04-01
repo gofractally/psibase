@@ -765,10 +765,13 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message("Pushing transaction");
 
-    let afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url: &args.node_args.api,
-    });
+    let afmt = ActionFormatter::with_schemas(
+        schemas,
+        HttpSchemaFetcher {
+            client: &client,
+            base_url: &args.node_args.api,
+        },
+    );
 
     push_transaction(
         &args.node_args.api,
