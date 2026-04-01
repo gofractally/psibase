@@ -18,4 +18,4 @@ fi
 
 
 rm -rf "$PROJECT_ROOT/db"
-PSIBASE_ADMIN_IP=$HOST_IP psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
+PSIBASE_ADMIN_IP=$HOST_IP exec psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT"
