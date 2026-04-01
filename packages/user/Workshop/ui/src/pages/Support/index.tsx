@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 import relative from "dayjs/plugin/relativeTime";
 import { useNavigate } from "react-router-dom";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
 import { LoadingBlock } from "@/components/LoadingBlock";
 
 import { useCurrentApp } from "@/hooks/useCurrentApp";
@@ -12,6 +11,7 @@ import {
     removeReplyPrefix,
 } from "@/lib/createThreadIdentifier";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { createIdenticon } from "@shared/lib/create-identicon";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";

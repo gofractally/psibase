@@ -2,7 +2,6 @@
 import { ChevronRight, File, Folder, Pencil, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
 import { FileUploader } from "@/components/file-uploader";
 
 import { useRemovePath } from "@/hooks/use-remove-path";
@@ -10,6 +9,7 @@ import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useSiteConfig } from "@/hooks/useSiteConfig";
 import { zPath } from "@/lib/zod-types";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";

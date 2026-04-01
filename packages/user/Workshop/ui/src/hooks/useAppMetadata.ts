@@ -1,11 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-
+import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
-
-import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
 export const Status = z.enum(["draft", "published", "unpublished"]);
 
@@ -49,7 +46,7 @@ export const fetchMetadata = async (account: string) => {
           }
         }
       `,
-            siblingUrl(null, "registry", "graphql"),
+            { service: "registry" },
         );
 
         const parsed = MetadataResponse.parse(res);

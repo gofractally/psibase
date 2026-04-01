@@ -1,5 +1,4 @@
 import { ControlPanel } from "@/components/control-panel";
-import { ErrorCard } from "@/components/error-card";
 import { MetaDataForm } from "@/components/metadata-form";
 
 import { useAccountStatus } from "@/hooks/useAccountStatus";
@@ -7,6 +6,7 @@ import { useAppMetadata } from "@/hooks/useAppMetadata";
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useSetMetadata } from "@/hooks/useSetMetadata";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { Spinner } from "@shared/components/spinner";
 import { zAccount } from "@shared/lib/schemas/account";
 

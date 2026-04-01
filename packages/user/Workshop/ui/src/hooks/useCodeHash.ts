@@ -1,11 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-
+import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
-
-import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
 export const ConfigResponse = z.object({
     code: z
@@ -34,7 +31,7 @@ export const useCodeHash = (
           }
         }
       `,
-                siblingUrl(null, "setcode", "graphql"),
+                { service: "setcode" },
             );
 
             const parsed = ConfigResponse.parse(res);

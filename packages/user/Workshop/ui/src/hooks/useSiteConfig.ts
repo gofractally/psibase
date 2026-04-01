@@ -1,12 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-
+import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
-
-import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
 
 const CSPString = z.string();
 
@@ -76,7 +73,7 @@ export const useSiteConfig = (
               }
               }
               `,
-                    siblingUrl(null, "sites", "graphql"),
+                    { service: "sites" },
                 );
 
                 return SiteConfigResponse.parse(res);
