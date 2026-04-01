@@ -2,8 +2,9 @@ import z from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { type Account, zAccount } from "@shared/lib/schemas/account";
+
 import { graphql } from "./graphql";
-import { Account, zAccount } from "./zod/Account";
 import { zDateTime } from "./zod/DateTime";
 
 const HistoryItem = z.object({

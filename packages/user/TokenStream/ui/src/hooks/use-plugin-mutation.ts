@@ -3,8 +3,7 @@ import z from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { zAccount } from "@/lib/types/account";
-
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const zParams = z.object({

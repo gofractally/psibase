@@ -1,8 +1,7 @@
+import type { Account } from "@shared/lib/schemas/account";
+
 import { identicon } from "@dicebear/collection";
 import { createAvatar } from "@dicebear/core";
-import { z } from "zod";
-
-import { zAccount } from "./zod/Account";
 
 export const createIdenticon = (seed: string): string =>
     createAvatar(identicon, {
@@ -12,7 +11,5 @@ export const createIdenticon = (seed: string): string =>
         scale: 110,
     }).toDataUri();
 
-export const generateAvatar = (
-    chainId: string,
-    account: z.infer<typeof zAccount>,
-) => createIdenticon(chainId + account);
+export const generateAvatar = (chainId: string, account: Account) =>
+    createIdenticon(chainId + account);

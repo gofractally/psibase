@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Params = z.object({

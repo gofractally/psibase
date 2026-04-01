@@ -1909,7 +1909,6 @@ __metadata:
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
-    "@uidotdev/usehooks": "npm:^2.4.1"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
     humanize-duration: "npm:^3.32.2"

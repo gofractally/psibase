@@ -1,16 +1,17 @@
 import type { DraftMessage, Message } from "@/apps/chainmail/types";
 import type { PluginId } from "@psibase/common-lib";
 
-import { zDraftMessage } from "@/apps/chainmail/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PencilIcon, Reply, Send, SquarePen, X } from "lucide-react";
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { zAccount } from "@shared/lib/schemas/account";
+import { zDraftMessage } from "@/apps/chainmail/types";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+import { zAccount } from "@shared/lib/schemas/account";
 import {
     AlertDialog,
     AlertDialogAction,

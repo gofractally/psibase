@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { zAccount } from "./zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const zPackageSource = z
     .object({

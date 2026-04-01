@@ -5,8 +5,8 @@ import z from "zod";
 import { supervisor } from "@/supervisor";
 
 import { TxStatus, checkLastTx } from "@/lib/checkStaging";
-import { zAccount } from "@/lib/zod/Account";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const zParams = z.object({

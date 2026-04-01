@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { Account } from "@/lib/zod/Account";
+import { Account } from "@shared/lib/schemas/account";
 
 import { graphql } from "../graphql";
 

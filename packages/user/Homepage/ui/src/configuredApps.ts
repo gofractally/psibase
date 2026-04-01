@@ -1,10 +1,11 @@
 import { z } from "zod";
 
+import { zAccount } from "@shared/lib/schemas/account";
+
 import { chainMailConfig } from "./apps/chainmail";
 import { contactsConfig } from "./apps/contacts";
 import { tokenSwapConfig } from "./apps/token-swap";
 import { tokensConfig } from "./apps/tokens";
-import { zAccount } from "@shared/lib/schemas/account";
 
 export const AppConfig = z.object({
     service: zAccount,

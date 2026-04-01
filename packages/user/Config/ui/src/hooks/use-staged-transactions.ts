@@ -5,7 +5,8 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 const zResponse = z.object({
     getStaged: z.object({

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { Account, zAccount } from "@/lib/zod/Account";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export type GetCurrentUserRes = string | null;
 

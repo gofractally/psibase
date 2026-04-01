@@ -2,8 +2,9 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { zAccount } from "@shared/lib/schemas/account";
+
 import { graphql } from "./graphql";
-import { zAccount } from "./zod/Account";
 
 const zStagedTx = z.object({
     id: z.number(),

@@ -14,8 +14,8 @@ import { useUsersAndGroups } from "@/hooks/app/use-users";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { arrayMove } from "@/lib/arrayMove";
 import { humanize } from "@/lib/humanize";
-import { zAccount } from "@/lib/zod/Account";
 
+import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import { toast } from "@shared/shadcn/ui/sonner";
 

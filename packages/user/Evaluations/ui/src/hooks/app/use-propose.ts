@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const Params = z.object({
     owner: zAccount,

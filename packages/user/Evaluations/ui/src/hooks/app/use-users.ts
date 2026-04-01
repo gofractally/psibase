@@ -2,7 +2,7 @@ import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { Account } from "@/lib/zod/Account";
+import { type Account } from "@shared/lib/schemas/account";
 
 import {
     FunctionResponse,
