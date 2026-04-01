@@ -3,6 +3,8 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+export RUSTC_WRAPPER=sccache
+
 mkdir -p "$PROJECT_ROOT/build"
 cd "$PROJECT_ROOT/build"
 cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
