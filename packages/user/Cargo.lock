@@ -1550,9 +1550,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
+checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
 
 [[package]]
 name = "heck"
@@ -1884,12 +1884,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.11.4"
+version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b0f83760fb341a774ed326568e19f5a863af4a952def8c39f9ab92fd95b88e5"
+checksum = "7714e70437a7dc3ac8eb7e6f8df75fd8eb422675fc7678aff7364301092b1017"
 dependencies = [
  "equivalent",
- "hashbrown 0.16.0",
+ "hashbrown 0.16.1",
  "serde",
  "serde_core",
 ]
@@ -2455,6 +2455,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "plugin-info"
+version = "0.23.0"
+dependencies = [
+ "plugin-info-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "wasmparser 0.245.1",
+]
+
+[[package]]
+name = "plugin-info-pkg"
+version = "0.23.0"
+dependencies = [
+ "plugin-info",
+ "psibase-user-workspace-hack",
+ "r-plugin-info",
+]
+
+[[package]]
 name = "polyval"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2866,6 +2889,17 @@ dependencies = [
  "psibase_service",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "r-plugin-info"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
 ]
 
 [[package]]
@@ -4367,7 +4401,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fb56df3e06b8e6b77e37d2969a50ba51281029a9aeb3855e76b7f49b6418847"
 dependencies = [
  "leb128",
- "wasmparser",
+ "wasmparser 0.215.0",
 ]
 
 [[package]]
@@ -4383,7 +4417,7 @@ dependencies = [
  "serde_json",
  "spdx",
  "wasm-encoder",
- "wasmparser",
+ "wasmparser 0.215.0",
 ]
 
 [[package]]
@@ -4396,6 +4430,16 @@ dependencies = [
  "bitflags 2.11.0",
  "hashbrown 0.14.5",
  "indexmap",
+ "semver",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.245.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f08c9adee0428b7bddf3890fc27e015ac4b761cc608c822667102b8bfd6995e"
+dependencies = [
+ "bitflags 2.11.0",
  "semver",
 ]
 
@@ -4840,7 +4884,7 @@ dependencies = [
  "serde_json",
  "wasm-encoder",
  "wasm-metadata",
- "wasmparser",
+ "wasmparser 0.215.0",
  "wit-parser",
 ]
 
@@ -4859,7 +4903,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "unicode-xid",
- "wasmparser",
+ "wasmparser 0.215.0",
 ]
 
 [[package]]
