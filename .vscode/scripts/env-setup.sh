@@ -18,6 +18,9 @@ cd "$WORKSPACE_ROOT/packages"
 yarn
 yarn dlx @yarnpkg/sdks vscode
 
+# Update submodules
+git submodule update --init --recursive
+
 # Symlink optional agent configuration(s)
 CONF_DIR=".cursor"
 if [ -L "$WORKSPACE_ROOT/$CONF_DIR" ]; then
