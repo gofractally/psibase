@@ -2,7 +2,6 @@ import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 
 import { useBranding } from "@shared/hooks/use-branding";
@@ -25,13 +24,12 @@ export const Loader = () => {
     const navigate = useNavigate();
 
     const { apps } = useTrackedApps();
-    const [expectCurrentUser] = useExpectCurrentUser();
 
     useEffect(() => {
-        if (apps.length > 0 && (expectCurrentUser || currentUser)) {
+        if (apps.length > 0 && currentUser) {
             navigate(`/app/${apps[0]!.account}`);
         }
-    }, [apps, navigate, expectCurrentUser, currentUser]);
+    }, [apps, navigate, currentUser]);
 
     const { data: networkName } = useBranding();
 

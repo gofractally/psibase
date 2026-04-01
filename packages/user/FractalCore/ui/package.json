@@ -12,7 +12,6 @@
         "@tanstack/react-form": "^1.11.1",
         "@tanstack/react-pacer": "^0.6.0",
         "@tanstack/react-query": "^5.90.6",
-        "@uidotdev/usehooks": "^2.4.1",
         "dayjs": "^1.11.13",
         "humanize-duration": "^3.32.2",
         "lucide-react": "^0.475.0",

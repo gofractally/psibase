@@ -50,7 +50,11 @@ export function NavMain() {
             </SidebarGroupLabel>
             <SidebarMenu>
                 {appMenus.map((item) => (
-                    <NavLink to={`/app/${appName}/${item.path}`} end>
+                    <NavLink
+                        to={`/app/${appName}/${item.path}`}
+                        key={item.path}
+                        end
+                    >
                         {({ isActive }) => (
                             <SidebarMenuItem
                                 className={cn({
