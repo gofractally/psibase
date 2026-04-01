@@ -379,7 +379,7 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                 .entry(service)
                 .or_insert_with(|| {
                     let storage = self.storage.clone();
-                    let fut = async move {
+                    let fut: PinType = Box::pin(async move {
                         let schema = storage
                             .fetcher
                             .fetch_schema(service)
@@ -387,9 +387,8 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
                             .map_err(|e| Rc::new(Cell::new(e)))?;
                         storage.schemas.borrow_mut().insert(service, schema);
                         Ok(())
-                    };
-                    let xxx: PinType = Box::pin(fut);
-                    xxx.shared()
+                    });
+                    fut.shared()
                 })
                 .clone();
             if let Err(e) = fut.await {
