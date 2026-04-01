@@ -5,6 +5,7 @@ use bindings::auth_sig::plugin::keyvault as AuthSigKeyVault;
 use bindings::exports::prem_accounts::plugin::admin::Guest as Admin;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
+use bindings::exports::prem_accounts::plugin::queries::MarketPrice;
 use bindings::host::common::client as HostClient;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
@@ -14,28 +15,26 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use psibase::define_trust;
 use psibase::fracpack::Pack;
-use psibase::services::tokens::{Precision, Quantity};
-
 mod errors;
 use errors::ErrorType;
 use psibase::services::invite::SubjectPublicKeyInfo;
 
 define_trust! {
     descriptions {
-        Low => "
-        Low trust grants these abilities:
-            - Querying account prices
-        ",
+        Low => "",
         Medium => "
         Medium trust grants the abilities of the Low trust level, plus these abilities:
-            - Purchasing premium account names
             - Claiming premium account names
         ",
-        High => "",
+        High => "
+        High trust grants the abilities of the Low trust level, plus these abilities:
+            - Purchasing premium account names
+        ",
     }
     functions {
-        Low => [get_prices],
-        High => [buy, claim],
+        Low => [],
+        Medium => [claim],
+        High => [buy],
     }
 }
 
@@ -46,8 +45,21 @@ impl Admin for PremAccountsPlugin {
         if HostClient::get_sender() != "config" {
             return Err(ErrorType::UpdateMarketStatusCallerDenied.into());
         }
-        let packed = prem_accounts::action_structs::update_market_status { length, enable }.packed();
+        let packed =
+            prem_accounts::action_structs::update_market_status { length, enable }.packed();
         add_action_to_transaction("update_market_status", &packed)?;
+        Ok(())
+    }
+
+    fn add_market(length: u8) -> Result<(), Error> {
+        if HostClient::get_sender() != "config" {
+            return Err(ErrorType::AddMarketCallerDenied.into());
+        }
+        if length < 1 || length > 15 {
+            return Err(ErrorType::AddMarketLengthInvalid.into());
+        }
+        let packed = prem_accounts::action_structs::add_market { length }.packed();
+        add_action_to_transaction("add_market", &packed)?;
         Ok(())
     }
 }
@@ -58,7 +70,27 @@ impl Api for PremAccountsPlugin {
 
         let service_account = "prem-accounts";
 
-        let sys_token_id = TokensHelpers::fetch_network_token()?.unwrap();
+        let sys_token_id = match TokensHelpers::fetch_network_token()? {
+            Some(id) => id,
+            None => return Err(ErrorType::SystemTokenNotDefined.into()),
+        };
+
+        let max_cost = max_cost.trim().to_string();
+        if max_cost.is_empty() {
+            return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
+        }
+
+        let max_cost_u64 = match TokensHelpers::decimal_to_u64(sys_token_id, &max_cost) {
+            Ok(v) => v,
+            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
+        };
+        let canonical = match TokensHelpers::u64_to_decimal(sys_token_id, max_cost_u64) {
+            Ok(v) => v,
+            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
+        };
+        if canonical != max_cost {
+            return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
+        }
 
         TokensUser::credit(
             sys_token_id,
@@ -69,9 +101,7 @@ impl Api for PremAccountsPlugin {
 
         let packed_buy_args = prem_accounts::action_structs::buy {
             account: account.clone(),
-            max_cost: Quantity::from_str(&max_cost, Precision::new(4).unwrap())
-                .unwrap()
-                .value,
+            max_cost: max_cost_u64,
         }
         .packed();
 
@@ -122,22 +152,29 @@ impl Api for PremAccountsPlugin {
     }
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GetPricesResponse {
     data: GetPricesData,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GetPricesData {
-    get_prices: Vec<u64>,
+    get_prices: Vec<MarketPriceDto>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketPriceDto {
+    length: u8,
+    price: psibase::services::tokens::Decimal,
 }
 
 impl Queries for PremAccountsPlugin {
     // TODO: Should this query also be an action for srv-to-srv calls?
-    fn get_prices() -> Result<Vec<u64>, Error> {
-        let graphql_str = "query { getPrices }";
+    fn get_prices() -> Result<Vec<MarketPrice>, Error> {
+        let graphql_str = "query { getPrices { length price } }";
 
         let response = serde_json::from_str::<GetPricesResponse>(
             &CommonServer::post_graphql_get_json(&graphql_str)?,
@@ -146,7 +183,15 @@ impl Queries for PremAccountsPlugin {
         let response =
             response.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
 
-        Ok(response.data.get_prices)
+        Ok(response
+            .data
+            .get_prices
+            .into_iter()
+            .map(|row| MarketPrice {
+                length: row.length,
+                price: row.price.to_string(),
+            })
+            .collect())
     }
 }
 

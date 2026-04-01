@@ -6,7 +6,7 @@ import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
 const zMarketRow = z.object({
-    length: z.number().int().min(1).max(9),
+    length: z.number().int().min(1).max(15),
     enabled: z.boolean(),
 });
 

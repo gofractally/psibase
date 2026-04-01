@@ -4,6 +4,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use diff_adjust::tables::RateLimitTable;
     use prem_accounts::tables::{AuctionsTable, PurchasedAccountsTable};
+    use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -12,6 +13,18 @@ mod service {
     struct MarketStatus {
         length: u8,
         enabled: bool,
+    }
+
+    #[derive(SimpleObject)]
+    struct MarketPrice {
+        length: u8,
+        price: Decimal,
+    }
+
+    #[derive(SimpleObject)]
+    struct BoughtNamesByLength {
+        length: u8,
+        names: Vec<String>,
     }
 
     #[derive(Deserialize, SimpleObject)]
@@ -33,6 +46,11 @@ mod service {
                 _ => "unknown".to_string(),
             }
         }
+
+        /// UTF-8 length of the premium account name (same convention as on-chain markets).
+        pub async fn length(&self) -> u8 {
+            self.account.to_string().len() as u8
+        }
     }
 
     struct Query {
@@ -53,62 +71,75 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Get prices for account name lengths 1-9
-        /// Returns array where index 0 = price for length-1 names, index 8 = price for length-9 names
-        async fn getPrices(&self) -> Vec<u64> {
+        /// Current prices for each configured premium name-length market (sparse, up to 15 markets).
+        /// Returns an empty list when the system token is not configured (avoids GraphQL failure).
+        async fn getPrices(&self) -> Vec<MarketPrice> {
+            let Some(token) = TokensWrapper::call().getSysToken() else {
+                return vec![];
+            };
+            let precision = token.precision;
             let auctions_table = AuctionsTable::read();
-            let mut prices = Vec::new();
-
-            for length in 1..=9 {
-                if let Some(auction) = auctions_table.get_index_pk().get(&length) {
-                    // Get the rate limit and calculate current difficulty
-                    if let Some(mut rate_limit) =
-                        RateLimitTable::read().get_index_pk().get(&auction.nft_id)
-                    {
-                        // Update difficulty if needed (this calculates the current difficulty)
-                        let current_difficulty = rate_limit.check_difficulty_decrease();
-                        prices.push(current_difficulty);
-                    } else {
-                        prices.push(0);
+            let rate_table = RateLimitTable::read();
+            let mut rows: Vec<MarketPrice> = auctions_table
+                .get_index_pk()
+                .iter()
+                .map(|auction| {
+                    let raw = rate_table
+                        .get_index_pk()
+                        .get(&auction.nft_id)
+                        .map(|mut rate_limit| rate_limit.check_difficulty_decrease())
+                        .unwrap_or(0);
+                    MarketPrice {
+                        length: auction.length,
+                        price: Decimal::new(Quantity::from(raw), precision),
                     }
-                } else {
-                    prices.push(0);
-                }
-            }
-
-            prices
+                })
+                .collect();
+            rows.sort_by_key(|r| r.length);
+            rows
         }
 
-        /// Status (enabled/disabled) for each premium name-length market (lengths 1–9).
+        /// Status (enabled/disabled) for each configured premium name-length market (sparse).
         async fn marketsStatus(&self) -> Vec<MarketStatus> {
             let auctions_table = AuctionsTable::read();
-            (1..=9u8)
-                .map(|length| {
-                    let enabled = auctions_table
-                        .get_index_pk()
-                        .get(&length)
-                        .map(|a| a.enabled)
-                        .unwrap_or(false);
-                    MarketStatus { length, enabled }
+            let mut rows: Vec<MarketStatus> = auctions_table
+                .get_index_pk()
+                .iter()
+                .map(|a| MarketStatus {
+                    length: a.length,
+                    enabled: a.enabled,
                 })
-                .collect()
+                .collect();
+            rows.sort_by_key(|r| r.length);
+            rows
         }
 
-        /// Returns a list of account names (strings) bought but not yet claimed by the authenticated user
-        async fn getBoughtNames(&self, user: AccountNumber) -> async_graphql::Result<Vec<String>> {
+        /// Bought-but-unclaimed names for the user, grouped by name length (sparse: only lengths with names).
+        async fn getBoughtNames(
+            &self,
+            user: AccountNumber,
+        ) -> async_graphql::Result<Vec<BoughtNamesByLength>> {
             self.check_user_auth(user)?;
 
             let purchased_table = PurchasedAccountsTable::read();
-            let mut names = Vec::new();
+            let mut by_length: std::collections::BTreeMap<u8, Vec<String>> =
+                std::collections::BTreeMap::new();
 
-            // TODO: This would be more efficient with a secondary index on owner
             for record in purchased_table.get_index_pk().iter() {
                 if record.owner == user {
-                    names.push(record.account.to_string());
+                    let name = record.account.to_string();
+                    let len = name.len() as u8;
+                    by_length.entry(len).or_default().push(name);
                 }
             }
 
-            Ok(names)
+            Ok(by_length
+                .into_iter()
+                .map(|(length, mut names)| {
+                    names.sort();
+                    BoughtNamesByLength { length, names }
+                })
+                .collect())
         }
 
         /// Returns a paginated subset of all historical events (that haven't yet been pruned

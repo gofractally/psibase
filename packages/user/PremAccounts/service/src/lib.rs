@@ -70,6 +70,21 @@ pub mod service {
     use psibase::*;
 
     const INIT_DIFFICULTY: u64 = 1000;
+    const MIN_NAME_MARKET_LENGTH: u8 = 1;
+    const MAX_NAME_MARKET_LENGTH: u8 = 15;
+
+    fn register_prem_acct_event_indices() {
+        let add_index = |method: &str, column: u8| {
+            events::Wrapper::call().addIndex(
+                DbId::HistoryEvent,
+                Wrapper::SERVICE,
+                MethodNumber::from(method),
+                column,
+            );
+        };
+        add_index("premAcctEvent", 0);
+        add_index("premAcctEvent", 1);
+    }
 
     fn new_account(name: AccountNumber) {
         Accounts::Wrapper::call().newAccount(name, AuthAny::SERVICE, true);
@@ -106,10 +121,9 @@ pub mod service {
         Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nfts::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
 
-        // Create DiffAdjust records for account name lengths 1 through 9
+        // Bootstrap default premium markets for name lengths 1–9 (more lengths: `add_market`).
         let auctions_table = AuctionsTable::new();
         for length in 1..=9 {
-            // Create a DiffAdjust rate limiter for this length
             let nft_id = DiffAdjust::call().create(
                 INIT_DIFFICULTY, // initial_difficulty
                 86400,           // window_seconds (1 day)
@@ -127,19 +141,8 @@ pub mod service {
                     enabled: true,
                 })
                 .unwrap();
-
-            let add_index = |method: &str, column: u8| {
-                events::Wrapper::call().addIndex(
-                    DbId::HistoryEvent,
-                    Wrapper::SERVICE,
-                    MethodNumber::from(method),
-                    column,
-                );
-            };
-
-            add_index("premAcctEvent", 0);
-            add_index("premAcctEvent", 1);
         }
+        register_prem_acct_event_indices();
     }
 
     #[pre_action(exclude(init))]
@@ -168,8 +171,8 @@ pub mod service {
 
         let length = account.len() as u8;
         check(
-            length >= 1 && length <= 9,
-            "account name must be 1-9 characters",
+            length >= MIN_NAME_MARKET_LENGTH && length <= MAX_NAME_MARKET_LENGTH,
+            "account name must be 1-15 characters",
         );
 
         let sys_token = check_some(
@@ -279,11 +282,33 @@ pub mod service {
     }
 
     #[action]
+    fn add_market(length: u8) {
+        check_init();
+        check(
+            length >= MIN_NAME_MARKET_LENGTH && length <= MAX_NAME_MARKET_LENGTH,
+            "market name length must be 1-15",
+        );
+        let auctions_table = AuctionsTable::new();
+        check(
+            auctions_table.get_index_pk().get(&length).is_none(),
+            "market already exists",
+        );
+        let nft_id = DiffAdjust::call().create(INIT_DIFFICULTY, 86400, 1, 10, 100, 50000, 50000);
+        auctions_table
+            .put(&Auction {
+                length,
+                nft_id,
+                enabled: true,
+            })
+            .unwrap();
+    }
+
+    #[action]
     fn update_market_status(length: u8, enable: bool) {
         check_init();
         check(
-            length >= 1 && length <= 9,
-            "market name length must be 1-9",
+            length >= MIN_NAME_MARKET_LENGTH && length <= MAX_NAME_MARKET_LENGTH,
+            "market name length must be 1-15",
         );
         let auctions_table = AuctionsTable::new();
         let mut auction = check_some(

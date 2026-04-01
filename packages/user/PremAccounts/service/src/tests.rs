@@ -125,7 +125,7 @@ mod tests {
             .pointer("/data/marketsStatus")
             .and_then(|v| v.as_array())
             .expect("marketsStatus array");
-        assert_eq!(status.len(), 9);
+        assert_eq!(status.len(), 9, "sparse row per configured market after init");
 
         let alice = AccountNumber::from("alice");
         PremAccounts::push_from(&chain, alice)
@@ -142,6 +142,151 @@ mod tests {
             .find(|v| v.get("length") == Some(&serde_json::json!(6)))
             .expect("row for length 6");
         assert_eq!(row6.get("enabled"), Some(&serde_json::json!(false)));
+
+        Ok(())
+    }
+
+    /// `add_market` creates a new auction row; `getPrices` returns sparse `{ length, price }` nodes.
+    #[psibase::test_case(packages("PremAccounts"))]
+    fn test_add_market_and_get_prices_graphql(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.finish_block();
+        if let Err(e) = initial_setup(&chain) {
+            if e.to_string().contains("not initialized") {
+                chain.finish_block();
+                initial_setup(&chain)?;
+            } else {
+                return Err(e);
+            }
+        }
+
+        let alice = AccountNumber::from("alice");
+        PremAccounts::push_from(&chain, alice).add_market(10).get()?;
+
+        let raw: serde_json::Value = chain.graphql(
+            AccountNumber::from("prem-accounts"),
+            "query { getPrices { length price } }",
+        )?;
+        let rows = raw
+            .pointer("/data/getPrices")
+            .and_then(|v| v.as_array())
+            .expect("getPrices array");
+        assert!(
+            rows.iter().any(|v| v.get("length") == Some(&serde_json::json!(10))),
+            "expected length-10 market in getPrices: {rows:?}"
+        );
+
+        Ok(())
+    }
+
+    /// Second `add_market` for the same length fails.
+    #[psibase::test_case(packages("PremAccounts"))]
+    fn test_add_market_duplicate_fails(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.finish_block();
+        if let Err(e) = initial_setup(&chain) {
+            if e.to_string().contains("not initialized") {
+                chain.finish_block();
+                initial_setup(&chain)?;
+            } else {
+                return Err(e);
+            }
+        }
+
+        let alice = AccountNumber::from("alice");
+        PremAccounts::push_from(&chain, alice).add_market(10).get()?;
+
+        let err = PremAccounts::push_from(&chain, alice)
+            .add_market(10)
+            .trace
+            .error
+            .expect("duplicate add_market should fail");
+        assert!(
+            err.contains("market already exists"),
+            "unexpected error: {err}"
+        );
+
+        Ok(())
+    }
+
+    /// `add_market` for a length that already exists from `init` fails.
+    #[psibase::test_case(packages("PremAccounts"))]
+    fn test_add_market_init_length_rejected(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.finish_block();
+        if let Err(e) = initial_setup(&chain) {
+            if e.to_string().contains("not initialized") {
+                chain.finish_block();
+                initial_setup(&chain)?;
+            } else {
+                return Err(e);
+            }
+        }
+
+        let alice = AccountNumber::from("alice");
+        let err = PremAccounts::push_from(&chain, alice)
+            .add_market(3)
+            .trace
+            .error
+            .expect("add_market for existing init market should fail");
+        assert!(
+            err.contains("market already exists"),
+            "unexpected error: {err}"
+        );
+
+        Ok(())
+    }
+
+    /// `add_market` rejects lengths outside 1–15 (aligns with Config UI validation).
+    #[psibase::test_case(packages("PremAccounts"))]
+    fn test_add_market_invalid_length_rejected(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.finish_block();
+        if let Err(e) = initial_setup(&chain) {
+            if e.to_string().contains("not initialized") {
+                chain.finish_block();
+                initial_setup(&chain)?;
+            } else {
+                return Err(e);
+            }
+        }
+
+        let alice = AccountNumber::from("alice");
+        for length in [0u8, 16u8] {
+            let err = PremAccounts::push_from(&chain, alice)
+                .add_market(length)
+                .trace
+                .error
+                .unwrap_or_else(|| panic!("add_market({length}) should fail"));
+            assert!(
+                err.contains("market name length must be 1-15"),
+                "unexpected error for length {length}: {err}"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// After `add_market`, `buy` succeeds for a name whose UTF-8 length matches that market.
+    #[psibase::test_case(packages("PremAccounts"))]
+    fn test_buy_succeeds_for_sparse_market_length(chain: psibase::Chain) -> Result<(), psibase::Error> {
+        chain.finish_block();
+        if let Err(e) = initial_setup(&chain) {
+            if e.to_string().contains("not initialized") {
+                chain.finish_block();
+                initial_setup(&chain)?;
+            } else {
+                return Err(e);
+            }
+        }
+
+        let alice = AccountNumber::from("alice");
+
+        Tokens::push_from(&chain, alice)
+            .credit(1, "prem-accounts".into(), 1000_0000u64.into(), "".into())
+            .get()?;
+
+        PremAccounts::push_from(&chain, alice).add_market(10).get()?;
+
+        PremAccounts::push_from(&chain, alice)
+            .buy("abcdefghij".to_string(), 1000_0000u64)
+            .get()?;
 
         Ok(())
     }

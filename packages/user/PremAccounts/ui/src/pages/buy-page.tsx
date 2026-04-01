@@ -1,6 +1,6 @@
 import type { PremAccountsOutletContext } from "@/components/prem-accounts-main";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
@@ -8,7 +8,9 @@ import { siblingUrl } from "@psibase/common-lib";
 import {
     PREM_ACCOUNTS_SERVICE,
     doesAccountExist,
-    formatPrice,
+    formatCanonicalTokenAmount,
+    isCanonicalTokenDecimal,
+    unitTokenAmountCanonical,
 } from "@/lib/prem-service";
 
 import { supervisor } from "@shared/lib/supervisor";
@@ -18,17 +20,21 @@ import { Label } from "@shared/shadcn/ui/label";
 
 export function BuyPage() {
     const { bumpHistory } = useOutletContext<PremAccountsOutletContext>();
-    const defaultMaxCost = "1.0000";
+    const maxCostDefaultSynced = useRef(false);
     const [accountName, setAccountName] = useState("");
     const [accountExists, setAccountExists] = useState<boolean | null>(null);
-    const [price, setPrice] = useState<number | null>(null);
+    /** Canonical network-token decimal string for the current ask (from `getPrices`). */
+    const [price, setPrice] = useState<string | null>(null);
     const [systemToken, setSystemToken] = useState<{
         precision: number;
         symbol?: string;
         id?: number;
     } | null>(null);
-    const [maxCost, setMaxCost] = useState(defaultMaxCost);
-    const [prices, setPrices] = useState<number[]>([]);
+    const [maxCost, setMaxCost] = useState("1.0000");
+    /** Map name length → canonical price string (from sparse `getPrices` markets). */
+    const [priceByLength, setPriceByLength] = useState<Map<number, string>>(
+        () => new Map(),
+    );
     const [hasLoadedPrices, setHasLoadedPrices] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
@@ -82,6 +88,10 @@ export function BuyPage() {
                     symbol: token.symbol,
                     id: sysTid,
                 });
+                if (!maxCostDefaultSynced.current) {
+                    setMaxCost(unitTokenAmountCanonical(token.precision));
+                    maxCostDefaultSynced.current = true;
+                }
             }
         } catch (e) {
             console.error("Failed to load system token:", e);
@@ -97,28 +107,40 @@ export function BuyPage() {
                 params: [],
             })) as unknown;
 
-            let pricesAsNumbers: number[];
-            if (pricesArray instanceof BigUint64Array) {
-                pricesAsNumbers = [];
-                for (let i = 0; i < pricesArray.length; i++) {
-                    pricesAsNumbers.push(Number(pricesArray[i]));
+            const next = new Map<number, string>();
+            if (Array.isArray(pricesArray)) {
+                for (const row of pricesArray) {
+                    if (
+                        row &&
+                        typeof row === "object" &&
+                        "length" in row &&
+                        "price" in row
+                    ) {
+                        const len = Number(
+                            (row as { length: unknown }).length,
+                        );
+                        const rawPrice = (row as { price: unknown }).price;
+                        const priceStr =
+                            typeof rawPrice === "string"
+                                ? rawPrice.trim()
+                                : rawPrice != null
+                                  ? String(rawPrice).trim()
+                                  : "";
+                        if (
+                            Number.isFinite(len) &&
+                            len >= 1 &&
+                            len <= 15 &&
+                            priceStr.length > 0
+                        ) {
+                            next.set(len, priceStr);
+                        }
+                    }
                 }
-            } else if (Array.isArray(pricesArray)) {
-                pricesAsNumbers = pricesArray.map((p) => {
-                    if (typeof p === "bigint") {
-                        return Number(p);
-                    }
-                    if (typeof p === "string") {
-                        return Number(p);
-                    }
-                    return p as number;
-                });
             } else {
                 console.error("Unexpected prices format:", pricesArray);
-                pricesAsNumbers = [];
             }
 
-            setPrices(pricesAsNumbers);
+            setPriceByLength(next);
         } catch (e) {
             console.error("Failed to load prices:", e);
         } finally {
@@ -142,7 +164,7 @@ export function BuyPage() {
                 return;
             }
 
-            if (accountName.length < 1 || accountName.length > 9) {
+            if (accountName.length < 1 || accountName.length > 15) {
                 setAccountExists(null);
                 setPrice(null);
                 return;
@@ -151,14 +173,10 @@ export function BuyPage() {
             const exists = await doesAccountExist(accountName);
             setAccountExists(exists);
 
-            if (!exists && prices.length > 0) {
+            if (!exists && priceByLength.size > 0) {
                 const length = accountName.length;
-                const priceIndex = length - 1;
-                if (priceIndex >= 0 && priceIndex < prices.length) {
-                    setPrice(prices[priceIndex]);
-                } else {
-                    setPrice(null);
-                }
+                const p = priceByLength.get(length);
+                setPrice(p !== undefined ? p : null);
             } else {
                 setPrice(null);
             }
@@ -168,7 +186,7 @@ export function BuyPage() {
             void checkAccount();
         }, 500);
         return () => clearTimeout(timeoutId);
-    }, [accountName, prices]);
+    }, [accountName, priceByLength]);
 
     const handleBuy = async () => {
         if (!accountName || accountExists !== false || price === null) {
@@ -195,7 +213,11 @@ export function BuyPage() {
             setAccountName("");
             setAccountExists(null);
             setPrice(null);
-            setMaxCost(defaultMaxCost);
+            setMaxCost(
+                systemToken != null
+                    ? unitTokenAmountCanonical(systemToken.precision)
+                    : "1.0000",
+            );
             await loadPrices();
             bumpHistory();
             setTimeout(() => setBuySuccessMessage(""), 5000);
@@ -214,22 +236,23 @@ export function BuyPage() {
         systemToken?.symbol ??
         (systemToken?.id != null ? `token ${systemToken.id}` : "SysToken");
     const isBuyEnabled =
+        systemToken != null &&
+        isCanonicalTokenDecimal(maxCost, systemToken.precision) &&
         accountName.length >= 1 &&
-        accountName.length <= 9 &&
+        accountName.length <= 15 &&
         accountExists === false &&
         price !== null &&
-        maxCost.trim().length > 0 &&
         !isLoading;
 
-    const priceIndex =
-        accountName.length >= 1 && accountName.length <= 9
-            ? accountName.length - 1
-            : -1;
+    const nameLen =
+        accountName.length >= 1 && accountName.length <= 15
+            ? accountName.length
+            : 0;
     const noMarketForNameLength =
         hasLoadedPrices &&
         accountExists === false &&
-        priceIndex >= 0 &&
-        (prices.length === 0 || priceIndex >= prices.length);
+        nameLen > 0 &&
+        !priceByLength.has(nameLen);
 
     return (
         <div className="mt-2">
@@ -248,7 +271,7 @@ export function BuyPage() {
                             setBuySuccessMessage("");
                         }}
                         value={accountName}
-                        placeholder="Enter 1-9 character name"
+                        placeholder="Enter 1-15 character name"
                     />
                 </div>
 
@@ -266,7 +289,11 @@ export function BuyPage() {
                             setError("");
                             setBuySuccessMessage("");
                         }}
-                        placeholder={defaultMaxCost}
+                        placeholder={
+                            systemToken != null
+                                ? unitTokenAmountCanonical(systemToken.precision)
+                                : "1.0000"
+                        }
                     />
                 </div>
                 <div className="col-span-6 mt-6 font-medium">
@@ -289,7 +316,7 @@ export function BuyPage() {
                     {!error &&
                         !buySuccessMessage &&
                         accountName.length > 0 &&
-                        accountName.length <= 9 && (
+                        accountName.length <= 15 && (
                             <div>
                                 {accountExists === true && (
                                     <p className="text-red-500">
@@ -299,9 +326,8 @@ export function BuyPage() {
                                 {accountExists === false && price !== null && (
                                     <p className="text-green-600">
                                         Buy for{" "}
-                                        {formatPrice(
+                                        {formatCanonicalTokenAmount(
                                             price,
-                                            systemToken?.precision,
                                             systemToken?.symbol,
                                         )}
                                     </p>

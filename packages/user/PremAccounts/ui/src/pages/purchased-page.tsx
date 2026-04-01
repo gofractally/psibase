@@ -36,19 +36,27 @@ export function PurchasedPage() {
                 body: JSON.stringify({
                     query: `
                         query {
-                            getBoughtNames(user: "${loggedInUser}")
+                            getBoughtNames(user: "${loggedInUser}") {
+                                length
+                                names
+                            }
                         }
                     `,
                 }),
             });
             const data = (await response.json()) as {
-                data?: { getBoughtNames?: string[] };
+                data?: {
+                    getBoughtNames?: Array<{ length: number; names: string[] }>;
+                };
                 errors?: Array<{ message: string }>;
             };
             if (data.errors) {
                 throw new Error(data.errors[0].message);
             }
-            setBoughtNames(data.data?.getBoughtNames || []);
+            const rows = data.data?.getBoughtNames ?? [];
+            const flat = rows.flatMap((r) => r.names);
+            flat.sort();
+            setBoughtNames(flat);
         } catch (e) {
             console.error("Failed to load bought names:", e);
             setBoughtNames([]);

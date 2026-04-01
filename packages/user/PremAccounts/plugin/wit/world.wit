@@ -3,9 +3,13 @@ package prem-accounts:plugin;
 interface admin {
     use host:types/types.{error};
 
-    /// Enable or disable new purchases for n-character premium names (`length` 1–9).
+    /// Enable or disable new purchases for n-character premium names (`length` 1–15).
     /// Only the Config app may call this (see plugin whitelist).
     update-market-status: func(length: u8, enable: bool) -> result<_, error>;
+
+    /// Add a new name-length market (`length` 1–15). Fails if that market already exists.
+    /// Only the Config app may call this (see plugin whitelist).
+    add-market: func(length: u8) -> result<_, error>;
 }
 
 interface api {
@@ -16,7 +20,14 @@ interface api {
 
 interface queries {
     use host:types/types.{error};
-    get-prices: func() -> result<list<u64>, error>;
+
+    /// `price` is the canonical network-token decimal string for the current ask (matches token precision).
+    record market-price {
+        length: u8,
+        price: string,
+    }
+
+    get-prices: func() -> result<list<market-price>, error>;
 }
 
 world imports {
