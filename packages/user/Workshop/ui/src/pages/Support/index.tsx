@@ -7,13 +7,13 @@ import { LoadingBlock } from "@/components/LoadingBlock";
 
 import { useCurrentApp } from "@/hooks/useCurrentApp";
 import { useMessages } from "@/hooks/useMessages";
-import { createIdenticon } from "@/lib/createIdenticon";
 import {
     getThreadIdentifier,
     removeReplyPrefix,
 } from "@/lib/createThreadIdentifier";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { createIdenticon } from "@shared/lib/create-identicon";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
 dayjs.extend(relative);

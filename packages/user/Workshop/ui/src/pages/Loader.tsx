@@ -2,11 +2,12 @@ import { Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useExpectCurrentUser } from "@/hooks/useExpectCurrentUser";
 import { useTrackedApps } from "@/hooks/useTrackedApps";
 
 import { useBranding } from "@shared/hooks/use-branding";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -17,10 +18,10 @@ import {
 } from "@shared/shadcn/ui/card";
 
 import { CreateAppModal } from "../components/create-app-modal";
-import { LoginButton } from "../components/login-button";
 
 export const Loader = () => {
     const { data: currentUser } = useCurrentUser();
+    const { mutate: login, isPending } = useConnectAccount();
     const navigate = useNavigate();
 
     const { apps } = useTrackedApps();
@@ -72,7 +73,9 @@ export const Loader = () => {
                             Add app
                         </Button>
                     ) : (
-                        <LoginButton />
+                        <Button disabled={isPending} onClick={() => login()}>
+                            Login
+                        </Button>
                     )}
                 </CardFooter>
             </CardHeader>
