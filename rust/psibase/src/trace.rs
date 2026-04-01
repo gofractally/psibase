@@ -490,10 +490,15 @@ fn format_pruned_json(
     use serde_json::Value::*;
     match value {
         String(s) if s.len() > 20 => {
+            let end = s
+                .char_indices()
+                .map(|(i, _)| i)
+                .find(|i| *i >= 20)
+                .unwrap_or(s.len());
             write!(
                 writer,
                 "{}",
-                serde_json::to_string(&(s[..s.ceil_char_boundary(20)].to_string() + "…")).unwrap()
+                serde_json::to_string(&(s[..end].to_string() + "…")).unwrap()
             )?;
         }
         Array(a) => {
