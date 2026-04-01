@@ -391,19 +391,12 @@ namespace SystemService
          return value->data;
       }
 
-      bool canDecompress(const std::string& encoding)
-      {
-         return get_decompressor(encoding).has_value();
-      }
-
       std::vector<char> getUncompressedContent(const std::vector<char>& content,
                                                const std::string&       encoding)
       {
          auto decompressor = get_decompressor(encoding);
-         if (!decompressor)
-         {
-            abortMessage("Requested encoding not supported.");
-         }
+         check(decompressor.has_value(), "Decompression of this content is not supported.");
+
          auto decompressorAccount = AccountNumber{*decompressor};
          check(to<Accounts>().exists(decompressorAccount),
                "[Fallback decompression error] Decompressor account not found");
@@ -501,7 +494,7 @@ namespace SystemService
                   {
                      // If identity is accepted and we can decompress the content, do that
                      // Otherwise, 406
-                     if (!is_accepted("identity") || !canDecompress(encoding))
+                     if (!is_accepted("identity") || !get_decompressor(encoding).has_value())
                      {
                         return make406("Requested encoding not supported.");
                      }
@@ -587,9 +580,10 @@ namespace SystemService
       return !!content;
    }
 
-   std::optional<SitesContentRow> Sites::getDetails(AccountNumber site, std::string path)
+   std::optional<SitesContentRow> Sites::getProps(AccountNumber site, std::string path)
    {
-      return getContentRow(site, path);
+      auto target = normalizeTarget(path);
+      return getContentRow(site, target);
    }
 
    std::vector<char> Sites::getData(AccountNumber site, std::string path, bool decompress)
@@ -601,9 +595,6 @@ namespace SystemService
       {
          return getRawData(*content);
       }
-
-      check(canDecompress(*content->contentEncoding),
-            "Decompression of this content is not supported.");
 
       return getUncompressedContent(getRawData(*content), *content->contentEncoding);
    }
@@ -757,6 +748,7 @@ namespace SystemService
 
          auto getDefaultCsp() const -> std::string { return DEFAULT_CSP_HEADER; }
 
+         /// Gets the site config for a given site
          auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
             auto tables = Sites::Tables{service, KvMode::read};
@@ -771,6 +763,7 @@ namespace SystemService
                               .proxy     = record.proxyAccount ? record.proxyAccount->str() : ""};
          }
 
+         /// Gets all file properties for a given site
          auto getContent(AccountNumber account) const
          {
             auto tables = Sites::Tables{service, KvMode::read};
@@ -786,7 +779,8 @@ namespace SystemService
                                          });
          }
 
-         auto getDetailsAt(AccountNumber account,
+         /// Gets the file properties for a given site and path
+         auto getContentAt(AccountNumber account,
                            std::string   path) const -> std::optional<SitesContentRow>
          {
             auto row = SystemService::getContentRow(account, normalizeTarget(path));
@@ -802,7 +796,7 @@ namespace SystemService
       PSIO_REFLECT(Query,                                //
                    method(getConfig, account),           //
                    method(getContent, account),          //
-                   method(getDetailsAt, account, path),  //
+                   method(getContentAt, account, path),  //
                    method(getDefaultCsp)                 //
       );
    }  // namespace

@@ -120,7 +120,25 @@ pub mod service {
     /// Note: For single-page applications, static assets (e.g. 'style.css') can be checked normally. However, all other assets
     /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
     #[action]
-    fn isValidPath(site: crate::AccountNumber, path: String) -> bool {
+    fn isValidPath(site: AccountNumber, path: String) -> bool {
+        unimplemented!()
+    }
+
+    /// Get file properties for a given site and path
+    #[action]
+    fn getProps(site: AccountNumber, path: String) -> Option<SitesContentRow> {
+        unimplemented!()
+    }
+
+    /// Get raw file data from a site, optionally decompressing it.
+    ///
+    /// Aborts if the file is not found.
+    ///
+    /// If the file has no encoding, or decompression is not requested, the raw data is returned.
+    /// Otherwise, the data is decompressed. This action aborts if no decompressor is available
+    /// for the file's encoding.
+    #[action]
+    fn getData(site: AccountNumber, path: String, decompress: bool) -> Vec<u8> {
         unimplemented!()
     }
 
@@ -166,18 +184,6 @@ pub mod service {
     /// Removes the proxy set with `setProxy`.
     #[action]
     fn clearProxy() {
-        unimplemented!()
-    }
-
-    /// Get content metadata for a given site and path
-    #[action]
-    fn getDetails(site: AccountNumber, path: String) -> Option<SitesContentRow> {
-        unimplemented!()
-    }
-
-    /// Get content raw data from a site, optionally decompressing it
-    #[action]
-    fn getData(site: AccountNumber, path: String, decompress: bool) -> Vec<u8> {
         unimplemented!()
     }
 }
