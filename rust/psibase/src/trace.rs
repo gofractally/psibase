@@ -249,18 +249,27 @@ fn format_transaction_trace(
     Ok(())
 }
 
-fn format_error_stack<T: std::fmt::Write>(atrace: &ActionTrace, f: &mut T) -> fmt::Result {
+fn format_error_stack<T: std::fmt::Write>(
+    schemas: &SchemaMap,
+    atrace: &ActionTrace,
+    f: &mut T,
+) -> fmt::Result {
     if atrace.error.is_some() {
+        let schema = schemas.get(&atrace.action.service);
+        let action_name = MethodString(atrace.action.method.to_string());
+        let action_name = schema
+            .and_then(|schema| schema.actions.get_key_value(&action_name))
+            .map_or(&action_name, |(name, _action_type)| name);
         writeln!(
             f,
             "{} => {}::{}",
-            atrace.action.sender, atrace.action.service, atrace.action.method
+            atrace.action.sender, atrace.action.service, action_name
         )?;
         for inner in &atrace.inner_traces {
             match &inner.inner {
                 InnerTraceEnum::ConsoleTrace(_) => (),
                 InnerTraceEnum::EventTrace(_) => (),
-                InnerTraceEnum::ActionTrace(a) => format_error_stack(a, f)?,
+                InnerTraceEnum::ActionTrace(a) => format_error_stack(schemas, a, f)?,
             }
         }
     }
@@ -268,11 +277,12 @@ fn format_error_stack<T: std::fmt::Write>(atrace: &ActionTrace, f: &mut T) -> fm
 }
 
 fn format_transaction_error_stack<T: std::fmt::Write>(
+    schemas: &SchemaMap,
     ttrace: &TransactionTrace,
     f: &mut T,
 ) -> fmt::Result {
     for a in &ttrace.action_traces {
-        format_error_stack(a, f)?;
+        format_error_stack(schemas, a, f)?;
         break;
     }
     if let Some(message) = &ttrace.error {
@@ -282,9 +292,9 @@ fn format_transaction_error_stack<T: std::fmt::Write>(
 }
 
 impl TransactionTrace {
-    pub fn fmt_stack(&self) -> String {
+    pub fn fmt_stack<'a, F: SchemaFetcher + 'a>(&self, afmt: &ActionFormatter<'a, F>) -> String {
         let mut result = String::new();
-        format_transaction_error_stack(self, &mut result).unwrap();
+        format_transaction_error_stack(&afmt.storage.schemas.borrow(), self, &mut result).unwrap();
         result
     }
 }
@@ -381,6 +391,32 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         let mut res = Ok(());
         for a in &ttrace.action_traces {
             res = res.and(self.prepare_action_trace(a).await)
+        }
+        res
+    }
+    pub async fn prepare_error_stack(&self, atrace: &ActionTrace) -> Result<(), anyhow::Error> {
+        if atrace.error.is_some() {
+            let mut res = self.add_service(atrace.action.service).await;
+            for inner in &atrace.inner_traces {
+                match &inner.inner {
+                    InnerTraceEnum::ActionTrace(a) => {
+                        res = res.and(Box::pin(self.prepare_error_stack(a)).await)
+                    }
+                    _ => {}
+                }
+            }
+            res
+        } else {
+            Ok(())
+        }
+    }
+    pub async fn prepare_transaction_error_stack(
+        &self,
+        ttrace: &TransactionTrace,
+    ) -> Result<(), anyhow::Error> {
+        let mut res = Ok(());
+        for a in &ttrace.action_traces {
+            res = res.and(self.prepare_error_stack(a).await);
         }
         res
     }

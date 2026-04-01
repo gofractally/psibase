@@ -129,7 +129,10 @@ impl TraceFormat {
             if !e.is_empty() {
                 let message = match self {
                     TraceFormat::Error => e.to_string(),
-                    TraceFormat::Stack => trace.fmt_stack(),
+                    TraceFormat::Stack => {
+                        let _ = afmt.prepare_transaction_error_stack(&trace).await;
+                        trace.fmt_stack(afmt)
+                    }
                     TraceFormat::Full => e.to_string(),
                     TraceFormat::Json => e.to_string(),
                 };
