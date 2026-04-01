@@ -1,9 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { ThemeProvider } from "@shared/components/theme-provider";
+
 import { App } from "./App";
-import { ThemeProvider } from "@/components/theme-provider";
 
 import "@shared/styles/globals.css";
 

@@ -4,8 +4,7 @@ import { HashRouter } from "react-router-dom";
 
 import { Toaster } from "@/components/ui/toaster";
 
-import { ThemeProvider } from "@/components/theme-provider";
-
+import { ThemeProvider } from "@shared/components/theme-provider";
 import "@shared/styles/globals.css";
 
 import { Routing } from "./routing";
