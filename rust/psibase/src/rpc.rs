@@ -118,11 +118,14 @@ impl TraceFormat {
                     Ok(std::io::stdout().flush()?)
                 })?
             }
-            TraceFormat::Json => progress.suspend(|| -> Result<(), anyhow::Error> {
-                serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?;
-                println!("");
-                Ok(std::io::stdout().flush()?)
-            })?,
+            TraceFormat::Json => {
+                let _ = afmt.prepare_transaction_trace(&trace).await;
+                progress.suspend(|| -> Result<(), anyhow::Error> {
+                    trace.write_json_pretty(afmt, std::io::stdout().lock())?;
+                    println!("");
+                    Ok(std::io::stdout().flush()?)
+                })?
+            }
             _ => {}
         }
         if let Some(e) = &trace.error {

@@ -9,10 +9,14 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use fracpack::{CompiledSchema, Unpack};
 use futures::future::{FutureExt, LocalBoxFuture, Shared};
-use serde::{Deserialize, Serialize};
+use serde::{
+    ser::{SerializeSeq, SerializeStruct},
+    Deserialize, Serialize, Serializer,
+};
 use serde_aux::prelude::deserialize_number_from_string;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::io::Write;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, Pack, Unpack, Serialize, Deserialize)]
@@ -100,6 +104,32 @@ impl TransactionTrace {
     }
     pub fn console(&self) -> TraceConsole<'_> {
         return TraceConsole { trace: self };
+    }
+    pub fn write_json<'a, F: SchemaFetcher + 'a, W: Write>(
+        &self,
+        afmt: &ActionFormatter<F>,
+        writer: W,
+    ) -> serde_json::Result<()> {
+        serde_json::to_writer(
+            writer,
+            &UnpackedTrace {
+                value: self,
+                schemas: &afmt.storage.schemas.borrow(),
+            },
+        )
+    }
+    pub fn write_json_pretty<'a, F: SchemaFetcher + 'a, W: Write>(
+        &self,
+        afmt: &ActionFormatter<F>,
+        writer: W,
+    ) -> serde_json::Result<()> {
+        serde_json::to_writer_pretty(
+            writer,
+            &UnpackedTrace {
+                value: self,
+                schemas: &afmt.storage.schemas.borrow(),
+            },
+        )
     }
 }
 
@@ -485,4 +515,158 @@ fn format_pruned_json(
         value => write!(writer, "{}", serde_json::to_string(value).unwrap())?,
     }
     Ok(())
+}
+
+struct UnpackedAction<'a> {
+    value: &'a Action,
+    method: &'a MethodString,
+    data: Option<serde_json::Value>,
+}
+
+impl<'a> Serialize for UnpackedAction<'a> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("Action", 4)?;
+        s.serialize_field("sender", &self.value.sender)?;
+        s.serialize_field("service", &self.value.service)?;
+        s.serialize_field("method", self.method)?;
+        if let Some(data) = &self.data {
+            s.serialize_field("data", data)?;
+        } else {
+            s.serialize_field("rawData", &self.value.rawData)?;
+        }
+        s.end()
+    }
+}
+
+struct UnpackedTrace<'a, T> {
+    value: T,
+    schemas: &'a SchemaMap,
+}
+
+impl<'a, 'b, T> Serialize for UnpackedTrace<'a, &'b Vec<T>>
+where
+    UnpackedTrace<'a, &'b T>: Serialize,
+{
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_seq(Some(self.value.len()))?;
+        for item in self.value {
+            s.serialize_element(&UnpackedTrace {
+                value: item,
+                schemas: self.schemas,
+            })?
+        }
+        s.end()
+    }
+}
+
+impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b TransactionTrace> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("TransactionTrace", 2)?;
+        s.serialize_field(
+            "actionTraces",
+            &UnpackedTrace {
+                value: &self.value.action_traces,
+                schemas: self.schemas,
+            },
+        )?;
+        s.serialize_field("error", &self.value.error)?;
+        s.end()
+    }
+}
+
+impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let atrace = &self.value;
+        let schema = self.schemas.get(&atrace.action.service);
+        let action_name = MethodString(atrace.action.method.to_string());
+        let (action_name, action_type) = schema
+            .and_then(|schema| schema.actions.get_key_value(&action_name))
+            .map_or((&action_name, None), |(name, action_type)| {
+                (name, Some(action_type))
+            });
+
+        let mut unpacked_args = None;
+        let mut unpacked_retval = None;
+
+        if let Some(action_type) = action_type {
+            let custom = schema_types();
+            let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
+            if !atrace.action.rawData.is_empty() {
+                cschema.extend(&action_type.params);
+                unpacked_args = cschema
+                    .to_value(&action_type.params, &atrace.action.rawData)
+                    .ok()
+            }
+            if !atrace.raw_retval.is_empty() {
+                if let Some(result_type) = &action_type.result {
+                    cschema.extend(result_type);
+                    unpacked_retval = cschema.to_value(result_type, &atrace.raw_retval).ok()
+                }
+            }
+        }
+
+        let mut s = serializer.serialize_struct("ActionTrace", 5)?;
+
+        s.serialize_field(
+            "action",
+            &UnpackedAction {
+                value: &self.value.action,
+                method: action_name,
+                data: unpacked_args,
+            },
+        )?;
+
+        if let Some(unpacked_retval) = unpacked_retval {
+            s.serialize_field("retval", &unpacked_retval)?;
+        } else {
+            s.serialize_field("rawRetval", &self.value.raw_retval)?;
+        }
+
+        s.serialize_field(
+            "innerTraces",
+            &UnpackedTrace {
+                value: &self.value.inner_traces,
+                schemas: self.schemas,
+            },
+        )?;
+        s.serialize_field("totalTime", &self.value.total_time)?;
+        s.serialize_field("error", &self.value.error)?;
+        s.end()
+    }
+}
+
+impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTrace> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut s = serializer.serialize_struct("InnerTrace", 1)?;
+        s.serialize_field(
+            "inner",
+            &UnpackedTrace {
+                value: &self.value.inner,
+                schemas: self.schemas,
+            },
+        )?;
+        s.end()
+    }
+}
+
+impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b InnerTraceEnum> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self.value {
+            InnerTraceEnum::ConsoleTrace(trace) => {
+                serializer.serialize_newtype_variant("InnerTraceEnum", 0, "ConsoleTrace", trace)
+            }
+            InnerTraceEnum::EventTrace(trace) => {
+                serializer.serialize_newtype_variant("InnerTraceEnum", 1, "EventTrace", trace)
+            }
+            InnerTraceEnum::ActionTrace(trace) => serializer.serialize_newtype_variant(
+                "InnerTraceEnum",
+                2,
+                "ActionTrace",
+                &UnpackedTrace {
+                    value: trace,
+                    schemas: self.schemas,
+                },
+            ),
+        }
+    }
 }
