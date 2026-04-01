@@ -559,6 +559,16 @@ void XHttp::startSession()
    recurse().to<XAdmin>().startSession();
 }
 
+bool XHttp::is_secure(int32_t socket)
+{
+   std::optional<SocketRow> socketRow;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
+   }
+   return std::get<HttpSocketInfo>(socketRow.value().info).tls.has_value();
+}
+
 auto XHttp::serveSys(HttpRequest                 req,
                      std::optional<std::int32_t> socket) -> std::optional<HttpReply>
 {

@@ -137,6 +137,12 @@ mod service {
     fn startSession() {
         unimplemented!()
     }
+
+    /// Returns true if the socket is over a secure connection (e.g. https)
+    #[action]
+    fn is_secure(socket: i32) -> bool {
+        unimplemented!()
+    }
 }
 
 #[test]
