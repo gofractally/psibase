@@ -168,6 +168,19 @@ pub mod service {
     fn clearProxy() {
         unimplemented!()
     }
+
+    /// Redirect requests to the sender to the specified subdomain
+    #[action]
+    fn setRedirect(destination: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Removes the redirect set with `setRedirect`.
+    /// No-op if no redirect is set.
+    #[action]
+    fn clearRedirect() {
+        unimplemented!()
+    }
 }
 
 #[test]

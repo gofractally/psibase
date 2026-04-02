@@ -48,8 +48,9 @@ namespace SystemService
       bool                                  cache        = true;
       std::optional<std::string>            globalCsp    = std::nullopt;
       std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
+      std::optional<psibase::AccountNumber> redirect     = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount, redirect)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
@@ -87,7 +88,8 @@ namespace SystemService
           ServiceTables<SitesContentTable, SiteConfigTable, SitesDataTable, SitesDataRefTable>;
 
       /// Serves a request by looking up the content uploaded to the specified subdomain
-      auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest        request,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
       /// Stores content accessible at the caller's subdomain
       void storeSys(std::string                path,
@@ -137,6 +139,13 @@ namespace SystemService
       /// Removes the proxy set with `setProxy`.
       void clearProxy();
 
+      /// Redirect requests to the sender to the specified subdomain
+      void setRedirect(psibase::AccountNumber destination);
+
+      /// Removes the redirect set with `setRedirect`.
+      /// No-op if no redirect is set.
+      void clearRedirect();
+
      private:
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
@@ -145,7 +154,7 @@ namespace SystemService
    };
 
    PSIO_REFLECT(Sites,
-                method(serveSys, request),
+                method(serveSys, request, socket),
                 method(storeSys, path, contentType, contentEncoding, content),
                 method(hardlink, path, contentType, contentEncoding, contentHash),
                 method(remove, path),
@@ -155,7 +164,9 @@ namespace SystemService
                 method(deleteCsp, path),
                 method(enableCache, enable),
                 method(setProxy, proxy),
-                method(clearProxy))
+                method(clearProxy),
+                method(setRedirect, destination),
+                method(clearRedirect))
 
    PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService

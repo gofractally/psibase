@@ -2,6 +2,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <psibase/HttpHeaders.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
@@ -48,21 +49,20 @@ namespace SystemService
 
          // Path reserved across all subdomains
          if (req.target.starts_with(HttpServer::commonApiPrefix))
+         {
             serviceName = HttpServer::commonApiService.str();
-
+         }
          // subdomain
          else if (isSubdomain(req, rootHost))
-            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
-
-         auto result = AccountNumber(serviceName);
-
-         // Reverse proxy the configured homepage subdomain to the homepage package
-         if (result == to<HttpServer>().homepage())
          {
-            return AccountNumber{"homepage"};
+            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
+         }
+         else
+         {
+            abortMessage("Sites app only handles subdomains");
          }
 
-         return result;
+         return AccountNumber(serviceName);
       }
 
       // Checks for an extension to determine if it is a static asset
@@ -226,6 +226,8 @@ namespace SystemService
          return it->second;
       }
 
+      /// Gets the value of a request header.
+      /// The specified header is not case-sensitive.
       std::optional<std::string> get_header_value(const HttpRequest& request,
                                                   const std::string& name)
       {
@@ -387,9 +389,16 @@ namespace SystemService
          return content;
       }
 
+      std::optional<AccountNumber> getRedirect(const psibase::AccountNumber& account)
+      {
+         auto record =
+             Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>().get(account);
+         return record ? record->redirect : std::nullopt;
+      }
+
    }  // namespace
 
-   std::optional<HttpReply> Sites::serveSys(HttpRequest request)
+   std::optional<HttpReply> Sites::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
    {
       auto rootHost = to<HttpServer>().rootHost(request.host);
       if (request.host.size() < rootHost.size())
@@ -398,6 +407,19 @@ namespace SystemService
       }
 
       auto account = getTargetService(request, rootHost);
+
+      auto redirect = getRedirect(account);
+      if (redirect)
+      {
+         auto redirectUrl = to<HttpServer>().getSiblingUrl(request, socket, *redirect);
+
+         auto hdrs = allowCors();
+         hdrs.push_back({"Location", redirectUrl});
+         HttpReply reply{.status      = HttpStatus::permanentRedirect,
+                         .contentType = "text/html",
+                         .headers     = std::move(hdrs)};
+         return std::move(reply);
+      }
 
       if (request.method == "GET" || request.method == "HEAD")
       {
@@ -675,6 +697,29 @@ namespace SystemService
          return;
       }
       row->proxyAccount = std::nullopt;
+      table.put(*row);
+   }
+
+   void Sites::setRedirect(psibase::AccountNumber destination)
+   {
+      auto table   = Tables{}.open<SiteConfigTable>();
+      auto row     = table.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
+      row.redirect = std::optional{std::move(destination)};
+      table.put(row);
+   }
+
+   void Sites::clearRedirect()
+   {
+      auto table = Tables{}.open<SiteConfigTable>();
+      auto row   = table.get(getSender());
+      psibase::check(!!row, "Site not found");
+
+      if (!row->redirect)
+      {
+         return;
+      }
+
+      row->redirect = std::nullopt;
       table.put(*row);
    }
 
