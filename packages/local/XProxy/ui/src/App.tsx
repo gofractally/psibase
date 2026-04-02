@@ -176,7 +176,7 @@ function ProxyEditor({
         if (!row) return;
 
         const subdomain = row.appName.trim();
-        if (subdomain) {
+        if (subdomain && row.saved) {
             setRemovingIndex(i);
             setMessage(null);
             try {
