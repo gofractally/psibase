@@ -212,25 +212,20 @@ pub(crate) fn assert_schema_matches_package<Wrapper: ToServiceSchema>() {
     let mut accounts = HashSet::new();
     accounts.insert(my_schema.service);
     let mut schemas = SchemaMap::new();
-    let mut found_any = false;
+    let mut names = Vec::new();
     for info in &index {
         if info.accounts.contains(&my_schema.service) {
-            found_any = true;
+            names.push(info.name.as_str());
             let package = block_on(registry.get_by_info(info)).unwrap();
             package.get_schemas(&mut accounts, &mut schemas).unwrap();
         }
     }
     assert!(
-        found_any,
+        !names.is_empty(),
         "Cannot find package containing {}",
         my_schema.service
     );
     let real_schema = schemas.get(&my_schema.service).unwrap_or_else(|| {
-        let names: Vec<_> = index
-            .iter()
-            .filter(|i| i.accounts.contains(&my_schema.service))
-            .map(|i| i.name.as_str())
-            .collect();
         panic!(
             "no schema for service {} after loading {};",
             my_schema.service,
