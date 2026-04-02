@@ -62,18 +62,6 @@ mod service {
         unimplemented!()
     }
 
-    /// Set the homepage subdomain
-    #[action]
-    fn setHomepage(subdomain: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Gets the current homepage subdomain
-    #[action]
-    fn homepage() -> AccountNumber {
-        unimplemented!()
-    }
-
     /// Entry point for messages
     #[action]
     fn recv(socket: i32, data: Hex<Vec<u8>>, flags: u32) {
@@ -88,6 +76,12 @@ mod service {
     /// Returns the root host for a given host
     #[action]
     fn rootHost(host: String) -> String {
+        unimplemented!()
+    }
+
+    /// Full URL for the same path/query on a sibling subdomain.
+    #[action]
+    fn getSiblingUrl(req: HttpRequest, socket: Option<i32>, destination: AccountNumber) -> String {
         unimplemented!()
     }
 }

@@ -103,10 +103,9 @@ namespace
       return {};
    }
 
-   // Returns nullopt if "for" is not present or is not an IP address
-   std::optional<IPAddress> parseForwardedFor(std::string_view forwarded)
+   std::optional<std::string> parseForwardedParam(std::string_view forwarded,
+                                                  std::string_view param)
    {
-      std::optional<IPAddress>      result;
       std::vector<std::string_view> parameterNames;
       for (auto kv : QSplit{forwarded, ';'})
       {
@@ -118,17 +117,21 @@ namespace
          auto q     = unquote(value);
          if (!q && !isToken(value))
             return std::nullopt;
-         if (q)
-            value = *q;
          if (std::ranges::any_of(parameterNames, [&](auto k) { return iequal(k, key); }))
             return std::nullopt;
          parameterNames.push_back(key);
-         if (iequal(key, "for"))
-         {
-            result = parseNodeId(value);
-         }
+         if (iequal(key, param))
+            return q ? std::move(*q) : std::string(value);
       }
-      return result;
+      return std::nullopt;
+   }
+
+   // Returns nullopt if "for" is not present or is not an IP address
+   std::optional<IPAddress> parseForwardedFor(std::string_view forwarded)
+   {
+      if (auto value = parseForwardedParam(forwarded, "for"))
+         return parseNodeId(*value);
+      return std::nullopt;
    }
 
    const char* findSeparator(const char* pos, const char* end, char ch)
@@ -219,4 +222,23 @@ std::vector<std::optional<IPAddress>> psibase::forwardedFor(const HttpRequest& r
       result.push_back(parseIPAddress(forwardedFor));
    }
    return result;
+}
+
+std::optional<std::string> psibase::forwardedProto(const HttpRequest& request)
+{
+   for (const auto& value : request.getHeaderValues("x-forwarded-proto"))
+   {
+      if (iequal(value, "https") || iequal(value, "http"))
+         return ToLower{}(value);
+   }
+   for (const auto& forwarded : request.getHeaderValues("forwarded"))
+   {
+      if (auto proto = parseForwardedParam(forwarded, "proto"))
+      {
+         auto lower = ToLower{}(*proto);
+         if (lower == "https" || lower == "http")
+            return lower;
+      }
+   }
+   return std::nullopt;
 }

@@ -54,6 +54,7 @@ namespace SystemService
       static constexpr auto service          = psibase::AccountNumber("http-server");
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
       static constexpr auto commonApiPrefix  = "/common/";
+      static constexpr auto homepageService  = psibase::AccountNumber("homepage");
       using Tables                           = psibase::ServiceTables<RegServTable, ConfigTable>;
 
       using Session = psibase::SessionTables<PendingRequestTable>;
@@ -95,12 +96,6 @@ namespace SystemService
       /// * Respond to GraphQL requests
       void registerServer(psibase::AccountNumber server);
 
-      /// Set the homepage subdomain
-      void setHomepage(psibase::AccountNumber subdomain);
-
-      /// Gets the current homepage subdomain
-      psibase::AccountNumber homepage();
-
       // Entry point for messages
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
       // Entry point for HTTP requests
@@ -108,6 +103,11 @@ namespace SystemService
 
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
+
+      /// Full URL for the same path/query on a sibling subdomain.
+      std::string getSiblingUrl(psibase::HttpRequest        req,
+                                std::optional<std::int32_t> socket,
+                                psibase::AccountNumber      destination);
    };
    PSIO_REFLECT(HttpServer,
                 method(sendProds, action),
@@ -117,11 +117,10 @@ namespace SystemService
                 method(giveSocket, socket, service),
                 method(takeSocket, socket),
                 method(registerServer, server),
-                method(setHomepage, subdomain),
-                method(homepage),
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
-                method(rootHost, host))
+                method(rootHost, host),
+                method(getSiblingUrl, req, socket, destination))
 
    PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Session)
 }  // namespace SystemService
