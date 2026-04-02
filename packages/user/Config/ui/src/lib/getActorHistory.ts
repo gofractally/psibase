@@ -4,8 +4,9 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
+import { zDateTime } from "@shared/lib/schemas/date-time";
+
 import { graphql } from "./graphql";
-import { zDateTime } from "./zod/DateTime";
 
 const HistoryItem = z.object({
     actor: zAccount,

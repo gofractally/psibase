@@ -1,9 +1,10 @@
+import type { Account } from "@shared/lib/schemas/account";
+
 import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
 import { graphql } from "./graphql";
-import { Account } from "./zod/Account";
 
 const zRes = z.object({
     getStagedByProposer: z.object({

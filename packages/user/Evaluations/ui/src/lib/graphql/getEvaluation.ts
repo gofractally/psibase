@@ -2,8 +2,9 @@ import { z } from "zod";
 
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
+import { zUnix } from "@shared/lib/schemas/unix";
+
 import { graphql } from "../graphql";
-import { zUnix } from "../zod/unix";
 
 export const zEvaluation = z.object({
     id: z.number(),

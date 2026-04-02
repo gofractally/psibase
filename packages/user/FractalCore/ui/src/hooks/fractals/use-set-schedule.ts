@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
-import { zUnix } from "@/lib/zod/Unix";
+import { zUnix } from "@shared/lib/schemas/unix";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { assertUser } from "@shared/hooks/use-current-user";
