@@ -10,11 +10,12 @@ publish.workspace = true
 [package.metadata.psibase]
 flags = ["isPrivileged"]
 postinstall = [
-    { sender = "fractal-gen", service = "fractal-gen", method = "create_frac" }
+    { sender = "fractal-gen", service = "fractal-gen", method = "create_frac" },
 ]
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 

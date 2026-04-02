@@ -1271,6 +1271,7 @@ dependencies = [
  "fractal-gen-pkg",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
 ]
 
