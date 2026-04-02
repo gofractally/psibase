@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 
 import {
-    zDurationUnit,
     type DurationUnit,
+    zDurationUnit,
 } from "@shared/lib/schemas/duration-unit";
 import { Input } from "@shared/shadcn/ui/input";
 import {

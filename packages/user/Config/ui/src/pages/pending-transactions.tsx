@@ -1,15 +1,14 @@
+import { ListTodo } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { ListTodo } from "lucide-react";
-
-import { EmptyBlock } from "@shared/components/empty-block";
-import { ErrorCard } from "@shared/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useStagedTransactions } from "@/hooks/use-staged-transactions";
-import { generateAvatar } from "@/lib/createIdenticon";
 
+import { EmptyBlock } from "@shared/components/empty-block";
+import { ErrorCard } from "@shared/components/error-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { generateAvatar } from "@shared/lib/create-identicon";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";

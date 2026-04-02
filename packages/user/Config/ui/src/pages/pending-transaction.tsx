@@ -1,7 +1,6 @@
 import { Ban, Check, Trash } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { ErrorCard } from "@shared/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useAcceptStaged } from "@/hooks/use-accept-staged";
@@ -10,10 +9,11 @@ import { useRejectStaged } from "@/hooks/use-reject-staged";
 import { useRemoveStaged } from "@/hooks/use-remove-staged";
 import { useStagedTransaction } from "@/hooks/use-staged-transaction";
 import { useTxHistory } from "@/hooks/use-tx-history";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { generateAvatar } from "@/lib/createIdenticon";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { generateAvatar } from "@shared/lib/create-identicon";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";

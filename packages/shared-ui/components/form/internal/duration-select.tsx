@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 
+import {
+    type DurationUnit,
+    zDurationUnit,
+} from "@shared/lib/schemas/duration-unit";
 import { Input } from "@shared/shadcn/ui/input";
 import {
     Select,
@@ -9,14 +13,10 @@ import {
     SelectValue,
 } from "@shared/shadcn/ui/select";
 
-import { zDurationUnit, type DurationUnit } from "@shared/lib/schemas/duration-unit";
-
 import { useFieldContext } from "../app-form";
 
 export const DurationSelect = ({ label }: { label: string }) => {
-    const [unit, setUnit] = useState<DurationUnit>(
-        zDurationUnit.enum.Minutes,
-    );
+    const [unit, setUnit] = useState<DurationUnit>(zDurationUnit.enum.Minutes);
     const field = useFieldContext();
     const seconds = field.state.value as number; // Assuming value is seconds, not Date
 
