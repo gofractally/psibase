@@ -79,9 +79,16 @@ mod service {
         unimplemented!()
     }
 
-    /// Full URL for the same path/query on a sibling subdomain.
+    /// Constructs a URL for a sibling subdomain under the same root host.
+    /// If `keepTarget` is true, the original path and query are preserved;
+    /// otherwise the URL points to the subdomain root.
     #[action]
-    fn getSiblingUrl(req: HttpRequest, socket: Option<i32>, destination: AccountNumber) -> String {
+    fn getSiblingUrl(
+        req: HttpRequest,
+        socket: Option<i32>,
+        destination: AccountNumber,
+        keepTarget: bool,
+    ) -> String {
         unimplemented!()
     }
 }

@@ -284,7 +284,7 @@ namespace SystemService
 
       auto redirect = [&](const psibase::AccountNumber& subdomain)
       {
-         auto loc  = getSiblingUrl(req, std::optional{sock}, subdomain);
+         auto loc  = getSiblingUrl(req, std::optional{sock}, subdomain, true);
          auto hdrs = allowCors();
          hdrs.push_back({"Location", loc});
          HttpReply reply{.status      = HttpStatus::permanentRedirect,
@@ -359,40 +359,33 @@ namespace SystemService
 
    std::string HttpServer::getSiblingUrl(HttpRequest                 req,
                                          std::optional<std::int32_t> socket,
-                                         AccountNumber               destination)
+                                         AccountNumber               destination,
+                                         bool                        keepTarget)
    {
       auto rootHost = to<XHttp>().rootHost(req.host);
 
-      check(req.host.size() >= rootHost.size(), "request host invalid: \"" + req.host + "\"");
+      check(iequal(req.host, rootHost) || isSubdomain(req, rootHost),
+            "request host invalid: \"" + req.host + "\"");
 
-      std::string redirectUrlHost;
-      if (iequal(req.host, rootHost))
-      {
-         redirectUrlHost = destination.str();
-         redirectUrlHost.push_back('.');
-         redirectUrlHost.append(rootHost);
-      }
-      else
-      {
-         auto prefixLen  = req.host.size() - rootHost.size() - 1;
-         redirectUrlHost = req.host;
-         redirectUrlHost.replace(0, prefixLen, destination.str());
-      }
+      std::string siblingUrlHost = destination.str();
+      siblingUrlHost.push_back('.');
+      siblingUrlHost.append(rootHost);
 
       std::string scheme;
       if (auto proto = forwardedProto(req))
          scheme = *proto + "://";
       else if (socket)
-         scheme = to<XHttp>().is_secure(*socket) ? "https://" : "http://";
+         scheme = to<XHttp>().isSecure(*socket) ? "https://" : "http://";
       else
          scheme = isLocalhost(req) ? "http://" : "https://";
 
-      std::string url = scheme + redirectUrlHost;
+      std::string url = scheme + siblingUrlHost;
 
       if (auto suf = hostHeaderPortSuffix(req); !suf.empty())
          url.append(suf);
 
-      url += req.target;
+      url += (keepTarget ? req.target : "/");
+
       return url;
    }
 }  // namespace SystemService

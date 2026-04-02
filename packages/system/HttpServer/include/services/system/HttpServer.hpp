@@ -96,10 +96,13 @@ namespace SystemService
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
 
-      /// Full URL for the same path/query on a sibling subdomain.
+      /// Constructs a URL for a sibling subdomain under the same root host.
+      /// If `keepTarget` is true, the original path and query are preserved;
+      /// otherwise the URL points to the subdomain root.
       std::string getSiblingUrl(psibase::HttpRequest        req,
                                 std::optional<std::int32_t> socket,
-                                psibase::AccountNumber      destination);
+                                psibase::AccountNumber      destination,
+                                bool                        keepTarget);
    };
    PSIO_REFLECT(HttpServer,
                 method(sendProds, action),
