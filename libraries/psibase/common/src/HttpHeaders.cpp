@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
-#include <ranges>
 
 using namespace psibase;
 
@@ -106,6 +105,7 @@ namespace
    std::optional<std::string> parseForwardedParam(std::string_view forwarded,
                                                   std::string_view param)
    {
+      std::optional<std::string>    result;
       std::vector<std::string_view> parameterNames;
       for (auto kv : QSplit{forwarded, ';'})
       {
@@ -121,9 +121,9 @@ namespace
             return std::nullopt;
          parameterNames.push_back(key);
          if (iequal(key, param))
-            return q ? std::move(*q) : std::string(value);
+            result = q ? std::move(*q) : std::string(value);
       }
-      return std::nullopt;
+      return result;
    }
 
    // Returns nullopt if "for" is not present or is not an IP address
