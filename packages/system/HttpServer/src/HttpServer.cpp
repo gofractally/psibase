@@ -273,9 +273,6 @@ namespace SystemService
 
       auto user = recurse().to<RTransact>().getUser(req);
 
-      auto config =
-          HttpServer::Tables(HttpServer::service, KvMode::read).open<ConfigTable>().get({});
-
       // Remove sensitive headers
       req.removeCookie("__HOST-SESSION");
       req.removeCookie("SESSION");

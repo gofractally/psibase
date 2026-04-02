@@ -6,15 +6,6 @@
 
 namespace SystemService
 {
-   struct ConfigRow
-   {
-      psibase::AccountNumber previous;
-      psibase::AccountNumber homepageSubdomain;
-   };
-   PSIO_REFLECT(ConfigRow, previous, homepageSubdomain)
-   using ConfigTable = psibase::Table<ConfigRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(ConfigTable)
-
    struct PendingRequestRow
    {
       std::int32_t           socket;
@@ -55,7 +46,7 @@ namespace SystemService
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
       static constexpr auto commonApiPrefix  = "/common/";
       static constexpr auto homepageService  = psibase::AccountNumber("homepage");
-      using Tables                           = psibase::ServiceTables<RegServTable, ConfigTable>;
+      using Tables                           = psibase::ServiceTables<RegServTable>;
 
       using Session = psibase::SessionTables<PendingRequestTable>;
 
@@ -98,6 +89,7 @@ namespace SystemService
 
       // Entry point for messages
       void recv(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
+
       // Entry point for HTTP requests
       void serve(std::int32_t socket, psibase::HttpRequest req);
 
