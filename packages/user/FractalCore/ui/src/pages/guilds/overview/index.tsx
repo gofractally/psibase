@@ -2,7 +2,7 @@ import { GuildOverviewCard } from "@/components/guild-overview-card";
 
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { PageContainer } from "@shared/components/page-container";
 
 import { ApplyToGuildCard } from "./components/apply-to-guild-card";
 import { MyMembershipCard } from "./components/my-membership-card";

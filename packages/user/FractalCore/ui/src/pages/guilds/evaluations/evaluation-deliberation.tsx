@@ -12,7 +12,7 @@ import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { PageContainer } from "@shared/components/page-container";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { arrayMove } from "@shared/lib/array-move";
 import { humanize } from "@shared/lib/humanize";

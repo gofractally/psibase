@@ -11,6 +11,7 @@ import { useStagedTransaction } from "@/hooks/use-staged-transaction";
 import { useTxHistory } from "@/hooks/use-tx-history";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { PageContainer } from "@shared/components/page-container";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { generateAvatar } from "@shared/lib/create-identicon";
@@ -77,7 +78,7 @@ export const PendingTransaction = () => {
 
     if (data?.details) {
         return (
-            <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+            <PageContainer className="space-y-6">
                 <div className="flex flex-col justify-between rounded-sm border p-4">
                     <div className="flex w-full justify-between">
                         <div className="flex flex-col">
@@ -275,7 +276,7 @@ export const PendingTransaction = () => {
                         </Table>
                     </div>
                 </div>
-            </div>
+            </PageContainer>
         );
     } else if (isLoading) {
         return <LoadingBlock />;
