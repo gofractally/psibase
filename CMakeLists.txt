@@ -281,7 +281,6 @@ add_rs_component_workspace(packages/:Plugins
     auth-sig
     base64
     brotli-codec
-    http-server
     kdf
     kvtests
     setcode
@@ -767,17 +766,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/HttpServerPlugin.psi
-    NAME HttpServerPlugin
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "A plugin for simplifying interactions with the HttpServer service"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
-    SERVICE http-server
-        DATA ${Plugins_OUTPUT_FILE_http_server} /plugin.wasm
-    DEPENDS ${Plugins_DEP}
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/SetCode.psi
     NAME SetCode
     VERSION ${PSIBASE_VERSION}.0
@@ -909,7 +897,6 @@ psibase_package(
     DESCRIPTION "A dashboard for developers to create and manage apps"
     PACKAGE_DEPENDS 
         "HttpServer(^${PSIBASE_VERSION})"
-        "HttpServerPlugin(^${PSIBASE_VERSION})"
         "Sites(^${PSIBASE_VERSION})" 
         "Accounts(^${PSIBASE_VERSION})" 
         "CommonApi(^${PSIBASE_VERSION})" 
@@ -1196,7 +1183,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host HttpServerPlugin Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1230,7 +1217,6 @@ install(
           ${SERVICE_DIR}/FractalCore.psi
           ${SERVICE_DIR}/Host.psi
           ${SERVICE_DIR}/HttpServer.psi
-          ${SERVICE_DIR}/HttpServerPlugin.psi
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
