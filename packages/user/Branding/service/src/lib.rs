@@ -27,8 +27,19 @@ mod tables {
 mod service {
     use crate::tables::*;
     use async_graphql::Object;
+    use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+    use psibase::services::sites::Wrapper as Sites;
     use psibase::*;
 
+    /// Sets the network name for the current network
+    ///
+    /// The specified name must be a valid account name.
+    /// The specified name must either:
+    /// * Not yet exist as an account, or
+    /// * Exist but be owned by the "branding" account (using auth-delegate)
+    ///
+    /// The specified network name will reverse proxy its content to the
+    /// homepage service.
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
@@ -36,6 +47,12 @@ mod service {
             get_sender() == SERVICE,
             "Only the 'branding' account is authorized to set network branding",
         );
+
+        let account = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
+
+        AuthDelegate::call().newAccount(account, SERVICE);
+        Sites::call_as(account).setProxy(account!("homepage"));
+
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
             .unwrap();
