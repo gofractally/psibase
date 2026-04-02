@@ -94,8 +94,11 @@ namespace SystemService
       void setOwner(psibase::AccountNumber owner);
 
       /// Create a new account with the specified name, owned by the specified `owner` account.
+      ///
+      /// If the account already exists and is owned by the same `owner`, this action is a no-op.
       void newAccount(psibase::AccountNumber name, psibase::AccountNumber owner);
 
+      /// Gets the owner account of the specified account
       psibase::AccountNumber getOwner(psibase::AccountNumber account);
 
      private:
