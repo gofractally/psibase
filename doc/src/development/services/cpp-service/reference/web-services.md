@@ -6,6 +6,7 @@
 flowchart TD
    200[200 OK]
    404[404 Not Found]
+   308[308 Permanent Redirect]
 
    A[HTTP Request]
    B[psinode]
@@ -16,17 +17,18 @@ flowchart TD
    A --> B --> C
    sites --> E{{was site data found?}} -->|yes| 200
    E -->|no| 404
-   C --> G{{target begins with '/common/'?}}
+   C --> R{{root host / no subdomain?}}
+   R -->|yes| homeRedir[redirect to homepage subdomain] --> 308
+   R -->|no| G{{target begins with '/common/'?}}
    G -->|yes| common['common-api' service's serveSys action] --> serveSys
-   G -->|no| I{{on a subdomain?}} -->|no| home['homepage' service's serveSys action] --> serveSys
-   I -->|yes| J{{Has registered server?}}
+   G -->|no| J{{Has registered server?}}
    J -->|yes| L[registered server's serveSys action] --> serveSys
    J -->|no| sites
    serveSys -->|yes| 200
    serveSys -->|no| sites
 ```
 
-`psinode` passes most HTTP requests to the [SystemService::HttpServer] service, which then routes requests to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
+`psinode` passes most HTTP requests to the [SystemService::HttpServer] service. Requests to the root host (no subdomain) are answered with a redirect to the homepage subdomain; otherwise the server routes to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
 [SystemService::CommonApi] provides services common to all domains under the `/common/` tree.
 
