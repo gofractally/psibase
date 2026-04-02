@@ -144,14 +144,14 @@ namespace SystemService
       /// - If the hash does not match, the new content is returned with an updated `ETag` header
       void enableCache(bool enable);
 
-      /// If content requested for the sender service is not found, proxy the request to the
-      /// specified proxy.
+      /// If content is not found on the caller's subdomain, transparently serve it from
+      /// the specified account's subdomain instead (reverse proxy).
       void setProxy(psibase::AccountNumber proxy);
 
       /// Removes the proxy set with `setProxy`.
       void clearProxy();
 
-      /// Redirect requests to the sender to the specified subdomain
+      /// Configures the caller's subdomain to 308 redirect all requests to the destination subdomain.
       void setRedirect(psibase::AccountNumber destination);
 
       /// Removes the redirect set with `setRedirect`.

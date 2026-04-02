@@ -86,13 +86,14 @@ interface api {
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
     set-cache-mode: func(enable: bool) -> result<_, error>;
 
-    /// Reverse proxies the sender account UI to the specified proxy account
+    /// If content is not found on the caller's subdomain, transparently serve it from
+    /// the specified account's subdomain instead (reverse proxy).
     set-proxy: func(proxy: string);
 
     /// Clears the reverse-proxy set with `set-proxy`
     clear-proxy: func();
 
-    /// Redirects the sender account UI to the specified destination account
+    /// Configures the caller's subdomain to 308 redirect all requests to the destination subdomain.
     set-redirect: func(destination: string);
 
     /// Clears the redirect set with `set-redirect`

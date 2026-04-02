@@ -175,8 +175,8 @@ pub mod service {
         unimplemented!()
     }
 
-    /// If content requested for the sender service is not found, proxy the request to the
-    /// specified proxy.
+    /// If content is not found on the caller's subdomain, transparently serve it from
+    /// the specified account's subdomain instead (reverse proxy).
     #[action]
     fn setProxy(proxy: AccountNumber) {
         unimplemented!()
@@ -188,7 +188,7 @@ pub mod service {
         unimplemented!()
     }
 
-    /// Redirect requests to the sender to the specified subdomain
+    /// Configures the caller's subdomain to 308 redirect all requests to the destination subdomain.
     #[action]
     fn setRedirect(destination: AccountNumber) {
         unimplemented!()

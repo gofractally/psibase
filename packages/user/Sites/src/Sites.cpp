@@ -417,7 +417,7 @@ namespace SystemService
       auto redirect = getRedirect(account);
       if (redirect)
       {
-         auto redirectUrl = to<HttpServer>().getSiblingUrl(request, socket, *redirect);
+         auto redirectUrl = to<HttpServer>().getSiblingUrl(request, socket, *redirect, true);
 
          auto hdrs = allowCors();
          hdrs.push_back({"Location", redirectUrl});
