@@ -61,6 +61,7 @@ pub mod service {
         pub cache: bool,
         pub globalCsp: Option<String>,
         pub proxyAccount: Option<AccountNumber>,
+        pub redirect: Option<AccountNumber>,
     }
 
     #[table(name = "SitesDataTable", index = 2)]
@@ -83,7 +84,7 @@ pub mod service {
 
     /// Serves a request by looking up the content uploaded to the specified subdomain
     #[action]
-    fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
+    fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<crate::http::HttpReply> {
         unimplemented!()
     }
 
