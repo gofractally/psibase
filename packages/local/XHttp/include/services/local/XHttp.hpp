@@ -148,8 +148,9 @@ namespace LocalService
       /// Called by the host at the beginning of a session
       void startSession();
 
-      /// Returns true if the socket is over a secure connection (e.g. https)
-      bool is_secure(int32_t socket);
+      /// Returns true if the socket is over a secure connection (e.g. https).
+      /// The sender must be the current owner of the socket.
+      bool isSecure(int32_t socket);
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data, flags),
@@ -166,7 +167,7 @@ namespace LocalService
                 method(rootHost, host),
                 method(serveSys, request, socket),
                 method(startSession),
-                method(is_secure, socket))
+                method(isSecure, socket))
 
    PSIBASE_REFLECT_TABLES(XHttp, XHttp::Subjective, XHttp::Session)
 
