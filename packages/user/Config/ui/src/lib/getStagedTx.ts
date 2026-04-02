@@ -1,10 +1,7 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
+import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "./graphql";
 
 const zStagedTx = z.object({
     id: z.number(),
@@ -61,7 +58,7 @@ export const getStagedTx = async (id: number) => {
                         }
                     }
                 `,
-        siblingUrl(null, "staged-tx", "/graphql"),
+        { service: "staged-tx" },
     );
 
     return zDataResponse.parse(res);

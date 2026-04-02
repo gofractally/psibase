@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
 import { queryKeys } from "@/lib/queryKeys";
+
+import { graphql } from "@shared/lib/graphql";
 
 interface NetworkVariables {
     blockReplayFactor: number;
@@ -11,12 +12,10 @@ interface NetworkVariables {
 }
 
 const zNetworkVariablesResponse = z.object({
-    data: z.object({
-        getNetworkVariables: z.object({
-            blockReplayFactor: z.number(),
-            perBlockSysCpuNs: z.string(),
-            objStorageBytes: z.string(),
-        }),
+    getNetworkVariables: z.object({
+        blockReplayFactor: z.number(),
+        perBlockSysCpuNs: z.string(),
+        objStorageBytes: z.string(),
     }),
 });
 
@@ -31,20 +30,20 @@ export const useNetworkVariables = () => {
                     objStorageBytes
                 }
             }`;
-            const res = await graphql(query, "virtual-server");
+            const res = await graphql(query, { service: "virtual-server" });
 
             const response = zNetworkVariablesResponse.parse(res);
 
             return {
-                blockReplayFactor: response.data.getNetworkVariables.blockReplayFactor,
+                blockReplayFactor:
+                    response.getNetworkVariables.blockReplayFactor,
                 perBlockSysCpuNs: Number(
-                    response.data.getNetworkVariables.perBlockSysCpuNs,
+                    response.getNetworkVariables.perBlockSysCpuNs,
                 ),
                 objStorageBytes: Number(
-                    response.data.getNetworkVariables.objStorageBytes,
+                    response.getNetworkVariables.objStorageBytes,
                 ),
             };
         },
     });
 };
-

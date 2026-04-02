@@ -1,12 +1,8 @@
 import z from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
+import { graphql } from "@shared/lib/graphql";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
-
 import { zDateTime } from "@shared/lib/schemas/date-time";
-
-import { graphql } from "./graphql";
 
 const HistoryItem = z.object({
     actor: zAccount,
@@ -40,7 +36,7 @@ export const getActorHistory = async (account: Account) => {
                 }
             }
         }`,
-        siblingUrl(null, "staged-tx", "/graphql"),
+        { service: "staged-tx" },
     );
 
     return response.parse(res).actorHistory.nodes;

@@ -1,8 +1,7 @@
 import { z } from "zod";
 
+import { graphql } from "@shared/lib/graphql";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../graphql";
 
 export const zUser = z.object({
     user: zAccount,
@@ -64,28 +63,26 @@ export const getUsersAndGroups = async (
                 }
             }
         }`,
-        "evaluations",
+        { service: "evaluations" },
     );
 
     const response = z
         .object({
-            data: z.object({
-                getUsers: z.object({
-                    nodes: zUser.array(),
-                }),
-                getGroups: z.object({
-                    nodes: zGroup.array(),
-                }),
-                getGroupResult: z.object({
-                    nodes: zResult.array(),
-                }),
+            getUsers: z.object({
+                nodes: zUser.array(),
+            }),
+            getGroups: z.object({
+                nodes: zGroup.array(),
+            }),
+            getGroupResult: z.object({
+                nodes: zResult.array(),
             }),
         })
         .parse(res);
 
     return FunctionResponse.parse({
-        users: response.data.getUsers.nodes,
-        groups: response.data.getGroups.nodes,
-        results: response.data.getGroupResult.nodes,
+        users: response.getUsers.nodes,
+        groups: response.getGroups.nodes,
+        results: response.getGroupResult.nodes,
     });
 };

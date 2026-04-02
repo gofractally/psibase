@@ -1,8 +1,7 @@
 import { z } from "zod";
 
+import { graphql } from "@shared/lib/graphql";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
-
-import { graphql } from "../graphql";
 
 export const getLastCreatedEvaluationId = async (account: Account) => {
     const parsed = zAccount.parse(account);
@@ -11,19 +10,17 @@ export const getLastCreatedEvaluationId = async (account: Account) => {
             id
             owner
         } }`,
-        "evaluations",
+        { service: "evaluations" },
     );
 
     const response = z
         .object({
-            data: z.object({
-                getLastEvaluation: z.object({
-                    id: z.number(),
-                    owner: zAccount,
-                }),
+            getLastEvaluation: z.object({
+                id: z.number(),
+                owner: zAccount,
             }),
         })
         .parse(res);
 
-    return response.data.getLastEvaluation;
+    return response.getLastEvaluation;
 };

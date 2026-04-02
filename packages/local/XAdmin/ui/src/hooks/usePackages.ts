@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getJson } from "@psibase/common-lib";
 
-import { graphql } from "@/lib/graphql";
 import { queryKeys } from "@/lib/queryKeys";
 import { PackageInfo } from "@/types";
+
+import { graphql } from "@shared/lib/graphql";
 
 export const usePackages = () =>
     useQuery<PackageInfo[]>({
@@ -30,14 +31,12 @@ export const useInstalledLocalPackages = () =>
         queryKey: queryKeys.installedLocalPackages,
         queryFn: async () => {
             const res = (await graphql(
-                "query { installed(first: 100) { edges { node { name version } } } }",
-                "x-packages",
+                "{ installed(first: 100) { edges { node { name version } } } }",
+                { service: "x-packages" },
             )) as {
-                data: {
-                    installed: { edges: { node: InstalledLocalPackage }[] };
-                };
+                installed: { edges: { node: InstalledLocalPackage }[] };
             };
-            return res.data.installed.edges.map((e) => e.node);
+            return res.installed.edges.map((e) => e.node);
         },
         initialData: [],
     });

@@ -1,10 +1,8 @@
 import { z } from "zod";
 
+import { graphql } from "@shared/lib/graphql";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
-
 import { zUnix } from "@shared/lib/schemas/unix";
-
-import { graphql } from "../graphql";
 
 export const zEvaluation = z.object({
     id: z.number(),
@@ -38,16 +36,14 @@ export const getEvaluation = async (owner: Account, id: number) => {
             numOptions
         } 
     }`,
-        "evaluations",
+        { service: "evaluations" },
     );
 
     const response = z
         .object({
-            data: z.object({
-                getEvaluation: zEvaluation,
-            }),
+            getEvaluation: zEvaluation,
         })
         .parse(evaluation);
 
-    return response.data.getEvaluation;
+    return response.getEvaluation;
 };
