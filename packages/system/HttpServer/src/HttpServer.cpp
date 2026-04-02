@@ -35,21 +35,10 @@ namespace SystemService
       std::optional<AccountNumber> getTargetService(const HttpRequest& req,
                                                     std::string_view   rootHost)
       {
-         std::string serviceName;
-
-         // Path reserved across all subdomains
-         if (req.target.starts_with(HttpServer::commonApiPrefix))
-            serviceName = HttpServer::commonApiService.str();
-
-         // subdomain
-         else if (isSubdomain(req, rootHost))
-            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
-
-         // root domain
-         else
+         if (!isSubdomain(req, rootHost))
             return std::nullopt;
 
-         return AccountNumber(serviceName);
+         return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
       }
 
       std::string_view hostHeaderPortSuffix(const HttpRequest& req)
@@ -313,7 +302,11 @@ namespace SystemService
          redirect(homepageService);
          return;
       }
-      auto service = service_opt.value();
+
+      // If the path is to the common api, force proxy to the common api service
+      auto service =
+          (req.target.starts_with(HttpServer::commonApiPrefix) ? HttpServer::commonApiService
+                                                               : service_opt.value());
 
       // First check the registered server
       auto                     registered = getServer(service);

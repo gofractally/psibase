@@ -45,24 +45,10 @@ namespace SystemService
 
       AccountNumber getTargetService(const HttpRequest& req, std::string_view rootHost)
       {
-         std::string serviceName;
-
-         // Path reserved across all subdomains
-         if (req.target.starts_with(HttpServer::commonApiPrefix))
-         {
-            serviceName = HttpServer::commonApiService.str();
-         }
-         // subdomain
-         else if (isSubdomain(req, rootHost))
-         {
-            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
-         }
-         else
-         {
+         if (!isSubdomain(req, rootHost))
             abortMessage("Sites app only handles subdomains");
-         }
 
-         return AccountNumber(serviceName);
+         return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
       }
 
       // Checks for an extension to determine if it is a static asset
@@ -419,6 +405,12 @@ namespace SystemService
                          .contentType = "text/html",
                          .headers     = std::move(hdrs)};
          return std::move(reply);
+      }
+
+      // Override target service for common api requests
+      if (request.target.starts_with(HttpServer::commonApiPrefix))
+      {
+         account = HttpServer::commonApiService;
       }
 
       if (request.method == "GET" || request.method == "HEAD")
