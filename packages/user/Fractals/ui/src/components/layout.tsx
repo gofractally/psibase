@@ -1,8 +1,8 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 
 import { AppSidebar } from "@/components/app-sidebar";
 
-import { useCurrentFractal } from "@/hooks/use-current-fractal";
+import { useFractal } from "@/hooks/fractals/use-fractal";
 
 import {
     Breadcrumb,
@@ -19,37 +19,16 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
-import { staticFractalMenus } from "./nav-main";
-
 export const Layout = () => {
-    const fractal = useCurrentFractal();
     const location = useLocation();
+    const { data: fractal } = useFractal();
 
-    const pathNameIndex = (index: number) => {
-        return location.pathname.split("/")[index];
-    };
-
-    const selectedGroup = staticFractalMenus.find(
-        (menu) => pathNameIndex(3) == menu.path,
-    );
-
-    const selectedGroupName = selectedGroup?.groupLabel;
-
-    const selectedPage = selectedGroup?.menus.find(
-        (menu) => pathNameIndex(4) == menu.path,
-    );
-
-    const pageName = selectedPage?.title;
-
-    const breadCrumbs: (string | undefined)[] = [
-        fractal || "Browse",
-        selectedGroupName,
-        pageName,
-    ];
+    const isBrowse =
+        location.pathname === "/browse" || location.pathname === "/browse/";
 
     return (
         <SidebarProvider>
-            <AppSidebar />
+            <AppSidebar variant="inset" />
             <SidebarInset>
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
@@ -60,26 +39,21 @@ export const Layout = () => {
                         />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                {breadCrumbs
-                                    .filter(Boolean)
-                                    .map((breadcrumb, index, arr) => (
-                                        <>
-                                            <BreadcrumbItem className="hidden md:block">
-                                                {index === 0 ? (
-                                                    <BreadcrumbLink>
-                                                        {breadcrumb}
-                                                    </BreadcrumbLink>
-                                                ) : (
-                                                    <BreadcrumbPage>
-                                                        {breadcrumb}
-                                                    </BreadcrumbPage>
-                                                )}
-                                            </BreadcrumbItem>
-                                            {arr.length - 1 !== index && (
-                                                <BreadcrumbSeparator className="hidden md:block" />
-                                            )}
-                                        </>
-                                    ))}
+                                <BreadcrumbItem className="hidden md:block">
+                                    <BreadcrumbLink asChild>
+                                        <Link to="/browse">Browse</Link>
+                                    </BreadcrumbLink>
+                                </BreadcrumbItem>
+                                {!isBrowse ? (
+                                    <>
+                                        <BreadcrumbSeparator className="hidden md:block" />
+                                        <BreadcrumbItem>
+                                            <BreadcrumbPage>
+                                                {fractal?.fractal?.name}
+                                            </BreadcrumbPage>
+                                        </BreadcrumbItem>
+                                    </>
+                                ) : null}
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>

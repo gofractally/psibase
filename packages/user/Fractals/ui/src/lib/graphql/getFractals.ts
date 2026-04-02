@@ -1,10 +1,8 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { zAccount } from "@/lib/zod/Account";
-
-import { graphql } from "../../graphql";
+import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zFractaListInstance = z.object({
     account: zAccount,
@@ -27,7 +25,7 @@ export const getFractals = async () => {
                 }
             }
         `,
-        siblingUrl(null, "fractals", "/graphql"),
+        { service: FRACTALS_SERVICE },
     );
 
     return z
