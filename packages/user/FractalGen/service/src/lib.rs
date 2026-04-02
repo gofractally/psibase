@@ -53,7 +53,7 @@ mod service {
             SYS_FRACTAL,
             SYS_GUILD,
             "Network Governance".into(),
-            "To establish, maintain, and grow the network by increasing the utility-driven use of its native token.".into(),
+            "To establish, maintain, and grow the network.".into(),
             account!("c-role-001"),
             account!("r-role-001"),
         );
