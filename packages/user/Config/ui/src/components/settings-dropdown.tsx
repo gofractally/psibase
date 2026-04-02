@@ -1,9 +1,9 @@
 import { LogIn, LogOut, Moon, Settings, Sun, UserPlus } from "lucide-react";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { useLogout } from "@/hooks/useLogout";
-
+import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useLogout } from "@shared/hooks/use-logout";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,
@@ -18,8 +18,6 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from "@shared/shadcn/ui/dropdown-menu";
-
-import { useTheme } from "@shared/components/theme-provider";
 
 export const SettingsDropdown = () => {
     const { setTheme } = useTheme();

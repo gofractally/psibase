@@ -1,11 +1,10 @@
 import { ChevronsUpDown, LogIn, LogOut, Moon, Sun, Users } from "lucide-react";
 
-import { useLogout } from "@/hooks/useLogout";
-
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useLogout } from "@shared/hooks/use-logout";
 import { useProfile } from "@shared/hooks/use-profile";
 import {
     DropdownMenu,
