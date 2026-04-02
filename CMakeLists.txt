@@ -688,11 +688,10 @@ psibase_package(
     NAME Homepage
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network homepage"
-    ACCOUNTS network # default homepage subdomain
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
 )
 
@@ -1136,7 +1135,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream Transact VirtualServer WebCrypto Workshop
 )
