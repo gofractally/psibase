@@ -33,8 +33,8 @@ mod service {
     };
     use psibase::*;
 
-    const SYS_FRACTAL: AccountNumber = account!("core-fractal");
-    const SYS_GUILD: AccountNumber = account!("core-genesis");
+    const SYS_FRACTAL: AccountNumber = account!("core-frac");
+    const SYS_GUILD: AccountNumber = account!("core-g1");
     const ROOT: AccountNumber = account!("root");
 
     #[action]
