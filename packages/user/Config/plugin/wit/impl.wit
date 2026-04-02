@@ -2,14 +2,15 @@ package config:plugin;
 
 world impl {
     include host:common/imports;
-    include http-server:plugin/imports;
     include staged-tx:plugin/imports;
     include producers:plugin/imports;
     include branding:plugin/imports;
     include transact:plugin/imports;
     include packages:plugin/imports;
     include virtual-server:plugin/imports;
+    include sites:plugin/imports;
 
+    import accounts:plugin/admin;
     import tokens:plugin/admin;
     import packages:plugin/private-api;
     import symbol:plugin/admin;
