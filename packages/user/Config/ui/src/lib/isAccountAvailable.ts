@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const AccountNameStatus = z.enum(["Available", "Taken", "Invalid"]);
 

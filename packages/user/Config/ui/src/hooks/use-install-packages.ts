@@ -2,12 +2,12 @@ import { queryClient } from "@/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
-import { supervisor } from "@/supervisor";
 import { getArrayBuffer } from "@psibase/common-lib";
 
 import { checkLastTx } from "@/lib/checkStaging";
 import QueryKey from "@/lib/queryKeys";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import {

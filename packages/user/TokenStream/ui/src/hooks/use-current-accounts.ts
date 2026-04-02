@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
-const supervisor = getSupervisor();
+import { supervisor } from "@shared/lib/supervisor";
 
 export const useCurrentAccounts = (enabled = true) =>
     useQuery({

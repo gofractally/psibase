@@ -3,11 +3,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import { TOKEN_STREAM } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({

@@ -3,11 +3,9 @@ import type { QueryOptions } from "@shared/hooks/types";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { supervisor } from "@shared/lib/supervisor";
 
 import QueryKey from "../lib/queryKeys";
-
-const supervisor = getSupervisor();
 
 export const queryCanCreateAccount = queryOptions({
     queryKey: QueryKey.canCreateAccount(),
@@ -34,4 +32,3 @@ export const useCanCreateAccount = (
     const queryOptions = options ?? {};
     return useQuery({ ...queryCanCreateAccount, ...queryOptions });
 };
-

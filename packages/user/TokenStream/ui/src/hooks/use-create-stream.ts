@@ -2,11 +2,10 @@ import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import { TOKEN_STREAM } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({
