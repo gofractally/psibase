@@ -1,14 +1,13 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
-    sites, transact,
+    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers,
+    setcode, sites, transact, verify_sig,
 };
 use crate::{
-    new_account_action, reg_server, schema_types, set_auth_service_action, set_code_action,
-    set_key_action, solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey,
-    Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString, Pack,
-    PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
+    reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
+    Action, AnyPublicKey, Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString,
+    Pack, PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -27,7 +26,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_packages};
+use crate::services::{x_admin, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -54,6 +53,7 @@ custom_error! {
     UnknownAction{service: AccountNumber, method: MethodNumber} = "{service} does not have an action called {method}",
     MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
     InvalidPackageSource = "Invalid package source",
+    InvalidVerifyService = "Invalid verify service",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -102,11 +102,17 @@ pub struct PackageRef {
     pub version: String,
 }
 
+fn network_scope() -> String {
+    "network".to_string()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Meta {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -120,6 +126,7 @@ impl Meta {
         return PackageInfo {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -133,6 +140,8 @@ impl Meta {
 pub struct PackageInfo {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -150,39 +159,29 @@ impl PackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
-        if self.accounts.is_empty() {
-            None
-        } else {
-            Some(
-                self.accounts
-                    .iter()
-                    .any(|account| account.to_string().starts_with("x-")),
-            )
+        match self.scope.as_str() {
+            "local" => Some(true),
+            "network" => Some(false),
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct InstalledPackageInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    pub depends: Vec<PackageRef>,
-    pub accounts: Vec<AccountNumber>,
-    pub owner: AccountNumber,
-}
+pub type InstalledPackageInfo = packages::InstalledPackage;
 
 impl InstalledPackageInfo {
     pub fn meta(&self) -> Meta {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "network".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -205,6 +204,7 @@ impl LocalPackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "local".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
@@ -525,6 +525,14 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         Ok(())
     }
+    pub fn needs_ui(&mut self) -> bool {
+        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
+            let script: Vec<PrettyAction> =
+                serde_json::de::from_str(&std::io::read_to_string(file).unwrap()).unwrap();
+            return script.into_iter().any(|act| act.service == sites::SERVICE);
+        }
+        false
+    }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
         let mut result = HashMap::new();
@@ -581,13 +589,19 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(new_account_action(accounts::SERVICE, account));
+        if sender == producers::ROOT {
+            actions.push(accounts::Wrapper::pack_from(accounts::SERVICE).preapproveAcc(account));
+        }
         if let Some(key) = key {
-            actions.push(set_key_action(account, key));
-            actions.push(set_auth_service_action(account, key.auth_service()));
+            if key.key.service != verify_sig::SERVICE {
+                return Err(Error::InvalidVerifyService)?;
+            }
+            actions.push(
+                auth_sig::Wrapper::pack_from(sender)
+                    .newAccount(account, key.key.rawData.0.clone().into()),
+            );
         } else {
-            actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
-            actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
+            actions.push(auth_delegate::Wrapper::pack_from(sender).newAccount(account, sender));
         }
         Ok(())
     }
@@ -789,7 +803,19 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         _compression_level: u32,
     ) -> Result<(), anyhow::Error> {
-        for (account, index, _info) in &self.services {
+        for (account, index, info) in &self.services {
+            if let Some(server) = &info.server {
+                crate::as_text(
+                    client
+                        .post(x_http::SERVICE.url(base_url)?.join("/register_server")?)
+                        .body(serde_json::to_string(&x_http::RegisterServerRequest {
+                            service: *account,
+                            server: *server,
+                        })?)
+                        .header("Content-Type", "application/json"),
+                )
+                .await?;
+            }
             crate::as_text(
                 client
                     .put(
@@ -1378,7 +1404,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))
@@ -1586,12 +1612,6 @@ struct LocalPackageQuery {
     installed: LocalPackageConnection,
 }
 
-#[allow(non_snake_case)]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct NewAccountsQuery {
-    newAccounts: Vec<AccountNumber>,
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct PackagesEdge {
     node: PackageInfo,
@@ -1612,27 +1632,6 @@ struct PackagesQuery {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SourcesQuery {
     sources: Vec<packages::PackageSource>,
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub async fn get_accounts_to_create(
-    base_url: &reqwest::Url,
-    client: &mut reqwest::Client,
-    accounts: &[AccountNumber],
-    sender: AccountNumber,
-) -> Result<Vec<AccountNumber>, anyhow::Error> {
-    let result: NewAccountsQuery = crate::gql_query(
-        base_url,
-        client,
-        packages::SERVICE,
-        format!(
-            "query {{ newAccounts(accounts: {}, owner: {}) }}",
-            serde_json::to_string(accounts)?,
-            serde_json::to_string(&sender)?,
-        ),
-    )
-    .await?;
-    Ok(result.newAccounts)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -1716,12 +1715,20 @@ fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyho
     for package in packages {
         match package {
             PackageOp::Install(info) | PackageOp::Replace(_, info) => {
-                if info.is_local() == Some(!local) {
-                    Err(anyhow!(
-                        "{} is{} a local package",
-                        &info.name,
-                        if local { " not" } else { "" }
-                    ))?
+                match (info.is_local(), local) {
+                    (Some(true), false) => {
+                        Err(anyhow!(
+                            "The package you are installing, or one of its dependencies ({}), is a local package. Local packages must be installed with the `--local` flag.",
+                            &info.name
+                        ))?
+                    }
+                    (Some(false), true) => {
+                        Err(anyhow!(
+                            "The package you are installing, or one of its dependencies ({}), is not a local package. Remove the `--local` flag to install this package.",
+                            &info.name
+                        ))?
+                    }
+                    _ => {}
                 }
             }
             PackageOp::Remove(_) => {}

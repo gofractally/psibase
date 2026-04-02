@@ -2,6 +2,7 @@ import { CircleCheck, LoaderCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useGuildMembership } from "@/hooks/fractals/use-guild-membership";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 import { usePushApplication } from "@/hooks/use-push-application";
 
@@ -18,6 +19,17 @@ export const InviteResponse = () => {
     const { data: currentUser } = useCurrentUser();
     const navigate = useNavigate();
 
+    const { data: guildMembership, isFetchedAfterMount } = useGuildMembership(
+        guild,
+        currentUser,
+    );
+
+    useEffect(() => {
+        if (guildMembership) {
+            navigate(`/guild/${guild}/membership/members`);
+        }
+    }, [guildMembership, guild, navigate]);
+
     const {
         mutateAsync: pushApplication,
         isIdle,
@@ -27,10 +39,10 @@ export const InviteResponse = () => {
     });
 
     useEffect(() => {
-        if (guild && isIdle) {
+        if (guild && isIdle && isFetchedAfterMount && guildMembership == null) {
             pushApplication([guild!]);
         }
-    }, [isIdle, guild, pushApplication]);
+    }, [isIdle, guild, isFetchedAfterMount, pushApplication, guildMembership]);
 
     if (error) {
         <Card className="mx-auto mt-4 w-[350px]">

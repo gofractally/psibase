@@ -24,13 +24,14 @@ namespace psibase
    {
       std::string                name;
       std::string                version;
+      std::string                scope;
       std::string                description;
       std::vector<PackageRef>    depends;
       std::vector<AccountNumber> accounts;
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO_REFLECT(PackageInfo, name, version, description, depends, accounts, sha256, file)
+   PSIO_REFLECT(PackageInfo, name, version, scope, description, depends, accounts, sha256, file)
 
    std::weak_ordering operator<=>(const PackageInfo&, const PackageInfo&);
 
@@ -60,6 +61,7 @@ namespace psibase
       void regServer(std::vector<Action>& actions);
       void postinstall(std::vector<Action>& actions, std::span<const PackagedService> packages);
       void commitInstall(std::vector<Action>& actions, AccountNumber sender);
+      bool needsUI();
 
       std::vector<char> manifest();
 

@@ -380,11 +380,8 @@ mod tests {
 
     #[psibase::test_case(packages("VirtualServer", "StagedTx", "Invite", "Credentials"))]
     fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
-        //let vserver = Wrapper::SERVICE;
-        // let tokens = tokens::Wrapper::SERVICE;
         let invite = invite::Wrapper::SERVICE;
         let sys: tokens::TID = 1;
-        // let alice = AccountNumber::from("alice");
         let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
         initial_setup(&chain)?;

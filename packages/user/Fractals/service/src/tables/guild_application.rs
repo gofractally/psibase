@@ -1,15 +1,21 @@
 use async_graphql::ComplexObject;
 use async_graphql::{connection::Connection, SimpleObject};
 
-use psibase::{check_none, check_some, get_sender, AccountNumber, RawKey, Table, TableQuery};
+use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 
 use crate::{
-    constants::GUILD_ATTEST_THRESHOLD,
+    constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
     tables::tables::{
         Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
     },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
+
+enum ApplicationStatus {
+    Accepted,
+    Rejected,
+    Pending,
+}
 
 impl GuildApplication {
     fn new(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
@@ -23,13 +29,15 @@ impl GuildApplication {
         }
     }
 
-    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) {
+    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
         check_none(Self::get(guild, applicant), "application already exists");
         check_none(
             GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
-        Self::new(guild, applicant, extra_info).save();
+        let new_instance = Self::new(guild, applicant, extra_info);
+        new_instance.save();
+        new_instance
     }
 
     pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
@@ -50,11 +58,49 @@ impl GuildApplication {
         self.save();
     }
 
+    fn application_status(&self) -> ApplicationStatus {
+        let mut score = 0i16;
+        let mut acceptors: Vec<AccountNumber> = Vec::new();
+        let mut rejectors: Vec<AccountNumber> = Vec::new();
+
+        for attestation in GuildAttestTable::read().get_index_pk().range(
+            (self.guild, self.applicant, AccountNumber::new(0))
+                ..=(self.guild, self.applicant, AccountNumber::new(u64::MAX)),
+        ) {
+            if attestation.endorses {
+                score += 1;
+                acceptors.push(attestation.attester);
+            } else {
+                score -= 1;
+                rejectors.push(attestation.attester);
+            }
+        }
+
+        let auth = psibase::services::auth_dyn::Wrapper::call();
+
+        if score >= (GUILD_APP_ENDORSEMENT_THRESHOLD as i16)
+            || auth.isAuthSys(self.guild, acceptors, None, None)
+        {
+            ApplicationStatus::Accepted
+        } else if score <= -(GUILD_APP_REJECT_THRESHOLD as i16)
+            || auth.isAuthSys(self.guild, rejectors, None, None)
+        {
+            ApplicationStatus::Rejected
+        } else {
+            ApplicationStatus::Pending
+        }
+    }
+
     fn check_attests(&self) {
-        let passed = self.attestations_score() >= (GUILD_ATTEST_THRESHOLD as i16);
-        if passed {
-            GuildMember::add(self.guild, self.applicant);
-            self.remove()
+        match self.application_status() {
+            ApplicationStatus::Accepted => {
+                GuildMember::add(self.guild, self.applicant);
+                self.remove()
+            }
+            ApplicationStatus::Rejected => {
+                self.remove();
+            }
+            ApplicationStatus::Pending => {}
         }
     }
 
@@ -69,8 +115,8 @@ impl GuildApplication {
             .sum()
     }
 
-    pub fn attest(&self, comment: String, endorses: bool) {
-        GuildAttest::set(self.guild, self.applicant, get_sender(), comment, endorses);
+    pub fn attest(&self, comment: String, attester: AccountNumber, endorses: bool) {
+        GuildAttest::set(self.guild, self.applicant, attester, comment, endorses);
         self.check_attests();
     }
 
@@ -135,7 +181,7 @@ impl GuildApplication {
     pub async fn score(&self) -> ApplicationScore {
         ApplicationScore {
             current: self.attestations_score(),
-            required: GUILD_ATTEST_THRESHOLD as i16,
+            required: GUILD_APP_ENDORSEMENT_THRESHOLD as i16,
         }
     }
 }

@@ -7,6 +7,7 @@
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/local/XPackages.hpp>
 
 using namespace psibase;
@@ -22,8 +23,10 @@ namespace
       // to an executor in onClose, the creator is responsible for
       // calling remove.
       void onClose(const std::optional<std::string>&) noexcept override {}
-      void send(Writer&, std::span<const char> data) override
+      void send(Writer&, std::span<const char> data, std::uint32_t flags) override
       {
+         if (flags != 0)
+            abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          auto reply = psio::from_frac<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
          {
@@ -42,13 +45,26 @@ namespace
       SocketInfo info() const override { return HttpSocketInfo{LocalEndpoint{}}; }
       bool       okay = false;
    };
+
+   HttpRequest registerServer(LocalService::RegisteredServiceRow server)
+   {
+      std::string         rootHost("", 1);
+      HttpRequest         req{.host        = XHttp::service.str() + "." + rootHost,
+                              .method      = "POST",
+                              .target      = "/register_server",
+                              .contentType = "application/json"};
+      psio::vector_stream stream{req.body};
+      to_json(server, stream);
+      return req;
+   }
 }  // namespace
 
 void load_local_packages(TransactionContext&             tc,
                          const DirectoryRegistry&        registry,
                          const std::vector<PackageInfo>& packages)
 {
-   std::vector<HttpRequest> requests;
+   std::vector<HttpRequest>          requests;
+   std::vector<RegisteredServiceRow> servers;
 
    for (const auto& info : packages)
    {
@@ -74,6 +90,15 @@ void load_local_packages(TransactionContext&             tc,
              .code     = std::move(code),
          };
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+
+         if (serviceInfo.server)
+         {
+            auto server = LocalService::RegisteredServiceRow{account, *serviceInfo.server};
+            if (account == XPackages::service)
+               servers.push_back(server);
+            else
+               requests.push_back(registerServer(server));
+         }
       }
 
       std::string rootHost("", 1);
@@ -108,6 +133,12 @@ void load_local_packages(TransactionContext&             tc,
       psio::vector_stream stream(postinstall.body);
       to_json(info, stream);
       requests.push_back(std::move(postinstall));
+   }
+
+   // Set up HTTP servers that we use directly, first
+   {
+      auto serverReqs = servers | std::views::transform(registerServer);
+      requests.insert(requests.begin(), serverReqs.begin(), serverReqs.end());
    }
 
    auto socket = std::make_shared<TempSocket>();

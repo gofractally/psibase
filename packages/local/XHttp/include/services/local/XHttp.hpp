@@ -9,6 +9,8 @@ namespace LocalService
 {
    using SystemService::PendingRequestRow;
    using SystemService::PendingRequestTable;
+   using SystemService::RegisteredServiceRow;
+   using SystemService::RegServTable;
 
    enum class SocketType : std::uint8_t
    {
@@ -29,9 +31,12 @@ namespace LocalService
    using ResponseHandlerTable = psibase::Table<ResponseHandlerRow, &ResponseHandlerRow::socket>;
    PSIO_REFLECT_TYPENAME(ResponseHandlerTable)
 
+   /// Entry point for sockets
    struct XHttp : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-http"};
+
+      using Subjective = psibase::SubjectiveTables<RegServTable>;
 
       using Session = psibase::SessionTables<PendingRequestTable, ResponseHandlerTable>;
 
@@ -49,10 +54,12 @@ namespace LocalService
       static psibase::AccountNumber getService(const psibase::HttpRequest& req);
       static psibase::AccountNumber getService(psio::view<const psibase::HttpRequest> req);
 
-      /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
-      void send(std::int32_t socket, psio::view<const std::vector<char>> data);
+      /// Sends a message to a socket
+      ///
+      /// HTTP sockets should use sendReply, instead.
+      void send(std::int32_t socket, psio::view<const std::vector<char>> data, std::uint32_t flags);
 
-      /// Sends an HTTP request and returns the new socket.
+      /// Sends an HTTP request and returns the new socket
       ///
       /// Must be followed by `setCallback(socket, callback, err)`, or the
       /// socket will be closed when the current context exits. When the response
@@ -62,7 +69,7 @@ namespace LocalService
                                std::optional<psibase::TLSInfo>        tls,
                                std::optional<psibase::SocketEndpoint> endpoint);
 
-      /// Opens a websocket connection and returns the new socket.
+      /// Opens a websocket connection and returns the new socket
       ///
       /// Must be followed by `setCallback(socket, callback, err)`, or the
       /// socket will be closed when the current context exits. The
@@ -78,29 +85,52 @@ namespace LocalService
                              std::optional<psibase::SocketEndpoint> endpoint);
 
       /// Enables or disables automatic closing of the socket
-      /// when the transaction context exits.
+      /// when the transaction context exits
       ///
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void autoClose(std::int32_t socket, bool value);
 
-      /// Sends an HTTP response. The socket must have autoClose enabled.
+      /// Allow another service to send a response to a socket
+      ///
+      /// Auto-close must be enabled and the current owner of the
+      /// socket must be the sender. If local is false, then the
+      /// reply is expected to come through http-server.
+      void giveSocket(std::int32_t socket, psibase::AccountNumber account, bool local);
+
+      /// Take back ownership of a socket
+      ///
+      /// autoClose must not have been disabled after the sender called
+      /// `giveSocket`. local must be true if it was true for the corresponding
+      /// call to `giveSocket`.
+      ///
+      /// Returns true if taking ownership was successful
+      bool takeSocket(std::int32_t socket, bool local);
+
+      /// Sends an HTTP response
+      ///
+      /// The socket must have autoClose enabled
       void sendReply(std::int32_t socket, const psibase::HttpReply& response);
 
-      /// Accepts a websocket connection. The response must be a
+      /// Accepts a websocket connection
+      ///
+      /// The response must be a
       /// valid websocket handshake for the request. Must be
       /// followed by `setCallback(socket, callback, err)`, or the
       /// socket will be closed when the current context exits.
       void accept(std::int32_t socket, const psibase::HttpReply& reply);
 
-      /// Changes the callbacks for a socket. The sender must be the owner
-      /// of the socket.
+      /// Changes the callbacks for a socket
+      ///
+      /// The sender must be the owner of the socket.
       ///
       /// Can be called inside `PSIBASE_SUBJECTIVE_TX`
       void setCallback(std::int32_t          socket,
                        psibase::MethodNumber callback,
                        psibase::MethodNumber err);
 
-      /// Close a socket. The socket should be either a websocket
+      /// Close a socket
+      ///
+      /// The socket should be either a websocket
       /// or a pending http request. The regular close notification
       /// will be called.
       void asyncClose(std::int32_t socket);
@@ -111,23 +141,30 @@ namespace LocalService
       /// Returns the root host for a given host
       std::string rootHost(psio::view<const std::string> host);
 
+      /// handles requests to the x-http subdomain
+      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
+          -> std::optional<psibase::HttpReply>;
+
       /// Called by the host at the beginning of a session
       void startSession();
    };
    PSIO_REFLECT(XHttp,
-                method(send, socket, data),
+                method(send, socket, data, flags),
                 method(sendRequest, request, tls, endpoint),
                 method(websocket, request, tls, endpoint),
                 method(autoClose, socket, value),
+                method(giveSocket, socket, service, local),
+                method(takeSocket, socket, local),
                 method(sendReply, socket, response),
                 method(accept, socket, reply, callback, err),
                 method(setCallback, socket, callback, err),
                 method(asyncClose, socket),
                 method(log, severity, msg),
                 method(rootHost, host),
+                method(serveSys, request, socket),
                 method(startSession))
 
-   PSIBASE_REFLECT_TABLES(XHttp, XHttp::Session)
+   PSIBASE_REFLECT_TABLES(XHttp, XHttp::Subjective, XHttp::Session)
 
    inline psibase::AccountNumber XHttp::getService(const psibase::HttpRequest& req)
    {

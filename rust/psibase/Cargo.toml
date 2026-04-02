@@ -55,6 +55,7 @@ psibase-rust-workspace-hack.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 clap = { version = "4.5", features = ["derive", "env", "string"] }
+dialoguer = "0.11.0"
 hmac = "0.12"
 hyper-util = "0.1"
 indicatif = "0.17"

@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 import { lookup } from "mrmime";
+
 import { siblingUrl } from "@psibase/common-lib";
 
 /**
@@ -11,7 +12,7 @@ export async function installService(
 ): Promise<void> {
     const wasmFile = zip.file(`service/${serviceName}.wasm`);
     const jsonMetaFile = zip.file(`service/${serviceName}.json`);
-    
+
     if (!wasmFile || !jsonMetaFile) {
         throw new Error(
             `Service ${serviceName} .wasm or .json file not found in package`,
@@ -33,6 +34,29 @@ export async function installService(
             `Failed to install service ${serviceName}: ${response.status} ${errorText}`,
         );
     }
+
+    const info = JSON.parse(await jsonMetaFile.async("text"));
+    if (info.server) {
+        const response = await fetch(
+            siblingUrl(null, "x-http", "/register_server"),
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    service: serviceName,
+                    server: info.server,
+                }),
+            },
+        );
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+                `Failed to register server for ${serviceName}: ${response.status} ${errorText}`,
+            );
+        }
+    }
 }
 
 /**
@@ -43,12 +67,12 @@ export async function installAllServices(
     serviceNames: string[],
 ): Promise<string[]> {
     const installed: string[] = [];
-    
+
     for (const serviceName of serviceNames) {
         await installService(zip, serviceName);
         installed.push(serviceName);
     }
-    
+
     return installed;
 }
 
@@ -58,7 +82,10 @@ export async function installAllServices(
 export async function installDataFiles(zip: JSZip): Promise<void> {
     const dataDir = zip.folder("data");
     if (dataDir) {
-        const dataFilePromises: Array<{ path: string; data: Promise<ArrayBuffer> }> = [];
+        const dataFilePromises: Array<{
+            path: string;
+            data: Promise<ArrayBuffer>;
+        }> = [];
 
         dataDir.forEach((relativePath, file) => {
             if (!file.dir) {

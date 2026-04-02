@@ -23,6 +23,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:local/XAdmin/ui/wasm"\
     },\
     {\
+      "name": "@psibase/xproxy-ui",\
+      "reference": "workspace:local/XProxy/ui"\
+    },\
+    {\
       "name": "@psibase/accounts-ui",\
       "reference": "workspace:system/Accounts/ui"\
     },\
@@ -101,6 +105,7 @@ const RAW_RUNTIME_STATE =
     ["@psibase/supervisor-ui", ["workspace:user/Supervisor/ui"]],\
     ["@psibase/workshop-ui", ["workspace:user/Workshop/ui"]],\
     ["@psibase/xadmin-ui", ["workspace:local/XAdmin/ui"]],\
+    ["@psibase/xproxy-ui", ["workspace:local/XProxy/ui"]],\
     ["packages", ["workspace:user/Packages/ui"]],\
     ["root-workspace-0b6124", ["workspace:."]],\
     ["token-stream", ["workspace:user/TokenStream/ui"]],\
@@ -2662,6 +2667,7 @@ const RAW_RUNTIME_STATE =
           ["@types/node", "npm:22.19.6"],\
           ["@types/react", "npm:19.2.8"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
+          ["@types/react-router-dom", "npm:5.3.3"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.2"],\
           ["humanize-duration", "npm:3.33.2"],\
           ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
@@ -3005,6 +3011,25 @@ const RAW_RUNTIME_STATE =
           ["vite-plugin-wasm", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.5.0"],\
           ["waait", "npm:1.0.5"],\
           ["zod", "npm:3.25.76"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@psibase/xproxy-ui", [\
+      ["workspace:local/XProxy/ui", {\
+        "packageLocation": "./local/XProxy/ui/",\
+        "packageDependencies": [\
+          ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
+          ["@psibase/xproxy-ui", "workspace:local/XProxy/ui"],\
+          ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.16"],\
+          ["@types/node", "npm:22.19.6"],\
+          ["@types/react", "npm:19.2.8"],\
+          ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
+          ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.2"],\
+          ["react", "npm:19.2.3"],\
+          ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
+          ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
+          ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -6631,14 +6656,14 @@ const RAW_RUNTIME_STATE =
     ]],\
     ["@trivago/prettier-plugin-sort-imports", [\
       ["npm:5.2.2", {\
-        "packageLocation": "../.caches/yarn/@trivago-prettier-plugin-sort-imports-npm-5.2.2-f4dcaaedd3-2a4f0464f1.zip/node_modules/@trivago/prettier-plugin-sort-imports/",\
+        "packageLocation": "./.yarn/unplugged/@trivago-prettier-plugin-sort-imports-virtual-9f42b177f7/node_modules/@trivago/prettier-plugin-sort-imports/",\
         "packageDependencies": [\
           ["@trivago/prettier-plugin-sort-imports", "npm:5.2.2"]\
         ],\
         "linkType": "SOFT"\
       }],\
       ["virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.2.2", {\
-        "packageLocation": "./.yarn/__virtual__/@trivago-prettier-plugin-sort-imports-virtual-9f42b177f7/2/.caches/yarn/@trivago-prettier-plugin-sort-imports-npm-5.2.2-f4dcaaedd3-2a4f0464f1.zip/node_modules/@trivago/prettier-plugin-sort-imports/",\
+        "packageLocation": "./.yarn/unplugged/@trivago-prettier-plugin-sort-imports-virtual-9f42b177f7/node_modules/@trivago/prettier-plugin-sort-imports/",\
         "packageDependencies": [\
           ["@babel/generator", "npm:7.28.6"],\
           ["@babel/parser", "npm:7.28.6"],\
@@ -14379,14 +14404,14 @@ const RAW_RUNTIME_STATE =
     ]],\
     ["prettier-plugin-tailwindcss", [\
       ["npm:0.5.14", {\
-        "packageLocation": "../.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-7eca7158c3/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["prettier-plugin-tailwindcss", "npm:0.5.14"]\
         ],\
         "linkType": "SOFT"\
       }],\
       ["virtual:23ffd5fef66e3094826609b25824b4cc8e93efd591484709f57b9799b300994440e2f2aa75325a50a3c8a2f95609e44796333afd0f119ecad7f07f451dad1978#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/prettier-plugin-tailwindcss-virtual-33ab1b72e3/2/.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-33ab1b72e3/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["@ianvs/prettier-plugin-sort-imports", null],\
           ["@prettier/plugin-pug", null],\
@@ -14459,7 +14484,7 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }],\
       ["virtual:bea8eaa94aae1d23925615f3bce7998ef9984a6f761d08fb097e00e9fd9beac7339111df33ba3c5051ec5c6936741b2de9e7d751d8f20316492b61e8afe473f4#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/prettier-plugin-tailwindcss-virtual-7eca7158c3/2/.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-7eca7158c3/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["@ianvs/prettier-plugin-sort-imports", null],\
           ["@prettier/plugin-pug", null],\
@@ -14532,7 +14557,7 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }],\
       ["virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:0.5.14", {\
-        "packageLocation": "./.yarn/__virtual__/prettier-plugin-tailwindcss-virtual-09ed13d932/2/.caches/yarn/prettier-plugin-tailwindcss-npm-0.5.14-4c72a3a392-9857873cb8.zip/node_modules/prettier-plugin-tailwindcss/",\
+        "packageLocation": "./.yarn/unplugged/prettier-plugin-tailwindcss-virtual-09ed13d932/node_modules/prettier-plugin-tailwindcss/",\
         "packageDependencies": [\
           ["@ianvs/prettier-plugin-sort-imports", null],\
           ["@prettier/plugin-pug", null],\

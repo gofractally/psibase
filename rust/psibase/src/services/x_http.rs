@@ -1,11 +1,20 @@
+use crate::AccountNumber;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct RegisterServerRequest {
+    pub service: AccountNumber,
+    pub server: AccountNumber,
+}
+
 #[crate::service(name = "x-http", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 mod service {
-    use crate::{HttpReply, HttpRequest, MethodNumber, SocketEndpoint, TLSInfo};
+    use crate::{AccountNumber, HttpReply, HttpRequest, MethodNumber, SocketEndpoint, TLSInfo};
 
     /// Sends a message to a socket. HTTP sockets should use sendReply, instead.
     #[action]
-    fn send(socket: i32, data: Vec<u8>) {
+    fn send(socket: i32, data: Vec<u8>, flags: u32) {
         unimplemented!()
     }
 
@@ -53,6 +62,28 @@ mod service {
         unimplemented!()
     }
 
+    /// Allow another service to send a response to a socket
+    ///
+    /// Auto-close must be enabled and the current owner of the
+    /// socket must be the sender. If local is false, then the
+    /// reply is expected to come through http-server.
+    #[action]
+    fn giveSocket(socket: i32, account: AccountNumber, local: bool) {
+        unimplemented!()
+    }
+
+    /// Take back ownership of a socket
+    ///
+    /// autoClose must not have been disabled after the sender called
+    /// `giveSocket`. local must be true if it was true for the corresponding
+    /// call to `giveSocket`.
+    ///
+    /// Returns true if taking ownership was successful
+    #[action]
+    fn takeSocket(socket: i32, local: bool) -> bool {
+        unimplemented!()
+    }
+
     /// Sends an HTTP response. The socket must have autoClose enabled.
     #[action]
     fn sendReply(socket: i32, response: HttpReply) {
@@ -93,6 +124,11 @@ mod service {
     /// Returns the root host for a given host
     #[action]
     fn rootHost(host: String) -> String {
+        unimplemented!()
+    }
+
+    #[action]
+    fn serveSys(req: HttpRequest, socket: Option<i32>) -> Option<HttpReply> {
         unimplemented!()
     }
 

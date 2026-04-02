@@ -7,10 +7,13 @@ publish.workspace = true
 
 [package.metadata.psibase]
 plugin = "identity-plugin"
+server = "identity"
 data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = [{ sender = "identity", service = "identity", method = "init" }]
 
 [dependencies]
 psibase_macros.workspace = true
+psibase_service.workspace = true
 psibase.workspace = true
 serde.workspace = true
 async-graphql.workspace = true

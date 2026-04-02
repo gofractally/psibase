@@ -2,20 +2,28 @@ use anyhow::Error;
 use anyhow::{anyhow, Context};
 use cargo_metadata::semver::Version;
 use cargo_metadata::Message;
-use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, PackageId};
+use cargo_metadata::{DepKindInfo, DependencyKind, Metadata, NodeDep, Package, PackageId};
 use clap::{Parser, Subcommand};
 use console::style;
-use psibase::{ExactAccountNumber, PackageInfo, Schema};
-use regex::Regex;
+use futures::{
+    future::{select, Either},
+    stream::FuturesUnordered,
+    Future, StreamExt,
+};
+use psibase::{ExactAccountNumber, PackageInfo};
 use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
-use std::fs::{read, write, File, OpenOptions};
+use std::fs::{read, write, File};
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::process::{exit, ExitCode, Stdio};
+use std::time::SystemTime;
 use std::{env, fs};
 use tokio::io::AsyncBufReadExt;
-use walrus::Module;
+use tokio::task::spawn_blocking;
+use walrus::{ExportItem, Module};
 use wasm_opt::OptimizationOptions;
 
 mod link;
@@ -26,15 +34,13 @@ use package::*;
 /// The version of the cargo-psibase crate at compile time
 const CARGO_PSIBASE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const SERVICE_ARGS: &[&str] = &["--lib", "--crate-type=cdylib"];
-const SERVICE_ARGS_RUSTC: &[&str] = &[
-    "--",
-    "-C",
-    "target-feature=+simd128,+bulk-memory,+sign-ext,+nontrapping-fptoint",
-];
+const SERVICE_ARGS: &[&str] = &["--lib"];
 
 const SERVICE_POLYFILL: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/service_wasi_polyfill.wasm"));
+
+const SERVICE_EXPORTS: &[&str] = &["start", "called", "verify", "serve", "recv", "close"];
+const TESTER_EXPORTS: &[&str] = &["_start"];
 
 /// Build, test, and deploy psibase services
 #[derive(Parser, Debug)]
@@ -53,7 +59,8 @@ enum PsibaseCommand {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Sign with this key (repeatable)
+    /// Sign transactions with one or more keys.
+    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
     #[clap(short = 's', long, value_name = "KEY")]
     sign: Vec<String>,
 
@@ -76,6 +83,10 @@ struct Args {
     /// Build only the specified packages
     #[clap(short = 'p', long, global = true, value_name = "SPEC")]
     package: Vec<String>,
+
+    /// The number of jobs to run in parallel
+    #[clap(short = 'j', long, global = true, value_name = "N")]
+    jobs: Option<usize>,
 
     #[clap(subcommand)]
     command: Command,
@@ -182,6 +193,19 @@ fn find_psitest() -> PathBuf {
     "psitest".to_string().into()
 }
 
+fn strip(code: &mut Module, fns: &[&str]) -> Result<(), Error> {
+    let mut ids = Vec::new();
+    for exp in code.exports.iter() {
+        if !matches!(exp.item, ExportItem::Function(_)) || !fns.contains(&exp.name.as_str()) {
+            ids.push(exp.id())
+        }
+    }
+    for id in ids {
+        code.exports.delete(id)
+    }
+    Ok(())
+}
+
 fn optimize(code: &mut Module) -> Result<(), Error> {
     let file = tempfile::NamedTempFile::new()?;
     code.emit_wasm_file(file.path())?;
@@ -204,17 +228,77 @@ fn optimize(code: &mut Module) -> Result<(), Error> {
     Ok(())
 }
 
-fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
-    let mut timestamp_file = filename.clone();
-    timestamp_file.as_mut_os_string().push(".cargo_psibase");
-    let md = fs::metadata(filename)
-        .with_context(|| format!("Failed to get metadata for {}", filename.display()))?;
-    if let Ok(md2) = fs::metadata(&timestamp_file) {
-        if md2.modified().unwrap() >= md.modified().unwrap() {
-            return Ok(());
-        }
+trait MTime {
+    fn oldest_mtime(&self) -> Result<SystemTime, Error> {
+        self.newest_mtime()
     }
+    fn newest_mtime(&self) -> Result<SystemTime, Error>;
+    fn is_newer_than<T: MTime>(&self, other: T) -> Result<bool, Error> {
+        if let Ok(md2) = other.newest_mtime() {
+            if md2 >= self.oldest_mtime()? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+}
 
+impl MTime for Path {
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        let md = fs::metadata(self)
+            .with_context(|| format!("Failed to get metadata for {}", self.display()))?;
+        Ok(md
+            .modified()
+            .with_context(|| format!("Failed to read mtime for {}", self.display()))?)
+    }
+}
+
+impl MTime for PathBuf {
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        self.as_path().newest_mtime()
+    }
+}
+
+impl<T: MTime + ?Sized> MTime for &T {
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        (*self).newest_mtime()
+    }
+}
+
+impl<T0: MTime, T1: MTime> MTime for (T0, T1) {
+    fn oldest_mtime(&self) -> Result<SystemTime, Error> {
+        Ok(self.0.oldest_mtime()?.min(self.1.oldest_mtime()?))
+    }
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        Ok(self.0.newest_mtime()?.max(self.1.newest_mtime()?))
+    }
+}
+
+impl<T: MTime, const N: usize> MTime for [T; N] {
+    fn oldest_mtime(&self) -> Result<SystemTime, Error> {
+        let mut iter = self.iter();
+        let mut result = iter.next().unwrap().oldest_mtime()?;
+        for x in iter {
+            result = result.min(x.oldest_mtime()?)
+        }
+        Ok(result)
+    }
+    fn newest_mtime(&self) -> Result<SystemTime, Error> {
+        let mut iter = self.iter();
+        let mut result = iter.next().unwrap().newest_mtime()?;
+        for x in iter {
+            result = result.max(x.newest_mtime()?)
+        }
+        Ok(result)
+    }
+}
+
+fn process(
+    filename: &PathBuf,
+    polyfill: Option<&[u8]>,
+    exports: &[&str],
+    output_file: &Path,
+) -> Result<(), Error> {
     let code = &read(filename).with_context(|| format!("Failed to read {}", filename.display()))?;
 
     let debug_build = false;
@@ -225,27 +309,113 @@ fn process(filename: &PathBuf, polyfill: Option<&[u8]>) -> Result<(), Error> {
 
     if let Some(polyfill) = polyfill {
         let polyfill_source_module = config.parse(polyfill)?;
-        pretty_path("Polyfilling", filename);
         link_module(&polyfill_source_module, &mut dest_module)?;
     }
 
-    pretty_path("Reoptimizing", filename);
+    strip(&mut dest_module, exports)?;
+
     optimize(&mut dest_module)?;
 
-    write(filename, dest_module.emit_wasm())
-        .with_context(|| format!("Failed to write {}", filename.display()))?;
-
-    OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(timestamp_file)?;
+    write(output_file, dest_module.emit_wasm())
+        .with_context(|| format!("Failed to write {}", output_file.display()))?;
 
     Ok(())
 }
 
+#[derive(Debug, Clone)]
+struct PackageArtifact<T> {
+    value: T,
+    package_index: usize,
+}
+
+type ArtifactFile = PackageArtifact<PathBuf>;
+
+#[derive(Debug, Default)]
+struct ArtifactList {
+    services: Vec<ArtifactFile>,
+    tests: Vec<ArtifactFile>,
+    dep_dirs: HashSet<PathBuf>,
+}
+
 async fn get_files(
-    packages: &[&str],
+    packages: &[&Package],
+    mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
+) -> Result<ArtifactList, Error> {
+    let mut result = ArtifactList::default();
+    while let Some(line) = lines.next_line().await? {
+        match serde_json::from_str::<cargo_metadata::Message>(&line)? {
+            Message::CompilerMessage(msg) => {
+                print!("{}", msg.message.rendered.unwrap());
+            }
+            Message::CompilerArtifact(artifact) => {
+                for p in &artifact.filenames {
+                    if p.extension() == Some("rmeta") {
+                        if let Some(parent) = p.parent() {
+                            result.dep_dirs.insert(parent.as_std_path().to_path_buf());
+                        }
+                    }
+                }
+                if let Some(idx) = packages
+                    .iter()
+                    .position(|package| package.id == artifact.package_id)
+                {
+                    if artifact.profile.test {
+                        if let Some(path) = artifact.executable {
+                            result.tests.push(ArtifactFile {
+                                value: path.clone().into_std_path_buf(),
+                                package_index: idx,
+                            })
+                        }
+                    } else {
+                        for p in &artifact.filenames {
+                            if p.extension() == Some("rlib") {
+                                result.services.push(ArtifactFile {
+                                    value: p.clone().into_std_path_buf(),
+                                    package_index: idx,
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+    Ok(result)
+}
+
+async fn get_plugin_files(
+    packages: &[&Package],
+    mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
+) -> Result<Vec<ArtifactFile>, Error> {
+    let mut result = Vec::new();
+    while let Some(line) = lines.next_line().await? {
+        match serde_json::from_str::<cargo_metadata::Message>(&line)? {
+            Message::CompilerMessage(msg) => {
+                print!("{}", msg.message.rendered.unwrap());
+            }
+            Message::CompilerArtifact(artifact) => {
+                if let Some(idx) = packages
+                    .iter()
+                    .position(|package| package.id == artifact.package_id)
+                {
+                    for p in &artifact.filenames {
+                        if p.extension() == Some("wasm") {
+                            result.push(ArtifactFile {
+                                value: p.clone().into_std_path_buf(),
+                                package_index: idx,
+                            })
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+    Ok(result)
+}
+
+async fn get_wasm_files(
     mut lines: tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
 ) -> Result<Vec<PathBuf>, Error> {
     let mut result = Vec::new();
@@ -255,15 +425,13 @@ async fn get_files(
                 print!("{}", msg.message.rendered.unwrap());
             }
             Message::CompilerArtifact(artifact) => {
-                if packages.contains(&artifact.package_id.repr.as_str()) {
-                    result.extend(
-                        artifact
-                            .filenames
-                            .iter()
-                            .map(|p| p.clone().into_std_path_buf())
-                            .filter(|p| p.as_path().extension().unwrap_or_default() == "wasm"),
-                    );
-                }
+                result.extend(
+                    artifact
+                        .filenames
+                        .iter()
+                        .filter(|p| p.extension() == Some("wasm"))
+                        .map(|p| p.clone().into_std_path_buf()),
+                );
             }
             _ => (),
         }
@@ -334,130 +502,330 @@ fn check_psibase_version(metadata: &Metadata) {
     }
 }
 
-async fn build(
-    args: &Args,
-    packages: &[&str],
-    envs: Vec<(&str, &str)>,
-    extra_args: &[&str],
-    poly: Option<&[u8]>,
-) -> Result<Vec<PathBuf>, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
-        .envs(envs)
-        .arg("rustc")
-        .args(extra_args)
-        .arg("--release")
-        .arg("--target=wasm32-wasip1")
-        .args(get_manifest_path(args))
-        .args(get_target_dir(args))
-        .arg("--message-format=json-diagnostic-rendered-ansi")
-        .arg("--color=always")
-        .args(SERVICE_ARGS_RUSTC)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+type JobAcquiredSender = tokio::sync::oneshot::Sender<std::io::Result<jobserver::Acquired>>;
 
-    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
-    let status = command.wait();
-    let (status, files, _) =
-        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
-
-    let status = status?;
-    if !status.success() {
-        exit(status.code().unwrap());
-    }
-
-    let files = files?;
-    for f in &files {
-        process(f, poly)?
-    }
-
-    Ok(files)
+struct AsyncJobServer {
+    helper: jobserver::HelperThread,
+    queue: std::sync::mpsc::Sender<JobAcquiredSender>,
 }
 
-async fn build_schema(
-    args: &Args,
-    packages: &[&str],
-    extra_args: &[&str],
-) -> Result<Schema, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
-        .envs(vec![("CARGO_PSIBASE_TEST", "")])
-        .arg("test")
-        .args(extra_args)
-        .arg("--release")
-        .arg("--target=wasm32-wasip1")
-        .args(get_manifest_path(args))
-        .args(get_target_dir(args))
-        .arg("--message-format=json-diagnostic-rendered-ansi")
-        .arg("--color=always")
-        .arg("--lib")
-        .arg("--no-run")
-        .args(SERVICE_ARGS_RUSTC)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-
-    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
-    let status = command.wait();
-    let (status, files, _) =
-        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
-
-    let status = status?;
-    if !status.success() {
-        exit(status.code().unwrap());
+impl AsyncJobServer {
+    fn new(client: jobserver::FromEnv, limit: Option<usize>) -> Result<AsyncJobServer, Error> {
+        use jobserver::FromEnvErrorKind::*;
+        let client = match client.client {
+            Ok(client) => client,
+            Err(err) => match err.kind() {
+                NoEnvVar | NoJobserver | Unsupported => jobserver::Client::new(
+                    limit.unwrap_or_else(|| {
+                        std::thread::available_parallelism().map_or(1, |n| n.get())
+                    }) - 1,
+                )?,
+                CannotParse | CannotOpenPath | CannotOpenFd | NegativeFd => {
+                    eprintln!("{:}: {}", style("warning").bold().yellow(), "A jobserver was found in the environment, but it could not be accessed. Add '+' to parent make rule.");
+                    jobserver::Client::new(limit.unwrap_or(1) - 1)?
+                }
+                _ => Err(err)?,
+            },
+        };
+        let (sender, receiver) = std::sync::mpsc::channel::<JobAcquiredSender>();
+        let helper = client.into_helper_thread(move |aq| {
+            if let Ok(send_token) = receiver.recv() {
+                let _ = send_token.send(aq);
+            }
+        })?;
+        Ok(AsyncJobServer {
+            helper,
+            queue: sender,
+        })
     }
-
-    let files = files?;
-    for f in &files {
-        process(f, None)?
+    async fn acquire(&self) -> Result<jobserver::Acquired, Error> {
+        let (send, receive) = tokio::sync::oneshot::channel();
+        self.queue.send(send)?;
+        self.helper.request_token();
+        Ok(receive.await??)
     }
+}
 
-    let mut command = tokio::process::Command::new(&args.psitest)
-        .arg(&files[0])
-        .arg("_psibase_get_schema")
-        .arg("--show-output")
-        .arg("--include-ignored")
-        .stdout(Stdio::piped())
-        .spawn()?;
+struct JobRunner<
+    Fut: Future<Output = Result<(), Error>>,
+    Acq: Future<Output = Result<jobserver::Acquired, Error>>,
+    F: Fn() -> Acq,
+> {
+    slots: u32,
+    acquire: F,
+    running: FuturesUnordered<Fut>,
+    acquired: Vec<jobserver::Acquired>,
+    pending: Option<Pin<Box<Acq>>>,
+}
 
-    let mut stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
-    let status = command.wait();
-
-    let (status, schema) = tokio::join!(
-        status, //
-        async {
-            let re = Regex::new(r"^psibase-schema-gen-output: (.*)$").unwrap();
-            let mut schema = None;
-            while let Some(line) = stdout.next_line().await? {
-                if schema.is_none() {
-                    if let Some(cap) = re.captures(&line) {
-                        schema = Some(cap[1].to_owned());
+impl<
+        Fut: Future<Output = Result<(), Error>>,
+        Acq: Future<Output = Result<jobserver::Acquired, Error>>,
+        F: Fn() -> Acq,
+    > JobRunner<Fut, Acq, F>
+{
+    fn new(acquire: F) -> Self {
+        JobRunner {
+            slots: 1,
+            acquire,
+            running: FuturesUnordered::new(),
+            acquired: Vec::new(),
+            pending: None,
+        }
+    }
+    async fn push(&mut self, fut: Fut) -> Result<(), Error> {
+        if self.slots > 0 {
+            self.slots -= 1
+        } else {
+            let new_slot =
+                std::mem::take(&mut self.pending).unwrap_or_else(|| Box::pin((self.acquire)()));
+            if self.running.is_empty() {
+                self.acquired.push(
+                    new_slot
+                        .await
+                        .with_context(|| format!("Failed to acquire job"))?,
+                );
+                println!("first slot acquired")
+            } else {
+                match select(new_slot, self.running.next()).await {
+                    Either::Left((slot, _)) => {
+                        self.acquired
+                            .push(slot.with_context(|| format!("Failed to acquire job"))?);
+                        println!("slot acquired");
+                    }
+                    Either::Right((res, slot)) => {
+                        println!("job finished");
+                        res.unwrap()?;
+                        self.pending = Some(slot)
                     }
                 }
             }
-            Ok::<_, Error>(schema)
-        },
-    );
+        }
+        self.running.push(fut);
+        Ok(())
+    }
+    async fn wait(&mut self) -> Result<(), Error> {
+        while let Some(res) = self.running.next().await {
+            res?;
+            if self.acquired.pop().is_none() {
+                self.slots += 1;
+            }
+        }
+        assert!(self.slots == 1);
+        Ok(())
+    }
+}
+
+async fn wait_for_child(
+    mut command: tokio::process::Child,
+    packages: &[&Package],
+) -> Result<ArtifactList, Error> {
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files, _) =
+        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+
+    let status = status.with_context(|| format!("Failed to wait for child"))?;
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+
+    files
+}
+
+fn write_service_crate(root: &Path) -> Result<PathBuf, Error> {
+    let manifest = root.join("Cargo.toml");
+    let libsrc = root.join("src/lib.rs");
+    let exesrc = root.join("src/main.rs");
+    write!(
+        &mut File::create(&manifest)?,
+        "{}",
+        include_str!("service/Cargo.toml")
+    )?;
+    std::fs::create_dir(root.join("src"))?;
+    write!(
+        &mut File::create(libsrc)?,
+        "{}",
+        include_str!("service/src/lib.rs")
+    )?;
+    write!(
+        &mut File::create(exesrc)?,
+        "{}",
+        include_str!("service/src/main.rs")
+    )?;
+    Ok(manifest)
+}
+
+async fn build_service_impl(
+    manifest: &Path,
+    target: &str,
+    rustc_args: &[OsString],
+) -> Result<Vec<PathBuf>, Error> {
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
+        .arg("rustc")
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .arg("--manifest-path")
+        .arg(manifest)
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .arg(target)
+        .arg("--")
+        .args(rustc_args);
+
+    let mut command = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+
+    let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
+    let status = command.wait();
+    let (status, files) = tokio::join!(status, get_wasm_files(stdout));
+
     let status = status?;
     if !status.success() {
         exit(status.code().unwrap());
     }
 
-    Ok(serde_json::from_str::<Schema>(
-        &schema?.ok_or_else(|| anyhow!("Failed to generate schema"))?,
-    )?)
+    files
 }
 
-async fn build_plugin(
+async fn build_service(
     args: &Args,
-    packages: &[&str],
-    extra_args: &[&str],
-) -> Result<Vec<PathBuf>, Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
+    lib: &Path,
+    output_file: &Path,
+    schema_file: &Path,
+    dep_dirs: &HashSet<PathBuf>,
+) -> Result<(), Error> {
+    if !lib.is_newer_than((output_file, &schema_file))? {
+        return Ok(());
+    }
+    pretty(
+        "Creating",
+        &format!(
+            "service {}",
+            output_file.file_name().unwrap().to_string_lossy()
+        ),
+    );
+    let tmp_crate = tempfile::tempdir()?;
+
+    let manifest = write_service_crate(tmp_crate.path())?;
+
+    let mut rustc_args = Vec::new();
+    rustc_args.push("--extern".into());
+    let mut dep = OsString::from("service=");
+    dep.push(lib);
+    rustc_args.push(dep);
+    for dir in dep_dirs {
+        rustc_args.push("-L".into());
+        let mut libpath = OsString::from("dependency=");
+        libpath.push(dir);
+        rustc_args.push(libpath);
+    }
+    let files = build_service_impl(&manifest, "--lib", &rustc_args).await?;
+    assert!(files.len() == 1);
+    let output_file_copy = output_file.to_owned();
+    spawn_blocking(move || {
+        process(
+            &files[0],
+            Some(SERVICE_POLYFILL),
+            SERVICE_EXPORTS,
+            &output_file_copy,
+        )
+    })
+    .await??;
+    let schema_gen = build_service_impl(&manifest, "--bins", &rustc_args).await?;
+    assert!(schema_gen.len() == 1);
+    let schema_gen_file = schema_gen[0].clone();
+    spawn_blocking(move || process(&schema_gen_file, None, TESTER_EXPORTS, &schema_gen_file))
+        .await??;
+
+    let status = tokio::process::Command::new(&args.psitest)
+        .arg(&schema_gen[0])
+        .stdout(File::create(&schema_file)?)
+        .status()
+        .await?;
+
+    if !status.success() {
+        exit(status.code().unwrap());
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+struct ServicePaths {
+    service: PathBuf,
+    schema: PathBuf,
+}
+
+type ServiceArtifacts = PackageArtifact<ServicePaths>;
+
+async fn build(
+    jobs: &AsyncJobServer,
+    args: &Args,
+    packages: &[&Package],
+    extra: &[&PackageId],
+) -> Result<Vec<ServiceArtifacts>, Error> {
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
+        .arg("build")
+        .args(SERVICE_ARGS)
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    for package in packages {
+        command.arg("-p");
+        command.arg(&package.name);
+    }
+    for package in extra {
+        command.arg("-p");
+        command.arg(&package.repr);
+    }
+
+    let files = wait_for_child(command.spawn()?, packages).await?;
+    let mut result = Vec::new();
+
+    let mut running = JobRunner::new(|| jobs.acquire());
+    for f in &files.services {
+        let name = &packages[f.package_index].name;
+        let service = f.value.with_file_name(format!("{name}.wasm"));
+        let schema = service.with_extension("schema.json");
+        {
+            let service = service.clone();
+            let schema = schema.clone();
+            let files = &files;
+            running
+                .push(async move {
+                    build_service(args, &f.value, &service, &schema, &files.dep_dirs)
+                        .await
+                        .with_context(|| format!("Failed to build service {}", service.display()))
+                })
+                .await?;
+        }
+        result.push(ServiceArtifacts {
+            value: ServicePaths { service, schema },
+            package_index: f.package_index,
+        });
+    }
+
+    running.wait().await?;
+
+    Ok(result)
+}
+
+async fn build_plugins(args: &Args, packages: &[&Package]) -> Result<Vec<ArtifactFile>, Error> {
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
         .arg("component")
         .arg("build")
-        .args(extra_args)
         .arg("--release")
         .arg("--target=wasm32-wasip1")
         .args(get_manifest_path(args))
@@ -465,14 +833,21 @@ async fn build_plugin(
         .arg("--message-format=json-render-diagnostics")
         .arg("--color=always")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
+    for p in packages {
+        command.arg("-p");
+        command.arg(&p.name);
+    }
 
+    let mut command = command.spawn()?;
     let stdout = tokio::io::BufReader::new(command.stdout.take().unwrap()).lines();
     let stderr = tokio::io::BufReader::new(command.stderr.take().unwrap()).lines();
     let status = command.wait();
-    let (status, files, _) =
-        tokio::join!(status, get_files(packages, stdout), print_messages(stderr),);
+    let (status, files, _) = tokio::join!(
+        status,
+        get_plugin_files(packages, stdout),
+        print_messages(stderr),
+    );
 
     let status = status?;
     if !status.success() {
@@ -480,29 +855,6 @@ async fn build_plugin(
     }
 
     Ok(files?)
-}
-
-async fn build_package_root(args: &Args, package: &str) -> Result<(), Error> {
-    let mut command = tokio::process::Command::new(get_cargo())
-        .arg("rustc")
-        .args(&["-p", package])
-        .arg("--release")
-        .arg("--lib")
-        .arg("--target=wasm32-wasip1")
-        .args(get_manifest_path(args))
-        .args(get_target_dir(args))
-        .arg("--color=always")
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-
-    let status = command.wait().await?;
-
-    if !status.success() {
-        exit(status.code().unwrap());
-    }
-
-    Ok(())
 }
 
 fn is_wasm32_wasi(dep: &DepKindInfo) -> bool {
@@ -541,7 +893,7 @@ fn is_normal_dependency(dep: &NodeDep) -> bool {
 
 struct PackageSet<'a> {
     packages: Vec<&'a PackageId>,
-    visited: HashSet<&'a PackageId>,
+    visited: HashMap<&'a PackageId, usize>,
     metadata: &'a MetadataIndex<'a>,
 }
 
@@ -549,7 +901,7 @@ impl<'a> PackageSet<'a> {
     fn new(metadata: &'a MetadataIndex) -> Self {
         PackageSet {
             packages: Vec::new(),
-            visited: HashSet::new(),
+            visited: HashMap::new(),
             metadata,
         }
     }
@@ -557,7 +909,8 @@ impl<'a> PackageSet<'a> {
         if package::get_metadata(self.metadata.packages.get(id.repr.as_str()).unwrap())?
             .is_package()
         {
-            if self.visited.insert(id) {
+            if !self.visited.contains_key(id) {
+                self.visited.insert(id, self.packages.len());
                 self.packages.push(id);
                 return Ok(true);
             }
@@ -579,7 +932,7 @@ impl<'a> PackageSet<'a> {
         }
         Ok(())
     }
-    async fn build(&self, args: &Args) -> Result<Vec<PackageInfo>, Error> {
+    async fn build(&self, jobs: &AsyncJobServer, args: &Args) -> Result<Vec<PackageInfo>, Error> {
         pretty(
             "Packages",
             &self
@@ -599,9 +952,7 @@ impl<'a> PackageSet<'a> {
 
         let mut index = Vec::new();
 
-        for p in &self.packages {
-            index.push(build_package(args, self.metadata, Some(&p.repr)).await?);
-        }
+        index.extend(build_packages(jobs, args, self.metadata, &self.packages).await?);
         Ok(index)
     }
 }
@@ -624,22 +975,27 @@ fn get_test_packages<'a>(
     Ok(packages)
 }
 
-async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> Result<(), Error> {
-    let mut test_packages: Vec<(&str, PackageSet)> = Vec::new();
+async fn test(
+    jobs: &AsyncJobServer,
+    args: &Args,
+    opts: &TestCommand,
+    metadata: &MetadataIndex<'_>,
+) -> Result<(), Error> {
+    let mut test_packages: Vec<(&Package, PackageSet)> = Vec::new();
     if args.package.is_empty() {
         for id in &*metadata.metadata.workspace_default_members {
-            test_packages.push((id.repr.as_str(), get_test_packages(metadata, &id.repr)?));
+            let p = metadata.packages.get(id.repr.as_str()).unwrap();
+            test_packages.push((*p, get_test_packages(metadata, &id.repr)?));
         }
     } else {
         for package in &args.package {
-            let id = &metadata
+            let p = &metadata
                 .metadata
                 .packages
                 .iter()
                 .find(|p| &p.name == package)
-                .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                .id;
-            test_packages.push((id.repr.as_str(), get_test_packages(metadata, &id.repr)?));
+                .ok_or_else(|| anyhow!("Could not find package {}", package))?;
+            test_packages.push((*p, get_test_packages(metadata, &p.id.repr)?));
         }
     }
 
@@ -648,65 +1004,95 @@ async fn test(args: &Args, opts: &TestCommand, metadata: &MetadataIndex<'_>) -> 
         |p| p.as_path(),
     );
     let out_dir = target_dir.join("wasm32-wasip1/release/packages");
-    let mut built: HashMap<&PackageId, PackageInfo> = HashMap::new();
     let mut test_info = Vec::new();
     pretty("Packages", "building dependencies...");
-    for (id, deps) in test_packages {
+    let mut all_dependencies = PackageSet::new(metadata);
+    for (_, deps) in &test_packages {
+        for package in &deps.packages {
+            all_dependencies.try_insert(*package).unwrap();
+        }
+    }
+    let info = all_dependencies.build(jobs, args).await?;
+
+    for (package, deps) in test_packages {
         let mut index = Vec::new();
         for p in &deps.packages {
-            if let Some(found) = built.get(p) {
-                index.push(found.clone());
-            } else {
-                let info = build_package(args, metadata, Some(p.repr.as_str())).await?;
-                built.insert(p, info.clone());
-                index.push(info);
-            }
+            index.push(info[all_dependencies.visited[*p]].clone());
         }
 
         // Write a package index specific to the crate
-        let index_file =
-            out_dir.join(metadata.packages.get(id).unwrap().name.clone() + "-index.json");
+        let index_file = out_dir.join(package.name.clone() + "-index.json");
         serde_json::to_writer(File::create(&index_file)?, &index)?;
-        test_info.push((id, index_file));
+        test_info.push((package, index_file));
     }
 
-    for (id, index_file) in test_info {
-        pretty("Test", "building unit tests...");
-        let name = &metadata.packages.get(id).unwrap().name;
-        let tests = build(
-            args,
-            &[id],
-            vec![
-                ("CARGO_PSIBASE_TEST", ""),
-                (
+    let mut index_files = Vec::new();
+    let mut packages = Vec::new();
+
+    let mut command = tokio::process::Command::new(get_cargo());
+    command
+        .arg("build")
+        .arg("--tests")
+        .arg("--release")
+        .arg("--target=wasm32-wasip1")
+        .args(get_manifest_path(args))
+        .args(get_target_dir(args))
+        .arg("--message-format=json-diagnostic-rendered-ansi")
+        .arg("--color=always")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    pretty("Test", "building unit tests...");
+    for (package, index_file) in test_info {
+        let name = &package.name;
+
+        index_files.push(index_file.canonicalize()?.into_os_string());
+        packages.push(package);
+        command.args(["-p", name.as_str()]);
+    }
+
+    let files = wait_for_child(command.spawn()?, &packages).await?;
+
+    let mut running = JobRunner::new(|| jobs.acquire());
+
+    for test in files.tests {
+        let index_files = &index_files;
+
+        running
+            .push(async move {
+                let p = test.value.with_extension("polyfilled.wasm");
+                if test.value.is_newer_than(&p)? {
+                    pretty_path("Reoptimizing", &p);
+                    let src = test.value;
+                    let dst = p.clone();
+                    spawn_blocking(move || process(&src, None, TESTER_EXPORTS, &dst)).await??;
+                }
+                pretty_path("Running", &p);
+                let mut command = tokio::process::Command::new(&args.psitest);
+                command.env(
                     "CARGO_PSIBASE_PACKAGE_PATH",
-                    index_file.canonicalize()?.to_str().unwrap(),
-                ),
-            ],
-            &["--tests", "-p", name.as_str()],
-            None,
-        )
-        .await?;
-
-        for test in tests {
-            pretty_path("Running", &test);
-            let mut command = std::process::Command::new(&args.psitest);
-            command.arg(test);
-            command.arg("--nocapture");
-            if let Some(ref filter) = opts.test_filter {
-                command.arg(filter);
-            }
-            let msg = format!("Failed running: {:?}", command);
-            if !command.status().context(msg.clone())?.success() {
-                return Err(anyhow! {msg});
-            }
-        }
+                    &index_files[test.package_index],
+                );
+                command.arg(p);
+                command.arg("--nocapture");
+                if let Some(ref filter) = opts.test_filter {
+                    command.arg(filter);
+                }
+                let msg = format!("Failed running: {:?}", command);
+                if !command.status().await.context(msg.clone())?.success() {
+                    return Err(anyhow! {msg});
+                }
+                Ok(())
+            })
+            .await?
     }
 
+    running.wait().await?;
     Ok(())
 }
 
 async fn install(
+    jobs: &AsyncJobServer,
     args: &Args,
     opts: &InstallCommand,
     metadata: &MetadataIndex<'_>,
@@ -731,11 +1117,14 @@ async fn install(
         }
     }
     packages.resolve_dependencies()?;
-    let index = packages.build(args).await?;
+    let index = packages.build(jobs, args).await?;
 
     let mut command = std::process::Command::new(&args.psibase);
 
     command.arg("install");
+    for key in &args.sign {
+        command.args(["--sign", key]);
+    }
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);
     }
@@ -765,7 +1154,7 @@ async fn install(
 }
 
 #[tokio::main]
-async fn main2() -> Result<(), Error> {
+async fn main2(jclient: jobserver::FromEnv) -> Result<(), Error> {
     let mut is_cargo_subcommand = false;
     if let Some(arg) = env::args().nth(1) {
         is_cargo_subcommand = arg == "psibase";
@@ -778,6 +1167,8 @@ async fn main2() -> Result<(), Error> {
         Args::parse()
     };
 
+    let jobs = AsyncJobServer::new(jclient, args.jobs)?;
+
     let metadata = get_metadata(&args)?;
     check_psibase_version(&metadata);
 
@@ -786,70 +1177,52 @@ async fn main2() -> Result<(), Error> {
             if args.package.is_empty() {
                 let index = MetadataIndex::new(&metadata);
                 for id in &*metadata.workspace_default_members {
-                    let package = &index.packages.get(id.repr.as_str()).unwrap().name;
-                    let mut extra_args = SERVICE_ARGS.to_owned();
-                    extra_args.extend(["-p", package.as_str()]);
-                    build(
-                        &args,
-                        &[id.repr.as_str()],
-                        vec![],
-                        &extra_args,
-                        Some(SERVICE_POLYFILL),
-                    )
-                    .await?;
+                    let package = *index.packages.get(id.repr.as_str()).unwrap();
+                    build(&jobs, &args, &[package], &[]).await?;
                 }
             } else {
                 for package in &args.package {
-                    let id = &metadata
+                    let p = metadata
                         .packages
                         .iter()
                         .find(|p| &p.name == package)
-                        .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                        .id
-                        .repr;
-                    let mut extra_args = SERVICE_ARGS.to_owned();
-                    extra_args.extend(["-p", package.as_str()]);
-                    build(
-                        &args,
-                        &[id.as_str()],
-                        vec![],
-                        &extra_args,
-                        Some(SERVICE_POLYFILL),
-                    )
-                    .await?;
+                        .ok_or_else(|| anyhow!("Could not find package {}", package))?;
+                    build(&jobs, &args, &[p], &[]).await?;
                 }
             }
             pretty("Done", "");
         }
         Command::Package {} => {
             let index = MetadataIndex::new(&metadata);
+            let mut ids = Vec::new();
             if args.package.is_empty() {
                 for id in &*metadata.workspace_default_members {
                     let package = index.packages.get(id.repr.as_str()).unwrap();
                     if package::get_metadata(package)?.is_package() {
-                        build_package(&args, &index, Some(id.repr.as_str())).await?;
+                        ids.push(id);
                     }
                 }
             } else {
                 for package in &args.package {
-                    let id = &metadata
-                        .packages
-                        .iter()
-                        .find(|p| &p.name == package)
-                        .ok_or_else(|| anyhow!("Could not find package {}", package))?
-                        .id
-                        .repr;
-                    build_package(&args, &index, Some(id)).await?;
+                    ids.push(
+                        &metadata
+                            .packages
+                            .iter()
+                            .find(|p| &p.name == package)
+                            .ok_or_else(|| anyhow!("Could not find package {}", package))?
+                            .id,
+                    );
                 }
             }
+            build_packages(&jobs, &args, &index, &ids).await?;
             pretty("Done", "");
         }
         Command::Test(opts) => {
-            test(&args, opts, &MetadataIndex::new(&metadata)).await?;
+            test(&jobs, &args, opts, &MetadataIndex::new(&metadata)).await?;
             pretty("Done", "All tests passed");
         }
         Command::Install(opts) => {
-            install(&args, opts, &MetadataIndex::new(&metadata)).await?;
+            install(&jobs, &args, opts, &MetadataIndex::new(&metadata)).await?;
         }
     };
 
@@ -857,7 +1230,7 @@ async fn main2() -> Result<(), Error> {
 }
 
 fn main() -> ExitCode {
-    if let Err(e) = main2() {
+    if let Err(e) = main2(unsafe { jobserver::Client::from_env_ext(false) }) {
         println!("{:}: {:?}", style("error").bold().red(), e);
         ExitCode::FAILURE
     } else {

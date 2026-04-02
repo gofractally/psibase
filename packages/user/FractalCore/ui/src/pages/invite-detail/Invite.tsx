@@ -10,11 +10,11 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
+import { useConnectAccount } from "@/hooks/use-connect-account";
 import { useDraftApplication } from "@/hooks/use-draft-application";
-import { getInvites } from "@/lib/graphql/fractals/getInvites";
+import { getInvites, importToken } from "@/lib/graphql/fractals/getInvites";
 
 import { useAppForm } from "@shared/components/form/app-form";
-import { useConnectAccount } from "@/hooks/use-connect-account";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     Card,
@@ -38,7 +38,8 @@ export const Invite = () => {
     } = useQuery({
         enabled: !!token,
         queryKey: ["invite", token],
-        queryFn: async () => getInvites(z.string().parse(token)),
+        queryFn: async () =>
+            importToken(z.string().parse(token)).then(getInvites),
     });
 
     const { mutateAsync: connectAccount } = useConnectAccount();
@@ -47,11 +48,11 @@ export const Invite = () => {
 
     const form = useAppForm({
         defaultValues: {
-            extraInfo: "",
+            description: "",
         },
-        onSubmit: async ({ value: { extraInfo } }) => {
+        onSubmit: async ({ value: { description } }) => {
             const guild = zAccount.parse(invite?.guildInvite?.guild.account);
-            await draftApplication([guild, extraInfo]);
+            await draftApplication([guild, description]);
             await connectAccount({
                 enabled: true,
                 returnPath: `/guild/${guild}/invite-response`,
@@ -109,8 +110,8 @@ export const Invite = () => {
 
         const description = isExpired
             ? `This invitation expired ${dayjs().to(expiry)} (${dayjs(
-                expiry,
-            ).format("YYYY/MM/DD h:mm A z")}).`
+                  expiry,
+              ).format("YYYY/MM/DD h:mm A z")}).`
             : `${inviter} has invited you to apply to join the ${guildInvite.guild.displayName} guild in the ${guildInvite.guild.fractal.name} fractal.`;
 
         if (isExpired) {
@@ -149,9 +150,9 @@ export const Invite = () => {
                             className="flex flex-col gap-2"
                         >
                             <form.AppField
-                                name="extraInfo"
+                                name="description"
                                 children={(field) => (
-                                    <field.TextField label="Description" />
+                                    <field.TextArea label="What additional information would you like to include with your application?" />
                                 )}
                             />
                             <form.AppForm>

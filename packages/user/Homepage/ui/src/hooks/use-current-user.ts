@@ -1,35 +1,26 @@
-import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
+
+import QueryKey from "@shared/lib/query-keys";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { supervisor } from "@/supervisor";
 
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
-
-export type GetCurrentUserRes = string | null;
-
-export const queryFn = async () => {
-    const res = await supervisor.functionCall({
-        method: "getCurrentUser",
-        params: [],
-        service: "accounts",
-        intf: "api",
-    });
-    return res ? zAccount.parse(res) : null;
-};
-
+/**
+ * Homepage-specific current user hook that uses this app's supervisor
+ * (with correct supervisorSrc). Uses the shared query key so cache is
+ * consistent with other apps.
+ */
 export const useCurrentUser = () =>
     useQuery({
         queryKey: QueryKey.currentUser(),
-        queryFn,
+        queryFn: async () => {
+            const res = await supervisor.functionCall({
+                method: "getCurrentUser",
+                params: [],
+                service: "accounts",
+                intf: "api",
+            });
+            return res ? zAccount.parse(res) : null;
+        },
         staleTime: 60000,
     });
-
-export const setCurrentUser = (
-    accountName: z.infer<typeof zAccount> | null,
-) => {
-    queryClient.setQueryData(QueryKey.currentUser(), () =>
-        accountName === null ? null : zAccount.parse(accountName),
-    );
-};

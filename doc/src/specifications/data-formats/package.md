@@ -4,15 +4,16 @@ A psibase package is a zip archive that contains the following files:
 
 ## meta.json
 
-| Field              | Type   | Description                                                                                            |
-|--------------------|--------|--------------------------------------------------------------------------------------------------------|
-| name               | String | The name of the package                                                                                |
-| version            | String | The package version. Must conform to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). |
-| description        | String | The package description                                                                                |
-| depends            | Array  | Other packages that this package depends on                                                            |
-| depends[n].name    | String | The name of the other package                                                                          |
-| depends[n].version | String | An expression that describes the compatible versions of the dependency                                 |
-| accounts           | Array  | Accounts that are created by this package                                                              |
+| Field              | Type   | Description                                                                                                   |
+|--------------------|--------|---------------------------------------------------------------------------------------------------------------|
+| name               | String | The name of the package                                                                                       |
+| version            | String | The package version. Must conform to [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).        |
+| scope              | String | Indicates whether the package is installed to the whole network (`"network"`) or to a single node (`"local"`) |
+| description        | String | The package description                                                                                       |
+| depends            | Array  | Other packages that this package depends on                                                                   |
+| depends[n].name    | String | The name of the other package                                                                                 |
+| depends[n].version | String | An expression that describes the compatible versions of the dependency                                        |
+| accounts           | Array  | Accounts that are created by this package                                                                     |
 
 ### Semantic version matching
 

@@ -63,6 +63,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ahash"
+version = "0.8.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
+dependencies = [
+ "cfg-if",
+ "once_cell",
+ "version_check",
+ "zerocopy",
+]
+
+[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -421,6 +433,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -459,41 +472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "brotli-codec"
-version = "0.23.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "brotli",
- "brotli-codec-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "serde",
-]
-
-[[package]]
-name = "brotli-codec-pkg"
-version = "0.23.0"
-dependencies = [
- "brotli-codec",
- "brotli-codec-plugin",
- "psibase-user-workspace-hack",
- "serde",
-]
-
-[[package]]
-name = "brotli-codec-plugin"
-version = "0.23.0"
-dependencies = [
- "brotli",
- "brotli-codec",
- "brotli-codec-pkg",
- "psibase",
- "psibase-user-workspace-hack",
- "wit-bindgen-rt",
-]
-
-[[package]]
 name = "brotli-decompressor"
 version = "4.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -501,6 +479,28 @@ checksum = "a334ef7c9e23abf0ce748e8cd309037da93e606ad52eb372e4ce327a0dcfbdfd"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
+]
+
+[[package]]
+name = "brotli-svc"
+version = "0.23.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "brotli",
+ "brotli-svc-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "brotli-svc-pkg"
+version = "0.23.0"
+dependencies = [
+ "brotli-svc",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
@@ -562,6 +562,7 @@ dependencies = [
  "chainmail_package",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
 ]
 
@@ -938,6 +939,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bce805d770f407bc62102fca7c2c64ceef2fbcb2b8bd19d2765ce093980de"
+dependencies = [
+ "console",
+ "shell-words",
+ "tempfile",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
 name = "diff-adjust"
 version = "0.23.0"
 dependencies = [
@@ -946,6 +960,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -1110,6 +1125,7 @@ dependencies = [
  "ecies",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "rand 0.9.2",
  "serde",
  "serde-aux",
@@ -1164,6 +1180,7 @@ dependencies = [
  "faucet-tok-pkg",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
 ]
 
@@ -1275,6 +1292,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -1458,6 +1476,63 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629b9b98ef3dd8afe6ca2bd0f89306cec16d43d907889945bc5d6687f2f13c7"
 
 [[package]]
+name = "graphql-introspection-query"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e063446242093b0acecc78a2313801e6c4faafa3501277b409a2b1972eff5d85"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "graphql-parser"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a818c0d883d7c0801df27be910917750932be279c7bc82dc541b8769425f409"
+dependencies = [
+ "combine",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "graphql_client"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0f04840854efa7b06377d86fab117f598f5f5c95727067463417ccaf8aa7635"
+dependencies = [
+ "graphql_query_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "graphql_client_codegen"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa0141e66c8d0302f8a586df12ad5d0cf87c0fa8c391f2f5b5dc296312dce569"
+dependencies = [
+ "graphql-introspection-query",
+ "graphql-parser",
+ "heck",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 2.0.106",
+]
+
+[[package]]
+name = "graphql_query_derive"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e16ecf9bb87a6760cf5227f66cbe48bad7b89505aeb002aa9439ea090e6038a3"
+dependencies = [
+ "graphql_client_codegen",
+ "proc-macro2",
+ "syn 2.0.106",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1480,6 +1555,15 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.14.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+dependencies = [
+ "ahash",
 ]
 
 [[package]]
@@ -1729,6 +1813,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "id-arena"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d3067d79b975e8844ca9eb072e16b31c3c1c36928edf9c6789548c524d0d954"
+
+[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1743,6 +1833,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -1816,7 +1907,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b0f83760fb341a774ed326568e19f5a863af4a952def8c39f9ab92fd95b88e5"
 dependencies = [
  "equivalent",
- "hashbrown",
+ "hashbrown 0.16.0",
  "serde",
  "serde_core",
 ]
@@ -2141,6 +2232,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2417,6 +2509,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "prettyplease"
+version = "0.2.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
+dependencies = [
+ "proc-macro2",
+ "syn 2.0.106",
+]
+
+[[package]]
 name = "primeorder"
 version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2476,6 +2578,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2518,6 +2621,7 @@ dependencies = [
  "cryptoki-sys",
  "custom_error",
  "der",
+ "dialoguer",
  "flate2",
  "form_urlencoded",
  "fracpack",
@@ -2636,6 +2740,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase_plugin"
+version = "0.23.0"
+dependencies = [
+ "graphql_client",
+ "psibase",
+ "psibase-rust-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen 0.30.0",
+]
+
+[[package]]
+name = "psibase_service"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2708,6 +2832,7 @@ dependencies = [
  "diff-adjust",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2728,6 +2853,7 @@ dependencies = [
  "evaluations",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2741,6 +2867,7 @@ dependencies = [
  "fractals",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2754,6 +2881,7 @@ dependencies = [
  "nft",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2766,6 +2894,7 @@ dependencies = [
  "profiles",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2777,6 +2906,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "registry",
  "registry-pkg",
  "serde",
@@ -2790,6 +2920,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2803,6 +2934,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2816,6 +2948,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2914,6 +3047,7 @@ dependencies = [
  "async-graphql",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "registry-pkg",
  "serde",
  "serde_json",
@@ -3249,6 +3383,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+
+[[package]]
 name = "serde"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3347,6 +3487,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-words"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
+
+[[package]]
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3391,12 +3537,21 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "socket2"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
+checksum = "86f4aa3ad99f2088c990dfa82d367e19cb29268ed67c574d10d0a4bfe71f07e0"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "spdx"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3e17e880bafaeb362a7b751ec46bdc5b61445a188f80e0606e68167cd540fa3"
+dependencies = [
+ "smallvec",
 ]
 
 [[package]]
@@ -3468,6 +3623,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "subgroups-pkg",
 ]
@@ -3504,6 +3660,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
  "symbol-pkg",
@@ -3671,6 +3828,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
  "token-stream-pkg",
@@ -3706,6 +3864,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
  "tokens-pkg",
@@ -3727,8 +3886,10 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_plugin",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tokens",
  "wit-bindgen-rt",
 ]
@@ -4142,7 +4303,7 @@ version = "1.0.1+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0562428422c63773dad2c345a1882263bbf4d65cf3f42e90921f787ef5ad58e7"
 dependencies = [
- "wit-bindgen",
+ "wit-bindgen 0.46.0",
 ]
 
 [[package]]
@@ -4215,6 +4376,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bad67dc8b2a1a6e5448428adec4c3e84c43e561d8c9ee8a9e5aabeb193ec41d1"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-encoder"
+version = "0.215.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fb56df3e06b8e6b77e37d2969a50ba51281029a9aeb3855e76b7f49b6418847"
+dependencies = [
+ "leb128",
+ "wasmparser",
+]
+
+[[package]]
+name = "wasm-metadata"
+version = "0.215.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c6bb07c5576b608f7a2a9baa2294c1a3584a249965d695a9814a496cb6d232f"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "spdx",
+ "wasm-encoder",
+ "wasmparser",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.215.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53fbde0881f24199b81cf49b6ff8f9c145ac8eb1b7fc439adb5c099734f7d90e"
+dependencies = [
+ "ahash",
+ "bitflags 2.11.0",
+ "hashbrown 0.14.5",
+ "indexmap",
+ "semver",
 ]
 
 [[package]]
@@ -4578,9 +4778,30 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b4bac478334a647374ff24a74b66737a4cb586dc8288bc3080a93252cd1105c"
+dependencies = [
+ "wit-bindgen-rt",
+ "wit-bindgen-rust-macro",
+]
+
+[[package]]
+name = "wit-bindgen"
 version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+
+[[package]]
+name = "wit-bindgen-core"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb7e3df01cd43cfa1cb52602e4fc05cb2b62217655f6705639b6953eb0a3fed2"
+dependencies = [
+ "anyhow",
+ "heck",
+ "wit-parser",
+]
 
 [[package]]
 name = "wit-bindgen-rt"
@@ -4589,6 +4810,74 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2de7a3b06b9725d129b5cbd1beca968feed919c433305a23da46843185ecdd6"
 dependencies = [
  "bitflags 2.11.0",
+]
+
+[[package]]
+name = "wit-bindgen-rust"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61a767d1a8eb4e908bfc53febc48b87ada545703b16fe0148ee7736a29a01417"
+dependencies = [
+ "anyhow",
+ "heck",
+ "indexmap",
+ "prettyplease",
+ "syn 2.0.106",
+ "wasm-metadata",
+ "wit-bindgen-core",
+ "wit-component",
+]
+
+[[package]]
+name = "wit-bindgen-rust-macro"
+version = "0.30.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b185c342d0d27bd83d4080f5a66cf3b4f247fa49d679bceb66e11cc7eb58b99"
+dependencies = [
+ "anyhow",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
+ "wit-bindgen-core",
+ "wit-bindgen-rust",
+]
+
+[[package]]
+name = "wit-component"
+version = "0.215.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f725e3885fc5890648be5c5cbc1353b755dc932aa5f1aa7de968b912a3280743"
+dependencies = [
+ "anyhow",
+ "bitflags 2.11.0",
+ "indexmap",
+ "log",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "wasm-encoder",
+ "wasm-metadata",
+ "wasmparser",
+ "wit-parser",
+]
+
+[[package]]
+name = "wit-parser"
+version = "0.215.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "935a97eaffd57c3b413aa510f8f0b550a4a9fe7d59e79cd8b89a83dcb860321f"
+dependencies = [
+ "anyhow",
+ "id-arena",
+ "indexmap",
+ "log",
+ "semver",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "unicode-xid",
+ "wasmparser",
 ]
 
 [[package]]

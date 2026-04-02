@@ -6,27 +6,23 @@ import { isoImport } from "vite-plugin-iso-import";
 import svg from "@poppanator/sveltekit-svg";
 import { verifyViteCache, createPsibaseConfig, createSharedViteConfig } from "../../../vite.shared";
 
-const serviceDir = path.resolve(__dirname);
-
-verifyViteCache(serviceDir);
+const appDirectory = path.resolve(__dirname);
+verifyViteCache(appDirectory);
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig((config) => ({
     plugins: [
         isoImport(),
         sveltekit(),
         createSharedViteConfig({
-            projectDir: serviceDir,
             uiFramework: 'svelte',
             manualChunks: {
                 vendor: ['svelte', '@sveltejs/kit']
             }
         }),
-        createPsibaseConfig({
-            service: "explorer",
-            serviceDir,
+        createPsibaseConfig(config, {
+            appDirectory,
             uiFramework: 'svelte',
-            isServing: command === "serve",
         }),
         // @ts-ignore
         svg({

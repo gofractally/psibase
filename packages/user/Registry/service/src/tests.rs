@@ -66,7 +66,6 @@ mod tests {
                         icon,
                         iconMimeType,
                         status,
-                        createdAt,
                         tags
                     }}
                 }}"#,
@@ -85,7 +84,6 @@ mod tests {
                     "icon": "icon-as-base64",
                     "iconMimeType": "image/png",
                     "status": "Draft",
-                    "createdAt": "1970-01-01T00:00:04+00:00",
                     "tags": [
                         "cozy",
                         "cuisine",

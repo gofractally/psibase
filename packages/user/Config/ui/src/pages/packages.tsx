@@ -1,7 +1,7 @@
 import { Package, X } from "lucide-react";
 import { useState } from "react";
 
-import { useAppForm } from "@/components/forms/app-form";
+import { useAppForm } from "@shared/components/form/app-form";
 import { PackageItem } from "@/components/package-item";
 
 import { useInstallPackages } from "@/hooks/use-install-packages";

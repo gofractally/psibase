@@ -16,16 +16,18 @@ namespace UserService
    {
       std::string                         name;
       std::string                         version;
+      std::string                         scope;
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
    };
-   PSIO_REFLECT(PackageMeta, name, version, description, depends, accounts)
+   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts)
 
    struct PublishedPackage
    {
       psibase::AccountNumber              owner;
       std::string                         name;
+      std::string                         scope;
       std::string                         version;
       std::string                         description;
       std::vector<PackageRef>             depends;
@@ -37,7 +39,15 @@ namespace UserService
                                         &PublishedPackage::name,
                                         &PublishedPackage::version>;
    };
-   PSIO_REFLECT(PublishedPackage, name, version, description, depends, accounts, sha256, file)
+   PSIO_REFLECT(PublishedPackage,
+                name,
+                version,
+                scope,
+                description,
+                depends,
+                accounts,
+                sha256,
+                file)
 
    struct PackageSource
    {

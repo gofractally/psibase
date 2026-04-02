@@ -16,7 +16,9 @@ from io import TextIOWrapper
 import subprocess
 
 class TestPackage:
-    def __init__(self, name, version, accounts=None, depends=None, description=None):
+    def __init__(self, name, version, scope=None, accounts=None, depends=None, description=None):
+        if scope is None:
+            scope = "network"
         if accounts is None:
             accounts = []
         if depends is None:
@@ -25,6 +27,7 @@ class TestPackage:
             description = "Test package"
         self.name = name
         self.version = version
+        self.scope = scope
         self.description = description
         self.accounts = accounts
         self._depends = depends
@@ -62,7 +65,7 @@ class TestPackage:
     def write(self, directory):
         filename = self.filename()
         package_filename = os.path.join(directory, filename)
-        meta = {'name': self.name, 'version': self.version, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts}
+        meta = {'name': self.name, 'version': self.version, 'scope': self.scope, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts}
         with zipfile.ZipFile(package_filename, 'w', zipfile.ZIP_DEFLATED) as archive:
             with archive.open('meta.json', 'w') as file:
                 json.dump(meta, TextIOWrapper(file, encoding='utf-8'))
@@ -117,9 +120,9 @@ class Foo:
 class XFoo:
     def __init__(self):
         self.wasm = make_wasm("x-foo")
-        self.foo10 = TestPackage('XFoo', '1.0.0', description='The original foo').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'original', 'file2.txt': 'deleted'})
-        self.foo11 = TestPackage('XFoo', '1.1.0', description='Minor version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'updated', 'file3.txt': 'added'})
-        self.foo20 = TestPackage('XFoo', '2.0.0', description='Major version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'version 2'})
+        self.foo10 = TestPackage('XFoo', '1.0.0', scope='local', description='The original foo').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'original', 'file2.txt': 'deleted'})
+        self.foo11 = TestPackage('XFoo', '1.1.0', scope='local', description='Minor version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'updated', 'file3.txt': 'added'})
+        self.foo20 = TestPackage('XFoo', '2.0.0', scope='local', description='Major version update').depends('XSites').service('x-foo', wasm=self.wasm, data={'file1.txt': 'version 2'})
 
         self.original_wasm = make_wasm('original')
         self.updated_wasm = make_wasm('updated')
@@ -165,7 +168,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_install_upgrade(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo = Foo()
 
@@ -185,7 +188,7 @@ class TestPsibase(unittest.TestCase):
 
     def do_test_upgrade(self, cluster, command, v2=False):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo = Foo()
 
@@ -225,7 +228,7 @@ class TestPsibase(unittest.TestCase):
         self.assertIn('status: not installed', info)
         self.assertIn('Explorer', info)
 
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo = Foo()
 
@@ -267,7 +270,7 @@ class TestPsibase(unittest.TestCase):
     @testutil.psinode_test
     def test_list(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         # A non-existent account should be an error
         for source in ['neminis', 'http://neminis.aaaaaaa123/']:
@@ -341,7 +344,7 @@ class TestPsibase(unittest.TestCase):
                 self.assertEqual(search('bar'), '')
                 self.assertEqual(search('foo', 'original'), 'foo 1.0.0\n')
             check_repo()
-            a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+            a.boot(packages=['Minimal', 'Explorer', 'Sites'])
             check_repo()
             self.assertIn('Transact ', search('^transact$'))
 
@@ -363,16 +366,39 @@ class TestPsibase(unittest.TestCase):
             self.assertResponse(a.get('/file3.txt', 'x-foo'), 'added')
 
     @testutil.psinode_test
+    def test_local_install_with_server(self, cluster):
+        a = cluster.complete(*testutil.generate_names(1))[0]
+        a.run_psibase(['install', '--local'] + a.node_args() + ['XWithServer', '--package-source', testutil.test_packages()])
+        # Should use the registered server, not the service
+        with a.get('/id', service='x-server') as reply:
+            reply.raise_for_status()
+            self.assertEqual(reply.json(), "x-r-server")
+        # If no server is registered, requests should return 404
+        with a.get('/id', service='x-r-server') as reply:
+            self.assertEqual(reply.status_code, 404)
+
+    @testutil.psinode_test
     def test_configure_sources(self, cluster):
         a = cluster.complete(*testutil.generate_names(1))[0]
-        a.boot(packages=['Minimal', 'Explorer', 'Sites', 'BrotliCodec'])
+        a.boot(packages=['Minimal', 'Explorer', 'Sites'])
 
         foo10 = TestPackage('foo', '1.0.0').depends('Sites').service('foo', data={'file1.txt': 'data'})
+        xfoo10 = TestPackage('xfoo', '1.0.0', scope='local').service('x-foo', data={'file2.txt', 'data2'})
         with tempfile.TemporaryDirectory() as dir:
-            path = os.path.join(dir, foo10.write(dir)["file"])
-            a.run_psibase(["publish", "-S", "root"] + a.node_args() + [path])
+            path1 = os.path.join(dir, foo10.write(dir)["file"])
+            path2 = os.path.join(dir, xfoo10.write(dir)["file"])
+            a.run_psibase(["publish", "-S", "root"] + a.node_args() + [path1, path2])
             a.push_action("root", "packages", "setSources", {"sources": [{"account":"root"}]})
             a.wait(new_block())
+            available = a.run_psibase(['list', '--available'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            print("list --available")
+            print(available)
+            # Local packages should not be included
+            self.assertNotIn('xfoo', available)
+            local = a.run_psibase(['list', '--local', '--available'] + a.node_args(), stdout=subprocess.PIPE, encoding='utf-8').stdout
+            print("list --local --available")
+            print(local)
+            self.assertIn('xfoo', local)
             a.run_psibase(['install'] + a.node_args() + ['foo'])
             a.wait(new_block())
             self.assertResponse(a.get('/file1.txt', 'foo'), 'data')

@@ -8,6 +8,7 @@ const DependencySchema = z.object({
 export const PackageSchema = z.object({
     name: z.string(),
     version: z.string(),
+    scope: z.string(),
     description: z.string(),
     depends: z.array(DependencySchema),
     accounts: z.array(z.string()),

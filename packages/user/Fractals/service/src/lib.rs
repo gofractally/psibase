@@ -54,7 +54,8 @@ pub mod constants {
     pub const DEFAULT_CANDIDACY_COOLDOWN: u32 = ONE_WEEK;
     pub const MAX_CANDIDACY_COOLDOWN: u32 = ONE_YEAR / 4;
 
-    pub const GUILD_ATTEST_THRESHOLD: u8 = 3;
+    pub const GUILD_APP_ENDORSEMENT_THRESHOLD: u8 = 3;
+    pub const GUILD_APP_REJECT_THRESHOLD: u8 = 3;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
@@ -68,11 +69,14 @@ pub mod service {
         },
     };
 
-    use psibase::services::{
-        auth_dyn::{self, policy::DynamicAuthPolicy},
-        transact::ServiceMethod,
-    };
     use psibase::*;
+    use psibase::{
+        get_sender,
+        services::{
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            transact::ServiceMethod,
+        },
+    };
 
     /// Creates a new account and fractal.
     ///
@@ -130,10 +134,6 @@ pub mod service {
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
         let guild = Guild::get_assert(guild_account);
         let sender = get_sender();
-        check_some(
-            FractalMember::get(guild.fractal, sender),
-            "must be a member of a fractal to apply for its guild",
-        );
         GuildApplication::add(guild.account, sender, extra_info);
     }
 
@@ -199,7 +199,11 @@ pub mod service {
         comment: String,
         endorses: bool,
     ) {
-        GuildApplication::get_assert(guild_account, applicant).attest(comment, endorses);
+        GuildApplication::get_assert(guild_account, applicant).attest(
+            comment,
+            get_sender(),
+            endorses,
+        );
     }
 
     /// Starts an evaluation for the specified guild.
