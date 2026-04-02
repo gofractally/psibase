@@ -1,4 +1,4 @@
-import { getJson, siblingUrl } from "@psibase/common-lib";
+import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { loadBasic } from "./component-loading";
 import { DownloadFailed } from "./errors";
@@ -78,6 +78,22 @@ const getChainId = (): Promise<string> => {
     return Promise.resolve(chainId);
 };
 export const chainIdPromise: Promise<string> = getChainId();
+
+export let networkName: string | undefined;
+const getNetworkName = (): Promise<string> => {
+    if (!networkName) {
+        const url = siblingUrl(null, "branding", "/graphql");
+        return postGraphQLGetJson<{ data: { networkName: string } }>(
+            url,
+            "query { networkName }",
+        ).then((res) => {
+            networkName = res.data.networkName;
+            return networkName;
+        });
+    }
+    return Promise.resolve(networkName);
+};
+export const networkNamePromise: Promise<string> = getNetworkName();
 
 export const isString = (value: any): value is string => {
     return typeof value === "string";

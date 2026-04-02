@@ -29,6 +29,8 @@ import {
     assert,
     chainIdPromise,
     isEmbedded,
+    networkName,
+    networkNamePromise,
     parser,
     serviceFromOrigin,
     setQueryToken,
@@ -83,9 +85,7 @@ export class Supervisor implements AppInterface {
 
         const service = serviceFromOrigin(callerOrigin);
 
-        if (service === "homepage") {
-            // TODO: we should check if service == the dynamically configured "homepage" service in httpserver.
-            // If it is, then we can internally namespace this app as "homepage".
+        if (service === networkName) {
             this.parentOrigination = {
                 app: "homepage",
                 origin: callerOrigin,
@@ -329,6 +329,7 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
@@ -343,6 +344,7 @@ export class Supervisor implements AppInterface {
     //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload(plugins);
         } catch (e) {
@@ -358,6 +360,7 @@ export class Supervisor implements AppInterface {
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
 
             // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
