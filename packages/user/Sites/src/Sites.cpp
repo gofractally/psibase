@@ -338,8 +338,8 @@ namespace SystemService
          return siteConfig && siteConfig->spa;
       }
 
-      std::optional<SitesContentRow> getContent(const psibase::AccountNumber& account,
-                                                const std::string&            target)
+      std::optional<SitesContentRow> getContentRow(const psibase::AccountNumber& account,
+                                                   const std::string&            target)
       {
          auto tables = Sites::Tables{getReceiver(), KvMode::read};
          auto isSpa  = useSpa(account);
@@ -368,11 +368,31 @@ namespace SystemService
             auto proxyTarget = getProxy(account);
             if (proxyTarget)
             {
-               content = getContent(*proxyTarget, target);
+               content = getContentRow(*proxyTarget, target);
             }
          }
 
          return content;
+      }
+
+      std::vector<char> getRawData(const SitesContentRow& row)
+      {
+         auto table = Sites::Tables{Sites::service, KvMode::read}.open<SitesDataTable>();
+         auto value = table.get(row.contentHash);
+         check(value.has_value(), "Invariant failure: file content missing");
+         return value->data;
+      }
+
+      std::vector<char> getUncompressedContent(const std::vector<char>& content,
+                                               const std::string&       encoding)
+      {
+         auto decompressor = get_decompressor(encoding);
+         check(decompressor.has_value(), "Decompression of this content is not supported.");
+
+         auto decompressorAccount = AccountNumber{*decompressor};
+         check(to<Accounts>().exists(decompressorAccount),
+               "[Fallback decompression error] Decompressor account not found");
+         return to<DecompressorInterface>(decompressorAccount).decompress(content);
       }
 
       std::optional<AccountNumber> getRedirect(const psibase::AccountNumber& account)
@@ -418,7 +438,7 @@ namespace SystemService
          Tables tables{getReceiver(), KvMode::read};
          auto   target = request.path();
 
-         auto content = getContent(account, target);
+         auto content = getContentRow(account, target);
 
          if (content)
          {
@@ -450,10 +470,7 @@ namespace SystemService
 
             if (request.method != "HEAD")
             {
-               auto index = tables.open<SitesDataTable>().getIndex<0>();
-               auto body  = index.get(content->contentHash);
-               check(body.has_value(), "Invariant failure: file content missing");
-               reply.body = std::move(body->data);
+               reply.body = getRawData(*content);
             }
 
             // RFC 7231
@@ -493,10 +510,9 @@ namespace SystemService
                   }
                   else
                   {
-                     auto decompressor = get_decompressor(encoding);
                      // If identity is accepted and we can decompress the content, do that
                      // Otherwise, 406
-                     if (!is_accepted("identity") || !decompressor)
+                     if (!is_accepted("identity") || !get_decompressor(encoding).has_value())
                      {
                         return make406("Requested encoding not supported.");
                      }
@@ -504,13 +520,7 @@ namespace SystemService
                      // Decompress the content (don't bother if it's a HEAD request)
                      if (request.method != "HEAD")
                      {
-                        auto decompressorAccount = AccountNumber{*decompressor};
-
-                        check(to<Accounts>().exists(decompressorAccount),
-                              "[Fallback decompression error] Decompressor account not found");
-
-                        Actor<DecompressorInterface> decoder(Sites::service, decompressorAccount);
-                        reply.body = decoder.decompress(std::move(reply.body));
+                        reply.body = getUncompressedContent(reply.body, encoding);
                      }
                   }
                }
@@ -584,8 +594,27 @@ namespace SystemService
    bool Sites::isValidPath(AccountNumber site, std::string path)
    {
       auto target  = normalizeTarget(path);
-      auto content = getContent(site, target);
+      auto content = getContentRow(site, target);
       return !!content;
+   }
+
+   std::optional<SitesContentRow> Sites::getProps(AccountNumber site, std::string path)
+   {
+      auto target = normalizeTarget(path);
+      return getContentRow(site, target);
+   }
+
+   std::vector<char> Sites::getData(AccountNumber site, std::string path, bool decompress)
+   {
+      auto content = getContentRow(site, path);
+      check(!!content, "Content not found");
+
+      if (!content->contentEncoding || !decompress)
+      {
+         return getRawData(*content);
+      }
+
+      return getUncompressedContent(getRawData(*content), *content->contentEncoding);
    }
 
    void Sites::enableSpa(bool enable)
@@ -760,6 +789,7 @@ namespace SystemService
 
          auto getDefaultCsp() const -> std::string { return DEFAULT_CSP_HEADER; }
 
+         /// Gets the site config for a given site
          auto getConfig(AccountNumber account) const -> std::optional<SiteConfig>
          {
             auto tables = Sites::Tables{service, KvMode::read};
@@ -774,6 +804,7 @@ namespace SystemService
                               .proxy     = record.proxyAccount ? record.proxyAccount->str() : ""};
          }
 
+         /// Gets all file properties for a given site
          auto getContent(AccountNumber account) const
          {
             auto tables = Sites::Tables{service, KvMode::read};
@@ -788,11 +819,26 @@ namespace SystemService
                                             return row;
                                          });
          }
+
+         /// Gets the file properties for a given site and path
+         auto getContentAt(AccountNumber account,
+                           std::string   path) const -> std::optional<SitesContentRow>
+         {
+            auto row = SystemService::getContentRow(account, normalizeTarget(path));
+            if (!row)
+            {
+               return std::nullopt;
+            }
+            SitesContentRow result = *row;
+            result.csp             = result.csp.value_or("");
+            return result;
+         }
       };
-      PSIO_REFLECT(Query,                        //
-                   method(getConfig, account),   //
-                   method(getContent, account),  //
-                   method(getDefaultCsp)         //
+      PSIO_REFLECT(Query,                                //
+                   method(getConfig, account),           //
+                   method(getContent, account),          //
+                   method(getContentAt, account, path),  //
+                   method(getDefaultCsp)                 //
       );
    }  // namespace
 
