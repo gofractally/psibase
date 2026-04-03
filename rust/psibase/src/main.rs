@@ -16,13 +16,13 @@ use psibase::{
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
     get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageInfo, PackageList,
-    PackageOp, PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService,
-    PrettyAction, SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
-    Version,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, ActionFormatter,
+    AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
+    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOrigin,
+    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
+    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -765,13 +765,22 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message("Pushing transaction");
 
+    let afmt = ActionFormatter::with_schemas(
+        schemas,
+        HttpSchemaFetcher {
+            client: &client,
+            base_url: &args.node_args.api,
+        },
+    );
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
 
@@ -812,13 +821,19 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message(format!("Creating {}", args.account));
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
 
@@ -864,13 +879,19 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message(format!("Setting auth for {}", args.account));
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
     finish_progress(&args.sig_args, progress, 1);
@@ -929,13 +950,20 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
         &args.sig_args.proposer,
         true,
     );
+
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
     finish_progress(&args.sig_args, progress, 1);
@@ -987,13 +1015,19 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
         true,
     );
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
     finish_progress(&args.sig_args, progress, 1);
@@ -1053,13 +1087,14 @@ fn fill_tree(
     Ok(())
 }
 
-async fn monitor_trx(
+async fn monitor_trx<F: SchemaFetcher>(
     args: &UploadArgs,
     client: &reqwest::Client,
     files: Vec<String>,
     trx: SignedTransaction,
     progress: ProgressBar,
     n: u64,
+    afmt: &ActionFormatter<'_, F>,
 ) -> Result<(), anyhow::Error> {
     let result = push_transaction(
         &args.node_args.api,
@@ -1068,6 +1103,7 @@ async fn monitor_trx(
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        afmt,
     )
     .await;
     if let Err(err) = result {
@@ -1194,6 +1230,12 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
+    let mut schemas = SchemaMap::new();
+    for package in &packages {
+        package.get_all_schemas(&mut schemas)?;
+    }
+    let mut afmt = ActionFormatter::with_schemas(schemas, NullSchemaFetcher);
+
     let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();
     let progress = ProgressBar::new((num_transactions + boot_transactions.len()) as u64)
         .with_style(ProgressStyle::with_template(
@@ -1201,7 +1243,14 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         )?);
 
     progress.set_message("Initializing chain");
-    push_boot(args, &client, boot_transactions.packed(), &progress).await?;
+    push_boot(
+        args,
+        &client,
+        boot_transactions.packed(),
+        &progress,
+        &mut afmt,
+    )
+    .await?;
     progress.inc(boot_transactions.len() as u64);
     for (label, transactions, _) in groups {
         progress.set_message(label);
@@ -1213,6 +1262,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
                 args.tx_args.trace,
                 args.tx_args.console,
                 Some(&progress),
+                &afmt,
             )
             .await?;
             progress.inc(1)
@@ -1228,6 +1278,7 @@ async fn push_boot(
     client: &reqwest::Client,
     packed: Vec<u8>,
     progress: &ProgressBar,
+    afmt: &mut ActionFormatter<'_, NullSchemaFetcher>,
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
@@ -1244,7 +1295,8 @@ async fn push_boot(
     }
     args.tx_args
         .trace
-        .error_for_trace(trace, Some(progress))
+        .error_for_trace(trace, Some(progress), afmt)
+        .await
         .context("Failed to boot")
 }
 
@@ -1276,6 +1328,11 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
     let mut running = Vec::new();
     let progress = ProgressBar::new(actions.len() as u64).with_style(ProgressStyle::with_template(
@@ -1300,6 +1357,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
             sign_transaction(trx, &args.sig_args.sign)?,
             progress.clone(),
             n as u64,
+            &afmt,
         ));
     }
 
@@ -1318,7 +1376,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn push_transactions_parallel<'a>(
+async fn push_transactions_parallel<'a, F: SchemaFetcher + 'a>(
     base_url: &'a Url,
     client: &'a reqwest::Client,
     signer: &TransactionSigner<'a>,
@@ -1327,6 +1385,7 @@ async fn push_transactions_parallel<'a>(
     console: bool,
     progress: &ProgressBar,
     max_simultaneous_transactions: usize,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     struct GroupCount {
         n: u64,
@@ -1376,6 +1435,7 @@ async fn push_transactions_parallel<'a>(
                         fmt,
                         console,
                         Some(progress),
+                        afmt,
                     )
                     .await
                     .with_context(|| label.to_string())?;
@@ -1500,6 +1560,11 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message("Publishing packages");
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     let result: Result<_, anyhow::Error> = push_transactions_parallel(
         &args.node_args.api,
         &client,
@@ -1509,6 +1574,7 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
         args.tx_args.console,
         &progress,
         4,
+        &afmt,
     )
     .await;
     if result.is_ok() {
@@ -1537,7 +1603,7 @@ async fn apply_packages<
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
-) -> Result<(), anyhow::Error> {
+) -> Result<SchemaMap, anyhow::Error> {
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
@@ -1604,7 +1670,7 @@ async fn apply_packages<
             }
         }
     }
-    Ok(())
+    Ok(schemas)
 }
 
 async fn do_install<T: Read + Seek>(
@@ -1657,7 +1723,7 @@ async fn do_install<T: Read + Seek>(
             )?)
         },
     );
-    apply_packages(
+    let schemas = apply_packages(
         &node_args.api,
         &mut client,
         &package_registry,
@@ -1674,6 +1740,14 @@ async fn do_install<T: Read + Seek>(
     if trx_builder.num_transactions() != 0 {
         trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
     }
+
+    let afmt = ActionFormatter::with_schemas(
+        schemas,
+        HttpSchemaFetcher {
+            client: &client,
+            base_url: &node_args.api,
+        },
+    );
 
     let upload_transactions = upload_builder.finish()?;
     {
@@ -1703,6 +1777,7 @@ async fn do_install<T: Read + Seek>(
                         tx_args.trace,
                         tx_args.console,
                         Some(&progress),
+                        &afmt,
                     )
                     .await?;
                     progress.inc(len);
@@ -1737,6 +1812,7 @@ async fn do_install<T: Read + Seek>(
         tx_args.trace,
         tx_args.console,
         &progress,
+        &afmt,
     )
     .await?;
 
