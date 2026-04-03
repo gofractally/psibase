@@ -1869,7 +1869,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                                          format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts exports {{ name service }} owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
@@ -1890,7 +1890,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                                             format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts exports {{ name service }} sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_local(edge.node);
