@@ -2,8 +2,8 @@ use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
     get_schemas, method_raw, new_account_action, set_auth_service_action, set_key_action,
     validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim, EssentialServices,
-    GenesisActionData, MethodNumber, PackagedService, Producer, SchemaMap, SignedTransaction,
-    Tapos, TimePointSec, Transaction, TransactionBuilder,
+    GenesisActionData, MethodNumber, PackageList, PackageOrigin, PackagedService, Producer,
+    SchemaMap, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -138,6 +138,7 @@ pub fn get_initial_actions<
 
     // If a package sets an auth service for an account, we should not override it
     let mut accounts_with_auth = HashSet::new();
+    let mut installed_packages = PackageList::new();
 
     for s in &mut service_packages[..] {
         let mut actions = Vec::new();
@@ -145,6 +146,12 @@ pub fn get_initial_actions<
         for act in actions {
             builder.push(act)?;
         }
+        installed_packages.insert(
+            s.meta().clone(),
+            PackageOrigin::Installed {
+                owner: producers::ROOT,
+            },
+        );
     }
 
     for s in &mut service_packages[..] {
@@ -161,6 +168,8 @@ pub fn get_initial_actions<
         if install_ui || s.needs_ui() {
             s.store_data(&mut actions, None, compression_level)?;
         }
+
+        s.link(&installed_packages, &mut actions)?;
 
         s.postinstall(schemas, &mut actions)?;
         for act in &actions {
