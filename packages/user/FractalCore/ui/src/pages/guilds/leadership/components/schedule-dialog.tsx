@@ -131,7 +131,7 @@ export const ScheduleDialog = ({
                     <form.AppField
                         name="register"
                         children={(field) => (
-                            <field.DateTime
+                            <field.DateTimePickerField
                                 label="Registration start"
                                 description="When users may register/RSVP for the evaluation."
                             />
@@ -140,25 +140,25 @@ export const ScheduleDialog = ({
                     <form.AppField
                         name="registerSeconds"
                         children={(field) => (
-                            <field.EvaluationDuration label="Registration duration" />
+                            <field.DurationSelectField label="Registration duration" />
                         )}
                     />
                     <form.AppField
                         name="deliberationSeconds"
                         children={(field) => (
-                            <field.EvaluationDuration label="Deliberation duration" />
+                            <field.DurationSelectField label="Deliberation duration" />
                         )}
                     />
                     <form.AppField
                         name="submissionSeconds"
                         children={(field) => (
-                            <field.EvaluationDuration label="Submission duration" />
+                            <field.DurationSelectField label="Submission duration" />
                         )}
                     />
                     <form.AppField
                         name="intervalSeconds"
                         children={(field) => (
-                            <field.EvaluationDuration
+                            <field.DurationSelectField
                                 label="Frequency"
                                 defaultFrequency="Days"
                             />

@@ -16709,6 +16709,7 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./user/TokenStream/ui/",\
         "packageDependencies": [\
           ["@number-flow/react", "virtual:d218e5f3d4216aaa908fc8ceaaa5f455662c2db910e961bfbbbccb1dcd7b297cbc7d6b31d892745238221b5bb12af089d96b5a575a1067cb2994183d9e125ea9#npm:0.5.10"],\
+          ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.27.7"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.16"],\
           ["@types/node", "npm:22.19.6"],\

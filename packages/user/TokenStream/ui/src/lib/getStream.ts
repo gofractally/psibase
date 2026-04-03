@@ -12,7 +12,6 @@ export const zStream = z.object({
     vested: z.string(),
     unclaimed: z.string(),
     lastDepositTimestamp: z.string().datetime({ offset: true }),
-    decayRatePerMillion: z.number().int().nonnegative(),
 });
 
 export const getStream = async (nftId: number) => {
@@ -28,7 +27,6 @@ export const getStream = async (nftId: number) => {
                     unclaimed
                     vested
                     lastDepositTimestamp
-                    decayRatePerMillion
                 }
                 updates(nftId: ${nftId}) {
                     nodes {

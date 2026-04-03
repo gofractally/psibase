@@ -1,4 +1,3 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -21,24 +20,22 @@ export const useDeleteStream = () => {
         mutationFn: async (params) => {
             const { nftId } = zParams.parse(params);
 
-            const toastId = toast.loading("Deleting...");
-
             await supervisor.functionCall({
                 method: "delete",
                 params: [nftId],
                 service: TOKEN_STREAM,
                 intf: "api",
             });
-
-            toast.success(`Deleted stream ${nftId}.`, {
-                id: toastId,
-            });
         },
-        onSuccess: (_, { nftId }) => {
-            queryClient.invalidateQueries({
+        onSuccess: (_, { nftId }, _result, ctx) => {
+            ctx.client.invalidateQueries({
                 queryKey: QueryKey.stream(nftId),
             });
+            toast.success(`Deleted stream ${nftId}.`);
             navigate("/");
+        },
+        onError: (error) => {
+            toast.error(error.message);
         },
     });
 };

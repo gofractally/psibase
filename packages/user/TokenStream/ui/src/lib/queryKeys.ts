@@ -10,7 +10,6 @@ export type OptionalString = string | undefined | null;
 
 const QueryKey = {
     streams: () => ["streams"] as const,
-    currentUser: () => ["currentUser"] as const,
     token: (id: OptionalString) => ["token", id] as const,
     stream: (id: OptionalString) => ["streams", id] as const,
     nft: (id: OptionalString) => ["nft", id] as const,

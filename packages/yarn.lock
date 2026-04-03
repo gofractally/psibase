@@ -12845,6 +12845,7 @@ __metadata:
   resolution: "token-stream@workspace:user/TokenStream/ui"
   dependencies:
     "@number-flow/react": "npm:^0.5.10"
+    "@psibase/common-lib": "workspace:*"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"

@@ -1,4 +1,3 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
@@ -18,22 +17,23 @@ export const useClaim = () =>
         mutationFn: async (params) => {
             const { nftId } = zParams.parse(params);
 
-            const toastId = toast.loading("Claiming...");
             await supervisor.functionCall({
                 method: "claim",
                 params: [nftId],
                 service: TOKEN_STREAM,
                 intf: "api",
             });
-
-            toast.success(`Claimed from stream.`, {
-                id: toastId,
-            });
-            queryClient.invalidateQueries({
+        },
+        onSuccess: (_, { nftId }, _result, ctx) => {
+            ctx.client.invalidateQueries({
                 queryKey: QueryKey.stream(nftId),
             });
-            queryClient.invalidateQueries({
+            ctx.client.invalidateQueries({
                 queryKey: QueryKey.streams(),
             });
+            toast.success("Claimed from stream.");
+        },
+        onError: (error) => {
+            toast.error(error.message);
         },
     });

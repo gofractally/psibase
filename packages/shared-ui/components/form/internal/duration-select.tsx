@@ -15,8 +15,14 @@ import {
 
 import { useFieldContext } from "../app-form";
 
-export const DurationSelect = ({ label }: { label: string }) => {
-    const [unit, setUnit] = useState<DurationUnit>(zDurationUnit.enum.Minutes);
+export const DurationSelect = ({
+    label,
+    defaultFrequency = "Minutes",
+}: {
+    label: string;
+    defaultFrequency?: DurationUnit;
+}) => {
+    const [unit, setUnit] = useState<DurationUnit>(defaultFrequency);
     const field = useFieldContext();
     const seconds = field.state.value as number; // Assuming value is seconds, not Date
 
@@ -55,18 +61,22 @@ export const DurationSelect = ({ label }: { label: string }) => {
     };
 
     return (
-        <div className="flex flex-col gap-1 py-2">
+        <div className="flex w-full flex-col gap-1 py-2">
             <div>{label}</div>
-            <div className="flex gap-2">
+            <div className="flex w-full gap-2">
                 <Input
                     type="number"
                     value={displayValue}
                     onChange={(e) => handleValueChange(e.target.value)}
                     placeholder="Enter duration"
+                    className="w-full"
                 />
                 <Select value={unit} onValueChange={handleUnitChange}>
                     <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Select unit" />
+                        <SelectValue
+                            className="w-32"
+                            placeholder="Select unit"
+                        />
                     </SelectTrigger>
                     <SelectContent>
                         {zDurationUnit.options.map((option) => (
