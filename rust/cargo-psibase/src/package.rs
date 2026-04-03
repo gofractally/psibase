@@ -378,6 +378,11 @@ impl<'a> PackageBuilder<'a> {
             .map(|(p, (service, _, _))| (p.name.as_str(), *service))
             .collect();
 
+        let exports = service_wasms
+            .iter()
+            .map(|(service, _, _)| (service.to_string(), *service))
+            .collect();
+
         let mut data_files = Vec::new();
         for (service, src, dest) in data_sources {
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
@@ -390,6 +395,7 @@ impl<'a> PackageBuilder<'a> {
             description: package_description.unwrap_or_else(|| package_name.to_string()),
             depends,
             accounts,
+            exports,
         };
 
         let out_dir = get_package_dir(args, metadata);
