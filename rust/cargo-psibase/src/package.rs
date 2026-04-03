@@ -1,11 +1,9 @@
-use crate::{
-    build, build_package_root, build_plugin, build_schema, Args, SERVICE_EXPORTS, SERVICE_POLYFILL,
-};
+use crate::{build, build_plugins, Args, AsyncJobServer, PackageArtifact};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
     AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, PackagedService, PrettyAction,
-    ServiceInfo,
+    Schema, ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -44,14 +42,14 @@ impl PsibaseMetadata {
 }
 
 fn find_dep<'a>(
-    packages: &HashMap<&str, &Package>,
-    ids: &'a [PackageId],
+    packages: &HashMap<&str, &'a Package>,
+    ids: &[PackageId],
     name: &str,
-) -> Option<&'a PackageId> {
+) -> Option<&'a Package> {
     for id in ids {
         let p = packages.get(&id.repr.as_str()).unwrap();
         if &p.name == name {
-            return Some(id);
+            return Some(p);
         }
     }
     None
@@ -174,18 +172,18 @@ fn should_build_package(
 fn add_files<'a>(
     service: AccountNumber,
     src: &Path,
-    dest: &String,
+    dest: &str,
     out: &mut Vec<(AccountNumber, String, PathBuf)>,
 ) -> Result<(), anyhow::Error> {
     if src.is_file() {
-        out.push((service, dest.clone(), src.to_path_buf()));
+        out.push((service, dest.to_string(), src.to_path_buf()));
     } else if src.is_dir() {
         for entry in src.read_dir()? {
             let entry = entry?;
             add_files(
                 service,
                 &entry.path(),
-                &(dest.clone()
+                &(dest.to_string()
                     + "/"
                     + entry.file_name().to_str().ok_or_else(|| {
                         anyhow!(
@@ -200,245 +198,381 @@ fn add_files<'a>(
     Ok(())
 }
 
-pub async fn build_package(
+pub struct PackageBuilder<'a> {
+    service_crates: Vec<&'a Package>,
+    service_info: Vec<ServiceInfo>,
+    plugin_crates: Vec<&'a Package>,
+    plugin_targets: Vec<(&'a str, String)>,
+    postinstall: Vec<PrettyAction>,
+    // (service-crate, src, dest)
+    data_sources: Vec<(&'a str, PathBuf, String)>,
+    depends: Vec<PackageRef>,
+}
+
+impl<'a> PackageBuilder<'a> {
+    pub fn new(
+        metadata: &'a MetadataIndex<'a>,
+        root: &PackageId,
+    ) -> Result<PackageBuilder<'a>, anyhow::Error> {
+        let mut depends_set = HashSet::new();
+        let mut visited = HashSet::new();
+        let mut queue = Vec::new();
+        let mut service_crates = Vec::new();
+        let mut service_info = Vec::new();
+        let mut plugin_crates = Vec::new();
+        let mut plugin_targets = Vec::new();
+        let mut postinstall = Vec::new();
+        let mut data_sources = Vec::new();
+
+        let get_dep = get_dep_type(|service, dep| {
+            let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
+            if dep == &service.name {
+                Ok(&service.id)
+            } else if let Some(p) = find_dep(&metadata.packages, &r.dependencies, dep) {
+                Ok(&p.id)
+            } else if let Some(p) = find_dep(
+                &metadata.packages,
+                &metadata.metadata.workspace_members,
+                dep,
+            ) {
+                Ok(&p.id)
+            } else {
+                Err(anyhow!("{} is not a dependency of {}", dep, service.name))
+            }
+        });
+
+        {
+            let package = metadata.packages.get(root.repr.as_str()).unwrap();
+            let meta = get_metadata(package)?;
+            if !meta.is_package() {
+                Err(anyhow!("{} is not a psibase package because it does not define package.metadata.psibase.package_name", package.name))?
+            }
+            if let Some(services) = &meta.services {
+                for s in services {
+                    let id: &str = &get_dep(package, &s)?.repr;
+                    if visited.insert(id) {
+                        queue.push(id);
+                    }
+                }
+            } else {
+                visited.insert(root.repr.as_str());
+                queue.push(root.repr.as_str());
+            }
+            // Add postinstall and dependencies from the root whether it is a service or not
+            if !visited.contains(root.repr.as_str()) {
+                if let Some(actions) = &meta.postinstall {
+                    postinstall.extend_from_slice(actions.as_slice());
+                }
+                for (k, v) in meta.dependencies {
+                    depends_set.insert(PackageRef {
+                        name: k,
+                        version: v,
+                    });
+                }
+            }
+        }
+
+        while !queue.is_empty() {
+            for service in std::mem::take(&mut queue) {
+                let Some(package) = metadata.packages.get(service) else {
+                    Err(anyhow!("Cannot find crate for service {}", service))?
+                };
+                let pmeta: PsibaseMetadata = get_metadata(package)?;
+                for (k, v) in pmeta.dependencies {
+                    depends_set.insert(PackageRef {
+                        name: k,
+                        version: v,
+                    });
+                }
+                let mut info = ServiceInfo {
+                    flags: pmeta.flags,
+                    server: None,
+                    schema: None,
+                };
+                if let Some(server) = pmeta.server {
+                    info.server = Some(server.parse()?);
+                    let server_package = &get_dep(package, &server)?.repr;
+                    if visited.insert(server_package) {
+                        queue.push(&server_package);
+                    }
+                }
+                if let Some(plugin) = pmeta.plugin {
+                    let Some(p) = find_dep(
+                        &metadata.packages,
+                        &metadata.metadata.workspace_members,
+                        &plugin,
+                    ) else {
+                        return Err(anyhow!("{} is not a workspace member", plugin,));
+                    };
+                    plugin_crates.push(p);
+                    plugin_targets.push((package.name.as_str(), "/plugin.wasm".to_string()));
+                }
+                for data in &pmeta.data {
+                    let src = package.manifest_path.parent().unwrap().join(&data.src);
+                    let mut dest = data.dst.clone();
+                    if !dest.starts_with('/') {
+                        dest = "/".to_string() + &dest;
+                    }
+                    if dest.ends_with('/') {
+                        dest.pop();
+                    }
+                    data_sources.push((package.name.as_str(), src.into_std_path_buf(), dest));
+                }
+                service_crates.push(*package);
+                service_info.push(info);
+                if let Some(actions) = &pmeta.postinstall {
+                    postinstall.extend_from_slice(actions.as_slice());
+                }
+            }
+        }
+
+        let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
+        depends.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Ok(PackageBuilder {
+            service_crates,
+            service_info,
+            plugin_crates,
+            plugin_targets,
+            postinstall,
+            data_sources,
+            depends,
+        })
+    }
+
+    fn finish(
+        self,
+        service_wasms: Vec<(AccountNumber, ServiceInfo, PathBuf)>,
+        args: &Args,
+        metadata: &MetadataIndex<'_>,
+        root: &PackageId,
+    ) -> Result<PackageInfo, anyhow::Error> {
+        let PackageBuilder {
+            service_crates,
+            service_info: _,
+            plugin_crates: _,
+            plugin_targets: _,
+            postinstall,
+            data_sources,
+            depends,
+        } = self;
+
+        let (package_name, package_version, package_description, package_scope) = {
+            let root = metadata.packages.get(root.repr.as_str()).unwrap();
+            let root_meta: PsibaseMetadata = get_metadata(root)?;
+            let name = root_meta.package_name.unwrap_or_else(|| root.name.clone());
+            let scope = root_meta.scope.unwrap_or_else(|| "network".to_string());
+            (
+                name,
+                root.version.to_string(),
+                root.description.clone(),
+                scope,
+            )
+        };
+
+        let accounts: Vec<_> = service_wasms.iter().map(|p| p.0).collect();
+
+        let crate_to_account: HashMap<&str, AccountNumber> = service_crates
+            .iter()
+            .zip(service_wasms.iter())
+            .map(|(p, (service, _, _))| (p.name.as_str(), *service))
+            .collect();
+
+        let mut data_files = Vec::new();
+        for (service, src, dest) in data_sources {
+            add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
+        }
+
+        let meta = Meta {
+            name: package_name.to_string(),
+            version: package_version.to_string(),
+            scope: package_scope,
+            description: package_description.unwrap_or_else(|| package_name.to_string()),
+            depends,
+            accounts,
+        };
+
+        let out_dir = get_package_dir(args, metadata);
+        let out_path = out_dir.join(package_name.clone() + ".psi");
+        let mut file =
+            if should_build_package(&out_path, &meta, &service_wasms, &data_files, &postinstall)
+                .unwrap_or(true)
+            {
+                std::fs::create_dir_all(&out_dir)?;
+                let mut out = ZipWriter::new(
+                    OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(&out_path)?,
+                );
+                let options: FileOptions = FileOptions::default();
+                out.start_file("meta.json", options)?;
+                write!(out, "{}", &serde_json::to_string(&meta)?)?;
+                for (service, info, path) in service_wasms {
+                    out.start_file(format!("service/{}.wasm", service), options)?;
+                    std::io::copy(&mut File::open(path)?, &mut out)?;
+                    out.start_file(format!("service/{}.json", service), options)?;
+                    write!(out, "{}", &serde_json::to_string(&info)?)?;
+                }
+                for (service, dest, src) in data_files {
+                    out.start_file(format!("data/{}{}", service, dest), options)?;
+                    std::io::copy(&mut File::open(src)?, &mut out)?;
+                }
+                if !postinstall.is_empty() {
+                    out.start_file("script/postinstall.json", options)?;
+                    write!(out, "{}", &serde_json::to_string(&postinstall)?)?;
+                }
+                let mut file = out.finish()?;
+                file.rewind()?;
+                file
+            } else {
+                File::open(out_path)?
+            };
+        // Calculate the package checksum
+        let mut hasher = Sha256::new();
+        std::io::copy(&mut file, &mut hasher)?;
+        let hash: [u8; 32] = hasher.finalize().into();
+        Ok(meta.info(Checksum256::from(hash), package_name.clone() + ".psi"))
+    }
+}
+
+#[derive(Default)]
+struct FlattenServices<'a> {
+    packages: Vec<&'a Package>,
+    uses: HashMap<*const Package, Vec<usize>>,
+    sizes: Vec<usize>,
+}
+
+impl<'a> FlattenServices<'a> {
+    fn new<I: IntoIterator<Item = &'a Vec<&'a Package>>>(packages: I) -> Self {
+        let mut result = FlattenServices::default();
+        let mut i = 0;
+        for group in packages {
+            result.sizes.push(group.len());
+            for package in group {
+                let v = result.uses.entry(*package as *const Package).or_default();
+                if v.is_empty() {
+                    result.packages.push(*package);
+                }
+                v.push(i);
+                i += 1;
+            }
+        }
+        result
+    }
+    fn split<T: Clone>(
+        mut self,
+        files: Vec<PackageArtifact<T>>,
+    ) -> Result<Vec<Vec<T>>, anyhow::Error> {
+        // Duplicate items as needed
+        let mut expanded = Vec::new();
+        for mut file in files {
+            let Some(uses) = self
+                .uses
+                .remove(&(self.packages[file.package_index] as *const Package))
+            else {
+                Err(anyhow!(
+                    "Service {} should not produce more than one wasm target",
+                    self.packages[file.package_index].name
+                ))?
+            };
+            for i in &uses[0..(uses.len() - 1)] {
+                file.package_index = *i;
+                expanded.push(file.clone());
+            }
+            file.package_index = *uses.last().unwrap();
+            expanded.push(file);
+        }
+        // Verify that all packages are present
+        for package in &self.packages {
+            if self.uses.contains_key(&(*package as *const Package)) {
+                Err(anyhow!(
+                    "Service {} is expected to produce a wasm target",
+                    package.name
+                ))?
+            }
+        }
+        // Sort by package_index
+        for i in 0..expanded.len() {
+            let j = expanded[i].package_index;
+            expanded.swap(i, j);
+        }
+        // Split into groups matching the original builders
+        let mut result = Vec::new();
+        let mut iter = expanded.into_iter();
+        for n in &self.sizes {
+            let mut group = Vec::with_capacity(*n);
+            for _ in 0..*n {
+                group.push(iter.next().unwrap().value)
+            }
+            result.push(group);
+        }
+        Ok(result)
+    }
+}
+
+pub async fn build_packages(
+    jobs: &AsyncJobServer,
     args: &Args,
     metadata: &MetadataIndex<'_>,
-    service: Option<&str>,
-) -> Result<PackageInfo, anyhow::Error> {
-    let mut depends_set = HashSet::new();
-    let mut accounts: Vec<AccountNumber> = Vec::new();
-    let mut visited = HashSet::new();
-    let mut queue = Vec::new();
-    let mut services = Vec::new();
-    let mut plugins = Vec::new();
-    let mut data_files = Vec::new();
-    let mut postinstall = Vec::new();
-    let mut data_sources = Vec::new();
+    roots: &[&PackageId],
+) -> Result<Vec<PackageInfo>, anyhow::Error> {
+    let mut builders = Vec::new();
+    let mut all_crates = HashSet::new();
 
-    let get_dep = get_dep_type(|service, dep| {
-        let r = metadata.resolved.get(&service.id.repr.as_str()).unwrap();
-        if dep == &service.name {
-            Ok(&service.id)
-        } else if let Some(id) = find_dep(&metadata.packages, &r.dependencies, dep) {
-            Ok(id)
-        } else if let Some(id) = find_dep(
-            &metadata.packages,
-            &metadata.metadata.workspace_members,
-            dep,
-        ) {
-            Ok(id)
-        } else {
-            Err(anyhow!("{} is not a dependency of {}", dep, service.name))
-        }
-    });
-
-    if let Some(root) = service {
-        let package = metadata.packages.get(root).unwrap();
-        let meta = get_metadata(package)?;
-        if !meta.is_package() {
-            Err(anyhow!("{} is not a psibase package because it does not define package.metadata.psibase.package_name", package.name))?
-        }
-        if let Some(services) = &meta.services {
-            for s in services {
-                let id: &str = &get_dep(package, &s)?.repr;
-                if visited.insert(id) {
-                    queue.push(id);
-                }
-            }
-        } else {
-            visited.insert(root);
-            queue.push(root);
-        }
-        // Add postinstall and dependencies from the root whether it is a service or not
-        if !visited.contains(root) {
-            if let Some(actions) = &meta.postinstall {
-                postinstall.extend_from_slice(actions.as_slice());
-            }
-            for (k, v) in meta.dependencies {
-                depends_set.insert(PackageRef {
-                    name: k,
-                    version: v,
-                });
-            }
-        }
-    } else {
-        Err(anyhow!("Cannot package a virtual workspace"))?
+    for root in roots {
+        builders.push(PackageBuilder::new(metadata, root)?);
     }
 
-    while !queue.is_empty() {
-        for service in std::mem::take(&mut queue) {
-            let Some(package) = metadata.packages.get(service) else {
-                Err(anyhow!("Cannot find crate for service {}", service))?
-            };
-            let pmeta: PsibaseMetadata = get_metadata(package)?;
-            for (k, v) in pmeta.dependencies {
-                depends_set.insert(PackageRef {
-                    name: k,
-                    version: v,
-                });
-            }
-            let mut info = ServiceInfo {
-                flags: pmeta.flags,
-                server: None,
-                schema: None,
-            };
-            if let Some(server) = pmeta.server {
-                info.server = Some(server.parse()?);
-                let server_package = &get_dep(package, &server)?.repr;
-                if visited.insert(server_package) {
-                    queue.push(&server_package);
-                }
-            }
-            if let Some(plugin) = pmeta.plugin {
-                let Some(id) = find_dep(
-                    &metadata.packages,
-                    &metadata.metadata.workspace_members,
-                    &plugin,
-                ) else {
-                    return Err(anyhow!("{} is not a workspace member", plugin,));
-                };
-                plugins.push((plugin, &package.name, "/plugin.wasm", &id.repr));
-            }
-            for data in &pmeta.data {
-                let src = package.manifest_path.parent().unwrap().join(&data.src);
-                let mut dest = data.dst.clone();
-                if !dest.starts_with('/') {
-                    dest = "/".to_string() + &dest;
-                }
-                if dest.ends_with('/') {
-                    dest.pop();
-                }
-                data_sources.push((&package.name, src.into_std_path_buf(), dest));
-            }
-            services.push((&package.name, info, &package.id.repr));
-            if let Some(actions) = &pmeta.postinstall {
-                postinstall.extend_from_slice(actions.as_slice());
-            }
+    for builder in &builders {
+        for service in &builder.service_crates {
+            all_crates.insert(&service.id);
+        }
+        for plugin in &builder.plugin_crates {
+            all_crates.insert(&plugin.id);
         }
     }
 
-    let (package_name, package_version, package_description, package_scope) = {
-        let root = metadata.packages.get(service.unwrap()).unwrap();
-        let root_meta: PsibaseMetadata = get_metadata(root)?;
-        let name = root_meta.package_name.unwrap_or_else(|| root.name.clone());
-        let scope = root_meta.scope.unwrap_or_else(|| "network".to_string());
-        (
-            name,
-            root.version.to_string(),
-            root.description.clone(),
-            scope,
-        )
-    };
-
-    let mut depends: Vec<PackageRef> = depends_set.into_iter().collect();
-    depends.sort_by(|a, b| a.name.cmp(&b.name));
-
-    let need_to_build_root = services
-        .iter()
-        .find(|(_, _, id)| id.as_str() == service.unwrap())
-        .is_none()
-        && plugins
-            .iter()
-            .find(|(_, _, _, id)| id.as_str() == service.unwrap())
-            .is_none();
-
-    for (plugin, service, path, id) in plugins {
-        let mut paths = build_plugin(args, &[id.as_str()], &["-p", &plugin]).await?;
-        if paths.len() != 1 {
-            Err(anyhow!(
-                "Plugin {} should produce exactly one wasm target",
-                plugin
-            ))?
-        };
-        data_sources.push((service, paths.pop().unwrap().into(), path.to_string()))
+    // Run cargo build at the root to pick up any build scripts
+    let mut extra_roots = Vec::new();
+    for root in roots {
+        if !all_crates.insert(*root) {
+            extra_roots.push(*root);
+        }
     }
 
-    let mut crate_to_account: HashMap<&String, AccountNumber> = HashMap::new();
-
-    let mut service_wasms = Vec::new();
-    for (service, mut info, id) in services {
-        let mut paths = build(
-            args,
-            &[id.as_str()],
-            vec![],
-            &["--lib", "--crate-type=cdylib", "-p", &service],
-            Some(SERVICE_POLYFILL),
-            SERVICE_EXPORTS,
-        )
-        .await?;
-        if paths.len() != 1 {
-            Err(anyhow!(
-                "Service {} should produce exactly one wasm target",
-                service
-            ))?
-        };
-        let schema = build_schema(args, &[&id], &["-p", &service]).await?;
-        crate_to_account.insert(service, schema.service.clone());
-        let service = schema.service.clone();
-        info.schema = Some(schema);
-        service_wasms.push((service, info, paths.pop().unwrap()));
-        accounts.push(service);
-    }
-
-    if need_to_build_root {
-        // Run cargo build at the root to pick up any build scripts
-        build_package_root(args, service.unwrap()).await?;
-    }
-
-    for (service, src, dest) in data_sources {
-        add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
-    }
-
-    let meta = Meta {
-        name: package_name.to_string(),
-        version: package_version.to_string(),
-        scope: package_scope,
-        description: package_description.unwrap_or_else(|| package_name.to_string()),
-        depends,
-        accounts,
-    };
-
-    let out_dir = get_package_dir(args, metadata);
-    let out_path = out_dir.join(package_name.clone() + ".psi");
-    let mut file =
-        if should_build_package(&out_path, &meta, &service_wasms, &data_files, &postinstall)
-            .unwrap_or(true)
+    let flat_plugins = FlattenServices::new(builders.iter().map(|b| &b.plugin_crates));
+    let plugin_paths = build_plugins(args, &flat_plugins.packages).await?;
+    let plugin_paths = flat_plugins.split(plugin_paths)?;
+    for (builder, plugins) in builders.iter_mut().zip(plugin_paths) {
+        for (plugin, (service, path)) in plugins
+            .into_iter()
+            .zip(std::mem::take(&mut builder.plugin_targets))
         {
-            std::fs::create_dir_all(&out_dir)?;
-            let mut out = ZipWriter::new(
-                OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(&out_path)?,
-            );
-            let options: FileOptions = FileOptions::default();
-            out.start_file("meta.json", options)?;
-            write!(out, "{}", &serde_json::to_string(&meta)?)?;
-            for (service, info, path) in service_wasms {
-                out.start_file(format!("service/{}.wasm", service), options)?;
-                std::io::copy(&mut File::open(path)?, &mut out)?;
-                out.start_file(format!("service/{}.json", service), options)?;
-                write!(out, "{}", &serde_json::to_string(&info)?)?;
-            }
-            for (service, dest, src) in data_files {
-                out.start_file(format!("data/{}{}", service, dest), options)?;
-                std::io::copy(&mut File::open(src)?, &mut out)?;
-            }
-            if !postinstall.is_empty() {
-                out.start_file("script/postinstall.json", options)?;
-                write!(out, "{}", &serde_json::to_string(&postinstall)?)?;
-            }
-            let mut file = out.finish()?;
-            file.rewind()?;
-            file
-        } else {
-            File::open(out_path)?
-        };
-    // Calculate the package checksum
-    let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher)?;
-    let hash: [u8; 32] = hasher.finalize().into();
-    Ok(meta.info(Checksum256::from(hash), package_name.clone() + ".psi"))
+            builder.data_sources.push((service, plugin, path));
+        }
+    }
+
+    let flattened = FlattenServices::new(builders.iter().map(|b| &b.service_crates));
+    let paths = build(&jobs, args, &flattened.packages, &extra_roots).await?;
+    let paths = flattened.split(paths)?;
+
+    let mut result = Vec::new();
+    for ((mut builder, paths), root) in builders.into_iter().zip(paths).zip(roots) {
+        let mut service_wasms = Vec::new();
+        for (mut info, paths) in std::mem::take(&mut builder.service_info)
+            .into_iter()
+            .zip(paths)
+        {
+            let schema: Schema =
+                serde_json::from_str(&std::io::read_to_string(File::open(paths.schema)?)?)?;
+            let service = schema.service.clone();
+            info.schema = Some(schema);
+            service_wasms.push((service, info, paths.service));
+        }
+        result.push(builder.finish(service_wasms, args, metadata, root)?)
+    }
+    Ok(result)
 }

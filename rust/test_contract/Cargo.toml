@@ -11,9 +11,6 @@ publish.workspace = true
 [package.metadata.psibase]
 package-name = "test_contract"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
 psibase.workspace = true
 psibase_service.workspace = true

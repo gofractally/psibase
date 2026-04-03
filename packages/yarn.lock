@@ -1902,8 +1902,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/fractal-core-ui@workspace:user/FractalCore/ui"
   dependencies:
-    "@dicebear/collection": "npm:^9.2.2"
-    "@dicebear/core": "npm:^9.2.2"
     "@tanstack/react-form": "npm:^1.11.1"
     "@tanstack/react-pacer": "npm:^0.6.0"
     "@tanstack/react-query": "npm:^5.90.6"
@@ -1916,7 +1914,6 @@ __metadata:
     eslint: "npm:^9.15.0"
     humanize-duration: "npm:^3.32.2"
     lucide-react: "npm:^0.475.0"
-    nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
     react-confetti-explosion: "npm:^3.0.3"
     react-dom: "npm:^19.1.0"
@@ -1936,24 +1933,18 @@ __metadata:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
     "@tanstack/react-form": "npm:^1.11.1"
-    "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
-    "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
     "@uidotdev/usehooks": "npm:^2.4.1"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
-    humanize-duration: "npm:^3.32.2"
     lucide-react: "npm:^0.475.0"
-    nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
-    usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     zod: "npm:^3.24.2"
   languageName: unknown
@@ -3974,13 +3965,6 @@ __metadata:
   version: 4.6.0
   resolution: "@sindresorhus/is@npm:4.6.0"
   checksum: 10c0/33b6fb1d0834ec8dd7689ddc0e2781c2bfd8b9c4e4bacbcb14111e0ae00621f2c264b8a7d36541799d74888b5dccdf422a891a5cb5a709ace26325eedc81e22e
-  languageName: node
-  linkType: hard
-
-"@standard-schema/spec@npm:1.0.0":
-  version: 1.0.0
-  resolution: "@standard-schema/spec@npm:1.0.0"
-  checksum: 10c0/a1ab9a8bdc09b5b47aa8365d0e0ec40cc2df6437be02853696a0e377321653b0d3ac6f079a8c67d5ddbe9821025584b1fb71d9cc041a6666a96f1fadf2ece15f
   languageName: node
   linkType: hard
 
@@ -10404,33 +10388,6 @@ __metadata:
   dependencies:
     esm-env: "npm:^1.1.4"
   checksum: 10c0/e114ddca72a82c2d9650307600e0583212af422d074e7650e40e30f650e3671563323c198c08ff18a66c8f8be323361ea28839a1671b4f94ee5539e1941d6bdc
-  languageName: node
-  linkType: hard
-
-"nuqs@npm:^2.4.3":
-  version: 2.8.6
-  resolution: "nuqs@npm:2.8.6"
-  dependencies:
-    "@standard-schema/spec": "npm:1.0.0"
-  peerDependencies:
-    "@remix-run/react": ">=2"
-    "@tanstack/react-router": ^1
-    next: ">=14.2.0"
-    react: ">=18.2.0 || ^19.0.0-0"
-    react-router: ^5 || ^6 || ^7
-    react-router-dom: ^5 || ^6 || ^7
-  peerDependenciesMeta:
-    "@remix-run/react":
-      optional: true
-    "@tanstack/react-router":
-      optional: true
-    next:
-      optional: true
-    react-router:
-      optional: true
-    react-router-dom:
-      optional: true
-  checksum: 10c0/51cd3cbc77903688844daa2f189ce5548db05f43b9e98a62cd5fd0e62334dd270e413cfd9365ebcaa08d38be77bd9864563bca5c2e2a237f0f80b1d8ad1c0cad
   languageName: node
   linkType: hard
 

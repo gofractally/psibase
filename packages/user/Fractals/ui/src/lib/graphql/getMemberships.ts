@@ -1,11 +1,9 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { Account, zAccount } from "@/lib/zod/Account";
-import { zDateTime } from "@/lib/zod/DateTime";
-
-import { graphql } from "../../graphql";
+import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { graphql } from "@shared/lib/graphql";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
+import { zDateTime } from "@shared/lib/schemas/date-time";
 
 export const zMember = z
     .object({
@@ -34,7 +32,7 @@ export const getMemberships = async (account: Account): Promise<Membership> => {
             }
         }
     `,
-        siblingUrl(null, "fractals", "/graphql"),
+        { service: FRACTALS_SERVICE },
     );
 
     return z

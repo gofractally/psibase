@@ -2755,8 +2755,6 @@ const RAW_RUNTIME_STATE =
       ["workspace:user/FractalCore/ui", {\
         "packageLocation": "./user/FractalCore/ui/",\
         "packageDependencies": [\
-          ["@dicebear/collection", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.2.4"],\
-          ["@dicebear/core", "npm:9.2.4"],\
           ["@psibase/fractal-core-ui", "workspace:user/FractalCore/ui"],\
           ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.27.7"],\
           ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0"],\
@@ -2770,7 +2768,6 @@ const RAW_RUNTIME_STATE =
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.2"],\
           ["humanize-duration", "npm:3.33.2"],\
           ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
-          ["nuqs", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.8.6"],\
           ["react", "npm:19.2.3"],\
           ["react-confetti-explosion", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:3.0.3"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
@@ -2792,24 +2789,18 @@ const RAW_RUNTIME_STATE =
           ["@dicebear/core", "npm:9.2.4"],\
           ["@psibase/fractals-ui", "workspace:user/Fractals/ui"],\
           ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.27.7"],\
-          ["@tanstack/react-pacer", "virtual:5264730febc38ea13beab048700e07e89dd640fc95f2142de4f9ebfe260da3e26c04b01eb44fe61468f43fb10b46bb2778c5ee5176df2376ca0cc3606d7339a2#npm:0.16.4"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.16"],\
-          ["@types/humanize-duration", "npm:3.27.4"],\
           ["@types/node", "npm:22.19.6"],\
           ["@types/react", "npm:19.2.8"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
           ["@uidotdev/usehooks", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.4.1"],\
           ["dayjs", "npm:1.11.19"],\
           ["eslint", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:9.39.2"],\
-          ["humanize-duration", "npm:3.33.2"],\
           ["lucide-react", "virtual:529da78ee9bbad35b13439475ca33f5401b9121f799d4c60e9de66600b411c43755e83652b7a77638cfb7619392b8f0665243a01d9aeed8d87cb42d3382284db#npm:0.475.0"],\
-          ["nuqs", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.8.6"],\
           ["react", "npm:19.2.3"],\
           ["react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
-          ["react-easy-sort", "virtual:5264730febc38ea13beab048700e07e89dd640fc95f2142de4f9ebfe260da3e26c04b01eb44fe61468f43fb10b46bb2778c5ee5176df2376ca0cc3606d7339a2#npm:1.8.0"],\
           ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.3"],\
           ["typescript", "patch:typescript@npm%3A5.9.3#optional!builtin<compat/typescript>::version=5.9.3&hash=5786d5"],\
-          ["usehooks-ts", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:3.1.1"],\
           ["vite", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.4.21"],\
           ["zod", "npm:3.25.76"]\
         ],\
@@ -5527,13 +5518,6 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@standard-schema/spec", [\
-      ["npm:1.0.0", {\
-        "packageLocation": "../.caches/yarn/@standard-schema-spec-npm-1.0.0-e86c6647f1-a1ab9a8bdc.zip/node_modules/@standard-schema/spec/",\
-        "packageDependencies": [\
-          ["@standard-schema/spec", "npm:1.0.0"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
       ["npm:1.1.0", {\
         "packageLocation": "../.caches/yarn/@standard-schema-spec-npm-1.1.0-d3e5ccd2e2-d90f55acde.zip/node_modules/@standard-schema/spec/",\
         "packageDependencies": [\
@@ -13575,49 +13559,6 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["esm-env", "npm:1.2.2"],\
           ["number-flow", "npm:0.5.8"]\
-        ],\
-        "linkType": "HARD"\
-      }]\
-    ]],\
-    ["nuqs", [\
-      ["npm:2.8.6", {\
-        "packageLocation": "../.caches/yarn/nuqs-npm-2.8.6-518183286b-51cd3cbc77.zip/node_modules/nuqs/",\
-        "packageDependencies": [\
-          ["nuqs", "npm:2.8.6"]\
-        ],\
-        "linkType": "SOFT"\
-      }],\
-      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.8.6", {\
-        "packageLocation": "./.yarn/__virtual__/nuqs-virtual-70fd1a1314/2/.caches/yarn/nuqs-npm-2.8.6-518183286b-51cd3cbc77.zip/node_modules/nuqs/",\
-        "packageDependencies": [\
-          ["@remix-run/react", null],\
-          ["@standard-schema/spec", "npm:1.0.0"],\
-          ["@tanstack/react-router", null],\
-          ["@types/next", null],\
-          ["@types/react", "npm:19.2.8"],\
-          ["@types/react-router", null],\
-          ["@types/react-router-dom", null],\
-          ["@types/remix-run__react", null],\
-          ["@types/tanstack__react-router", null],\
-          ["next", null],\
-          ["nuqs", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:2.8.6"],\
-          ["react", "npm:19.2.3"],\
-          ["react-router", null],\
-          ["react-router-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:6.30.3"]\
-        ],\
-        "packagePeers": [\
-          "@remix-run/react",\
-          "@tanstack/react-router",\
-          "@types/next",\
-          "@types/react-router-dom",\
-          "@types/react-router",\
-          "@types/react",\
-          "@types/remix-run__react",\
-          "@types/tanstack__react-router",\
-          "next",\
-          "react-router-dom",\
-          "react-router",\
-          "react"\
         ],\
         "linkType": "HARD"\
       }]\
