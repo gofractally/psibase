@@ -1073,7 +1073,8 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
         SERVER x-proxy
-    DEPENDS wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XProxy/ui/dist/* /
+    DEPENDS wasm ${XProxy_js_DEP}
 )
 
 psibase_package(
@@ -1142,7 +1143,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts TokenStream Transact VirtualServer WebCrypto Workshop
 )

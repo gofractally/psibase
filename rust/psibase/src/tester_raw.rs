@@ -22,6 +22,9 @@ extern "C" {
     /// Returns a chain handle
     pub fn createChain(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> u32;
 
+    /// Clones a chain. Should only be used for temporary chains.
+    pub fn cloneChain(chain_id: u32) -> u32;
+
     /// Destroy chain
     ///
     /// This destroys the chain and deletes its database from the filesystem.
@@ -123,6 +126,7 @@ extern "C" {
         value: *const u8,
         value_len: u32,
     );
+    pub fn kvRemove(chain_handle: u32, db: crate::DbId, key: *const u8, key_len: u32);
 
     pub fn checkoutSubjective(chain_handle: u32);
     pub fn commitSubjective(chain_handle: u32) -> bool;
@@ -131,6 +135,7 @@ extern "C" {
 
 thread_local! {
     static SELECTED_CHAIN: std::cell::Cell<Option<u32>> = std::cell::Cell::new(None);
+    pub(crate) static KEY_PREFIX_LEN: std::cell::Cell<u32> = std::cell::Cell::new(0);
 }
 
 pub fn get_selected_chain() -> u32 {

@@ -559,8 +559,8 @@ void XHttp::startSession()
    recurse().to<XAdmin>().startSession();
 }
 
-auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
-    -> std::optional<HttpReply>
+auto XHttp::serveSys(HttpRequest                 req,
+                     std::optional<std::int32_t> socket) -> std::optional<HttpReply>
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
@@ -568,7 +568,7 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
       return reply;
 
    if (req.method == "OPTIONS")
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
 
    auto target = req.path();
    if (target == "/register_server")
@@ -585,7 +585,7 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
       {
          open<RegServTable>().put(body);
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }
 
    return {};

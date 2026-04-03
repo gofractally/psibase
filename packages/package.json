@@ -26,7 +26,8 @@
             "user/Permissions/ui",
             "user/PremAccounts/ui",
             "user/Workshop/ui",
-            "local/XAdmin/ui"
+            "local/XAdmin/ui",
+            "local/XProxy/ui"
         ]
     },
     "dependencies": {

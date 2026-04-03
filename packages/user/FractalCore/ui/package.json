@@ -9,8 +9,6 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@dicebear/collection": "^9.2.2",
-        "@dicebear/core": "^9.2.2",
         "@tanstack/react-form": "^1.11.1",
         "@tanstack/react-pacer": "^0.6.0",
         "@tanstack/react-query": "^5.90.6",
@@ -18,8 +16,8 @@
         "dayjs": "^1.11.13",
         "humanize-duration": "^3.32.2",
         "lucide-react": "^0.475.0",
-        "nuqs": "^2.4.3",
         "react": "^19.1.0",
+        "react-confetti-explosion": "^3.0.3",
         "react-dom": "^19.1.0",
         "react-easy-sort": "^1.6.0",
         "react-router-dom": "^6.26.1",

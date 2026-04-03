@@ -12,6 +12,7 @@ postinstall = [{ sender = "virtual-server", service = "virtual-server", method =
 
 [dependencies]
 psibase.workspace = true
+psibase_service.workspace = true
 psibase_macros.workspace = true
 serde.workspace = true
 serde_json.workspace = true

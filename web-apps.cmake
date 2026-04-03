@@ -43,6 +43,7 @@ set(UI_PROJECTS
     user/Workshop/ui:Workshop_js
     user/Config/ui:Config_js
     local/XAdmin/ui:XAdmin_js
+    local/XProxy/ui:XProxy_js
 )
 
 message(STATUS "common-fonts: ${common-fonts}")

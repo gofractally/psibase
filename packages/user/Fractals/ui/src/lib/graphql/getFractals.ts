@@ -1,0 +1,38 @@
+import { z } from "zod";
+
+import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
+
+export const zFractaListInstance = z.object({
+    account: zAccount,
+    name: z.string(),
+    mission: z.string(),
+});
+
+export type FractalListInstance = z.infer<typeof zFractaListInstance>;
+
+export const getFractals = async () => {
+    const res = await graphql(
+        `
+            {
+                fractals(first: 99) {
+                    nodes {
+                        account
+                        name
+                        mission
+                    }
+                }
+            }
+        `,
+        { service: FRACTALS_SERVICE },
+    );
+
+    return z
+        .object({
+            fractals: z.object({
+                nodes: zFractaListInstance.array(),
+            }),
+        })
+        .parse(res).fractals.nodes;
+};

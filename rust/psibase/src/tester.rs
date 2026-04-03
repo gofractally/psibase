@@ -12,8 +12,9 @@ use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
     get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
     Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, PackageRegistry, RunMode, Seconds,
-    SignedTransaction, StatusRow, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, JointRegistry, KvHandle, KvMode,
+    PackageRegistry, PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow,
+    Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder,
     TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
@@ -26,6 +27,9 @@ use psibase_macros::account_raw;
 use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -43,6 +47,7 @@ pub struct Chain {
     status: RefCell<Option<StatusRow>>,
     producing: Cell<bool>,
     is_auto_block_start: bool,
+    public: bool,
 }
 
 pub const PRODUCER_ACCOUNT: AccountNumber = AccountNumber::new(account_raw!("prod"));
@@ -53,9 +58,18 @@ impl Default for Chain {
     }
 }
 
+thread_local! {
+    static NUM_PUBLIC_CHAINS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
 impl Drop for Chain {
     fn drop(&mut self) {
         unsafe { tester_raw::destroyChain(self.chain_handle) }
+        if self.public {
+            NUM_PUBLIC_CHAINS.with(|cell| {
+                cell.set(cell.get() - 1);
+            })
+        }
         tester_raw::tester_clear_chain_for_db(self.chain_handle)
     }
 }
@@ -84,10 +98,46 @@ impl Chain {
         Self::create(1 << 27, 1 << 27, 1 << 27, 1 << 27)
     }
 
+    fn make_test_chain_prototype() -> Chain {
+        let result = Chain::create_impl(1 << 27, 1 << 27, 1 << 27, 1 << 27, false);
+        result.boot().unwrap();
+        result
+    }
+
+    /// Returns a booted chain with TestDefault installed
+    pub fn test_chain() -> Chain {
+        thread_local! {
+            static PROTOTYPE: Chain = Chain::make_test_chain_prototype();
+        }
+        println!("TESTER CREATE");
+        let mut result = PROTOTYPE.with(|proto| Chain {
+            chain_handle: unsafe { tester_raw::cloneChain(proto.chain_handle) },
+            status: proto.status.clone(),
+            producing: proto.producing.clone(),
+            is_auto_block_start: proto.is_auto_block_start,
+            public: true,
+        });
+        result.auto_select_chain();
+        result.start_session();
+        result.start_block();
+        result
+    }
+
     /// Boot the tester chain with default services being deployed
     pub fn boot(&self) -> Result<(), Error> {
         let default_services: Vec<String> = vec!["TestDefault".to_string()];
         self.boot_with(&Self::default_registry(), &default_services[..])
+    }
+
+    pub fn test_registry() -> JointRegistry<BufReader<File>> {
+        let mut registry = JointRegistry::new();
+        if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
+            for path in local_packages.split(':') {
+                registry.push(DirectoryRegistry::new(path.into())).unwrap();
+            }
+        }
+        registry.push(Self::default_registry()).unwrap();
+        registry
     }
 
     pub fn default_registry() -> DirectoryRegistry {
@@ -129,23 +179,44 @@ impl Chain {
         Ok(())
     }
 
+    fn auto_select_chain(&mut self) {
+        if self.public {
+            let first = NUM_PUBLIC_CHAINS.with(|n| {
+                let old = n.get();
+                n.set(old + 1);
+                old == 0
+            });
+            if first {
+                self.select_chain()
+            }
+        }
+    }
+
     /// Create a new chain and make it active for database native functions.
     ///
     /// The arguments are the file sizes in bytes for the database's
     /// various files.
     pub fn create(hot_bytes: u64, warm_bytes: u64, cool_bytes: u64, cold_bytes: u64) -> Chain {
         println!("TESTER CREATE");
+        Self::create_impl(hot_bytes, warm_bytes, cool_bytes, cold_bytes, true)
+    }
+    fn create_impl(
+        hot_bytes: u64,
+        warm_bytes: u64,
+        cool_bytes: u64,
+        cold_bytes: u64,
+        public: bool,
+    ) -> Chain {
         let chain_handle =
             unsafe { tester_raw::createChain(hot_bytes, warm_bytes, cool_bytes, cold_bytes) };
-        if chain_handle == 0 {
-            tester_raw::tester_select_chain_for_db(chain_handle)
-        }
         let mut result = Chain {
             chain_handle,
             status: None.into(),
             producing: false.into(),
             is_auto_block_start: true,
+            public,
         };
+        result.auto_select_chain();
         result.load_local_services();
         result.start_session();
         result
@@ -476,6 +547,19 @@ impl Chain {
         tester_raw::tester_select_chain_for_db(self.chain_handle)
     }
 
+    pub fn open<R: TableRecord, T: Table<R>>(&self) -> T {
+        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let handle = unsafe {
+            KvHandle::from_raw(polyfill::open_in_chain(
+                self.chain_handle,
+                R::DB,
+                prefix,
+                KvMode::Read,
+            ))
+        };
+        T::from_handle(handle)
+    }
+
     pub fn kv_get_bytes(&self, db: DbId, key: &[u8]) -> Option<Vec<u8>> {
         let size =
             unsafe { tester_raw::kvGet(self.chain_handle, db, key.as_ptr(), key.len() as u32) };
@@ -536,6 +620,99 @@ impl Chain {
         services::setcode::Wrapper::push_from(self, account)
             .setCode(account, 0, 0, code.to_vec().into())
             .get()
+    }
+
+    fn push_transactions(
+        &self,
+        transactions: Vec<(String, Vec<Vec<Action>>, bool)>,
+    ) -> Result<(), anyhow::Error> {
+        for (_label, group, _carry) in transactions {
+            for actions in group {
+                let mut trx = Transaction {
+                    tapos: Default::default(),
+                    actions: actions,
+                    claims: vec![],
+                };
+                self.fill_tapos(&mut trx, 2);
+                let trace = self.push(&SignedTransaction {
+                    transaction: trx.packed().into(),
+                    proofs: Default::default(),
+                });
+                ChainEmptyResult { trace }.get()?
+            }
+        }
+        Ok(())
+    }
+
+    fn load_schemas<R: Read + Seek>(
+        &self,
+        package: &mut PackagedService<R>,
+        schemas: &mut SchemaMap,
+    ) -> Result<(), anyhow::Error> {
+        use crate::Table;
+        package.get_all_schemas(schemas)?;
+        let mut required = HashSet::new();
+        package.get_required_schemas(&mut required)?;
+        let index = self
+            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
+            .get_index_pk();
+        for account in required {
+            if !schemas.contains_key(&account) {
+                let Some(schema) = index.get(&account) else {
+                    Err(anyhow!("Could not find schema for {account}"))?
+                };
+                schemas.insert(account, schema.schema);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn install<R: PackageRegistry>(
+        &self,
+        reg: &R,
+        packages: &[String],
+    ) -> Result<(), anyhow::Error> {
+        use crate::Table;
+        let installed_table = self.open::<services::packages::InstalledPackage, services::packages::InstalledPackageTable>();
+        let mut installed = PackageList::new();
+        for p in &installed_table.get_index_pk() {
+            installed.insert_installed(p)
+        }
+        let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
+
+        let mut schemas = SchemaMap::new();
+        let sender = services::producers::ROOT;
+        const TARGET_SIZE: usize = 1024 * 1024;
+        const COMPRESSION_LEVEL: u32 = 4;
+        for op in packages {
+            match op {
+                PackageOp::Install(info) => {
+                    let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
+                    let mut package = block_on(reg.get_by_info(&info))?;
+                    self.load_schemas(&mut package, &mut schemas)?;
+                    builder.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                    let mut account_actions = vec![];
+                    package.install_accounts(&mut account_actions, None, sender, &None)?;
+                    builder.push_all(account_actions)?;
+                    let mut actions = vec![];
+                    package.install(
+                        &mut actions,
+                        None,
+                        sender,
+                        true,
+                        COMPRESSION_LEVEL,
+                        &mut schemas,
+                    )?;
+                    builder.push_all(actions)?;
+
+                    self.push_transactions(builder.finish()?)?;
+                }
+                _ => {
+                    unimplemented!("Replacing or removing packages")
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn http(&self, request: &HttpRequest) -> Result<HttpReply, anyhow::Error> {
@@ -854,5 +1031,194 @@ impl<'a> Caller for ChainPusher<'a> {
         }
 
         ret
+    }
+}
+
+#[cfg(target_family = "wasm")]
+#[allow(non_snake_case)]
+pub mod polyfill {
+    use crate::native_raw::{KvHandle, KvMode};
+    use crate::tester_raw;
+    use crate::tester_raw::get_selected_chain;
+    use crate::DbId;
+
+    struct KvBucket {
+        chain_handle: u32,
+        db: DbId,
+        prefix: Vec<u8>,
+        _mode: KvMode,
+    }
+    impl KvBucket {
+        unsafe fn new<'a>(
+            chain_handle: u32,
+            db: DbId,
+            prefix: Vec<u8>,
+            mode: KvMode,
+        ) -> &'a mut KvBucket {
+            let ptr = std::alloc::alloc(std::alloc::Layout::new::<KvBucket>()) as *mut KvBucket;
+            assert!(!ptr.is_null());
+            ptr.write(KvBucket {
+                chain_handle,
+                db,
+                prefix,
+                _mode: mode,
+            });
+            &mut *ptr
+        }
+        unsafe fn key(&self, key: *const u8, len: u32) -> Vec<u8> {
+            let mut result = Vec::with_capacity(self.prefix.len() + len as usize);
+            result.extend_from_slice(&self.prefix);
+            result.extend_from_slice(std::slice::from_raw_parts(key, len as usize));
+            return result;
+        }
+        unsafe fn handle(&self) -> KvHandle {
+            KvHandle(self as *const KvBucket as usize as u32)
+        }
+        unsafe fn from_handle<'a>(handle: KvHandle) -> &'a mut KvBucket {
+            &mut *(handle.0 as usize as *mut KvBucket)
+        }
+    }
+
+    pub(crate) unsafe fn open_in_chain(
+        chain_handle: u32,
+        db: DbId,
+        prefix: Vec<u8>,
+        mode: KvMode,
+    ) -> KvHandle {
+        KvBucket::new(chain_handle, db, prefix, mode).handle()
+    }
+
+    pub unsafe fn kvOpen(db: DbId, prefix: *const u8, len: u32, mode: KvMode) -> KvHandle {
+        KvBucket::new(
+            get_selected_chain(),
+            db,
+            std::slice::from_raw_parts(prefix, len as usize).to_owned(),
+            mode,
+        )
+        .handle()
+    }
+
+    pub unsafe fn kvOpenAt(
+        handle: KvHandle,
+        prefix: *const u8,
+        len: u32,
+        mode: KvMode,
+    ) -> KvHandle {
+        let src = KvBucket::from_handle(handle);
+        KvBucket::new(src.chain_handle, src.db, src.key(prefix, len), mode).handle()
+    }
+
+    pub unsafe fn kvClose(handle: KvHandle) {
+        let ptr = KvBucket::from_handle(handle) as *mut KvBucket;
+        ptr.drop_in_place();
+        std::alloc::dealloc(ptr as *mut u8, std::alloc::Layout::new::<KvBucket>());
+    }
+
+    pub unsafe fn kvGet(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvGet(
+            bucket.chain_handle,
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+        )
+    }
+
+    pub unsafe fn getSequential(db: DbId, id: u64) -> u32 {
+        return tester_raw::getSequential(get_selected_chain(), db, id);
+    }
+
+    pub unsafe fn getKey(dest: *mut u8, dest_size: u32) -> u32 {
+        // copy the key into a temporary buffer to trim off the prefix
+        let prefix_size = tester_raw::KEY_PREFIX_LEN.with(|l| l.get());
+        let size = prefix_size + dest_size;
+        let mut tmp = Vec::with_capacity(size as usize);
+
+        let actual_size = tester_raw::getKey(tmp.as_mut_ptr(), size);
+        let truncated_size = std::cmp::min(size, actual_size);
+        tmp.set_len(truncated_size as usize);
+        assert!(actual_size >= prefix_size);
+        std::slice::from_raw_parts_mut(dest, (truncated_size - prefix_size) as usize)
+            .copy_from_slice(&tmp[prefix_size as usize..truncated_size as usize]);
+        actual_size - prefix_size
+    }
+
+    pub unsafe fn kvGreaterEqual(
+        db: KvHandle,
+        key: *const u8,
+        key_len: u32,
+        match_key_len: u32,
+    ) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
+        tester_raw::kvGreaterEqual(
+            bucket.chain_handle,
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+            bucket.prefix.len() as u32 + match_key_len,
+        )
+    }
+
+    pub unsafe fn kvLessThan(
+        db: KvHandle,
+        key: *const u8,
+        key_len: u32,
+        match_key_len: u32,
+    ) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
+        tester_raw::kvLessThan(
+            bucket.chain_handle,
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+            bucket.prefix.len() as u32 + match_key_len,
+        )
+    }
+
+    pub unsafe fn kvMax(db: KvHandle, key: *const u8, key_len: u32) -> u32 {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::KEY_PREFIX_LEN.with(|l| l.set(bucket.prefix.len() as u32));
+        tester_raw::kvMax(
+            bucket.chain_handle,
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+        )
+    }
+
+    pub unsafe fn kvPut(
+        db: KvHandle,
+        key: *const u8,
+        key_len: u32,
+        value: *const u8,
+        value_len: u32,
+    ) {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvPut(
+            bucket.chain_handle,
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+            value,
+            value_len,
+        )
+    }
+
+    pub unsafe fn kvRemove(db: KvHandle, key: *const u8, key_len: u32) {
+        let bucket = KvBucket::from_handle(db);
+        let full_key = bucket.key(key, key_len);
+        tester_raw::kvRemove(
+            bucket.chain_handle,
+            bucket.db,
+            full_key.as_ptr(),
+            full_key.len() as u32,
+        )
     }
 }
