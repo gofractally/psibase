@@ -1,7 +1,8 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { ProtectedRoute } from "@shared/components/protected-route";
+
 import { Layout } from "./components/layout";
-import { ProtectedRoute } from "./components/protected-route";
 import { Loader } from "./pages/Loader";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";

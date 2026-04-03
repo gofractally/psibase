@@ -1,6 +1,6 @@
-import { queryClient } from "@/queryClient";
-
 import QueryKey from "@/lib/queryKeys";
+
+import { queryClient } from "@shared/lib/queryClient";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 
