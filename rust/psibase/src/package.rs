@@ -1929,6 +1929,9 @@ impl PackageList {
             },
         )
     }
+    pub fn remove_all_versions(&mut self, name: &str) {
+        self.packages.remove(name);
+    }
 
     pub fn contains_package(&self, name: &str) -> bool {
         self.packages.get(name).is_some()

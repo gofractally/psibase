@@ -13,6 +13,7 @@ interface types {
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        exports: list<tuple<string, string>>,
         sha256: string,
         file: string,
     }
@@ -24,6 +25,7 @@ interface types {
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        exports: list<tuple<string, string>>,
     }
     /// The location of a package repository.
     ///
