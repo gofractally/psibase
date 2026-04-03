@@ -588,6 +588,26 @@ auto XHttp::serveSys(HttpRequest                 req,
       return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }
 
+   if (target == "/unregister_server")
+   {
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+
+      if (req.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+
+      auto service = psio::convert_from_json<AccountNumber>(
+          std::string(req.body.begin(), req.body.end()));
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto serverTable = open<RegServTable>();
+         if (!serverTable.get(service))
+            return error(HttpStatus::notFound, "Service is not registered");
+         serverTable.erase(service);
+      }
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+   }
+
    return {};
 }
 

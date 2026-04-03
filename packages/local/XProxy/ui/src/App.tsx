@@ -74,6 +74,28 @@ async function fetchOriginServers(): Promise<ProxyRow[]> {
     return data.originServers.map(normalizeOriginRow);
 }
 
+async function removeOrigin(subdomain: string): Promise<void> {
+    const opts = { headers: { "Content-Type": "application/json" } };
+    const body = JSON.stringify(subdomain);
+
+    const [rm, unreg] = await Promise.all([
+        fetch(siblingUrl(null, "x-proxy", "/remove_origin_server"), {
+            ...opts,
+            method: "POST",
+            body,
+        }),
+        fetch(siblingUrl(null, "x-http", "/unregister_server"), {
+            ...opts,
+            method: "POST",
+            body,
+        }),
+    ]);
+    if (!rm.ok && rm.status !== 404)
+        throw new Error(`remove_origin_server: ${await rm.text()}`);
+    if (!unreg.ok && unreg.status !== 404)
+        throw new Error(`unregister_server: ${await unreg.text()}`);
+}
+
 async function saveRows(rows: ProxyRow[]): Promise<void> {
     const registerUrl = siblingUrl(null, "x-http", "/register_server");
     const setOriginUrl = siblingUrl(null, "x-proxy", "/set_origin_server");
@@ -135,7 +157,48 @@ function ProxyEditor({
         Record<number, string>
     >({});
     const [saving, setSaving] = useState(false);
+    const [removingIndex, setRemovingIndex] = useState<number | null>(null);
     const [message, setMessage] = useState<string | null>(null);
+
+    const reindexPrefixDrafts = (removedIndex: number) =>
+        setPrefixDraftByRow((d) => {
+            const next: Record<number, string> = {};
+            for (const [k, v] of Object.entries(d)) {
+                const j = Number(k);
+                if (j === removedIndex) continue;
+                next[j > removedIndex ? j - 1 : j] = v;
+            }
+            return next;
+        });
+
+    const removeRowAt = async (i: number) => {
+        const row = rows[i];
+        if (!row) return;
+
+        const subdomain = row.appName.trim();
+        if (subdomain && row.saved) {
+            setRemovingIndex(i);
+            setMessage(null);
+            try {
+                await removeOrigin(subdomain);
+                setRows((prev) => prev.filter((_, j) => j !== i));
+                reindexPrefixDrafts(i);
+                await queryClient.invalidateQueries({
+                    queryKey: ["origin_servers"],
+                });
+                toast("Proxy routing removed.");
+            } catch (e) {
+                const msg = e instanceof Error ? e.message : "Remove failed";
+                setMessage(msg);
+            } finally {
+                setRemovingIndex(null);
+            }
+        } else {
+            setRows((prev) => prev.filter((_, j) => j !== i));
+            reindexPrefixDrafts(i);
+            toast("Row removed.");
+        }
+    };
 
     const addRow = () =>
         setRows((prev) => [
@@ -190,6 +253,7 @@ function ProxyEditor({
         setSaving(true);
         try {
             await saveRows(rows);
+            setRows((prev) => prev.map((r) => ({ ...r, saved: true })));
             await queryClient.invalidateQueries({
                 queryKey: ["origin_servers"],
             });
@@ -216,8 +280,25 @@ function ProxyEditor({
             </div>
             <div className="mb-6 flex flex-col gap-4">
                 {rows.map((row, i) => (
-                    <Card key={i} className="gap-0 py-0 shadow-sm">
-                        <CardContent className="space-y-5 p-4 sm:p-5">
+                    <Card key={i} className="relative gap-0 py-0 shadow-sm">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-foreground absolute right-2 top-2 z-10 size-8 shrink-0"
+                            onClick={() => void removeRowAt(i)}
+                            disabled={removingIndex === i}
+                            aria-label={
+                                row.appName.trim()
+                                    ? `Remove proxy routing for ${row.appName}`
+                                    : "Remove row"
+                            }
+                        >
+                            <span className="text-xl leading-none" aria-hidden>
+                                ×
+                            </span>
+                        </Button>
+                        <CardContent className="space-y-5 p-4 pr-12 sm:p-5 sm:pr-14">
                             <div className="space-y-3">
                                 <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
                                     Origin
