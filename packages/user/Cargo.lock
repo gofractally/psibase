@@ -1265,6 +1265,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "fractal-gen"
+version = "0.23.0"
+dependencies = [
+ "fractal-gen-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "fractal-gen-pkg"
+version = "0.23.0"
+dependencies = [
+ "fractal-gen",
+ "psibase-user-workspace-hack",
+]
+
+[[package]]
 name = "fractals"
 version = "0.23.0"
 dependencies = [

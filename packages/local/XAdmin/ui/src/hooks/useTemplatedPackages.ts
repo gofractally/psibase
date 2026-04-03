@@ -11,7 +11,7 @@ export const getDefaultSelectedPackages = (
     const { dev } = options;
     if (packages.length == 0) return [];
 
-    const relevantPackageName = dev ? "DevDefault" : "ProdDefault";
+    const relevantPackageName = dev ? "DevDefault" : "ProdWithFG";
     const relevantPackage = packages.find(
         (pack) => pack.name === relevantPackageName,
     );
