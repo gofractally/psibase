@@ -15,9 +15,8 @@ mod service {
     use super::PackageSource;
     use crate as psibase;
     use crate::package::Meta;
-    use crate::{AccountNumber, Checksum256, Hex, PackageRef, Schema};
+    use crate::{AccountNumber, Checksum256, Hex, PackageExport, PackageRef, Schema};
     use fracpack::{Pack, ToSchema, Unpack};
-    use indexmap::IndexMap;
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InstalledPackageTable", index = 0)]
@@ -31,7 +30,7 @@ mod service {
         pub depends: Vec<PackageRef>,
         pub accounts: Vec<AccountNumber>,
         pub owner: AccountNumber,
-        pub exports: IndexMap<String, AccountNumber>,
+        pub exports: Vec<PackageExport>,
     }
 
     impl InstalledPackage {

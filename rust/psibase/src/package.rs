@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use fracpack::CompiledSchema;
-use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -103,6 +102,15 @@ pub struct PackageRef {
     pub version: String,
 }
 
+#[derive(
+    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, Hash,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct PackageExport {
+    pub name: String,
+    pub service: AccountNumber,
+}
+
 fn network_scope() -> String {
     "network".to_string()
 }
@@ -121,7 +129,7 @@ pub struct Meta {
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
-    pub exports: IndexMap<String, AccountNumber>,
+    pub exports: Vec<PackageExport>,
 }
 
 impl Meta {
@@ -153,7 +161,7 @@ pub struct PackageInfo {
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
-    pub exports: IndexMap<String, AccountNumber>,
+    pub exports: Vec<PackageExport>,
     #[serde(default)]
     pub sha256: Checksum256,
     #[serde(default)]
@@ -204,7 +212,7 @@ pub struct LocalPackageInfo {
     pub description: String,
     pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
-    pub exports: IndexMap<String, AccountNumber>,
+    pub exports: Vec<PackageExport>,
     pub sha256: Checksum256,
 }
 
@@ -847,15 +855,15 @@ impl<R: Read + Seek> PackagedService<R> {
                     dep.version
                 ))?
             };
-            for (name, value) in &meta.exports {
-                if let Some(old) = visited_imports.insert(name, value) {
-                    if old != value {
-                        Err(anyhow!("Ambiguous import for {name}"))?
+            for export in &meta.exports {
+                if let Some(old) = visited_imports.insert(&export.name, export.service) {
+                    if old != export.service {
+                        Err(anyhow!("Ambiguous import for {}", export.name))?
                     }
                 } else {
                     imports.push(dyn_ld::DynDep {
-                        name: name.clone(),
-                        service: value.clone(),
+                        name: export.name.clone(),
+                        service: export.service.clone(),
                     })
                 }
             }

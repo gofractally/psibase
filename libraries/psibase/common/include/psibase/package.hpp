@@ -17,6 +17,7 @@
 
 namespace psibase
 {
+   using UserService::PackageExport;
    using UserService::PackageMeta;
    using UserService::PackageRef;
 
@@ -28,10 +29,20 @@ namespace psibase
       std::string                description;
       std::vector<PackageRef>    depends;
       std::vector<AccountNumber> accounts;
+      std::vector<PackageExport> exports;
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO_REFLECT(PackageInfo, name, version, scope, description, depends, accounts, sha256, file)
+   PSIO_REFLECT(PackageInfo,
+                name,
+                version,
+                scope,
+                description,
+                depends,
+                accounts,
+                exports,
+                sha256,
+                file)
 
    std::weak_ordering operator<=>(const PackageInfo&, const PackageInfo&);
 

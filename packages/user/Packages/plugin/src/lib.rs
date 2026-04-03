@@ -54,6 +54,24 @@ impl From<psibase::PackageRef> for types::PackageRef {
     }
 }
 
+impl From<types::PackageExport> for psibase::PackageExport {
+    fn from(value: types::PackageExport) -> psibase::PackageExport {
+        psibase::PackageExport {
+            name: value.name,
+            service: value.service.as_str().into(),
+        }
+    }
+}
+
+impl From<psibase::PackageExport> for types::PackageExport {
+    fn from(value: psibase::PackageExport) -> types::PackageExport {
+        types::PackageExport {
+            name: value.name,
+            service: value.service.to_string(),
+        }
+    }
+}
+
 impl From<types::PackageInfo> for psibase::PackageInfo {
     fn from(value: types::PackageInfo) -> Self {
         psibase::PackageInfo {
@@ -67,11 +85,7 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
                 .into_iter()
                 .map(|a| a.as_str().into())
                 .collect(),
-            exports: value
-                .exports
-                .into_iter()
-                .map(|(k, s)| (k, s.as_str().into()))
-                .collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
             sha256: value.sha256.parse().unwrap(),
             file: value.file,
         }
@@ -87,11 +101,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
-            exports: value
-                .exports
-                .into_iter()
-                .map(|(k, s)| (k, s.to_string()))
-                .collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
             sha256: value.sha256.to_string(),
             file: value.file,
         }
@@ -117,11 +127,7 @@ impl From<psibase::Meta> for types::Meta {
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
-            exports: value
-                .exports
-                .into_iter()
-                .map(|(k, s)| (k, s.to_string()))
-                .collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
         }
     }
 }

@@ -2,8 +2,8 @@ use crate::{build, build_plugins, Args, AsyncJobServer, PackageArtifact};
 use anyhow::anyhow;
 use cargo_metadata::{Metadata, Node, Package, PackageId};
 use psibase::{
-    AccountNumber, Checksum256, Meta, PackageInfo, PackageRef, PackagedService, PrettyAction,
-    Schema, ServiceInfo,
+    AccountNumber, Checksum256, Meta, PackageExport, PackageInfo, PackageRef, PackagedService,
+    PrettyAction, Schema, ServiceInfo,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -380,7 +380,10 @@ impl<'a> PackageBuilder<'a> {
 
         let exports = service_wasms
             .iter()
-            .map(|(service, _, _)| (service.to_string(), *service))
+            .map(|(service, _, _)| PackageExport {
+                name: service.to_string(),
+                service: *service,
+            })
             .collect();
 
         let mut data_files = Vec::new();
