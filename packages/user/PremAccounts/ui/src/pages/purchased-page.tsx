@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
+import {
+    PREM_ACCOUNTS_SERVICE,
+    zPremiumAccountName,
+} from "@/lib/prem-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { supervisor } from "@shared/lib/supervisor";
@@ -36,7 +39,7 @@ export function PurchasedPage() {
                 body: JSON.stringify({
                     query: `
                         query {
-                            getBoughtNames(user: "${loggedInUser}") {
+                            unclaimedNames(user: "${loggedInUser}") {
                                 length
                                 names
                             }
@@ -46,14 +49,14 @@ export function PurchasedPage() {
             });
             const data = (await response.json()) as {
                 data?: {
-                    getBoughtNames?: Array<{ length: number; names: string[] }>;
+                    unclaimedNames?: Array<{ length: number; names: string[] }>;
                 };
                 errors?: Array<{ message: string }>;
             };
             if (data.errors) {
                 throw new Error(data.errors[0].message);
             }
-            const rows = data.data?.getBoughtNames ?? [];
+            const rows = data.data?.unclaimedNames ?? [];
             const flat = rows.flatMap((r) => r.names);
             flat.sort();
             setBoughtNames(flat);
@@ -84,13 +87,26 @@ export function PurchasedPage() {
         setClaimSuccessMessage("");
         setClaimSuccessNotification(null);
 
+        const zod = zPremiumAccountName.safeParse(name.trim());
+        if (!zod.success) {
+            setError(
+                zod.error.issues[0]?.message ?? "Invalid account name",
+            );
+            setClaimingNames((prev) => {
+                const next = new Set(prev);
+                next.delete(name);
+                return next;
+            });
+            return;
+        }
+
         try {
             const privateKey = (await supervisor.functionCall({
                 service: PREM_ACCOUNTS_SERVICE,
                 plugin: "plugin",
                 intf: "api",
                 method: "claim",
-                params: [name],
+                params: [name.trim()],
             })) as string;
 
             setClaimSuccessMessage(`Account '${name}' claimed successfully`);

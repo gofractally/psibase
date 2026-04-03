@@ -46,8 +46,8 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             query: `
-                                query PremAccountEvents($owner: String!, $first: Int, $after: String) {
-                                    premAccountEvents(owner: $owner, first: $first, after: $after) {
+                                query NameEvents($owner: String!, $first: Int, $after: String) {
+                                    nameEvents(owner: $owner, first: $first, after: $after) {
                                         nodes {
                                             account
                                             action
@@ -69,7 +69,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
 
                     const data = (await response.json()) as {
                         data?: {
-                            premAccountEvents?: {
+                            nameEvents?: {
                                 nodes?: Array<{
                                     account?: string;
                                     action?: string;
@@ -87,7 +87,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                         throw new Error(data.errors[0].message);
                     }
 
-                    const connection = data.data?.premAccountEvents;
+                    const connection = data.data?.nameEvents;
                     if (!connection) {
                         break;
                     }

@@ -1,4 +1,4 @@
-import { Package, ShoppingCart } from "lucide-react";
+import { type LucideIcon, Package, ShoppingCart } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { cn } from "@shared/lib/utils";
@@ -10,38 +10,45 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
+export type PremAccountNavItem = {
+    title: string;
+    path: string;
+    end?: boolean;
+    icon: LucideIcon;
+};
+
+export const premAccountNavItems: PremAccountNavItem[] = [
+    { title: "Buy name", path: "/", end: true, icon: ShoppingCart },
+    { title: "Claim name", path: "/purchased", end: true, icon: Package },
+];
+
 export function NavMain() {
     return (
         <SidebarGroup>
             <SidebarGroupLabel>Premium accounts</SidebarGroupLabel>
             <SidebarMenu>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Buy">
-                        <NavLink
-                            to="/"
-                            end
-                            className={({ isActive }) =>
-                                cn(isActive && "bg-muted/50 font-semibold")
-                            }
-                        >
-                            <ShoppingCart />
-                            <span>Buy</span>
-                        </NavLink>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton asChild tooltip="Purchased names">
-                        <NavLink
-                            to="/purchased"
-                            className={({ isActive }) =>
-                                cn(isActive && "bg-muted/50 font-semibold")
-                            }
-                        >
-                            <Package />
-                            <span>Purchased names</span>
-                        </NavLink>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
+                {premAccountNavItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                        <SidebarMenuItem key={item.path}>
+                            <SidebarMenuButton asChild tooltip={item.title}>
+                                <NavLink
+                                    to={item.path}
+                                    end={item.end}
+                                    className={({ isActive }) =>
+                                        cn(
+                                            isActive &&
+                                                "bg-muted/50 font-semibold",
+                                        )
+                                    }
+                                >
+                                    <Icon />
+                                    <span>{item.title}</span>
+                                </NavLink>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    );
+                })}
             </SidebarMenu>
         </SidebarGroup>
     );

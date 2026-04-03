@@ -7,17 +7,17 @@ import { usePluginMutation } from "./use-plugin-mutation";
 
 const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
 
-export const useAddPremiumMarket = () =>
-    usePluginMutation<[number, string, number, string]>(
+export const useDisablePremiumMarket = () =>
+    usePluginMutation<[number]>(
         {
             service: PREM_ACCOUNTS,
             intf: "market-admin",
-            method: "create",
+            method: "disable",
         },
         {
-            error: "Failed to add premium market",
-            loading: "Adding premium market…",
-            success: "Premium market added",
+            error: "Failed to disable premium market",
+            loading: "Disabling new purchases…",
+            success: "Premium market purchases disabled",
             isStagable: true,
             onSuccess: (_params, _status) => {
                 void queryClient.invalidateQueries({

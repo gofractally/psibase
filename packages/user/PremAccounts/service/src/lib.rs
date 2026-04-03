@@ -18,8 +18,13 @@ pub mod tables {
     pub struct Auction {
         pub length: u8,
         pub nft_id: u32,
-        /// When false, `buy` rejects new purchases for this name length; other actions are unchanged.
         pub enabled: bool,
+        pub initial_price: u64,
+        pub target: u32,
+        pub floor_price: u64,
+        pub window_seconds: u32,
+        pub increase_ppm: u32,
+        pub decrease_ppm: u32,
     }
 
     impl Default for Auction {
@@ -28,6 +33,12 @@ pub mod tables {
                 length: 0,
                 nft_id: 0,
                 enabled: true,
+                initial_price: 0,
+                target: 0,
+                floor_price: 0,
+                window_seconds: 0,
+                increase_ppm: 0,
+                decrease_ppm: 0,
             }
         }
     }
@@ -49,8 +60,11 @@ pub mod tables {
     }
 }
 
+pub mod constants;
+
 #[psibase::service(name = "prem-accounts", tables = "tables")]
 pub mod service {
+    use crate::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
@@ -69,9 +83,9 @@ pub mod service {
     use psibase::AccountNumber;
     use psibase::*;
 
-    const INIT_DIFFICULTY: u64 = 1000;
-    const MIN_NAME_MARKET_LENGTH: u8 = 1;
-    const MAX_NAME_MARKET_LENGTH: u8 = 15;
+    /// DiffAdjust window for target semantics (30-day period).
+    const MARKET_WINDOW_SECONDS: u32 = 30 * 86400;
+    const DIFF_ADJUST_PPM: u32 = 50_000;
 
     fn register_prem_acct_event_indices() {
         let add_index = |method: &str, column: u8| {
@@ -84,6 +98,32 @@ pub mod service {
         };
         add_index("premAcctEvent", 0);
         add_index("premAcctEvent", 1);
+        add_index("marketConfigured", 0);
+        add_index("marketStatus", 0);
+    }
+
+    fn emit_market_status(length: u8, enabled: bool) {
+        crate::Wrapper::emit()
+            .history()
+            .marketStatus(length, enabled);
+    }
+
+    /// Apply full DiffAdjust admin params from `configure`. Does not set active difficulty;
+    /// live ask evolves via sales and decay after market creation.
+    fn apply_diff_adjust_configure(
+        nft_id: u32,
+        window_seconds: u32,
+        target: u32,
+        floor_price: u64,
+        increase_ppm: u32,
+        decrease_ppm: u32,
+    ) {
+        check(target > 0, "target must be positive");
+        check(window_seconds > 0, "window seconds must be positive");
+        DiffAdjust::call().set_window(nft_id, window_seconds);
+        DiffAdjust::call().set_targets(nft_id, target, target);
+        DiffAdjust::call().set_floor(nft_id, floor_price);
+        DiffAdjust::call().set_ppm(nft_id, increase_ppm, decrease_ppm);
     }
 
     fn new_account(name: AccountNumber) {
@@ -121,27 +161,6 @@ pub mod service {
         Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nfts::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
 
-        // Bootstrap default premium markets for name lengths 1–9 (more lengths: `add_market`).
-        let auctions_table = AuctionsTable::new();
-        for length in 1..=9 {
-            let nft_id = DiffAdjust::call().create(
-                INIT_DIFFICULTY, // initial_difficulty
-                86400,           // window_seconds (1 day)
-                1,               // target_min
-                10,              // target_max
-                100,             // floor_difficulty
-                50000,           // inc_ppm (5% = 50000 ppm)
-                50000,           // dec_ppm (5% = 50000 ppm)
-            );
-
-            auctions_table
-                .put(&Auction {
-                    length,
-                    nft_id,
-                    enabled: true,
-                })
-                .unwrap();
-        }
         register_prem_acct_event_indices();
     }
 
@@ -162,17 +181,23 @@ pub mod service {
     fn buy(account: String, max_cost: u64) {
         check_init();
 
-        let acct_to_buy = AccountNumber::from_exact(&account).expect("invalid account name");
+        let length = account.len() as u8;
+        check(
+            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            &format!(
+                "account name must be {}-{} characters",
+                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+            ),
+        );
+
+        let acct_to_buy = check_some(
+            AccountNumber::from_exact(&account).ok(),
+            "invalid account name: start with a letter; use only lowercase letters, numbers, and hyphens; may not end with '-' or start with 'x-'",
+        );
 
         check(
             !Accounts::Wrapper::call().exists(acct_to_buy),
             "account already exists",
-        );
-
-        let length = account.len() as u8;
-        check(
-            length >= MIN_NAME_MARKET_LENGTH && length <= MAX_NAME_MARKET_LENGTH,
-            "account name must be 1-15 characters",
         );
 
         let sys_token = check_some(
@@ -202,8 +227,12 @@ pub mod service {
             Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, service_account);
 
         check(
-            current_price <= shared_bal.value && current_price <= max_cost,
-            "insufficient balance or max_cost too low",
+            current_price <= max_cost,
+            "max cost is below the current price; raise max cost to at least the displayed ask",
+        );
+        check(
+            current_price <= shared_bal.value,
+            "insufficient balance allocated for this purchase; increase max cost so it covers the current price",
         );
 
         new_account(acct_to_buy);
@@ -238,7 +267,10 @@ pub mod service {
         check_init();
 
         let purchased_accounts_table = PurchasedAccountsTable::new();
-        let acct_to_claim = AccountNumber::from_exact(&account).expect("invalid account name");
+        let acct_to_claim = check_some(
+            AccountNumber::from_exact(&account).ok(),
+            "invalid account name: start with a letter; use only lowercase letters, numbers, and hyphens; may not end with '-' or start with 'x-'",
+        );
 
         let purchased_account = check_some(
             purchased_accounts_table.get_index_pk().get(&acct_to_claim),
@@ -282,47 +314,191 @@ pub mod service {
     }
 
     #[action]
-    fn add_market(length: u8) {
+    fn create(length: u8, initial_price: u64, target: u32, floor_price: u64) {
         check_init();
         check(
-            length >= MIN_NAME_MARKET_LENGTH && length <= MAX_NAME_MARKET_LENGTH,
-            "market name length must be 1-15",
+            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            &format!(
+                "market name length must be {}-{}",
+                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+            ),
         );
         let auctions_table = AuctionsTable::new();
         check(
             auctions_table.get_index_pk().get(&length).is_none(),
             "market already exists",
         );
-        let nft_id = DiffAdjust::call().create(INIT_DIFFICULTY, 86400, 1, 10, 100, 50000, 50000);
+        check(
+            initial_price >= floor_price,
+            "initial price must be at least floor price",
+        );
+        check(target > 0, "target must be positive");
+        let nft_id = DiffAdjust::call().create(
+            initial_price,
+            MARKET_WINDOW_SECONDS,
+            1,
+            target,
+            floor_price,
+            DIFF_ADJUST_PPM,
+            DIFF_ADJUST_PPM,
+        );
+        Nfts::Wrapper::call().debit(
+            nft_id,
+            "prem accounts rate limit NFT"
+                .to_string()
+                .try_into()
+                .unwrap(),
+        );
         auctions_table
             .put(&Auction {
                 length,
                 nft_id,
                 enabled: true,
+                initial_price,
+                target,
+                floor_price,
+                window_seconds: MARKET_WINDOW_SECONDS,
+                increase_ppm: DIFF_ADJUST_PPM,
+                decrease_ppm: DIFF_ADJUST_PPM,
             })
             .unwrap();
+        crate::Wrapper::emit().history().marketConfigured(
+            length,
+            initial_price,
+            target,
+            floor_price,
+            true,
+            MARKET_WINDOW_SECONDS,
+            DIFF_ADJUST_PPM,
+            DIFF_ADJUST_PPM,
+        );
+        emit_market_status(length, true);
     }
 
+    /// Update the params for a name-length market
+    ///
+    /// # Arguments
+    /// * `length` - The length of the name-length market
+    /// * `window_seconds` - The window seconds for the name-length market
+    /// * `target` - The target for the name-length market
+    /// * `floor_price` - The floor price for the name-length market
+    /// * `increase_ppm` - The increase ppm for the name-length market
+    /// * `decrease_ppm` - The decrease ppm for the name-length market
+    ///
+    /// # Note: Does not change `initial_price` or enabled status.
     #[action]
-    fn update_market_status(length: u8, enable: bool) {
+    fn configure(
+        length: u8,
+        window_seconds: u32,
+        target: u32,
+        floor_price: u64,
+        increase_ppm: u32,
+        decrease_ppm: u32,
+    ) {
         check_init();
         check(
-            length >= MIN_NAME_MARKET_LENGTH && length <= MAX_NAME_MARKET_LENGTH,
-            "market name length must be 1-15",
+            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            &format!(
+                "market name length must be {}-{}",
+                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+            ),
         );
         let auctions_table = AuctionsTable::new();
         let mut auction = check_some(
             auctions_table.get_index_pk().get(&length),
             "auction not found for this length",
         );
-        auction.enabled = enable;
+        apply_diff_adjust_configure(
+            auction.nft_id,
+            window_seconds,
+            target,
+            floor_price,
+            increase_ppm,
+            decrease_ppm,
+        );
+        auction.target = target;
+        auction.floor_price = floor_price;
+        auction.window_seconds = window_seconds;
+        auction.increase_ppm = increase_ppm;
+        auction.decrease_ppm = decrease_ppm;
         auctions_table.put(&auction).unwrap();
+        crate::Wrapper::emit().history().marketConfigured(
+            length,
+            auction.initial_price,
+            target,
+            floor_price,
+            auction.enabled,
+            window_seconds,
+            increase_ppm,
+            decrease_ppm,
+        );
+    }
+
+    /// Enable new purchases for a name-length market
+    #[action]
+    fn enable(length: u8) {
+        check_init();
+        check(
+            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            &format!(
+                "market name length must be {}-{}",
+                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+            ),
+        );
+        let auctions_table = AuctionsTable::new();
+        let mut auction = check_some(
+            auctions_table.get_index_pk().get(&length),
+            "auction not found for this length",
+        );
+        if auction.enabled {
+            return;
+        }
+        auction.enabled = true;
+        auctions_table.put(&auction).unwrap();
+        emit_market_status(length, true);
+    }
+
+    /// Disable new purchases for a name-length market
+    #[action]
+    fn disable(length: u8) {
+        check_init();
+        check(
+            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            &format!(
+                "market name length must be {}-{}",
+                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+            ),
+        );
+        let auctions_table = AuctionsTable::new();
+        let mut auction = check_some(
+            auctions_table.get_index_pk().get(&length),
+            "auction not found for this length",
+        );
+        auction.enabled = false;
+        auctions_table.put(&auction).unwrap();
+        emit_market_status(length, false);
     }
 
     pub const BOUGHT: u8 = 0;
     pub const CLAIMED: u8 = 1;
     #[event(history)]
     fn premAcctEvent(owner: AccountNumber, account: AccountNumber, action: u8) {}
+
+    #[event(history)]
+    fn marketConfigured(
+        length: u8,
+        initial_price: u64,
+        target: u32,
+        floor_price: u64,
+        enable: bool,
+        window_seconds: u32,
+        increase_ppm: u32,
+        decrease_ppm: u32,
+    ) {
+    }
+
+    #[event(history)]
+    fn marketStatus(length: u8, enabled: bool) {}
 }
 
 #[cfg(test)]

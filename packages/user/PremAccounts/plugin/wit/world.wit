@@ -1,15 +1,23 @@
 package prem-accounts:plugin;
 
-interface admin {
+interface market-admin {
     use host:types/types.{error};
 
-    /// Enable or disable new purchases for n-character premium names (`length` 1–15).
+    /// Create a new name-length market (`length` within premium name bounds). Purchases start enabled.
+    /// `initial-price` and `floor-price` are canonical network-token decimal strings. `initial-price` is fixed for the life of the market.
     /// Only the Config app may call this (see plugin whitelist).
-    update-market-status: func(length: u8, enable: bool) -> result<_, error>;
+    create: func(length: u8, initial-price: string, target: u32, floor-price: string) -> result<_, error>;
 
-    /// Add a new name-length market (`length` 1–15). Fails if that market already exists.
+    /// Update DiffAdjust params: window length (seconds), target (applied as both min and max), floor price, and PPM for increase vs decrease.
+    /// Does not change initial price or enabled status. `floor-price` is a canonical network-token decimal string.
     /// Only the Config app may call this (see plugin whitelist).
-    add-market: func(length: u8) -> result<_, error>;
+    configure: func(length: u8, window-seconds: u32, target: u32, floor-price: string, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
+
+    /// Allow new purchases for a name-length market. Only the Config app may call this.
+    enable: func(length: u8) -> result<_, error>;
+
+    /// Disable new purchases for a name-length market. Only the Config app may call this.
+    disable: func(length: u8) -> result<_, error>;
 }
 
 interface api {

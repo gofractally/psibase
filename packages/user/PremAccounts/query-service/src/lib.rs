@@ -1,7 +1,8 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::connection::Connection;
+    use async_graphql::*;
     use diff_adjust::tables::RateLimitTable;
     use prem_accounts::tables::{AuctionsTable, PurchasedAccountsTable};
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
@@ -9,10 +10,42 @@ mod service {
     use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
+    fn deserialize_sqlite_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match u64::deserialize(deserializer)? {
+            0 => Ok(false),
+            1 => Ok(true),
+            n => Err(serde::de::Error::custom(format!(
+                "expected SQLite bool as 0 or 1, got {n}"
+            ))),
+        }
+    }
+
+    fn default_market_window_seconds() -> u32 {
+        30 * 86400
+    }
+
+    fn default_market_ppm() -> u32 {
+        50_000
+    }
+
     #[derive(SimpleObject)]
-    struct MarketStatus {
+    struct MarketParams {
         length: u8,
         enabled: bool,
+        target: u32,
+        #[graphql(name = "initialPrice")]
+        initial_price: Decimal,
+        #[graphql(name = "floorPrice")]
+        floor_price: Decimal,
+        #[graphql(name = "windowSeconds")]
+        window_seconds: u32,
+        #[graphql(name = "increasePpm")]
+        increase_ppm: u32,
+        #[graphql(name = "decreasePpm")]
+        decrease_ppm: u32,
     }
 
     #[derive(SimpleObject)]
@@ -22,7 +55,7 @@ mod service {
     }
 
     #[derive(SimpleObject)]
-    struct BoughtNamesByLength {
+    struct UnclaimedNamesByLength {
         length: u8,
         names: Vec<String>,
     }
@@ -53,8 +86,70 @@ mod service {
         }
     }
 
+    #[derive(Deserialize, SimpleObject)]
+    struct MarketConfiguredEvent {
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        length: u8,
+        #[graphql(name = "initialPrice")]
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        initial_price: u64,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        target: u32,
+        #[graphql(name = "floorPrice")]
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        floor_price: u64,
+        #[serde(deserialize_with = "deserialize_sqlite_bool")]
+        enable: bool,
+        #[serde(
+            default = "default_market_window_seconds",
+            deserialize_with = "deserialize_number_from_string"
+        )]
+        #[graphql(name = "windowSeconds")]
+        window_seconds: u32,
+        #[serde(
+            default = "default_market_ppm",
+            deserialize_with = "deserialize_number_from_string",
+            alias = "ppm"
+        )]
+        #[graphql(name = "increasePpm")]
+        increase_ppm: u32,
+        #[serde(
+            default = "default_market_ppm",
+            deserialize_with = "deserialize_number_from_string"
+        )]
+        #[graphql(name = "decreasePpm")]
+        decrease_ppm: u32,
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    struct MarketStatusEvent {
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        length: u8,
+        #[serde(deserialize_with = "deserialize_sqlite_bool")]
+        enabled: bool,
+    }
+
     struct Query {
         user: Option<AccountNumber>,
+    }
+
+    fn query_name_events(
+        q: &Query,
+        owner: AccountNumber,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
+        q.check_user_auth(owner.clone())?;
+
+        EventQuery::new("history.prem-accounts.premAcctEvent")
+            .condition(format!("owner = '{}'", owner))
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
     }
 
     impl Query {
@@ -67,13 +162,22 @@ mod service {
             }
             Ok(())
         }
+
+        fn require_authenticated(&self) -> async_graphql::Result<()> {
+            if self.user.is_none() {
+                return Err(async_graphql::Error::new(
+                    "permission denied: an authorized session is required for this query.",
+                ));
+            }
+            Ok(())
+        }
     }
 
     #[Object]
     impl Query {
-        /// Current prices for each configured premium name-length market (sparse, up to 15 markets).
-        /// Returns an empty list when the system token is not configured (avoids GraphQL failure).
-        async fn getPrices(&self) -> Vec<MarketPrice> {
+        /// Current prices for each configured premium name-length market (sparse rows; lengths follow PremAccounts service limits).
+        /// GraphQL field: `currentPrices`. Returns an empty list when the system token is not configured (avoids GraphQL failure).
+        async fn current_prices(&self) -> Vec<MarketPrice> {
             let Some(token) = TokensWrapper::call().getSysToken() else {
                 return vec![];
             };
@@ -84,11 +188,15 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .map(|auction| {
-                    let raw = rate_table
+                    let mut raw = rate_table
                         .get_index_pk()
                         .get(&auction.nft_id)
                         .map(|mut rate_limit| rate_limit.check_difficulty_decrease())
                         .unwrap_or(0);
+                    // DiffAdjust can read 0 before the rate row is populated or in edge cases; the auction still stores the configured ask.
+                    if auction.enabled && raw == 0 && auction.initial_price > 0 {
+                        raw = auction.initial_price;
+                    }
                     MarketPrice {
                         length: auction.length,
                         price: Decimal::new(Quantity::from(raw), precision),
@@ -99,15 +207,26 @@ mod service {
             rows
         }
 
-        /// Status (enabled/disabled) for each configured premium name-length market (sparse).
-        async fn marketsStatus(&self) -> Vec<MarketStatus> {
+        /// All configured premium name-length markets (sparse): status plus pricing parameters.
+        /// GraphQL field: `marketParams`.
+        async fn market_params(&self) -> Vec<MarketParams> {
+            let Some(token) = TokensWrapper::call().getSysToken() else {
+                return vec![];
+            };
+            let precision = token.precision;
             let auctions_table = AuctionsTable::read();
-            let mut rows: Vec<MarketStatus> = auctions_table
+            let mut rows: Vec<MarketParams> = auctions_table
                 .get_index_pk()
                 .iter()
-                .map(|a| MarketStatus {
+                .map(|a| MarketParams {
                     length: a.length,
                     enabled: a.enabled,
+                    target: a.target,
+                    initial_price: Decimal::new(Quantity::from(a.initial_price), precision),
+                    floor_price: Decimal::new(Quantity::from(a.floor_price), precision),
+                    window_seconds: a.window_seconds,
+                    increase_ppm: a.increase_ppm,
+                    decrease_ppm: a.decrease_ppm,
                 })
                 .collect();
             rows.sort_by_key(|r| r.length);
@@ -115,10 +234,10 @@ mod service {
         }
 
         /// Bought-but-unclaimed names for the user, grouped by name length (sparse: only lengths with names).
-        async fn getBoughtNames(
+        async fn unclaimed_names(
             &self,
             user: AccountNumber,
-        ) -> async_graphql::Result<Vec<BoughtNamesByLength>> {
+        ) -> async_graphql::Result<Vec<UnclaimedNamesByLength>> {
             self.check_user_auth(user)?;
 
             let purchased_table = PurchasedAccountsTable::read();
@@ -137,15 +256,14 @@ mod service {
                 .into_iter()
                 .map(|(length, mut names)| {
                     names.sort();
-                    BoughtNamesByLength { length, names }
+                    UnclaimedNamesByLength { length, names }
                 })
                 .collect())
         }
 
-        /// Returns a paginated subset of all historical events (that haven't yet been pruned
-        /// from this node) related to premium account buys and claims.
-        /// Can be filtered by account length and/or account owner.
-        async fn prem_account_events(
+        /// Historical premium **name** activity for `owner` (`premAcctEvent`: purchases and claims).
+        /// The caller must authorize as `owner`.
+        async fn name_events(
             &self,
             owner: AccountNumber,
             first: Option<i32>,
@@ -153,11 +271,47 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
-            self.check_user_auth(owner.clone())?;
+            query_name_events(self, owner, first, last, before, after)
+        }
 
-            EventQuery::new("history.prem-accounts.premAcctEvent")
-                .condition(format!("owner = '{}'", owner))
-                .first(first)
+        /// Historical **market configuration** changes (`marketConfigured` events). Requires an authenticated session.
+        async fn market_config_events(
+            &self,
+            length: Option<u8>,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, MarketConfiguredEvent>> {
+            self.require_authenticated()?;
+
+            let mut q = EventQuery::new("history.prem-accounts.marketConfigured");
+            if let Some(l) = length {
+                q = q.condition(format!("length = {l}"));
+            }
+            q.first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        /// Historical **market enabled/disabled** changes (`marketStatus` events). Requires an authenticated session.
+        async fn market_status_events(
+            &self,
+            length: Option<u8>,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, MarketStatusEvent>> {
+            self.require_authenticated()?;
+
+            let mut q = EventQuery::new("history.prem-accounts.marketStatus");
+            if let Some(l) = length {
+                q = q.condition(format!("length = {l}"));
+            }
+            q.first(first)
                 .last(last)
                 .before(before)
                 .after(after)

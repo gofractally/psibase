@@ -7,11 +7,17 @@ import { siblingUrl } from "@psibase/common-lib";
 
 import {
     PREM_ACCOUNTS_SERVICE,
+    canonicalTokenAmountToRaw,
     doesAccountExist,
+    expandToCanonicalTokenDecimal,
     formatCanonicalTokenAmount,
-    isCanonicalTokenDecimal,
     unitTokenAmountCanonical,
+    zPremiumAccountName,
 } from "@/lib/prem-service";
+import {
+    MAX_PREMIUM_NAME_LENGTH,
+    MIN_PREMIUM_NAME_LENGTH,
+} from "@/lib/premium-name-length";
 
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
@@ -23,7 +29,6 @@ export function BuyPage() {
     const maxCostDefaultSynced = useRef(false);
     const [accountName, setAccountName] = useState("");
     const [accountExists, setAccountExists] = useState<boolean | null>(null);
-    /** Canonical network-token decimal string for the current ask (from `getPrices`). */
     const [price, setPrice] = useState<string | null>(null);
     const [systemToken, setSystemToken] = useState<{
         precision: number;
@@ -31,7 +36,6 @@ export function BuyPage() {
         id?: number;
     } | null>(null);
     const [maxCost, setMaxCost] = useState("1.0000");
-    /** Map name length → canonical price string (from sparse `getPrices` markets). */
     const [priceByLength, setPriceByLength] = useState<Map<number, string>>(
         () => new Map(),
     );
@@ -39,6 +43,17 @@ export function BuyPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const [buySuccessMessage, setBuySuccessMessage] = useState("");
+
+    const trimmedAccount = accountName.trim();
+    const nameZodResult =
+        trimmedAccount.length > 0
+            ? zPremiumAccountName.safeParse(trimmedAccount)
+            : null;
+    const nameValidationMessage =
+        nameZodResult && !nameZodResult.success
+            ? (nameZodResult.error.issues[0]?.message ?? "Invalid account name")
+            : "";
+    const accountNameValid = nameZodResult?.success === true;
 
     const loadSystemToken = async () => {
         try {
@@ -116,9 +131,7 @@ export function BuyPage() {
                         "length" in row &&
                         "price" in row
                     ) {
-                        const len = Number(
-                            (row as { length: unknown }).length,
-                        );
+                        const len = Number((row as { length: unknown }).length);
                         const rawPrice = (row as { price: unknown }).price;
                         const priceStr =
                             typeof rawPrice === "string"
@@ -128,8 +141,8 @@ export function BuyPage() {
                                   : "";
                         if (
                             Number.isFinite(len) &&
-                            len >= 1 &&
-                            len <= 15 &&
+                            len >= MIN_PREMIUM_NAME_LENGTH &&
+                            len <= MAX_PREMIUM_NAME_LENGTH &&
                             priceStr.length > 0
                         ) {
                             next.set(len, priceStr);
@@ -158,23 +171,25 @@ export function BuyPage() {
 
     useEffect(() => {
         const checkAccount = async () => {
-            if (!accountName || accountName.length === 0) {
+            const trimmed = accountName.trim();
+            if (!trimmed) {
                 setAccountExists(null);
                 setPrice(null);
                 return;
             }
 
-            if (accountName.length < 1 || accountName.length > 15) {
+            const zod = zPremiumAccountName.safeParse(trimmed);
+            if (!zod.success) {
                 setAccountExists(null);
                 setPrice(null);
                 return;
             }
 
-            const exists = await doesAccountExist(accountName);
+            const exists = await doesAccountExist(trimmed);
             setAccountExists(exists);
 
             if (!exists && priceByLength.size > 0) {
-                const length = accountName.length;
+                const length = trimmed.length;
                 const p = priceByLength.get(length);
                 setPrice(p !== undefined ? p : null);
             } else {
@@ -189,7 +204,22 @@ export function BuyPage() {
     }, [accountName, priceByLength]);
 
     const handleBuy = async () => {
-        if (!accountName || accountExists !== false || price === null) {
+        const trimmed = accountName.trim();
+        const zod = zPremiumAccountName.safeParse(trimmed);
+        if (!zod.success) {
+            setError(zod.error.issues[0]?.message ?? "Invalid account name");
+            return;
+        }
+
+        if (accountExists !== false || price === null) {
+            return;
+        }
+
+        const token = systemToken;
+        if (token == null) {
+            setError(
+                "System token is not loaded yet. Please wait and try again.",
+            );
             return;
         }
 
@@ -197,14 +227,30 @@ export function BuyPage() {
         setError("");
         setBuySuccessMessage("");
 
-        const purchasedName = accountName;
+        const purchasedName = trimmed;
+
+        const maxCostForTx =
+            expandToCanonicalTokenDecimal(maxCost, token.precision) ??
+            maxCost.trim();
+        const maxRaw = canonicalTokenAmountToRaw(maxCostForTx, token.precision);
+        const priceRaw =
+            price != null
+                ? canonicalTokenAmountToRaw(price, token.precision)
+                : null;
+        if (maxRaw != null && priceRaw != null && maxRaw < priceRaw) {
+            setError(
+                "Max cost is below the current price. Raise max cost to at least the displayed price.",
+            );
+            setIsLoading(false);
+            return;
+        }
 
         try {
             await supervisor.functionCall({
                 service: PREM_ACCOUNTS_SERVICE,
                 intf: "api",
                 method: "buy",
-                params: [accountName, maxCost],
+                params: [trimmed, maxCostForTx],
             });
 
             setBuySuccessMessage(
@@ -235,19 +281,19 @@ export function BuyPage() {
     const maxCostLabel =
         systemToken?.symbol ??
         (systemToken?.id != null ? `token ${systemToken.id}` : "SysToken");
+    const maxCostCanonical =
+        systemToken != null
+            ? expandToCanonicalTokenDecimal(maxCost, systemToken.precision)
+            : null;
     const isBuyEnabled =
         systemToken != null &&
-        isCanonicalTokenDecimal(maxCost, systemToken.precision) &&
-        accountName.length >= 1 &&
-        accountName.length <= 15 &&
+        maxCostCanonical != null &&
+        accountNameValid &&
         accountExists === false &&
         price !== null &&
         !isLoading;
 
-    const nameLen =
-        accountName.length >= 1 && accountName.length <= 15
-            ? accountName.length
-            : 0;
+    const nameLen = accountNameValid ? trimmedAccount.length : 0;
     const noMarketForNameLength =
         hasLoadedPrices &&
         accountExists === false &&
@@ -271,7 +317,7 @@ export function BuyPage() {
                             setBuySuccessMessage("");
                         }}
                         value={accountName}
-                        placeholder="Enter 1-15 character name"
+                        placeholder={`e.g. my-name (letters, numbers, hyphens; ${MIN_PREMIUM_NAME_LENGTH}–${MAX_PREMIUM_NAME_LENGTH} chars)`}
                     />
                 </div>
 
@@ -291,7 +337,9 @@ export function BuyPage() {
                         }}
                         placeholder={
                             systemToken != null
-                                ? unitTokenAmountCanonical(systemToken.precision)
+                                ? unitTokenAmountCanonical(
+                                      systemToken.precision,
+                                  )
                                 : "1.0000"
                         }
                     />
@@ -308,15 +356,19 @@ export function BuyPage() {
 
                 <div className="col-span-6 mt-4 flex min-h-[3rem] items-center">
                     {error && <p className="text-red-500">{error}</p>}
-                    {!error && buySuccessMessage && (
+                    {!error && nameValidationMessage && (
+                        <p className="text-red-500">{nameValidationMessage}</p>
+                    )}
+                    {!error && !nameValidationMessage && buySuccessMessage && (
                         <p className="font-medium text-green-600">
                             {buySuccessMessage}
                         </p>
                     )}
                     {!error &&
+                        !nameValidationMessage &&
                         !buySuccessMessage &&
-                        accountName.length > 0 &&
-                        accountName.length <= 15 && (
+                        trimmedAccount.length > 0 &&
+                        accountNameValid && (
                             <div>
                                 {accountExists === true && (
                                     <p className="text-red-500">
@@ -342,7 +394,8 @@ export function BuyPage() {
                                 {accountExists === false &&
                                     noMarketForNameLength && (
                                         <p className="text-muted-foreground">
-                                            {accountName} is not a premium name.
+                                            {trimmedAccount} is not a premium
+                                            name.
                                         </p>
                                     )}
                             </div>

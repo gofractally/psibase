@@ -1,0 +1,2 @@
+pub const MIN_PREMIUM_NAME_LENGTH: u8 = 1;
+pub const MAX_PREMIUM_NAME_LENGTH: u8 = 15;
