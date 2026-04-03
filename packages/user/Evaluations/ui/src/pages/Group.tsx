@@ -6,15 +6,15 @@ import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useNavigate, useParams } from "react-router-dom";
 import { useInterval } from "usehooks-ts";
 
-import { useAttest } from "@/hooks/app/use-attest";
-import { useEvaluation } from "@/hooks/app/use-evaluation";
-import { setCachedProposal, useProposal } from "@/hooks/app/use-proposal";
-import { usePropose } from "@/hooks/app/use-propose";
-import { useUsersAndGroups } from "@/hooks/app/use-users";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { arrayMove } from "@/lib/arrayMove";
-import { humanize } from "@/lib/humanize";
+import { useAttest } from "@/hooks/use-attest";
+import { useEvaluation } from "@/hooks/use-evaluation";
+import { setCachedProposal, useProposal } from "@/hooks/use-proposal";
+import { usePropose } from "@/hooks/use-propose";
+import { useUsersAndGroups } from "@/hooks/use-users";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { arrayMove } from "@shared/lib/array-move";
+import { humanize } from "@shared/lib/humanize";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -157,9 +157,9 @@ export const GroupPage = () => {
         evaluation && now >= evaluation.submissionStarts
             ? now >= evaluation.finishBy
                 ? `Evaluation finished`
-                : `Submission deadline in ${humanize((evaluation.finishBy - now) * 1000)}`
+                : `Submission deadline in ${humanize(evaluation.finishBy - now, 3)}`
             : evaluation && now >= evaluation.deliberationStarts
-              ? `Deliberation deadline in ${humanize((evaluation.submissionStarts - now) * 1000)}`
+              ? `Deliberation deadline in ${humanize(evaluation.submissionStarts - now, 3)}`
               : "Registration";
 
     const onSortEnd = (oldIndex: number, newIndex: number) => {

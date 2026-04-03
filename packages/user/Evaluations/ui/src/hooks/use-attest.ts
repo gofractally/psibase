@@ -1,9 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Params = z.object({
@@ -15,7 +14,7 @@ const Params = z.object({
 export const useAttest = () =>
     useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
-            void (await getSupervisor().functionCall({
+            void (await supervisor.functionCall({
                 method: "attest",
                 service: "evaluations",
                 intf: "user",

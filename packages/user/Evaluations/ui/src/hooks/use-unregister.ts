@@ -1,11 +1,10 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
-
-import { getSupervisor } from "@psibase/common-lib";
 
 import { zUser } from "@/lib/graphql/getUsers";
 
-import { useCurrentUser } from "../use-current-user";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { queryClient } from "@shared/lib/queryClient";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const useUnregister = () => {
     const { data: currentUser } = useCurrentUser();
@@ -15,7 +14,7 @@ export const useUnregister = () => {
                 throw new Error("User not found");
             }
 
-            void (await getSupervisor().functionCall({
+            void (await supervisor.functionCall({
                 method: "unregister",
                 service: "evaluations",
                 intf: "user",

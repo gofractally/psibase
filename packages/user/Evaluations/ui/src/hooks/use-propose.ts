@@ -1,9 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 const Params = z.object({
     owner: zAccount,
@@ -30,6 +29,6 @@ export const usePropose = () =>
             };
             console.log("Proposing...", pars);
 
-            void (await getSupervisor().functionCall(pars));
+            void (await supervisor.functionCall(pars));
         },
     });

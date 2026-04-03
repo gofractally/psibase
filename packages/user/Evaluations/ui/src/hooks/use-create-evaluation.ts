@@ -1,13 +1,13 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
 import { getEvaluation } from "@/lib/graphql/getEvaluation";
 import { getLastCreatedEvaluationId } from "@/lib/graphql/getLastCreatedEvaluation";
+
+import { queryClient } from "@shared/lib/queryClient";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 const dateToUnix = (date: Date) => Math.floor(date.getTime() / 1000);
 
@@ -57,7 +57,7 @@ export const useCreateEvaluation = () => {
                 useHooks,
             } = Params.parse(params);
 
-            void (await getSupervisor().functionCall({
+            void (await supervisor.functionCall({
                 method: "create",
                 service: "evaluations",
                 intf: "admin",

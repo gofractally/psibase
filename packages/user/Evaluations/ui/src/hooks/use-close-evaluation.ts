@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { supervisor } from "@shared/lib/supervisor";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const Params = z.object({
@@ -13,7 +13,7 @@ export const useCloseEvaluation = () => {
     const navigate = useNavigate();
     return useMutation({
         mutationFn: async (params: z.infer<typeof Params>) => {
-            void (await getSupervisor().functionCall({
+            void (await supervisor.functionCall({
                 method: "close",
                 service: "evaluations",
                 intf: "admin",

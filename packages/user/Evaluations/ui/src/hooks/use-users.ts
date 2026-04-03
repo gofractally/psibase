@@ -1,13 +1,10 @@
-import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { queryClient } from "@shared/lib/queryClient";
 import { type Account } from "@shared/lib/schemas/account";
 
-import {
-    FunctionResponse,
-    getUsersAndGroups,
-} from "../../lib/graphql/getUsers";
+import { FunctionResponse, getUsersAndGroups } from "../lib/graphql/getUsers";
 
 const genQueryKey = (owner: Account, evaluationId: number) => [
     "users",

@@ -1559,13 +1559,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/hashes@npm:^1.7.1":
-  version: 1.8.0
-  resolution: "@noble/hashes@npm:1.8.0"
-  checksum: 10c0/06a0b52c81a6fa7f04d67762e08b2c476a00285858150caeaaff4037356dd5e119f45b2a530f638b77a5eeca013168ec1b655db41bae3236cb2e9d511484fc77
-  languageName: node
-  linkType: hard
-
 "@nodelib/fs.scandir@npm:2.1.5":
   version: 2.1.5
   resolution: "@nodelib/fs.scandir@npm:2.1.5"
@@ -1836,17 +1829,15 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/evaluations-ui@workspace:user/Evaluations/ui"
   dependencies:
-    "@noble/hashes": "npm:^1.7.1"
+    "@psibase/common-lib": "workspace:*"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
-    "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
-    humanize-duration: "npm:^3.32.1"
     lucide-react: "npm:^0.475.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"

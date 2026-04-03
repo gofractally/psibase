@@ -1,11 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
-import { useCurrentUser } from "../use-current-user";
 import { addUserToCache } from "./use-users";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -23,7 +22,7 @@ export const useRegister = () => {
                 throw new Error("User not found");
             }
 
-            void (await getSupervisor().functionCall({
+            void (await supervisor.functionCall({
                 method: "register",
                 service: "evaluations",
                 intf: "user",

@@ -1,8 +1,8 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { queryClient } from "@shared/lib/queryClient";
+import { supervisor } from "@shared/lib/supervisor";
 
 const StartParams = z.object({
     evaluationId: z.number(),
@@ -14,7 +14,7 @@ export const useStartEvaluation = () =>
     useMutation({
         mutationFn: async (params: z.infer<typeof StartParams>) => {
             const { evaluationId } = StartParams.parse(params);
-            void (await getSupervisor().functionCall({
+            void (await supervisor.functionCall({
                 method: "start",
                 service: "evaluations",
                 intf: "admin",
