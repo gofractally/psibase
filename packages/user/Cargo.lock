@@ -2499,6 +2499,7 @@ dependencies = [
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -2912,6 +2913,7 @@ dependencies = [
  "prem-accounts",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
