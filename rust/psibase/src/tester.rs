@@ -679,6 +679,7 @@ impl Chain {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
+        let updated_packages = installed.into_updated(&packages);
 
         let mut schemas = SchemaMap::new();
         let sender = services::producers::ROOT;
@@ -702,7 +703,7 @@ impl Chain {
                         true,
                         COMPRESSION_LEVEL,
                         &mut schemas,
-                        installed,
+                        &updated_packages,
                     )?;
                     builder.push_all(actions)?;
 
