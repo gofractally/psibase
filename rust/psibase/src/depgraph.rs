@@ -356,6 +356,7 @@ impl<'a> DepGraph<'a> {
                 description: meta.description.clone(),
                 depends: meta.depends.clone(),
                 accounts: meta.accounts.clone(),
+                exports: meta.exports.clone(),
                 sha256: Default::default(),
                 file: String::new(),
             });

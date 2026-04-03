@@ -1537,7 +1537,9 @@ async fn apply_packages<
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
+    installed_packages: PackageList,
 ) -> Result<(), anyhow::Error> {
+    let updated_packages = installed_packages.into_updated(&ops);
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
@@ -1561,6 +1563,7 @@ async fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
@@ -1579,7 +1582,7 @@ async fn apply_packages<
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.upgrade(package.manifest(), out)?;
+                old_manifest.upgrade(package.manifest(), &meta.name, out)?;
                 // Install the new package
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
@@ -1592,6 +1595,7 @@ async fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
@@ -1600,7 +1604,7 @@ async fn apply_packages<
                 out.set_label(format!("Removing {}", &meta.name));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.remove(out)?;
+                old_manifest.remove(&meta.name, out)?;
             }
         }
     }
@@ -1617,6 +1621,7 @@ async fn do_install<T: Read + Seek>(
     tx_args: &TxArgs,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
+    installed_packages: PackageList,
 ) -> Result<(), anyhow::Error> {
     let tapos = get_tapos_for_head(&node_args.api, client.clone()).await?;
 
@@ -1668,6 +1673,7 @@ async fn do_install<T: Read + Seek>(
         sender,
         key,
         compression_level,
+        installed_packages,
     )
     .await?;
 
@@ -1823,6 +1829,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.tx_args,
             &args.key,
             args.compression_level,
+            installed,
         )
         .await?;
     }
@@ -2068,6 +2075,7 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             &args.tx_args,
             &args.key,
             args.compression_level,
+            installed,
         )
         .await
     }

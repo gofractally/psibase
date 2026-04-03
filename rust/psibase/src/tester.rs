@@ -689,6 +689,7 @@ impl Chain {
                         true,
                         COMPRESSION_LEVEL,
                         &mut schemas,
+                        installed,
                     )?;
                     builder.push_all(actions)?;
 

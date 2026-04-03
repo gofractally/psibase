@@ -11,7 +11,7 @@ export interface LoadedPlugin {
 
 type ServiceUiDeps = {
     data: {
-        uiDepsFor: {
+        depsFor: {
             deps: {
                 name: string;
                 service: string;
@@ -22,11 +22,11 @@ type ServiceUiDeps = {
 
 async function getServiceMap(service: string): Promise<ServiceMap | null> {
     const url = siblingUrl(null, "dyn-ld", `/graphql`);
-    const query = `query { uiDepsFor(service: "${service}") { deps { name service }}}`;
+    const query = `query { depsFor(service: "${service}") { deps { name service }}}`;
     const result = await postGraphQLGetJson<ServiceUiDeps>(url, query);
-    if (result.data.uiDepsFor) {
+    if (result.data.depsFor) {
         let map = new Object() as ServiceMap;
-        for (const { name, service } of result.data.uiDepsFor.deps) {
+        for (const { name, service } of result.data.depsFor.deps) {
             map[name] = service;
         }
         return map;

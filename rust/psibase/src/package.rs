@@ -1,8 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers,
-    setcode, sites, transact, verify_sig,
+    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages,
+    producers, setcode, sites, transact, verify_sig,
 };
 use crate::{
     reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
 use fracpack::CompiledSchema;
+use indexmap::IndexMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -119,6 +120,8 @@ pub struct Meta {
     pub depends: Vec<PackageRef>,
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
+    #[serde(default)]
+    pub exports: IndexMap<String, AccountNumber>,
 }
 
 impl Meta {
@@ -130,6 +133,7 @@ impl Meta {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            exports: self.exports.clone(),
             sha256,
             file,
         };
@@ -149,6 +153,8 @@ pub struct PackageInfo {
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
+    pub exports: IndexMap<String, AccountNumber>,
+    #[serde(default)]
     pub sha256: Checksum256,
     #[serde(default)]
     pub file: String,
@@ -163,6 +169,7 @@ impl PackageInfo {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            exports: self.exports.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
@@ -185,6 +192,7 @@ impl InstalledPackageInfo {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            exports: self.exports.clone(),
         }
     }
 }
@@ -196,6 +204,7 @@ pub struct LocalPackageInfo {
     pub description: String,
     pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
+    pub exports: IndexMap<String, AccountNumber>,
     pub sha256: Checksum256,
 }
 
@@ -208,6 +217,7 @@ impl LocalPackageInfo {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            exports: self.exports.clone(),
         }
     }
 }
@@ -668,11 +678,14 @@ impl<R: Read + Seek> PackagedService<R> {
         install_ui: bool,
         compression_level: u32,
         schemas: &SchemaMap,
+        packages: &PackageList,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
             self.store_data(actions, uploader, compression_level)?;
         }
+
+        self.link(packages, actions)?;
 
         self.postinstall(schemas, actions)?;
         self.commit_install(sender, actions)?;
@@ -792,6 +805,66 @@ impl<R: Read + Seek> PackagedService<R> {
                     .await?,
                 );
             }
+        }
+        Ok(())
+    }
+
+    // Returns services in this package that should have
+    // dependencies linked using dyn-ld
+    fn linked_services(&self) -> Vec<AccountNumber> {
+        let mut visited = HashSet::new();
+        let mut services = Vec::new();
+
+        for (service, _, _) in &self.services {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        for (service, _) in &self.data {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        services
+    }
+
+    // packages must contain
+    // - all packages being installed
+    // - installed packages that are not being updated, and that
+    //   the packages being installed depend on
+    pub fn link<A: ActionSink>(
+        &self,
+        packages: &PackageList,
+        actions: &mut A,
+    ) -> Result<(), anyhow::Error> {
+        let mut visited_imports = HashMap::new();
+        let mut imports = Vec::new();
+        for dep in &self.meta.depends {
+            let Some((meta, _)) = packages.get_by_ref(dep)? else {
+                Err(anyhow!(
+                    "Package list does not contain {}-{}",
+                    dep.name,
+                    dep.version
+                ))?
+            };
+            for (name, value) in &meta.exports {
+                if let Some(old) = visited_imports.insert(name, value) {
+                    if old != value {
+                        Err(anyhow!("Ambiguous import for {name}"))?
+                    }
+                } else {
+                    imports.push(dyn_ld::DynDep {
+                        name: name.clone(),
+                        service: value.clone(),
+                    })
+                }
+            }
+        }
+
+        for service in self.linked_services() {
+            actions.push_action(
+                dyn_ld::Wrapper::pack_from(service).link(self.meta.name.clone(), imports.clone()),
+            )?
         }
         Ok(())
     }
@@ -962,8 +1035,10 @@ impl PackageManifest {
     pub fn upgrade<T: ActionSink>(
         &self,
         other: PackageManifest,
+        package_name: &str,
         out: &mut T,
     ) -> Result<(), anyhow::Error> {
+        let new_linked_services = other.linked_services_set();
         let new_files: HashSet<_> = other.data.into_iter().collect();
         for file in &self.data {
             if !new_files.contains(file) {
@@ -984,9 +1059,16 @@ impl PackageManifest {
                 out.push_action(set_code_action(*service, vec![]))?;
             }
         }
+        for service in self.linked_services(new_linked_services) {
+            out.push_action(dyn_ld::Wrapper::pack_from(service).unlink(package_name.to_string()))?;
+        }
         Ok(())
     }
-    pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
+    pub fn remove<T: ActionSink>(
+        &self,
+        package_name: &str,
+        out: &mut T,
+    ) -> Result<(), anyhow::Error> {
         for file in &self.data {
             out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone()))?;
         }
@@ -999,7 +1081,34 @@ impl PackageManifest {
             }
             out.push_action(set_code_action(*service, vec![]))?;
         }
+        for service in self.linked_services(HashSet::new()) {
+            out.push_action(dyn_ld::Wrapper::pack_from(service).unlink(package_name.to_string()))?;
+        }
         Ok(())
+    }
+    fn linked_services_set(&self) -> HashSet<AccountNumber> {
+        let mut visited = HashSet::new();
+        for file in &self.data {
+            visited.insert(file.account);
+        }
+        for (service, _) in &self.services {
+            visited.insert(*service);
+        }
+        visited
+    }
+    fn linked_services(&self, mut visited: HashSet<AccountNumber>) -> Vec<AccountNumber> {
+        let mut services = Vec::new();
+        for file in &self.data {
+            if visited.insert(file.account) {
+                services.push(file.account)
+            }
+        }
+        for (service, _) in &self.services {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        services
     }
 }
 
@@ -1897,6 +2006,25 @@ impl PackageList {
             (&lhs.0.name, &lhs.0.version).cmp(&(&rhs.0.name, &rhs.0.version))
         });
         result
+    }
+    // If self is the current set of installed packages, returns the
+    // set of installed packages after ops are applied.
+    pub fn into_updated(mut self, ops: &Vec<PackageOp>) -> Self {
+        for op in ops {
+            match op {
+                PackageOp::Install(info) => {
+                    self.insert_info(info.clone());
+                }
+                PackageOp::Replace(old, info) => {
+                    self.packages.remove(&old.name);
+                    self.insert_info(info.clone());
+                }
+                PackageOp::Remove(meta) => {
+                    self.packages.remove(&meta.name);
+                }
+            }
+        }
+        self
     }
     pub fn get_by_ref(
         &self,

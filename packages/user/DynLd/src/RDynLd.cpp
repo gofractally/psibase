@@ -11,12 +11,12 @@ namespace
 {
    struct Query
    {
-      auto uiDepsFor(AccountNumber service) const
+      auto depsFor(AccountNumber service) const
       {
-         auto table = DynLd{}.open<UiDepsTable>();
+         auto table = DynLd{}.open<DynDepsTable>();
          return table.get(service);
       }
-      PSIO_REFLECT(Query, method(uiDepsFor, service))
+      PSIO_REFLECT(Query, method(depsFor, service))
    };
 }  // namespace
 
