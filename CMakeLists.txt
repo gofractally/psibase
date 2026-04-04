@@ -215,7 +215,7 @@ ExternalProject_Add(
     DEPENDS             wasm
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       ${CMAKE_COMMAND} -E env "LIBCLANG_PATH=${LIBCLANG_PATH}" "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     INSTALL_COMMAND     ""
 )
 ExternalProject_Add(
