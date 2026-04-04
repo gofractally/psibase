@@ -15,6 +15,19 @@ if(NOT DEFINED ICU_LIBRARY_DIR )
     set(ICU_LIBRARY_DIR $ENV{ICU_LIBRARY_DIR})
 endif()
 
+if(NOT ICU_LIBRARY_DIR AND ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Darwin")
+    execute_process(
+        COMMAND brew --prefix icu4c
+        OUTPUT_VARIABLE ICU_PREFIX
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE ICU_BREW_RESULT
+    )
+    if(ICU_BREW_RESULT EQUAL 0 AND EXISTS "${ICU_PREFIX}/lib")
+        set(ICU_LIBRARY_DIR "${ICU_PREFIX}/lib")
+    endif()
+endif()
+
 option (FORCE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." TRUE)
 if (${FORCE_COLORED_OUTPUT})
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
@@ -42,13 +55,23 @@ include(GNUInstallDirs)
 
 if(DEFINED WASI_SDK_PREFIX)
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
-elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
-    if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz)
-        set(WASI_SDK_SHA256 87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171)
-    elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
-        set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-linux.tar.gz)
-        set(WASI_SDK_SHA256 052ad773397dc9e5aa99fb4cfef694175e6b1e81bb2ad1d3c8e7b3fc81441b7c)
+else()
+    if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
+        if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz)
+            set(WASI_SDK_SHA256 87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171)
+        elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-linux.tar.gz)
+            set(WASI_SDK_SHA256 052ad773397dc9e5aa99fb4cfef694175e6b1e81bb2ad1d3c8e7b3fc81441b7c)
+        endif()
+    elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Darwin")
+        if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-macos.tar.gz)
+            set(WASI_SDK_SHA256 d0de2fd3ea5c57060efa87e4356c164bec3689972f2386f0c9a89c58e10cec8d)
+        elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-macos.tar.gz)
+            set(WASI_SDK_SHA256 e11552913e3f99e834d7fe7da1bd081abaf764759ed76b6097a34c63fc83665e)
+        endif()
     endif()
     if(DEFINED WASI_SDK_URL)
         ExternalProject_Add(wasi-sdk
@@ -1180,7 +1203,7 @@ function(write_package_index target dir)
     add_custom_command(
         OUTPUT ${dir}/index.json
         DEPENDS ${deps}
-        COMMAND /usr/bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/make_package_index.sh ${CMAKE_COMMAND} ${dir} ${ARGN} >${dir}/index.json
     )
     add_custom_target(${target} ALL DEPENDS ${dir}/index.json)
 endfunction()

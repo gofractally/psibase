@@ -18,6 +18,14 @@
 
 #include <stdio.h>
 #include <bitset>
+
+#ifdef __APPLE__
+#include <crt_externs.h>
+static char** get_environ() { return *_NSGetEnviron(); }
+#else
+extern char** environ;
+static char** get_environ() { return environ; }
+#endif
 #include <chrono>
 #include <optional>
 #include <random>
@@ -760,7 +768,8 @@ struct callbacks
    int32_t wasi_environ_sizes_get(wasm_ptr<uint32_t> environc, wasm_ptr<uint32_t> bufsize)
    {
       std::size_t totalSize = 0;
-      char**      p         = environ;
+      char**      p         = get_environ();
+      char**      start     = p;
       for (; *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
@@ -768,9 +777,9 @@ struct callbacks
             return wasi_errno_overflow;
          totalSize += size;
       }
-      if (totalSize > 0xffffffffu || p - environ > 0xffffffffu)
+      if (totalSize > 0xffffffffu || static_cast<std::size_t>(p - start) > 0xffffffffu)
          return wasi_errno_overflow;
-      *environc = p - environ;
+      *environc = p - start;
       *bufsize  = totalSize;
       return 0;
    }
@@ -785,7 +794,7 @@ struct callbacks
          return wasi_errno_fault;
       char* memory = state.backend.get_context().linear_memory();
 
-      for (char** p = ::environ; *p; ++p)
+      for (char** p = get_environ(); *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
          if (end - buf < size || end - env < 4)

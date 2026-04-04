@@ -17,9 +17,13 @@
 #include <boost/log/sinks/syslog_constants.hpp>
 #include <boost/log/sinks/text_file_backend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
-#include <boost/process/child.hpp>
-#include <boost/process/io.hpp>
-#include <boost/process/start_dir.hpp>
+#include <boost/process/v1/child.hpp>
+#include <boost/process/v1/io.hpp>
+#include <boost/process/v1/start_dir.hpp>
+namespace boost::process
+{
+   using namespace v1;
+}
 #include <charconv>
 #include <chrono>
 #include <ctime>
