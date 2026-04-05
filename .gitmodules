@@ -7,3 +7,6 @@
 [submodule "eos-vm"]
 	path = external/eos-vm
 	url = https://github.com/gofractally/eos-vm.git
+[submodule "external/psitri"]
+	path = external/psitri
+	url = https://github.com/gofractally/arbtrie.git
