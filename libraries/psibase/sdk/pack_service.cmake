@@ -226,7 +226,7 @@ function(psibase_package)
                 set(wasm ${_WASM_${service}})
                 list(APPEND zip-deps ${wasm})
             endif()
-            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service}.wasm)
+            list(APPEND copy-contents COMMAND ${CMAKE_COMMAND} -E copy ${wasm} ${outdir}/service/${service}.wasm)
             list(APPEND contents service/${service}.wasm service/${service}.json)
         endif()
         if(_DATA_${service})
@@ -299,7 +299,7 @@ function(psibase_package)
     elseif(_POSTINSTALL)
         list(APPEND copy-contents
             COMMAND ${CMAKE_COMMAND} -E make_directory ${outdir}/script
-            COMMAND ln -f ${_POSTINSTALL} ${outdir}/script/postinstall.json)
+            COMMAND ${CMAKE_COMMAND} -E copy ${_POSTINSTALL} ${outdir}/script/postinstall.json)
         list(APPEND contents script/postinstall.json)
         list(APPEND zip-deps ${_POSTINSTALL})
     endif()
@@ -392,12 +392,15 @@ function(psibase_schema target)
 
     if(ARGC GREATER_EQUAL 2)
         set(_OUTFILE ${ARGV1})
+        set(_BYPRODUCTS BYPRODUCTS ${_OUTFILE})
     else()
         set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+        set(_BYPRODUCTS "")
     endif()
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        ${_BYPRODUCTS}
         DEPENDS ${target}
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
         COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp

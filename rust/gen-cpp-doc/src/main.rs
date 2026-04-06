@@ -1,8 +1,7 @@
 use clang::documentation::{Comment, CommentChild};
 use clang::{Accessibility, Entity, EntityKind, TranslationUnit, Type};
 use clap::{Parser, Subcommand};
-use mdbook::preprocess::CmdPreprocessor;
-use mdbook::BookItem;
+use mdbook_preprocessor::book::BookItem;
 use regex::{Captures, Regex};
 use std::cmp::max;
 use std::collections::BTreeMap;
@@ -277,7 +276,7 @@ fn lookup(items: &[Item], parent: usize, path: &[&str], recursed: bool, result: 
 }
 
 // Set the url field of every item embedded in a chapter
-fn set_urls(chapter: &mdbook::book::Chapter, items: &mut Vec<Item>, path: &str) {
+fn set_urls(chapter: &mdbook_preprocessor::book::Chapter, items: &mut Vec<Item>, path: &str) {
     let mut chapter_path = chapter
         .path
         .clone()
@@ -733,9 +732,11 @@ fn document_macro(items: &[Item], index: usize, path: &str, result: &mut String)
 }
 
 fn escape_html(s: &str) -> String {
-    let mut result = String::new();
-    pulldown_cmark::escape::escape_html(&mut result, s).unwrap();
-    result
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
 }
 
 fn filter_children<'a, P>(entity: &Entity<'a>, predicate: P) -> Vec<Entity<'a>>
@@ -846,7 +847,7 @@ fn parse<'tu>(
     Ok(parser.parse()?)
 }
 
-fn modify_book(book: &mut mdbook::book::Book, mut items: Vec<Item>) {
+fn modify_book(book: &mut mdbook_preprocessor::book::Book, mut items: Vec<Item>) {
     let cpp_doc_re = Regex::new(r"[{][{] *#cpp-doc +([^ ]+) *[}][}]").unwrap();
     let svg_bob_re = Regex::new(r"(?s)```svgbob(.*?)```").unwrap();
 
@@ -915,7 +916,7 @@ fn main() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (ctx, mut book) = CmdPreprocessor::parse_input(io::stdin())?;
+    let (ctx, mut book) = mdbook_preprocessor::parse_input(io::stdin())?;
     let mut path = ctx.root;
     path.push("../..");
     let repo_path = match args.srcdir {
