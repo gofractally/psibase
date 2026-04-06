@@ -24,6 +24,11 @@
 
 #include <sys/stat.h>
 
+#ifdef __APPLE__
+#include <crt_externs.h>
+#define environ (*_NSGetEnviron())
+#endif
+
 using namespace std::literals;
 
 using eosio::vm::span;
@@ -785,7 +790,7 @@ struct callbacks
          return wasi_errno_fault;
       char* memory = state.backend.get_context().linear_memory();
 
-      for (char** p = ::environ; *p; ++p)
+      for (char** p = environ; *p; ++p)
       {
          auto size = std::strlen(*p) + 1;
          if (end - buf < size || end - env < 4)
