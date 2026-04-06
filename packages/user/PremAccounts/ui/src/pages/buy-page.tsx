@@ -14,11 +14,11 @@ import {
     unitTokenAmountCanonical,
     zPremiumAccountName,
 } from "@/lib/prem-service";
+
 import {
     MAX_PREMIUM_NAME_LENGTH,
     MIN_PREMIUM_NAME_LENGTH,
-} from "@/lib/premium-name-length";
-
+} from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";

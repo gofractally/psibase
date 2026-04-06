@@ -1,12 +1,12 @@
 import {
+    DollarSign,
     FolderUp,
     ListTodo,
     type LucideIcon,
     Package,
     Pickaxe,
-    Settings,
     Server,
-    DollarSign,
+    Settings,
     Store,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -58,9 +58,9 @@ export const appMenus: Menu[] = [
         path: "resource-pricing",
     },
     {
-        title: "Premium Market Config",
+        title: "Premium Name Market",
         icon: Store,
-        path: "premium-market-config",
+        path: "premium-name-market-config",
     },
     {
         title: "Settings",

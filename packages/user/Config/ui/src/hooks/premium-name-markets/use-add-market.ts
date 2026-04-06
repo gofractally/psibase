@@ -3,11 +3,11 @@ import { queryClient } from "@/queryClient";
 
 import QueryKey from "@/lib/queryKeys";
 
-import { usePluginMutation } from "./use-plugin-mutation";
+import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 
 const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
 
-export const useAddPremiumMarket = () =>
+export const useAddPremiumNameMarket = () =>
     usePluginMutation<[number, string, number, string]>(
         {
             service: PREM_ACCOUNTS,
@@ -15,13 +15,13 @@ export const useAddPremiumMarket = () =>
             method: "create",
         },
         {
-            error: "Failed to add premium market",
-            loading: "Adding premium market…",
-            success: "Premium market added",
+            error: "Failed to add premium name market",
+            loading: "Adding premium name market…",
+            success: "Premium name market added",
             isStagable: true,
-            onSuccess: (_params, _status) => {
+            onSuccess: (_, __) => {
                 void queryClient.invalidateQueries({
-                    queryKey: QueryKey.premiumConfiguredMarkets(),
+                    queryKey: QueryKey.premiumNameMarkets(),
                 });
             },
         },

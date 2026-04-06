@@ -6,7 +6,6 @@ use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
 use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
 use bindings::exports::prem_accounts::plugin::queries::MarketPrice;
-use bindings::host::common::client as HostClient;
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::tokens::plugin::helpers as TokensHelpers;
@@ -15,12 +14,11 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use prem_accounts::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
 
-use psibase::define_trust;
-use psibase::fracpack::Pack;
-use psibase::AccountNumber;
+use crate::trust::*;
+use psibase::services::invite::SubjectPublicKeyInfo;
+use psibase::{define_trust, fracpack::Pack, AccountNumber};
 mod errors;
 use errors::ErrorType;
-use psibase::services::invite::SubjectPublicKeyInfo;
 
 fn validate_premium_account_name(account: &str) -> Result<(), Error> {
     let len = account.len();
@@ -42,12 +40,13 @@ define_trust! {
         High => "
         High trust grants the abilities of the Low trust level, plus these abilities:
             - Purchasing premium account names
+            - Creating, configuring, enabling/disabling premium name markets
         ",
     }
     functions {
         Low => [],
         Medium => [claim],
-        High => [buy],
+        High => [buy, create, configure, enable, disable],
     }
 }
 
@@ -60,11 +59,10 @@ impl MarketAdmin for PremAccountsPlugin {
         target: u32,
         floor_price: String,
     ) -> Result<(), Error> {
-        if HostClient::get_sender() != "config" {
-            return Err(ErrorType::ConfigMarketCallerDenied.into());
-        }
+        assert_authorized_with_whitelist(FunctionName::create, vec!["config".into()])?;
+
         if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
+            return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
             Some(id) => id,
@@ -102,23 +100,18 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        if HostClient::get_sender() != "config" {
-            return Err(ErrorType::ConfigMarketCallerDenied.into());
-        }
-        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
-        }
-        if window_seconds == 0 {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
-        }
-        if target == 0 {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
-        }
-        if increase_ppm == 0 || increase_ppm >= 1_000_000 {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
-        }
-        if decrease_ppm == 0 || decrease_ppm >= 1_000_000 {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
+        assert_authorized_with_whitelist(FunctionName::configure, vec!["config".into()])?;
+
+        if length < MIN_PREMIUM_NAME_LENGTH
+            || length > MAX_PREMIUM_NAME_LENGTH
+            || window_seconds == 0
+            || target == 0
+            || increase_ppm == 0
+            || increase_ppm >= 1_000_000
+            || decrease_ppm == 0
+            || decrease_ppm >= 1_000_000
+        {
+            return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
             Some(id) => id,
@@ -146,11 +139,10 @@ impl MarketAdmin for PremAccountsPlugin {
     }
 
     fn enable(length: u8) -> Result<(), Error> {
-        if HostClient::get_sender() != "config" {
-            return Err(ErrorType::ConfigMarketCallerDenied.into());
-        }
+        assert_authorized_with_whitelist(FunctionName::enable, vec!["config".into()])?;
+
         if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
+            return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let packed = prem_accounts::action_structs::enable { length }.packed();
         add_action_to_transaction("enable", &packed)?;
@@ -158,11 +150,10 @@ impl MarketAdmin for PremAccountsPlugin {
     }
 
     fn disable(length: u8) -> Result<(), Error> {
-        if HostClient::get_sender() != "config" {
-            return Err(ErrorType::ConfigMarketCallerDenied.into());
-        }
+        assert_authorized_with_whitelist(FunctionName::enable, vec!["config".into()])?;
+
         if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::AddMarketLengthInvalid.into());
+            return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let packed = prem_accounts::action_structs::disable { length }.packed();
         add_action_to_transaction("disable", &packed)?;
@@ -172,7 +163,7 @@ impl MarketAdmin for PremAccountsPlugin {
 
 impl Api for PremAccountsPlugin {
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::buy)?;
+        assert_authorized_with_whitelist(FunctionName::buy, vec!["accounts".into()])?;
 
         let account = account.trim().to_string();
         validate_premium_account_name(&account)?;
@@ -235,7 +226,7 @@ impl Api for PremAccountsPlugin {
     }
 
     fn claim(account: String) -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::claim)?;
+        assert_authorized_with_whitelist(FunctionName::claim, vec!["accounts".into()])?;
 
         let account = account.trim().to_string();
         validate_premium_account_name(&account)?;
@@ -309,7 +300,7 @@ struct MarketsOverviewResponse {
     data: MarketsOverviewData,
 }
 
-/// Resolves sparse configured markets: missing row → not offered; disabled → unavailable; else current ask in raw units.
+/// Resolves sparse configured markets: missing row → not offered; disabled → unavailable; else current ask
 fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
     let graphql_str = "query { marketParams { length enabled } currentPrices { length price } }";
     let response = serde_json::from_str::<MarketsOverviewResponse>(
@@ -328,7 +319,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
     };
 
     if !st.enabled {
-        return Err(ErrorType::PremiumMarketDisabled.into());
+        return Err(ErrorType::PremiumNameMarketDisabled.into());
     }
 
     let row = response
@@ -339,15 +330,14 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
 
     let Some(row) = row else {
         return Err(ErrorType::QueryResponseParseError(
-            "missing price row for configured premium market".into(),
+            "missing price row for configured premium name market".into(),
         )
         .into());
     };
 
     let price_str = row.price.to_string();
-    TokensHelpers::decimal_to_u64(sys_token_id, &price_str).map_err(|_| {
-        ErrorType::QueryResponseParseError("invalid price for premium market".into()).into()
-    })
+    TokensHelpers::decimal_to_u64(sys_token_id, &price_str)
+        .map_err(|_| ErrorType::QueryResponseParseError("invalid price".into()).into())
 }
 
 impl Queries for PremAccountsPlugin {

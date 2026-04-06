@@ -4,10 +4,7 @@ import { z } from "zod";
 
 import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
-import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
-} from "@/lib/premium-market-defaults";
+import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
 
 const zRow = z.object({
     length: z
@@ -27,12 +24,12 @@ const zData = z.object({
     marketParams: z.array(zRow),
 });
 
-export type ConfiguredPremiumMarketRow = z.infer<typeof zRow>;
+export type ConfiguredPremiumNameMarketRow = z.infer<typeof zRow>;
 
-export const useConfiguredPremiumMarkets = () =>
+export const useConfiguredPremiumNameMarkets = () =>
     useQuery({
-        queryKey: QueryKey.premiumConfiguredMarkets(),
-        queryFn: async (): Promise<ConfiguredPremiumMarketRow[]> => {
+        queryKey: QueryKey.premiumNameMarkets(),
+        queryFn: async (): Promise<ConfiguredPremiumNameMarketRow[]> => {
             const query = `
                 query {
                     marketParams {

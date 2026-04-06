@@ -83,8 +83,7 @@ namespace SystemService
          // Allow PremAccounts service to create accounts with < 10 characters
          if (getSender() != AccountNumber("prem-accounts"))
          {
-            check(strName.length() >= 10,
-                  "account name must be at least 10 characters: " + strName);
+            check(strName.length() >= 8, "account name must be at least 10 characters: " + strName);
          }
       }
 

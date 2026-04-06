@@ -80,7 +80,6 @@ mod service {
             }
         }
 
-        /// UTF-8 length of the premium account name (same convention as on-chain markets).
         pub async fn length(&self) -> u8 {
             self.account.to_string().len() as u8
         }
@@ -176,7 +175,7 @@ mod service {
     #[Object]
     impl Query {
         /// Current prices for each configured premium name-length market (sparse rows; lengths follow PremAccounts service limits).
-        /// GraphQL field: `currentPrices`. Returns an empty list when the system token is not configured (avoids GraphQL failure).
+        /// GraphQL field: `currentPrices`. Returns an empty list when the system token is not configured.
         async fn current_prices(&self) -> Vec<MarketPrice> {
             let Some(token) = TokensWrapper::call().getSysToken() else {
                 return vec![];
@@ -208,7 +207,6 @@ mod service {
         }
 
         /// All configured premium name-length markets (sparse): status plus pricing parameters.
-        /// GraphQL field: `marketParams`.
         async fn market_params(&self) -> Vec<MarketParams> {
             let Some(token) = TokensWrapper::call().getSysToken() else {
                 return vec![];
@@ -233,7 +231,7 @@ mod service {
             rows
         }
 
-        /// Bought-but-unclaimed names for the user, grouped by name length (sparse: only lengths with names).
+        /// Bought-but-unclaimed names for the user, grouped by name length
         async fn unclaimed_names(
             &self,
             user: AccountNumber,
@@ -261,8 +259,7 @@ mod service {
                 .collect())
         }
 
-        /// Historical premium **name** activity for `owner` (`premAcctEvent`: purchases and claims).
-        /// The caller must authorize as `owner`.
+        /// premium **name** history for `owner`
         async fn name_events(
             &self,
             owner: AccountNumber,
@@ -274,7 +271,7 @@ mod service {
             query_name_events(self, owner, first, last, before, after)
         }
 
-        /// Historical **market configuration** changes (`marketConfigured` events). Requires an authenticated session.
+        /// **market configuration** History
         async fn market_config_events(
             &self,
             length: Option<u8>,
@@ -296,7 +293,7 @@ mod service {
                 .query()
         }
 
-        /// Historical **market enabled/disabled** changes (`marketStatus` events). Requires an authenticated session.
+        /// **market enabled/disabled** History
         async fn market_status_events(
             &self,
             length: Option<u8>,

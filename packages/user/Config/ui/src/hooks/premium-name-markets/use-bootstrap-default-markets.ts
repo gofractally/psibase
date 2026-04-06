@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { supervisor } from "@/supervisor";
 
 import { checkLastTx } from "@/lib/checkStaging";
-import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-market-defaults";
+import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
+import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
 import { zAccount } from "@shared/lib/schemas/account";
 import { queryClient } from "@/queryClient";
 
@@ -14,19 +15,20 @@ import { toast } from "@shared/shadcn/ui/sonner";
 
 const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
 
-export const useBootstrapDefaultPremiumMarkets = () => {
+export const useBootstrapDefaultPremiumNameMarkets = () => {
     const navigate = useNavigate();
+    const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH}–${MAX_PREMIUM_NAME_LENGTH}`;
 
     return useMutation({
         mutationKey: [
             PREM_ACCOUNTS,
             "market-admin",
-            "bootstrapDefaultPremiumMarkets",
+            "bootstrapDefaultPremiumNameMarkets",
         ] as const,
         onMutate: (): string | number =>
-            toast.loading("Configuring premium markets 1–9…"),
+            toast.loading(`Configuring premium name markets ${nameLengthRangeStr}…`),
         mutationFn: async () => {
-            for (let len = 1; len <= 9; len++) {
+            for (let len = MIN_PREMIUM_NAME_LENGTH; len <= MAX_PREMIUM_NAME_LENGTH; len++) {
                 await supervisor.functionCall({
                     service: PREM_ACCOUNTS,
                     intf: "market-admin",
@@ -41,8 +43,8 @@ export const useBootstrapDefaultPremiumMarkets = () => {
             }
         },
         onError: (errorObj, _vars, id) => {
-            console.error({ errorObj }, "bootstrap premium markets");
-            toast.error("Failed to configure default markets", {
+            console.error({ errorObj }, "bootstrap default premium name markets");
+            toast.error("Failed to configure default premium name markets", {
                 description:
                     errorObj instanceof Error
                         ? errorObj.message
@@ -52,16 +54,16 @@ export const useBootstrapDefaultPremiumMarkets = () => {
         },
         onSuccess: async (_data, _vars, id) => {
             void queryClient.invalidateQueries({
-                queryKey: QueryKey.premiumConfiguredMarkets(),
+                queryKey: QueryKey.premiumNameMarkets(),
             });
             const lastTx = await checkLastTx();
             if (lastTx.type == "executed") {
-                toast.success("Premium markets 1–9 configured", {
+                toast.success(`Premium name markets ${nameLengthRangeStr} configured`, {
                     id,
                     description: "Change is live.",
                 });
             } else {
-                toast.success("Premium markets 1–9 proposed", {
+                toast.success(`Premium name markets ${nameLengthRangeStr} proposed`, {
                     id,
                     description: "Change is proposed.",
                     action: {

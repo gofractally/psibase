@@ -1,22 +1,24 @@
 import { ChevronDown, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { useAddPremiumMarket } from "@/hooks/use-add-premium-market";
-import { useBootstrapDefaultPremiumMarkets } from "@/hooks/use-bootstrap-default-premium-markets";
-import { useConfigurePremiumMarket } from "@/hooks/use-configure-premium-market";
+import { useAddPremiumNameMarket } from "@/hooks/premium-name-markets/use-add-market";
+import { useBootstrapDefaultPremiumNameMarkets } from "@/hooks/premium-name-markets/use-bootstrap-default-markets";
+import { useConfigurePremiumNameMarket } from "@/hooks/premium-name-markets/use-config-market";
 import {
-    type ConfiguredPremiumMarketRow,
-    useConfiguredPremiumMarkets,
-} from "@/hooks/use-configured-premium-markets";
-import { useDisablePremiumMarket } from "@/hooks/use-disable-premium-market";
-import { useEnablePremiumMarket } from "@/hooks/use-enable-premium-market";
+    type ConfiguredPremiumNameMarketRow,
+    useConfiguredPremiumNameMarkets,
+} from "@/hooks/premium-name-markets/use-configured-markets";
+import { useDisablePremiumNameMarket } from "@/hooks/premium-name-markets/use-disable-market";
+import { useEnablePremiumNameMarket } from "@/hooks/premium-name-markets/use-enable-market";
+import {
+    PREMIUM_MARKET_DEFAULTS,
+    PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
+} from "@/lib/premium-name-market-defaults";
+
 import {
     MAX_PREMIUM_NAME_LENGTH,
     MIN_PREMIUM_NAME_LENGTH,
-    PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
-    PREMIUM_MARKET_DEFAULTS,
-} from "@/lib/premium-market-defaults";
-
+} from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import {
     Accordion,
@@ -53,7 +55,6 @@ function parsePositiveInt(raw: string): number | null {
     return n;
 }
 
-/** DiffAdjust PPM; on-chain range is (0, 1_000_000). */
 function parsePpm(raw: string): number | null {
     const t = raw.trim();
     if (!t || !/^\d+$/.test(t)) return null;
@@ -62,15 +63,15 @@ function parsePpm(raw: string): number | null {
     return n;
 }
 
-function MarketRowPanel({
+function NameMarketRowPanel({
     row,
     saveConfig,
     savingLength,
     disablingLength,
     enablingLength,
 }: {
-    row: ConfiguredPremiumMarketRow;
-    saveConfig: ReturnType<typeof useConfigurePremiumMarket>["mutate"];
+    row: ConfiguredPremiumNameMarketRow;
+    saveConfig: ReturnType<typeof useConfigurePremiumNameMarket>["mutate"];
     savingLength: number | null;
     disablingLength: number | null;
     enablingLength: number | null;
@@ -89,7 +90,13 @@ function MarketRowPanel({
         setTargetRaw(String(row.target));
         setIncreasePpmRaw(String(row.increasePpm));
         setDecreasePpmRaw(String(row.decreasePpm));
-    }, [row.length, row.floorPrice, row.target, row.increasePpm, row.decreasePpm]);
+    }, [
+        row.length,
+        row.floorPrice,
+        row.target,
+        row.increasePpm,
+        row.decreasePpm,
+    ]);
 
     const target = parsePositiveInt(targetRaw);
     const increasePpm = parsePpm(increasePpmRaw);
@@ -126,9 +133,7 @@ function MarketRowPanel({
                 />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor={`pm-inc-ppm-${row.length}`}>
-                    Increase PPM (over target, 1–999999)
-                </Label>
+                <Label htmlFor={`pm-inc-ppm-${row.length}`}>Increase PPM</Label>
                 <Input
                     id={`pm-inc-ppm-${row.length}`}
                     inputMode="numeric"
@@ -139,9 +144,7 @@ function MarketRowPanel({
                 />
             </div>
             <div className="grid gap-2">
-                <Label htmlFor={`pm-dec-ppm-${row.length}`}>
-                    Decrease PPM (under target, 1–999999)
-                </Label>
+                <Label htmlFor={`pm-dec-ppm-${row.length}`}>Decrease PPM</Label>
                 <Input
                     id={`pm-dec-ppm-${row.length}`}
                     inputMode="numeric"
@@ -183,35 +186,35 @@ function MarketRowPanel({
     );
 }
 
-export const PremiumMarketConfig = () => {
+export const PremiumNameMarketConfig = () => {
     const {
         data: rows,
         isLoading,
         isError,
         error,
-    } = useConfiguredPremiumMarkets();
+    } = useConfiguredPremiumNameMarkets();
     const {
         mutate: addMarket,
         isPending: isAdding,
         variables: addVars,
-    } = useAddPremiumMarket();
+    } = useAddPremiumNameMarket();
     const {
         mutate: saveMarketConfig,
         isPending: savingConfig,
         variables: saveVars,
-    } = useConfigurePremiumMarket();
+    } = useConfigurePremiumNameMarket();
     const {
         mutate: disablePurchases,
         isPending: disablingPurchases,
         variables: disableVars,
-    } = useDisablePremiumMarket();
+    } = useDisablePremiumNameMarket();
     const {
         mutate: enablePurchases,
         isPending: enablingPurchases,
         variables: enableVars,
-    } = useEnablePremiumMarket();
-    const { mutate: bootstrap, isPending: bootstrapping } =
-        useBootstrapDefaultPremiumMarkets();
+    } = useEnablePremiumNameMarket();
+    const { mutate: bootstrapNameMarkets, isPending: bootstrapping } =
+        useBootstrapDefaultPremiumNameMarkets();
 
     const savingLength =
         savingConfig && saveVars !== undefined ? saveVars[0] : null;
@@ -271,17 +274,19 @@ export const PremiumMarketConfig = () => {
     return (
         <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
             <div>
-                <h2 className="text-lg font-medium">Premium Market Config</h2>
+                <h2 className="text-lg font-medium">
+                    Premium Name Market Config
+                </h2>
                 <p className="text-muted-foreground text-sm">
                     Each row is a premium account name length (1–
-                    {MAX_PREMIUM_NAME_LENGTH} characters). When you add a market,
-                    you set the initial price; it cannot be changed later. Use the
-                    switch on each row to turn purchases on or off immediately.
-                    Expand a row to edit floor price, target sales per 30-day
-                    window, and increase/decrease PPM (Save). Saving always uses a
-                    30-day DiffAdjust window. Disabling purchases blocks new buys
-                    for that length;
-                    existing purchases can still be claimed.
+                    {MAX_PREMIUM_NAME_LENGTH} characters). When you add a
+                    market, you set the initial price; it cannot be changed
+                    later. Use the switch on each row to turn purchases on or
+                    off immediately. Expand a row to edit floor price, target
+                    sales per 30-day window, and increase/decrease PPM (Save).
+                    Saving always uses a 30-day DiffAdjust window. Disabling
+                    purchases blocks new buys for that length; existing
+                    purchases can still be claimed.
                 </p>
             </div>
 
@@ -289,7 +294,7 @@ export const PremiumMarketConfig = () => {
                 <p className="text-destructive text-sm">
                     {error instanceof Error
                         ? error.message
-                        : "Could not load premium markets."}
+                        : "Could not load premium name markets."}
                 </p>
             ) : null}
 
@@ -299,16 +304,16 @@ export const PremiumMarketConfig = () => {
                         <span className="text-foreground font-medium">
                             None
                         </span>{" "}
-                        — no premium markets are configured yet.
+                        — no premium name markets are configured yet.
                     </p>
                     <Button
                         type="button"
                         disabled={bootstrapping}
-                        onClick={() => bootstrap()}
+                        onClick={() => bootstrapNameMarkets()}
                     >
                         {bootstrapping
                             ? "Configuring…"
-                            : "Configure markets 1–9 with defaults"}
+                            : "Configure name markets 1–9 with defaults"}
                     </Button>
                 </div>
             ) : null}
@@ -385,7 +390,7 @@ export const PremiumMarketConfig = () => {
                                         </div>
                                     </AccordionPrimitive.Header>
                                     <AccordionContent>
-                                        <MarketRowPanel
+                                        <NameMarketRowPanel
                                             row={row}
                                             saveConfig={saveMarketConfig}
                                             savingLength={savingLength}
