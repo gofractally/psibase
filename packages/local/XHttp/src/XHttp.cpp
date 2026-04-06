@@ -559,8 +559,8 @@ void XHttp::startSession()
    recurse().to<XAdmin>().startSession();
 }
 
-auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
-    -> std::optional<HttpReply>
+auto XHttp::serveSys(HttpRequest                 req,
+                     std::optional<std::int32_t> socket) -> std::optional<HttpReply>
 {
    check(getSender() == XHttp::service, "Wrong sender");
 
@@ -568,7 +568,7 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
       return reply;
 
    if (req.method == "OPTIONS")
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
 
    auto target = req.path();
    if (target == "/register_server")
@@ -585,7 +585,27 @@ auto XHttp::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
       {
          open<RegServTable>().put(body);
       }
-      return HttpReply{.headers = allowCors(req, XAdmin::service)};
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+   }
+
+   if (target == "/unregister_server")
+   {
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+
+      if (req.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+
+      auto service = psio::convert_from_json<AccountNumber>(
+          std::string(req.body.begin(), req.body.end()));
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto serverTable = open<RegServTable>();
+         if (!serverTable.get(service))
+            return error(HttpStatus::notFound, "Service is not registered");
+         serverTable.erase(service);
+      }
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }
 
    return {};

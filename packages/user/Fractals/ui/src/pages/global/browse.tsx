@@ -1,14 +1,21 @@
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { CreateFractalModal } from "@/components/create-fractal-modal";
-import { EmptyBlock } from "@/components/empty-block";
 
 import { useFractals } from "@/hooks/fractals/use-fractals";
 
+import { EmptyBlock } from "@shared/components/empty-block";
+import { GlowingCard } from "@shared/components/glowing-card";
+import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { Button } from "@shared/shadcn/ui/button";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -23,52 +30,78 @@ export const Browse = () => {
     const [showModal, setShowModal] = useState(false);
 
     return (
-        <div className="mx-auto w-full max-w-5xl p-4 px-6">
-            <div className="flex h-9 items-center">
-                <h1 className="text-lg font-semibold">Fractals</h1>
+        <PageContainer className="space-y-4">
+            <CreateFractalModal
+                openChange={(e) => setShowModal(e)}
+                show={showModal}
+            />
+            <div className="flex justify-end">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowModal(true)}
+                >
+                    <Plus />
+                    <span className="hidden lg:inline">New Fractal</span>
+                </Button>
             </div>
-            <div className="mt-3">
-                {fractals && fractals.length > 0 && (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Fractal</TableHead>
-                                <TableHead>Mission</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {fractals?.map((fractal) => (
-                                <TableRow
-                                    key={fractal.account}
-                                    onClick={() => {
-                                        navigate(`/fractal/${fractal.account}`);
-                                    }}
-                                    className="cursor-pointer"
-                                >
-                                    <TableCell className="font-medium">
-                                        {fractal.name || fractal.account}
-                                    </TableCell>
-                                    <TableCell>{fractal.mission}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
-                {fractals?.length == 0 && (
-                    <EmptyBlock
-                        title="No fractals"
-                        description="No fractals have been created yet"
-                        buttonLabel="Create the first fractal"
-                        onButtonClick={() => {
-                            setShowModal(true);
-                        }}
-                    />
-                )}
-                <CreateFractalModal
-                    openChange={(e) => setShowModal(e)}
-                    show={showModal}
+            {fractals?.length == 0 ? (
+                <EmptyBlock
+                    title="No fractals"
+                    description="No fractals have been created yet"
+                    buttonLabel="Create the first fractal"
+                    onButtonClick={() => {
+                        setShowModal(true);
+                    }}
                 />
-            </div>
-        </div>
+            ) : (
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>All Fractals</CardTitle>
+                    </CardHeader>
+                    <CardContent className="@container">
+                        {fractals && fractals.length > 0 && (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead className="w-48 whitespace-nowrap">
+                                            Fractal
+                                        </TableHead>
+                                        <TableHead>Mission</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {fractals?.map((fractal) => (
+                                        <TableRow
+                                            key={fractal.account}
+                                            onClick={() => {
+                                                navigate(
+                                                    `/fractal/${fractal.account}`,
+                                                );
+                                            }}
+                                            className="cursor-pointer"
+                                        >
+                                            <TableCell className="w-48 whitespace-nowrap font-medium">
+                                                <FractalGuildIdentifier
+                                                    name={fractal.name}
+                                                    account={fractal.account}
+                                                    size="sm"
+                                                />
+                                            </TableCell>
+                                            <TableCell className="whitespace-normal">
+                                                {fractal.mission}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                                <TableCaption>
+                                    A list of all fractals.
+                                </TableCaption>
+                            </Table>
+                        )}
+                    </CardContent>
+                </GlowingCard>
+            )}
+        </PageContainer>
     );
 };

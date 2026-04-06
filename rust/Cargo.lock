@@ -20,6 +20,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "psimacrotest",
  "serde",
 ]
@@ -422,6 +423,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "psimacrotest",
  "serde",
 ]
@@ -588,6 +590,8 @@ dependencies = [
  "cargo_metadata",
  "clap",
  "console",
+ "futures",
+ "jobserver",
  "psibase",
  "psibase-rust-workspace-hack",
  "regex",
@@ -1147,6 +1151,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bce805d770f407bc62102fca7c2c64ceef2fbcb2b8bd19d2765ce093980de"
+dependencies = [
+ "console",
+ "shell-words",
+ "tempfile",
+ "thiserror 1.0.60",
+ "zeroize",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1322,6 +1339,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde-aux",
  "serde_json",
@@ -2246,10 +2264,11 @@ checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 
 [[package]]
 name = "jobserver"
-version = "0.1.31"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2b099aaa34a9751c5bf0878add70444e1ed2dd73f347be99003d4577277de6e"
+checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
 dependencies = [
+ "getrandom 0.3.4",
  "libc",
 ]
 
@@ -2536,6 +2555,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "psimacrotest",
  "serde",
 ]
@@ -3180,6 +3200,7 @@ dependencies = [
  "cryptoki-sys",
  "custom_error",
  "der",
+ "dialoguer",
  "flate2",
  "form_urlencoded",
  "fracpack",
@@ -3342,6 +3363,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "psibase_service"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-rust-workspace-hack",
+]
+
+[[package]]
 name = "psimacrotest"
 version = "0.23.0"
 dependencies = [
@@ -3352,6 +3381,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -3463,6 +3493,7 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_service",
  "serde",
  "tpack",
 ]
@@ -4048,6 +4079,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-words"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
+
+[[package]]
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4244,6 +4281,7 @@ dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
  "psibase_macros",
+ "psibase_service",
  "serde",
 ]
 
@@ -4387,6 +4425,7 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_service",
  "serde",
  "serde_json",
 ]
@@ -4736,6 +4775,7 @@ version = "0.23.0"
 dependencies = [
  "psibase",
  "psibase-rust-workspace-hack",
+ "psibase_service",
  "serde",
  "test_package",
 ]

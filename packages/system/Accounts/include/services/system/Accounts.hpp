@@ -53,6 +53,15 @@ namespace SystemService
       /// Creates accounts for other system services.
       void init();
 
+      /// Preapprove an account of any length to be created within this transaction.
+      /// If an account is preapproved, it will bypass naming restrictions.
+      ///
+      /// The `Accounts` service must itself authorize this action.
+      ///
+      /// The preapproval only lasts for the duration of the transaction context, after
+      /// which the preapproval is cleared.
+      void preapproveAcc(psibase::AccountNumber name);
+
       /// Used to create a new account with a specified auth service
       ///
       /// The accounts permitted to call this action are restricted to either Accounts itself
@@ -79,6 +88,7 @@ namespace SystemService
 
    PSIO_REFLECT(Accounts,
                 method(init),
+                method(preapproveAcc, name),
                 method(newAccount, name, authService, requireNew),
                 method(setAuthServ, authService),
                 method(getAccount, name),

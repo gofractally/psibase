@@ -2,6 +2,7 @@
 
 #include <psibase/WebSocket.hpp>
 #include <psibase/dispatch.hpp>
+#include <psibase/serveGraphQL.hpp>
 #include <psibase/webServices.hpp>
 #include <services/local/XAdmin.hpp>
 #include <services/local/XHttp.hpp>
@@ -12,6 +13,64 @@ using namespace psibase;
 using namespace LocalService;
 using namespace SystemService;
 
+namespace
+{
+   struct Query
+   {
+      std::vector<OriginServerRow> originServers() const
+      {
+         std::vector<OriginServerRow> result;
+         PSIBASE_SUBJECTIVE_TX
+         {
+            auto table = XProxy{}.open<OriginServerTable>();
+            for (auto row : table.getIndex<0>())
+               result.push_back(std::move(row));
+         }
+         return result;
+      }
+      PSIO_REFLECT(Query, method(originServers))
+   };
+
+   HttpReply makeError(HttpStatus status, std::string_view msg)
+   {
+      return {
+          .status      = status,
+          .contentType = "text/html",
+          .body        = {msg.begin(), msg.end()},
+      };
+   }
+
+   std::string joinPath(std::string_view base, std::string_view suffix)
+   {
+      if (suffix.empty())
+         return std::string(base);
+      auto result = std::string(base);
+
+      const bool baseEndsWithSlash     = base.ends_with('/');
+      const bool suffixStartsWithSlash = suffix.starts_with('/');
+
+      if (baseEndsWithSlash && suffixStartsWithSlash)
+         result.pop_back();
+      else if (!baseEndsWithSlash && !suffixStartsWithSlash)
+         result.push_back('/');
+      result.append(suffix.begin(), suffix.end());
+
+      return result;
+   }
+
+   bool pathMatchesBypassPrefix(std::string_view path, const std::vector<std::string>& prefixes)
+   {
+      for (const auto& prefix : prefixes)
+      {
+         if (prefix.empty())
+            continue;
+         if (path.starts_with(prefix))
+            return true;
+      }
+      return false;
+   }
+}  // namespace
+
 std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::int32_t> socket)
 {
    check(getSender() == XHttp::service, "Wrong sender");
@@ -21,28 +80,61 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
 
    if (subdomain == getReceiver())
    {
-      // Handle request to x-proxy
+      if (auto reply = to<XAdmin>().checkAuth(req, socket))
+         return reply;
+
+      if (auto result = serveGraphQL(req, Query{}))
+         return result;
+
       if (target == "/set_origin_server")
       {
-         if (auto reply = to<XAdmin>().checkAuth(req, socket))
-            return reply;
          if (req.method != "POST")
             return HttpReply::methodNotAllowed(req);
          if (req.contentType != "application/json")
          {
             std::string_view msg = "Content-Type must be application/json\n";
-            return HttpReply{
-                .status      = HttpStatus::unsupportedMediaType,
-                .contentType = "text/html",
-                .body        = {msg.begin(), msg.end()},
-            };
+            return makeError(HttpStatus::unsupportedMediaType, msg);
          }
          auto table = open<OriginServerTable>();
          auto row   = psio::convert_from_json<OriginServerRow>(
              std::string(req.body.begin(), req.body.end()));
+
+         if (row.host.empty())
+         {
+            std::string_view msg{"Invalid host for origin server."};
+            return makeError(HttpStatus::badRequest, msg);
+         }
+
+         if (!row.bypassPrefixes.has_value())
+            row.bypassPrefixes = std::vector<std::string>{std::string{"/common"}};
+
          PSIBASE_SUBJECTIVE_TX
          {
             table.put(row);
+         }
+         return HttpReply{.headers = allowCors()};
+      }
+
+      if (target == "/remove_origin_server")
+      {
+         if (req.method != "POST")
+            return HttpReply::methodNotAllowed(req);
+         if (req.contentType != "application/json")
+         {
+            std::string_view msg = "Content-Type must be application/json\n";
+            return makeError(HttpStatus::unsupportedMediaType, msg);
+         }
+         auto originSubdomain = psio::convert_from_json<AccountNumber>(
+             std::string(req.body.begin(), req.body.end()));
+         auto table = open<OriginServerTable>();
+         PSIBASE_SUBJECTIVE_TX
+         {
+            if (!table.get(originSubdomain))
+            {
+               std::string_view msg{"Origin server not found\n"};
+               return makeError(HttpStatus::notFound, msg);
+            }
+            table.erase(originSubdomain);
          }
          return HttpReply{.headers = allowCors()};
       }
@@ -50,6 +142,7 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    else
    {
       // Try the server registered in HttpServer
+      // This allows RPC calls to be handled by the registered server
       if (auto registered = HttpServer::Tables(HttpServer::service, KvMode::read)
                                 .open<RegServTable>()
                                 .get(subdomain))
@@ -82,7 +175,20 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
    }
    if (originServer)
    {
-      req.host = originServer->host;
+      if (originServer->bypassPrefixes &&
+          pathMatchesBypassPrefix(req.path(), *originServer->bypassPrefixes))
+         return {};
+
+      if (auto originUrl = psibase::splitURL(originServer->host); !originUrl.scheme.empty())
+      {
+         if (!originUrl.host.empty())
+            req.host = originUrl.host;
+         req.target = joinPath(originUrl.path, req.target);
+      }
+      else
+      {
+         req.host = originServer->host;
+      }
       std::int32_t          upstream;
       psibase::MethodNumber callback;
       if (isWebSocketHandshake(req))
@@ -156,9 +262,7 @@ void XProxy::onError(std::int32_t socket, std::optional<psibase::HttpReply> repl
    if (!reply)
    {
       std::string_view msg{"Bad Gateway"};
-      reply = {.status      = HttpStatus::badGateway,
-               .contentType = "text/html",
-               .body        = std::vector(msg.begin(), msg.end())};
+      reply = makeError(HttpStatus::badGateway, msg);
    }
    PSIBASE_SUBJECTIVE_TX
    {

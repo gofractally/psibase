@@ -1902,8 +1902,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/fractal-core-ui@workspace:user/FractalCore/ui"
   dependencies:
-    "@dicebear/collection": "npm:^9.2.2"
-    "@dicebear/core": "npm:^9.2.2"
     "@tanstack/react-form": "npm:^1.11.1"
     "@tanstack/react-pacer": "npm:^0.6.0"
     "@tanstack/react-query": "npm:^5.90.6"
@@ -1916,8 +1914,8 @@ __metadata:
     eslint: "npm:^9.15.0"
     humanize-duration: "npm:^3.32.2"
     lucide-react: "npm:^0.475.0"
-    nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
+    react-confetti-explosion: "npm:^3.0.3"
     react-dom: "npm:^19.1.0"
     react-easy-sort: "npm:^1.6.0"
     react-router-dom: "npm:^6.26.1"
@@ -1935,24 +1933,18 @@ __metadata:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
     "@tanstack/react-form": "npm:^1.11.1"
-    "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
-    "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
     "@uidotdev/usehooks": "npm:^2.4.1"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
-    humanize-duration: "npm:^3.32.2"
     lucide-react: "npm:^0.475.0"
-    nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
-    usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     zod: "npm:^3.24.2"
   languageName: unknown
@@ -2140,6 +2132,23 @@ __metadata:
     vite-plugin-wasm: "npm:^3.3.0"
     waait: "npm:^1.0.5"
     zod: "npm:^3.24.2"
+  languageName: unknown
+  linkType: soft
+
+"@psibase/xproxy-ui@workspace:local/XProxy/ui":
+  version: 0.0.0-use.local
+  resolution: "@psibase/xproxy-ui@workspace:local/XProxy/ui"
+  dependencies:
+    "@psibase/common-lib": "workspace:*"
+    "@tanstack/react-query": "npm:^5.90.6"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    eslint: "npm:^9.15.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    typescript: "npm:^5.7.3"
+    vite: "npm:^5.4.1"
   languageName: unknown
   linkType: soft
 
@@ -3956,13 +3965,6 @@ __metadata:
   version: 4.6.0
   resolution: "@sindresorhus/is@npm:4.6.0"
   checksum: 10c0/33b6fb1d0834ec8dd7689ddc0e2781c2bfd8b9c4e4bacbcb14111e0ae00621f2c264b8a7d36541799d74888b5dccdf422a891a5cb5a709ace26325eedc81e22e
-  languageName: node
-  linkType: hard
-
-"@standard-schema/spec@npm:1.0.0":
-  version: 1.0.0
-  resolution: "@standard-schema/spec@npm:1.0.0"
-  checksum: 10c0/a1ab9a8bdc09b5b47aa8365d0e0ec40cc2df6437be02853696a0e377321653b0d3ac6f079a8c67d5ddbe9821025584b1fb71d9cc041a6666a96f1fadf2ece15f
   languageName: node
   linkType: hard
 
@@ -10389,33 +10391,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nuqs@npm:^2.4.3":
-  version: 2.8.6
-  resolution: "nuqs@npm:2.8.6"
-  dependencies:
-    "@standard-schema/spec": "npm:1.0.0"
-  peerDependencies:
-    "@remix-run/react": ">=2"
-    "@tanstack/react-router": ^1
-    next: ">=14.2.0"
-    react: ">=18.2.0 || ^19.0.0-0"
-    react-router: ^5 || ^6 || ^7
-    react-router-dom: ^5 || ^6 || ^7
-  peerDependenciesMeta:
-    "@remix-run/react":
-      optional: true
-    "@tanstack/react-router":
-      optional: true
-    next:
-      optional: true
-    react-router:
-      optional: true
-    react-router-dom:
-      optional: true
-  checksum: 10c0/51cd3cbc77903688844daa2f189ce5548db05f43b9e98a62cd5fd0e62334dd270e413cfd9365ebcaa08d38be77bd9864563bca5c2e2a237f0f80b1d8ad1c0cad
-  languageName: node
-  linkType: hard
-
 "object-assign@npm:^4.0.1, object-assign@npm:^4.1.1":
   version: 4.1.1
   resolution: "object-assign@npm:4.1.1"
@@ -11264,6 +11239,16 @@ __metadata:
     react: ^18.x
     react-dom: ^18.x
   checksum: 10c0/28f96b2f6dae73a8ed4e5e4b2df588bbb8ae761b162e1ef34f614e27ee0d9d577917313285bf4fa3aa839eb2a3692bec03e580363ec8d7eaf34340d8461a9ad3
+  languageName: node
+  linkType: hard
+
+"react-confetti-explosion@npm:^3.0.3":
+  version: 3.0.3
+  resolution: "react-confetti-explosion@npm:3.0.3"
+  peerDependencies:
+    react: ">=16.8.0"
+    react-dom: ">=16.8.0"
+  checksum: 10c0/19d5c8df436d0e06c13f1f553c17f2ebc888dc0f389ed13de98356ea07cb71af352f9baa66ead00c30af9ec40f546152440af8774564167f3680af5444485c84
   languageName: node
   linkType: hard
 

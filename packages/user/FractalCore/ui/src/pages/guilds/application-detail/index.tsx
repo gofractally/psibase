@@ -3,8 +3,6 @@ import { UserCheck, UserX } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
@@ -12,6 +10,7 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
@@ -31,8 +30,6 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-import { AlertConfirmAcceptApplication } from "./components/alert-confirm-accept-application";
-import { AlertConfirmRejectApplication } from "./components/alert-confirm-reject-application";
 import { ModalAttest } from "./components/modal-attest";
 
 export const ApplicationDetail = () => {
@@ -89,18 +86,6 @@ export const ApplicationDetail = () => {
                         Application to join{" "}
                         {guild.data?.displayName || "this guild"}
                     </CardDescription>
-                    <CardAction className="flex gap-2">
-                        <AlertConfirmRejectApplication applicant={applicant}>
-                            <Button variant="destructive" size="sm">
-                                Reject (temp)
-                            </Button>
-                        </AlertConfirmRejectApplication>
-                        <AlertConfirmAcceptApplication applicant={applicant}>
-                            <Button variant="outline" size="sm">
-                                Accept (temp)
-                            </Button>
-                        </AlertConfirmAcceptApplication>
-                    </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid gap-2 text-sm">
@@ -120,6 +105,12 @@ export const ApplicationDetail = () => {
                                 "No additional details were provided."}
                         </p>
                     </div>
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">Score</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap text-sm">
+                            {application?.score.current} / {application?.score.required}
+                        </p>
+                    </div>
                 </CardContent>
             </GlowingCard>
             <GlowingCard>
@@ -132,6 +123,7 @@ export const ApplicationDetail = () => {
                         <Button
                             variant="destructive"
                             size="sm"
+                            disabled={isSelf}
                             onClick={() => setObjecting(true)}
                         >
                             <UserX data-icon="inline-start" /> Object
@@ -139,6 +131,7 @@ export const ApplicationDetail = () => {
                         <Button
                             variant="outline"
                             size="sm"
+                            disabled={isSelf}
                             onClick={() => setEndorsing(true)}
                         >
                             <UserCheck data-icon="inline-start" /> Endorse

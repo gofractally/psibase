@@ -13,6 +13,7 @@ postinstall = [{ sender = "identity", service = "identity", method = "init" }]
 
 [dependencies]
 psibase_macros.workspace = true
+psibase_service.workspace = true
 psibase.workspace = true
 serde.workspace = true
 async-graphql.workspace = true

@@ -1,12 +1,11 @@
 import dayjs from "dayjs";
 import { useNavigate } from "react-router-dom";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useCompletedEvaluation } from "@/hooks/fractals/use-completed-evaluations";
 import { useGuild } from "@/hooks/use-guild";
 
 import { EmptyBlock } from "@shared/components/empty-block";
+import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import {
     Table,
     TableBody,

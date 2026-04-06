@@ -18,4 +18,4 @@ if [ -z "$HOST_IP" ] || [ -z "$PRODUCER" ] || [ -z "$PORT" ] || [ -z "$PKCS11_MO
 fi
 
 rm -rf "$PROJECT_ROOT/db"
-PSIBASE_ADMIN_IP=$HOST_IP psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT" --pkcs11-module="$PKCS11_MODULE"
+PSIBASE_ADMIN_IP=$HOST_IP exec psinode "$PROJECT_ROOT/db" -p "$PRODUCER" -l "$PORT" --pkcs11-module="$PKCS11_MODULE"

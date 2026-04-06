@@ -525,6 +525,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/FractalGen.psi
+    PATH packages/user/FractalGen
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -941,14 +947,6 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/TestFractal.psi
-    NAME TestFractal
-    VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "A test fractal"
-    PACKAGE_DEPENDS "FractalCore(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION})" "Fractals(^${PSIBASE_VERSION})"
-)
-
-psibase_package(
     OUTPUT ${SERVICE_DIR}/TokenUsers.psi
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
@@ -1071,7 +1069,8 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/XProxy.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/XProxy-schema.json
         SERVER x-proxy
-    DEPENDS wasm
+        DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XProxy/ui/dist/* /
+    DEPENDS wasm ${XProxy_js_DEP}
 )
 
 psibase_package(
@@ -1129,22 +1128,29 @@ psibase_package(
     OUTPUT ${SERVICE_DIR}/DevDefault.psi
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "All development packages"
+    DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TestFractal TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/ProdDefault.psi
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
-    DESCRIPTION "All production packages"
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
+    PACKAGE_DEPENDS Accounts Aes AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/ProdWithFG.psi
+    NAME ProdWithFG
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Network initializes with production-ready apps, secure authentication, and \"fractal\" network governance."
+    PACKAGE_DEPENDS ProdDefault FractalGen
+)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Minimal.psi
@@ -1186,9 +1192,9 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TestFractal TokenUsers Tokens TokenStream TokenSwap Transact Homepage VirtualServer WebCrypto Workshop Config
+    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore FractalGen Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
@@ -1210,6 +1216,7 @@ install(
           ${SERVICE_DIR}/DevDefault.psi
           ${SERVICE_DIR}/DiffAdjust.psi
           ${SERVICE_DIR}/ProdDefault.psi
+          ${SERVICE_DIR}/ProdWithFG.psi
           ${SERVICE_DIR}/CpuLimit.psi
           ${SERVICE_DIR}/Db.psi
           ${SERVICE_DIR}/Docs.psi
@@ -1219,6 +1226,7 @@ install(
           ${SERVICE_DIR}/FaucetTok.psi
           ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/FractalCore.psi
+          ${SERVICE_DIR}/FractalGen.psi
           ${SERVICE_DIR}/Host.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi
@@ -1241,7 +1249,6 @@ install(
           ${SERVICE_DIR}/Supervisor.psi
           ${SERVICE_DIR}/Symbol.psi
           ${SERVICE_DIR}/TestDefault.psi
-          ${SERVICE_DIR}/TestFractal.psi
           ${SERVICE_DIR}/Tokens.psi
           ${SERVICE_DIR}/TokenStream.psi
           ${SERVICE_DIR}/TokenSwap.psi

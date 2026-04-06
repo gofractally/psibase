@@ -34,7 +34,7 @@ namespace SystemService
       if (enable_print)
          std::printf("isAuthSys\n");
 
-      return true;
+      return std::ranges::contains(authorizers, sender);
    }
 
    bool AuthAny::isRejectSys(AccountNumber sender, std::vector<AccountNumber> rejecters)
@@ -42,7 +42,7 @@ namespace SystemService
       if (enable_print)
          std::printf("isRejectSys\n");
 
-      return false;
+      return std::ranges::contains(rejecters, sender);
    }
 }  // namespace SystemService
 

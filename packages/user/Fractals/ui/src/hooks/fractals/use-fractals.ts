@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getFractals } from "@/lib/graphql/fractals/getFractals";
+import { getFractals } from "@/lib/graphql/getFractals";
 import QueryKey from "@/lib/queryKeys";
 
 export const useFractals = () =>
