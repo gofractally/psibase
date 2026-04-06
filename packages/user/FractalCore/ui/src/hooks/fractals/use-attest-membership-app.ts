@@ -1,4 +1,3 @@
-import { queryClient } from "@shared/lib/queryClient";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -7,6 +6,7 @@ import { fractalCorePlugin } from "@/lib/plugin";
 import QueryKey from "@/lib/queryKeys";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 

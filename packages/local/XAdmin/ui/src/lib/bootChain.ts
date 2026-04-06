@@ -2,7 +2,8 @@ import { boot } from "wasm-transpiled";
 
 import { BootState, PackageInfo } from "@/types";
 
-import { queryClient } from "../main";
+import { queryClient } from "@shared/lib/query-client";
+
 import { chain } from "./chainEndpoints";
 import { exportKeyToPEM } from "./keys";
 import { queryKeys } from "./queryKeys";

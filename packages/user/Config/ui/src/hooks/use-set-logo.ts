@@ -3,7 +3,7 @@ import type { TxStatus } from "@/lib/checkStaging";
 import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 

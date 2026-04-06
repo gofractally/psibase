@@ -14,7 +14,7 @@ import { useSetCsp } from "@/hooks/use-set-csps";
 import { SiteConfigResponse, useSiteConfig } from "@/hooks/use-site-config";
 import { useSpa } from "@/hooks/use-spa";
 
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";

@@ -7,7 +7,7 @@ import QueryKey from "@/lib/queryKeys";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
 import { assertUser } from "@shared/hooks/use-current-user";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useEvaluationInstance } from "./use-evaluation-instance";

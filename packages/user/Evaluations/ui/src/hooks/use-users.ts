@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { type Account } from "@shared/lib/schemas/account";
 
 import { FunctionResponse, getUsersAndGroups } from "../lib/graphql/getUsers";

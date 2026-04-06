@@ -12,7 +12,7 @@ import { useTrackedApps } from "@/hooks/use-tracked-apps";
 
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { createIdenticon } from "@shared/lib/create-identicon";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,

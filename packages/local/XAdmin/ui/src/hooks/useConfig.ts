@@ -8,7 +8,6 @@ import {
     PsinodeConfigUI,
     PsinodeConfigUpdate,
 } from "../configuration/interfaces";
-import { queryClient } from "../main";
 
 const transformConfigServerToUI = (
     serverConfig: PsinodeConfigSelect,
@@ -52,9 +51,9 @@ export const useConfigUpdate = () =>
                 throw "Error updating config";
             }
         },
-        onSuccess: () => {
+        onSuccess: (_data, _variables, _onMutateResult, context) => {
             const queryKey = queryKeys.config;
-            queryClient.invalidateQueries({ queryKey });
-            queryClient.refetchQueries({ queryKey });
+            context.client.invalidateQueries({ queryKey });
+            context.client.refetchQueries({ queryKey });
         },
     });

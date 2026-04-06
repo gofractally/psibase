@@ -2,7 +2,7 @@ import { useLocalStorage } from "@uidotdev/usehooks";
 import { useEffect } from "react";
 import { z } from "zod";
 
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 import { wait } from "../lib/wait";

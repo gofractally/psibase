@@ -1,7 +1,7 @@
 import { CONFIG } from "@/lib/services";
 
+import { queryClient } from "@shared/lib/query-client";
 import SharedQueryKey from "@shared/lib/query-keys";
-import { queryClient } from "@shared/lib/queryClient";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 

@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { zUser } from "@/lib/graphql/getUsers";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
 
 export const useUnregister = () => {

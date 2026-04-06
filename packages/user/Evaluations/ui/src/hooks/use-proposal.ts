@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getProposal } from "@/lib/getProposal";
 
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { type Account } from "@shared/lib/schemas/account";
 
 const genQueryKey = (owner: Account, evaluationId: number, groupId: number) => [

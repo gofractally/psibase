@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getEvaluation } from "@/lib/graphql/getEvaluation";
 import { getLastCreatedEvaluationId } from "@/lib/graphql/getLastCreatedEvaluation";
 
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
