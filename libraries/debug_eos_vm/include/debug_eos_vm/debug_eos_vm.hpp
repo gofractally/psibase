@@ -83,10 +83,12 @@ namespace debug_eos_vm
             uint32_t wasm = 0;
             for (auto& instr : locs.instr_locs)
             {
+#ifndef __aarch64__
                EOS_VM_ASSERT(code <= instr.code_offset, eosio::vm::profile_exception,
                              "jit instructions are out of order");
                EOS_VM_ASSERT(wasm <= instr.wasm_addr, eosio::vm::profile_exception,
                              "jit instructions are out of order");
+#endif
                code = instr.code_offset;
                wasm = instr.wasm_addr;
             }

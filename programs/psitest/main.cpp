@@ -49,7 +49,7 @@ struct vm_options
    static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
 };
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
 template <>
 void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
                                     true>::on_unreachable()
@@ -61,8 +61,8 @@ void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, 
 
 using backend_t = eosio::vm::backend<  //
     rhf_t,
-#ifdef __x86_64__
-    eosio::vm::jit_profile,
+#if defined(__x86_64__) || defined(__aarch64__)
+    eosio::vm::jit,
 #else
     eosio::vm::interpreter,
 #endif

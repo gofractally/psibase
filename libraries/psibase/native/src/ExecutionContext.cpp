@@ -21,8 +21,8 @@ namespace psibase
 {
    struct ExecutionContextImpl;
    using rhf_t = eosio::vm::registered_host_functions<ExecutionContextImpl>;
-#ifdef __x86_64__
-   using impl_t = eosio::vm::jit_profile;
+#if defined(__x86_64__) || defined(__aarch64__)
+   using impl_t = eosio::vm::jit;
 #else
    using impl_t = eosio::vm::interpreter;
 #endif
