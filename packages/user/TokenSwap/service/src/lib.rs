@@ -194,6 +194,13 @@ pub mod service {
             current_amount,
             "Swap complete".into(),
         );
+        Wrapper::emit().history().swap_completed(
+            sender,
+            token_in,
+            amount_in,
+            current_token,
+            current_amount,
+        );
     }
 
     #[event(history)]
