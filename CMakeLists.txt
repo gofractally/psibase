@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16.3)
 cmake_policy(VERSION 3.16.3...3.31.6)
 project(psibase)
 include(ExternalProject)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(CMAKE_BINARY_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     message(FATAL_ERROR "Building in-source is not supported; create a build dir and remove ${CMAKE_SOURCE_DIR}/CMakeCache.txt and ${CMAKE_SOURCE_DIR}/CMakeFiles")
@@ -53,23 +54,37 @@ option(BUILD_DEBUG_WASM "Build debug wasms" OFF)
 
 include(GNUInstallDirs)
 
+set(WASI_SDK_EXPECTED_VERSION "29")
+
 if(DEFINED WASI_SDK_PREFIX)
+    # Validate user-provided WASI SDK version
+    if(EXISTS "${WASI_SDK_PREFIX}/VERSION")
+        file(READ "${WASI_SDK_PREFIX}/VERSION" _wasi_sdk_version_file)
+        string(REGEX MATCH "^([0-9]+)" _wasi_sdk_major "${_wasi_sdk_version_file}")
+        if(_wasi_sdk_major AND NOT _wasi_sdk_major STREQUAL WASI_SDK_EXPECTED_VERSION)
+            message(WARNING
+                "WASI SDK version ${_wasi_sdk_major} detected at ${WASI_SDK_PREFIX}, "
+                "but psibase is tested with version ${WASI_SDK_EXPECTED_VERSION}. "
+                "Other versions may cause test failures due to incompatible wasi-libc changes. "
+                "Unset WASI_SDK_PREFIX to auto-download the correct version.")
+        endif()
+    endif()
     install(DIRECTORY ${WASI_SDK_PREFIX}/ USE_SOURCE_PERMISSIONS DESTINATION . COMPONENT WASI EXCLUDE_FROM_ALL)
 else()
     if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Linux")
         if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-linux.tar.gz)
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}.0-x86_64-linux.tar.gz)
             set(WASI_SDK_SHA256 87d1d1a2879d139cdc624b968efad3d4a97b8078cdff95e63ac88ecafd1a0171)
         elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
-            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-linux.tar.gz)
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}.0-arm64-linux.tar.gz)
             set(WASI_SDK_SHA256 052ad773397dc9e5aa99fb4cfef694175e6b1e81bb2ad1d3c8e7b3fc81441b7c)
         endif()
     elseif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Darwin")
         if (${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-x86_64-macos.tar.gz)
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}.0-x86_64-macos.tar.gz)
             set(WASI_SDK_SHA256 d0de2fd3ea5c57060efa87e4356c164bec3689972f2386f0c9a89c58e10cec8d)
         elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "^(arm|aarch).*" )
-            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-29/wasi-sdk-29.0-arm64-macos.tar.gz)
+            set(WASI_SDK_URL https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}/wasi-sdk-${WASI_SDK_EXPECTED_VERSION}.0-arm64-macos.tar.gz)
             set(WASI_SDK_SHA256 e11552913e3f99e834d7fe7da1bd081abaf764759ed76b6097a34c63fc83665e)
         endif()
     endif()
@@ -209,20 +224,29 @@ else()
     message(WARNING "WASI_SDK_PREFIX isn't defined; skipping wasm")
 endif()
 
+# Auto-install cargo-based tools into the build tree
+include(CargoTools)
+ensure_cargo_tool(NAME mdbook           VERSION 0.5.2)
+ensure_cargo_tool(NAME mdbook-mermaid   VERSION 0.17.0)
+ensure_cargo_tool(NAME mdbook-pagetoc   VERSION 0.3.0)
+ensure_cargo_tool(NAME mdbook-tabs      VERSION 0.3.4)
+# mdbook-linkcheck 0.7.7 is incompatible with mdbook 0.5; skipped until updated
+# ensure_cargo_tool(NAME mdbook-linkcheck VERSION 0.7.7)
+
 # Documentation
 ExternalProject_Add(
     gen-cpp-doc
     DEPENDS             wasm
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       ${CMAKE_COMMAND} -E env "LIBCLANG_PATH=${LIBCLANG_PATH}" "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" cargo build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       ${CMAKE_COMMAND} -E env "LIBCLANG_PATH=${LIBCLANG_PATH}" "LLVM_CONFIG_PATH=${LLVM_CONFIG_PATH}" ${CARGO_EXECUTABLE} build -r --bin gen-cpp-doc --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     INSTALL_COMMAND     ""
 )
 ExternalProject_Add(
     md2man
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       ${CARGO_EXECUTABLE} build -r --bin md2man --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
 )
@@ -251,7 +275,7 @@ add_custom_command(
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/book/html
     DEPENDS gen-cpp-doc ${doc-src} ${doc-cpp} ${doc-cmake} ${doc-headers} ${doc-service-headers}
     COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/book
-    COMMAND mdbook build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc
+    COMMAND ${CMAKE_COMMAND} -E env "PATH=${CARGO_TOOLS_DIR}/bin:$ENV{PATH}" ${mdbook_EXECUTABLE} build -d ${CMAKE_CURRENT_BINARY_DIR}/book ${CMAKE_CURRENT_BINARY_DIR}/doc
     COMMAND find ${CMAKE_CURRENT_BINARY_DIR}/book "(" -name ".*" -o -name "*~" ")" -delete
     VERBATIM
 )
@@ -280,7 +304,7 @@ ExternalProject_Add(
     cargo-psibase
     SOURCE_DIR          ${CMAKE_CURRENT_SOURCE_DIR}/rust
     CONFIGURE_COMMAND   ""
-    BUILD_COMMAND       cargo build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND       ${CARGO_EXECUTABLE} build -r --bin cargo-psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_BYPRODUCTS    ${CMAKE_CURRENT_BINARY_DIR}/rust/release/cargo-psibase
     BUILD_ALWAYS        1
     INSTALL_COMMAND     ""
@@ -1433,7 +1457,7 @@ ExternalProject_Add(
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rust
     BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/rust/release/psibase
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND   cargo build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
+    BUILD_COMMAND   ${CARGO_EXECUTABLE} build -r --bin psibase --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml --target-dir ${CMAKE_CURRENT_BINARY_DIR}/rust
     BUILD_ALWAYS 1
     INSTALL_COMMAND ""
 )

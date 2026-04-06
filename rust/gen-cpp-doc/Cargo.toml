@@ -13,8 +13,7 @@ license.workspace = true
 anyhow.workspace = true
 clang = { version = "1", features = ["clang_10_0"] }
 clap.workspace = true
-mdbook = "0.4"
-pulldown-cmark = "0.9"
+mdbook-preprocessor = "0.5"
 regex.workspace = true
 serde_json.workspace = true
 svgbob = "0.6"
