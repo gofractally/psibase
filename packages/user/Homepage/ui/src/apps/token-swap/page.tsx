@@ -14,7 +14,6 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { DevModal } from "./components/dev-modal";
 import { TradeSettingsModal } from "./components/trade-settings-modal";
 import { Liquidity } from "./liquidity";
 import { Swap } from "./swap";
@@ -26,7 +25,6 @@ type Tab = z.infer<typeof zCurrentTab>;
 export const SwapPage = () => {
     const [currentTab, setCurrentTab] = useState<Tab>(zCurrentTab.Values.Swap);
 
-    const { value: showDevModal, setValue: setShowDevModal } = useBoolean();
     const { value: showSettingsModal, setValue: setShowSettingsModal } =
         useBoolean();
 
@@ -37,12 +35,6 @@ export const SwapPage = () => {
 
     return (
         <div className="container mx-auto max-w-lg px-4 py-12 ">
-            <DevModal
-                openChange={(e) => {
-                    setShowDevModal(e);
-                }}
-                show={showDevModal}
-            />
             <TradeSettingsModal
                 openChange={(e) => {
                     setShowSettingsModal(e);
@@ -103,18 +95,6 @@ export const SwapPage = () => {
                 )}
                 {currentTab == zCurrentTab.Values.Liquidity && <Liquidity />}
             </GlowingCard>
-
-            <div className="flex w-full justify-center">
-                <Button
-                    variant={"link"}
-                    onClick={() => {
-                        setShowDevModal(true);
-                    }}
-                    className="text-muted-foreground mt-6 text-xs"
-                >
-                    Dev tools
-                </Button>
-            </div>
         </div>
     );
 };
