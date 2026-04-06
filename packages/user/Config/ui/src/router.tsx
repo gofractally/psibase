@@ -3,9 +3,9 @@ import { createBrowserRouter } from "react-router-dom";
 import { ProtectedRoute } from "@shared/components/protected-route";
 
 import { Layout } from "./components/layout";
-import { Loader } from "./pages/Loader";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";
+import { Loader } from "./pages/loader";
 import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
 import { PendingTransactions } from "./pages/pending-transactions";

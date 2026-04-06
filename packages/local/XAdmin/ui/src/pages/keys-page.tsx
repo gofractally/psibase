@@ -14,13 +14,13 @@ import { z } from "zod";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
 import { KeysTable } from "@/components/keys-and-devices/keys-table";
 
 import { getErrorMessage } from "@/lib/utils";
 import { KeyDeviceSchema } from "@/types";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -102,7 +102,7 @@ export const KeysPage = () => {
                     <EmptyBlock
                         title="Keys and devices is not available"
                         description="This panel is only available in secure contexts (HTTPS or localhost)."
-                        ButtonIcon={ShieldOff}
+                        Icon={ShieldOff}
                     />
                 </div>
             </main>
@@ -162,7 +162,7 @@ export const KeysPage = () => {
                 <div className="mt-4 w-full">
                     <EmptyBlock
                         buttonLabel="Try again"
-                        onClick={() => {
+                        onButtonClick={() => {
                             refetchServerKeys();
                             refetchKeyDevices();
                         }}
@@ -172,7 +172,7 @@ export const KeysPage = () => {
                                 ? `Error: ${errorFetchingKeyDevices?.message}.`
                                 : "Unknown error"
                         }.`}
-                        ButtonIcon={CircleAlert}
+                        Icon={CircleAlert}
                     />
                 </div>
             </main>
@@ -187,7 +187,7 @@ export const KeysPage = () => {
                     <EmptyBlock
                         title="No security devices"
                         description="No security devices were found for storing server keys. Please ensure one is available."
-                        ButtonIcon={CircleAlert}
+                        Icon={CircleAlert}
                     />
                 </div>
             </main>
@@ -201,7 +201,7 @@ export const KeysPage = () => {
                 <div className="mt-4 w-full">
                     <EmptyBlock
                         buttonLabel="Try again"
-                        onClick={() => {
+                        onButtonClick={() => {
                             refetchServerKeys();
                             refetchKeyDevices();
                         }}
@@ -211,7 +211,7 @@ export const KeysPage = () => {
                                 ? `Error: ${errorFetchingServerKeys?.message}.`
                                 : "Unknown error"
                         }.`}
-                        ButtonIcon={CircleAlert}
+                        Icon={CircleAlert}
                     />
                 </div>
             </main>
@@ -351,14 +351,16 @@ export const KeysPage = () => {
                                             ? undefined
                                             : "New Key"
                                     }
-                                    onClick={() => setNewKeyDialogOpen(true)}
+                                    onButtonClick={() =>
+                                        setNewKeyDialogOpen(true)
+                                    }
                                     title="No server keys available"
                                     description={
                                         keyDevices.every((kd) => !kd.unlocked)
                                             ? "No server keys are available. Unlock a device to view keys in that device or create a new key to continue."
                                             : "There are no server keys available to the server for signing."
                                     }
-                                    ButtonIcon={FileKey2}
+                                    Icon={FileKey2}
                                 />
                             </div>
                         ) : (

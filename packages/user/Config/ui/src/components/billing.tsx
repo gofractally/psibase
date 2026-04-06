@@ -1,14 +1,14 @@
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { Button } from "@shared/shadcn/ui/button";
-import { Label } from "@shared/shadcn/ui/label";
-import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
-
-import { useAppForm } from "@shared/components/form/app-form";
-import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { useSetEnableBilling } from "@/hooks/use-set-enable-billing";
 import { useSetFeeReceiverAccount } from "@/hooks/use-set-fee-receiver-account";
+
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { parseError } from "@shared/lib/parseErrorMessage";
+import { Button } from "@shared/shadcn/ui/button";
+import { Label } from "@shared/shadcn/ui/label";
 
 interface SystemTokenInfo {
     id: string;
@@ -25,10 +25,7 @@ interface BillingProps {
     systemTokenLoading: boolean;
 }
 
-export const Billing = ({
-    systemToken,
-    systemTokenLoading,
-}: BillingProps) => {
+export const Billing = ({ systemToken, systemTokenLoading }: BillingProps) => {
     const {
         mutateAsync: setFeeReceiverAccount,
         error: feeReceiverError,
@@ -41,16 +38,21 @@ export const Billing = ({
         isError: enableBillingIsError,
         reset: resetEnableBilling,
     } = useSetEnableBilling();
-    const { data: billingConfig, isLoading: billingConfigLoading } = useBillingConfig();
+    const { data: billingConfig, isLoading: billingConfigLoading } =
+        useBillingConfig();
 
     // Track the submitted/initial value of enableBilling for comparison
-    const [submittedEnableBilling, setSubmittedEnableBilling] = useState<boolean | null>(null);
+    const [submittedEnableBilling, setSubmittedEnableBilling] = useState<
+        boolean | null
+    >(null);
 
     const computedInitialValues = useMemo<BillingFormData>(() => {
         if (billingConfig) {
             return {
                 enableBilling: billingConfig.enabled,
-                tokenFeeReceiverAccount: { account: billingConfig.feeReceiver || "" },
+                tokenFeeReceiverAccount: {
+                    account: billingConfig.feeReceiver || "",
+                },
             };
         }
         return {
@@ -71,18 +73,27 @@ export const Billing = ({
         defaultValues: computedInitialValues,
         onSubmit: async (data: { value: BillingFormData }) => {
             resetFeeReceiver();
-            await setFeeReceiverAccount([data.value.tokenFeeReceiverAccount.account]);
+            await setFeeReceiverAccount([
+                data.value.tokenFeeReceiverAccount.account,
+            ]);
             billingForm.reset(data.value);
         },
     });
 
     const feeReceiverTxError =
-        feeReceiverIsError && feeReceiverError ? parseError(feeReceiverError) : null;
+        feeReceiverIsError && feeReceiverError
+            ? parseError(feeReceiverError)
+            : null;
     const enableBillingTxError =
-        enableBillingIsError && enableBillingError ? parseError(enableBillingError) : null;
+        enableBillingIsError && enableBillingError
+            ? parseError(enableBillingError)
+            : null;
 
     const hasFeeReceiverAccount = useMemo(() => {
-        return billingConfig?.feeReceiver != null && billingConfig.feeReceiver !== "";
+        return (
+            billingConfig?.feeReceiver != null &&
+            billingConfig.feeReceiver !== ""
+        );
     }, [billingConfig?.feeReceiver]);
 
     const handleApplyEnableBilling = async () => {
@@ -132,10 +143,14 @@ export const Billing = ({
                         <div>
                             <FieldAccountExisting
                                 form={billingForm}
-                                fields={{ account: "tokenFeeReceiverAccount.account" }}
+                                fields={{
+                                    account: "tokenFeeReceiverAccount.account",
+                                }}
                                 label="Billing fees paid to:"
                                 placeholder="Enter account name"
-                                disabled={!systemToken?.id || hasFeeReceiverAccount}
+                                disabled={
+                                    !systemToken?.id || hasFeeReceiverAccount
+                                }
                                 description={undefined}
                                 onValidate={undefined}
                             />
@@ -153,7 +168,7 @@ export const Billing = ({
                                     return (
                                         <div className="mt-2">
                                             {feeReceiverTxError && (
-                                                <p className="text-destructive text-sm mb-2">
+                                                <p className="text-destructive mb-2 text-sm">
                                                     {feeReceiverTxError}
                                                 </p>
                                             )}
@@ -197,14 +212,13 @@ export const Billing = ({
                                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                     {(enableBilling: any) => {
                                         const isApplyEnabled =
-                                            submittedEnableBilling !==
-                                                null &&
+                                            submittedEnableBilling !== null &&
                                             enableBilling !==
                                                 submittedEnableBilling;
                                         return (
                                             <div className="mt-2">
                                                 {enableBillingTxError && (
-                                                    <p className="text-destructive text-sm mb-2">
+                                                    <p className="text-destructive mb-2 text-sm">
                                                         {enableBillingTxError}
                                                     </p>
                                                 )}

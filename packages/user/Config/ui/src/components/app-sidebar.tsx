@@ -4,9 +4,9 @@ import { Link } from "react-router-dom";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { NavMain } from "@/components/nav-main";
-import { NavUser } from "@/components/nav-user";
 
 import { NetworkLogo } from "@shared/components/network-logo";
+import { UserSidebarNavFooter } from "@shared/components/user-sidebar-nav-footer";
 import {
     Sidebar,
     SidebarContent,
@@ -18,7 +18,7 @@ import {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
-        <Sidebar {...props}>
+        <Sidebar variant="inset" collapsible="icon" {...props}>
             <SidebarHeader>
                 <Link to={siblingUrl()}>
                     <SidebarMenuButton size="lg" asChild>
@@ -30,7 +30,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <NavMain />
             </SidebarContent>
             <SidebarFooter>
-                <NavUser />
+                <UserSidebarNavFooter />
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>
