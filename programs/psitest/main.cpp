@@ -675,6 +675,7 @@ struct callbacks
    void backtrace()
    {
       fprintf(stderr, "Generating backtrace...\n");
+#ifdef __x86_64__
       void* data[max_backtrace_frames];
       int   count =
           state.backend.get_context().backtrace(data, sizeof(data) / sizeof(data[0]), nullptr);
@@ -694,6 +695,9 @@ struct callbacks
             fprintf(stderr, ": %s", sub->demangled_name.c_str());
          fprintf(stderr, "\n");
       }
+#else
+      fprintf(stderr, "(backtrace not available on this architecture)\n");
+#endif
    }
 
    void check_bounds(void* data, size_t size)
