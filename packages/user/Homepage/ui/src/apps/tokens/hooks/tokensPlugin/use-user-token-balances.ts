@@ -1,4 +1,3 @@
-import { queryClient } from "@/main";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
@@ -12,6 +11,7 @@ import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
 
 import { Quantity } from "@shared/lib/quantity";
+import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export interface Token {

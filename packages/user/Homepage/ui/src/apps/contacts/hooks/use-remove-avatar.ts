@@ -1,4 +1,3 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
@@ -19,11 +18,11 @@ export const useRemoveAvatar = () => {
                 service: "profiles",
                 intf: "api",
             }),
-        onSuccess: async () => {
+        onSuccess: async (_data, _variables, _onMutateResult, context) => {
             toast.success("Avatar removed");
 
             const currentUser = zAccount.parse(
-                await queryClient.getQueryData(QueryKey.currentUser()),
+                await context.client.getQueryData(QueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");
 

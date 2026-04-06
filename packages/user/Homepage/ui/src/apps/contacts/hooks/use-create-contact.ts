@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
@@ -12,8 +12,6 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { LocalContact, zLocalContact } from "../types";
 
 export const useCreateContact = () => {
-    const queryClient = useQueryClient();
-
     return useMutation({
         mutationFn: async (newContact: LocalContact) => {
             const parsed = zLocalContact.parse(newContact);
@@ -25,18 +23,18 @@ export const useCreateContact = () => {
             }));
         },
         onMutate: () => ({ toastId: toast.loading("Creating contact...") }),
-        onSuccess: (_, newContact, context) => {
-            toast.success("Contact created", { id: context.toastId });
+        onSuccess: (_data, newContact, onMutateResult, context) => {
+            toast.success("Contact created", { id: onMutateResult.toastId });
             const username = zAccount.parse(
-                queryClient.getQueryData(QueryKey.currentUser()),
+                context.client.getQueryData(QueryKey.currentUser()),
             );
             upsertUserToCache(username, newContact);
-            queryClient.invalidateQueries({
+            context.client.invalidateQueries({
                 queryKey: SharedQueryKey.contacts(username),
             });
         },
-        onError: (error, _, context) => {
-            toast.error(error.message, { id: context?.toastId });
+        onError: (error, _, onMutateResult) => {
+            toast.error(error.message, { id: onMutateResult?.toastId });
         },
     });
 };
