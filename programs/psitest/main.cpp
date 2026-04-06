@@ -1365,7 +1365,67 @@ struct callbacks
 
       if (state.additional_args[cl_flags::timing])
       {
-         std::cout << "psibase transaction took " << us.count() << " us\n";
+         // Collect timing for significant actions (>100us), summarize the rest
+         struct TimingSummary
+         {
+            std::string                        label;
+            int64_t                            us;
+            std::vector<std::pair<std::string, int64_t>> children;
+         };
+
+         std::function<void(const psibase::ActionTrace&, std::vector<TimingSummary>&)> collect =
+             [&](const psibase::ActionTrace& at, std::vector<TimingSummary>& out)
+         {
+            auto action_us =
+                std::chrono::duration_cast<std::chrono::microseconds>(at.totalTime).count();
+            auto label = at.action.service.str() + "::" + at.action.method.str();
+
+            TimingSummary summary{label, action_us, {}};
+            for (auto& inner : at.innerTraces)
+               if (auto* a = std::get_if<psibase::ActionTrace>(&inner.inner))
+               {
+                  auto child_us =
+                      std::chrono::duration_cast<std::chrono::microseconds>(a->totalTime).count();
+                  auto child_label = a->action.service.str() + "::" + a->action.method.str();
+                  if (child_us >= 100)
+                     summary.children.push_back({child_label, child_us});
+                  // Recurse for nested significant actions
+                  for (auto& inner2 : a->innerTraces)
+                     if (auto* a2 = std::get_if<psibase::ActionTrace>(&inner2.inner))
+                     {
+                        auto us2 = std::chrono::duration_cast<std::chrono::microseconds>(
+                                       a2->totalTime)
+                                       .count();
+                        if (us2 >= 100)
+                           summary.children.push_back(
+                               {"  " + a2->action.service.str() +
+                                    "::" + a2->action.method.str(),
+                                us2});
+                     }
+               }
+            out.push_back(std::move(summary));
+         };
+
+         std::vector<TimingSummary> summaries;
+         for (auto& at : trace.actionTraces)
+            collect(at, summaries);
+
+         for (auto& s : summaries)
+         {
+            std::cout << "tx " << us.count() << "us  " << s.label << " " << s.us << "us";
+            if (!s.children.empty())
+            {
+               std::cout << " {";
+               for (size_t i = 0; i < s.children.size(); ++i)
+               {
+                  if (i)
+                     std::cout << ",";
+                  std::cout << " " << s.children[i].first << " " << s.children[i].second << "us";
+               }
+               std::cout << " }";
+            }
+            std::cout << "\n";
+         }
       }
 
       // std::cout << eosio::format_json(trace) << "\n";
