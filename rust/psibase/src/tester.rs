@@ -638,6 +638,7 @@ impl Chain {
                 let trace = self.push(&SignedTransaction {
                     transaction: trx.packed().into(),
                     proofs: Default::default(),
+                    subjectiveData: None,
                 });
                 ChainEmptyResult { trace }.get()?
             }
@@ -835,6 +836,7 @@ impl Chain {
         let strx = SignedTransaction {
             transaction: trx.packed().into(),
             proofs: vec![],
+            subjectiveData: None,
         };
 
         let reply = self.post(
@@ -1032,6 +1034,7 @@ impl<'a> Caller for ChainPusher<'a> {
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
+            subjectiveData: None,
         });
 
         if self.chain.is_auto_block_start {
@@ -1060,6 +1063,7 @@ impl<'a> Caller for ChainPusher<'a> {
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
+            subjectiveData: None,
         });
         let ret = ChainResult::<Ret> {
             trace,

@@ -452,6 +452,7 @@ mod tests {
         let strx = SignedTransaction {
             transaction: tx_packed.into(),
             proofs: vec![signature.to_bytes().to_vec().into()],
+            subjectiveData: None,
         };
         let trace = chain.push(&strx);
         if trace.error.is_some() {
