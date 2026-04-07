@@ -2,7 +2,7 @@ import { ReactNode, useState } from "react";
 
 import { Schema } from "../../types";
 import { camelCase } from "../../utils";
-import { TypeBasedInput } from "./TypeBasedInput";
+import { TypeBasedInput } from "./type-based-input";
 
 interface RecordField {
     name: string;

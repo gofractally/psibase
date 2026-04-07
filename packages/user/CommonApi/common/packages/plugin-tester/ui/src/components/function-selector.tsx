@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { ExportedMethodsByInterface, Schema, SchemaFunction } from "../types";
-import { TabControl } from "./TabControl";
+import { TabControl } from "./tab-control";
 
 interface FunctionSelectorProps {
     schema: Schema;

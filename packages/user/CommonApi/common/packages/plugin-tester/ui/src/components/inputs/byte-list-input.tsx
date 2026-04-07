@@ -1,15 +1,15 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 
 import { Schema } from "../../types";
-import { ListInput } from "./ListInput";
-import { Base64Input } from "./bytelist-encodings/Base64Input";
+import { ListInput } from "./list-input";
+import { Base64Input } from "./bytelist-encodings/base-64-input";
 import {
     Encoding,
     EncodingSelector,
-} from "./bytelist-encodings/EncodingSelector";
-import { FileInput } from "./bytelist-encodings/FileInput";
-import { HexInput } from "./bytelist-encodings/HexInput";
-import { Utf8Input } from "./bytelist-encodings/Utf8Input";
+} from "./bytelist-encodings/encoding-selector";
+import { FileInput } from "./bytelist-encodings/file-input";
+import { HexInput } from "./bytelist-encodings/hex-input";
+import { Utf8Input } from "./bytelist-encodings/utf8-input";
 
 interface ByteListInputProps {
     value: Uint8Array;

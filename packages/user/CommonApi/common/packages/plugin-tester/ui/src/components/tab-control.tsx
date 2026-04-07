@@ -1,4 +1,4 @@
-import { TabButton } from "./TabButton";
+import { TabButton } from "./tab-button";
 
 interface TabControlProps {
     selectedTab: string;

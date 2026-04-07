@@ -1,5 +1,5 @@
 import { Schema, SchemaFunction } from "../types";
-import { ParameterEditor } from "./ParameterEditor";
+import { ParameterEditor } from "./parameter-editor";
 
 interface ParametersSectionProps {
     selectedFunction: SchemaFunction;

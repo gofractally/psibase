@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 
 import { Schema } from "../../types";
 import { getTypeInfo } from "../../utils";
-import { TypeBasedInput } from "./TypeBasedInput";
+import { TypeBasedInput } from "./type-based-input";
 
 interface OptionalInputProps {
     innerType: unknown;

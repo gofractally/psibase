@@ -2,7 +2,7 @@ import { FC } from "react";
 
 import { Schema, SchemaFunction } from "../../types";
 import { camelCase } from "../../utils";
-import { TypeBasedInput } from "../inputs/TypeBasedInput";
+import { TypeBasedInput } from "../inputs/type-based-input";
 
 interface RichParameterEditorProps {
     values: Record<string, unknown>;

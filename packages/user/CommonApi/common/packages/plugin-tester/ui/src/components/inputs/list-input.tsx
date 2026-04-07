@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 
 import { Schema } from "../../types";
-import { TypeBasedInput } from "./TypeBasedInput";
+import { TypeBasedInput } from "./type-based-input";
 
 interface ListInputProps {
     itemType: unknown;

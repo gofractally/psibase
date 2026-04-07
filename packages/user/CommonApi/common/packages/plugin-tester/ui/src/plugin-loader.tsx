@@ -3,11 +3,11 @@ import type { Supervisor } from "@psibase/common-lib";
 
 import { useEffect, useState } from "react";
 
-import { ExecutionTabs } from "./components/ExecutionTabs";
-import { FunctionSelector } from "./components/FunctionSelector";
-import { ParametersSection } from "./components/ParametersSection";
-import { ServiceInput } from "./components/ServiceInput";
-import { usePluginSchema } from "./hooks/usePluginSchema";
+import { ExecutionTabs } from "./components/execution-tabs";
+import { FunctionSelector } from "./components/function-selector";
+import { ParametersSection } from "./components/parameters-section";
+import { ServiceInput } from "./components/service-input";
+import { usePluginSchema } from "./hooks/use-plugin-schema";
 import { camelCase, getTypeInfo } from "./utils";
 
 export function PluginLoader({ supervisor }: { supervisor: Supervisor }) {

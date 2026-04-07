@@ -4,7 +4,7 @@ import type { Supervisor } from "@psibase/common-lib";
 import { useState } from "react";
 
 import { camelCase, withArgs } from "../utils";
-import { TabControl } from "./TabControl";
+import { TabControl } from "./tab-control";
 
 interface ExecutionTabsProps {
     selectedFunction: SchemaFunction;

@@ -3,18 +3,18 @@ import { ReactNode } from "react";
 
 import { Schema } from "../../types";
 import { getTypeInfo } from "../../utils";
-import { BooleanInput } from "./BooleanInput";
-import { ByteListInput } from "./ByteListInput";
-import { CharInput } from "./CharInput";
-import { EnumInput } from "./EnumInput";
-import { FlagsInput } from "./FlagsInput";
-import { ListInput } from "./ListInput";
-import { NumberInput } from "./NumberInput";
-import { OptionalInput } from "./OptionalInput";
-import { RecordInput } from "./RecordInput";
-import { StringInput } from "./StringInput";
-import { TupleInput } from "./TupleInput";
-import { VariantInput, VariantValue } from "./VariantInput";
+import { BooleanInput } from "./boolean-input";
+import { ByteListInput } from "./byte-list-input";
+import { CharInput } from "./char-input";
+import { EnumInput } from "./enum-input";
+import { FlagsInput } from "./flags-input";
+import { ListInput } from "./list-input";
+import { NumberInput } from "./number-input";
+import { OptionalInput } from "./optional-input";
+import { RecordInput } from "./record-input";
+import { StringInput } from "./string-input";
+import { TupleInput } from "./tuple-input";
+import { VariantInput, VariantValue } from "./variant-input";
 
 interface TypeBasedInputProps {
     type: unknown;

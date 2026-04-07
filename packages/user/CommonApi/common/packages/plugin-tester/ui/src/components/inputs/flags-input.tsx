@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 
 import { camelCase } from "../../utils";
-import { BooleanInput } from "./BooleanInput";
+import { BooleanInput } from "./boolean-input";
 
 interface Flag {
     name: string;

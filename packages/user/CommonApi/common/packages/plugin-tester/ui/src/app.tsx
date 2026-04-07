@@ -1,8 +1,8 @@
 import { getSupervisor } from "@psibase/common-lib";
 
-import "./App.css";
-import { LoginBar } from "./LoginBar";
-import { PluginLoader } from "./PluginLoader";
+import "./app.css";
+import { LoginBar } from "./login-bar";
+import { PluginLoader } from "./plugin-loader";
 
 const supervisor = getSupervisor();
 

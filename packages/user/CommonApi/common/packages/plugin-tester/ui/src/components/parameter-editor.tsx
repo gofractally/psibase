@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 import { Schema, SchemaFunction } from "../types";
-import { TabControl } from "./TabControl";
-import { RawParameterEditor } from "./editors/RawParameterEditor";
-import { RichParameterEditor } from "./editors/RichParameterEditor";
+import { TabControl } from "./tab-control";
+import { RawParameterEditor } from "./editors/raw-parameter-editor";
+import { RichParameterEditor } from "./editors/rich-parameter-editor";
 
 interface ParameterEditorProps {
     values: Record<string, unknown>;

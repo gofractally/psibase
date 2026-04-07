@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 import {
     getNumericConstraints,
     validateNumericInput,
-} from "../../NumericConstraints";
+} from "../../numeric-constraints";
 
 interface NumberInputProps {
     value: number | bigint;

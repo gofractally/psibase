@@ -2,8 +2,8 @@ import { ReactNode } from "react";
 
 import { Schema } from "../../types";
 import { getTypeInfo } from "../../utils";
-import { EnumInput } from "./EnumInput";
-import { TypeBasedInput } from "./TypeBasedInput";
+import { EnumInput } from "./enum-input";
+import { TypeBasedInput } from "./type-based-input";
 
 interface VariantCase {
     name: string;
