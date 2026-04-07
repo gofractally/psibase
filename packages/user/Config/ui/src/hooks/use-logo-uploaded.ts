@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 
-import { siblingUrl } from "../../../../CommonApi/common/packages/common-lib/src";
+import { graphql } from "@shared/lib/graphql";
 
 export const SiteConfigResponse = z.object({
     getContent: z.object({
@@ -34,13 +33,16 @@ export const useLogoUploaded = () =>
                         }
                     }
                 `,
-                siblingUrl(null, "sites", "graphql"),
+                { service: "sites" },
             );
 
             const parsed = SiteConfigResponse.parse(res);
-            const paths = parsed?.getContent.edges.map((edge) => edge.node.path) ?? [];
+            const paths =
+                parsed?.getContent.edges.map((edge) => edge.node.path) ?? [];
             return paths.some(
-                (path) => path === "/network_logo.svg" || path.endsWith("network_logo.svg"),
+                (path) =>
+                    path === "/network_logo.svg" ||
+                    path.endsWith("network_logo.svg"),
             );
         },
     });

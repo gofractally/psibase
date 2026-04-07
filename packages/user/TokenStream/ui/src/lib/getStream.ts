@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { graphql } from "./graphql";
-import { zAccount } from "./types/account";
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zStream = z.object({
     nftId: z.number().int().positive(),
@@ -14,7 +12,6 @@ export const zStream = z.object({
     vested: z.string(),
     unclaimed: z.string(),
     lastDepositTimestamp: z.string().datetime({ offset: true }),
-    decayRatePerMillion: z.number().int().nonnegative(),
 });
 
 export const getStream = async (nftId: number) => {
@@ -30,7 +27,6 @@ export const getStream = async (nftId: number) => {
                     unclaimed
                     vested
                     lastDepositTimestamp
-                    decayRatePerMillion
                 }
                 updates(nftId: ${nftId}) {
                     nodes {
@@ -42,7 +38,7 @@ export const getStream = async (nftId: number) => {
                 }
             }
         `,
-        siblingUrl(null, "token-stream", "/graphql"),
+        { service: "token-stream" },
     );
 
     const response = z

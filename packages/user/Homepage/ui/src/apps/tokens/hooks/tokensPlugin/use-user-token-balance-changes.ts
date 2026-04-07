@@ -1,13 +1,14 @@
 import type { Token } from "./use-user-token-balances";
 
-import { fetchUserTokenBalanceChanges } from "@/apps/tokens/lib/graphql/ui";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { fetchUserTokenBalanceChanges } from "@/apps/tokens/lib/graphql/ui";
+
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@shared/lib/schemas/account";
 
 import { Quantity } from "@shared/lib/quantity";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zActionType = z.enum([
     "credited",
@@ -28,7 +29,7 @@ export interface Transaction {
 }
 
 export const useUserTokenBalanceChanges = (
-    username: z.infer<typeof zAccount> | undefined | null,
+    username: Account | undefined | null,
     token: Token,
 ) => {
     return useQuery<Transaction[]>({

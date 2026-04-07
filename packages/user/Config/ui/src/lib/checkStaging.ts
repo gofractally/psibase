@@ -1,8 +1,7 @@
 import z from "zod";
 
 import { getCurrentUser } from "@shared/hooks/use-current-user";
-
-import { queryClient } from "@/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 
 import { getActorHistory } from "./getActorHistory";
 import { getStagedByProposer } from "./getStagedByProposer";

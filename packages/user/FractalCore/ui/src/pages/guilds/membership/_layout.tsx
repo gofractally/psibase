@@ -1,27 +1,29 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { useBoolean } from "usehooks-ts";
 
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { InviteGuildMemberModal } from "@/components/modals/invite-guild-member-modal";
+
+import { PageContainer } from "@shared/components/page-container";
+import { Button } from "@shared/shadcn/ui/button";
 import {
     Tabs,
     TabsContent,
     TabsList,
     TabsTrigger,
 } from "@shared/shadcn/ui/tabs";
-import {
-    Button,
-} from "@shared/shadcn/ui/button";
-import { useBoolean } from "usehooks-ts";
-import { InviteGuildMemberModal } from "@/components/modals/invite-guild-member-modal";
 
 export const GuildMembershipLayout = () => {
     const location = useLocation();
     const tab = location.pathname.split("/").pop();
 
-    const { value: showModal, setValue: setShowModal } = useBoolean()
+    const { value: showModal, setValue: setShowModal } = useBoolean();
 
     return (
         <PageContainer className="space-y-4">
-            <InviteGuildMemberModal show={showModal} openChange={setShowModal} />
+            <InviteGuildMemberModal
+                show={showModal}
+                openChange={setShowModal}
+            />
             <Tabs value={tab}>
                 <div className="flex justify-between">
                     <TabsList>
@@ -32,7 +34,11 @@ export const GuildMembershipLayout = () => {
                             <Link to="applicants">Applicants</Link>
                         </TabsTrigger>
                     </TabsList>
-                    <Button onClick={() => { setShowModal(true) }}>
+                    <Button
+                        onClick={() => {
+                            setShowModal(true);
+                        }}
+                    >
                         Create invite
                     </Button>
                 </div>
@@ -43,10 +49,6 @@ export const GuildMembershipLayout = () => {
                     <Outlet />
                 </TabsContent>
             </Tabs>
-
         </PageContainer>
     );
 };
-
-
-

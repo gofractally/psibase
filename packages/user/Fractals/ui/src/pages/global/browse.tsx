@@ -8,8 +8,8 @@ import { useFractals } from "@/hooks/fractals/use-fractals";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {

@@ -9,8 +9,8 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
@@ -108,7 +108,8 @@ export const ApplicationDetail = () => {
                     <div className="space-y-2">
                         <p className="text-sm font-medium">Score</p>
                         <p className="text-muted-foreground whitespace-pre-wrap text-sm">
-                            {application?.score.current} / {application?.score.required}
+                            {application?.score.current} /{" "}
+                            {application?.score.required}
                         </p>
                     </div>
                 </CardContent>

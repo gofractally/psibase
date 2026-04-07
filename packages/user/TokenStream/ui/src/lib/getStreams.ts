@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { graphql } from "./graphql";
+import { graphql } from "@shared/lib/graphql";
 
 export const zStream = z.object({
     nftId: z.number().int().positive(),
@@ -29,7 +27,7 @@ export const getStreams = async () => {
                 }
             }
         `,
-        siblingUrl(null, "token-stream", "/graphql"),
+        { service: "token-stream" },
     );
 
     const response = z

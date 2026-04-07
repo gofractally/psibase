@@ -3,16 +3,16 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useInterval, useLocalStorage } from "usehooks-ts";
 
-import { useCloseEvaluation } from "@/hooks/app/use-close-evaluation";
-import { useEvaluation } from "@/hooks/app/use-evaluation";
-import { useRegister } from "@/hooks/app/use-register";
-import { useStartEvaluation } from "@/hooks/app/use-start-evaluation";
-import { useUnregister } from "@/hooks/app/use-unregister";
-import { useUsersAndGroups } from "@/hooks/app/use-users";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCloseEvaluation } from "@/hooks/use-close-evaluation";
+import { useEvaluation } from "@/hooks/use-evaluation";
+import { useRegister } from "@/hooks/use-register";
+import { useStartEvaluation } from "@/hooks/use-start-evaluation";
+import { useUnregister } from "@/hooks/use-unregister";
+import { useUsersAndGroups } from "@/hooks/use-users";
 import { Types, getStatus } from "@/lib/getStatus";
-import { humanize } from "@/lib/humanize";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { humanize } from "@shared/lib/humanize";
 import { Button } from "@shared/shadcn/ui/button";
 import { Switch } from "@shared/shadcn/ui/switch";
 
@@ -153,7 +153,8 @@ export const EvaluationPage = () => {
                             {humanize(
                                 dayjs
                                     .unix(status.registrationStarts)
-                                    .diff(dayjs()),
+                                    .diff(dayjs()) / 1000,
+                                3,
                             )}
                         </Button>
                     </div>
@@ -171,7 +172,8 @@ export const EvaluationPage = () => {
                         {humanize(
                             dayjs
                                 .unix(evaluation!.deliberationStarts)
-                                .diff(dayjs()),
+                                .diff(dayjs()) / 1000,
+                            3,
                         )}
                         )
                     </div>
@@ -218,7 +220,10 @@ export const EvaluationPage = () => {
                     </div>
                     <div>
                         {humanize(
-                            dayjs.unix(status.deliberationStarts).diff(dayjs()),
+                            dayjs
+                                .unix(status.deliberationStarts)
+                                .diff(dayjs()) / 1000,
+                            3,
                         )}
                     </div>
                     <div className="flex w-full justify-center">

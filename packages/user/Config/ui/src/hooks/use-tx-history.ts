@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const zResponse = z.object({
     txidHistory: z.object({
@@ -45,7 +44,7 @@ export const useTxHistory = (txId: string | undefined | null) =>
                     }
                 }
             `,
-                siblingUrl(null, "staged-tx", "/graphql"),
+                { service: "staged-tx" },
             );
 
             return zResponse.parse(res).txidHistory.nodes.reverse();

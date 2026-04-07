@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
 
 import { EmptyBlock } from "@shared/components/empty-block";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { PageContainer } from "@shared/components/page-container";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {

@@ -4,7 +4,6 @@ type QueryKeyGenerator<Prefix extends string = string> = (
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
 const QueryKey = {
-    currentUser: () => ["currentUser"] as const,
     getAllAccounts: () => ["getAllAccounts"] as const,
     canCreateAccount: () => ["canCreateAccount"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;

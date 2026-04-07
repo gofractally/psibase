@@ -1,9 +1,8 @@
-import { queryClient } from "@shared/lib/queryClient";
-
 import { fractalCorePlugin } from "@/lib/plugin";
 import QueryKey from "@/lib/queryKeys";
 
 import { getSubDomain } from "@shared/lib/get-sub-domain";
+import { queryClient } from "@shared/lib/query-client";
 
 import { usePluginFunctionCallMutation } from "../use-plugin-function-call-mutation";
 

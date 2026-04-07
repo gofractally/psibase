@@ -7,7 +7,7 @@ import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 import { useGuild } from "@/hooks/use-guild";
 
 import { EmptyBlock } from "@shared/components/empty-block";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { PageContainer } from "@shared/components/page-container";
 import {
     Table,
     TableBody,

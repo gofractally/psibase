@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
-import { z } from "zod";
 
+import {
+    type DurationUnit,
+    zDurationUnit,
+} from "@shared/lib/schemas/duration-unit";
 import { Input } from "@shared/shadcn/ui/input";
 import {
     Select,
@@ -12,12 +15,14 @@ import {
 
 import { useFieldContext } from "../app-form";
 
-const zDuration = z.enum(["Minutes", "Hours", "Days"]);
-
-export const DurationSelect = ({ label }: { label: string }) => {
-    const [unit, setUnit] = useState<z.infer<typeof zDuration>>(
-        zDuration.Values.Minutes,
-    );
+export const DurationSelect = ({
+    label,
+    defaultFrequency = "Minutes",
+}: {
+    label: string;
+    defaultFrequency?: DurationUnit;
+}) => {
+    const [unit, setUnit] = useState<DurationUnit>(defaultFrequency);
     const field = useFieldContext();
     const seconds = field.state.value as number; // Assuming value is seconds, not Date
 
@@ -25,8 +30,8 @@ export const DurationSelect = ({ label }: { label: string }) => {
     const displayValue = useMemo(() => {
         if (typeof seconds !== "number" || isNaN(seconds)) return "";
         let value = seconds;
-        if (unit === zDuration.Values.Hours) value = seconds / 3600;
-        else if (unit === zDuration.Values.Days) value = seconds / 86400;
+        if (unit === zDurationUnit.enum.Hours) value = seconds / 3600;
+        else if (unit === zDurationUnit.enum.Days) value = seconds / 86400;
         else value = seconds / 60;
         return value.toString();
     }, [seconds, unit]);
@@ -35,20 +40,20 @@ export const DurationSelect = ({ label }: { label: string }) => {
         const num = parseFloat(input);
         if (!isNaN(num)) {
             let newSeconds = num;
-            if (unit === zDuration.Values.Hours) newSeconds = num * 3600;
-            else if (unit === zDuration.Values.Days) newSeconds = num * 86400;
+            if (unit === zDurationUnit.enum.Hours) newSeconds = num * 3600;
+            else if (unit === zDurationUnit.enum.Days) newSeconds = num * 86400;
             else newSeconds = num * 60;
             field.handleChange(newSeconds);
         }
     };
 
-    const handleUnitChange = (newUnit: z.infer<typeof zDuration>) => {
+    const handleUnitChange = (newUnit: DurationUnit) => {
         setUnit(newUnit);
         const num = parseFloat(displayValue);
         if (!isNaN(num)) {
             let newSeconds = num;
-            if (newUnit === zDuration.Values.Hours) newSeconds = num * 3600;
-            else if (newUnit === zDuration.Values.Days)
+            if (newUnit === zDurationUnit.enum.Hours) newSeconds = num * 3600;
+            else if (newUnit === zDurationUnit.enum.Days)
                 newSeconds = num * 86400;
             else newSeconds = num * 60;
             field.handleChange(newSeconds);
@@ -56,21 +61,25 @@ export const DurationSelect = ({ label }: { label: string }) => {
     };
 
     return (
-        <div className="flex flex-col gap-1 py-2">
+        <div className="flex w-full flex-col gap-1 py-2">
             <div>{label}</div>
-            <div className="flex gap-2">
+            <div className="flex w-full gap-2">
                 <Input
                     type="number"
                     value={displayValue}
                     onChange={(e) => handleValueChange(e.target.value)}
                     placeholder="Enter duration"
+                    className="w-full"
                 />
                 <Select value={unit} onValueChange={handleUnitChange}>
                     <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Select unit" />
+                        <SelectValue
+                            className="w-32"
+                            placeholder="Select unit"
+                        />
                     </SelectTrigger>
                     <SelectContent>
-                        {zDuration.options.map((option) => (
+                        {zDurationUnit.options.map((option) => (
                             <SelectItem key={option} value={option}>
                                 {option}
                             </SelectItem>

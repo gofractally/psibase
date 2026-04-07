@@ -4,7 +4,7 @@ import { z } from "zod";
 import QueryKey from "@/lib/queryKeys";
 
 import { assertUser } from "@shared/hooks/use-current-user";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 

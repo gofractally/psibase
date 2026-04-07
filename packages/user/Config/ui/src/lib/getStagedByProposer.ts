@@ -1,9 +1,8 @@
+import type { Account } from "@shared/lib/schemas/account";
+
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { graphql } from "./graphql";
-import { Account } from "./zod/Account";
+import { graphql } from "@shared/lib/graphql";
 
 const zRes = z.object({
     getStagedByProposer: z.object({
@@ -26,7 +25,7 @@ export const getStagedByProposer = async (account: Account) => {
                 }
         }
     }`,
-        siblingUrl(null, "staged-tx", "/graphql"),
+        { service: "staged-tx" },
     );
 
     return zRes.parse(res).getStagedByProposer.nodes;

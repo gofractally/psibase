@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import { useToast } from "@/components/ui/use-toast";
 
-import { EmptyBlock } from "@/components/EmptyBlock";
 import { Pulse } from "@/components/Pulse";
 import { SmartConnectForm } from "@/components/forms/smart-connect-form";
 
@@ -16,6 +15,7 @@ import {
     chain,
 } from "@/lib/chainEndpoints";
 
+import { EmptyBlock } from "@shared/components/empty-block";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -207,7 +207,7 @@ export const PeersPage = () => {
             {combinedPeers.length == 0 ? (
                 <EmptyBlock
                     buttonLabel="Add Connection"
-                    onClick={() => setShowModalConnection(true)}
+                    onButtonClick={() => setShowModalConnection(true)}
                     title="No connections"
                     description="No existing connections to other nodes."
                 />

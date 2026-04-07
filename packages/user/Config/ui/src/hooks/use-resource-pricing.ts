@@ -1,9 +1,9 @@
-import { siblingUrl } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
+
+import { graphql } from "@shared/lib/graphql";
 
 const zThresholds = z.object({
     idlePct: z.string(),
@@ -70,10 +70,7 @@ export const useResourcePricing = () => {
                 }
             `;
 
-            const res = await graphql(
-                query,
-                siblingUrl(null, "virtual-server", "/graphql"),
-            );
+            const res = await graphql(query, { service: "virtual-server" });
             const parsed = zPricingResponse.parse(res);
 
             if (!parsed.cpuPricing) {

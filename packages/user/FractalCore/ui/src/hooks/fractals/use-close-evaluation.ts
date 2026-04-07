@@ -1,10 +1,10 @@
-import { queryClient } from "@shared/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
 import { zGuildAccount } from "@/lib/zod/Wrappers";
 
+import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";
 
 import { useFractalAccount } from "./use-fractal-account";

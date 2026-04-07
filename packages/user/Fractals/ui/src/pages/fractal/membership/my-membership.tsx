@@ -3,8 +3,8 @@ import { useMembership } from "@/hooks/fractals/use-membership";
 import { useCurrentFractal } from "@/hooks/use-current-fractal";
 
 import { ErrorCard } from "@shared/components/error-card";
+import { PageContainer } from "@shared/components/page-container";
 import { OverviewCard } from "@shared/domains/fractal/components/fractal-overview-card";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { useChainId } from "@shared/hooks/use-chain-id";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";

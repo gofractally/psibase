@@ -1,17 +1,18 @@
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
 import {
     fetchTokenMeta,
     fetchUserTokenBalances,
 } from "@/apps/tokens/lib/graphql/ui";
-import { queryClient } from "@/main";
-import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
 import QueryKey from "@/lib/queryKeys";
 import { updateArray } from "@/lib/updateArray";
-import { zAccount } from "@shared/lib/schemas/account";
 
 import { Quantity } from "@shared/lib/quantity";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { queryClient } from "@shared/lib/query-client";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export interface Token {
     id: number;
@@ -23,9 +24,9 @@ export interface Token {
 }
 
 export const useUserTokenBalances = (
-    optionalUsername?: z.infer<typeof zAccount> | undefined | null,
+    optionalUsername?: Account | undefined | null,
 ) => {
-    const { data: currentUser} = useCurrentUser();
+    const { data: currentUser } = useCurrentUser();
     const username = optionalUsername || currentUser;
     return useQuery<Token[]>({
         queryKey: QueryKey.userTokenBalances(username),
@@ -64,7 +65,6 @@ export const useUserTokenBalances = (
                 (token, index, arr) =>
                     arr.findIndex((t) => t.id == token.id) == index,
             );
-
 
             return tokenBalances;
         },

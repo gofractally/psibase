@@ -1,5 +1,5 @@
-import { useAccountStatus } from "@/hooks/useAccountStatus";
-import { useCurrentApp } from "@/hooks/useCurrentApp";
+import { useAccountStatus } from "@/hooks/use-account-status";
+import { useCurrentApp } from "@/hooks/use-current-app";
 
 import { CreateAppAccountCard } from "./create-app-account-card";
 

@@ -1,12 +1,10 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-
-import { supervisor } from "@/supervisor";
 
 import { TOKEN_STREAM } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({
@@ -20,17 +18,18 @@ export const useCreateStream = () =>
         mutationFn: async (params) => {
             const { halfLifeSeconds, tokenId } = zParams.parse(params);
 
-            const toastId = toast.loading("Creating stream...");
             await supervisor.functionCall({
                 method: "create",
                 params: [halfLifeSeconds, tokenId],
                 service: TOKEN_STREAM,
                 intf: "api",
             });
-
-            toast.success("Created stream.", { id: toastId });
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: QueryKey.streams() });
+        onSuccess: (_, __, _result, ctx) => {
+            ctx.client.invalidateQueries({ queryKey: QueryKey.streams() });
+            toast.success("Created stream.");
+        },
+        onError: (error) => {
+            toast.error(error.message);
         },
     });

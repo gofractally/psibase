@@ -1,32 +1,35 @@
+import { useQuery } from "@tanstack/react-query";
+
 import {
     SharedBalNode,
     fetchOpenLinesOfCredit,
 } from "@/apps/tokens/lib/graphql/ui";
-import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@shared/lib/schemas/account";
 
 import { Quantity } from "@shared/lib/quantity";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 export interface PendingBalance {
     balance: Quantity;
-    creditor: z.infer<typeof zAccount>;
-    debitor: z.infer<typeof zAccount>;
+    creditor: Account;
+    debitor: Account;
     id: number;
     label: string;
 }
 
 export const useUserPendingBalance = (
-    username: z.infer<typeof zAccount> | undefined | null,
+    username: Account | undefined | null,
     tokenId: number | undefined = undefined,
 ) => {
     return useQuery<PendingBalance[]>({
         queryKey: QueryKey.userLinesOfCredit(username),
         enabled: !!username,
         queryFn: async () => {
-            const res = await fetchOpenLinesOfCredit(zAccount.parse(username), tokenId);
+            const res = await fetchOpenLinesOfCredit(
+                zAccount.parse(username),
+                tokenId,
+            );
             const xformSharedBalNode = (sbn: SharedBalNode): PendingBalance => {
                 const quan = new Quantity(
                     sbn.balance,

@@ -1,7 +1,7 @@
-import { queryClient } from "@/queryClient";
-
 import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
+
+import { queryClient } from "@shared/lib/query-client";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 
@@ -20,9 +20,15 @@ export const useSetFeeReceiverAccount = () =>
             onSuccess: ([feeReceiverAccount], status) => {
                 if (status.type == "executed") {
                     const updater = (
-                        old: { feeReceiver: string | null; enabled: boolean } | undefined,
+                        old:
+                            | { feeReceiver: string | null; enabled: boolean }
+                            | undefined,
                     ) => {
-                        if (!old) return { feeReceiver: feeReceiverAccount, enabled: false };
+                        if (!old)
+                            return {
+                                feeReceiver: feeReceiverAccount,
+                                enabled: false,
+                            };
                         return { ...old, feeReceiver: feeReceiverAccount };
                     };
                     queryClient.setQueryData(

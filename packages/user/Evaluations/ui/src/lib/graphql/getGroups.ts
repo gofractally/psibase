@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-import { Account } from "@/lib/zod/Account";
-
-import { graphql } from "../graphql";
+import { graphql } from "@shared/lib/graphql";
+import { Account } from "@shared/lib/schemas/account";
 
 const ErrorResponse = z.object({
     errors: z.array(
@@ -27,10 +26,8 @@ export const zGroup = z.object({
 });
 
 const SuccessResponse = z.object({
-    data: z.object({
-        getGroups: z.object({
-            nodes: z.array(zGroup),
-        }),
+    getGroups: z.object({
+        nodes: z.array(zGroup),
     }),
 });
 
@@ -44,13 +41,13 @@ export const getGroups = async (
 ): Promise<Group[]> => {
     const res = await graphql(
         `{ getGroups(owner: "${owner}", evaluationId: ${evaluationId}) { nodes { owner number evaluationId keySubmitter result } } }`,
-        "evaluations",
+        { service: "evaluations" },
     );
 
     const response = GraphqlResponse.parse(res);
 
-    if (response.data) {
-        return response.data.getGroups.nodes;
+    if ("getGroups" in response) {
+        return response.getGroups.nodes;
     }
     throw new Error(response.errors[0].message);
 };

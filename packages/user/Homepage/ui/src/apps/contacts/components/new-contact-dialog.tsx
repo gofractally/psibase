@@ -1,6 +1,4 @@
-import { z } from "zod";
-
-import { zAccount } from "@shared/lib/schemas/account";
+import type { Account } from "@shared/lib/schemas/account";
 
 import {
     Dialog,
@@ -16,7 +14,7 @@ import { ContactForm } from "./contact-form";
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onNewAccount: (account: z.infer<typeof zAccount>) => void;
+    onNewAccount: (account: Account) => void;
     trigger: React.ReactNode;
 }
 

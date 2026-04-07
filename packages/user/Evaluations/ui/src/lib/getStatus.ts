@@ -3,9 +3,10 @@ import { z } from "zod";
 
 import { type Evaluation } from "@/lib/graphql/getEvaluation";
 
+import { type Account } from "@shared/lib/schemas/account";
+
 import { Group } from "./graphql/getGroups";
 import { User, zResult } from "./graphql/getUsers";
-import { Account } from "./zod/Account";
 
 const zTimeStatus = z.enum([
     "pending",
