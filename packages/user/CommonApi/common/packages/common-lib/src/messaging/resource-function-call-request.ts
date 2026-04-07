@@ -1,4 +1,4 @@
-import { QualifiedFunctionCallArgs } from "./FunctionCallRequest";
+import { QualifiedFunctionCallArgs } from "./function-call-request";
 
 export interface ResourceCallArgs {
     service: string;
@@ -15,13 +15,15 @@ export interface QualifiedResourceCallArgs extends ResourceCallArgs {
     intf: string;
 }
 
-export function toQualifiedFunctionCallArgs(args: QualifiedResourceCallArgs ): QualifiedFunctionCallArgs {
-    return { 
-        service: args.service, 
-        plugin: args.plugin, 
-        intf: args.intf, 
-        method: args.type + "." + args.method, 
-        params: args.params 
+export function toQualifiedFunctionCallArgs(
+    args: QualifiedResourceCallArgs,
+): QualifiedFunctionCallArgs {
+    return {
+        service: args.service,
+        plugin: args.plugin,
+        intf: args.intf,
+        method: args.type + "." + args.method,
+        params: args.params,
     };
 }
 

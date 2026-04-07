@@ -1,4 +1,4 @@
-import { QualifiedPluginId } from "./PluginId";
+import { QualifiedPluginId } from "./plugin-id";
 
 // This is an unrecoverable error
 export class PluginError extends Error {
@@ -66,18 +66,26 @@ export const isPluginError = (error: any): error is PluginError => {
     return isGenericError(error) && "pluginId" in error;
 };
 
-export const isGenericErrorObject = (error: any): error is GenericErrorObject => {
+export const isGenericErrorObject = (
+    error: any,
+): error is GenericErrorObject => {
     return (
         typeof error === "object" &&
         "message" in error &&
         typeof error.message === "string" &&
         "name" in error &&
         typeof error.name === "string"
-    )
+    );
 };
 export const isPluginErrorObject = (error: any): error is PluginErrorObject => {
     return isGenericErrorObject(error) && "pluginId" in error;
-}
-export const isRedirectErrorObject = (error: any): error is RedirectErrorObject => {
-    return isGenericErrorObject(error) && "pluginId" in error && error.name === "RedirectErrorObject";
+};
+export const isRedirectErrorObject = (
+    error: any,
+): error is RedirectErrorObject => {
+    return (
+        isGenericErrorObject(error) &&
+        "pluginId" in error &&
+        error.name === "RedirectErrorObject"
+    );
 };

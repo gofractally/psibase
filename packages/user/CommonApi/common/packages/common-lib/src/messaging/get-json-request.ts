@@ -1,4 +1,4 @@
-import { QualifiedPluginId } from "./PluginId";
+import { QualifiedPluginId } from "./plugin-id";
 import { GET_JSON_REQUEST } from "./index";
 
 export interface GetJsonRequest {

@@ -1,4 +1,4 @@
-import { QualifiedPluginId } from "./PluginId";
+import { QualifiedPluginId } from "./plugin-id";
 
 const PRE_LOAD_PLUGINS_REQUEST = "PRE_LOAD_PLUGINS_REQUEST" as const;
 
@@ -22,4 +22,3 @@ export const buildPreLoadPluginsRequest = (
         plugins,
     },
 });
-
