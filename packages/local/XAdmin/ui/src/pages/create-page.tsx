@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import { useToast } from "@/components/ui/use-toast";
 
-import { PrevNextButtons } from "@/components/PrevNextButtons";
 import { BootSuccess } from "@/components/boot-success";
 import { BlockProducerForm } from "@/components/forms/block-producer";
 import {
@@ -18,11 +17,12 @@ import { PromptConfirmSigningKey } from "@/components/forms/prompt-confirm-signi
 import { PromptSaveSigningKey } from "@/components/forms/prompt-save-signing-key";
 import { InstallationSummary } from "@/components/installation-summary";
 import { MultiStepLoader } from "@/components/multi-step-loader";
+import { PrevNextButtons } from "@/components/prev-next-buttons";
 import { Steps } from "@/components/steps";
 
-import { bootChain } from "@/lib/bootChain";
-import { getId } from "@/lib/getId";
-import { getRequiredPackages } from "@/lib/getRequiredPackages";
+import { bootChain } from "@/lib/boot-chain";
+import { getId } from "@/lib/get-id";
+import { getRequiredPackages } from "@/lib/get-required-packages";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { useAppForm } from "@shared/components/form/app-form";
@@ -36,12 +36,12 @@ import {
     CardTitle,
 } from "@shared/shadcn/ui/card";
 
-import { useConfig } from "../hooks/useConfig";
-import { useAddServerKey } from "../hooks/useKeyDevices";
-import { usePackages } from "../hooks/usePackages";
-import { useSelectedRows } from "../hooks/useSelectedRows";
-import { useStepper } from "../hooks/useStepper";
-import { getDefaultSelectedPackages } from "../hooks/useTemplatedPackages";
+import { useConfig } from "../hooks/use-config";
+import { useAddServerKey } from "../hooks/use-key-devices";
+import { usePackages } from "../hooks/use-packages";
+import { useSelectedRows } from "../hooks/use-selected-rows";
+import { useStepper } from "../hooks/use-stepper";
+import { getDefaultSelectedPackages } from "../hooks/use-templated-packages";
 import {
     BootCompleteSchema,
     BootCompleteUpdate,

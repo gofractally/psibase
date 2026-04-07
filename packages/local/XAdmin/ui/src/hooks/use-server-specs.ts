@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys } from "@/lib/query-keys";
 
 import { graphql } from "@shared/lib/graphql";
 

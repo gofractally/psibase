@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { type Producer, getProducers } from "@/lib/graphql/getProducers";
-import { queryKeys } from "@/lib/queryKeys";
+import { type Producer, getProducers } from "@/lib/graphql/get-producers";
+import { queryKeys } from "@/lib/query-keys";
 
-import { useConfig } from "./useConfig";
-import { useStatuses } from "./useStatuses";
+import { useConfig } from "./use-config";
+import { useStatuses } from "./use-statuses";
 
 export const useProducers = () => {
     const { data: status, error: statusError } = useStatuses();

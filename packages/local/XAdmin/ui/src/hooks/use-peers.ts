@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { PeersType, chain } from "@/lib/chainEndpoints";
-import { queryKeys } from "@/lib/queryKeys";
+import { PeersType, chain } from "@/lib/chain-endpoints";
+import { queryKeys } from "@/lib/query-keys";
 
 export const usePeers = () =>
     useQuery<PeersType, string>({

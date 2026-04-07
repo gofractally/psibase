@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { PeerType, chain } from "@/lib/chainEndpoints";
-import { queryKeys } from "@/lib/queryKeys";
+import { PeerType, chain } from "@/lib/chain-endpoints";
+import { queryKeys } from "@/lib/query-keys";
 
 export const connectParam = z.object({
     url: z.string(),

@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { chain } from "@/lib/chainEndpoints";
-import { queryKeys } from "@/lib/queryKeys";
+import { chain } from "@/lib/chain-endpoints";
+import { queryKeys } from "@/lib/query-keys";
 
 import {
     PsinodeConfigSelect,

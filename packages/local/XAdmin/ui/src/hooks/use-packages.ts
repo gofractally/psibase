@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { getJson } from "@psibase/common-lib";
 
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys } from "@/lib/query-keys";
 import { PackageInfo } from "@/types";
 
 import { graphql } from "@shared/lib/graphql";

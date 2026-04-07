@@ -22,15 +22,19 @@ import {
 } from "../configuration/interfaces";
 import { putJson } from "../helpers";
 import {
-    buildManifestPayload,
-    callPostinstall,
-    callPreinstall,
-    extractPackage,
     installAllServices,
     installDataFiles,
+} from "./chain-endpoints/install-files";
+import {
+    callPostinstall,
+    callPreinstall,
     installManifest,
-} from "./chainEndpoints/index";
-import { recursiveFetch } from "./recursiveFetch";
+} from "./chain-endpoints/package-api";
+import {
+    buildManifestPayload,
+    extractPackage,
+} from "./chain-endpoints/package-extraction";
+import { recursiveFetch } from "./recursive-fetch";
 
 export const Peer = z
     .object({

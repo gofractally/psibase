@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { chain } from "@/lib/chainEndpoints";
+import { chain } from "@/lib/chain-endpoints";
 import { hexDERPublicKeyToCryptoKey } from "@/lib/keys";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys } from "@/lib/query-keys";
 
 export const useKeyDevices = () =>
     useQuery({

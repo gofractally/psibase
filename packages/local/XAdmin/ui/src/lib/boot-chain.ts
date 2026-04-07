@@ -4,9 +4,9 @@ import { BootState, PackageInfo } from "@/types";
 
 import { queryClient } from "@shared/lib/query-client";
 
-import { chain } from "./chainEndpoints";
+import { chain } from "./chain-endpoints";
 import { exportKeyToPEM } from "./keys";
-import { queryKeys } from "./queryKeys";
+import { queryKeys } from "./query-keys";
 
 type BootChainParams = {
     packages: PackageInfo[];

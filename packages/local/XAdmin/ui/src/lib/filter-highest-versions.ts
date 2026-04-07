@@ -1,6 +1,6 @@
 import { PackageInfo } from "@/types";
 
-import { isLeftLessThanRight, splitVersion } from "./splitVersion";
+import { isLeftLessThanRight, splitVersion } from "./split-version";
 
 export const filterHighestVersions = (
     packages: PackageInfo[],

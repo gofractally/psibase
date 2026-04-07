@@ -2,8 +2,8 @@ import { RowSelectionState } from "@tanstack/react-table";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
-import { getId } from "@/lib/getId";
-import { detectChange } from "@/lib/rowElements";
+import { getId } from "@/lib/get-id";
+import { detectChange } from "@/lib/row-elements";
 
 import { PackageInfo, PackageInfoSchema } from "../types";
 

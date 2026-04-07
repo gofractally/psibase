@@ -10,8 +10,8 @@ import { useEffect, useState } from "react";
 
 import { useToast } from "@/components/ui/use-toast";
 
-import { useServerKeys } from "@/hooks/useKeyDevices";
-import { useMyProducer } from "@/hooks/useProducers";
+import { useServerKeys } from "@/hooks/use-key-devices";
+import { useMyProducer } from "@/hooks/use-producers";
 import {
     calculateKeyFingerprint,
     exportKeyToPEM,
