@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
-import { MemberStatus } from "@shared/domains/fractal/lib/schemas/MemberStatus";
+import { MemberStatus } from "@shared/domains/fractal/lib/schemas/member-status";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
