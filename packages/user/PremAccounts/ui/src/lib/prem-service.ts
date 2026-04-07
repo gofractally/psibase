@@ -1,7 +1,8 @@
 import { supervisor } from "@shared/lib/supervisor";
-import { zAccount } from "@shared/lib/schemas/account";
-
-import { MAX_PREMIUM_NAME_LENGTH } from "@/lib/premium-name-length";
+import {
+    MAX_PREMIUM_NAME_LENGTH,
+    zAccount,
+} from "@shared/lib/schemas/account";
 
 export const PREM_ACCOUNTS_SERVICE = "prem-accounts";
 

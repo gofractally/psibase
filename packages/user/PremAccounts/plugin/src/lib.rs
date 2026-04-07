@@ -58,10 +58,18 @@ impl MarketAdmin for PremAccountsPlugin {
         initial_price: String,
         target: u32,
         floor_price: String,
+        increase_ppm: u32,
+        decrease_ppm: u32,
     ) -> Result<(), Error> {
         assert_authorized_with_whitelist(FunctionName::create, vec!["config".into()])?;
 
-        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
+        if length < MIN_PREMIUM_NAME_LENGTH
+            || length > MAX_PREMIUM_NAME_LENGTH
+            || increase_ppm == 0
+            || increase_ppm >= 1_000_000
+            || decrease_ppm == 0
+            || decrease_ppm >= 1_000_000
+        {
             return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
@@ -86,6 +94,8 @@ impl MarketAdmin for PremAccountsPlugin {
             initial_price: initial_price_u64,
             target,
             floor_price: floor_price_u64,
+            increase_ppm,
+            decrease_ppm,
         }
         .packed();
         add_action_to_transaction("create", &packed)?;
@@ -168,7 +178,7 @@ impl Api for PremAccountsPlugin {
         let account = account.trim().to_string();
         validate_premium_account_name(&account)?;
 
-        let service_account = "prem-accounts";
+        let service_account = prem_accounts::SERVICE.to_string();
 
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
             Some(id) => id,
@@ -200,7 +210,7 @@ impl Api for PremAccountsPlugin {
 
         TokensUser::credit(
             sys_token_id,
-            service_account,
+            &service_account,
             &max_cost,
             "premium account purchase",
         )?;
@@ -216,7 +226,7 @@ impl Api for PremAccountsPlugin {
             // TODO: if tx fails, pull back credit; if succeeds, pull back change
             TokensUser::uncredit(
                 sys_token_id,
-                service_account,
+                &service_account,
                 &max_cost,
                 "account purchase failed",
             )?;

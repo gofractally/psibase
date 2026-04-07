@@ -2,6 +2,9 @@
 
 #[cfg(test)]
 mod tests {
+    /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PPM` for `create` actions.
+    const DEFAULT_CREATE_PPM: u32 = 50_000;
+
     use crate::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
     use crate::Wrapper as PremAccounts;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
@@ -69,7 +72,14 @@ mod tests {
         const TARGET: u32 = 10;
         for len in 1u8..=9u8 {
             PremAccounts::push_from(chain, admin)
-                .create(len, INITIAL, TARGET, FLOOR)
+                .create(
+                    len,
+                    INITIAL,
+                    TARGET,
+                    FLOOR,
+                    DEFAULT_CREATE_PPM,
+                    DEFAULT_CREATE_PPM,
+                )
                 .get()?;
         }
         Ok(())
@@ -87,7 +97,7 @@ mod tests {
 
         // max_cost below current ask (shared balance is sufficient; max_cost is the binding constraint)
         Tokens::push_from(&chain, alice)
-            .credit(1, "prem-accounts".into(), 1000_0000u64.into(), "".into())
+            .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;
 
         let err = PremAccounts::push_from(&chain, alice)
@@ -101,7 +111,7 @@ mod tests {
         );
 
         let raw: serde_json::Value = chain.graphql(
-            AccountNumber::from("prem-accounts"),
+            PremAccounts::SERVICE,
             "query { marketParams { length enabled target } }",
         )?;
         let listed = raw
@@ -112,7 +122,7 @@ mod tests {
 
         // --- disable + buy rules + claim ---
         Tokens::push_from(&chain, alice)
-            .credit(1, "prem-accounts".into(), 1000_0000u64.into(), "".into())
+            .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;
 
         PremAccounts::push_from(&chain, alice)
@@ -121,26 +131,22 @@ mod tests {
 
         PremAccounts::push_from(&chain, alice).disable(4).get()?;
 
-        let auth_len4 = chain.login(alice, PremAccounts::SERVICE)?;
-        let raw_status: serde_json::Value = chain.graphql_auth(
-            AccountNumber::from("prem-accounts"),
-            r#"query {
-                marketStatusEvents(length: 4, first: 10) {
-                    edges { node { length enabled } }
-                }
-            }"#,
-            &auth_len4,
+        let raw_after_disable: serde_json::Value = chain.graphql(
+            PremAccounts::SERVICE,
+            "query { marketParams { length enabled } }",
         )?;
-        let st_edges = raw_status
-            .pointer("/data/marketStatusEvents/edges")
+        let mp_rows = raw_after_disable
+            .pointer("/data/marketParams")
             .and_then(|v| v.as_array())
-            .expect("marketStatusEvents edges");
-        assert!(
-            st_edges.iter().filter_map(|e| e.get("node")).any(|n| {
-                n.get("length") == Some(&serde_json::json!(4))
-                    && n.get("enabled") == Some(&serde_json::json!(false))
-            }),
-            "expected marketStatus disabled for length 4: {raw_status:?}"
+            .expect("marketParams array");
+        let row4 = mp_rows
+            .iter()
+            .find(|v| v.get("length") == Some(&serde_json::json!(4)))
+            .expect("marketParams row for length 4");
+        assert_eq!(
+            row4.get("enabled"),
+            Some(&serde_json::json!(false)),
+            "expected length-4 market disabled: {raw_after_disable:?}"
         );
 
         let err = PremAccounts::push_from(&chain, alice)
@@ -168,7 +174,7 @@ mod tests {
         // --- marketParams + configure ---
         let fetch = |c: &psibase::Chain| -> Result<serde_json::Value, psibase::Error> {
             c.graphql(
-                AccountNumber::from("prem-accounts"),
+                PremAccounts::SERVICE,
                 "query { marketParams { length enabled } }",
             )
         };
@@ -195,11 +201,11 @@ mod tests {
 
         // --- create(10), currentPrices, duplicate create(10) fails ---
         PremAccounts::push_from(&chain, alice)
-            .create(10, 1000, 10, 100)
+            .create(10, 1000, 10, 100, DEFAULT_CREATE_PPM, DEFAULT_CREATE_PPM)
             .get()?;
 
         let raw: serde_json::Value = chain.graphql(
-            AccountNumber::from("prem-accounts"),
+            PremAccounts::SERVICE,
             "query { currentPrices { length price } }",
         )?;
         let rows = raw
@@ -212,7 +218,7 @@ mod tests {
         );
 
         let err = PremAccounts::push_from(&chain, alice)
-            .create(10, 1000, 10, 100)
+            .create(10, 1000, 10, 100, DEFAULT_CREATE_PPM, DEFAULT_CREATE_PPM)
             .trace
             .error
             .expect("duplicate create should fail");
@@ -223,7 +229,7 @@ mod tests {
 
         // --- create(3) rejected (init market) ---
         let err = PremAccounts::push_from(&chain, alice)
-            .create(3, 1000, 10, 100)
+            .create(3, 1000, 10, 100, DEFAULT_CREATE_PPM, DEFAULT_CREATE_PPM)
             .trace
             .error
             .expect("create for existing bootstrap market should fail");
@@ -235,7 +241,14 @@ mod tests {
         // --- invalid lengths ---
         for length in [0u8, MAX_PREMIUM_NAME_LENGTH + 1] {
             let err = PremAccounts::push_from(&chain, alice)
-                .create(length, 1000, 10, 100)
+                .create(
+                    length,
+                    1000,
+                    10,
+                    100,
+                    DEFAULT_CREATE_PPM,
+                    DEFAULT_CREATE_PPM,
+                )
                 .trace
                 .error
                 .unwrap_or_else(|| panic!("create({length}) should fail"));
@@ -251,7 +264,7 @@ mod tests {
 
         // --- buy on length-10 market (already added) ---
         Tokens::push_from(&chain, alice)
-            .credit(1, "prem-accounts".into(), 1000_0000u64.into(), "".into())
+            .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;
 
         PremAccounts::push_from(&chain, alice)
@@ -274,7 +287,7 @@ mod tests {
             .get()?;
 
         let raw: serde_json::Value = chain.graphql(
-            AccountNumber::from("prem-accounts"),
+            PremAccounts::SERVICE,
             "query { marketParams { length enabled target initialPrice floorPrice windowSeconds increasePpm decreasePpm } }",
         )?;
         let markets = raw
@@ -302,53 +315,6 @@ mod tests {
             Some(&serde_json::json!(TEST_DECREASE_PPM))
         );
 
-        // --- marketConfigEvents (authenticated): full market configuration history ---
-        PremAccounts::push_from(&chain, alice)
-            .configure(
-                7,
-                TEST_WINDOW_SECS,
-                9,
-                120,
-                TEST_INCREASE_PPM,
-                TEST_DECREASE_PPM,
-            )
-            .get()?;
-
-        let auth = chain.login(alice, PremAccounts::SERVICE)?;
-        let raw: serde_json::Value = chain.graphql_auth(
-            AccountNumber::from("prem-accounts"),
-            r#"query {
-                marketConfigEvents(length: 7, first: 10) {
-                    edges { node { length enable target initialPrice floorPrice windowSeconds increasePpm decreasePpm } }
-                }
-            }"#,
-            &auth,
-        )?;
-        let edges = raw
-            .pointer("/data/marketConfigEvents/edges")
-            .and_then(|v| v.as_array())
-            .expect("edges");
-        assert!(
-            !edges.is_empty(),
-            "expected marketConfigured event: {raw:?}"
-        );
-        let node = &edges[edges.len() - 1]["node"];
-        assert_eq!(node.get("length"), Some(&serde_json::json!(7)));
-        assert_eq!(node.get("enable"), Some(&serde_json::json!(true)));
-        assert_eq!(node.get("target"), Some(&serde_json::json!(9)));
-        assert_eq!(
-            node.get("windowSeconds"),
-            Some(&serde_json::json!(TEST_WINDOW_SECS))
-        );
-        assert_eq!(
-            node.get("increasePpm"),
-            Some(&serde_json::json!(TEST_INCREASE_PPM))
-        );
-        assert_eq!(
-            node.get("decreasePpm"),
-            Some(&serde_json::json!(TEST_DECREASE_PPM))
-        );
-
         Ok(())
     }
 
@@ -358,7 +324,7 @@ mod tests {
     ) -> Result<(), psibase::Error> {
         setup_tokens(&chain)?;
         let raw: serde_json::Value = chain.graphql(
-            AccountNumber::from("prem-accounts"),
+            PremAccounts::SERVICE,
             "query { marketParams { length } }",
         )?;
         let cfg = raw

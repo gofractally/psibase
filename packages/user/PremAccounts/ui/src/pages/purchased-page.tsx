@@ -39,27 +39,21 @@ export function PurchasedPage() {
                 body: JSON.stringify({
                     query: `
                         query {
-                            unclaimedNames(user: "${loggedInUser}") {
-                                length
-                                names
-                            }
+                            unclaimedNames
                         }
                     `,
                 }),
             });
             const data = (await response.json()) as {
                 data?: {
-                    unclaimedNames?: Array<{ length: number; names: string[] }>;
+                    unclaimedNames?: string[];
                 };
                 errors?: Array<{ message: string }>;
             };
             if (data.errors) {
                 throw new Error(data.errors[0].message);
             }
-            const rows = data.data?.unclaimedNames ?? [];
-            const flat = rows.flatMap((r) => r.names);
-            flat.sort();
-            setBoughtNames(flat);
+            setBoughtNames(data.data?.unclaimedNames ?? []);
         } catch (e) {
             console.error("Failed to load bought names:", e);
             setBoughtNames([]);

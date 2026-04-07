@@ -38,6 +38,8 @@ export const useBootstrapDefaultPremiumNameMarkets = () => {
                         PREMIUM_MARKET_DEFAULTS.initialPrice,
                         PREMIUM_MARKET_DEFAULTS.target,
                         PREMIUM_MARKET_DEFAULTS.floorPrice,
+                        PREMIUM_MARKET_DEFAULTS.increasePpm,
+                        PREMIUM_MARKET_DEFAULTS.decreasePpm,
                     ],
                 });
             }

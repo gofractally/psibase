@@ -53,6 +53,7 @@ pub mod tables {
     #[table(name = "PurchasedAccountsTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PurchasedAccount {
+        // How often do we use this as a primary key? perhaps owner should be primary?
         #[primary_key]
         pub account: AccountNumber,
         //#[secondary_key(1)]
@@ -85,7 +86,6 @@ pub mod service {
 
     /// DiffAdjust window for target semantics (30-day period).
     const MARKET_WINDOW_SECONDS: u32 = 30 * 86400;
-    const DIFF_ADJUST_PPM: u32 = 50_000;
 
     fn register_prem_acct_event_indices() {
         let add_index = |method: &str, column: u8| {
@@ -98,18 +98,10 @@ pub mod service {
         };
         add_index("premAcctEvent", 0);
         add_index("premAcctEvent", 1);
-        add_index("marketConfigured", 0);
-        add_index("marketStatus", 0);
     }
 
-    fn emit_market_status(length: u8, enabled: bool) {
-        crate::Wrapper::emit()
-            .history()
-            .marketStatus(length, enabled);
-    }
-
-    /// Apply full DiffAdjust admin params from `configure`. Does not set active difficulty;
-    /// live ask evolves via sales and decay after market creation.
+    /// Apply full DiffAdjust admin params from `configure`.
+    /// Does not set active difficulty; price evolves soely via sales and decay after market creation.
     fn apply_diff_adjust_configure(
         nft_id: u32,
         window_seconds: u32,
@@ -177,6 +169,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `account` - The account name to purchase
+    /// * `max_cost` - The maximum cost to pay for the account name (to account for during-call fluctuations)
     #[action]
     fn buy(account: String, max_cost: u64) {
         check_init();
@@ -200,22 +193,16 @@ pub mod service {
             "account already exists",
         );
 
-        let sys_token = check_some(
+        let sys_token_id: TID = check_some(
             Tokens::Wrapper::call().getSysToken(),
             "system token must be defined",
-        );
-        let sys_token_id: TID = sys_token.id;
+        )
+        .id;
 
         let sender = get_sender();
-        let service_account = get_service();
 
-        crate::Wrapper::emit()
-            .history()
-            .premAcctEvent(sender, acct_to_buy, BOUGHT);
-
-        let auctions_table = AuctionsTable::new();
         let auction = check_some(
-            auctions_table.get_index_pk().get(&length),
+            AuctionsTable::new().get_index_pk().get(&length),
             "auction not found for this length",
         );
 
@@ -223,8 +210,7 @@ pub mod service {
 
         let current_price = DiffAdjust::call().get_diff(auction.nft_id);
 
-        let shared_bal =
-            Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, service_account);
+        let shared_bal = Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, get_service());
 
         check(
             current_price <= max_cost,
@@ -260,6 +246,10 @@ pub mod service {
 
         // Alert the DiffAdjust service to the purchase
         DiffAdjust::call().increment(auction.nft_id, 1);
+
+        crate::Wrapper::emit()
+            .history()
+            .premAcctEvent(sender, acct_to_buy, BOUGHT);
     }
 
     #[action]
@@ -281,10 +271,6 @@ pub mod service {
             purchased_account.owner == get_sender(),
             "account not purchased by sender",
         );
-
-        crate::Wrapper::emit()
-            .history()
-            .premAcctEvent(get_sender(), acct_to_claim, CLAIMED);
 
         let set_key_action = Action {
             sender: acct_to_claim,
@@ -311,10 +297,21 @@ pub mod service {
         Transact::call().runAs(set_auth_serv_action, vec![]);
 
         purchased_accounts_table.remove(&purchased_account);
+
+        crate::Wrapper::emit()
+            .history()
+            .premAcctEvent(get_sender(), acct_to_claim, CLAIMED);
     }
 
     #[action]
-    fn create(length: u8, initial_price: u64, target: u32, floor_price: u64) {
+    fn create(
+        length: u8,
+        initial_price: u64,
+        target: u32,
+        floor_price: u64,
+        increase_ppm: u32,
+        decrease_ppm: u32,
+    ) {
         check_init();
         check(
             length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
@@ -322,6 +319,13 @@ pub mod service {
                 "market name length must be {}-{}",
                 MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
             ),
+        );
+        check(
+            increase_ppm > 0
+                && increase_ppm < 1_000_000
+                && decrease_ppm > 0
+                && decrease_ppm < 1_000_000,
+            "increase and decrease ppm must be between 1 and 999999",
         );
         let auctions_table = AuctionsTable::new();
         check(
@@ -339,8 +343,8 @@ pub mod service {
             1,
             target,
             floor_price,
-            DIFF_ADJUST_PPM,
-            DIFF_ADJUST_PPM,
+            increase_ppm,
+            decrease_ppm,
         );
         Nfts::Wrapper::call().debit(
             nft_id,
@@ -358,21 +362,10 @@ pub mod service {
                 target,
                 floor_price,
                 window_seconds: MARKET_WINDOW_SECONDS,
-                increase_ppm: DIFF_ADJUST_PPM,
-                decrease_ppm: DIFF_ADJUST_PPM,
+                increase_ppm,
+                decrease_ppm,
             })
             .unwrap();
-        crate::Wrapper::emit().history().marketConfigured(
-            length,
-            initial_price,
-            target,
-            floor_price,
-            true,
-            MARKET_WINDOW_SECONDS,
-            DIFF_ADJUST_PPM,
-            DIFF_ADJUST_PPM,
-        );
-        emit_market_status(length, true);
     }
 
     /// Update the params for a name-length market
@@ -422,16 +415,6 @@ pub mod service {
         auction.increase_ppm = increase_ppm;
         auction.decrease_ppm = decrease_ppm;
         auctions_table.put(&auction).unwrap();
-        crate::Wrapper::emit().history().marketConfigured(
-            length,
-            auction.initial_price,
-            target,
-            floor_price,
-            auction.enabled,
-            window_seconds,
-            increase_ppm,
-            decrease_ppm,
-        );
     }
 
     /// Enable new purchases for a name-length market
@@ -455,7 +438,6 @@ pub mod service {
         }
         auction.enabled = true;
         auctions_table.put(&auction).unwrap();
-        emit_market_status(length, true);
     }
 
     /// Disable new purchases for a name-length market
@@ -476,29 +458,12 @@ pub mod service {
         );
         auction.enabled = false;
         auctions_table.put(&auction).unwrap();
-        emit_market_status(length, false);
     }
 
     pub const BOUGHT: u8 = 0;
     pub const CLAIMED: u8 = 1;
     #[event(history)]
     fn premAcctEvent(owner: AccountNumber, account: AccountNumber, action: u8) {}
-
-    #[event(history)]
-    fn marketConfigured(
-        length: u8,
-        initial_price: u64,
-        target: u32,
-        floor_price: u64,
-        enable: bool,
-        window_seconds: u32,
-        increase_ppm: u32,
-        decrease_ppm: u32,
-    ) {
-    }
-
-    #[event(history)]
-    fn marketStatus(length: u8, enabled: bool) {}
 }
 
 #[cfg(test)]

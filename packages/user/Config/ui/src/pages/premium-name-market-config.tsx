@@ -234,6 +234,12 @@ export const PremiumNameMarketConfig = () => {
     const [addTargetRaw, setAddTargetRaw] = useState(
         String(PREMIUM_MARKET_DEFAULTS.target),
     );
+    const [addIncreasePpmRaw, setAddIncreasePpmRaw] = useState(
+        String(PREMIUM_MARKET_DEFAULTS.increasePpm),
+    );
+    const [addDecreasePpmRaw, setAddDecreasePpmRaw] = useState(
+        String(PREMIUM_MARKET_DEFAULTS.decreasePpm),
+    );
 
     const parsedLength = useMemo(
         () => parseNameLength(newLengthRaw),
@@ -241,10 +247,14 @@ export const PremiumNameMarketConfig = () => {
     );
 
     const addTarget = parsePositiveInt(addTargetRaw);
+    const addIncreasePpm = parsePpm(addIncreasePpmRaw);
+    const addDecreasePpm = parsePpm(addDecreasePpmRaw);
     const addPricesOk =
         addInitial.trim() !== "" &&
         addFloor.trim() !== "" &&
-        addTarget !== null;
+        addTarget !== null &&
+        addIncreasePpm !== null &&
+        addDecreasePpm !== null;
 
     const trimmedLen = newLengthRaw.trim();
     const lengthTooLong =
@@ -269,6 +279,8 @@ export const PremiumNameMarketConfig = () => {
         setAddInitial(PREMIUM_MARKET_DEFAULTS.initialPrice);
         setAddFloor(PREMIUM_MARKET_DEFAULTS.floorPrice);
         setAddTargetRaw(String(PREMIUM_MARKET_DEFAULTS.target));
+        setAddIncreasePpmRaw(String(PREMIUM_MARKET_DEFAULTS.increasePpm));
+        setAddDecreasePpmRaw(String(PREMIUM_MARKET_DEFAULTS.decreasePpm));
     };
 
     return (
@@ -489,6 +501,32 @@ export const PremiumNameMarketConfig = () => {
                             className="font-mono"
                         />
                     </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="add-pm-inc-ppm">Increase PPM</Label>
+                        <Input
+                            id="add-pm-inc-ppm"
+                            inputMode="numeric"
+                            value={addIncreasePpmRaw}
+                            onChange={(e) =>
+                                setAddIncreasePpmRaw(e.target.value)
+                            }
+                            autoComplete="off"
+                            className="font-mono"
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="add-pm-dec-ppm">Decrease PPM</Label>
+                        <Input
+                            id="add-pm-dec-ppm"
+                            inputMode="numeric"
+                            value={addDecreasePpmRaw}
+                            onChange={(e) =>
+                                setAddDecreasePpmRaw(e.target.value)
+                            }
+                            autoComplete="off"
+                            className="font-mono"
+                        />
+                    </div>
                     <p className="text-muted-foreground text-sm">
                         New markets are created with purchases enabled. You can
                         turn them off anytime using the switch on each row.
@@ -500,7 +538,9 @@ export const PremiumNameMarketConfig = () => {
                             onClick={() => {
                                 if (
                                     parsedLength === null ||
-                                    addTarget === null
+                                    addTarget === null ||
+                                    addIncreasePpm === null ||
+                                    addDecreasePpm === null
                                 ) {
                                     return;
                                 }
@@ -510,6 +550,8 @@ export const PremiumNameMarketConfig = () => {
                                         addInitial.trim(),
                                         addTarget,
                                         addFloor.trim(),
+                                        addIncreasePpm,
+                                        addDecreasePpm,
                                     ],
                                     {
                                         onSuccess: () => {

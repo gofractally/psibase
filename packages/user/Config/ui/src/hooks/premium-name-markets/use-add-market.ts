@@ -8,7 +8,7 @@ import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
 
 export const useAddPremiumNameMarket = () =>
-    usePluginMutation<[number, string, number, string]>(
+    usePluginMutation<[number, string, number, string, number, number]>(
         {
             service: PREM_ACCOUNTS,
             intf: "market-admin",

@@ -8,10 +8,11 @@ interface market-admin {
     /// * `initial-price`: the initial price as Quantity string
     /// * `target`: target number of accounts to sell in 30 day period
     /// * `floor-price`: the minimum price as Quantity string
+    /// * `increase-ppm` / `decrease-ppm`: DiffAdjust PPM parameters (1..1000000)
     /// Notes:
     /// * `initial-price` is fixed for the life of the market.
     /// * Market starts enabled.
-    create: func(length: u8, initial-price: string, target: u32, floor-price: string) -> result<_, error>;
+    create: func(length: u8, initial-price: string, target: u32, floor-price: string, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
 
     /// Update name market params:
     /// * `length`: market identifier; must be within premium name bounds
