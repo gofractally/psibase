@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 
-import { HistorySection } from "@/components/history-section";
+import { HistorySection } from "./history-section";
 
 import { supervisor } from "@shared/lib/supervisor";
 

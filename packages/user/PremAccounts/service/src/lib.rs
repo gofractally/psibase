@@ -110,7 +110,7 @@ pub mod service {
     }
 
     /// Apply full DiffAdjust admin params from `configure`.
-    /// Does not set active difficulty; price evolves soely via sales and decay after market creation.
+    /// Does not set active difficulty; price evolves soley via sales and decay after market creation.
     fn apply_diff_adjust_configure(
         nft_id: u32,
         window_seconds: u32,
