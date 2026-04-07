@@ -598,13 +598,8 @@ set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi)
 set(THIRD_SRC ${COMMON_API}/common/resources/thirdParty/src)
 set(THIRD_FILES
     ${THIRD_SRC}/htm.module.js
-    ${THIRD_SRC}/react-dom.development.js
     ${THIRD_SRC}/react-dom.production.min.js
-    ${THIRD_SRC}/react-router-dom.min.js
-    ${THIRD_SRC}/react.development.js
-    ${THIRD_SRC}/react.production.min.js
-    ${THIRD_SRC}/semantic-ui-react.min.js
-    ${THIRD_SRC}/useLocalStorageState.js)
+    ${THIRD_SRC}/react.production.min.js)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/CommonApi.psi
@@ -617,7 +612,6 @@ psibase_package(
         SERVER common-api
         DATA      ${COMMON_API}/common/packages/common-lib/dist/common-lib.js common/common-lib.js
         DATA GLOB ${COMMON_API}/common/resources/*.mjs                        common/
-        DATA      ${COMMON_API}/common/resources/fonts                        common/fonts
         DATA GLOB ${THIRD_FILES}                                              common
         DATA      ${COMPONENT_BIN_DIR}/${ComponentParser_OUTPUT_FILE}         /common/${ComponentParser_OUTPUT_FILE}
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/plugin-tester/ui/dist/* /common/plugin-tester/
@@ -984,7 +978,6 @@ psibase_package(
         FLAGS isPrivileged
         SERVER x-admin
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/local/XAdmin/ui/dist/* /
-        DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts /common/fonts
         DATA ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/packages/common-lib/dist/common-lib.js /common/common-lib.js
     DEPENDS wasm ${XAdmin_js_DEP}
     PACKAGE_DEPENDS XHttp XSites XBasic

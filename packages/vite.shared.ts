@@ -113,12 +113,6 @@ export function createPsibaseConfig(
             replacement: path.resolve(appDirectory, "./src"),
         },
         {
-            find: /^\/common(?!\/(?:fonts))(.*)$/,
-            replacement: path.resolve(
-                `${servicesDir}/user/CommonApi/common/resources$1`,
-            ),
-        },
-        {
             find: /^@psibase\/common-lib.*$/,
             replacement:
                 isDevServer || bundleCommonLib
