@@ -2,11 +2,11 @@ import { z } from "zod";
 
 import { Account } from "@shared/lib/schemas/account";
 
-import { Evaluation } from "./graphql/evaluations/getEvaluation";
+import { Evaluation } from "./graphql/evaluations/get-evaluation";
 import {
     UsersAndGroups,
     zResult,
-} from "./graphql/evaluations/getUsersAndGroups";
+} from "./graphql/evaluations/get-users-and-groups";
 import { zUnix } from "@shared/lib/schemas/unix";
 
 const zTimeStatus = z.enum([

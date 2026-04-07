@@ -11,7 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { useDraftApplication } from "@/hooks/use-draft-application";
-import { getInvites, importToken } from "@/lib/graphql/fractals/getInvites";
+import { getInvites, importToken } from "@/lib/graphql/fractals/get-invites";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";

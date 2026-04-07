@@ -1,7 +1,7 @@
 import { supervisor } from "@shared/lib/supervisor";
 
-import { getGuildInvite } from "./getGuildInvite";
-import { getInviteById } from "./getInviteById";
+import { getGuildInvite } from "./get-guild-invite";
+import { getInviteById } from "./get-invite-by-id";
 import z from "zod";
 
 

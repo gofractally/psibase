@@ -5,7 +5,7 @@ import z from "zod";
 import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
 
 import { useGuild } from "@/hooks/use-guild";
-import { Guild } from "@/lib/graphql/fractals/getGuild";
+import { Guild } from "@/lib/graphql/fractals/get-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";

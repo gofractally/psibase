@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import QueryKey from "@/lib/queryKeys";
-import { zGuildAccount } from "@/lib/zod/Wrappers";
+import QueryKey from "@/lib/query-keys";
+import { zGuildAccount } from "@/lib/zod/wrappers";
 
 import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";

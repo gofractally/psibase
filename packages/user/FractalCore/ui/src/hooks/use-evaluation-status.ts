@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { EvaluationStatus, getStatus } from "@/lib/getStatus";
+import { EvaluationStatus, getStatus } from "@/lib/get-status";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 
 import { useEvaluationInstance } from "./fractals/use-evaluation-instance";
