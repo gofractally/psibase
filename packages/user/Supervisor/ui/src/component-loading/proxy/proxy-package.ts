@@ -1,5 +1,5 @@
-import { FuncShape } from "../../witExtraction";
-import { Code, FilePath, ImportDetails, PkgId } from "../importDetails";
+import { FuncShape } from "../../wit-extraction";
+import { Code, FilePath, ImportDetails, PkgId } from "../import-details";
 
 const col = (col: number): string => {
     return " ".repeat(col * 4);

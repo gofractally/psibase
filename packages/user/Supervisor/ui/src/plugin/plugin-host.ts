@@ -7,7 +7,7 @@ import {
     assertTruthy,
 } from "@psibase/common-lib";
 
-import { HostInterface, HttpRequest, HttpResponse } from "../hostInterface";
+import { HostInterface, HttpRequest, HttpResponse } from "../host-interface";
 import { Supervisor } from "../supervisor";
 import { chainId, isEmbedded } from "../utils";
 import { RecoverableErrorPayload } from "./errors";

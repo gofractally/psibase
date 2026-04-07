@@ -1,4 +1,4 @@
-import { CallStack } from "./callStack";
+import { CallStack } from "./call-stack";
 
 // An instance of this class is created to correspond to each invocation
 //   of the `entry` function on the supervisor. It contains data that is specific to each

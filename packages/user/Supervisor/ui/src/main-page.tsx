@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { LocalStorageManager } from "./localStorageManager";
+import { LocalStorageManager } from "./local-storage-manager";
 
 export function MainPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);

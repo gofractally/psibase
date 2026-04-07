@@ -1,4 +1,4 @@
-import { HostInterface } from "../hostInterface";
+import { HostInterface } from "../host-interface";
 import { Plugin } from "./plugin";
 
 export interface LoadedPlugin {
