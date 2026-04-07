@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 import {
     type Membership,
