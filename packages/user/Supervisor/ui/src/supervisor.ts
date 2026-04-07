@@ -15,8 +15,8 @@ import {
 import {
     getCallArgs,
     toString,
-} from "@psibase/common-lib/messaging/FunctionCallRequest";
-import { pluginId } from "@psibase/common-lib/messaging/PluginId";
+} from "@psibase/common-lib/messaging/function-call-request";
+import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
