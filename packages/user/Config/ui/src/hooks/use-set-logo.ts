@@ -1,6 +1,6 @@
-import type { TxStatus } from "@/lib/checkStaging";
+import type { TxStatus } from "@/lib/check-staging";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 import { CONFIG } from "@/lib/services";
 
 import { queryClient } from "@shared/lib/query-client";

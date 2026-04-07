@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import {
     type FractalRes,
     getFractal,
-} from "@shared/domains/fractal/lib/graphql/getFractal";
+} from "@shared/domains/fractal/lib/graphql/get-fractal";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
 import { useCurrentFractal } from "../use-current-fractal";

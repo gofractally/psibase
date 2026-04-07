@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 
 import "@shared/styles/globals.css";
 
-import App from "./App";
+import App from "./app";
 
 const queryClient = new QueryClient();
 

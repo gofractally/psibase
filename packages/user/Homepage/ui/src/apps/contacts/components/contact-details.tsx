@@ -34,7 +34,7 @@ import {
 import { useDeleteContact } from "../hooks/use-delete-contact";
 import { useUpdateContact } from "../hooks/use-update-contact";
 import { LocalContact } from "../types";
-import { formatNames } from "../utils/formatNames";
+import { formatNames } from "../utils/format-names";
 import { ContactForm } from "./contact-form";
 import { EditProfileDialogContent } from "./edit-profile-dialog";
 

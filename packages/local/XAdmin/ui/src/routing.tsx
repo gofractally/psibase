@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import App from "./App";
+import App from "./app";
 import { ConfigurationPage } from "./configuration/configuration-page";
-import { useStatuses } from "./hooks/useStatuses";
+import { useStatuses } from "./hooks/use-statuses";
 import { Layout } from "./layout";
 import { LogsPage } from "./log/logs-page";
 import { CreatePage } from "./pages/create-page";

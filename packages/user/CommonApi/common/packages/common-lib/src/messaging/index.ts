@@ -7,7 +7,7 @@ export {
     type FunctionCallResponse,
     buildFunctionCallResponse,
     isFunctionCallResponse,
-} from "./FunctionCallResponse";
+} from "./function-call-response";
 
 export {
     type FunctionCallRequest,
@@ -18,23 +18,21 @@ export {
     buildFunctionCallRequest,
     toString,
     getCallArgs,
-} from "./FunctionCallRequest";
+} from "./function-call-request";
 
 export {
     type ResourceCallArgs,
     type QualifiedResourceCallArgs,
     toQualifiedFunctionCallArgs,
     getResourceCallArgs,
-} from "./ResourceFunctionCallRequest";
+} from "./resource-function-call-request";
 
-export {
-    type QualifiedDynCallArgs,
-} from "./DynamicFunctionCallRequest";
+export { type QualifiedDynCallArgs } from "./dynamic-function-call-request";
 
 export {
     type PreLoadPluginsRequest,
     isPreLoadPluginsRequest,
-} from "./PreLoadPluginsRequest";
+} from "./preload-plugins-request";
 
 export {
     type PluginId,
@@ -42,17 +40,28 @@ export {
     isEqual,
     pluginId,
     pluginString,
-} from "./PluginId";
+} from "./plugin-id";
 
 export {
     isSupervisorInitialized,
     buildMessageSupervisorInitialized,
-} from "./SupervisorInitialized";
+} from "./supervisor-initialized";
 
 export {
     type GetJsonRequest,
     isGetJsonRequest,
     buildGetJsonRequest,
-} from "./GetJsonRequest";
+} from "./get-json-request";
 
-export { PluginError, PluginErrorObject, RedirectErrorObject, GenericError, GenericErrorObject, isPluginError, isGenericError, isPluginErrorObject, isRedirectErrorObject, isGenericErrorObject } from "./Errors";
+export {
+    PluginError,
+    PluginErrorObject,
+    RedirectErrorObject,
+    GenericError,
+    GenericErrorObject,
+    isPluginError,
+    isGenericError,
+    isPluginErrorObject,
+    isRedirectErrorObject,
+    isGenericErrorObject,
+} from "./errors";

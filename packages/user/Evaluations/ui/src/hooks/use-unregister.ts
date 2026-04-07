@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { zUser } from "@/lib/graphql/getUsers";
+import { zUser } from "@/lib/graphql/get-users";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { queryClient } from "@shared/lib/query-client";

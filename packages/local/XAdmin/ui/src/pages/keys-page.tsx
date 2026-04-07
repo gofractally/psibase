@@ -15,7 +15,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/components/ui/use-toast";
 
 import { KeyDeviceForm } from "@/components/forms/key-device-form";
-import { KeysTable } from "@/components/keys-and-devices/keys-table";
+import { KeysTable } from "@/components/keys-table";
 
 import { getErrorMessage } from "@/lib/utils";
 import { KeyDeviceSchema } from "@/types";
@@ -46,7 +46,7 @@ import {
     useAddServerKey,
     useKeyDevices,
     useServerKeys,
-} from "../hooks/useKeyDevices";
+} from "../hooks/use-key-devices";
 
 export const KeysPage = () => {
     const { toast } = useToast();

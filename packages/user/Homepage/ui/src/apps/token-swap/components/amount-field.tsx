@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 
-import { stringToNum } from "@/lib/stringToNum";
+import { stringToNum } from "@/lib/string-to-num";
 
 import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";

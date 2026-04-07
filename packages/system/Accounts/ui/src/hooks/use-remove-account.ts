@@ -1,6 +1,6 @@
 import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { supervisor } from "@shared/lib/supervisor";
 

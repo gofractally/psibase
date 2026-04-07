@@ -1,5 +1,5 @@
 import { compareSemVer } from "@shared/lib/semver";
-import { ProcessedPackage } from "@/lib/zod/CommonPackage";
+import { ProcessedPackage } from "@/lib/zod/common-package";
 
 import { useAvailablePackages } from "./use-available-packages";
 import { useInstalledPackages } from "./use-installed-packages";

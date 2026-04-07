@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import QueryKey from "../lib/queryKeys";
+import QueryKey from "../lib/query-keys";
 
 export const queryGetAllAccounts = queryOptions({
     queryKey: QueryKey.getAllAccounts(),

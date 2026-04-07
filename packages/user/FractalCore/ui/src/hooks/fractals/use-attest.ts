@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSupervisor } from "@psibase/common-lib";
 
 import { paths } from "@/lib/paths";
-import { zGuildAccount } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 

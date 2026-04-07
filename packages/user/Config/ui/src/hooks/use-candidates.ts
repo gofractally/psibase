@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { graphql } from "@shared/lib/graphql";
 

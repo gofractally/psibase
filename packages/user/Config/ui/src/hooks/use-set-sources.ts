@@ -1,4 +1,4 @@
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { queryClient } from "@shared/lib/query-client";
 

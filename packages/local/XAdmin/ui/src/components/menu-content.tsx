@@ -2,7 +2,7 @@ import { Moon, Power, RotateCcw, Sun } from "lucide-react";
 import { Cog } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { chain } from "@/lib/chainEndpoints";
+import { chain } from "@/lib/chain-endpoints";
 
 import { useTheme } from "@shared/components/theme-provider";
 import { Button } from "@shared/shadcn/ui/button";

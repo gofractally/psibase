@@ -4,8 +4,8 @@ import { z } from "zod";
 
 import { useToast } from "@/components/ui/use-toast";
 
-import { Pulse } from "@/components/Pulse";
 import { SmartConnectForm } from "@/components/forms/smart-connect-form";
+import { Pulse } from "@/components/pulse";
 
 import {
     PeerType,
@@ -13,7 +13,7 @@ import {
     StateEnum,
     UIPeer,
     chain,
-} from "@/lib/chainEndpoints";
+} from "@/lib/chain-endpoints";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { cn } from "@shared/lib/utils";
@@ -41,8 +41,8 @@ import {
     TableRow,
 } from "@shared/shadcn/ui/table";
 
-import { useConfig } from "../hooks/useConfig";
-import { usePeers } from "../hooks/usePeers";
+import { useConfig } from "../hooks/use-config";
+import { usePeers } from "../hooks/use-peers";
 
 const randomIntFromInterval = (min: number, max: number) =>
     Math.floor(Math.random() * (max - min + 1) + min);
