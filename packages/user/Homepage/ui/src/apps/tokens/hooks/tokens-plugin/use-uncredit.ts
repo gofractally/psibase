@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import QueryKey from "@/lib/queryKeys";
-import { TokenId } from "@/lib/zod/TokenId";
+import QueryKey from "@/lib/query-keys";
+import { TokenId } from "@/lib/zod/token-id";
 
 import { zAccount } from "@shared/lib/schemas/account";
 

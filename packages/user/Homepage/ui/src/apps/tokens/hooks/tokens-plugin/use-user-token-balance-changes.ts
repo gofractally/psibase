@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { fetchUserTokenBalanceChanges } from "@/apps/tokens/lib/graphql/ui";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { Quantity } from "@shared/lib/quantity";
 import { type Account, zAccount } from "@shared/lib/schemas/account";

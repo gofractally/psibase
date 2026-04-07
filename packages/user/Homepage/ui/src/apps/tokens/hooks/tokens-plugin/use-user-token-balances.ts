@@ -7,8 +7,8 @@ import {
 } from "@/apps/tokens/lib/graphql/ui";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
-import QueryKey from "@/lib/queryKeys";
-import { updateArray } from "@/lib/updateArray";
+import QueryKey from "@/lib/query-keys";
+import { updateArray } from "@/lib/update-array";
 
 import { Quantity } from "@shared/lib/quantity";
 import { queryClient } from "@shared/lib/query-client";

@@ -24,7 +24,7 @@ import { RejectButton } from "./components/pending/button-reject";
 import {
     type PendingBalance,
     useUserPendingBalance,
-} from "./hooks/tokensPlugin/use-pending-balances";
+} from "./hooks/tokens-plugin/use-pending-balances";
 import { TokensOutletContext } from "./layout";
 
 export interface PendingActionProps {

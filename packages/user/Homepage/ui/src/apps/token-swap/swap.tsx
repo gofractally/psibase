@@ -4,7 +4,7 @@ import { useBoolean } from "usehooks-ts";
 
 import { Button } from "@shared/shadcn/ui/button";
 
-import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
+import { useUserTokenBalances } from "../tokens/hooks/tokens-plugin/use-user-token-balances";
 import { DualTokens } from "./components/dual-tokens";
 import { PickTokenModal } from "./components/pick-token-modal";
 import { ConfirmSwapModal } from "./components/swap-modal";

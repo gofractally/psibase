@@ -6,7 +6,7 @@ import { TokenAmount } from "@shared/lib/plugins/token-swap";
 import { Quantity } from "@shared/lib/quantity";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 
-import { useUserTokenBalances } from "../tokens/hooks/tokensPlugin/use-user-token-balances";
+import { useUserTokenBalances } from "../tokens/hooks/tokens-plugin/use-user-token-balances";
 import { AddLiquidityModal } from "./components/add-liquidity-modal";
 import { CreatePoolModal } from "./components/create-pool-modal";
 import { DualTokens } from "./components/dual-tokens";

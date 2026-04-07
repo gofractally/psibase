@@ -14,7 +14,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { zSendMessageSchema } from "../components/compose-dialog";
 import { zMailbox, zRawMessage } from "../types";
