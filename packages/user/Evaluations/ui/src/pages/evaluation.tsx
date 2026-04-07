@@ -9,7 +9,7 @@ import { useRegister } from "@/hooks/use-register";
 import { useStartEvaluation } from "@/hooks/use-start-evaluation";
 import { useUnregister } from "@/hooks/use-unregister";
 import { useUsersAndGroups } from "@/hooks/use-users";
-import { Types, getStatus } from "@/lib/getStatus";
+import { Types, getStatus } from "@/lib/get-status";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { humanize } from "@shared/lib/humanize";

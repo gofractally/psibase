@@ -1,12 +1,12 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { type Evaluation } from "@/lib/graphql/getEvaluation";
+import { type Evaluation } from "@/lib/graphql/get-evaluation";
 
 import { type Account } from "@shared/lib/schemas/account";
 
-import { Group } from "./graphql/getGroups";
-import { User, zResult } from "./graphql/getUsers";
+import { Group } from "./graphql/get-groups";
+import { User, zResult } from "./graphql/get-users";
 
 const zTimeStatus = z.enum([
     "pending",
