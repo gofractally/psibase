@@ -5,20 +5,18 @@ import { useOutletContext } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import {
-    PREM_ACCOUNTS_SERVICE,
-    canonicalTokenAmountToRaw,
-    doesAccountExist,
-    expandToCanonicalTokenDecimal,
-    formatCanonicalTokenAmount,
-    unitTokenAmountCanonical,
-    zPremiumAccountName,
-} from "@/lib/prem-service";
+import { PREM_ACCOUNTS_SERVICE, doesAccountExist, zPremiumAccountName } from "@/lib/prem-service";
 
 import {
     MAX_PREMIUM_NAME_LENGTH,
     MIN_PREMIUM_NAME_LENGTH,
 } from "@shared/lib/schemas/account";
+import {
+    canonicalTokenAmountToRaw,
+    expandToCanonicalTokenDecimal,
+    formatCanonicalTokenAmount,
+    unitTokenAmountCanonical,
+} from "@shared/lib/quantity";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";

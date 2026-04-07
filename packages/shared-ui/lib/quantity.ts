@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { formatThousands } from "./format-number";
 
+/**
+ * LIMITS (address in a follow-up PR; keep ctor/method signatures stable):
+ * - `amount` is `number`: not every u64 smallest-unit value fits in `Number` (`MAX_SAFE_INTEGER`); parsing via `Number(string)` can round.
+ * - Comparisons and add/subtract use float paths → rounding; scaled *integer* math avoids float error but u64 magnitudes still cause limit issues unless using `bigint`.
+ * - Target: store exact value as `bigint` (or fixed-scale decimal string), derive `number` only for safe display, add `toCanonicalDecimal` / plugin helpers.
+ */
 const Decimal = z.number().or(z.string());
 
 type QuantityInput = string | number;
@@ -61,7 +67,7 @@ export class Quantity {
         let amountNum: number;
 
         if (typeof amount === "string") {
-            // Validate string amount
+            // LOSSY for large integers — see file header.
             const parsed = Number(amount);
             if (!Number.isFinite(parsed)) {
                 throw new Error(`Invalid amount string: "${amount}"`);
@@ -229,4 +235,84 @@ export class Quantity {
             this.tokenSymbol,
         );
     }
+}
+
+// --- Canonical decimal strings (fixed fraction digits) for Tokens / plugin Quantity rules ---
+
+/** One whole token unit as canonical decimal, e.g. precision 4 → `"1.0000"`. */
+export function unitTokenAmountCanonical(precision: number): string {
+    if (precision <= 0) {
+        return "1";
+    }
+    return `1.${"0".repeat(precision)}`;
+}
+
+/** Pad/validate user input to canonical form; rejects excess fraction digits. */
+export function expandToCanonicalTokenDecimal(
+    amount: string,
+    precision: number,
+): string | null {
+    const t = amount.trim();
+    if (t.length === 0) {
+        return null;
+    }
+    if (precision <= 0) {
+        return /^\d+$/.test(t) ? t : null;
+    }
+    const m = /^(\d+)(?:\.(\d*))?$/.exec(t);
+    if (!m) {
+        return null;
+    }
+    const intPart = m[1];
+    let frac = m[2] ?? "";
+    if (frac.length > precision) {
+        return null;
+    }
+    frac = frac.padEnd(precision, "0");
+    return `${intPart}.${frac}`;
+}
+
+export function isCanonicalTokenDecimal(amount: string, precision: number): boolean {
+    const t = amount.trim();
+    if (t.length === 0) {
+        return false;
+    }
+    if (precision <= 0) {
+        return /^\d+$/.test(t) && !t.includes(".");
+    }
+    const m = /^(\d+)\.(\d+)$/.exec(t);
+    if (!m) {
+        return false;
+    }
+    const [, intPart, frac] = m;
+    return (
+        intPart.length > 0 &&
+        /^\d+$/.test(intPart) &&
+        /^\d+$/.test(frac) &&
+        frac.length === precision
+    );
+}
+
+export function formatCanonicalTokenAmount(
+    canonicalDecimal: string,
+    symbol?: string,
+): string {
+    return symbol ? `${canonicalDecimal} ${symbol}` : canonicalDecimal;
+}
+
+/** Smallest-unit count as `bigint` from a canonical decimal; `null` if not canonical. */
+export function canonicalTokenAmountToRaw(
+    canonical: string,
+    precision: number,
+): bigint | null {
+    const t = canonical.trim();
+    if (!isCanonicalTokenDecimal(t, precision)) {
+        return null;
+    }
+    if (precision <= 0) {
+        return BigInt(t);
+    }
+    const [whole, frac] = t.split(".");
+    const scale = BigInt(10) ** BigInt(precision);
+    return BigInt(whole) * scale + BigInt(frac);
 }
