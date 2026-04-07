@@ -53,11 +53,20 @@ pub mod tables {
     #[table(name = "PurchasedAccountsTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PurchasedAccount {
-        // How often do we use this as a primary key? perhaps owner should be primary?
-        #[primary_key]
         pub account: AccountNumber,
-        //#[secondary_key(1)]
         pub owner: AccountNumber,
+    }
+
+    impl PurchasedAccount {
+        #[primary_key]
+        fn pk(&self) -> AccountNumber {
+            self.account
+        }
+
+        #[secondary_key(1)]
+        fn by_owner(&self) -> (AccountNumber, AccountNumber) {
+            (self.owner, self.account)
+        }
     }
 }
 

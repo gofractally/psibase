@@ -4,7 +4,7 @@ mod service {
     use async_graphql::connection::Connection;
     use async_graphql::*;
     use diff_adjust::tables::RateLimitTable;
-    use prem_accounts::tables::{AuctionsTable, PurchasedAccountsTable};
+    use prem_accounts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -165,12 +165,15 @@ mod service {
             let user = self.require_authenticated()?;
 
             let purchased_table = PurchasedAccountsTable::read();
-            let mut names: Vec<String> = purchased_table
-                .get_index_pk()
-                .iter()
-                .filter(|record| record.owner == user)
-                .map(|record| record.account.to_string())
-                .collect();
+            let owner_idx = purchased_table.get_index_by_owner();
+            let mut prefix = owner_idx.prefix.clone();
+            user.append_key(&mut prefix);
+            let sub = TableIndex::<AccountNumber, PurchasedAccount>::new(
+                &owner_idx.db,
+                prefix,
+                owner_idx.is_secondary,
+            );
+            let mut names: Vec<String> = sub.iter().map(|r| r.account.to_string()).collect();
             names.sort();
             Ok(names)
         }
