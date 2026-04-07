@@ -1,9 +1,9 @@
 import * as d3 from "d3";
 import { useEffect, useRef, useState } from "react";
 
-import "./App.css";
-import { Sidebar } from "./Sidebar";
-import { SvgCanvas } from "./SvgCanvas";
+import "./app.css";
+import { Sidebar } from "./sidebar";
+import { SvgCanvas } from "./svg-canvas";
 import {
     SELECTOR,
     dataSetName,
