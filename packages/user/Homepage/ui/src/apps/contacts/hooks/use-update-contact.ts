@@ -3,8 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
+import { zAccount } from "@shared/lib/schemas/account";
 import SharedQueryKey from "@shared/lib/query-keys";
-import { zAccount } from "@/lib/zod/Account";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
