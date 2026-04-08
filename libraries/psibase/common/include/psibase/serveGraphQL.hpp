@@ -7,6 +7,7 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
+#include <unordered_map>
 
 namespace psibase
 {
@@ -125,6 +126,41 @@ namespace psibase
 
    template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
    constexpr const char* get_type_name(const Connection<Node, ConnectionName, EdgeName>*)
+   {
+      return ConnectionName.c_str();
+   }
+
+   /// Additional fields on each event edge providing block context.
+   template <typename Node, psio::FixedString EdgeName>
+   struct EventEdge
+   {
+      Node                              node;
+      std::string                       cursor;
+      std::optional<psibase::BlockNum>  blockNum;
+      std::optional<psibase::BlockTime> blockTime;
+      PSIO_REFLECT(EventEdge, node, cursor, blockNum, blockTime)
+   };
+
+   template <typename Node, psio::FixedString EdgeName>
+   constexpr const char* get_type_name(const EventEdge<Node, EdgeName>*)
+   {
+      return EdgeName.c_str();
+   }
+
+   /// A connection type for event queries whose edges carry block context.
+   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   struct EventConnection
+   {
+      using NodeType = Node;
+      using Edge     = psibase::EventEdge<Node, EdgeName>;
+
+      std::vector<Edge> edges;
+      PageInfo          pageInfo;
+      PSIO_REFLECT(EventConnection, edges, pageInfo)
+   };
+
+   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
+   constexpr const char* get_type_name(const EventConnection<Node, ConnectionName, EdgeName>*)
    {
       return ConnectionName.c_str();
    }
@@ -890,6 +926,12 @@ namespace psibase
       PSIO_REFLECT(SqlRow, rowid, data)
    };
 
+   struct BlockStartMarker
+   {
+      BlockNum blockNum;
+      PSIO_REFLECT(BlockStartMarker, blockNum)
+   };
+
    /// GraphQL Pagination through Event tables
    ///
    /// Event tables are stored in an SQLite database in a service.
@@ -994,17 +1036,17 @@ namespace psibase
          return *this;
       }
 
-      /// Execute the query and return a Connection containing the results
+      /// Execute the query and return an EventConnection containing the results
       ///
       /// Returns error if both first and last are specified.
-      Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge"> query()
-          const
+      EventConnection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">
+      query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using EdgeType = Edge<T, psio::reflect<T>::name + "Edge">;
-         using ConnType =
-             Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
+         using EdgeType = EventEdge<T, psio::reflect<T>::name + "Edge">;
+         using ConnType = EventConnection<T, psio::reflect<T>::name + "Connection",
+                                          psio::reflect<T>::name + "Edge">;
 
          ConnType connection;
          connection.pageInfo.hasNextPage     = has_next_page;
@@ -1022,12 +1064,81 @@ namespace psibase
          {
             connection.pageInfo.startCursor = connection.edges.front().cursor;
             connection.pageInfo.endCursor   = connection.edges.back().cursor;
+
+            addBlockContext(connection.edges);
          }
 
          return connection;
       }
 
+      template <typename EdgeType>
+      void addBlockContext(std::vector<EdgeType>& edges) const
+      {
+         uint64_t minRowId = extract_cursor(edges.front().cursor);
+         uint64_t maxRowId = extract_cursor(edges.back().cursor);
+
+         auto markers = fetchBlockStartMarkers(minRowId, maxRowId);
+         if (markers.empty())
+            return;
+
+         std::unordered_map<BlockNum, BlockTime> blockTimeCache;
+
+         auto db            = proxyKvOpen(DbId::blockLog, {}, KvMode::read);
+         auto blockLogIndex = TableIndex<Block, uint32_t>{db, {}, false};
+
+         auto lookupBlockTime = [&](BlockNum bn) -> std::optional<BlockTime>
+         {
+            auto it = blockTimeCache.find(bn);
+            if (it != blockTimeCache.end())
+               return it->second;
+            auto block = blockLogIndex.get(bn);
+            if (block)
+            {
+               blockTimeCache[bn] = block->header.time;
+               return block->header.time;
+            }
+            return std::nullopt;
+         };
+
+         size_t markerIdx = markers.size() - 1;
+         for (auto eit = edges.rbegin(); eit != edges.rend(); ++eit)
+         {
+            uint64_t edgeRowId = extract_cursor(eit->cursor);
+            while (markerIdx > 0 && markers[markerIdx].rowid > edgeRowId)
+               --markerIdx;
+
+            if (markers[markerIdx].rowid <= edgeRowId)
+            {
+               auto bn        = markers[markerIdx].data.blockNum;
+               eit->blockNum  = bn;
+               eit->blockTime = lookupBlockTime(bn);
+            }
+         }
+      }
+
      private:
+      std::vector<SqlRow<BlockStartMarker>> fetchBlockStartMarkers(uint64_t minRowId,
+                                                                   uint64_t maxRowId) const
+      {
+         auto sql = std::format(
+             "WITH covering AS ("
+             " SELECT ROWID"
+             " FROM \"history.transact.blockStart\""
+             " WHERE ROWID <= {}"
+             " ORDER BY ROWID DESC"
+             " LIMIT 1"
+             ")"
+             " SELECT ROWID, *"
+             " FROM \"history.transact.blockStart\""
+             " WHERE ROWID = (SELECT ROWID FROM covering)"
+             "    OR (ROWID > (SELECT ROWID FROM covering) AND ROWID <= {})"
+             " ORDER BY ROWID ASC",
+             minRowId, maxRowId);
+         auto json    = sql_query(sql, {}, _debug);
+         auto markers = psio::convert_from_json<std::vector<SqlRow<BlockStartMarker>>>(json);
+         return markers;
+      }
+
       std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges() const
       {
          std::optional<int32_t> limit_plus_one;
@@ -1084,14 +1195,18 @@ namespace psibase
          return {rows, has_next_page, has_prev_page};
       }
 
-      uint64_t extract_cursor(std::optional<std::string> cursor) const
+      uint64_t extract_cursor(std::string_view c) const
       {
-         uint64_t         b{};
-         std::string_view c = *cursor;
-         auto [ptr, ec]     = std::from_chars(c.data(), c.data() + c.size(), b);
+         uint64_t b{};
+         auto [ptr, ec] = std::from_chars(c.data(), c.data() + c.size(), b);
          check(ec == std::errc{}, "Invalid cursor");
          check(ptr == c.data() + c.size(), "Invalid cursor: not all characters consumed");
          return b;
+      }
+
+      uint64_t extract_cursor(const std::string& cursor) const
+      {
+         return extract_cursor(std::string_view{cursor});
       }
 
       std::string generate_sql_query(std::optional<int32_t>     limit,
@@ -1108,12 +1223,12 @@ namespace psibase
 
          if (before.has_value())
          {
-            filters.push_back(std::format("ROWID < {}", extract_cursor(before)));
+            filters.push_back(std::format("ROWID < {}", extract_cursor(*before)));
          }
 
          if (after.has_value())
          {
-            filters.push_back(std::format("ROWID > {}", extract_cursor(after)));
+            filters.push_back(std::format("ROWID > {}", extract_cursor(*after)));
          }
 
          auto order = descending ? "DESC" : "ASC";
