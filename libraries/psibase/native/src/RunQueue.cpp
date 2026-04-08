@@ -75,7 +75,7 @@ namespace psibase
             return psio::view<const TimerRow>(psio::prevalidated{entry});
          }
       };
-      Item pop_impl(std::unique_lock<std::mutex>&, Database& db)
+      Item pop_impl(std::unique_lock<std::mutex>&, KVStore& db)
       {
          auto prefix     = psio::convert_to_key(runPrefix());
          auto search_key = psio::convert_to_key(runKey(next));
@@ -119,7 +119,7 @@ namespace psibase
       }
 
       Item popTimer(std::unique_lock<std::mutex>&,
-                    Database&                              db,
+                    KVStore&                               db,
                     std::chrono::steady_clock::time_point& nextExpiration)
       {
          if (timerRunning)
@@ -153,18 +153,17 @@ namespace psibase
          {
             auto nextExpiration = std::chrono::steady_clock::time_point::max();
             {
-               Database db{systemContext.sharedDatabase,
-                           systemContext.sharedDatabase.emptyRevision()};
-               auto     session = db.startWrite(writer);
-               db.checkoutSubjective();
-               if (auto result = popTimer(l, db, nextExpiration))
+               KVStore kv;
+               kv.checkoutSubjective(*writer, systemContext.sharedDatabase);
+               if (auto result = popTimer(l, kv, nextExpiration))
                {
                   return result;
                }
-               if (auto result = pop_impl(l, db))
+               if (auto result = pop_impl(l, kv))
                {
                   return result;
                }
+               kv.abortSubjective();
             }
             if (nextExpiration == std::chrono::steady_clock::time_point::max())
                cond.wait(l);
@@ -231,7 +230,7 @@ namespace psibase
          while (auto item = queue->pop(*systemContext, writer,
                                        [this, threadIndex] { return threadIndex >= numThreads; }))
          {
-            auto         revision = systemContext->sharedDatabase.getHead();
+            auto         revision = systemContext->sharedDatabase.getHead(*writer);
             BlockContext bc{*systemContext, revision, writer, true};
             bc.start();
             switch (item.kind)

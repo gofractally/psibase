@@ -13,9 +13,9 @@ namespace psibase
       {
          nextProducersBlockNum = loader.validator->state.next->blockNum;
       }
-      Database db{systemContext->sharedDatabase, revision};
-      auto     session = db.startRead();
-      auto     status  = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key());
+      RevisionAccess _ra{systemContext->sharedDatabase, revision};
+      auto&          db      = _ra.kv;
+      auto           status  = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key());
       check(status && status->head, "Invalid status row in snapshot");
       info = *status->head;
    }

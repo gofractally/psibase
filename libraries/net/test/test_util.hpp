@@ -99,16 +99,24 @@ struct WasmMemoryCache
 
 struct TempDatabase
 {
+   std::filesystem::path                 tmpDir;
+   std::shared_ptr<psibase::SharedState> sharedState;
+
    TempDatabase()
-       : sharedState{std::make_shared<psibase::SharedState>(
-             psibase::SharedDatabase{std::filesystem::temp_directory_path(),
-                                     {1ull << 27, 1ull << 27, 1ull << 27, 1ull << 27},
-                                     triedent::open_mode::temporary},
+       : tmpDir(std::filesystem::temp_directory_path() /
+                ("psibase-test-" + std::to_string(std::random_device{}()))),
+         sharedState{std::make_shared<psibase::SharedState>(
+             psibase::SharedDatabase{tmpDir, {}, psitri::open_mode::create_or_open},
              psibase::WasmCache{16})}
    {
    }
+   ~TempDatabase()
+   {
+      sharedState.reset();
+      std::error_code ec;
+      std::filesystem::remove_all(tmpDir, ec);
+   }
    auto getSystemContext() { return sharedState->getSystemContext(); }
-   std::shared_ptr<psibase::SharedState> sharedState;
 };
 
 template <typename Node>

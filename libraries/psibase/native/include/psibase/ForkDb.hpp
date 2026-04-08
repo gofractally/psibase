@@ -191,13 +191,13 @@ namespace psibase
       BlockHeaderWasmConfig               wasmConfig;
 
       // Reads the next or current state
-      BlockAuthState(SystemContext* systemContext, const WriterPtr& writer, Database& db)
+      BlockAuthState(SystemContext* systemContext, const WriterPtr& writer, KVStore& db)
       {
          revision = systemContext->sharedDatabase.emptyRevision();
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
          {
-            Database dst{systemContext->sharedDatabase, revision};
-            auto     session   = dst.startWrite(writer);
+            RevisionAccess _dst_ra{*writer, revision};
+            auto&          dst    = _dst_ra.kv;
             auto&    consensus = status->consensus.next ? status->consensus.next->consensus
                                                         : status->consensus.current;
             services           = consensus.services;
@@ -210,7 +210,7 @@ namespace psibase
       // Loads the current state
       BlockAuthState(SystemContext*   systemContext,
                      const WriterPtr& writer,
-                     Database&        db,
+                     KVStore&         db,
                      ConstRevisionPtr revision)
           : revision(revision ? std::move(revision) : systemContext->sharedDatabase.emptyRevision())
       {
@@ -260,8 +260,8 @@ namespace psibase
          check(!!header.authCode, "code must be provided when changing auth services");
          services   = newServices;
          wasmConfig = newWasmConfig;
-         Database db{systemContext->sharedDatabase, prev.revision};
-         auto     session = db.startWrite(writer);
+         RevisionAccess _ra{*writer, prev.revision};
+         auto&          db = _ra.kv;
          updateServices(db, prev.services, prev.wasmConfig, services, wasmConfig, *header.authCode);
          revision = db.getModifiedRevision();
       }
@@ -271,13 +271,13 @@ namespace psibase
    {
       snapshot::StateChecksum operator()()
       {
-         Database                db{sharedDatabase, revision};
-         auto                    session = db.startRead();
+         RevisionAccess          _ra{sharedDatabase, revision};
+         auto&                   db = _ra.kv;
          snapshot::StateChecksum result{.serviceRoot = hash(db, DbId::service),
                                         .nativeRoot  = hash(db, DbId::native)};
          return result;
       }
-      Checksum256 hash(Database& database, DbId db)
+      Checksum256 hash(KVStore& database, DbId db)
       {
          KvMerkle       merkle;
          KvMerkle::Item item{{}, {}};
@@ -324,9 +324,9 @@ namespace psibase
           : info(info), revision(revision)
       {
          // Reads the active producer set from the database
-         Database db{systemContext->sharedDatabase, revision};
-         auto     session = db.startRead();
-         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         RevisionAccess _ra{systemContext->sharedDatabase, revision};
+         auto&          db     = _ra.kv;
+         auto           status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
          if (!status)
          {
             producers = std::make_shared<ProducerSet>();
@@ -346,7 +346,7 @@ namespace psibase
                        const WriterPtr&        writer,
                        const BlockHeaderState& prev,
                        const BlockInfo&        info,
-                       ConstRevisionPtr        revision = nullptr)
+                       ConstRevisionPtr        revision = {})
           : info(info),
             revision(revision),
             producers(prev.producers),
@@ -416,9 +416,9 @@ namespace psibase
       void loadAuthState(SystemContext* systemContext, const WriterPtr& writer)
       {
          auto&    authState = nextProducers ? nextProducers->authState : producers->authState;
-         Database db{systemContext->sharedDatabase, revision};
-         auto     session = db.startRead();
-         authState        = std::make_shared<BlockAuthState>(systemContext, writer, db);
+         RevisionAccess _ra{systemContext->sharedDatabase, revision};
+         auto&          db = _ra.kv;
+         authState         = std::make_shared<BlockAuthState>(systemContext, writer, db);
          if (nextProducers)
          {
             producers->authState = std::make_shared<BlockAuthState>(systemContext, writer, db,
@@ -427,8 +427,8 @@ namespace psibase
       }
       JointConsensus readState(SystemContext* systemContext) const
       {
-         Database db{systemContext->sharedDatabase, revision};
-         auto     session = db.startRead();
+         RevisionAccess _ra{systemContext->sharedDatabase, revision};
+         auto&          db = _ra.kv;
          if (auto status = db.kvGet<StatusRow>(StatusRow::db, StatusRow::key()))
          {
             return status->consensus;
@@ -499,7 +499,7 @@ namespace psibase
          {
             abortMessage(producer.str() + " is not an active producer at block " +
                          loggers::to_string(info.blockId));
-            return nullptr;
+            return {};
          }
       }
       // The block that finalizes a swap to a new producer set needs to
@@ -599,8 +599,8 @@ namespace psibase
          }
          prevBlockNum         = info.header.blockNum;
          auto     blockNumKey = psio::convert_to_key(info.header.blockNum);
-         Database database(systemContext->sharedDatabase, revision);
-         auto     session = database.startWrite(writer);
+         RevisionAccess _ra{*writer, revision};
+         auto&          database = _ra.kv;
          database.kvPutRaw(DbId::blockLog, blockNumKey, psio::to_frac(block->block().unpack()));
          if (!block->signature().empty())
          {
@@ -743,8 +743,8 @@ namespace psibase
          // are identical.
          if (!getRanges(db)->add(std::move(low), std::move(high)))
             abortMessage("Snapshot parts overlap");
-         Database database(systemContext->sharedDatabase, revision);
-         auto     session = database.startWrite(writer);
+         RevisionAccess _ra{*writer, revision};
+         auto&          database = _ra.kv;
          for (const SnapshotItem& row : rows)
          {
             database.kvPutRaw(db, row.key, row.value);
@@ -757,12 +757,12 @@ namespace psibase
    struct SnapshotSender
    {
       SnapshotSender(SystemContext* context, ConstRevisionPtr revision)
-          : database(context->sharedDatabase, std::move(revision))
+          : _ra(std::make_unique<RevisionAccess>(context->sharedDatabase, std::move(revision)))
       {
       }
-      std::vector<char> currentKey;
-      DbId              currentDb = DbId::service;
-      Database          database;
+      std::vector<char>                  currentKey;
+      DbId                               currentDb = DbId::service;
+      std::unique_ptr<RevisionAccess>    _ra;
       bool              next(DbId&                      db,
                              std::vector<char>&         low,
                              std::vector<char>&         high,
@@ -776,10 +776,9 @@ namespace psibase
          constexpr std::size_t limit     = 1024 * 1024;
          std::size_t           totalSize = 0;
          {
-            auto sesssion = database.startRead();
             while (totalSize < limit)
             {
-               if (auto row = database.kvGreaterEqualRaw(currentDb, currentKey, 0))
+               if (auto row = _ra->kv.kvGreaterEqualRaw(currentDb, currentKey, 0))
                {
                   auto key   = std::vector<char>{row->key.pos, row->key.end};
                   auto value = std::vector<char>{row->value.pos, row->value.end};
@@ -903,9 +902,9 @@ namespace psibase
          }
          else
          {
-            Database db{systemContext->sharedDatabase, head->revision};
-            auto     session  = db.startRead();
-            auto     blockNum = getBlockNum(id);
+            RevisionAccess _ra{systemContext->sharedDatabase, head->revision};
+            auto&          db       = _ra.kv;
+            auto           blockNum = getBlockNum(id);
             if (auto block = db.kvGet<Block>(DbId::blockLog, blockNum))
             {
                if (BlockInfo{*block}.blockId == id)
@@ -928,8 +927,8 @@ namespace psibase
          }
          else
          {
-            Database db{systemContext->sharedDatabase, head->revision};
-            auto     session = db.startRead();
+            RevisionAccess _ra{systemContext->sharedDatabase, head->revision};
+            auto&          db = _ra.kv;
             if (auto next = db.kvGet<Block>(DbId::blockLog, num + 1))
             {
                return next->header.previous;
@@ -954,8 +953,8 @@ namespace psibase
          }
          else
          {
-            Database db{systemContext->sharedDatabase, head->revision};
-            auto     session = db.startRead();
+            RevisionAccess _ra{systemContext->sharedDatabase, head->revision};
+            auto&          db = _ra.kv;
             if (auto block = db.kvGet<Block>(DbId::blockLog, num))
             {
                auto proof = db.kvGet<std::vector<char>>(DbId::blockProof, num);
@@ -1271,9 +1270,8 @@ namespace psibase
                return prev + 1;
             }
          }
-         Database database{systemContext->sharedDatabase, systemContext->sharedDatabase.getHead()};
-         auto     session = database.startRead();
-         database.checkoutSubjective();
+         KVStore database;
+         database.checkoutSubjective(*writer, systemContext->sharedDatabase);
          psio::size_stream prefixLen;
          psio::to_key(consensusChangePrefix(), prefixLen);
          auto key = psio::convert_to_key(consensusChangeKey(prev + 1));
@@ -1281,17 +1279,28 @@ namespace psibase
          {
             auto value = psio::from_frac<ConsensusChangeRow>(row->value);
             if (value.start > prev)
+            {
+               database.abortSubjective();
                return value.start;
+            }
             if (value.commit > prev)
+            {
+               database.abortSubjective();
                return value.commit;
+            }
             if (value.end > prev)
+            {
+               database.abortSubjective();
                return value.end;
+            }
          }
          if (auto row = database.kvGreaterEqualRaw(ConsensusChangeRow::db, key, prefixLen.size))
          {
             auto value = psio::from_frac<ConsensusChangeRow>(row->value);
+            database.abortSubjective();
             return value.start;
          }
+         database.abortSubjective();
          return {};
       }
       SnapshotLoader start_snapshot(std::unique_ptr<LightHeaderState>&& state,
@@ -1368,9 +1377,7 @@ namespace psibase
          currentTerm = std::max(currentTerm, pos->second.info.header.term);
          set_subtree(&pos->second, "received snapshot");
          {
-            Database database{systemContext->sharedDatabase, revision};
-            auto     session = database.startWrite(writer);
-            database.writeRevision(session, id);
+            systemContext->sharedDatabase.writeRevision(*writer, id, revision);
          }
          systemContext->sharedDatabase.setHead(*writer, revision);
          head = &pos->second;
@@ -1393,9 +1400,8 @@ namespace psibase
       }
       Checksum256 get_last_snapshot_id()
       {
-         Database db(systemContext->sharedDatabase, systemContext->sharedDatabase.getHead());
-         auto     session = db.startRead();
-         db.checkoutSubjective();
+         KVStore db;
+         db.checkoutSubjective(*writer, systemContext->sharedDatabase);
          auto key       = psio::convert_to_key(snapshotPrefix());
          auto prefixLen = key.size();
          for (auto row = db.kvMaxRaw(DbId::nativeSubjective, key); row;
@@ -1410,6 +1416,7 @@ namespace psibase
                ProducerSet producers(status.consensus.current.data);
                if (value.state()->signatures().size() >= producers.weak_threshold())
                {
+                  db.abortSubjective();
                   return id;
                }
                else
@@ -1428,6 +1435,7 @@ namespace psibase
             }
             key.assign(row->key.pos, row->key.end);
          }
+         db.abortSubjective();
          return Checksum256{};
       }
       SnapshotSender send_snapshot(const Checksum256& id)
@@ -1697,8 +1705,8 @@ namespace psibase
       }
       bool should_make_snapshot(const BlockHeaderState* state)
       {
-         Database db(systemContext->sharedDatabase, state->revision);
-         auto     session = db.startRead();
+         RevisionAccess _ra{systemContext->sharedDatabase, state->revision};
+         auto&          db = _ra.kv;
          if (db.kvGet<ScheduledSnapshotRow>(ScheduledSnapshotRow::db,
                                             scheduledSnapshotKey(state->info.header.blockNum)))
          {
@@ -1785,9 +1793,9 @@ namespace psibase
       {
          check(!!revision, "Missing revision for state signature");
          // look up active producers
-         Database db{systemContext->sharedDatabase, std::move(revision)};
-         auto     session = db.startRead();
-         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         RevisionAccess _ra{systemContext->sharedDatabase, std::move(revision)};
+         auto&          db     = _ra.kv;
+         auto           status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
          check(!!status, "Missing status row");
          check(!!status->head, "StatusRow missing head");
          return std::move(*status);
@@ -1811,9 +1819,8 @@ namespace psibase
          auto authRevision = revision;
          if (status.consensus.next)
          {
-            Database db{systemContext->sharedDatabase, revision};
-            auto     session = db.startRead();
-            authRevision     = db.getPrevAuthServices();
+            RevisionAccess _ra{systemContext->sharedDatabase, revision};
+            authRevision = _ra.kv.getPrevAuthServices();
          }
          verify(authRevision, snapshot::StateSignatureInfo{checksum}, sig.claim, sig.rawData);
 
@@ -2009,9 +2016,9 @@ namespace psibase
          auto bc = getBlockContext();
          if (!bc || bc->needGenesisAction)
             return {};
-         auto session = bc->db.startWrite(writer);
-         auto result  = bc->callNextTransaction();
-         session.commit();
+         auto frame  = bc->consensus_tx->sub_transaction();
+         auto result = bc->callNextTransaction();
+         frame.commit();
          return result;
       }
 
@@ -2053,8 +2060,8 @@ namespace psibase
 
       std::vector<char> getBlockProof(ConstRevisionPtr revision, BlockNum blockNum)
       {
-         Database db{systemContext->sharedDatabase, std::move(revision)};
-         auto     session = db.startRead();
+         RevisionAccess _ra{systemContext->sharedDatabase, std::move(revision)};
+         auto&          db = _ra.kv;
          if (auto row = db.kvGet<std::vector<char>>(DbId::blockProof, blockNum))
          {
             return *row;
@@ -2082,8 +2089,8 @@ namespace psibase
          systemContext = sc;
          writer        = sc->sharedDatabase.createWriter();
 
-         Database db{sc->sharedDatabase, sc->sharedDatabase.getHead()};
-         auto     session = db.startRead();
+         RevisionAccess _ra{sc->sharedDatabase, sc->sharedDatabase.getHead()};
+         auto&          db = _ra.kv;
          auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
          if (!status || !status->head)
          {
@@ -2222,9 +2229,9 @@ namespace psibase
 
       BlockInfo readHead(ConstRevisionPtr revision)
       {
-         Database db{systemContext->sharedDatabase, std::move(revision)};
-         auto     session = db.startRead();
-         auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+         RevisionAccess _ra{systemContext->sharedDatabase, std::move(revision)};
+         auto&          db     = _ra.kv;
+         auto           status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
          check(status && status->head, "Missing head");
          return *status->head;
       }

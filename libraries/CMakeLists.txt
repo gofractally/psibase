@@ -1,7 +1,7 @@
 enable_testing()
 
 if(DEFINED IS_NATIVE)
-  add_subdirectory(triedent)
+  # triedent removed — replaced by psitri (added via external/CMakeLists.txt)
 endif()
 
 add_subdirectory(psio)

@@ -21,7 +21,7 @@ std::string Bucket::to_string() const
           " mode=" + std::to_string(static_cast<std::uint32_t>(mode));
 }
 
-std::optional<Database::KVResult> Bucket::trimResult(std::optional<Database::KVResult> result) const
+std::optional<KVStore::KVResult> Bucket::trimResult(std::optional<KVStore::KVResult> result) const
 {
    if (result)
    {

@@ -13,7 +13,7 @@ namespace psibase
       KvMode                            mode = KvMode::none;
       explicit                          operator bool() const { return mode != KvMode::none; }
       std::vector<char>                 key(std::span<const char>) const;
-      std::optional<Database::KVResult> trimResult(std::optional<Database::KVResult> result) const;
+      std::optional<KVStore::KVResult> trimResult(std::optional<KVStore::KVResult> result) const;
 
       bool isRead() const { return mode == KvMode::read || mode == KvMode::readWrite; }
       bool isWrite() const { return mode == KvMode::write || mode == KvMode::readWrite; }

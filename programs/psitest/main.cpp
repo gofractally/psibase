@@ -35,6 +35,16 @@ using eosio::vm::span;
 using psibase::WatchdogManager;
 using psio::convert_to_bin;
 
+// WASM-facing database config (same memory layout as the old triedent::database_config
+// for backwards compatibility with test WASM modules)
+struct test_database_config
+{
+   std::uint64_t hot_bytes  = 1000 * 1000ull;
+   std::uint64_t warm_bytes = 1000 * 1000ull;
+   std::uint64_t cool_bytes = 1000 * 1000ull;
+   std::uint64_t cold_bytes = 1000 * 1000ull;
+};
+
 struct callbacks;
 using rhf_t = eosio::vm::registered_host_functions<callbacks>;
 
@@ -54,23 +64,11 @@ struct vm_options
    static constexpr std::uint32_t max_stack_bytes      = 1024 * 1024;
 };
 
-#if defined(__x86_64__) || defined(__aarch64__)
-template <>
-void eosio::vm::machine_code_writer<eosio::vm::jit_execution_context<callbacks, true>,
-                                    true>::on_unreachable()
-{
-   backtrace();
-   eosio::vm::throw_<wasm_interpreter_exception>("unreachable");
-}
-#endif
+// To override on_unreachable for JIT, set mod.callbacks.on_unreachable before parsing.
 
 using backend_t = eosio::vm::backend<  //
     rhf_t,
-#if defined(__x86_64__) || defined(__aarch64__)
     eosio::vm::jit,
-#else
-    eosio::vm::interpreter,
-#endif
     vm_options,
     debug_eos_vm::debug_instr_map>;
 
@@ -263,8 +261,8 @@ struct test_chain
    psibase::SharedDatabase                  db;
    psibase::WriterPtr                       writer;
    std::unique_ptr<psibase::SystemContext>  sys;
-   std::shared_ptr<const psibase::Revision> revisionAtBlockStart;
-   std::shared_ptr<const psibase::Revision> head;
+   psibase::ConstRevisionPtr revisionAtBlockStart;
+   psibase::ConstRevisionPtr head;
    std::unique_ptr<psibase::BlockContext>   blockContext;
    // altBlockContext is created on demand to handle db reads between blocks
    std::unique_ptr<psibase::BlockContext>       altBlockContext;
@@ -298,16 +296,16 @@ struct test_chain
                                  state.watchdogManager,
                                  std::make_shared<psibase::Sockets>(this->db)});
       state.shared_memory_cache.init(*sys);
-      head = this->db.getHead();
+      head = this->db.getHead(*writer);
    }
 
-   test_chain(::state&                         state,
-              const std::filesystem::path&     path,
-              const triedent::database_config& config,
-              triedent::open_mode              mode)
+   test_chain(::state&                     state,
+              const std::filesystem::path& path,
+              const psitri::runtime_config& config,
+              psitri::open_mode             mode)
        : test_chain{state, {path, config, mode}}
    {
-      if (mode != triedent::open_mode::read_only)
+      if (mode != psitri::open_mode::read_only)
       {
          sys->sockets->set(*writer, psibase::SocketRow::producer_multicast,
                            std::make_shared<NullSocket>());
@@ -331,7 +329,7 @@ struct test_chain
          nativeFunctionsTransactionContext.reset();
          blockContext.reset();
          altBlockContext.reset();
-         revisionAtBlockStart.reset();
+         revisionAtBlockStart = {};
          head = std::move(newHead);
          return true;
       }
@@ -352,7 +350,8 @@ struct test_chain
       nativeFunctionsTransactionContext.reset();
       blockContext.reset();
       altBlockContext.reset();
-      revisionAtBlockStart.reset();
+      revisionAtBlockStart = {};
+      head = {};
       state.shared_memory_cache.cleanup(*sys);
       sys.reset();
       writer = {};
@@ -401,7 +400,7 @@ struct test_chain
          PSIBASE_LOG_CONTEXT_BLOCK(logger, blockContext->current.header, blockId);
          PSIBASE_LOG(logger, info) << "Produced block";
          blockContext.reset();
-         revisionAtBlockStart.reset();
+         revisionAtBlockStart = {};
       }
    }
 
@@ -422,12 +421,15 @@ struct test_chain
       psibase::check(!blockContext, "may not call writeRevision while building a block");
       if (altBlockContext)
       {
-         auto status = altBlockContext->db.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
+         auto status = altBlockContext->kv.kvGet<psibase::StatusRow>(psibase::StatusRow::db,
                                                                      psibase::statusKey());
          psibase::check(status.has_value(), "missing status record");
-         auto revision = altBlockContext->session.writeRevision(status->head->blockId);
-         head          = revision;
+         // Capture the current tree root as the revision
+         auto revision = altBlockContext->consensus_tx->read_cursor().get_root();
+         db.writeRevision(*writer, status->head->blockId, revision);
          db.setHead(*writer, revision);
+         altBlockContext->consensus_tx->commit();
+         head = revision;
       }
    }
 
@@ -448,7 +450,7 @@ struct test_chain
              psibase::ActionContext{*nativeFunctionsTransactionContext, dummyAction,
                                     nativeFunctionsTrace->actionTraces[0]});
          nativeFunctions = std::make_unique<psibase::NativeFunctions>(
-             psibase::NativeFunctions{blockContext->db,
+             psibase::NativeFunctions{blockContext->kv,
                                       *nativeFunctionsTransactionContext,
                                       psibase::DbMode::rpc(),
                                       {},
@@ -457,7 +459,7 @@ struct test_chain
       return *nativeFunctions;
    }
 
-   psibase::Database& database() { return native().database; }
+   psibase::KVStore& database() { return native().database; }
 };  // test_chain
 
 struct ScopedCheckoutSubjective
@@ -1183,17 +1185,19 @@ struct callbacks
                               uint64_t cool_bytes,
                               uint64_t cold_bytes)
    {
+      auto tempDir = std::filesystem::temp_directory_path() /
+                     ("psitest-" + std::to_string(std::chrono::steady_clock::now()
+                                                      .time_since_epoch()
+                                                      .count()));
       state.chains.push_back(std::make_unique<test_chain>(
-          state, std::filesystem::temp_directory_path(),
-          triedent::database_config{hot_bytes, warm_bytes, cool_bytes, cold_bytes},
-          triedent::open_mode::temporary));
+          state, tempDir, psitri::runtime_config{}, psitri::open_mode::create_or_open));
       return state.chains.size() - 1;
    }
 
-   uint32_t testerOpenChain(span<const char>                          path,
-                            wasi_oflags_t                             oflags,
-                            wasi_rights_t                             fs_rights_base,
-                            wasm_ptr<const triedent::database_config> config)
+   uint32_t testerOpenChain(span<const char>                    path,
+                            wasi_oflags_t                       oflags,
+                            wasi_rights_t                       fs_rights_base,
+                            wasm_ptr<const test_database_config> config)
    {
       bool read   = fs_rights_base & wasi_rights_fd_read;
       bool write  = fs_rights_base & wasi_rights_fd_write;
@@ -1203,27 +1207,26 @@ struct callbacks
 
       psibase::check(read, "Chain cannot be opened without read access");
 
-      triedent::open_mode mode;
+      psitri::open_mode mode;
       if (!write)
       {
          if (create || excl || trunc)
             throw std::runtime_error("Unsupported combination of flags for openChain");
-         mode = triedent::open_mode::read_only;
+         mode = psitri::open_mode::read_only;
       }
       else if (!create && !excl && !trunc)
-         mode = triedent::open_mode::read_write;
+         mode = psitri::open_mode::open_existing;
       else if (create && !excl && !trunc)
-         mode = triedent::open_mode::create;
+         mode = psitri::open_mode::create_or_open;
       else if (create && excl && !trunc)
-         mode = triedent::open_mode::create_new;
+         mode = psitri::open_mode::create_only;
       else if (create && !excl && trunc)
-         mode = triedent::open_mode::trunc;
+         mode = psitri::open_mode::create_or_open;  // psitri doesn't have trunc; use create_or_open
       else
          throw std::runtime_error("Unsupported combination of flags for openChain");
 
       state.chains.push_back(std::make_unique<test_chain>(
-          state, std::string_view{path.data(), path.size()},
-          create ? *config : triedent::database_config{1 << 27, 1 << 27, 1 << 27, 1 << 27}, mode));
+          state, std::string_view{path.data(), path.size()}, psitri::runtime_config{}, mode));
       return state.chains.size() - 1;
    }
 
@@ -1554,7 +1557,7 @@ struct callbacks
       return assert_chain(chain_index).native();
    }
 
-   psibase::Database& database(std::uint32_t chain_index)
+   psibase::KVStore& database(std::uint32_t chain_index)
    {
       return assert_chain(chain_index).database();
    }
@@ -1579,7 +1582,7 @@ struct callbacks
          return -1;
       }
    }
-   uint32_t setResult(const std::optional<psibase::Database::KVResult>& o)
+   uint32_t setResult(const std::optional<psibase::KVStore::KVResult>& o)
    {
       if (!o)
       {

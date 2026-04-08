@@ -117,9 +117,9 @@ namespace psibase
       void         add(Writer&                        writer,
                        const std::shared_ptr<Socket>& socket,
                        SocketAutoCloseSet*            owner = nullptr,
-                       Database*                      db    = nullptr);
+                       KVStore*                       db    = nullptr);
       void         set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>& socket);
-      void         remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db);
+      void         remove(Writer& writer, const std::shared_ptr<Socket>& socket, KVStore* db);
       std::int32_t setFlags(std::int32_t               socket,
                             std::uint32_t              mask,
                             std::uint32_t              value,

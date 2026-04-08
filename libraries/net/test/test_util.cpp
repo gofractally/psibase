@@ -53,7 +53,9 @@ void TempDir::reset()
 
 std::vector<char> readWholeFile(const std::filesystem::path& name)
 {
-   std::ifstream     in(name);
+   std::ifstream in(name);
+   if (!in)
+      throw std::runtime_error("Failed to open file: " + name.string());
    std::vector<char> result;
    std::copy(std::istreambuf_iterator<char>(in.rdbuf()), std::istreambuf_iterator<char>(),
              std::back_inserter(result));

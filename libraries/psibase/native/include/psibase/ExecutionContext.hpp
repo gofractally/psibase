@@ -5,11 +5,11 @@
 
 namespace psibase
 {
-   struct Database;
+   class KVStore;
    struct VMOptions;
 
    // Only useful for genesis
-   void setCode(Database&          db,
+   void setCode(KVStore&           db,
                 AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,

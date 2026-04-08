@@ -6,17 +6,15 @@
 #include <psio/fracpack.hpp>
 #include <psio/from_bin.hpp>
 #include <psio/to_key.hpp>
-#include <triedent/file_fwd.hpp>
 
 #include <array>
 #include <filesystem>
+#include <map>
+#include <optional>
 
-namespace triedent
-{
-   class write_session;
-   class root;
-   struct database_config;
-}  // namespace triedent
+#include <psitri/database.hpp>
+#include <psitri/transaction.hpp>
+#include <sal/smart_ptr_impl.hpp>
 
 namespace psibase::net
 {
@@ -31,41 +29,19 @@ namespace psibase
    struct SocketChange;
    using SocketChangeSet = std::vector<SocketChange>;
 
-   struct Revision;
-   using ConstRevisionPtr = std::shared_ptr<const Revision>;
+   // ── PsiTri type aliases ──────────────────────────────────────────────
 
-   using Writer    = triedent::write_session;
-   using WriterPtr = std::shared_ptr<Writer>;
+   using WriteSessionPtr  = psitri::write_session::ptr;
+   using ConstRevisionPtr = sal::smart_ptr<sal::alloc_header>;
 
-   using DbPtr = std::shared_ptr<triedent::root>;
+   // Legacy aliases kept for minimal-diff migration of consumer code that
+   // still references Writer / WriterPtr. These expose psitri types directly.
+   using Writer    = psitri::write_session;
+   using WriterPtr = WriteSessionPtr;
 
-   struct DbChangeSet
-   {
-      struct Range
-      {
-         std::vector<unsigned char> lower;
-         std::vector<unsigned char> upper;
-         bool                       write;
-      };
-      std::vector<Range> ranges;
-      void               onRead(std::span<const char> value);
-      void               onGreaterEqual(std::span<const char> key,
-                                        std::size_t           prefixLen,
-                                        bool                  found,
-                                        std::span<const char> result);
-      void               onLessThan(std::span<const char> key,
-                                    std::size_t           prefixLen,
-                                    bool                  found,
-                                    std::span<const char> result);
-      void               onMax(std::span<const char> key, bool found, std::span<const char> result);
-      void               onWrite(std::span<const char> key);
-   };
-
-   using IndependentRevision  = std::array<DbPtr, numIndependentDatabases>;
-   using IndependentChangeSet = std::array<DbChangeSet, numIndependentDatabases>;
+   // ── Callbacks ────────────────────────────────────────────────────────
 
    // Certain rows may trigger callbacks when they are written.
-   //
    struct DatabaseCallbacks
    {
       std::function<void()>                      nextTransaction;
@@ -73,9 +49,6 @@ namespace psibase
       std::function<void(std::span<const char>)> validateHostConfig;
       std::function<void()>                      hostConfig;
       std::function<void()>                      shutdown;
-      // This isn't actually part of the db. It's triggered
-      // by a separate host function, but there isn't a better
-      // place to put it.
       std::function<void(std::span<const char>,
                          const std::function<void(const std::shared_ptr<Socket>&)>&)>
                                                                         socketOpen;
@@ -89,24 +62,18 @@ namespace psibase
       void run(Flags& flags)
       {
          if ((flags & nextTransactionFlag) != 0 && nextTransaction)
-         {
             nextTransaction();
-         }
          if ((flags & runQueueFlag) && runQueue)
-         {
             runQueue();
-         }
          if ((flags & hostConfigFlag) && hostConfig)
-         {
             hostConfig();
-         }
          if ((flags & shutdownFlag) && shutdown)
-         {
             shutdown();
-         }
          flags = 0;
       }
    };
+
+   // ── SharedDatabase ───────────────────────────────────────────────────
 
    struct SharedDatabaseImpl;
    struct SharedDatabase
@@ -114,9 +81,9 @@ namespace psibase
       std::shared_ptr<SharedDatabaseImpl> impl;
 
       SharedDatabase() = default;
-      SharedDatabase(const std::filesystem::path&     dir,
-                     const triedent::database_config& config,
-                     triedent::open_mode              mode = triedent::open_mode::create);
+      SharedDatabase(const std::filesystem::path& dir,
+                     const psitri::runtime_config& config  = {},
+                     psitri::open_mode             mode    = psitri::open_mode::create_or_open);
       SharedDatabase(const SharedDatabase&) = default;
       SharedDatabase(SharedDatabase&&)      = default;
 
@@ -128,13 +95,20 @@ namespace psibase
       // the storage is shared.
       SharedDatabase clone() const;
 
-      ConstRevisionPtr getHead();
+      ConstRevisionPtr getHead(Writer& writer);
+      ConstRevisionPtr getHead();  // read-only path (creates temporary session)
       ConstRevisionPtr emptyRevision();
-      WriterPtr        createWriter();
+      WriteSessionPtr  createWriter();
       void             setHead(Writer& writer, ConstRevisionPtr revision);
+
+      // Fork revision management (stored as subtrees in root 2)
       ConstRevisionPtr getRevision(Writer& writer, const Checksum256& blockId);
+      void             writeRevision(Writer& writer,
+                                     const Checksum256& blockId,
+                                     ConstRevisionPtr   root);
       void             removeRevisions(Writer& writer, const Checksum256& irreversible);
 
+      // Subjective database access (root 1 — mutex-protected, no OCC)
       void kvPutSubjective(Writer&               writer,
                            DbId                  db,
                            std::span<const char> key,
@@ -144,14 +118,8 @@ namespace psibase
                                                        DbId                  db,
                                                        std::span<const char> key);
 
-      IndependentRevision getSubjective();
-      bool                commitSubjective(Writer&                writer,
-                                           IndependentRevision&   original,
-                                           IndependentRevision    updated,
-                                           IndependentChangeSet&& changes,
-                                           SocketChangeSet&&      socketChanges,
-                                           Sockets&               sockets,
-                                           SocketAutoCloseSet&    closing);
+      // Get an allocator session for read-only cursor access
+      sal::allocator_session_ptr readAllocatorSession() const;
 
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
@@ -160,110 +128,44 @@ namespace psibase
       DatabaseCallbacks* getCallbacks() const;
    };
 
-   struct DatabaseImpl;
-   struct Database
-   {
-      std::unique_ptr<DatabaseImpl> impl;
+   // ── KVStore ──────────────────────────────────────────────────────────
+   //
+   // Thin routing layer that prefixes keys with DbId and dispatches to
+   // the active psitri::transaction (consensus or subjective) or to
+   // in-memory std::maps for ephemeral databases.
 
+   class KVStore
+   {
+     public:
       struct KVResult
       {
          psio::input_stream key;
          psio::input_stream value;
       };
 
-      struct Session
-      {
-         Database* db = {};
+      // Active transactions — set by BlockContext
+      psitri::transaction* consensus_tx  = nullptr;
+      psitri::transaction* subjective_tx = nullptr;
 
-         Session() = default;
-         Session(Database* db) : db{db} {}
-         Session(const Session&) = delete;
-         Session(Session&& src)
-         {
-            db     = src.db;
-            src.db = nullptr;
-         }
-         ~Session()
-         {
-            if (db)
-               db->abort(*this);
-         }
+      // Writer for read-only subjective access (reads current root without checkout)
+      Writer* _writer = nullptr;
 
-         Session& operator=(const Session&) = delete;
+      // Ephemeral databases — in-memory only (temporary is per-transaction)
+      using MemoryKV = std::map<std::vector<char>, std::vector<char>>;
+      MemoryKV temporary;
 
-         Session& operator=(Session&& src)
-         {
-            db     = src.db;
-            src.db = nullptr;
-            return *this;
-         }
+      // ── Raw KV operations ─────────────────────────────────────────────
 
-         void commit()
-         {
-            if (db)
-               db->commit(*this);
-            db = nullptr;
-         }
-
-         ConstRevisionPtr writeRevision(const Checksum256& blockId)
-         {
-            if (!db)
-               throw std::runtime_error("Session ended; can not create revision");
-            ConstRevisionPtr result;
-            result = db->writeRevision(*this, blockId);
-            db     = nullptr;
-            return result;
-         }
-      };  // Session
-
-      Database(SharedDatabase shared, ConstRevisionPtr revision);
-      Database(const Database&) = delete;
-      ~Database();
-
-      void             setRevision(ConstRevisionPtr revision);
-      ConstRevisionPtr getBaseRevision();
-      ConstRevisionPtr getModifiedRevision();
-      Session          startRead();
-      Session          startWrite(WriterPtr writer);
-      void             commit(Session& session);
-      ConstRevisionPtr writeRevision(Session& session, const Checksum256& blockId);
-      void             abort(Session&);
-
-      ConstRevisionPtr getPrevAuthServices();
-      void             setPrevAuthServices(ConstRevisionPtr revision);
-
-      // Manage access to subjective database
-      void checkoutEmptySubjective();
-      void checkoutSubjective();
-      bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
-      void abortSubjective();
-      // sockets options are linked to subjective checkouts. Eventually the state might
-      // be exposed in a table.
-      std::int32_t socketSetFlags(std::int32_t        socket,
-                                  std::uint32_t       mask,
-                                  std::uint32_t       value,
-                                  Sockets&            sockets,
-                                  SocketAutoCloseSet& closing);
-      std::int32_t socketEnableP2P(std::int32_t        socket,
-                                   Sockets&            sockets,
-                                   SocketAutoCloseSet& closing);
-      // Used to ensure that checkout and commit are run in the same action
-      std::size_t saveSubjective();
-      void        restoreSubjective(std::size_t depth);
-
-      void clearTemporary();
-
-      // TODO: kvPutRaw, kvRemoveRaw: return deltas
-      // TODO: getters: pass in input buffers instead of returning KVResult
-
-      void kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
-      void kvRemoveRaw(DbId db, psio::input_stream key);
+      void                             kvPutRaw(DbId db, psio::input_stream key, psio::input_stream value);
+      void                             kvRemoveRaw(DbId db, psio::input_stream key);
       std::optional<psio::input_stream> kvGetRaw(DbId db, psio::input_stream key);
-      std::optional<KVResult>           kvGreaterEqualRaw(DbId               db,
-                                                          psio::input_stream key,
-                                                          size_t             matchKeySize);
-      std::optional<KVResult> kvLessThanRaw(DbId db, psio::input_stream key, size_t matchKeySize);
-      std::optional<KVResult> kvMaxRaw(DbId db, psio::input_stream key);
+      std::optional<KVResult>          kvGreaterEqualRaw(DbId               db,
+                                                         psio::input_stream key,
+                                                         size_t             matchKeySize);
+      std::optional<KVResult>          kvLessThanRaw(DbId db, psio::input_stream key, size_t matchKeySize);
+      std::optional<KVResult>          kvMaxRaw(DbId db, psio::input_stream key);
+
+      // ── Templated wrappers ────────────────────────────────────────────
 
       template <typename K, typename V>
       auto kvPut(DbId db, const K& key, const V& value)
@@ -296,6 +198,104 @@ namespace psibase
          return {};
       }
 
+      // ── prevAuthServices ──────────────────────────────────────────────
+
+      ConstRevisionPtr getPrevAuthServices();
+      void             setPrevAuthServices(ConstRevisionPtr revision);
+
+      // ── Revision access ───────────────────────────────────────────────
+
+      void             setBaseRevision(ConstRevisionPtr root) { _base_root = std::move(root); }
+      ConstRevisionPtr getBaseRevision() const { return _base_root; }
+      ConstRevisionPtr getModifiedRevision() const;
+
+      // ── Subjective management (delegated from BlockContext) ───────────
+
+      void checkoutSubjective(Writer& ws, SharedDatabase& shared);
+      void checkoutEmptySubjective(Writer& ws);
+      bool commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing);
+      void abortSubjective();
+
+      std::int32_t socketSetFlags(std::int32_t        socket,
+                                  std::uint32_t       mask,
+                                  std::uint32_t       value,
+                                  Sockets&            sockets,
+                                  SocketAutoCloseSet& closing);
+      std::int32_t socketEnableP2P(std::int32_t        socket,
+                                   Sockets&            sockets,
+                                   SocketAutoCloseSet& closing);
+      std::size_t saveSubjective();
+      void        restoreSubjective(std::size_t depth);
+
+      // ── Ephemeral lifecycle ───────────────────────────────────────────
+
+      void clearTemporary() { temporary.clear(); }
+
       void setCallbackFlags(DatabaseCallbacks::Flags);
-   };  // Database
+
+     private:
+      ConstRevisionPtr  _base_root;
+      std::vector<char> _keyBuffer;
+      std::vector<char> _valueBuffer;
+      std::vector<char> _prefixedKey;
+
+      // Subjective transaction storage (owned when checked out)
+      std::optional<psitri::transaction>         _subjective_tx_storage;
+      std::vector<psitri::transaction_frame_ref> _subjective_frames;  // nesting via sub-transactions
+      SharedDatabase*                            _subjective_shared = nullptr;
+      DatabaseCallbacks::Flags           _callbackFlags     = {};
+      std::size_t                        _subjectiveLimit   = 0;
+
+      // Prepend DbId byte to key, return view into _prefixedKey buffer
+      std::string_view prefixKey(DbId db, std::span<const char> key);
+
+      // Read cursor that works for both checked-out and read-only subjective access
+      psitri::cursor readCursorForDb(DbId db);
+
+      // Helpers for ephemeral database operations
+      std::optional<psio::input_stream> ephemeralGet(MemoryKV& m, psio::input_stream key);
+      std::optional<KVResult>           ephemeralGreaterEqual(MemoryKV& m, psio::input_stream key,
+                                                              size_t matchKeySize);
+      std::optional<KVResult>           ephemeralLessThan(MemoryKV& m, psio::input_stream key,
+                                                          size_t matchKeySize);
+      std::optional<KVResult>           ephemeralMax(MemoryKV& m, psio::input_stream key);
+   };
+
+   // ── RevisionAccess ────────────────────────────────────────────────
+   //
+   // Convenience RAII wrapper that pairs a KVStore with a psitri
+   // transaction for temporary read/write access to a specific revision.
+   // Replaces the old  Database db{shared, revision}; db.startXxx()  pattern.
+
+   struct RevisionAccess
+   {
+      KVStore             kv;
+      psitri::transaction tx;
+
+      // Write access from revision (requires a write session)
+      RevisionAccess(Writer& writer, ConstRevisionPtr revision)
+          : tx(writer.allocator_session(),
+               std::move(revision),
+               [](sal::smart_ptr<sal::alloc_header>) {},
+               []() {},
+               psitri::tx_mode::batch)
+      {
+         kv.consensus_tx = &tx;
+      }
+
+      // Read-only access from revision
+      RevisionAccess(SharedDatabase& shared, ConstRevisionPtr revision)
+          : tx(shared.readAllocatorSession(),
+               std::move(revision),
+               [](sal::smart_ptr<sal::alloc_header>) {},
+               []() {},
+               psitri::tx_mode::batch)
+      {
+         kv.consensus_tx = &tx;
+      }
+
+      RevisionAccess(const RevisionAccess&)            = delete;
+      RevisionAccess& operator=(const RevisionAccess&) = delete;
+   };
+
 }  // namespace psibase

@@ -283,7 +283,7 @@ std::filesystem::path package_path()
 
 void initialize_database(SystemContext& context, const std::string& template_);
 
-void load_environment(Database& db)
+void load_environment(KVStore& db)
 {
 #ifdef __APPLE__
    const char* const* env = *_NSGetEnviron();
@@ -1219,11 +1219,10 @@ void run(const std::string&              db_path,
       auto writer = system->sharedDatabase.createWriter();
       system->sockets->set(*writer, SocketRow::log, makeLogSocket());
 
-      Database           db{system->sharedDatabase, system->sharedDatabase.emptyRevision()};
+      KVStore            kv;
       SocketAutoCloseSet autoClose;
-      auto               session = db.startWrite(std::move(writer));
-      db.checkoutSubjective();
-      load_environment(db);
+      kv.checkoutSubjective(*writer, system->sharedDatabase);
+      load_environment(kv);
       HostConfigRow hostConfig = toHostConfig(
           PsinodeConfig{
               .producer       = producer,
@@ -1242,8 +1241,8 @@ void run(const std::string&              db_path,
               .loggers         = loggers::Config::get(),
           },
           extra_options);
-      db.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
-      if (!db.commitSubjective(*system->sockets, autoClose))
+      kv.kvPut(hostConfig.db, hostConfig.key(), hostConfig);
+      if (!kv.commitSubjective(*system->sockets, autoClose))
       {
          throw std::runtime_error("Failed to initialize database");
       }

@@ -231,17 +231,16 @@ namespace
 
 Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
 {
-   // emptyRevision is okay, because we only need the subjective db
-   Database db{this->sharedDb, sharedDb.emptyRevision()};
-   auto     session = db.startRead();
-   db.checkoutSubjective();
-   auto                   key       = psio::convert_to_key(socketPrefix());
-   auto                   prefixLen = key.size();
-   std::vector<SocketRow> rows;
-   if (db.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
+   auto    writer = this->sharedDb.createWriter();
+   KVStore kv;
+   kv.checkoutSubjective(*writer, this->sharedDb);
+   auto key       = psio::convert_to_key(socketPrefix());
+   auto prefixLen = key.size();
+   if (kv.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
    {
       abortMessage("Socket table should start empty");
    }
+   kv.abortSubjective();
 }
 
 void Sockets::shutdown()
@@ -273,7 +272,7 @@ std::int32_t Sockets::send(Writer&               writer,
 void Sockets::add(Writer&                        writer,
                   const std::shared_ptr<Socket>& socket,
                   SocketAutoCloseSet*            owner,
-                  Database*                      db)
+                  KVStore*                       db)
 {
    {
       std::lock_guard l{mutex};
@@ -359,7 +358,7 @@ void Sockets::set(Writer& writer, std::int32_t fd, const std::shared_ptr<Socket>
                                psio::to_frac(row));
    }
 }
-void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, Database* db)
+void Sockets::remove(Writer& writer, const std::shared_ptr<Socket>& socket, KVStore* db)
 {
    bool matched = false;
    {

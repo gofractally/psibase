@@ -5,28 +5,39 @@
 
 namespace psibase
 {
-   BlockContext::BlockContext(psibase::SystemContext&         systemContext,
-                              std::shared_ptr<const Revision> revision,
-                              WriterPtr                       writer,
-                              bool                            isProducing)
+   BlockContext::BlockContext(psibase::SystemContext& systemContext,
+                              ConstRevisionPtr        revision,
+                              WriterPtr               writer,
+                              bool                    isProducing)
        : systemContext{systemContext},
-         db{systemContext.sharedDatabase, std::move(revision)},
          writer{std::move(writer)},
-         session{db.startWrite(this->writer)},
          isProducing{isProducing}
    {
+      kv.setBaseRevision(revision);
+      kv._writer = this->writer.get();
+      // start_transaction(0) properly retains the root, sets up the commit
+      // callback to publish root 0, and acquires the per-root lock.
+      consensus_tx.emplace(this->writer->start_transaction(0, psitri::tx_mode::batch));
+      kv.consensus_tx = &*consensus_tx;
       trxLogger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("transaction")));
    }
 
-   BlockContext::BlockContext(psibase::SystemContext&         systemContext,
-                              std::shared_ptr<const Revision> revision)
+   BlockContext::BlockContext(psibase::SystemContext& systemContext,
+                              ConstRevisionPtr        revision)
        : systemContext{systemContext},
-         db{systemContext.sharedDatabase, std::move(revision)},
-         session{db.startRead()},
          isProducing{true},  // a read_only block is never replayed
          isReadOnly{true}
    {
+      kv.setBaseRevision(revision);
+      // Read-only: create a no-op transaction for cursor access
+      consensus_tx.emplace(
+          systemContext.sharedDatabase.readAllocatorSession(),
+          std::move(revision),
+          [](sal::smart_ptr<sal::alloc_header>) {},  // no-op commit
+          []() {},                                    // no-op rollback
+          psitri::tx_mode::batch);
+      kv.consensus_tx = &*consensus_tx;
       trxLogger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("transaction")));
    }
@@ -56,16 +67,16 @@ namespace psibase
                                  BlockNum                 irreversible)
    {
       check(!started, "block has already been started");
-      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      auto status = kv.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status)
          status.emplace();
 
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      auto dbStatus = kv.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
       if (!dbStatus)
       {
          dbStatus.emplace();
          if (!isReadOnly)
-            db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
+            kv.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
       }
 
       current.header.producer = producer;
@@ -98,7 +109,7 @@ namespace psibase
          status->consensus.current = std::move(status->consensus.next->consensus);
          status->consensus.next.reset();
          if (!isReadOnly)
-            db.setPrevAuthServices(nullptr);
+            kv.setPrevAuthServices({});
       }
       if (singleProducer(*status, producer))
       {
@@ -116,7 +127,7 @@ namespace psibase
       }
       status->current = current.header;
       if (!isReadOnly)
-         db.kvPut(StatusRow::db, status->key(), *status);
+         kv.kvPut(StatusRow::db, status->key(), *status);
       started = true;
       active  = true;
 
@@ -133,7 +144,7 @@ namespace psibase
             "block previous does not match expected");
       check(src.header.blockNum == current.header.blockNum, "block num does not match expected");
       current.transactions = std::move(src.transactions);
-      db.kvPut(StatusRow::db, status.key(), status);
+      kv.kvPut(StatusRow::db, status.key(), status);
       active = true;
    }
 
@@ -173,7 +184,7 @@ namespace psibase
    void BlockContext::callOnBlock()
    {
       auto notifyData =
-          db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(NotifyType::acceptBlock)));
+          kv.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(NotifyType::acceptBlock)));
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
@@ -197,9 +208,9 @@ namespace psibase
 
          try
          {
-            auto session = db.startWrite(writer);
+            auto frame = consensus_tx->sub_transaction();
             tc.execNonTrxAction(0, action, atrace);
-            session.commit();
+            frame.commit();
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
             PSIBASE_LOG(trxLogger, debug) << "onBlock succeeded";
          }
@@ -215,7 +226,7 @@ namespace psibase
    void BlockContext::callOnTransaction(const Checksum256& id, const TransactionTrace& trace)
    {
       auto notifyType = trace.error ? NotifyType::rejectTransaction : NotifyType::acceptTransaction;
-      auto notifyData = db.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(notifyType)));
+      auto notifyData = kv.kvGetRaw(NotifyRow::db, psio::convert_to_key(notifyKey(notifyType)));
       if (!notifyData)
          return;
       auto notifySpan = std::span{notifyData->pos, notifyData->end};
@@ -251,9 +262,9 @@ namespace psibase
 
          try
          {
-            auto session = db.startWrite(writer);
+            auto frame = consensus_tx->sub_transaction();
             tc.execNonTrxAction(0, action, atrace);
-            session.commit();
+            frame.commit();
             BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
             PSIBASE_LOG(trxLogger, debug) << "onTransaction succeeded";
          }
@@ -285,7 +296,7 @@ namespace psibase
       if (verifyContextId)
          return *verifyContextId;
       Checksum256 result{};
-      auto        status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      auto        status = kv.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (status && status->head)
       {
          auto& services = status->consensus.next ? status->consensus.next->consensus.services
@@ -341,9 +352,9 @@ namespace psibase
 
          try
          {
-            auto session = db.startWrite(writer);
+            auto frame = consensus_tx->sub_transaction();
             tc.execNonTrxAction(0, action, atrace);
-            session.commit();
+            frame.commit();
 
             std::optional<SignedTransaction> result;
             if (!psio::from_frac(result, atrace.rawRetval))
@@ -411,9 +422,9 @@ namespace psibase
 
          try
          {
-            auto session = db.startWrite(writer);
+            auto frame = consensus_tx->sub_transaction();
             tc.execNonTrxAction(0, action, atrace);
-            session.commit();
+            frame.commit();
 
             std::optional<std::vector<std::optional<RunToken>>> result;
             if (!psio::from_frac(result, atrace.rawRetval))
@@ -481,13 +492,13 @@ namespace psibase
 
       try
       {
-         auto session = db.startWrite(writer);
+         auto frame = consensus_tx->sub_transaction();
          auto maxTime = saturatingCast<CpuClock::duration>(row.maxTime().unpack());
          tc.setWatchdog(std::max(maxTime, CpuClock::duration::zero()));
          if (row.mode() == RunMode::speculative)
          {
-            db.checkoutEmptySubjective();
-            auto _ = psio::finally{[&] { db.abortSubjective(); }};
+            kv.checkoutEmptySubjective(*writer);
+            auto _ = psio::finally{[&] { kv.abortSubjective(); }};
             tc.execNonTrxAction(0, action, atrace);
          }
          else
@@ -507,7 +518,7 @@ namespace psibase
 
       try
       {
-         auto session = db.startWrite(writer);
+         auto frame = consensus_tx->sub_transaction();
          auto token   = sha256(
              VerifyTokenData{!trace.error, row.mode(), action,
                              row.mode() == RunMode::verify ? getVerifyContextId() : Checksum256{}});
@@ -542,7 +553,7 @@ namespace psibase
       TransactionTrace  trace;
       try
       {
-         auto               session = db.startWrite(writer);
+         auto               frame = consensus_tx->sub_transaction();
          psibase::Action    action{.service = row.service(),
                                    .method  = row.method(),
                                    .rawData = psio::to_frac(std::tuple())};
@@ -565,7 +576,7 @@ namespace psibase
 
    Checksum256 BlockContext::makeEventMerkleRoot()
    {
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      auto dbStatus = kv.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
       check(!!dbStatus, "databaseStatus not set");
 
       Merkle m;
@@ -573,7 +584,7 @@ namespace psibase
                          end = dbStatus->nextMerkleEventNumber;
            i != end; ++i)
       {
-         auto data = db.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
+         auto data = kv.kvGetRaw(DbId::merkleEvent, psio::convert_to_key(i));
          m.push(EventInfo{i, std::span{data->pos, data->end}});
       }
       return m.root();
@@ -590,7 +601,7 @@ namespace psibase
    }
 
    // May start joint consensus if the set of services changed
-   void updateAuthServices(Database&   db,
+   void updateAuthServices(KVStore&    db,
                            StatusRow&  status,
                            Block&      current,
                            const auto& modifiedAuthAccounts,
@@ -710,10 +721,10 @@ namespace psibase
       check(!needGenesisAction, "missing genesis action in block");
       active = false;
 
-      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      auto status = kv.kvGet<StatusRow>(StatusRow::db, statusKey());
       check(status.has_value(), "missing status record");
 
-      updateAuthServices(db, *status, current, modifiedAuthAccounts, removedCode);
+      updateAuthServices(kv, *status, current, modifiedAuthAccounts, removedCode);
 
       if (status->consensus.next && status->consensus.next->blockNum == status->current.blockNum)
       {
@@ -738,30 +749,33 @@ namespace psibase
          status->current.commitNum = current.header.commitNum = current.header.blockNum;
       }
 
+      // Defer subjective writes until after the consensus transaction commits.
+      // Subjective kvPut calls set_root which triggers sync(), advancing
+      // _first_write_pos on the shared allocator session and making consensus
+      // nodes allocated during this transaction read-only prematurely.
+      std::optional<ConsensusChangeRow> deferredChangeRow;
       if (status->consensus.next && status->consensus.next->blockNum <= current.header.commitNum)
       {
-         ConsensusChangeRow changeRow{status->consensus.next->blockNum, current.header.commitNum,
-                                      current.header.blockNum};
-         systemContext.sharedDatabase.kvPutSubjective(*writer, ConsensusChangeRow::db,
-                                                      psio::convert_to_key(changeRow.key()),
-                                                      psio::to_frac(changeRow));
+         deferredChangeRow.emplace(ConsensusChangeRow{status->consensus.next->blockNum,
+                                                      current.header.commitNum,
+                                                      current.header.blockNum});
       }
 
       if (status->consensus.next)
       {
          if (prevAuthServices)
          {
-            db.setPrevAuthServices(prevAuthServices);
+            kv.setPrevAuthServices(prevAuthServices);
          }
-         else if (!status->consensus.current.services.empty() && !db.getPrevAuthServices())
+         else if (!status->consensus.current.services.empty() && !kv.getPrevAuthServices())
          {
             assert(status->consensus.next->blockNum == current.header.blockNum);
-            db.setPrevAuthServices(db.getBaseRevision());
+            kv.setPrevAuthServices(kv.getBaseRevision());
          }
       }
       else
       {
-         check(!db.getPrevAuthServices(),
+         check(!kv.getPrevAuthServices(),
                "prevAuthServices should not be set outside joint consensus");
       }
 
@@ -776,10 +790,10 @@ namespace psibase
       if (isGenesisBlock)
          status->chainId = status->head->blockId;
 
-      auto dbStatus = db.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
+      auto dbStatus = kv.kvGet<DatabaseStatusRow>(DatabaseStatusRow::db, databaseStatusKey());
       check(!!dbStatus, "databaseStatus not set");
       dbStatus->blockMerkleEventNumber = dbStatus->nextMerkleEventNumber;
-      db.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
+      kv.kvPut(DatabaseStatusRow::db, dbStatus->key(), *dbStatus);
 
       // These values will be replaced at the start of the next block.
       // Changing the these here gives services running in RPC mode
@@ -790,17 +804,34 @@ namespace psibase
       status->current.blockNum = status->head->header.blockNum + 1;
       status->current.time     = status->head->header.time + Seconds(1);
 
-      db.kvPut(StatusRow::db, status->key(), *status);
+      kv.kvPut(StatusRow::db, status->key(), *status);
 
       // TODO: store block proofs somewhere
       // TODO: avoid repacking
-      db.kvPut(DbId::blockLog, current.header.blockNum, current);
-      db.kvPut(DbId::blockProof, current.header.blockNum,
+      kv.kvPut(DbId::blockLog, current.header.blockNum, current);
+      kv.kvPut(DbId::blockProof, current.header.blockNum,
                prover.prove(BlockSignatureInfo(*status->head), claim));
 
       callOnBlock();
 
-      return {session.writeRevision(status->head->blockId), status->head->blockId};
+      // Capture the current tree root as the revision snapshot, then commit.
+      auto root = consensus_tx->read_cursor().get_root();
+      consensus_tx->commit();
+
+      // Store revision by blockId and update head
+      systemContext.sharedDatabase.writeRevision(*writer, status->head->blockId, root);
+      systemContext.sharedDatabase.setHead(*writer, root);
+
+      // Now safe to do subjective writes — consensus transaction is committed
+      if (deferredChangeRow)
+      {
+         systemContext.sharedDatabase.kvPutSubjective(
+             *writer, ConsensusChangeRow::db,
+             psio::convert_to_key(deferredChangeRow->key()),
+             psio::to_frac(*deferredChangeRow));
+      }
+
+      return {root, status->head->blockId};
    }
 
    void BlockContext::verifyProof(const SignedTransaction&                 trx,
@@ -925,9 +956,9 @@ namespace psibase
          // if !enableUndo then BlockContext becomes unusable if transaction fails.
          active = enableUndo;
 
-         Database::Session session;
+         std::optional<psitri::transaction_frame_ref> frame;
          if (enableUndo)
-            session = db.startWrite(writer);
+            frame.emplace(consensus_tx->sub_transaction());
 
          std::vector<std::vector<char>> result;
          {
@@ -946,7 +977,8 @@ namespace psibase
 
          if (commit)
          {
-            session.commit();
+            if (frame)
+               frame->commit();
             callOnTransaction(id, trace);
             active = true;
          }
@@ -966,7 +998,7 @@ namespace psibase
 
    psibase::BlockTime BlockContext::getHeadBlockTime()
    {
-      auto status = db.kvGet<StatusRow>(StatusRow::db, statusKey());
+      auto status = kv.kvGet<StatusRow>(StatusRow::db, statusKey());
       if (!status || !(status->head))
       {
          return psibase::TimePointSec{};

@@ -11,7 +11,7 @@ namespace psibase
 {
    struct NativeFunctions
    {
-      Database&           database;
+      KVStore&            database;
       TransactionContext& transactionContext;
       const DbMode&       dbMode;
       CodeRow             code               = {};

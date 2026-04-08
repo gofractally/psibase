@@ -5,16 +5,17 @@
 #include <psibase/SystemContext.hpp>
 #include <psibase/log.hpp>
 #include <psibase/trace.hpp>
+#include <psitri/transaction.hpp>
 
 namespace psibase
 {
    struct BlockContext
    {
-      SystemContext&    systemContext;
-      Database          db;
-      WriterPtr         writer;
-      Database::Session session;
-      Block             current;
+      SystemContext&                   systemContext;
+      KVStore                          kv;
+      WriterPtr                        writer;
+      std::optional<psitri::transaction> consensus_tx;
+      Block                            current;
       bool              isProducing       = false;
       bool              isReadOnly        = false;
       bool              isGenesisBlock    = false;
@@ -31,13 +32,13 @@ namespace psibase
 
       loggers::common_logger trxLogger;
 
-      BlockContext(SystemContext&                  systemContext,
-                   std::shared_ptr<const Revision> revision,
-                   WriterPtr                       writer,
-                   bool                            isProducing);
+      BlockContext(SystemContext&  systemContext,
+                   ConstRevisionPtr revision,
+                   WriterPtr        writer,
+                   bool             isProducing);
 
-      BlockContext(SystemContext&                  systemContext,
-                   std::shared_ptr<const Revision> revision);  // Read-only mode
+      BlockContext(SystemContext&    systemContext,
+                   ConstRevisionPtr revision);  // Read-only mode
 
       void checkActive() { check(active, "block is not active"); }
 
@@ -61,7 +62,7 @@ namespace psibase
       std::pair<ConstRevisionPtr, Checksum256> writeRevision(
           const Prover&,
           const Claim&,
-          const ConstRevisionPtr& prevAuthServices = nullptr);
+          const ConstRevisionPtr& prevAuthServices = {});
 
       void verifyProof(const SignedTransaction&                 trx,
                        TransactionTrace&                        trace,

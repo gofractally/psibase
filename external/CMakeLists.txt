@@ -29,6 +29,8 @@ if(IS_NATIVE)
     set(CMAKE_CURRENT_SOURCE_DIR ${PREV_SOURCE_DIR})
     add_subdirectory(eos-vm)
 
+    # PsiTri — persistent key-value store (replaces triedent)
+    add_subdirectory(psitri EXCLUDE_FROM_ALL)
 endif()
 
 if(IS_WASM)

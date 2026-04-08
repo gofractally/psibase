@@ -43,7 +43,7 @@ namespace psibase
    }
 
    // Only useful for genesis
-   void setCode(Database&          database,
+   void setCode(KVStore&           database,
                 AccountNumber      service,
                 uint8_t            vmType,
                 uint8_t            vmVersion,
@@ -184,13 +184,11 @@ namespace psibase
                            const VMOptions&    vmOptions,
                            ExecutionMemory&    memory,
                            AccountNumber       service)
-          : NativeFunctions{transactionContext.blockContext.db, transactionContext,
+          : NativeFunctions{transactionContext.blockContext.kv, transactionContext,
                             transactionContext.dbMode},
             vmOptions{vmOptions},
             wa{memory.impl->wa}
       {
-         database.checkoutSubjective();
-         psio::finally _{[&] { database.abortSubjective(); }};
          auto [ca, db] = getCode(service);
 
          code   = std::move(ca);

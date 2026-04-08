@@ -197,10 +197,9 @@ namespace psibase
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "ConfigRow has incorrect key");
 
-         // Both of these are on the conservative side for triedent. The actual
-         // max values are odd.
-         check(row.maxKeySize <= 128, "maxKeySize too big for triedent");
-         check(row.maxValueSize <= (15 << 20), "maxValueSize too big for triedent");
+         // Conservative limits for the key-value store
+         check(row.maxKeySize <= 128, "maxKeySize too big");
+         check(row.maxValueSize <= (15 << 20), "maxValueSize too big");
       }
 
       void verifyWasmConfigRow(NativeTableNum     table,
@@ -222,7 +221,7 @@ namespace psibase
          // The notifyTable is only processed subjectively
       }
 
-      void verifySubjectiveNotifyTableRow(Database&          db,
+      void verifySubjectiveNotifyTableRow(KVStore&           db,
                                           psio::input_stream key,
                                           psio::input_stream value)
       {
@@ -248,7 +247,7 @@ namespace psibase
                "CodeRow has incorrect key");
       }
 
-      void verifySubjectiveRunTableRow(Database&          db,
+      void verifySubjectiveRunTableRow(KVStore&           db,
                                        psio::input_stream key,
                                        psio::input_stream value)
       {
@@ -275,7 +274,7 @@ namespace psibase
 
       void verifySocketRow(TransactionContext& tc, psio::input_stream key, psio::input_stream value)
       {
-         auto existing = tc.blockContext.db.kvGetRaw(DbId::nativeSession, key);
+         auto existing = tc.blockContext.kv.kvGetRaw(DbId::nativeSession, key);
          if (!existing)
             abortMessage("Cannot write a new socket");
          auto old = psio::view<const SocketRow>(
@@ -293,7 +292,7 @@ namespace psibase
             {
                if (oldInfo->endpoint() == newInfo->endpoint() && oldInfo->tls() == newInfo->tls())
                {
-                  auto err = tc.blockContext.db.socketEnableP2P(
+                  auto err = tc.blockContext.kv.socketEnableP2P(
                       row.fd(), *tc.blockContext.systemContext.sockets, tc.ownedSockets);
                   if (err != 0)
                      abortMessage("Socket cannot enable P2P: " + std::to_string(err));
@@ -329,7 +328,7 @@ namespace psibase
                callbacks->validateHostConfig({value.pos, value.end});
             }
          }
-         context.blockContext.db.setCallbackFlags(DatabaseCallbacks::hostConfigFlag);
+         context.blockContext.kv.setCallbackFlags(DatabaseCallbacks::hostConfigFlag);
       }
 
       void verifyPendingShutdownRow(TransactionContext& context,
@@ -342,10 +341,10 @@ namespace psibase
          check(key.remaining() == expected_key.size() &&
                    !memcmp(key.pos, expected_key.data(), key.remaining()),
                "PendingShutdownRow has incorrect key");
-         context.blockContext.db.setCallbackFlags(DatabaseCallbacks::shutdownFlag);
+         context.blockContext.kv.setCallbackFlags(DatabaseCallbacks::shutdownFlag);
       }
 
-      void verifyTimerRow(Database& db, psio::input_stream key, psio::input_stream value)
+      void verifyTimerRow(KVStore& db, psio::input_stream key, psio::input_stream value)
       {
          if (psio::fracpack_validate<TimerRow>({value.pos, value.end}))
          {
@@ -380,7 +379,7 @@ namespace psibase
             throw std::runtime_error("Unrecognized key in nativeConstrained");
       }
 
-      void verifyWriteSubjective(Database& db, psio::input_stream key, psio::input_stream value)
+      void verifyWriteSubjective(KVStore& db, psio::input_stream key, psio::input_stream value)
       {
          NativeTableNum table;
          check(key.remaining() >= sizeof(table), "Unrecognized key in nativeSubjective");
@@ -415,7 +414,7 @@ namespace psibase
          else if (table == pendingShutdownTable)
             verifyPendingShutdownRow(context, key, value);
          else if (table == timerTable)
-            verifyTimerRow(context.blockContext.db, key, value);
+            verifyTimerRow(context.blockContext.kv, key, value);
          else
             throw std::runtime_error("Unrecognized key in nativeSession");
       }
@@ -457,7 +456,7 @@ namespace psibase
          return self.result_value.size();
       }
 
-      uint32_t setResult(NativeFunctions& self, const std::optional<Database::KVResult>& o)
+      uint32_t setResult(NativeFunctions& self, const std::optional<KVStore::KVResult>& o)
       {
          if (!o)
             return clearResult(self);
@@ -1013,7 +1012,7 @@ namespace psibase
 
    void NativeFunctions::checkoutSubjective()
    {
-      database.checkoutSubjective();
+      database.checkoutSubjective(*transactionContext.blockContext.writer, transactionContext.blockContext.systemContext.sharedDatabase);
    }
    bool NativeFunctions::commitSubjective()
    {

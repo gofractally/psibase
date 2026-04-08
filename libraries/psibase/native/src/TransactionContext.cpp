@@ -64,7 +64,7 @@ namespace psibase
       if (blockContext.writer)
       {
          ownedSockets.close(*blockContext.writer, *blockContext.systemContext.sockets);
-         blockContext.db.clearTemporary();
+         blockContext.kv.clearTemporary();
       }
    }
 
@@ -75,7 +75,7 @@ namespace psibase
    {
       ScopedAtomic saved{impl->vmTimedOut};
       // Prepare for execution
-      auto& db         = blockContext.db;
+      auto& db         = blockContext.kv;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
@@ -110,7 +110,7 @@ namespace psibase
       atrace.action = action;
       try
       {
-         auto& db   = self.blockContext.db;
+         auto& db   = self.blockContext.kv;
          auto  data = psio::from_frac_strict<GenesisActionData>(action.rawData);
          for (auto& service : data.services)
          {
@@ -189,7 +189,7 @@ namespace psibase
                                             std::vector<char>  proof)
    {
       ScopedAtomic saved{impl->vmTimedOut};
-      auto&        db  = blockContext.db;
+      auto&        db  = blockContext.kv;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(WasmConfigRow::db,
                                                           WasmConfigRow::key(proofWasmConfigTable));
@@ -228,7 +228,7 @@ namespace psibase
                                              ActionTrace&  atrace)
    {
       ScopedAtomic saved{impl->vmTimedOut};
-      auto&        db      = blockContext.db;
+      auto&        db      = blockContext.kv;
       config               = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       auto wasmConfigTable = dbMode.verifyOnly ? proofWasmConfigTable : transactionWasmConfigTable;
       impl->wasmConfig =
@@ -332,7 +332,7 @@ namespace psibase
    void TransactionContext::execServe(const Action& action, ActionTrace& atrace)
    {
       ScopedAtomic saved{impl->vmTimedOut};
-      auto&        db  = blockContext.db;
+      auto&        db  = blockContext.kv;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
@@ -359,7 +359,7 @@ namespace psibase
                                        ActionTrace&     atrace)
    {
       ScopedAtomic saved{impl->vmTimedOut};
-      auto&        db  = blockContext.db;
+      auto&        db  = blockContext.kv;
       config           = db.kvGetOrDefault<ConfigRow>(ConfigRow::db, ConfigRow::key());
       impl->wasmConfig = db.kvGetOrDefault<WasmConfigRow>(
           WasmConfigRow::db, WasmConfigRow::key(transactionWasmConfigTable));
