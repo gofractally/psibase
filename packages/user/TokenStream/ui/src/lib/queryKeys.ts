@@ -1,4 +1,4 @@
-import { Account } from "./types/account";
+import { type Account } from "@shared/lib/schemas/account";
 
 type QueryKeyGenerator<Prefix extends string = string> = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,7 +10,6 @@ export type OptionalString = string | undefined | null;
 
 const QueryKey = {
     streams: () => ["streams"] as const,
-    currentUser: () => ["currentUser"] as const,
     token: (id: OptionalString) => ["token", id] as const,
     stream: (id: OptionalString) => ["streams", id] as const,
     nft: (id: OptionalString) => ["nft", id] as const,

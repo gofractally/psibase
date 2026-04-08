@@ -1,31 +1,22 @@
-import { Account } from "./zod/Account";
-
 type QueryKeyGenerator<Prefix extends string = string> = (
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...args: any[]
 ) => readonly [prefix: Prefix, ...specifiers: unknown[]];
 
 const QueryKey = {
-    currentUser: () => ["currentUser"] as const,
-    virtualServer: () => ["virtualServer"] as const,
-    branding: () => ["branding"] as const,
-    snapshotSeconds: () => ["snapshotSeconds"] as const,
-    brandingFiles: () => ["brandingFiles"] as const,
-    chainId: () => ["chainId"] as const,
-    connectedAccounts: () => ["connectedAccounts"] as const,
-    virtualServerResources: () => ["virtualServer", "resources"] as const,
-    virtualServerPricing: () => ["virtualServer", "pricing"] as const,
     availablePackages: () => ["availablePackages"] as const,
+    brandingFiles: () => ["brandingFiles"] as const,
+    candidates: () => ["candidates"] as const,
     installedPackages: () => ["installedPackages"] as const,
-    stagedTransactions: () => ["stagedTransactions"] as const,
+    snapshotSeconds: () => ["snapshotSeconds"] as const,
+    sources: () => ["sources"] as const,
     stagedTransaction: (id: number) => ["stagedTransactions", id] as const,
-    stagedTransactionsByUser: (account: Account) =>
-        ["stagedTransactionsByUser", account] as const,
+    stagedTransactions: () => ["stagedTransactions"] as const,
     transactionHistory: (id: string | undefined | null) =>
         ["transactionHistory", id] as const,
-    sources: () => ["sources"] as const,
-    candidates: () => ["candidates"] as const,
-    tokens: () => ["tokens"] as const,
+    virtualServer: () => ["virtualServer"] as const,
+    virtualServerPricing: () => ["virtualServer", "pricing"] as const,
+    virtualServerResources: () => ["virtualServer", "resources"] as const,
     premiumNameMarkets: () =>
         ["nameMarketParams"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;

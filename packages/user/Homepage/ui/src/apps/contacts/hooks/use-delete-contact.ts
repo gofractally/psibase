@@ -1,18 +1,16 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
-import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
 import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
 
 import { removeUserFromCache } from "@shared/hooks/use-contacts";
+import { type Account, zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useDeleteContact = () =>
     useMutation({
-        mutationFn: async (account: z.infer<typeof zAccount>) => {
+        mutationFn: async (account: Account) => {
             await supervisor.functionCall({
                 service: zAccount.parse("profiles"),
                 method: "remove",
@@ -20,10 +18,10 @@ export const useDeleteContact = () =>
                 intf: "contacts",
             });
         },
-        onSuccess: (_, account) => {
+        onSuccess: (_data, account, _onMutateResult, context) => {
             toast.success(`Contact removed: ${account}`);
             const currentUser = zAccount.parse(
-                queryClient.getQueryData(QueryKey.currentUser()),
+                context.client.getQueryData(QueryKey.currentUser()),
             );
             removeUserFromCache(currentUser, account);
         },

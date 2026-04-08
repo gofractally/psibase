@@ -1,17 +1,20 @@
+import type { CpuPricing, NetPricing } from "@/hooks/use-resource-pricing";
+
 import { useEffect, useMemo } from "react";
 
-import { Label } from "@shared/shadcn/ui/label";
-import { useAppForm } from "@shared/components/form/app-form";
+import { TimeUnitSelect } from "@/components/unit-select";
+
 import { useSetCpuPricingParams } from "@/hooks/use-set-cpu-pricing-params";
 import { useSetNetPricingParams } from "@/hooks/use-set-net-pricing-params";
 import {
     type RateTimeUnit,
-    getBestRateTimeUnit,
-    convertRateTimeUnit,
     TIME_FACTORS,
+    convertRateTimeUnit,
+    getBestRateTimeUnit,
 } from "@/lib/unit-conversions";
-import type { CpuPricing, NetPricing } from "@/hooks/use-resource-pricing";
-import { TimeUnitSelect } from "@/components/unit-select";
+
+import { useAppForm } from "@shared/components/form/app-form";
+import { Label } from "@shared/shadcn/ui/label";
 
 interface PricingFormValues {
     halvingTimeUnit: RateTimeUnit;
@@ -61,7 +64,9 @@ function getInitialFormValues(
             "sec",
             initialDoubling.unit,
         ).toString(),
-        idleThreshold: Math.round(parseFloat(pricing.thresholds.idlePct) || 0).toString(),
+        idleThreshold: Math.round(
+            parseFloat(pricing.thresholds.idlePct) || 0,
+        ).toString(),
         congestedThreshold: Math.round(
             parseFloat(pricing.thresholds.congestedPct) || 0,
         ).toString(),
@@ -116,7 +121,8 @@ export const PricingSection = ({
 
             const idlePct = (formValues.idleThreshold || "0").trim();
             const congestedPct = (formValues.congestedThreshold || "0").trim();
-            const numBlocksToAverage = Number(formValues.averageWindowSize) || 0;
+            const numBlocksToAverage =
+                Number(formValues.averageWindowSize) || 0;
 
             if (isCpu) {
                 const minBillableUnitNs = Math.floor(
@@ -184,7 +190,9 @@ export const PricingSection = ({
                 <div className="mb-4">
                     <h3 className="text-base font-medium">{title}</h3>
                 </div>
-                <p className="text-muted-foreground text-sm">No pricing data available</p>
+                <p className="text-muted-foreground text-sm">
+                    No pricing data available
+                </p>
             </div>
         );
     }
@@ -218,14 +226,20 @@ export const PricingSection = ({
                                                 />
                                                 <div className="mt-2">
                                                     <TimeUnitSelect
-                                                        value={unitField.state.value}
+                                                        value={
+                                                            unitField.state
+                                                                .value
+                                                        }
                                                         onChange={(newUnit) => {
                                                             const val =
                                                                 Number(
-                                                                    valueField.state.value,
+                                                                    valueField
+                                                                        .state
+                                                                        .value,
                                                                 ) || 0;
                                                             const oldUnit =
-                                                                unitField.state.value;
+                                                                unitField.state
+                                                                    .value;
                                                             const inSec =
                                                                 convertRateTimeUnit(
                                                                     val,
@@ -268,14 +282,20 @@ export const PricingSection = ({
                                                 />
                                                 <div className="mt-2">
                                                     <TimeUnitSelect
-                                                        value={unitField.state.value}
+                                                        value={
+                                                            unitField.state
+                                                                .value
+                                                        }
                                                         onChange={(newUnit) => {
                                                             const val =
                                                                 Number(
-                                                                    valueField.state.value,
+                                                                    valueField
+                                                                        .state
+                                                                        .value,
                                                                 ) || 0;
                                                             const oldUnit =
-                                                                unitField.state.value;
+                                                                unitField.state
+                                                                    .value;
                                                             const inSec =
                                                                 convertRateTimeUnit(
                                                                     val,

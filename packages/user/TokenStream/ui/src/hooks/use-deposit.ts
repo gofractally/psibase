@@ -1,12 +1,10 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
-
-import { supervisor } from "@/supervisor";
 
 import { TOKEN_STREAM } from "@/lib/constants";
 import QueryKey from "@/lib/queryKeys";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 const zParams = z.object({
@@ -22,22 +20,21 @@ export const useDeposit = () =>
         mutationFn: async (params) => {
             const { amount, nftId, tokenId, memo } = zParams.parse(params);
 
-            const toastId = toast.loading("Depositing...");
-
             await supervisor.functionCall({
                 method: "deposit",
                 params: [nftId, tokenId, amount, memo],
                 service: TOKEN_STREAM,
                 intf: "api",
             });
-
-            toast.success(`Deposited into stream.`, {
-                id: toastId,
-            });
         },
-        onSuccess: (_, { nftId }) => {
-            queryClient.refetchQueries({
+        onSuccess: (_, { nftId }, _result, ctx) => {
+            ctx.client.invalidateQueries({
                 queryKey: QueryKey.stream(nftId),
             });
+
+            toast.success("Deposited into stream.");
+        },
+        onError: (error) => {
+            toast.error(error.message);
         },
     });

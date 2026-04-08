@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import { zAccount } from "./zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 const zPackageSource = z
     .object({

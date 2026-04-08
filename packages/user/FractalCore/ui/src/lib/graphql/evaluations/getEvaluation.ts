@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { zUnix } from "@/lib/zod/Unix";
+import { zUnix } from "@shared/lib/schemas/unix";
 
 import {
     EVALUATIONS_SERVICE,

@@ -1,9 +1,11 @@
-import { queryClient } from "@/queryClient";
+import type { TxStatus } from "@/lib/checkStaging";
+
 import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
 
+import { queryClient } from "@shared/lib/query-client";
+
 import { usePluginMutation } from "./use-plugin-mutation";
-import type { TxStatus } from "@/lib/checkStaging";
 
 export const useSetLogo = () =>
     usePluginMutation<[Uint8Array]>(
@@ -19,7 +21,9 @@ export const useSetLogo = () =>
             isStagable: true,
             onSuccess: (_params, status: TxStatus) => {
                 if (status.type === "executed") {
-                    queryClient.invalidateQueries({ queryKey: QueryKey.brandingFiles() });
+                    queryClient.invalidateQueries({
+                        queryKey: QueryKey.brandingFiles(),
+                    });
                 }
             },
         },

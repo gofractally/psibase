@@ -1,9 +1,10 @@
 import { queryKeys } from "@/lib/queryKeys";
 
+import { queryClient } from "@shared/lib/query-client";
+
 import { Schema, UrlForm } from "../../components/forms/url";
 import { useToast } from "../../components/ui/use-toast";
 import { useConnect } from "../../hooks/useConnect";
-import { queryClient } from "../../main";
 
 interface Props {
     onConnection: () => void;

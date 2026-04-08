@@ -202,6 +202,8 @@ export const CreatePage = () => {
         },
         packages,
     );
+    const devTemplate = packages.find((pack) => pack.name === "DevDefault");
+    const prodTemplate = packages.find((pack) => pack.name === "ProdWithFG");
 
     const [
         { dependencies, show: showDependencyDialog, removingPackage },
@@ -374,7 +376,19 @@ export const CreatePage = () => {
                             <h1 className="mb-4 scroll-m-20 text-3xl font-extrabold tracking-tight lg:text-4xl">
                                 Boot template
                             </h1>
-                            <ChainTypeForm form={chainTypeForm} next={next} />
+                            {devTemplate &&
+                                prodTemplate && (
+                                    <ChainTypeForm
+                                        form={chainTypeForm}
+                                        next={next}
+                                        devTemplateDescription={
+                                            devTemplate.description
+                                        }
+                                        prodTemplateDescription={
+                                            prodTemplate.description
+                                        }
+                                    />
+                                )}
                         </div>
                     )}
                     {currentStep === Step.BlockProducer && (

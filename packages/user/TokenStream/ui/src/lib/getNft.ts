@@ -1,9 +1,7 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { graphql } from "./graphql";
-import { zAccount } from "./types/account";
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
 
 export const zNft = z.object({
     id: z.number().int().positive(),
@@ -24,7 +22,7 @@ export const getNft = async (nftId: number) => {
                 }
             }
         `,
-        siblingUrl(null, "nft", "/graphql"),
+        { service: "nft" },
     );
 
     const response = z

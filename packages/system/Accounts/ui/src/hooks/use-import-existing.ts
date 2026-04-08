@@ -1,9 +1,7 @@
 import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
-
-const supervisor = getSupervisor();
+import { supervisor } from "@shared/lib/supervisor";
 
 const CredentialSchema = z.object({
     account: z.string(),

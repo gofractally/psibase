@@ -1,8 +1,7 @@
-import { siblingUrl } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
+import { graphql } from "@shared/lib/graphql";
 import QueryKey from "@/lib/queryKeys";
 import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
 
@@ -45,7 +44,7 @@ export const useConfiguredPremiumNameMarkets = () =>
             `;
             const raw = await graphql(
                 query,
-                siblingUrl(null, "prem-accounts", "/graphql"),
+                { service: "prem-accounts", path: "/graphql" },
             );
             const parsed = zData.parse(raw);
             return parsed.marketParams;

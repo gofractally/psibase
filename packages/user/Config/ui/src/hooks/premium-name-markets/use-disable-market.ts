@@ -1,5 +1,5 @@
 import { zAccount } from "@shared/lib/schemas/account";
-import { queryClient } from "@/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 
 import QueryKey from "@/lib/queryKeys";
 

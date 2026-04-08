@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-import { siblingUrl } from "@psibase/common-lib";
-
-import { graphql } from "./graphql";
+import { graphql } from "@shared/lib/graphql";
 
 export const zToken = z.object({
     precision: z.number().int(),
@@ -17,7 +15,7 @@ export const getToken = async (tokenId: string) => {
                 }
             }
         `,
-        siblingUrl(null, "tokens", "/graphql"),
+        { service: "tokens" },
     );
 
     const response = z

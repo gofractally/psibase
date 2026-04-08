@@ -7,7 +7,7 @@ import {
     UsersAndGroups,
     zResult,
 } from "./graphql/evaluations/getUsersAndGroups";
-import { zUnix } from "./zod/Unix";
+import { zUnix } from "@shared/lib/schemas/unix";
 
 const zTimeStatus = z.enum([
     "PENDING",

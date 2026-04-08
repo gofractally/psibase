@@ -1,8 +1,7 @@
 import { z } from "zod";
 
-import { zAccount } from "@/lib/zod/Account";
-
-import { graphql } from "../graphql";
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
 
 const zProducer = z.object({
     name: zAccount,
@@ -27,16 +26,14 @@ export const getProducers = async () => {
                 }
             }
         `,
-        "producers",
+        { service: "producers" },
     );
 
     const response = z
         .object({
-            data: z.object({
-                producers: z.array(zProducer),
-            }),
+            producers: z.array(zProducer),
         })
         .parse(producers);
 
-    return response.data.producers;
+    return response.producers;
 };

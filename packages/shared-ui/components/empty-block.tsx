@@ -14,6 +14,7 @@ interface Props {
         Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
     >;
     iconClass?: string;
+    disabled?: boolean;
 }
 
 export const EmptyBlock = ({
@@ -24,6 +25,7 @@ export const EmptyBlock = ({
     isLoading = false,
     Icon = FilePlus2,
     iconClass = "",
+    disabled = false,
 }: Props) => {
     if (isLoading) {
         return <Skeleton className="h-[450px] w-full rounded-md" />;
@@ -41,6 +43,7 @@ export const EmptyBlock = ({
                 )}
                 {onButtonClick && (
                     <Button
+                        disabled={disabled}
                         size="lg"
                         className="mt-4"
                         onClick={() => {

@@ -1,14 +1,12 @@
 import { z } from "zod";
 
-import { getSupervisor } from "@psibase/common-lib";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const getProposal = async (
     owner: string,
     evaluationId: number,
     groupId: number,
 ) => {
-    const supervisor = getSupervisor();
-
     const pars = {
         method: "getProposal",
         params: [owner, evaluationId, groupId],

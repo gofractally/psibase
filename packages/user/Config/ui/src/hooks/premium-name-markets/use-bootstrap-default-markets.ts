@@ -1,13 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 import { checkLastTx } from "@/lib/checkStaging";
 import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
 import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
 import { zAccount } from "@shared/lib/schemas/account";
-import { queryClient } from "@/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 
 import QueryKey from "@/lib/queryKeys";
 
@@ -17,12 +17,12 @@ const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
 
 export const useBootstrapDefaultPremiumNameMarkets = () => {
     const navigate = useNavigate();
-    const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH}–${MAX_PREMIUM_NAME_LENGTH}`;
+    const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH}-${MAX_PREMIUM_NAME_LENGTH}`;
 
-    return useMutation({
+    return useMutation<void, Error, void, string | number>({
         mutationKey: [
             PREM_ACCOUNTS,
-            "market-admin",
+            "marketAdmin",
             "bootstrapDefaultPremiumNameMarkets",
         ] as const,
         onMutate: (): string | number =>
@@ -44,14 +44,13 @@ export const useBootstrapDefaultPremiumNameMarkets = () => {
                 });
             }
         },
-        onError: (errorObj, _vars, id) => {
+        onError: (errorObj: Error, _vars: unknown) => {
             console.error({ errorObj }, "bootstrap default premium name markets");
             toast.error("Failed to configure default premium name markets", {
                 description:
                     errorObj instanceof Error
                         ? errorObj.message
                         : String(errorObj),
-                id,
             });
         },
         onSuccess: async (_data, _vars, id) => {

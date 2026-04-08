@@ -1,8 +1,33 @@
-import { useMemo } from "react";
-import type React from "react";
-import z from "zod";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Info } from "lucide-react";
+import { useMemo } from "react";
+import z from "zod";
 
+import {
+    PerBlockSysCpuUnitSelect,
+    StorageUnitSelect,
+} from "@/components/unit-select";
+
+import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
+import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
+import { useVirtualServerResources } from "@/hooks/use-virtual-server-resources";
+import {
+    STORAGE_FACTORS,
+    type StorageUnit,
+    TIME_FACTORS,
+    type TimeUnit,
+    getBestStorageUnit,
+    getBestTimeUnit,
+} from "@/lib/unit-conversions";
+
+import { useAppForm } from "@shared/components/form/app-form";
+import { parseError } from "@shared/lib/parseErrorMessage";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@shared/shadcn/ui/accordion";
 import { Button } from "@shared/shadcn/ui/button";
 import { Label } from "@shared/shadcn/ui/label";
 import {
@@ -10,28 +35,6 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@shared/shadcn/ui/accordion";
-
-import { useAppForm } from "@shared/components/form/app-form";
-import { useSetNetworkVariables } from "@/hooks/use-set-network-variables";
-import { useSetServerSpecs } from "@/hooks/use-set-server-specs";
-import { useVirtualServerResources } from "@/hooks/use-virtual-server-resources";
-
-import { parseError } from "@shared/lib/parseErrorMessage";
-import {
-    STORAGE_FACTORS,
-    TIME_FACTORS,
-    getBestStorageUnit,
-    getBestTimeUnit,
-    type StorageUnit,
-    type TimeUnit,
-} from "@/lib/unit-conversions";
-import { PerBlockSysCpuUnitSelect, StorageUnitSelect } from "@/components/unit-select";
 
 /** Pattern for partial decimal input (e.g. ".", ".5", "0.") while typing */
 const PARTIAL_DECIMAL = /^\d*\.?\d*$/;
@@ -87,21 +90,28 @@ export const VirtualServer = () => {
         if (serverSpecs && networkVariables) {
             // Convert bits/sec to Gbps: divide by 1e9
             const netBpsGbps = (serverSpecs.netBps / 1_000_000_000).toString();
-            
+
             // Auto-select best storage unit for storageBytes
-            const storageUnitData = getBestStorageUnit(serverSpecs.storageBytes);
-            
+            const storageUnitData = getBestStorageUnit(
+                serverSpecs.storageBytes,
+            );
+
             // Auto-select best time unit for perBlockSysCpuNs
-            const timeUnitData = getBestTimeUnit(networkVariables.perBlockSysCpuNs);
-            
+            const timeUnitData = getBestTimeUnit(
+                networkVariables.perBlockSysCpuNs,
+            );
+
             // Auto-select best storage unit for objStorageBytes
-            const objStorageUnitData = getBestStorageUnit(networkVariables.objStorageBytes);
+            const objStorageUnitData = getBestStorageUnit(
+                networkVariables.objStorageBytes,
+            );
 
             return {
                 netGbps: netBpsGbps,
                 storageAmount: storageUnitData.value.toString(),
                 storageUnit: storageUnitData.unit,
-                blockReplayFactor: networkVariables.blockReplayFactor.toString(),
+                blockReplayFactor:
+                    networkVariables.blockReplayFactor.toString(),
                 perBlockSysCpu: timeUnitData.value.toString(),
                 perBlockSysCpuUnit: timeUnitData.unit,
                 objStorageAmount: objStorageUnitData.value.toString(),
@@ -123,14 +133,26 @@ export const VirtualServer = () => {
 
     // Zod schemas for validation
     const serverSpecsSchema = z.object({
-        netGbps: z.coerce.number().nonnegative("Net Bandwidth must be a positive number"),
-        storageAmount: z.coerce.number().nonnegative("Storage must be a positive number"),
+        netGbps: z.coerce
+            .number()
+            .nonnegative("Net Bandwidth must be a positive number"),
+        storageAmount: z.coerce
+            .number()
+            .nonnegative("Storage must be a positive number"),
     });
 
     const networkVariablesSchema = z.object({
-        blockReplayFactor: z.coerce.number().int().min(0).max(255, "Block replay factor must be between 0 and 255"),
-        perBlockSysCpu: z.coerce.number().nonnegative("Per-block system CPU must be a positive number"),
-        objStorageAmount: z.coerce.number().nonnegative("Objective storage must be a positive number"),
+        blockReplayFactor: z.coerce
+            .number()
+            .int()
+            .min(0)
+            .max(255, "Block replay factor must be between 0 and 255"),
+        perBlockSysCpu: z.coerce
+            .number()
+            .nonnegative("Per-block system CPU must be a positive number"),
+        objStorageAmount: z.coerce
+            .number()
+            .nonnegative("Objective storage must be a positive number"),
     });
 
     const form = useAppForm({
@@ -154,7 +176,8 @@ export const VirtualServer = () => {
 
             // Convert storage value from selected unit to bytes
             const storageBytesValue = Math.floor(
-                parsedSpecs.storageAmount * STORAGE_FACTORS[data.value.storageUnit]
+                parsedSpecs.storageAmount *
+                    STORAGE_FACTORS[data.value.storageUnit],
             );
 
             // Submit server specs
@@ -167,12 +190,14 @@ export const VirtualServer = () => {
 
             // Convert per-block system CPU from selected unit to nanoseconds
             const perBlockSysCpuNsValue = Math.floor(
-                parsedVars.perBlockSysCpu * TIME_FACTORS[data.value.perBlockSysCpuUnit]
+                parsedVars.perBlockSysCpu *
+                    TIME_FACTORS[data.value.perBlockSysCpuUnit],
             );
 
             // Convert obj storage value from selected unit to bytes
             const objStorageBytesValue = Math.floor(
-                parsedVars.objStorageAmount * STORAGE_FACTORS[data.value.objStorageUnit]
+                parsedVars.objStorageAmount *
+                    STORAGE_FACTORS[data.value.objStorageUnit],
             );
 
             // Submit network variables
@@ -201,7 +226,7 @@ export const VirtualServer = () => {
             <Label>{label}</Label>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                    <Info className="text-muted-foreground h-3 w-3 cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>{tooltip}</TooltipContent>
             </Tooltip>
@@ -217,8 +242,9 @@ export const VirtualServer = () => {
 
     const updateButton = (
         <div className="mt-1 flex flex-row font-medium">
-            <form.Subscribe selector={(state) => [state.canSubmit, state.isDirty]}>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <form.Subscribe
+                selector={(state) => [state.canSubmit, state.isDirty]}
+            >
                 {([canSubmit, isDirty]: any) => (
                     <Button type="submit" disabled={!isDirty || !canSubmit}>
                         Update
@@ -230,338 +256,406 @@ export const VirtualServer = () => {
 
     return (
         <form.AppForm>
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                form.handleSubmit();
-            }}
-        >
-            <div className="rounded-lg border p-4">
-                <div className="mb-4">
-                    <h3 className="text-base font-medium">Virtual Server</h3>
-                </div>
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    form.handleSubmit();
+                }}
+            >
+                <div className="rounded-lg border p-4">
+                    <div className="mb-4">
+                        <h3 className="text-base font-medium">
+                            Virtual Server
+                        </h3>
+                    </div>
 
-                {/* Server Specs Subsection */}
-                <div className="mb-0 border-b pb-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <form.AppField
-                            name="netGbps"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(nonNegativeNumberRefine, {
-                                        message: "Net Bandwidth must be a positive number",
-                                    }),
-                            }}
-                        >
-                            {(field) => (
-                                <div>
-                                    <LabelWithInfo
-                                        label="Net bandwidth"
-                                        tooltip="Configures the total network bandwidth available to the virtual server"
-                                    />
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <field.TextField
-                                            label={undefined}
-                                            description={undefined}
-                                            placeholder="0"
-                                            className="w-36"
+                    {/* Server Specs Subsection */}
+                    <div className="mb-0 border-b pb-4">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <form.AppField
+                                name="netGbps"
+                                validators={{
+                                    onChange: z
+                                        .string()
+                                        .refine(nonNegativeNumberRefine, {
+                                            message:
+                                                "Net Bandwidth must be a positive number",
+                                        }),
+                                }}
+                            >
+                                {(field) => (
+                                    <div>
+                                        <LabelWithInfo
+                                            label="Net bandwidth"
+                                            tooltip="Configures the total network bandwidth available to the virtual server"
                                         />
-                                        <div className="text-muted-foreground text-sm">
-                                            Gbps
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <field.TextField
+                                                label={undefined}
+                                                description={undefined}
+                                                placeholder="0"
+                                                className="w-36"
+                                            />
+                                            <div className="text-muted-foreground text-sm">
+                                                Gbps
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </form.AppField>
-                        <form.AppField
-                            name="storageAmount"
-                            validators={{
-                                onChange: z
-                                    .string()
-                                    .refine(nonNegativeNumberRefine, {
-                                        message: "Storage must be a positive number",
-                                    }),
-                            }}
-                        >
-                            {(field) => (
-                                <div>
-                                    <LabelWithInfo
-                                        label="Total storage"
-                                        tooltip="Configures the total disk space available to the virtual server"
-                                    />
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <field.TextField
-                                            label={undefined}
-                                            description={undefined}
-                                            placeholder="0"
-                                            className="w-36"
+                                )}
+                            </form.AppField>
+                            <form.AppField
+                                name="storageAmount"
+                                validators={{
+                                    onChange: z
+                                        .string()
+                                        .refine(nonNegativeNumberRefine, {
+                                            message:
+                                                "Storage must be a positive number",
+                                        }),
+                                }}
+                            >
+                                {(field) => (
+                                    <div>
+                                        <LabelWithInfo
+                                            label="Total storage"
+                                            tooltip="Configures the total disk space available to the virtual server"
                                         />
-                                        <form.Field name="storageUnit">
-                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                            {(unitField: any) => (
-                                                <div className="mt-2">
-                                                    <StorageUnitSelect
-                                                        value={unitField.state.value}
-                                                        onChange={(value) => {
-                                                            unitField.handleChange(value);
-                                                        }}
-                                                    />
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <field.TextField
+                                                label={undefined}
+                                                description={undefined}
+                                                placeholder="0"
+                                                className="w-36"
+                                            />
+                                            <form.Field name="storageUnit">
+                                                {(unitField: any) => (
+                                                    <div className="mt-2">
+                                                        <StorageUnitSelect
+                                                            value={
+                                                                unitField.state
+                                                                    .value
+                                                            }
+                                                            onChange={(
+                                                                value,
+                                                            ) => {
+                                                                unitField.handleChange(
+                                                                    value,
+                                                                );
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </form.Field>
+                                        </div>
+                                    </div>
+                                )}
+                            </form.AppField>
+                        </div>
+                    </div>
+
+                    {/* Network Variables Subsection */}
+                    <div>
+                        <Accordion type="single" collapsible>
+                            <AccordionItem value="advanced">
+                                <AccordionTrigger className="w-fit !flex-none flex-row-reverse !justify-start">
+                                    Advanced
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                    <p className="text-destructive mb-3 text-xs">
+                                        WARNING: These are advanced features;
+                                        ensure you know the implications of
+                                        changing these values!
+                                    </p>
+                                    <h4 className="mb-2 text-sm font-medium">
+                                        Network variables
+                                    </h4>
+                                    <p className="text-muted-foreground mb-4 text-sm">
+                                        These variables change how the network
+                                        specs are derived from the server specs.
+                                    </p>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <form.AppField
+                                            name="blockReplayFactor"
+                                            validators={{
+                                                onChange: z
+                                                    .string()
+                                                    .refine(
+                                                        blockReplayFactorRefine,
+                                                        {
+                                                            message:
+                                                                "Block replay factor must be an integer between 0 and 255",
+                                                        },
+                                                    ),
+                                            }}
+                                        >
+                                            {(field) => (
+                                                <field.TextField
+                                                    label="Block Replay Factor"
+                                                    description="Block replay speed compared to live network processing"
+                                                    placeholder="0-255"
+                                                    className="mt-1 w-36"
+                                                />
+                                            )}
+                                        </form.AppField>
+
+                                        <form.AppField
+                                            name="perBlockSysCpu"
+                                            validators={{
+                                                onChange: z
+                                                    .string()
+                                                    .refine(
+                                                        nonNegativeNumberRefine,
+                                                        {
+                                                            message:
+                                                                "Per-block system CPU must be a positive number",
+                                                        },
+                                                    ),
+                                            }}
+                                        >
+                                            {(field) => (
+                                                <div>
+                                                    <Label>
+                                                        Per-Block System CPU
+                                                    </Label>
+                                                    <p className="text-muted-foreground text-sm">
+                                                        CPU devoted to system
+                                                        execution
+                                                    </p>
+                                                    <div className="mt-1 flex items-center gap-2">
+                                                        <field.TextField
+                                                            label={undefined}
+                                                            description={
+                                                                undefined
+                                                            }
+                                                            placeholder="0"
+                                                            className="w-36"
+                                                        />
+                                                        <form.Field name="perBlockSysCpuUnit">
+                                                            {(
+                                                                unitField: any,
+                                                            ) => (
+                                                                <div className="mt-2">
+                                                                    <PerBlockSysCpuUnitSelect
+                                                                        value={
+                                                                            unitField
+                                                                                .state
+                                                                                .value
+                                                                        }
+                                                                        onChange={(
+                                                                            value,
+                                                                        ) => {
+                                                                            unitField.handleChange(
+                                                                                value,
+                                                                            );
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </form.Field>
+                                                    </div>
                                                 </div>
                                             )}
-                                        </form.Field>
+                                        </form.AppField>
+
+                                        <form.AppField
+                                            name="objStorageAmount"
+                                            validators={{
+                                                onChange: z
+                                                    .string()
+                                                    .refine(
+                                                        nonNegativeNumberRefine,
+                                                        {
+                                                            message:
+                                                                "Objective storage must be a positive number",
+                                                        },
+                                                    ),
+                                            }}
+                                        >
+                                            {(field) => (
+                                                <div>
+                                                    <Label>
+                                                        Objective Storage
+                                                    </Label>
+                                                    <p className="text-muted-foreground text-sm">
+                                                        Storage devoted to
+                                                        objective state (vs
+                                                        subjective state)
+                                                    </p>
+                                                    <div className="mt-1 flex items-center gap-2">
+                                                        <field.TextField
+                                                            label={undefined}
+                                                            description={
+                                                                undefined
+                                                            }
+                                                            placeholder="0"
+                                                            className="w-36"
+                                                        />
+                                                        <form.Field name="objStorageUnit">
+                                                            {(
+                                                                unitField: any,
+                                                            ) => (
+                                                                <div className="mt-2">
+                                                                    <StorageUnitSelect
+                                                                        value={
+                                                                            unitField
+                                                                                .state
+                                                                                .value
+                                                                        }
+                                                                        onChange={(
+                                                                            value,
+                                                                        ) => {
+                                                                            unitField.handleChange(
+                                                                                value,
+                                                                            );
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </form.Field>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </form.AppField>
                                     </div>
-                                </div>
-                            )}
-                        </form.AppField>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
                     </div>
-                </div>
 
-                {/* Network Variables Subsection */}
-                <div>
-                    <Accordion
-                        type="single"
-                        collapsible
-                    >
-                        <AccordionItem value="advanced">
-                            <AccordionTrigger className="!flex-none !justify-start flex-row-reverse w-fit">
-                                Advanced
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                <p className="text-destructive text-xs mb-3">
-                                    WARNING: These are advanced features; ensure you know
-                                    the implications of changing these values!
-                                </p>
-                                <h4 className="text-sm font-medium mb-2">
-                                    Network variables
-                                </h4>
-                                <p className="text-muted-foreground text-sm mb-4">
-                                    These variables change how the network specs are derived
-                                    from the server specs.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <form.AppField
-                                        name="blockReplayFactor"
-                                        validators={{
-                                            onChange: z
-                                                .string()
-                                                .refine(blockReplayFactorRefine, {
-                                                    message: "Block replay factor must be an integer between 0 and 255",
-                                                }),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <field.TextField
-                                                label="Block Replay Factor"
-                                                description="Block replay speed compared to live network processing"
-                                                placeholder="0-255"
-                                                className="mt-1 w-36"
-                                            />
-                                        )}
-                                    </form.AppField>
+                    <>
+                        {txError && (
+                            <p className="text-destructive mt-2 text-sm">
+                                {txError}
+                            </p>
+                        )}
+                        {updateButton}
+                    </>
 
-                                    <form.AppField
-                                        name="perBlockSysCpu"
-                                        validators={{
-                                            onChange: z
-                                                .string()
-                                                .refine(nonNegativeNumberRefine, {
-                                                    message: "Per-block system CPU must be a positive number",
-                                                }),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div>
-                                                <Label>Per-Block System CPU</Label>
-                                                <p className="text-muted-foreground text-sm">
-                                                    CPU devoted to system execution
+                    {/* Network Resources Display */}
+                    <form.Subscribe selector={(state) => state.values}>
+                        {(formValues: any) => {
+                            // Helper to format numbers
+                            const formatNumber = (
+                                num: number,
+                                decimals: number = 2,
+                            ): string => {
+                                if (isNaN(num) || !isFinite(num)) return "—";
+                                return num.toFixed(decimals);
+                            };
+
+                            // Convert form values to base units (bytes, nanoseconds)
+                            const getStorageBytes = (): number => {
+                                const value = parseFloat(
+                                    formValues.storageAmount || "0",
+                                );
+                                if (isNaN(value)) return 0;
+                                const unit = (formValues.storageUnit ||
+                                    "GB") as StorageUnit;
+                                return value * STORAGE_FACTORS[unit];
+                            };
+
+                            const getObjStorageBytes = (): number => {
+                                const value = parseFloat(
+                                    formValues.objStorageAmount || "0",
+                                );
+                                if (isNaN(value)) return 0;
+                                const unit = (formValues.objStorageUnit ||
+                                    "GB") as StorageUnit;
+                                return value * STORAGE_FACTORS[unit];
+                            };
+
+                            // Calculate derived values (in base units)
+                            const storageBytes = getStorageBytes();
+                            const objStorageBytes = getObjStorageBytes();
+
+                            // Server-derived values (not form state); display only
+                            // CPU / Bandwidth capacity are derived from pricing:
+                            //   capacity = availableUnits * billableUnit
+                            const cpuCapacityNs =
+                                cpuAvailableUnits * cpuBillableUnit;
+                            const cpuForTxDisplay =
+                                getBestTimeUnit(cpuCapacityNs);
+
+                            const netCapacityBps =
+                                netAvailableUnits * netBillableUnit;
+                            const netGbps = netCapacityBps / 1_000_000_000;
+
+                            const objStorageDisplay =
+                                getBestStorageUnit(objStorageBytes);
+                            const subjectiveStorageBytes = Math.max(
+                                0,
+                                storageBytes - objStorageBytes,
+                            );
+                            const subjectiveStorageDisplay = getBestStorageUnit(
+                                subjectiveStorageBytes,
+                            );
+
+                            return (
+                                <div className="mt-2 border-t pt-2">
+                                    <div className="m-1 rounded border p-2">
+                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <div className="col-span-1 md:col-span-2">
+                                                <div className="text-sm">
+                                                    Billable Resources
+                                                </div>
+                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                    These values are
+                                                    automatically computed and
+                                                    take into account many
+                                                    variables, such as the
+                                                    virtual server specs,
+                                                    advanced variables, number
+                                                    of infrastructure providers,
+                                                    etc.
                                                 </p>
-                                                <div className="mt-1 flex items-center gap-2">
-                                                    <field.TextField
-                                                        label={undefined}
-                                                        description={undefined}
-                                                        placeholder="0"
-                                                        className="w-36"
-                                                    />
-                                                    <form.Field name="perBlockSysCpuUnit">
-                                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                                        {(unitField: any) => (
-                                                            <div className="mt-2">
-                                                                <PerBlockSysCpuUnitSelect
-                                                                    value={unitField.state.value}
-                                                                    onChange={(value) => {
-                                                                        unitField.handleChange(value);
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </form.Field>
+                                            </div>
+
+                                            {/* Row 1 (desktop): Objective / Subjective storage */}
+                                            <div className="text-sm">
+                                                <div>
+                                                    <span className="text-muted-foreground">
+                                                        Objective Storage:
+                                                    </span>{" "}
+                                                    {`${formatNumber(objStorageDisplay.value)} ${objStorageDisplay.unit}`}
                                                 </div>
                                             </div>
-                                        )}
-                                    </form.AppField>
 
-                                    <form.AppField
-                                        name="objStorageAmount"
-                                        validators={{
-                                            onChange: z
-                                                .string()
-                                                .refine(nonNegativeNumberRefine, {
-                                                    message: "Objective storage must be a positive number",
-                                                }),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div>
-                                                <Label>Objective Storage</Label>
-                                                <p className="text-muted-foreground text-sm">
-                                                    Storage devoted to objective state (vs subjective
-                                                    state)
-                                                </p>
-                                                <div className="mt-1 flex items-center gap-2">
-                                                    <field.TextField
-                                                        label={undefined}
-                                                        description={undefined}
-                                                        placeholder="0"
-                                                        className="w-36"
-                                                    />
-                                                    <form.Field name="objStorageUnit">
-                                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                                        {(unitField: any) => (
-                                                            <div className="mt-2">
-                                                                <StorageUnitSelect
-                                                                    value={unitField.state.value}
-                                                                    onChange={(value) => {
-                                                                        unitField.handleChange(value);
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                        )}
-                                                    </form.Field>
+                                            <div className="text-sm">
+                                                <div>
+                                                    <span className="text-muted-foreground">
+                                                        Subjective Storage:
+                                                    </span>{" "}
+                                                    {`${formatNumber(subjectiveStorageDisplay.value)} ${subjectiveStorageDisplay.unit}`}
                                                 </div>
                                             </div>
-                                        )}
-                                    </form.AppField>
 
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                </div>
-
-                <>
-                    {txError && (
-                        <p className="text-destructive text-sm mt-2">{txError}</p>
-                    )}
-                    {updateButton}
-                </>
-
-                {/* Network Resources Display */}
-                <form.Subscribe selector={(state) => state.values}>
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {(formValues: any) => {
-                        // Helper to format numbers
-                        const formatNumber = (num: number, decimals: number = 2): string => {
-                            if (isNaN(num) || !isFinite(num)) return "—";
-                            return num.toFixed(decimals);
-                        };
-
-                        // Convert form values to base units (bytes, nanoseconds)
-                        const getStorageBytes = (): number => {
-                            const value = parseFloat(formValues.storageAmount || "0");
-                            if (isNaN(value)) return 0;
-                            const unit = (formValues.storageUnit || "GB") as StorageUnit;
-                            return value * STORAGE_FACTORS[unit];
-                        };
-
-                        const getObjStorageBytes = (): number => {
-                            const value = parseFloat(formValues.objStorageAmount || "0");
-                            if (isNaN(value)) return 0;
-                            const unit = (formValues.objStorageUnit || "GB") as StorageUnit;
-                            return value * STORAGE_FACTORS[unit];
-                        };
-
-                        
-                        // Calculate derived values (in base units)
-                        const storageBytes = getStorageBytes();
-                        const objStorageBytes = getObjStorageBytes();
-
-                        // Server-derived values (not form state); display only
-                        // CPU / Bandwidth capacity are derived from pricing:
-                        //   capacity = availableUnits * billableUnit
-                        const cpuCapacityNs = cpuAvailableUnits * cpuBillableUnit;
-                        const cpuForTxDisplay = getBestTimeUnit(cpuCapacityNs);
-
-                        const netCapacityBps = netAvailableUnits * netBillableUnit;
-                        const netGbps = netCapacityBps / 1_000_000_000;
-
-                        const objStorageDisplay = getBestStorageUnit(objStorageBytes);
-                        const subjectiveStorageBytes = Math.max(0, storageBytes - objStorageBytes);
-                        const subjectiveStorageDisplay = getBestStorageUnit(subjectiveStorageBytes);
-
-                        return (
-                            <div className="border-t mt-2 pt-2">
-                                <div className="border rounded p-2 m-1">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="col-span-1 md:col-span-2">
-                                            <div className="text-sm">Billable Resources</div>
-                                            <p className="text-muted-foreground text-xs mt-1">
-                                                These values are automatically computed and take into account many variables, such as the virtual server specs, advanced variables, number of infrastructure providers, etc.
-                                            </p>
-                                        </div>
-
-                                        {/* Row 1 (desktop): Objective / Subjective storage */}
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Objective Storage:
-                                                </span>{" "}
-                                                {`${formatNumber(objStorageDisplay.value)} ${objStorageDisplay.unit}`}
+                                            {/* Row 2 (desktop): CPU / Bandwidth */}
+                                            <div className="text-sm">
+                                                <div>
+                                                    <span className="text-muted-foreground">
+                                                        CPU for transactions:
+                                                    </span>{" "}
+                                                    {`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Subjective Storage:
-                                                </span>{" "}
-                                                {`${formatNumber(subjectiveStorageDisplay.value)} ${subjectiveStorageDisplay.unit}`}
-                                            </div>
-                                        </div>
-
-                                        {/* Row 2 (desktop): CPU / Bandwidth */}
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    CPU for transactions:
-                                                </span>{" "}
-                                                {`${formatNumber(cpuForTxDisplay.value)} ${cpuForTxDisplay.unit}`}
-                                            </div>
-                                        </div>
-
-                                        <div className="text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">Bandwidth:</span>{" "}
-                                                {`${formatNumber(netGbps)} Gbps`}
+                                            <div className="text-sm">
+                                                <div>
+                                                    <span className="text-muted-foreground">
+                                                        Bandwidth:
+                                                    </span>{" "}
+                                                    {`${formatNumber(netGbps)} Gbps`}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    }}
-                </form.Subscribe>
-            </div>
-        </form>
+                            );
+                        }}
+                    </form.Subscribe>
+                </div>
+            </form>
         </form.AppForm>
     );
 };
-
-
-
-
-
-
-
-

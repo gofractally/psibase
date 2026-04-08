@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { getSupervisor, siblingUrl } from "@psibase/common-lib";
-import { ErrorCard } from "@shared/components/error-card";
+import { siblingUrl } from "@psibase/common-lib";
 
-const supervisor = getSupervisor();
+import { ErrorCard } from "@shared/components/error-card";
+import { supervisor } from "@shared/lib/supervisor";
 
 interface PromptDetails {
     promptApp: string;
@@ -100,7 +100,12 @@ export const App = () => {
     if (error) {
         return (
             <div className="flex min-h-screen items-center justify-center">
-                <ErrorCard error={new Error(error)} title="Error" retryLabel="Go back" retry={() => window.history.back()} />
+                <ErrorCard
+                    error={new Error(error)}
+                    title="Error"
+                    retryLabel="Go back"
+                    retry={() => window.history.back()}
+                />
             </div>
         );
     }
