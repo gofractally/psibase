@@ -1,7 +1,7 @@
 import { zAccount } from "@shared/lib/schemas/account";
 import { queryClient } from "@shared/lib/query-client";
 
-import QueryKey from "@shared/lib/query-keys";
+import QueryKey from "../../lib/query-keys";
 
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 
