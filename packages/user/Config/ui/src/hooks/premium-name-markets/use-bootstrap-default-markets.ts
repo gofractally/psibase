@@ -1,82 +1,62 @@
-import { useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-
+import { queryClient } from "@shared/lib/query-client";
+import {
+    MAX_PREMIUM_NAME_LENGTH,
+    MIN_PREMIUM_NAME_LENGTH,
+    zAccount,
+} from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
-import { checkLastTx } from "@/lib/check-staging";
+import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
-import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
-import { zAccount } from "@shared/lib/schemas/account";
-import { queryClient } from "@shared/lib/query-client";
-
 import QueryKey from "@/lib/query-keys";
-
-import { toast } from "@shared/shadcn/ui/sonner";
 
 const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
 
 export const useBootstrapDefaultPremiumNameMarkets = () => {
-    const navigate = useNavigate();
     const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH}-${MAX_PREMIUM_NAME_LENGTH}`;
 
-    return useMutation<void, Error, void, string | number>({
-        mutationKey: [
-            PREM_ACCOUNTS,
-            "marketAdmin",
-            "bootstrapDefaultPremiumNameMarkets",
-        ] as const,
-        onMutate: (): string | number =>
-            toast.loading(`Configuring premium name markets ${MIN_PREMIUM_NAME_LENGTH}-9…`),
-        mutationFn: async () => {
-            for (let len = MIN_PREMIUM_NAME_LENGTH; len <= MAX_PREMIUM_NAME_LENGTH; len++) {
-                await supervisor.functionCall({
-                    service: PREM_ACCOUNTS,
-                    intf: "marketAdmin",
-                    method: "create",
-                    params: [
-                        len,
-                        PREMIUM_MARKET_DEFAULTS.initialPrice,
-                        PREMIUM_MARKET_DEFAULTS.target,
-                        PREMIUM_MARKET_DEFAULTS.floorPrice,
-                        PREMIUM_MARKET_DEFAULTS.increasePpm,
-                        PREMIUM_MARKET_DEFAULTS.decreasePpm,
-                    ],
-                });
-            }
+    return usePluginMutation<void>(
+        {
+            service: PREM_ACCOUNTS,
+            intf: "marketAdmin",
+            method: "create",
         },
-        onError: (errorObj: Error, _vars: unknown) => {
-            console.error({ errorObj }, "bootstrap default premium name markets");
-            toast.error("Failed to configure default premium name markets", {
-                description:
-                    errorObj instanceof Error
-                        ? errorObj.message
-                        : String(errorObj),
-            });
-        },
-        onSuccess: async (_data, _vars, id) => {
-            void queryClient.invalidateQueries({
-                queryKey: QueryKey.premiumNameMarkets(),
-            });
-            const lastTx = await checkLastTx();
-            if (lastTx.type == "executed") {
-                toast.success(`Premium name markets ${nameLengthRangeStr} configured`, {
-                    id,
-                    description: "Change is live.",
+        {
+            mutationKey: [
+                PREM_ACCOUNTS,
+                "marketAdmin",
+                "bootstrapDefaultPremiumNameMarkets",
+            ] as const,
+            customMutationFn: async () => {
+                for (
+                    let len = MIN_PREMIUM_NAME_LENGTH;
+                    len <= MAX_PREMIUM_NAME_LENGTH;
+                    len++
+                ) {
+                    await supervisor.functionCall({
+                        service: PREM_ACCOUNTS,
+                        intf: "marketAdmin",
+                        method: "create",
+                        params: [
+                            len,
+                            PREMIUM_MARKET_DEFAULTS.initialPrice,
+                            PREMIUM_MARKET_DEFAULTS.target,
+                            PREMIUM_MARKET_DEFAULTS.floorPrice,
+                            PREMIUM_MARKET_DEFAULTS.increasePpm,
+                            PREMIUM_MARKET_DEFAULTS.decreasePpm,
+                        ],
+                    });
+                }
+            },
+            error: "Failed to configure default premium name markets",
+            loading: `Configuring premium name markets ${nameLengthRangeStr}…`,
+            success: `Premium name markets ${nameLengthRangeStr} updated`,
+            isStagable: true,
+            onSuccess: () => {
+                void queryClient.invalidateQueries({
+                    queryKey: QueryKey.premiumNameMarkets(),
                 });
-            } else {
-                toast.success(`Premium name markets ${nameLengthRangeStr} proposed`, {
-                    id,
-                    description: "Change is proposed.",
-                    action: {
-                        label: "View",
-                        onClick: () => {
-                            navigate(
-                                `/pending-transactions/${lastTx.stagedId}`,
-                            );
-                        },
-                    },
-                });
-            }
+            },
         },
-    });
+    );
 };

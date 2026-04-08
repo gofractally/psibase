@@ -1,4 +1,4 @@
-import { ChevronDown, Plus } from "lucide-react";
+import { AlertCircle, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAddPremiumNameMarket } from "@/hooks/premium-name-markets/use-add-market";
@@ -15,6 +15,8 @@ import {
     PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
 } from "@/lib/premium-name-market-defaults";
 
+import { PageContainer } from "@shared/components/page-container";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     MAX_PREMIUM_NAME_LENGTH,
     MIN_PREMIUM_NAME_LENGTH,
@@ -26,7 +28,15 @@ import {
     AccordionItem,
     AccordionPrimitive,
 } from "@shared/shadcn/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Switch } from "@shared/shadcn/ui/switch";
@@ -69,12 +79,14 @@ function NameMarketRowPanel({
     savingLength,
     disablingLength,
     enablingLength,
+    actionsDisabled,
 }: {
     row: ConfiguredPremiumNameMarketRow;
     saveConfig: ReturnType<typeof useConfigurePremiumNameMarket>["mutate"];
     savingLength: number | null;
     disablingLength: number | null;
     enablingLength: number | null;
+    actionsDisabled: boolean;
 }) {
     const [floorPrice, setFloorPrice] = useState(row.floorPrice);
     const [targetRaw, setTargetRaw] = useState(String(row.target));
@@ -117,6 +129,7 @@ function NameMarketRowPanel({
                     onChange={(e) => setFloorPrice(e.target.value)}
                     autoComplete="off"
                     className="font-mono"
+                    disabled={actionsDisabled}
                 />
             </div>
             <div className="grid gap-2">
@@ -130,6 +143,7 @@ function NameMarketRowPanel({
                     onChange={(e) => setTargetRaw(e.target.value)}
                     autoComplete="off"
                     className="font-mono"
+                    disabled={actionsDisabled}
                 />
             </div>
             <div className="grid gap-2">
@@ -141,6 +155,7 @@ function NameMarketRowPanel({
                     onChange={(e) => setIncreasePpmRaw(e.target.value)}
                     autoComplete="off"
                     className="font-mono"
+                    disabled={actionsDisabled}
                 />
             </div>
             <div className="grid gap-2">
@@ -152,11 +167,13 @@ function NameMarketRowPanel({
                     onChange={(e) => setDecreasePpmRaw(e.target.value)}
                     autoComplete="off"
                     className="font-mono"
+                    disabled={actionsDisabled}
                 />
             </div>
             <Button
                 type="button"
                 disabled={
+                    actionsDisabled ||
                     !pricesOk ||
                     savingLength === row.length ||
                     disablingLength === row.length ||
@@ -187,6 +204,11 @@ function NameMarketRowPanel({
 }
 
 export const PremiumNameMarketConfig = () => {
+    const { data: systemToken, isLoading: systemTokenLoading } =
+        useSystemToken();
+    const hasSystemToken = Boolean(systemToken?.id);
+    const actionsDisabled = systemTokenLoading || !hasSystemToken;
+
     const {
         data: rows,
         isLoading,
@@ -266,7 +288,26 @@ export const PremiumNameMarketConfig = () => {
         parsedLength !== null &&
         (rows?.some((r) => r.length === parsedLength) ?? false);
 
+    const allLengthMarketsCreated = useMemo(() => {
+        if (isLoading || isError || !rows) {
+            return false;
+        }
+        const lengths = new Set(rows.map((r) => r.length));
+        for (
+            let len = MIN_PREMIUM_NAME_LENGTH;
+            len <= MAX_PREMIUM_NAME_LENGTH;
+            len++
+        ) {
+            if (!lengths.has(len)) {
+                return false;
+            }
+        }
+        return true;
+    }, [rows, isLoading, isError]);
+
     const canAdd =
+        !actionsDisabled &&
+        !allLengthMarketsCreated &&
         parsedLength !== null &&
         !duplicate &&
         !isAdding &&
@@ -284,23 +325,54 @@ export const PremiumNameMarketConfig = () => {
     };
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">
                     Premium Name Market Config
                 </h2>
-                <p className="text-muted-foreground text-sm">
-                    Each row is a premium account name length (1–
-                    {MAX_PREMIUM_NAME_LENGTH} characters). When you add a
-                    market, you set the initial price; it cannot be changed
-                    later. Use the switch on each row to turn purchases on or
-                    off immediately. Expand a row to edit floor price, target
-                    sales per 30-day window, and increase/decrease PPM (Save).
-                    Saving always uses a 30-day DiffAdjust window. Disabling
-                    purchases blocks new buys for that length; existing
-                    purchases can still be claimed.
-                </p>
+                <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
+                    <li>
+                        Each row is a premium account name length (1–
+                        {MAX_PREMIUM_NAME_LENGTH} characters). When you add a
+                        market, you set the initial price; it cannot be changed
+                        later.
+                    </li>
+                    <li>
+                        Use the switch on each row to turn purchases on or off
+                        immediately.
+                    </li>
+                    <li>
+                        Expand a row to edit floor price, target sales per
+                        30-day window, and increase/decrease PPM (Save). Saving
+                        always uses a 30-day DiffAdjust window.
+                    </li>
+                    <li>
+                        Disabling purchases blocks new buys for that length;
+                        existing purchases can still be claimed.
+                    </li>
+                </ul>
             </div>
+
+            {systemTokenLoading ? (
+                <p className="text-muted-foreground text-sm">
+                    Checking system token…
+                </p>
+            ) : null}
+
+            {!systemTokenLoading && !hasSystemToken ? (
+                <Alert variant="warning" className="max-w-2xl">
+                    <AlertCircle />
+                    <AlertTitle variant="warning">
+                        System token required
+                    </AlertTitle>
+                    <AlertDescription variant="warning">
+                        <p>
+                            No system token configured yet. All Premium name
+                            markets rely on a sys token for pricing.
+                        </p>
+                    </AlertDescription>
+                </Alert>
+            ) : null}
 
             {isError ? (
                 <p className="text-destructive text-sm">
@@ -309,6 +381,21 @@ export const PremiumNameMarketConfig = () => {
                         : "Could not load premium name markets."}
                 </p>
             ) : null}
+
+            <div className="flex justify-end">
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={
+                        actionsDisabled ||
+                        allLengthMarketsCreated ||
+                        bootstrapping
+                    }
+                    onClick={openAddForm}
+                >
+                    + Add market
+                </Button>
+            </div>
 
             {!isLoading && !isError && (rows?.length ?? 0) === 0 ? (
                 <div className="space-y-3 rounded-lg border border-dashed p-6">
@@ -320,7 +407,7 @@ export const PremiumNameMarketConfig = () => {
                     </p>
                     <Button
                         type="button"
-                        disabled={bootstrapping}
+                        disabled={actionsDisabled || bootstrapping}
                         onClick={() => bootstrapNameMarkets()}
                     >
                         {bootstrapping
@@ -385,7 +472,10 @@ export const PremiumNameMarketConfig = () => {
                                         >
                                             <Switch
                                                 checked={row.enabled}
-                                                disabled={toggleBusy}
+                                                disabled={
+                                                    actionsDisabled ||
+                                                    toggleBusy
+                                                }
                                                 aria-label={`Purchases for length-${row.length} names`}
                                                 onCheckedChange={(enable) => {
                                                     if (enable) {
@@ -408,6 +498,7 @@ export const PremiumNameMarketConfig = () => {
                                             savingLength={savingLength}
                                             disablingLength={disablingLength}
                                             enablingLength={enablingLength}
+                                            actionsDisabled={actionsDisabled}
                                         />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -417,121 +508,137 @@ export const PremiumNameMarketConfig = () => {
                 </div>
             ) : null}
 
-            <div className="flex justify-end">
-                <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    aria-label="Add premium market"
-                    onClick={openAddForm}
-                >
-                    <Plus className="size-4" />
-                </Button>
-            </div>
-
-            {showAdd ? (
-                <div className="flex max-w-md flex-col gap-4 rounded-lg border p-4">
-                    <h3 className="text-sm font-medium">Add market</h3>
-                    <div className="space-y-2">
-                        <Label htmlFor="new-premium-market-length">
-                            Name length (1–{MAX_PREMIUM_NAME_LENGTH})
-                        </Label>
-                        <Input
-                            id="new-premium-market-length"
-                            inputMode="numeric"
-                            autoComplete="off"
-                            maxLength={2}
-                            placeholder={`1–${MAX_PREMIUM_NAME_LENGTH}`}
-                            value={newLengthRaw}
-                            onChange={(e) => setNewLengthRaw(e.target.value)}
-                            aria-invalid={
-                                trimmedLen !== "" &&
-                                (parsedLength === null ||
-                                    duplicate ||
-                                    lengthTooLong)
-                            }
-                        />
-                        {lengthTooLong ? (
-                            <p className="text-destructive text-sm">
-                                Name length must be at most{" "}
-                                {MAX_PREMIUM_NAME_LENGTH}.
-                            </p>
-                        ) : null}
-                        {duplicate ? (
-                            <p className="text-destructive text-sm">
-                                A market for this length already exists.
-                            </p>
-                        ) : null}
-                        {trimmedLen !== "" &&
-                        parsedLength === null &&
-                        !lengthTooLong ? (
-                            <p className="text-destructive text-sm">
-                                Enter a whole number from 1 to{" "}
-                                {MAX_PREMIUM_NAME_LENGTH}.
-                            </p>
-                        ) : null}
+            <Dialog open={showAdd} onOpenChange={setShowAdd}>
+                <DialogContent className="max-w-md sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Add market</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="new-premium-market-length">
+                                Name length (1–{MAX_PREMIUM_NAME_LENGTH})
+                            </Label>
+                            <Input
+                                id="new-premium-market-length"
+                                inputMode="numeric"
+                                autoComplete="off"
+                                maxLength={2}
+                                placeholder={`1–${MAX_PREMIUM_NAME_LENGTH}`}
+                                value={newLengthRaw}
+                                onChange={(e) =>
+                                    setNewLengthRaw(e.target.value)
+                                }
+                                disabled={actionsDisabled}
+                                aria-invalid={
+                                    trimmedLen !== "" &&
+                                    (parsedLength === null ||
+                                        duplicate ||
+                                        lengthTooLong)
+                                }
+                            />
+                            {lengthTooLong ? (
+                                <p className="text-destructive text-sm">
+                                    Name length must be at most{" "}
+                                    {MAX_PREMIUM_NAME_LENGTH}.
+                                </p>
+                            ) : null}
+                            {duplicate ? (
+                                <p className="text-destructive text-sm">
+                                    A market for this length already exists.
+                                </p>
+                            ) : null}
+                            {trimmedLen !== "" &&
+                            parsedLength === null &&
+                            !lengthTooLong ? (
+                                <p className="text-destructive text-sm">
+                                    Enter a whole number from 1 to{" "}
+                                    {MAX_PREMIUM_NAME_LENGTH}.
+                                </p>
+                            ) : null}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="add-pm-initial">
+                                Initial price
+                            </Label>
+                            <Input
+                                id="add-pm-initial"
+                                value={addInitial}
+                                onChange={(e) => setAddInitial(e.target.value)}
+                                className="font-mono"
+                                disabled={actionsDisabled}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="add-pm-floor">Floor price</Label>
+                            <Input
+                                id="add-pm-floor"
+                                value={addFloor}
+                                onChange={(e) => setAddFloor(e.target.value)}
+                                className="font-mono"
+                                disabled={actionsDisabled}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="add-pm-target">
+                                Target sales per window
+                            </Label>
+                            <Input
+                                id="add-pm-target"
+                                inputMode="numeric"
+                                value={addTargetRaw}
+                                onChange={(e) =>
+                                    setAddTargetRaw(e.target.value)
+                                }
+                                className="font-mono"
+                                disabled={actionsDisabled}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="add-pm-inc-ppm">
+                                Increase PPM
+                            </Label>
+                            <Input
+                                id="add-pm-inc-ppm"
+                                inputMode="numeric"
+                                value={addIncreasePpmRaw}
+                                onChange={(e) =>
+                                    setAddIncreasePpmRaw(e.target.value)
+                                }
+                                autoComplete="off"
+                                className="font-mono"
+                                disabled={actionsDisabled}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="add-pm-dec-ppm">
+                                Decrease PPM
+                            </Label>
+                            <Input
+                                id="add-pm-dec-ppm"
+                                inputMode="numeric"
+                                value={addDecreasePpmRaw}
+                                onChange={(e) =>
+                                    setAddDecreasePpmRaw(e.target.value)
+                                }
+                                autoComplete="off"
+                                className="font-mono"
+                                disabled={actionsDisabled}
+                            />
+                        </div>
+                        <p className="text-muted-foreground text-sm">
+                            New markets are created with purchases enabled. You
+                            can turn them off anytime using the switch on each
+                            row.
+                        </p>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="add-pm-initial">Initial price</Label>
-                        <Input
-                            id="add-pm-initial"
-                            value={addInitial}
-                            onChange={(e) => setAddInitial(e.target.value)}
-                            className="font-mono"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="add-pm-floor">Floor price</Label>
-                        <Input
-                            id="add-pm-floor"
-                            value={addFloor}
-                            onChange={(e) => setAddFloor(e.target.value)}
-                            className="font-mono"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="add-pm-target">
-                            Target sales per window
-                        </Label>
-                        <Input
-                            id="add-pm-target"
-                            inputMode="numeric"
-                            value={addTargetRaw}
-                            onChange={(e) => setAddTargetRaw(e.target.value)}
-                            className="font-mono"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="add-pm-inc-ppm">Increase PPM</Label>
-                        <Input
-                            id="add-pm-inc-ppm"
-                            inputMode="numeric"
-                            value={addIncreasePpmRaw}
-                            onChange={(e) =>
-                                setAddIncreasePpmRaw(e.target.value)
-                            }
-                            autoComplete="off"
-                            className="font-mono"
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="add-pm-dec-ppm">Decrease PPM</Label>
-                        <Input
-                            id="add-pm-dec-ppm"
-                            inputMode="numeric"
-                            value={addDecreasePpmRaw}
-                            onChange={(e) =>
-                                setAddDecreasePpmRaw(e.target.value)
-                            }
-                            autoComplete="off"
-                            className="font-mono"
-                        />
-                    </div>
-                    <p className="text-muted-foreground text-sm">
-                        New markets are created with purchases enabled. You can
-                        turn them off anytime using the switch on each row.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setShowAdd(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button
                             type="button"
                             disabled={!canAdd}
@@ -562,20 +669,15 @@ export const PremiumNameMarketConfig = () => {
                                 );
                             }}
                         >
-                            {isAdding && addVars && addVars[0] === parsedLength
+                            {isAdding &&
+                            addVars &&
+                            addVars[0] === parsedLength
                                 ? "Saving…"
                                 : "Save"}
                         </Button>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => setShowAdd(false)}
-                        >
-                            Cancel
-                        </Button>
-                    </div>
-                </div>
-            ) : null}
-        </div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </PageContainer>
     );
 };
