@@ -696,6 +696,7 @@ pub fn sign_transaction(
     Ok(crate::SignedTransaction {
         transaction: transaction.into(),
         proofs,
+        subjectiveData: None,
     })
 }
 

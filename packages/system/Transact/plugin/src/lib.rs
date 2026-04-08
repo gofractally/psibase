@@ -227,6 +227,7 @@ impl Admin for TransactPlugin {
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs: get_proofs(&sha256(&tx.packed()), true)?,
+            subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
@@ -300,6 +301,7 @@ impl Auth for TransactPlugin {
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
             proofs: get_proofs_for_user(&sha256(&tx.packed()), &user)?,
+            subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
