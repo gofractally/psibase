@@ -79,7 +79,7 @@ export const router = createBrowserRouter([
                 ),
             },
             {
-                path: "premium-market-config",
+                path: "premium-name-market-config",
                 element: (
                     <ProtectedRoute>
                         <PremiumNameMarketConfig />

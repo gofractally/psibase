@@ -11,7 +11,7 @@ export const useAddPremiumNameMarket = () =>
     usePluginMutation<[number, string, number, string, number, number]>(
         {
             service: PREM_ACCOUNTS,
-            intf: "market-admin",
+            intf: "marketAdmin",
             method: "create",
         },
         {

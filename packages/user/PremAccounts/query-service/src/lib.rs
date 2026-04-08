@@ -5,6 +5,7 @@ mod service {
     use async_graphql::*;
     use diff_adjust::tables::RateLimitTable;
     use prem_accounts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
+    use prem_accounts::Wrapper as PremAccountsService;
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -72,7 +73,11 @@ mod service {
     ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
         q.check_user_auth(owner.clone())?;
 
-        EventQuery::new(format!("history.{}.premAcctEvent", Wrapper::SERVICE))
+        // Events are emitted by `prem-accounts`, not the `r-prem-accts` query service account.
+        EventQuery::new(format!(
+            "history.{}.premAcctEvent",
+            PremAccountsService::SERVICE
+        ))
             .condition(format!("owner = '{}'", owner))
             .first(first)
             .last(last)

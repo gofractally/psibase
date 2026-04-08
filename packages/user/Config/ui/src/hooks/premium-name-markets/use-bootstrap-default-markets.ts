@@ -26,12 +26,12 @@ export const useBootstrapDefaultPremiumNameMarkets = () => {
             "bootstrapDefaultPremiumNameMarkets",
         ] as const,
         onMutate: (): string | number =>
-            toast.loading(`Configuring premium name markets ${nameLengthRangeStr}…`),
+            toast.loading(`Configuring premium name markets ${MIN_PREMIUM_NAME_LENGTH}-9…`),
         mutationFn: async () => {
             for (let len = MIN_PREMIUM_NAME_LENGTH; len <= MAX_PREMIUM_NAME_LENGTH; len++) {
                 await supervisor.functionCall({
                     service: PREM_ACCOUNTS,
-                    intf: "market-admin",
+                    intf: "marketAdmin",
                     method: "create",
                     params: [
                         len,

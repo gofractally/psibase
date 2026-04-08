@@ -16,6 +16,7 @@ services = ["prem-accounts"]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
 Permissions = "0.23.0"
+Tokens = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]

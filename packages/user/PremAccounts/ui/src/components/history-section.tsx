@@ -48,9 +48,11 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                             query: `
                                 query NameEvents($owner: String!, $first: Int, $after: String) {
                                     nameEvents(owner: $owner, first: $first, after: $after) {
-                                        nodes {
-                                            account
-                                            action
+                                        edges {
+                                            node {
+                                                account
+                                                action
+                                            }
                                         }
                                         pageInfo {
                                             hasNextPage
@@ -67,12 +69,15 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                         }),
                     });
 
-                    const data = (await response.json()) as {
+                    const raw = await response.text();
+                    let data: {
                         data?: {
                             nameEvents?: {
-                                nodes?: Array<{
-                                    account?: string;
-                                    action?: string;
+                                edges?: Array<{
+                                    node?: {
+                                        account?: string;
+                                        action?: string;
+                                    } | null;
                                 } | null>;
                                 pageInfo?: {
                                     hasNextPage?: boolean;
@@ -82,6 +87,17 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                         };
                         errors?: Array<{ message: string }>;
                     };
+                    try {
+                        data = JSON.parse(raw) as typeof data;
+                    } catch {
+                        const snippet =
+                            raw.length === 0
+                                ? `History request failed (HTTP ${response.status})`
+                                : raw.length > 300
+                                  ? `${raw.slice(0, 300)}…`
+                                  : raw;
+                        throw new Error(snippet);
+                    }
 
                     if (data.errors && data.errors.length > 0) {
                         throw new Error(data.errors[0].message);
@@ -92,8 +108,9 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                         break;
                     }
 
-                    const nodes = connection.nodes ?? [];
-                    for (const node of nodes) {
+                    const edges = connection.edges ?? [];
+                    for (const edge of edges) {
+                        const node = edge?.node;
                         if (
                             node &&
                             typeof node.account === "string" &&
