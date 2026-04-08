@@ -926,10 +926,11 @@ namespace psibase
       PSIO_REFLECT(SqlRow, rowid, data)
    };
 
-   struct BlockStartMarker
+   struct EdgeBlockStart
    {
+      uint64_t edgeIndex;
       BlockNum blockNum;
-      PSIO_REFLECT(BlockStartMarker, blockNum)
+      PSIO_REFLECT(EdgeBlockStart, edgeIndex, blockNum)
    };
 
    /// GraphQL Pagination through Event tables
@@ -1074,11 +1075,8 @@ namespace psibase
       template <typename EdgeType>
       void addBlockContext(std::vector<EdgeType>& edges) const
       {
-         uint64_t minRowId = extract_cursor(edges.front().cursor);
-         uint64_t maxRowId = extract_cursor(edges.back().cursor);
-
-         auto markers = fetchBlockStartMarkers(minRowId, maxRowId);
-         if (markers.empty())
+         auto edgeBlockStarts = fetchEdgeBlockStarts(edges);
+         if (edgeBlockStarts.empty())
             return;
 
          std::unordered_map<BlockNum, BlockTime> blockTimeCache;
@@ -1100,43 +1098,49 @@ namespace psibase
             return std::nullopt;
          };
 
-         size_t markerIdx = markers.size() - 1;
-         for (auto eit = edges.rbegin(); eit != edges.rend(); ++eit)
+         for (const auto& edgeBlockStart : edgeBlockStarts)
          {
-            uint64_t edgeRowId = extract_cursor(eit->cursor);
-            while (markerIdx > 0 && markers[markerIdx].rowid > edgeRowId)
-               --markerIdx;
-
-            if (markers[markerIdx].rowid <= edgeRowId)
+            if (edgeBlockStart.edgeIndex < edges.size())
             {
-               auto bn        = markers[markerIdx].data.blockNum;
-               eit->blockNum  = bn;
-               eit->blockTime = lookupBlockTime(bn);
+               auto  bn       = edgeBlockStart.blockNum;
+               auto& edge     = edges[edgeBlockStart.edgeIndex];
+               edge.blockNum  = bn;
+               edge.blockTime = lookupBlockTime(bn);
             }
          }
       }
 
      private:
-      std::vector<SqlRow<BlockStartMarker>> fetchBlockStartMarkers(uint64_t minRowId,
-                                                                   uint64_t maxRowId) const
+      template <typename EdgeType>
+      std::vector<EdgeBlockStart> fetchEdgeBlockStarts(const std::vector<EdgeType>& edges) const
       {
+         if (edges.empty())
+            return {};
+
+         std::string values;
+         for (size_t i = 0; i < edges.size(); ++i)
+         {
+            if (i)
+               values += ", ";
+            auto edgeRowId = extract_cursor(edges[i].cursor);
+            std::format_to(std::back_inserter(values), "({}, {})", i, edgeRowId);
+         }
+
          auto sql = std::format(
-             "WITH covering AS ("
-             " SELECT ROWID"
-             " FROM \"history.transact.blockStart\""
-             " WHERE ROWID <= {}"
-             " ORDER BY ROWID DESC"
-             " LIMIT 1"
-             ")"
-             " SELECT ROWID, *"
-             " FROM \"history.transact.blockStart\""
-             " WHERE ROWID = (SELECT ROWID FROM covering)"
-             "    OR (ROWID > (SELECT ROWID FROM covering) AND ROWID <= {})"
-             " ORDER BY ROWID ASC",
-             minRowId, maxRowId);
-         auto json    = sql_query(sql, {}, _debug);
-         auto markers = psio::convert_from_json<std::vector<SqlRow<BlockStartMarker>>>(json);
-         return markers;
+             "WITH edges(edgeIndex, edgeRowId) AS (VALUES {})"
+             " SELECT e.edgeIndex, m.blockNum"
+             " FROM edges e"
+             " JOIN \"history.transact.blockStart\" m ON m.ROWID = ("
+             "   SELECT ROWID"
+             "   FROM \"history.transact.blockStart\""
+             "   WHERE ROWID <= e.edgeRowId"
+             "   ORDER BY ROWID DESC"
+             "   LIMIT 1"
+             " )"
+             " ORDER BY e.edgeIndex ASC",
+             values);
+         auto json = sql_query(sql, {}, _debug);
+         return psio::convert_from_json<std::vector<EdgeBlockStart>>(json);
       }
 
       std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges() const

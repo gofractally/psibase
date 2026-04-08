@@ -13,6 +13,7 @@ use serde_aux::prelude::deserialize_number_from_string;
 use serde_json::Value;
 use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::mem::take;
 use std::ops::RangeBounds;
 
@@ -429,9 +430,12 @@ pub struct BlockInfoEdgeFields {
 pub type EventConnection<T> = Connection<u64, T, EmptyFields, BlockInfoEdgeFields>;
 
 #[derive(Deserialize)]
-struct MarkerRow {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    rowid: u64,
+struct EdgeBlockStartRow {
+    #[serde(
+        rename = "edgeIndex",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    edge_index: usize,
     #[serde(
         rename = "blockNum",
         deserialize_with = "deserialize_number_from_string"
@@ -724,25 +728,36 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
         Ok(connection)
     }
 
-    fn fetch_block_start_markers(&self, min_rowid: u64, max_rowid: u64) -> Vec<MarkerRow> {
+    fn fetch_edge_block_starts<N>(&self, edges: &[(u64, N)]) -> Vec<EdgeBlockStartRow> {
+        if edges.is_empty() {
+            return Vec::new();
+        }
+
+        let mut values = String::new();
+        for (i, (edge_rowid, _)) in edges.iter().enumerate() {
+            if i > 0 {
+                values.push_str(", ");
+            }
+            let _ = write!(values, "({}, {})", i, edge_rowid);
+        }
+
         let sql = format!(
-            "WITH covering AS (\
+            "WITH edges(edgeIndex, edgeRowId) AS (VALUES {}) \
+            SELECT e.edgeIndex, m.blockNum \
+            FROM edges e \
+            JOIN \"history.transact.blockStart\" m ON m.ROWID = ( \
                 SELECT ROWID \
                 FROM \"history.transact.blockStart\" \
-                WHERE ROWID <= {} \
+                WHERE ROWID <= e.edgeRowId \
                 ORDER BY ROWID DESC \
-                LIMIT 1\
+                LIMIT 1 \
             ) \
-            SELECT ROWID, * \
-            FROM \"history.transact.blockStart\" \
-            WHERE ROWID = (SELECT ROWID FROM covering) \
-               OR (ROWID > (SELECT ROWID FROM covering) AND ROWID <= {}) \
-            ORDER BY ROWID ASC",
-            min_rowid, max_rowid
+            ORDER BY e.edgeIndex ASC",
+            values
         );
         let json = self.sql_query(sql, vec![]);
         serde_json::from_str(&json).unwrap_or_else(|e| {
-            abort_message(&format!("Failed to deserialize blockStart markers: {}", e));
+            abort_message(&format!("Failed to deserialize edge block starts: {}", e));
         })
     }
 
@@ -752,33 +767,26 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
             return result;
         }
 
-        let min_rowid = edges.first().unwrap().0;
-        let max_rowid = edges.last().unwrap().0;
-
-        let markers = self.fetch_block_start_markers(min_rowid, max_rowid);
-        if markers.is_empty() {
+        let edge_block_starts = self.fetch_edge_block_starts(edges);
+        if edge_block_starts.is_empty() {
             return result;
         }
 
-        // Match each edge to its block marker
         let mut block_time_cache: HashMap<BlockNum, BlockTime> = HashMap::new();
         let block_log_handle = KvHandle::new(DbId::BlockLog, &[], KvMode::Read);
-        let mut marker_idx = markers.len() - 1;
-        for (i, (edge_rowid, _)) in edges.iter().enumerate().rev() {
-            while marker_idx > 0 && markers[marker_idx].rowid > *edge_rowid {
-                marker_idx -= 1;
+        for edge_block_start in edge_block_starts {
+            if edge_block_start.edge_index >= edges.len() {
+                continue;
             }
-            if markers[marker_idx].rowid <= *edge_rowid {
-                let bn = markers[marker_idx].block_num;
-                let bt = get_block_time(&block_log_handle, bn, &mut block_time_cache);
-                result.insert(
-                    i,
-                    BlockInfoEdgeFields {
-                        block_num: Some(bn),
-                        block_time: bt,
-                    },
-                );
-            }
+            let bn = edge_block_start.block_num;
+            let bt = get_block_time(&block_log_handle, bn, &mut block_time_cache);
+            result.insert(
+                edge_block_start.edge_index,
+                BlockInfoEdgeFields {
+                    block_num: Some(bn),
+                    block_time: bt,
+                },
+            );
         }
 
         result
