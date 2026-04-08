@@ -1,15 +1,18 @@
 use crate::{
-    get_key_bytes, get_sequential_bytes, kv_get, kv_greater_equal_bytes, kv_less_than_bytes,
-    kv_max_bytes, AccountNumber, DbId, MethodNumber, RawKey, TableIndex, TableRecord, ToKey,
+    abort_message, get_key_bytes, get_sequential_bytes, kv_get, kv_greater_equal_bytes,
+    kv_less_than_bytes, kv_max_bytes, AccountNumber, Block, BlockNum, BlockTime, DbId, KvHandle,
+    KvMode, MethodNumber, RawKey, TableIndex, TableRecord, ToKey,
 };
 use anyhow::anyhow;
-use async_graphql::connection::{query_with, Connection, Edge};
-use async_graphql::OutputType;
+use async_graphql::connection::{query_with, Connection, Edge, EmptyFields};
+use async_graphql::{OutputType, SimpleObject};
 use fracpack::{Unpack, UnpackOwned};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
+use serde_aux::prelude::deserialize_number_from_string;
 use serde_json::Value;
 use std::cmp::{max, min};
+use std::collections::HashMap;
 use std::mem::take;
 use std::ops::RangeBounds;
 
@@ -415,6 +418,43 @@ impl<'de> Deserialize<'de> for SqlRow {
     }
 }
 
+/// Additional fields on each event edge providing block context.
+#[derive(SimpleObject, Default)]
+pub struct BlockInfoEdgeFields {
+    pub block_num: Option<BlockNum>,
+    pub block_time: Option<BlockTime>,
+}
+
+/// A connection type for event queries whose edges carry block context.
+pub type EventConnection<T> = Connection<u64, T, EmptyFields, BlockInfoEdgeFields>;
+
+#[derive(Deserialize)]
+struct MarkerRow {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    rowid: u64,
+    #[serde(
+        rename = "blockNum",
+        deserialize_with = "deserialize_number_from_string"
+    )]
+    block_num: BlockNum,
+}
+
+fn get_block_time(
+    kv_handle: &KvHandle,
+    bn: BlockNum,
+    cache: &mut HashMap<BlockNum, BlockTime>,
+) -> Option<BlockTime> {
+    if let Some(&bt) = cache.get(&bn) {
+        return Some(bt);
+    }
+    if let Ok(Some(block)) = kv_get::<Block, BlockNum>(kv_handle, &bn) {
+        let bt = block.header.time;
+        cache.insert(bn, bt);
+        return Some(bt);
+    }
+    None
+}
+
 /// GraphQL Pagination through Event tables
 ///
 /// Event tables are stored in an SQLite database in a service.
@@ -649,21 +689,19 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
         (rows, has_previous_page, has_next_page)
     }
 
-    /// Execute the query and return a Connection containing the results
+    /// Execute the query and return an EventConnection containing the results
     ///
     /// Returns error if both first and last are specified.
-    pub fn query(&self) -> async_graphql::Result<Connection<u64, T>> {
-        let (edges, has_previous_page, has_next_page) = self.all_edges();
+    pub fn query(&self) -> async_graphql::Result<EventConnection<T>> {
+        let (edge_rows, has_previous_page, has_next_page) = self.all_edges();
 
-        let mut connection = Connection::new(has_previous_page, has_next_page);
-        for edge in edges {
+        let mut edges: Vec<(u64, T)> = Vec::with_capacity(edge_rows.len());
+        for edge in edge_rows {
             if self.debug {
                 println!("Edge data: {}", edge.data);
             }
             match serde_json::from_value(edge.data) {
-                Ok(data) => {
-                    connection.edges.push(Edge::new(edge.rowid, data));
-                }
+                Ok(data) => edges.push((edge.rowid, data)),
                 Err(e) => {
                     crate::abort_message(&format!(
                         "Failed to deserialize row {}: {}",
@@ -673,8 +711,76 @@ impl<T: DeserializeOwned + OutputType> EventQuery<T> {
             }
         }
 
-        // PageInfo object is a dynamic resolver on the Connection type.
+        let mut block_info = self.fetch_block_context(&edges);
+
+        let mut connection: EventConnection<T> = Connection::new(has_previous_page, has_next_page);
+        for (i, (rowid, data)) in edges.into_iter().enumerate() {
+            let fields = block_info.remove(&i).unwrap_or_default();
+            connection
+                .edges
+                .push(Edge::with_additional_fields(rowid, data, fields));
+        }
 
         Ok(connection)
+    }
+
+    fn fetch_block_start_markers(&self, min_rowid: u64, max_rowid: u64) -> Vec<MarkerRow> {
+        let sql = format!(
+            "WITH covering AS (\
+                SELECT ROWID \
+                FROM \"history.transact.blockStart\" \
+                WHERE ROWID <= {} \
+                ORDER BY ROWID DESC \
+                LIMIT 1\
+            ) \
+            SELECT ROWID, * \
+            FROM \"history.transact.blockStart\" \
+            WHERE ROWID = (SELECT ROWID FROM covering) \
+               OR (ROWID > (SELECT ROWID FROM covering) AND ROWID <= {}) \
+            ORDER BY ROWID ASC",
+            min_rowid, max_rowid
+        );
+        let json = self.sql_query(sql, vec![]);
+        serde_json::from_str(&json).unwrap_or_else(|e| {
+            abort_message(&format!("Failed to deserialize blockStart markers: {}", e));
+        })
+    }
+
+    fn fetch_block_context<N>(&self, edges: &[(u64, N)]) -> HashMap<usize, BlockInfoEdgeFields> {
+        let mut result = HashMap::new();
+        if edges.is_empty() {
+            return result;
+        }
+
+        let min_rowid = edges.first().unwrap().0;
+        let max_rowid = edges.last().unwrap().0;
+
+        let markers = self.fetch_block_start_markers(min_rowid, max_rowid);
+        if markers.is_empty() {
+            return result;
+        }
+
+        // Match each edge to its block marker
+        let mut block_time_cache: HashMap<BlockNum, BlockTime> = HashMap::new();
+        let block_log_handle = KvHandle::new(DbId::BlockLog, &[], KvMode::Read);
+        let mut marker_idx = markers.len() - 1;
+        for (i, (edge_rowid, _)) in edges.iter().enumerate().rev() {
+            while marker_idx > 0 && markers[marker_idx].rowid > *edge_rowid {
+                marker_idx -= 1;
+            }
+            if markers[marker_idx].rowid <= *edge_rowid {
+                let bn = markers[marker_idx].block_num;
+                let bt = get_block_time(&block_log_handle, bn, &mut block_time_cache);
+                result.insert(
+                    i,
+                    BlockInfoEdgeFields {
+                        block_num: Some(bn),
+                        block_time: bt,
+                    },
+                );
+            }
+        }
+
+        result
     }
 }
