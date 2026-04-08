@@ -3,13 +3,13 @@ import { useNavigate } from "react-router-dom";
 
 import { supervisor } from "@shared/lib/supervisor";
 
-import { checkLastTx } from "@/lib/checkStaging";
+import { checkLastTx } from "@/lib/check-staging";
 import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
 import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
 import { zAccount } from "@shared/lib/schemas/account";
 import { queryClient } from "@shared/lib/query-client";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
