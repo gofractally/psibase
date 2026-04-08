@@ -7,6 +7,10 @@ pub mod constants {
     pub const ONE_WEEK: u32 = ONE_DAY * 7;
     const ONE_YEAR: u32 = ONE_WEEK * 52;
 
+    pub mod roles {
+        pub const LEGISLATURE: u8 = 1;
+        pub const JUDICIARY: u8 = 2;
+    }
     pub mod token_distributions {
         pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
 
@@ -61,28 +65,34 @@ pub mod constants {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::tables::{Fractal, FractalMember, RewardConsensus};
+    use crate::tables::tables::{Fractal, FractalMember, RewardStream};
 
-    use psibase::services::{
-        auth_dyn::{self, policy::DynamicAuthPolicy},
-        transact::ServiceMethod,
-    };
     use psibase::*;
+    use psibase::{
+        services::{
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            transact::ServiceMethod,
+        },
+        AccountNumber,
+    };
 
     /// Creates a new account and fractal.
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
+    /// * `legislature` - Legislature role account.
+    /// * `judiciary` - Judiciary role account.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
     fn create_fractal(
         fractal_account: AccountNumber,
+        legislature: AccountNumber,
+        judiciary: AccountNumber,
         name: String,
         mission: String,
-        initial_occupation: AccountNumber,
     ) {
-        Fractal::add(fractal_account, initial_occupation, name, mission);
+        Fractal::add(fractal_account, legislature, judiciary, name, mission);
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -96,7 +106,10 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn init_token(fractal: AccountNumber) {
-        Fractal::get_assert(fractal).init_token();
+        // Init token should require that a symbol is actually mapped against it.
+        let fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_legislature();
+        fractal.init_token();
     }
 
     /// Set Fractal distribution interval
@@ -107,22 +120,7 @@ pub mod service {
     #[action]
     fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
-
-        RewardConsensus::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
-    }
-
-    /// Set token threshold.
-    ///
-    /// Sets the required amount of active members in the legislature guild before the token can be initialised.  
-    ///
-    /// # Arguments
-    /// * `fractal` - Fractal to update.
-    /// * `threshold` - The minimum amount of active members required.
-    #[action]
-    fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
-        let mut fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
-        // TODO: Figure out where to put this fractal.set_token_threshold(threshold);
+        RewardStream::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
     }
 
     /// Exile a fractal member.
@@ -138,43 +136,13 @@ pub mod service {
         FractalMember::get_assert(fractal, member).exile();
     }
 
-    /// Set ranked guild slots.
-    ///
-    /// Must be called by legislature.  
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `slots_count` - The number of ranked guild slots.
-    #[action]
-    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
-        RewardConsensus::get_assert(fractal).set_ranked_guild_slot_count(slots_count);
-    }
-
     /// Distribute token for a fractal.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
-        RewardConsensus::get_assert(fractal).distribute_tokens();
-    }
-
-    /// Rank guilds for a fractal
-    ///
-    /// This action assigns the fractal's consensus reward distribution to the provided
-    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
-    /// guilds in the vector receive progressively larger shares.
-    ///
-    /// Must be called by the legislature.  
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `guilds` - Ranked guilds, from highest rewarded to lowest.
-    #[action]
-    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
-        RewardConsensus::get_assert(fractal).set_ranked_guilds(guilds);
+        Fractal::get_assert(fractal).distribute_tokens();
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
@@ -199,6 +167,11 @@ pub mod service {
         use psibase::services::staged_tx as StagedTx;
 
         let policy = check_some(account_policy(account), "account not supported");
+
+        // What is the policy for save the whales legislature?
+        // Look up the the account on the roles table
+        // hit role_policy on the occupation, returning what its policy is.
+        //
 
         if method.is_some_and(|method| {
             let banned_service_methods: Vec<ServiceMethod> = vec![

@@ -1,3 +1,5 @@
+use std::u64;
+
 use psibase::{
     abort_message, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
 };
@@ -32,6 +34,13 @@ impl FractalMember {
             created_at: now,
             stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
         }
+    }
+
+    pub fn get_all(fractal: AccountNumber) -> Vec<Self> {
+        FractalMemberTable::read()
+            .get_index_pk()
+            .range(&(fractal, AccountNumber::from(0))..&(fractal, AccountNumber::from(u64::MAX)))
+            .collect()
     }
 
     pub fn add(fractal: AccountNumber, account: AccountNumber) -> Self {

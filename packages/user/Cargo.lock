@@ -933,6 +933,7 @@ version = "0.23.0"
 dependencies = [
  "async-graphql",
  "de-facto-pkg",
+ "fractals",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_macros",
@@ -1552,6 +1553,7 @@ version = "0.23.0"
 dependencies = [
  "async-graphql",
  "evaluations",
+ "fractals",
  "guilds-pkg",
  "psibase",
  "psibase-user-workspace-hack",

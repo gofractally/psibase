@@ -15,6 +15,7 @@ mod graphql;
 mod helpers;
 use psibase::AccountNumber;
 
+use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::errors::ErrorType;
 use crate::graphql::fractal::get_fractal;
@@ -116,7 +117,8 @@ impl AdminFractal for FractallyPlugin {
             fractal_account: fractal_account.parse().unwrap(),
             name,
             mission,
-            initial_occupation: "derp".into(),
+            judiciary: gen_rand_account(None)?.as_str().into(),
+            legislature: gen_rand_account(None)?.as_str().into(),
         }
         .packed();
         add_action_to_transaction(

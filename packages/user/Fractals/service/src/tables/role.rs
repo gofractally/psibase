@@ -1,0 +1,46 @@
+use crate::tables::tables::{Role, RoleTable};
+use psibase::{check_none, check_some, AccountNumber, Table};
+
+impl Role {
+    fn new(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
+        Self {
+            fractal,
+            role_id,
+            occupation,
+        }
+    }
+
+    pub fn get(fractal: AccountNumber, role_id: u8) -> Option<Self> {
+        RoleTable::read().get_index_pk().get(&(fractal, role_id))
+    }
+
+    pub fn get_assert(fractal: AccountNumber, role_id: u8) -> Self {
+        check_some(
+            Self::get(fractal, role_id),
+            &format!(
+                "role with id {} does not exist for fractal {}",
+                role_id,
+                fractal.to_string()
+            ),
+        )
+    }
+
+    pub fn add(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
+        check_none(
+            Self::get(fractal, role_id),
+            &format!(
+                "role with id {} already exists for fractal {}",
+                role_id,
+                fractal.to_string()
+            ),
+        );
+
+        let new_instance = Self::new(fractal, role_id, occupation);
+        new_instance.save();
+        new_instance
+    }
+
+    fn save(&self) {
+        RoleTable::read_write().put(&self).unwrap();
+    }
+}

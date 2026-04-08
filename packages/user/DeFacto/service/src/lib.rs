@@ -1,84 +1,59 @@
-#[psibase::service_tables]
-pub mod tables {
-    use async_graphql::SimpleObject;
-    use psibase::{Fracpack, ToSchema};
-    use serde::{Deserialize, Serialize};
-
-    #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
-    impl InitRow {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-
-    #[table(name = "ExampleThingTable", index = 1)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct ExampleThing {
-        pub thing: String,
-    }
-
-    impl ExampleThing {
-        #[primary_key]
-        fn pk(&self) {}
-    }
-}
-
-#[psibase::service(name = "de-facto", tables = "tables")]
+#[psibase::service(name = "de-facto")]
 pub mod service {
-    use crate::tables::{ExampleThing, ExampleThingTable, InitRow, InitTable};
-    use psibase::*;
+    use fractals::helpers::two_thirds_plus_one;
+    use psibase::{
+        services::auth_dyn::{self, policy::DynamicAuthPolicy},
+        *,
+    };
 
     #[action]
-    fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-
-        // Initial service configuration
-        let thing_table = ExampleThingTable::new();
-        if thing_table.get_index_pk().get(&()).is_none() {
-            thing_table
-                .put(&ExampleThing {
-                    thing: String::from("default thing"),
-                })
-                .unwrap();
-        }
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        let table = InitTable::read();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
+    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
+        ::fractals::tables::tables::FractalMemberTable::read()
+            .get_index_pk()
+            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
+            .map(|account| (account.account, 1))
+            .collect()
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn setExampleThing(thing: String) {
-        let table = ExampleThingTable::new();
-        let old_thing = table.get_index_pk().get(&()).unwrap_or_default().thing;
-
-        table
-            .put(&ExampleThing {
-                thing: thing.clone(),
-            })
-            .unwrap();
-
-        Wrapper::emit().history().updated(old_thing, thing);
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
+        ::fractals::tables::tables::FractalMemberTable::read()
+            .get_index_pk()
+            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
+            .any(|account| account.account == member)
     }
 
     #[action]
-    #[allow(non_snake_case)]
-    fn getExampleThing() -> String {
-        let table = ExampleThingTable::new();
-        table.get_index_pk().get(&()).unwrap_or_default().thing
+    fn is_supported(fractal: AccountNumber) -> bool {
+        ::fractals::tables::tables::FractalTable::read()
+            .get_index_pk()
+            .get(&fractal)
+            .is_some()
     }
 
-    #[event(history)]
-    pub fn updated(old_thing: String, new_thing: String) {}
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    #[action]
+    fn role_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
+        // account will be the legislature role account, then we look up the fractal
+        // and return the fractal members,
+
+        // ask fractals, what is the fractal for this role account?
+        // use a secondary key for now, delete later?
+        //
+
+        let accounts: Vec<(AccountNumber, u8)> =
+            ::fractals::tables::tables::FractalMemberTable::read()
+                .get_index_pk()
+                .range((account, AccountNumber::new(0))..=(account, AccountNumber::new(u64::MAX)))
+                .map(|account| (account.account, 1))
+                .collect();
+
+        DynamicAuthPolicy::from_weighted_authorizers(
+            accounts.clone(),
+            two_thirds_plus_one(accounts.len() as u8),
+        )
+    }
 }
-
-#[cfg(test)]
-mod tests;

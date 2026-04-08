@@ -39,6 +39,16 @@ pub mod tables {
         pub candidacy_cooldown: u32,
     }
 
+    #[table(name = "OwnerSettingsTable", index = 2)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct OwnerSettings {
+        #[primary_key]
+        pub owner: AccountNumber,
+        pub legislature: AccountNumber,
+        pub judiciary: AccountNumber,
+        pub guild_rankings: Vec<AccountNumber>,
+    }
+
     define_flags!(GuildFlags, u8, {
         rank_ordering,
     });
@@ -60,7 +70,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildMemberTable", index = 2)]
+    #[table(name = "GuildMemberTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildMember {
@@ -93,7 +103,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildApplicationTable", index = 3)]
+    #[table(name = "GuildApplicationTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildApplication {
@@ -116,7 +126,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildInviteTable", index = 4)]
+    #[table(name = "GuildInviteTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildInvite {
@@ -136,7 +146,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "GuildAttestTable", index = 5)]
+    #[table(name = "GuildAttestTable", index = 6)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct GuildAttest {
@@ -165,7 +175,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "EvaluationInstanceTable", index = 6)]
+    #[table(name = "EvaluationInstanceTable", index = 7)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct EvaluationInstance {

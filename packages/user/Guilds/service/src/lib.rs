@@ -3,7 +3,10 @@ pub mod helpers;
 pub mod tables;
 #[psibase::service(name = "guilds", tables = "tables::tables")]
 pub mod service {
-    use crate::tables::tables::{EvaluationInstance, Guild, GuildMember, InitRow, InitTable};
+    use crate::{
+        helpers::RollingBits16,
+        tables::tables::{EvaluationInstance, Guild, GuildMember, GuildTable, InitRow, InitTable},
+    };
     use psibase::*;
 
     #[action]
@@ -24,7 +27,6 @@ pub mod service {
     /// Creates a guild within a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
     /// * `council_role` - Council role account.
@@ -50,17 +52,25 @@ pub mod service {
 
     #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
-        vec![("Barry".into(), 1)]
+        GuildMember::memberships_of_guild(fractal)
+            .into_iter()
+            .map(|membership| (membership.member, membership.score))
+            .collect()
     }
 
     #[action]
-    fn is_active(fractal: AccountNumber, member: AccountNumber) -> Option<bool> {
-        None
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
+        GuildMember::get(fractal, member)
+            .is_some_and(|member| RollingBits16::from(member.attendance).count_recent_ones(4) >= 2)
     }
 
     #[action]
     fn is_supported(fractal: AccountNumber) -> bool {
-        false
+        GuildTable::read()
+            .get_index_by_owner()
+            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
+            .next()
+            .is_some()
     }
 
     /// Set guild display name

@@ -1,4 +1,4 @@
-use psibase::{check, check_some, AccountNumber, Memo, Table};
+use psibase::{check, check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::constants::{
     DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, FRACTAL_STREAM_HALF_LIFE,
@@ -24,18 +24,19 @@ impl RewardStream {
     }
 
     pub fn add(fractal: AccountNumber, token_id: TID) -> Self {
+        check_none(Self::get(fractal), "stream already exists");
         let new_instance = Self::new(fractal, token_id);
 
         new_instance.save();
         new_instance
     }
 
-    pub fn get(stream_id: u32) -> Option<Self> {
-        RewardStreamTable::read().get_index_pk().get(&stream_id)
+    pub fn get(fractal: AccountNumber) -> Option<Self> {
+        RewardStreamTable::read().get_index_pk().get(&fractal)
     }
 
-    pub fn get_assert(stream_id: u32) -> Self {
-        check_some(Self::get(stream_id), "reward stream does not exist")
+    pub fn get_assert(fractal: AccountNumber) -> Self {
+        check_some(Self::get(fractal), "reward stream does not exist")
     }
 
     fn save(&self) {
@@ -74,12 +75,14 @@ impl RewardStream {
     fn claim_token_stream(&self) -> Quantity {
         let claimable = TokenStream::call().claim(self.stream_id);
 
-        Tokens::call().debit(
-            self.fractal_token(),
-            TokenStream::SERVICE,
-            claimable,
-            "Reward claim".into(),
-        );
+        if claimable.value > 0 {
+            Tokens::call().debit(
+                self.fractal_token(),
+                TokenStream::SERVICE,
+                claimable,
+                "Reward claim".into(),
+            );
+        }
 
         claimable
     }
