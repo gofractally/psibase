@@ -93,12 +93,14 @@ namespace SystemService
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
+      const auto& stat = getStatus();
+      emit().history().blockStart(stat.current.blockNum);
+
       // Remove expired transaction IDs. The iteration limit on the loop helps to
       // mitigate a potential attack.
-      const auto& stat          = getStatus();
-      auto        includedTable = tables.open<IncludedTrxTable>();
-      auto        includedIndex = includedTable.getIndex<0>();
-      auto        includedEnd   = includedIndex.end();
+      auto includedTable = tables.open<IncludedTrxTable>();
+      auto includedIndex = includedTable.getIndex<0>();
+      auto includedEnd   = includedIndex.end();
       for (int i = 0; i < 20; ++i)
       {
          auto it = includedIndex.begin();

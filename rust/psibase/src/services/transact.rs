@@ -394,6 +394,12 @@ mod service {
     fn headBlockTime() -> crate::TimePointSec {
         unimplemented!()
     }
+
+    /// Emitted at the start of each block
+    #[event(history)]
+    fn blockStart(blockNum: crate::BlockNum) {
+        unimplemented!()
+    }
 }
 
 // TODO: inline functions in Transact.hpp
