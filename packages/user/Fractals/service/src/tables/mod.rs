@@ -2,7 +2,6 @@ mod fractal;
 mod fractal_exile;
 pub mod fractal_member;
 mod occupation;
-mod reward_consensus;
 mod reward_stream;
 mod role;
 pub enum DistributionStrategy {

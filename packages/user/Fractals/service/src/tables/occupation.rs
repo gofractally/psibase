@@ -1,4 +1,4 @@
-use psibase::{check, check_none, check_some, AccountNumber, Table};
+use psibase::{check, check_none, AccountNumber, Table};
 
 use crate::tables::tables::{Occupation, OccupationTable};
 
@@ -22,17 +22,10 @@ impl Occupation {
         new_instance
     }
 
-    pub fn get(fractal: AccountNumber, index: u8) -> Option<Self> {
+    fn get(fractal: AccountNumber, index: u8) -> Option<Self> {
         OccupationTable::read()
             .get_index_pk()
             .get(&(fractal, index))
-    }
-
-    pub fn get_assert(fractal: AccountNumber, index: u8) -> Self {
-        check_some(
-            Self::get(fractal, index),
-            "occupation does not exist for this fractal and index",
-        )
     }
 
     fn save(&self) {
@@ -41,7 +34,7 @@ impl Occupation {
             .expect("failed to save");
     }
 
-    pub fn get_all(fractal: AccountNumber) -> Vec<Self> {
+    pub fn get_ordered(fractal: AccountNumber) -> Vec<Self> {
         let mut occupations: Vec<_> = OccupationTable::read()
             .get_index_pk()
             .range(&(fractal, 0)..&(fractal, u8::MAX))
@@ -60,7 +53,7 @@ impl Occupation {
             "too many occupations",
         );
 
-        let existing_occupations = Self::get_all(fractal);
+        let existing_occupations = Self::get_ordered(fractal);
 
         for (index, occupation) in new_occupations.into_iter().enumerate() {
             if let Some(existing) = existing_occupations.get(index) {
