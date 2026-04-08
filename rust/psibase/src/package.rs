@@ -242,6 +242,7 @@ pub struct PackagedService<R: Read + Seek> {
     meta: Meta,
     services: Vec<(AccountNumber, usize, ServiceInfo)>,
     data: Vec<(AccountNumber, usize)>,
+    postinstall: Vec<PrettyAction>,
 }
 
 pub type SchemaMap = HashMap<AccountNumber, Schema>;
@@ -264,23 +265,48 @@ pub struct PrettyAction {
 }
 
 impl PrettyAction {
+    fn pack_data(
+        service: AccountNumber,
+        method: MethodNumber,
+        data: &Option<serde_json::Value>,
+        schemas: &SchemaMap,
+    ) -> Result<Hex<Vec<u8>>, anyhow::Error> {
+        let schema = schemas.get(&service).unwrap();
+        let custom = schema_types();
+        let mut cschema = CompiledSchema::new(&schema.types, &custom);
+        let Some(act) = schema.actions.get(&MethodString(method.to_string())) else {
+            Err(Error::UnknownAction {
+                service: service,
+                method: method,
+            })?
+        };
+        cschema.extend(&act.params);
+        if let Some(data) = data {
+            Ok(cschema.from_value(&act.params, data)?.into())
+        } else {
+            Ok(cschema
+                .from_value(&act.params, &serde_json::json!({}))?
+                .into())
+        }
+    }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
-        let raw_data = match self.raw_data {
-            Some(raw_data) => raw_data,
-            None => {
-                let schema = schemas.get(&self.service).unwrap();
-                let custom = schema_types();
-                let mut cschema = CompiledSchema::new(&schema.types, &custom);
-                let Some(act) = schema.actions.get(&MethodString(self.method.to_string())) else {
-                    Err(Error::UnknownAction {
-                        service: self.service,
-                        method: self.method,
-                    })?
-                };
-                cschema.extend(&act.params);
-                let data = self.data.unwrap_or_else(|| serde_json::json!({}));
-                cschema.from_value(&act.params, &data)?.into()
-            }
+        let raw_data = if let Some(raw_data) = self.raw_data {
+            raw_data
+        } else {
+            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+        };
+        Ok(Action {
+            sender: self.sender,
+            service: self.service,
+            method: self.method,
+            rawData: raw_data,
+        })
+    }
+    pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let raw_data = if let Some(raw_data) = &self.raw_data {
+            raw_data.clone()
+        } else {
+            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
@@ -364,11 +390,19 @@ impl<R: Read + Seek> PackagedService<R> {
                 Err(Error::UnknownAccount { name: *account })?
             }
         }
+
+        let postinstall = if let Ok(file) = archive.by_name("script/postinstall.json") {
+            serde_json::de::from_str::<Vec<PrettyAction>>(&std::io::read_to_string(file)?)?
+        } else {
+            Vec::new()
+        };
+
         Ok(PackagedService {
             archive: archive,
             meta: meta,
             services: services,
             data: data,
+            postinstall,
         })
     }
     pub fn name(&self) -> &str {
@@ -502,36 +536,26 @@ impl<R: Read + Seek> PackagedService<R> {
         &self.meta.accounts
     }
     pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            Ok(serde_json::de::from_str(&std::io::read_to_string(file)?)?)
-        } else {
-            Ok(Vec::new())
-        }
+        Ok(self.postinstall.clone())
     }
     pub fn postinstall(
         &mut self,
         schemas: &SchemaMap,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let script: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
-            actions.append(
-                &mut script
-                    .into_iter()
-                    .map(|act| act.into_action(schemas))
-                    .collect::<Result<Vec<Action>, anyhow::Error>>()?,
-            );
-        }
+        actions.append(
+            &mut self
+                .postinstall
+                .iter()
+                .map(|act| act.to_action(schemas))
+                .collect::<Result<Vec<Action>, anyhow::Error>>()?,
+        );
         Ok(())
     }
     pub fn needs_ui(&mut self) -> bool {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let script: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file).unwrap()).unwrap();
-            return script.into_iter().any(|act| act.service == sites::SERVICE);
-        }
-        false
+        self.postinstall
+            .iter()
+            .any(|act| act.service == sites::SERVICE)
     }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
@@ -683,7 +707,7 @@ impl<R: Read + Seek> PackagedService<R> {
     // immediate dependencies. The first group can be any account, the second
     // must be services
     pub fn get_required_accounts(
-        &mut self,
+        &self,
     ) -> Result<(Vec<AccountNumber>, Vec<AccountNumber>), anyhow::Error> {
         let mut accounts = vec![];
         let mut services = vec![];
@@ -704,13 +728,9 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
 
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let actions: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
-            for act in actions {
-                accounts.push(act.sender);
-                services.push(act.service);
-            }
+        for act in &self.postinstall {
+            accounts.push(act.sender);
+            services.push(act.service);
         }
 
         accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
@@ -727,13 +747,9 @@ impl<R: Read + Seek> PackagedService<R> {
         &mut self,
         out: &mut HashSet<AccountNumber>,
     ) -> Result<(), anyhow::Error> {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let actions: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
-            for act in actions {
-                if act.raw_data.is_none() {
-                    out.insert(act.service);
-                }
+        for act in &self.postinstall {
+            if act.raw_data.is_none() {
+                out.insert(act.service);
             }
         }
         Ok(())
@@ -1135,6 +1151,206 @@ pub fn validate_dependencies<T: Read + Seek>(
             }
         }
     }
+    Ok(())
+}
+
+pub enum PackageOpFull<R: Read + Seek> {
+    Install(PackagedService<R>),
+    Replace(Meta, PackagedService<R>),
+    Remove(Meta),
+}
+
+impl<R: Read + Seek> PackageOpFull<R> {
+    fn name(&self) -> &str {
+        match self {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => package.name(),
+            PackageOpFull::Remove(meta) => &meta.name,
+        }
+    }
+}
+
+// Finds all packages reachable from package in deps.
+// Packages that should not be considered should be excluded from deps.
+fn get_transitive_services<'a>(
+    package: &'a str,
+    deps: &'a HashMap<String, &Vec<PackageRef>>,
+    visited: &mut HashSet<&'a str>,
+    out: &mut Vec<String>,
+) -> Result<(), anyhow::Error> {
+    if let Some(children) = deps.get(package) {
+        if visited.insert(package) {
+            out.push(package.to_string());
+            for dep in *children {
+                get_transitive_services(&dep.name, deps, visited, out)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_package_order_graph<R: Read + Seek>(
+    packages: &Vec<PackageOpFull<R>>,
+) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+    let mut result: HashMap<String, Vec<String>> = HashMap::new();
+    let mut provides_service: HashMap<AccountNumber, String> = HashMap::new();
+    let mut has_postinstall = HashSet::new();
+    let empty_deps = Vec::new();
+    let mut service_deps = HashMap::new();
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                for (service, _, _) in &package.services {
+                    if let Some(prev) =
+                        provides_service.insert(*service, package.name().to_string())
+                    {
+                        Err(Error::ServiceConflict {
+                            name: *service,
+                            old: prev,
+                            new: package.name().to_string(),
+                        })?
+                    }
+                }
+                if !package.postinstall.is_empty() {
+                    has_postinstall.insert(package.name());
+                }
+            }
+            PackageOpFull::Remove(_) => {}
+        }
+    }
+    // Build the graph of service dependencies. Service dependencies
+    // can be cyclic as long as nothing calls any of the services in
+    // the cycle before all of them are installed.
+    //
+    // TODO: indirect dependencies through a package not being
+    // updated, are not accounted for.
+    //
+    // A(install) -> B(keep) -> C(update) -> D(update)
+    //
+    // This is a problem, because the order D, A, C, may install
+    // A while C is unusable
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                if !package.services.is_empty() {
+                    // If a package provides any services, direct dependents can
+                    // assume they are installed. This transitively requires all
+                    // services that this package might use to be installed.
+                    service_deps.insert(package.name().to_string(), &package.meta().depends);
+                } else if !package.postinstall.is_empty() {
+                    // If a package provides a postinstall script, direct dependents
+                    // can assume that it has been run. Dependencies only need to
+                    // be installed first if they are required to install this package
+                    service_deps.insert(package.name().to_string(), &empty_deps);
+                }
+            }
+            PackageOpFull::Remove(_) => {}
+        }
+    }
+    // Construct a graph describing constraints on install order
+    // All services that might be run during installation must
+    // be installed first.
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                let mut all_required_packages = Vec::new();
+                let mut visited = HashSet::new();
+                for service in package.get_required_accounts()?.1 {
+                    let Some(required_package) = provides_service.get(&service) else {
+                        Err(Error::MissingDepAccount {
+                            name: service,
+                            package: package.name().to_string(),
+                        })?
+                    };
+                    if required_package != package.name() {
+                        if visited.insert(required_package.as_str()) {
+                            all_required_packages.push(required_package.to_string());
+                        }
+                    }
+                    for dep in &package.meta().depends {
+                        get_transitive_services(
+                            &dep.name,
+                            &service_deps,
+                            &mut visited,
+                            &mut all_required_packages,
+                        )?;
+                    }
+                }
+                // The postinstall script can rely on direct dependencies'
+                // postinstall scripts having run first.
+                if has_postinstall.contains(&package.name()) {
+                    for dep in &package.meta().depends {
+                        if has_postinstall.contains(&dep.name.as_str()) && visited.insert(&dep.name)
+                        {
+                            all_required_packages.push(dep.name.clone());
+                        }
+                    }
+                }
+                result.insert(package.name().to_string(), all_required_packages);
+            }
+            PackageOpFull::Remove(_) => {
+                // There is no postrm for now, so remove order doesn't matter
+            }
+        }
+    }
+    Ok(result)
+}
+
+fn topological_sort_impl(
+    vertex: &str,
+    graph: &HashMap<String, Vec<String>>,
+    indexes: &HashMap<String, usize>,
+    out: &mut Vec<usize>,
+    mut i: usize,
+) -> Result<usize, anyhow::Error> {
+    const NEW: usize = usize::MAX;
+    const ON_STACK: usize = NEW - 1;
+    let index = *indexes.get(vertex).unwrap();
+    if out[index] == ON_STACK {
+        Err(anyhow! {"Circular install dependency for {vertex}"})?
+    } else if out[index] == NEW {
+        out[index] = ON_STACK;
+        let Some(edges) = graph.get(vertex) else {
+            Err(anyhow!("Missing vertex {vertex}"))?
+        };
+        for edge in edges {
+            i = topological_sort_impl(edge.as_str(), graph, indexes, out, i)
+                .with_context(|| format!("Installing {vertex}"))?;
+        }
+        out[index] = i;
+        i += 1;
+    }
+    Ok(i)
+}
+
+fn get_package_order<R: Read + Seek>(
+    packages: &Vec<PackageOpFull<R>>,
+) -> Result<Vec<usize>, anyhow::Error> {
+    let mut permutation = vec![usize::MAX; packages.len()];
+    let mut indexes = HashMap::new();
+    for (i, package) in packages.iter().enumerate() {
+        indexes.insert(package.name().to_string(), i);
+    }
+    let graph = build_package_order_graph(packages)?;
+    for package in packages {
+        topological_sort_impl(package.name(), &graph, &indexes, &mut permutation, 0)?;
+    }
+    Ok(permutation)
+}
+
+fn apply_permutation<T>(vec: &mut Vec<T>, permutation: &mut [usize]) {
+    assert!(vec.len() == permutation.len());
+    for i in 0..vec.len() {
+        let pos = permutation[i];
+        permutation.swap(i, pos);
+        vec.swap(i, pos);
+    }
+}
+
+pub fn sort_package_ops<R: Read + Seek>(
+    packages: &mut Vec<PackageOpFull<R>>,
+) -> Result<(), anyhow::Error> {
+    let mut order = get_package_order(packages)?;
+    apply_permutation(packages, &mut order);
     Ok(())
 }
 

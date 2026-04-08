@@ -16,13 +16,14 @@ use psibase::{
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
     get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, ActionFormatter,
-    AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
-    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOrigin,
-    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    set_code_action, set_key_action, sign_transaction, sort_package_ops, AccountNumber, Action,
+    ActionFormatter, AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry,
+    ExactAccountNumber, FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher,
+    JointRegistry, Meta, NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp,
+    PackageOpFull, PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService,
+    PrettyAction, SchemaFetcher, SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload,
+    Tapos, TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder,
+    TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1219,7 +1220,20 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names).await?;
+    let packages = PackageList::new()
+        .resolve_changes(&package_registry, &package_names, false, false)
+        .await?;
+    let mut packages: Vec<_> = fetch_packages(&package_registry, packages)
+        .await?
+        .into_iter()
+        .map(|op| {
+            if let PackageOpFull::Install(package) = op {
+                package
+            } else {
+                panic!("Only install is expected when there are no existing packages")
+            }
+        })
+        .collect();
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1588,6 +1602,24 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn fetch_packages<R: PackageRegistry>(
+    reg: &R,
+    ops: Vec<PackageOp>,
+) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
+    let mut result = Vec::with_capacity(ops.len());
+    for op in ops {
+        result.push(match op {
+            PackageOp::Install(info) => PackageOpFull::Install(reg.get_by_info(&info).await?),
+            PackageOp::Replace(meta, info) => {
+                PackageOpFull::Replace(meta, reg.get_by_info(&info).await?)
+            }
+            PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
+        })
+    }
+    sort_package_ops(&mut result)?;
+    Ok(result)
+}
+
 async fn apply_packages<
     R: PackageRegistry,
     F: Fn(Vec<Action>) -> Result<SignedTransaction, anyhow::Error>,
@@ -1604,17 +1636,21 @@ async fn apply_packages<
     key: &Option<AnyPublicKey>,
     compression_level: u32,
 ) -> Result<SchemaMap, anyhow::Error> {
+    let ops = fetch_packages(reg, ops).await?;
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
-            PackageOp::Install(info) => {
-                // TODO: verify ownership of existing accounts
-                let mut package = reg.get_by_info(&info).await?;
+            PackageOpFull::Install(mut package) => {
                 package.load_schemas(base_url, client, &mut schemas).await?;
-                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                out.set_label(format!(
+                    "Installing {}-{}",
+                    package.name(),
+                    package.version()
+                ));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
-                    &info.name, &info.version
+                    package.name(),
+                    package.version()
                 ));
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
@@ -1631,17 +1667,20 @@ async fn apply_packages<
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
-            PackageOp::Replace(meta, info) => {
-                let mut package = reg.get_by_info(&info).await?;
+            PackageOpFull::Replace(meta, mut package) => {
                 package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
-                    &meta.name, &meta.version, &info.name, &info.version
+                    &meta.name,
+                    &meta.version,
+                    package.name(),
+                    package.version()
                 ));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
-                    &info.name, &info.version
+                    package.name(),
+                    package.version()
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
@@ -1662,7 +1701,7 @@ async fn apply_packages<
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
-            PackageOp::Remove(meta) => {
+            PackageOpFull::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
