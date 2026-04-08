@@ -1,4 +1,4 @@
-import { configuredApps } from "@/configuredApps";
+import { configuredApps } from "@/configured-apps";
 import { type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 

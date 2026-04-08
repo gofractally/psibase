@@ -6,7 +6,7 @@ import { useSetGuildDescription } from "@/hooks/fractals/use-set-guild-descripti
 import { useSetGuildDisplayName } from "@/hooks/fractals/use-set-guild-display-name";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { useCurrentUser } from "@shared/hooks/use-current-user";

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { queryClient } from "@shared/lib/query-client";
 import { type Account } from "@shared/lib/schemas/account";
 
-import { FunctionResponse, getUsersAndGroups } from "../lib/graphql/getUsers";
+import { FunctionResponse, getUsersAndGroups } from "../lib/graphql/get-users";
 
 const genQueryKey = (owner: Account, evaluationId: number) => [
     "users",

@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 
-import { OptionalNumber } from "@/lib/queryKeys";
+import { OptionalNumber } from "@/lib/query-keys";
 
 export const useNextEvaluations = (
     interval: OptionalNumber,

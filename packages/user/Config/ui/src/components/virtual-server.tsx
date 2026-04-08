@@ -21,7 +21,7 @@ import {
 } from "@/lib/unit-conversions";
 
 import { useAppForm } from "@shared/components/form/app-form";
-import { parseError } from "@shared/lib/parseErrorMessage";
+import { parseError } from "@shared/lib/parse-error-message";
 import {
     Accordion,
     AccordionContent,

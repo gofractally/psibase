@@ -1,5 +1,5 @@
-import type { Guild } from "@/lib/graphql/fractals/getGuild";
-import type { Score } from "@/lib/graphql/fractals/getScores";
+import type { Guild } from "@/lib/graphql/fractals/get-guild";
+import type { Score } from "@/lib/graphql/fractals/get-scores";
 
 import dayjs from "dayjs";
 

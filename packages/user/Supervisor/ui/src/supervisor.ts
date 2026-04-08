@@ -15,14 +15,14 @@ import {
 import {
     getCallArgs,
     toString,
-} from "@psibase/common-lib/messaging/FunctionCallRequest";
-import { pluginId } from "@psibase/common-lib/messaging/PluginId";
+} from "@psibase/common-lib/messaging/function-call-request";
+import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
-import { AppInterface } from "./appInterace";
-import { CallContext } from "./callContext";
+import { AppInterface } from "./app-interface";
+import { CallContext } from "./call-context";
 import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
-import { PluginLoader } from "./plugin/pluginLoader";
+import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
     OriginationData,
@@ -188,12 +188,11 @@ export class Supervisor implements AppInterface {
         const user = this.supervisorCall(
             getCallArgs("accounts", "plugin", "api", "getCurrentUser", []),
         );
-        
-        if (!user) 
-        {
+
+        if (!user) {
             return undefined;
         }
-        
+
         const token = this.supervisorCall(
             getCallArgs("host", "auth", "api", "getActiveQueryToken", [
                 this.parentOrigination.app,
@@ -201,7 +200,6 @@ export class Supervisor implements AppInterface {
             ]),
         );
         return token;
-        
     }
 
     constructor() {
@@ -406,10 +404,7 @@ export class Supervisor implements AppInterface {
                         err.message,
                     );
                 } else {
-                    newError = new PluginErrorObject(
-                        err.producer,
-                        err.message,
-                    );
+                    newError = new PluginErrorObject(err.producer, err.message);
                 }
                 this.replyToParent(id, newError);
             } else {

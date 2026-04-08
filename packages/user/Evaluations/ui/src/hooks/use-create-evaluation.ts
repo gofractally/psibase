@@ -2,8 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { getEvaluation } from "@/lib/graphql/getEvaluation";
-import { getLastCreatedEvaluationId } from "@/lib/graphql/getLastCreatedEvaluation";
+import { getEvaluation } from "@/lib/graphql/get-evaluation";
+import { getLastCreatedEvaluationId } from "@/lib/graphql/get-last-created-evaluation";
 
 import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";

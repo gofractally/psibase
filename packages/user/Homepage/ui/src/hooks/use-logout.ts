@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { useConnectedAccounts } from "./use-connected-accounts";
 

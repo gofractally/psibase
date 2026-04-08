@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { useUserTokenBalances } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
+import { useUserTokenBalances } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { Quantity } from "@shared/lib/quantity";
 

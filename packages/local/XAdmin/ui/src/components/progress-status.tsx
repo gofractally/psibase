@@ -1,6 +1,6 @@
 import { Progress } from "@shared/shadcn/ui/progress";
 
-import { type TransactionTrace, getActionStack } from "../lib/actionStack";
+import { type TransactionTrace, getActionStack } from "../lib/action-stack";
 import { BootState, RequestUpdate, RequestUpdateSchema } from "../types";
 
 const getStack = (trace: TransactionTrace) => {

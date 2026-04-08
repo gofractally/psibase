@@ -1,5 +1,5 @@
 import { fractalCorePlugin } from "@/lib/plugin";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { getSubDomain } from "@shared/lib/get-sub-domain";
 import { queryClient } from "@shared/lib/query-client";

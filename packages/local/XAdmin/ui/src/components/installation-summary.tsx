@@ -17,7 +17,7 @@ import {
     PopoverTrigger,
 } from "@shared/shadcn/ui/popover";
 
-import { useKeyDevices } from "../hooks/useKeyDevices";
+import { useKeyDevices } from "../hooks/use-key-devices";
 
 interface ChipProps {
     label: string;

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getProposal } from "@/lib/getProposal";
+import { getProposal } from "@/lib/get-proposal";
 
 import { queryClient } from "@shared/lib/query-client";
 import { type Account } from "@shared/lib/schemas/account";

@@ -1,4 +1,4 @@
-import type { TransactionTrace } from "./lib/actionStack";
+import type { TransactionTrace } from "./lib/action-stack";
 
 import { z } from "zod";
 

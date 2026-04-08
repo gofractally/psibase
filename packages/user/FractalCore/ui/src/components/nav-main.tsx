@@ -1,4 +1,4 @@
-import type { Guild } from "@/lib/graphql/fractals/getGuild";
+import type { Guild } from "@/lib/graphql/fractals/get-guild";
 
 import {
     Calendar,

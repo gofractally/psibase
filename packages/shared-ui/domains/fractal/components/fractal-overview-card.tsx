@@ -1,5 +1,5 @@
-import type { FractalRes } from "../lib/graphql/getFractal";
-import type { Membership } from "../lib/graphql/getMembership";
+import type { FractalRes } from "../lib/graphql/get-fractal";
+import type { Membership } from "../lib/graphql/get-membership";
 
 import dayjs from "dayjs";
 import { ChevronRight } from "lucide-react";
@@ -12,7 +12,7 @@ import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 
-import { getMemberLabel } from "../lib/getMemberLabel";
+import { getMemberLabel } from "../lib/get-member-label";
 import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 export const OverviewCard = ({

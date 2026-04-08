@@ -1,4 +1,4 @@
-import { AppConfigType } from "@/configuredApps";
+import { AppConfigType } from "@/configured-apps";
 import { Inbox, Mail, PencilLine, Send } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
