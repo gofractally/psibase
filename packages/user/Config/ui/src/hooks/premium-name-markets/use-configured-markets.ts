@@ -42,10 +42,7 @@ export const useConfiguredPremiumNameMarkets = () =>
                     }
                 }
             `;
-            const raw = await graphql(
-                query,
-                { service: "prem-accounts", path: "/graphql" },
-            );
+            const raw = await graphql(query, { service: "prem-accounts" });
             const parsed = zData.parse(raw);
             return parsed.marketParams;
         },
