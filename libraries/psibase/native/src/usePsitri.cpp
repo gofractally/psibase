@@ -10,8 +10,9 @@ namespace psibase
    // ── Constants ────────────────────────────────────────────────────────
 
    // Root 0: consensus (objective) — all chain databases with DbId prefix
-   // Root 1: subjective — subjective databases with DbId prefix
+   // Root 1: subjective — persistent subjective databases (subjective, nativeSubjective)
    // Root 2: meta — revision management (head, block revisions)
+   // Session databases (session, nativeSession) use in-memory SessionKV maps, not psitri.
    static constexpr uint32_t consensusRootIndex  = 0;
    static constexpr uint32_t subjectiveRootIndex = 1;
    static constexpr uint32_t metaRootIndex       = 2;
@@ -35,6 +36,20 @@ namespace psibase
       return result;
    }
 
+   // ── Database classification helpers ───────────────────────────────
+
+   // Persistent subjective databases (root 1): subjective, nativeSubjective
+   static bool isSubjective(DbId db)
+   {
+      return db >= DbId::beginIndependent && db < DbId::endPersistent;
+   }
+
+   // Non-persistent session databases (root 3): session, nativeSession
+   static bool isSessionDb(DbId db)
+   {
+      return db >= DbId::endPersistent && db < DbId::endIndependent;
+   }
+
    // ── SharedDatabaseImpl ──────────────────────────────────────────────
 
    struct SharedDatabaseImpl
@@ -42,41 +57,62 @@ namespace psibase
       psitri::database_ptr db;
       DatabaseCallbacks*   callbacks = nullptr;
 
+      // Per-instance roots — each clone gets its own copy so mutations on one
+      // chain don't affect others (same semantics as triedent's topRoot).
+      ConstRevisionPtr metaRoot;        // revision management (head, block revisions)
+      ConstRevisionPtr subjectiveRoot;  // persistent subjective databases
+
+      // Session databases live in-memory — no psitri roots, no persistence.
+      // Each SharedDatabaseImpl (including clones) has its own empty maps.
+      SessionOrderedKV sessionKV;      // DbId::session (66) — ordered for Table API
+      SessionOrderedKV nativeSessionKV; // DbId::nativeSession (67) — ordered for Table API
+
       SharedDatabaseImpl(const std::filesystem::path&   dir,
                          const psitri::runtime_config&  config,
                          psitri::open_mode              mode)
       {
          db = psitri::database::open(dir, mode, config);
+         // Load persisted roots
+         auto ws = db->start_write_session();
+         metaRoot       = ws->get_root(metaRootIndex);
+         subjectiveRoot = ws->get_root(subjectiveRootIndex);
       }
 
       SharedDatabaseImpl(const SharedDatabaseImpl& other)
-          : db(other.db)
+          : db(other.db), metaRoot(other.metaRoot), subjectiveRoot(other.subjectiveRoot)
       {
+         // Clone gets snapshots of both roots — subsequent mutations
+         // on either side are independent (COW semantics).
+         // Session databases start empty in clones.
       }
 
-      // Head is just root 0 — get_root uses RW locks internally, thread-safe.
       ConstRevisionPtr getHead(psitri::write_session& ws)
       {
-         return ws.get_root(consensusRootIndex);
+         if (!metaRoot)
+            return {};
+         psitri::cursor c(metaRoot);
+         auto headKey = std::string_view(metaHeadKey, sizeof(metaHeadKey));
+         if (!c.seek(headKey))
+            return {};
+         if (c.is_subtree())
+            return ConstRevisionPtr(c.subtree());
+         return {};
       }
 
-      // Meta-tree operations use a write_cursor directly rather than
-      // start_transaction(), because start_transaction() acquires a
-      // per-root lock — and setHead + writeRevision are often called
-      // together, which would deadlock on root 2.
-      //
-      // The meta tree (root 2) is only mutated by a single writer thread,
-      // so no locking is required.
+      // Meta-tree operations use a write_cursor.  The meta root is per-impl
+      // (not stored in a psitri root), so no locking or root index needed.
 
       void setHead(psitri::write_session& ws, ConstRevisionPtr newHead)
       {
          // Update meta tree: store head pointer as subtree value
-         auto                 metaRoot = ws.get_root(metaRootIndex);
          psitri::write_cursor wc = metaRoot ? psitri::write_cursor(std::move(metaRoot))
-                                            : psitri::write_cursor(ws.allocator_session());
+                                            : *ws.create_write_cursor();
          auto headKey = std::string_view(metaHeadKey, sizeof(metaHeadKey));
          wc.upsert(headKey, newHead);
-         ws.set_root(metaRootIndex, wc.root(), ws.get_sync());
+         metaRoot = wc.root();
+
+         // Persist meta root to psitri root 2 for crash recovery
+         ws.set_root(metaRootIndex, metaRoot, ws.get_sync());
 
          // Publish to root 0 so readers can snapshot the consensus tree
          ws.set_root(consensusRootIndex, std::move(newHead), ws.get_sync());
@@ -86,12 +122,14 @@ namespace psibase
                          const Checksum256&     blockId,
                          ConstRevisionPtr       root)
       {
-         auto                 metaRoot = ws.get_root(metaRootIndex);
          psitri::write_cursor wc = metaRoot ? psitri::write_cursor(std::move(metaRoot))
-                                            : psitri::write_cursor(ws.allocator_session());
+                                            : *ws.create_write_cursor();
          auto key = metaRevisionById(blockId);
          wc.upsert(std::string_view(key.data(), key.size()), std::move(root));
-         ws.set_root(metaRootIndex, wc.root(), ws.get_sync());
+         metaRoot = wc.root();
+
+         // Persist meta root to psitri root 2
+         ws.set_root(metaRootIndex, metaRoot, ws.get_sync());
       }
    };
 
@@ -116,12 +154,6 @@ namespace psibase
       return impl->getHead(writer);
    }
 
-   ConstRevisionPtr SharedDatabase::getHead()
-   {
-      auto rs = impl->db->start_read_session();
-      return rs->get_root(consensusRootIndex);
-   }
-
    ConstRevisionPtr SharedDatabase::emptyRevision()
    {
       // null smart_ptr = empty revision
@@ -140,11 +172,10 @@ namespace psibase
 
    ConstRevisionPtr SharedDatabase::getRevision(Writer& writer, const Checksum256& blockId)
    {
-      auto metaRoot = writer.get_root(metaRootIndex);
-      if (!metaRoot)
+      if (!impl->metaRoot)
          return {};
 
-      psitri::cursor c(metaRoot);
+      psitri::cursor c(impl->metaRoot);
       auto           key = metaRevisionById(blockId);
       if (!c.seek(std::string_view(key.data(), key.size())))
          return {};
@@ -161,13 +192,12 @@ namespace psibase
    void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
       // Get nativeSubjective root for snapshot checks
-      auto subjectiveRoot = writer.get_root(subjectiveRootIndex);
+      auto subjectiveRoot = impl->subjectiveRoot;
 
-      // Use write_cursor directly (not start_transaction) — same thread
-      // reasoning as setHead/writeRevision.
-      auto metaRoot = writer.get_root(metaRootIndex);
-      if (!metaRoot)
+      // Use write_cursor on the per-impl meta root (not psitri root 2 directly).
+      if (!impl->metaRoot)
          return;
+      auto metaRoot = impl->metaRoot;
 
       psitri::write_cursor wc(std::move(metaRoot));
       auto cursor = wc.read_cursor();
@@ -286,7 +316,8 @@ namespace psibase
             wc.remove(std::string_view(key.data(), key.size()));
       }
 
-      writer.set_root(metaRootIndex, wc.root(), writer.get_sync());
+      impl->metaRoot = wc.root();
+      writer.set_root(metaRootIndex, impl->metaRoot, writer.get_sync());
    }
 
    void SharedDatabase::kvPutSubjective(Writer&               writer,
@@ -294,7 +325,26 @@ namespace psibase
                                         std::span<const char> key,
                                         std::span<const char> value)
    {
-      auto tx = writer.start_transaction(subjectiveRootIndex, psitri::tx_mode::batch);
+      if (isSessionDb(db))
+      {
+         if (db == DbId::nativeSession)
+            impl->nativeSessionKV.put(key, value);
+         else
+            impl->sessionKV.put(key, value);
+         return;
+      }
+
+      // Create transaction from per-impl subjective root (not shared psitri root 1)
+      auto* implPtr = impl.get();
+      auto tx = psitri::transaction(
+          writer.allocator_session(),
+          impl->subjectiveRoot,
+          [implPtr, &writer](sal::smart_ptr<sal::alloc_header> new_root) {
+             implPtr->subjectiveRoot = new_root;
+             writer.set_root(subjectiveRootIndex, std::move(new_root), writer.get_sync());
+          },
+          []() {},
+          psitri::tx_mode::batch);
 
       // Prefix key with DbId
       std::vector<char> prefixedKey;
@@ -309,7 +359,25 @@ namespace psibase
 
    void SharedDatabase::kvRemoveSubjective(Writer& writer, DbId db, std::span<const char> key)
    {
-      auto tx = writer.start_transaction(subjectiveRootIndex, psitri::tx_mode::batch);
+      if (isSessionDb(db))
+      {
+         if (db == DbId::nativeSession)
+            impl->nativeSessionKV.remove(key);
+         else
+            impl->sessionKV.remove(key);
+         return;
+      }
+
+      auto* implPtr = impl.get();
+      auto tx = psitri::transaction(
+          writer.allocator_session(),
+          impl->subjectiveRoot,
+          [implPtr, &writer](sal::smart_ptr<sal::alloc_header> new_root) {
+             implPtr->subjectiveRoot = new_root;
+             writer.set_root(subjectiveRootIndex, std::move(new_root), writer.get_sync());
+          },
+          []() {},
+          psitri::tx_mode::batch);
 
       std::vector<char> prefixedKey;
       prefixedKey.reserve(1 + key.size());
@@ -324,7 +392,15 @@ namespace psibase
                                                                     DbId                  db,
                                                                     std::span<const char> key)
    {
-      auto root = writer.get_root(subjectiveRootIndex);
+      if (isSessionDb(db))
+      {
+         if (db == DbId::nativeSession)
+            return impl->nativeSessionKV.get(key);
+         else
+            return impl->sessionKV.get(key);
+      }
+
+      auto root = impl->subjectiveRoot;
       if (!root)
          return std::nullopt;
 
@@ -338,10 +414,14 @@ namespace psibase
           std::string_view(prefixedKey.data(), prefixedKey.size()));
    }
 
-   sal::allocator_session_ptr SharedDatabase::readAllocatorSession() const
+   SessionOrderedKV& SharedDatabase::nativeSessionMap()
    {
-      auto rs = impl->db->start_read_session();
-      return rs->allocator_session();
+      return impl->nativeSessionKV;
+   }
+
+   SessionOrderedKV& SharedDatabase::sessionMap()
+   {
+      return impl->sessionKV;
    }
 
    bool SharedDatabase::isSlow() const
@@ -375,20 +455,6 @@ namespace psibase
       _prefixedKey.push_back(static_cast<char>(db));
       _prefixedKey.insert(_prefixedKey.end(), key.begin(), key.end());
       return {_prefixedKey.data(), _prefixedKey.size()};
-   }
-
-   static bool isEphemeral(DbId db)
-   {
-      return db >= DbId::endPersistent;
-   }
-
-   static bool isSubjective(DbId db)
-   {
-      // All independent databases (subjective, nativeSubjective, session, nativeSession)
-      // are stored in psitri root 1.  Session databases are "not preserved when the server
-      // exits" but must persist during a running session — they live in the same subjective
-      // tree and are cleared on startup rather than stored in ephemeral maps.
-      return db >= DbId::beginIndependent && db < DbId::endIndependent;
    }
 
    KVStore::MemoryKV* kvStoreEphemeral(KVStore& store, DbId db)
@@ -475,19 +541,30 @@ namespace psibase
    // Returns a read cursor for the given db.
    // For subjective dbs, if no transaction is active, reads directly from
    // the writer's current subjective root — readers don't block writers.
-   psitri::cursor KVStore::readCursorForDb(DbId db)
+   // Session databases use in-memory maps and never need cursors.
+   std::optional<psitri::cursor> KVStore::readCursorForDb(DbId db)
    {
       if (isSubjective(db))
       {
          if (subjective_tx)
             return subjective_tx->read_cursor();
-         // Read-only fallback: cursor from current subjective root.
-         // Readers don't need checkout — they just snapshot the current root.
-         check(_writer != nullptr, "no writer for subjective read");
-         return psitri::cursor(_writer->get_root(subjectiveRootIndex));
+         // User-visible subjective database requires checkout
+         check(db != DbId::subjective,
+               "subjectiveCheckout is required to access the subjective database");
+         // nativeSubjective: fallback read from per-impl root (for XDb::open → isLocal)
+         check(_shared_db != nullptr, "no shared database for subjective read");
+         auto root = _shared_db->impl->subjectiveRoot;
+         if (!root)
+            return std::nullopt;
+         return psitri::cursor(std::move(root));
       }
-      check(consensus_tx != nullptr, "no consensus transaction active");
-      return consensus_tx->read_cursor();
+      // Session databases are in-memory — should not reach here
+      check(!isSessionDb(db), "session databases do not use psitri cursors");
+      if (consensus_tx)
+         return consensus_tx->read_cursor();
+      if (consensus_cursor.has_value())
+         return *consensus_cursor;
+      return std::nullopt;
    }
 
    // ── KV operations ───────────────────────────────────────────────────
@@ -500,10 +577,27 @@ namespace psibase
          return;
       }
 
+      if (isSessionDb(db))
+      {
+         auto keySpan = std::span<const char>{key.pos, static_cast<size_t>(key.end - key.pos)};
+         auto valSpan = std::span<const char>{value.pos, static_cast<size_t>(value.end - value.pos)};
+         if (db == DbId::session)
+         {
+            check(session_ordered_kv != nullptr, "session database not available");
+            session_ordered_kv->put(keySpan, valSpan);
+         }
+         else
+         {
+            check(session_native_kv != nullptr, "nativeSession database not available");
+            session_native_kv->put(keySpan, valSpan);
+         }
+         return;
+      }
+
       psitri::transaction* tx;
       if (isSubjective(db))
       {
-         check(subjective_tx != nullptr, "subjective checkout required");
+         check(subjective_tx != nullptr, "subjectiveCheckout is required to access the subjective database");
          tx = subjective_tx;
       }
       else
@@ -524,10 +618,26 @@ namespace psibase
          return;
       }
 
+      if (isSessionDb(db))
+      {
+         auto keySpan = std::span<const char>{key.pos, static_cast<size_t>(key.end - key.pos)};
+         if (db == DbId::session)
+         {
+            check(session_ordered_kv != nullptr, "session database not available");
+            session_ordered_kv->remove(keySpan);
+         }
+         else
+         {
+            check(session_native_kv != nullptr, "nativeSession database not available");
+            session_native_kv->remove(keySpan);
+         }
+         return;
+      }
+
       psitri::transaction* tx;
       if (isSubjective(db))
       {
-         check(subjective_tx != nullptr, "subjective checkout required");
+         check(subjective_tx != nullptr, "subjectiveCheckout is required to access the subjective database");
          tx = subjective_tx;
       }
       else
@@ -545,9 +655,29 @@ namespace psibase
       if (auto* mem = kvStoreEphemeral(*this, db))
          return ephemeralGet(*mem, key);
 
+      if (isSessionDb(db))
+      {
+         auto keySpan = std::span<const char>{key.pos, static_cast<size_t>(key.end - key.pos)};
+         std::optional<std::vector<char>> val;
+         if (db == DbId::session)
+         {
+            check(session_ordered_kv != nullptr, "session database not available");
+            val = session_ordered_kv->get(keySpan);
+         }
+         else
+         {
+            check(session_native_kv != nullptr, "nativeSession database not available");
+            val = session_native_kv->get(keySpan);
+         }
+         if (!val)
+            return {};
+         _valueBuffer = std::move(*val);
+         return psio::input_stream{_valueBuffer};
+      }
+
       auto pk = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
 
-      // Fast path: use transaction::get() for point lookups when checked out
+      // Fast path: use transaction::get() for point lookups when a transaction is active
       psitri::transaction* tx = nullptr;
       if (isSubjective(db))
          tx = subjective_tx;
@@ -562,16 +692,93 @@ namespace psibase
          return psio::input_stream{_valueBuffer};
       }
 
-      // Read-only fallback for subjective reads without checkout
-      check(_writer != nullptr, "no writer or transaction for read");
-      auto cursor = psitri::cursor(_writer->get_root(subjectiveRootIndex));
-      if (!cursor.seek(pk))
+      // Cursor fallback for read-only access (consensus only)
+      auto optCursor = readCursorForDb(db);
+      if (!optCursor || !optCursor->seek(pk))
          return {};
-      auto val = cursor.value<std::vector<char>>();
+      auto val = optCursor->value<std::vector<char>>();
       if (!val)
          return {};
       _valueBuffer = std::move(*val);
       return psio::input_stream{_valueBuffer};
+   }
+
+   // Helper: kvGreaterEqual on an ordered map (absl::btree_map or std::map)
+   template <typename OrderedMap>
+   static std::optional<KVStore::KVResult> orderedGreaterEqual(OrderedMap&        m,
+                                                                psio::input_stream key,
+                                                                size_t             matchKeySize,
+                                                                std::vector<char>& keyBuf,
+                                                                std::vector<char>& valBuf)
+   {
+      auto it = m.lower_bound(std::vector<char>(key.pos, key.end));
+      if (it == m.end())
+         return {};
+      if (matchKeySize &&
+          (it->first.size() < matchKeySize ||
+           memcmp(it->first.data(), key.pos, matchKeySize) != 0))
+         return {};
+      keyBuf = it->first;
+      valBuf = it->second;
+      return KVStore::KVResult{{keyBuf}, {valBuf}};
+   }
+
+   // Helper: kvLessThan on an ordered map
+   template <typename OrderedMap>
+   static std::optional<KVStore::KVResult> orderedLessThan(OrderedMap&        m,
+                                                            psio::input_stream key,
+                                                            size_t             matchKeySize,
+                                                            std::vector<char>& keyBuf,
+                                                            std::vector<char>& valBuf)
+   {
+      auto it = m.lower_bound(std::vector<char>(key.pos, key.end));
+      if (it == m.begin())
+         return {};
+      --it;
+      if (matchKeySize &&
+          (it->first.size() < matchKeySize ||
+           memcmp(it->first.data(), key.pos, matchKeySize) != 0))
+         return {};
+      keyBuf = it->first;
+      valBuf = it->second;
+      return KVStore::KVResult{{keyBuf}, {valBuf}};
+   }
+
+   // Helper: kvMax on an ordered map
+   template <typename OrderedMap>
+   static std::optional<KVStore::KVResult> orderedMax(OrderedMap&        m,
+                                                       psio::input_stream key,
+                                                       std::vector<char>& keyBuf,
+                                                       std::vector<char>& valBuf)
+   {
+      auto keyVec = std::vector<char>(key.pos, key.end);
+      auto upper  = keyVec;
+      while (!upper.empty() && static_cast<unsigned char>(upper.back()) == 0xffu)
+         upper.pop_back();
+      if (upper.empty())
+      {
+         if (m.empty())
+            return {};
+         auto it = m.end();
+         --it;
+         if (it->first.size() < keyVec.size() ||
+             memcmp(it->first.data(), keyVec.data(), keyVec.size()) != 0)
+            return {};
+         keyBuf = it->first;
+         valBuf = it->second;
+         return KVStore::KVResult{{keyBuf}, {valBuf}};
+      }
+      ++upper.back();
+      auto it = m.lower_bound(upper);
+      if (it == m.begin())
+         return {};
+      --it;
+      if (it->first.size() < keyVec.size() ||
+          memcmp(it->first.data(), keyVec.data(), keyVec.size()) != 0)
+         return {};
+      keyBuf = it->first;
+      valBuf = it->second;
+      return KVStore::KVResult{{keyBuf}, {valBuf}};
    }
 
    std::optional<KVStore::KVResult> KVStore::kvGreaterEqualRaw(DbId               db,
@@ -581,14 +788,25 @@ namespace psibase
       if (auto* mem = kvStoreEphemeral(*this, db))
          return ephemeralGreaterEqual(*mem, key, matchKeySize);
 
-      auto pk     = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
-      auto cursor = readCursorForDb(db);
+      if (isSessionDb(db))
+      {
+         auto* kv = (db == DbId::session) ? session_ordered_kv : session_native_kv;
+         check(kv != nullptr, "session database not available");
+         std::shared_lock lock(kv->mutex);
+         return orderedGreaterEqual(kv->data, key, matchKeySize,
+                                    _keyBuffer, _valueBuffer);
+      }
 
-      // lower_bound returns true = positioned at valid key, false = at end
-      if (!cursor.lower_bound(pk))
+      auto pk       = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
+      auto optCursor = readCursorForDb(db);
+      if (!optCursor)
          return {};
 
-      auto foundKey = cursor.key();
+      // lower_bound returns true = positioned at valid key, false = at end
+      if (!optCursor->lower_bound(pk))
+         return {};
+
+      auto foundKey = optCursor->key();
 
       // Verify we're still within this DbId's prefix
       if (foundKey.empty() || foundKey[0] != static_cast<char>(db))
@@ -603,7 +821,7 @@ namespace psibase
          return {};
 
       // Read value
-      auto val = cursor.value<std::vector<char>>();
+      auto val = optCursor->value<std::vector<char>>();
       if (!val)
          return {};
 
@@ -619,25 +837,36 @@ namespace psibase
       if (auto* mem = kvStoreEphemeral(*this, db))
          return ephemeralLessThan(*mem, key, matchKeySize);
 
-      auto pk     = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
-      auto cursor = readCursorForDb(db);
+      if (isSessionDb(db))
+      {
+         auto* kv = (db == DbId::session) ? session_ordered_kv : session_native_kv;
+         check(kv != nullptr, "session database not available");
+         std::shared_lock lock(kv->mutex);
+         return orderedLessThan(kv->data, key, matchKeySize,
+                                _keyBuffer, _valueBuffer);
+      }
+
+      auto pk       = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
+      auto optCursor = readCursorForDb(db);
+      if (!optCursor)
+         return {};
 
       // Position at or after key, then go back one
       // lower_bound returns true = positioned at valid key, false = at end
-      if (cursor.lower_bound(pk))
+      if (optCursor->lower_bound(pk))
       {
          // Positioned at a key >= pk — go to previous
-         if (!cursor.prev())
+         if (!optCursor->prev())
             return {};  // nothing before
       }
       else
       {
          // At end — go to last key
-         if (!cursor.seek_last())
+         if (!optCursor->seek_last())
             return {};  // tree is empty
       }
 
-      auto foundKey = cursor.key();
+      auto foundKey = optCursor->key();
 
       // Verify still within this DbId's prefix
       if (foundKey.empty() || foundKey[0] != static_cast<char>(db))
@@ -649,7 +878,7 @@ namespace psibase
           (matchKeySize && memcmp(strippedKey.data(), key.pos, matchKeySize) != 0))
          return {};
 
-      auto val = cursor.value<std::vector<char>>();
+      auto val = optCursor->value<std::vector<char>>();
       if (!val)
          return {};
 
@@ -663,9 +892,19 @@ namespace psibase
       if (auto* mem = kvStoreEphemeral(*this, db))
          return ephemeralMax(*mem, key);
 
+      if (isSessionDb(db))
+      {
+         auto* kv = (db == DbId::session) ? session_ordered_kv : session_native_kv;
+         check(kv != nullptr, "session database not available");
+         std::shared_lock lock(kv->mutex);
+         return orderedMax(kv->data, key, _keyBuffer, _valueBuffer);
+      }
+
       // key is the prefix — find last entry with this prefix under DbId
-      auto pk     = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
-      auto cursor = readCursorForDb(db);
+      auto pk       = prefixKey(db, {key.pos, static_cast<size_t>(key.end - key.pos)});
+      auto optCursor = readCursorForDb(db);
+      if (!optCursor)
+         return {};
 
       // Find end of prefix range: upper_bound on the prefix
       // Build the next-prefix key by incrementing the last byte
@@ -676,28 +915,28 @@ namespace psibase
       if (upperKey.empty())
       {
          // prefix is all 0xff — seek to last
-         if (!cursor.seek_last())
+         if (!optCursor->seek_last())
             return {};
       }
       else
       {
          ++upperKey.back();
          // lower_bound returns true = positioned at valid key, false = at end
-         if (cursor.lower_bound(std::string_view(upperKey.data(), upperKey.size())))
+         if (optCursor->lower_bound(std::string_view(upperKey.data(), upperKey.size())))
          {
             // Positioned at key >= upper — go to previous
-            if (!cursor.prev())
+            if (!optCursor->prev())
                return {};
          }
          else
          {
             // At end — seek to last
-            if (!cursor.seek_last())
+            if (!optCursor->seek_last())
                return {};
          }
       }
 
-      auto foundKey = cursor.key();
+      auto foundKey = optCursor->key();
 
       // Verify still in this DbId's prefix
       if (foundKey.empty() || foundKey[0] != static_cast<char>(db))
@@ -711,7 +950,7 @@ namespace psibase
           memcmp(strippedKey.data(), key.pos, prefixLen) != 0)
          return {};
 
-      auto val = cursor.value<std::vector<char>>();
+      auto val = optCursor->value<std::vector<char>>();
       if (!val)
          return {};
 
@@ -724,9 +963,16 @@ namespace psibase
 
    ConstRevisionPtr KVStore::getPrevAuthServices()
    {
-      check(consensus_tx != nullptr, "no consensus transaction active");
       auto prevKey = std::string_view(prevAuthServicesKey, sizeof(prevAuthServicesKey));
-      return ConstRevisionPtr(consensus_tx->get_subtree(prevKey));
+      if (consensus_tx)
+         return ConstRevisionPtr(consensus_tx->get_subtree(prevKey));
+      // Read-only cursor path
+      if (!consensus_cursor.has_value())
+         return {};  // Empty database
+      auto c = *consensus_cursor;
+      if (c.seek(prevKey) && c.is_subtree())
+         return c.subtree();
+      return {};
    }
 
    void KVStore::setPrevAuthServices(ConstRevisionPtr revision)
@@ -754,14 +1000,30 @@ namespace psibase
    {
       if (_subjective_tx_storage.has_value())
       {
-         // Nested checkout: create a sub-transaction savepoint
+         // Nested checkout: create sub-transaction savepoints
          _subjective_frames.emplace_back(_subjective_tx_storage->sub_transaction());
          return;
       }
       _subjective_shared = &shared;
-      _subjective_tx_storage.emplace(ws.start_transaction(subjectiveRootIndex, psitri::tx_mode::batch));
-      subjective_tx  = &*_subjective_tx_storage;
-      _callbackFlags = 0;
+
+      // Create transaction from per-impl subjective root (not shared psitri root 1).
+      // This ensures cloned chains have independent subjective state.
+      auto* implPtr = shared.impl.get();
+      _subjective_tx_storage.emplace(
+          ws.allocator_session(),
+          shared.impl->subjectiveRoot,
+          [implPtr, &ws](sal::smart_ptr<sal::alloc_header> new_root) {
+             implPtr->subjectiveRoot = new_root;
+             ws.set_root(subjectiveRootIndex, std::move(new_root), ws.get_sync());
+          },
+          []() {},
+          psitri::tx_mode::batch);
+      subjective_tx = &*_subjective_tx_storage;
+
+      // Session databases use in-memory maps — just set the pointers
+      session_ordered_kv = &shared.impl->sessionKV;
+      session_native_kv  = &shared.impl->nativeSessionKV;
+      _callbackFlags     = 0;
    }
 
    void KVStore::checkoutEmptySubjective(Writer& ws)
@@ -771,19 +1033,24 @@ namespace psibase
          _subjective_frames.emplace_back(_subjective_tx_storage->sub_transaction());
          return;
       }
+      auto session = ws.allocator_session();
       _subjective_tx_storage.emplace(
-          ws.allocator_session(),
+          session,
           sal::smart_ptr<sal::alloc_header>{},  // null = empty tree
           [](sal::smart_ptr<sal::alloc_header>) {},  // no-op commit
           []() {},  // no-op rollback
           psitri::tx_mode::batch);
       subjective_tx  = &*_subjective_tx_storage;
+      // No session pointers for empty checkout — session databases remain inaccessible
       _callbackFlags = 0;
    }
 
    bool KVStore::commitSubjective(Sockets& sockets, SocketAutoCloseSet& closing)
    {
-      check(_subjective_tx_storage.has_value(),
+      auto currentDepth = _subjective_tx_storage.has_value()
+                              ? 1 + _subjective_frames.size()
+                              : std::size_t(0);
+      check(currentDepth > _subjectiveLimit,
             "commitSubjective requires checkoutSubjective");
 
       if (!_subjective_frames.empty())
@@ -796,6 +1063,8 @@ namespace psibase
       _subjective_tx_storage->commit();
       _subjective_tx_storage.reset();
       subjective_tx = nullptr;
+      session_ordered_kv = nullptr;
+      session_native_kv  = nullptr;
 
       if (_callbackFlags && _subjective_shared && _subjective_shared->impl->callbacks)
       {
@@ -807,21 +1076,24 @@ namespace psibase
 
    void KVStore::abortSubjective()
    {
+      auto currentDepth = _subjective_tx_storage.has_value()
+                              ? 1 + _subjective_frames.size()
+                              : std::size_t(0);
+      check(currentDepth > _subjectiveLimit,
+            "abortSubjective requires checkoutSubjective");
+
       if (!_subjective_frames.empty())
       {
-         // Nested abort: roll back just the innermost sub-transaction
-         // (destructor without commit = abort)
          _subjective_frames.pop_back();
          return;
       }
 
       // Top-level abort
-      if (_subjective_tx_storage.has_value())
-      {
-         _subjective_tx_storage->abort();
-         _subjective_tx_storage.reset();
-         subjective_tx = nullptr;
-      }
+      _subjective_tx_storage->abort();
+      _subjective_tx_storage.reset();
+      subjective_tx = nullptr;
+      session_ordered_kv = nullptr;
+      session_native_kv  = nullptr;
       _subjective_shared = nullptr;
    }
 
@@ -870,6 +1142,8 @@ namespace psibase
             _subjective_tx_storage->abort();
             _subjective_tx_storage.reset();
             subjective_tx      = nullptr;
+            session_ordered_kv = nullptr;
+            session_native_kv  = nullptr;
             _subjective_shared = nullptr;
          }
          currentDepth = _subjective_tx_storage.has_value()

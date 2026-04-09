@@ -31,6 +31,19 @@ if(IS_NATIVE)
 
     # PsiTri — persistent key-value store (replaces triedent)
     add_subdirectory(psitri EXCLUDE_FROM_ALL)
+
+    # Abseil — used for absl::btree_map in session databases
+    include(FetchContent)
+    set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
+    set(ABSL_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        abseil
+        GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+        GIT_TAG        20240722.0
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(abseil)
 endif()
 
 if(IS_WASM)

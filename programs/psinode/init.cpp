@@ -186,8 +186,8 @@ std::filesystem::path package_path();
 
 void initialize_database(SystemContext& context, const std::string& template_)
 {
-   BlockContext bc{context, context.sharedDatabase.getHead(), context.sharedDatabase.createWriter(),
-                   true};
+   auto        writer = context.sharedDatabase.createWriter();
+   BlockContext bc{context, context.sharedDatabase.getHead(*writer), std::move(writer), true};
 
    SignedTransaction  trx;
    TransactionTrace   trace;

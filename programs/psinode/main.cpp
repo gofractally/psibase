@@ -1802,8 +1802,9 @@ void run(const std::string&              db_path,
                     .method  = MethodNumber{"startSession"},
                     .rawData = psio::to_frac(std::tuple())};
 
-         BlockContext bc{*system, system->sharedDatabase.getHead(),
-                         system->sharedDatabase.createWriter(), true};
+         auto writer = system->sharedDatabase.createWriter();
+         BlockContext bc{*system, system->sharedDatabase.getHead(*writer),
+                         std::move(writer), true};
 
          bc.execAsyncAction(std::move(act));
       }

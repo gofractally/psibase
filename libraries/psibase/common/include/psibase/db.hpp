@@ -147,10 +147,21 @@ namespace psibase
 
       endPersistent,
 
-      /// Data that is not part of consensus and is not preserved when the server exits
+      /// Data that is not part of consensus and is not preserved when the server exits.
+      ///
+      /// Like `subjective`, but cleared on server startup and shutdown. All
+      /// connections share a single instance of this database — there is no
+      /// per-client or per-connection isolation. Used for server-lifetime state
+      /// such as open socket tracking.
+      ///
+      /// The first 64 bits of the key match the service. Services are
+      /// not allowed to read or write keys belonging to other services.
       session = endPersistent,
 
-      /// Native subjective tables that are not preserved when the server exits
+      /// Native tables that are not preserved when the server exits.
+      ///
+      /// Used by native code (e.g. socket management) for server-lifetime state.
+      /// Cleared on startup and shutdown, shared across all connections.
       nativeSession,
 
       endIndependent,

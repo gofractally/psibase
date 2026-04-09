@@ -14,10 +14,20 @@ namespace psibase
          isProducing{isProducing}
    {
       kv.setBaseRevision(revision);
-      kv._writer = this->writer.get();
-      // start_transaction(0) properly retains the root, sets up the commit
-      // callback to publish root 0, and acquires the per-root lock.
-      consensus_tx.emplace(this->writer->start_transaction(0, psitri::tx_mode::batch));
+      kv._writer    = this->writer.get();
+      kv._shared_db = &systemContext.sharedDatabase;
+      // Create a transaction from the specific revision root, not from root 0's
+      // published state.  This is critical for fork handling: different BlockContexts
+      // may start from different revisions (e.g. fork A vs fork B), but root 0 only
+      // reflects the most recently published head.
+      auto* ws = this->writer.get();
+      consensus_tx.emplace(
+          this->writer->allocator_session(),
+          std::move(revision),
+          [ws](sal::smart_ptr<sal::alloc_header> new_root)
+          { ws->set_root(0, std::move(new_root), ws->get_sync()); },
+          []() {},
+          psitri::tx_mode::batch);
       kv.consensus_tx = &*consensus_tx;
       trxLogger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("transaction")));
@@ -30,14 +40,9 @@ namespace psibase
          isReadOnly{true}
    {
       kv.setBaseRevision(revision);
-      // Read-only: create a no-op transaction for cursor access
-      consensus_tx.emplace(
-          systemContext.sharedDatabase.readAllocatorSession(),
-          std::move(revision),
-          [](sal::smart_ptr<sal::alloc_header>) {},  // no-op commit
-          []() {},                                    // no-op rollback
-          psitri::tx_mode::batch);
-      kv.consensus_tx = &*consensus_tx;
+      // Read-only: use cursor directly, no transaction needed
+      if (revision)
+         kv.consensus_cursor.emplace(std::move(revision));
       trxLogger.add_attribute("Channel",
                               boost::log::attributes::constant(std::string("transaction")));
    }

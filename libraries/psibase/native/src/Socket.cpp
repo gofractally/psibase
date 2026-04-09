@@ -231,16 +231,12 @@ namespace
 
 Sockets::Sockets(SharedDatabase sharedDb) : sharedDb(std::move(sharedDb))
 {
-   auto    writer = this->sharedDb.createWriter();
-   KVStore kv;
-   kv.checkoutSubjective(*writer, this->sharedDb);
-   auto key       = psio::convert_to_key(socketPrefix());
-   auto prefixLen = key.size();
-   if (kv.kvGreaterEqualRaw(SocketRow::db, key, prefixLen))
+   // Session databases use in-memory maps that start empty —
+   // no need to query the database to verify emptiness.
+   if (!this->sharedDb.nativeSessionMap().empty())
    {
       abortMessage("Socket table should start empty");
    }
-   kv.abortSubjective();
 }
 
 void Sockets::shutdown()

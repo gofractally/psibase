@@ -196,8 +196,8 @@ namespace
          auto           writer = systemContext->sharedDatabase.createWriter();
          auto           claim  = Claim{genesisProducer};
          CompoundProver prover;
-         BlockContext blockContext(*systemContext, systemContext->sharedDatabase.getHead(), writer,
-                                   true);
+         BlockContext blockContext(*systemContext, systemContext->sharedDatabase.getHead(*writer),
+                                   writer, true);
          blockContext.start(TimePointSec{}, genesisProducer, 0, 0);
          blockContext.callStartBlock();
          for (auto&& trx : makeBoot(*init))

@@ -197,7 +197,7 @@ function(add suffix)
     if(DEFINED IS_NATIVE)
         find_package(Boost 1.70 CONFIG REQUIRED COMPONENTS filesystem log)
 
-        target_link_libraries(psibase${suffix} PUBLIC eos-vm psitri Boost::filesystem Boost::log debug_eos_vm -ldl)
+        target_link_libraries(psibase${suffix} PUBLIC eos-vm psitri absl::btree Boost::filesystem Boost::log debug_eos_vm -ldl)
         target_include_directories(psibase${suffix} PUBLIC
             native/include
             common/include)

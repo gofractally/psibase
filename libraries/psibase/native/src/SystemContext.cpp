@@ -79,8 +79,9 @@ namespace psibase
          std::lock_guard<std::mutex> lock{impl->mutex};
          return impl->db;
       }();
-      auto           head = sharedDb.getHead();
-      RevisionAccess ra{sharedDb, std::move(head)};
+      auto           writer = sharedDb.createWriter();
+      auto           head   = sharedDb.getHead(*writer);
+      RevisionAccess ra{*writer, std::move(head)};
       if (auto status = ra.kv.kvGet<StatusRow>(StatusRow::db, statusKey()))
       {
          if (status->head)

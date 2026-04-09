@@ -315,6 +315,9 @@ struct test_chain
 
    explicit test_chain(const test_chain& other) : test_chain{other.state, other.db.clone()}
    {
+      // Use the source chain's head, not root 0 (which may have been
+      // advanced by a different chain sharing the same database).
+      head = other.head;
       sys->sockets->set(*writer, psibase::SocketRow::producer_multicast,
                         std::make_shared<NullSocket>());
       sys->sockets->set(*writer, psibase::SocketRow::log, psibase::makeLogSocket());

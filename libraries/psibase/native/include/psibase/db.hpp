@@ -11,7 +11,9 @@
 #include <filesystem>
 #include <map>
 #include <optional>
+#include <shared_mutex>
 
+#include <absl/container/btree_map.h>
 #include <psitri/database.hpp>
 #include <psitri/transaction.hpp>
 #include <sal/smart_ptr_impl.hpp>
@@ -38,6 +40,58 @@ namespace psibase
    // still references Writer / WriterPtr. These expose psitri types directly.
    using Writer    = psitri::write_session;
    using WriterPtr = WriteSessionPtr;
+
+   // ── Session database maps ───────────────────────────────────────────
+   //
+   // Session data is server-lifetime only — not persisted to disk, no
+   // undo/rollback.  A shared_mutex gives concurrent reads with exclusive
+   // writes.
+   //
+   // SessionOrderedKV — sorted btree_map for both session (DbId 66) and
+   //   nativeSession (DbId 67).  Supports lower_bound/upper_bound for
+   //   WASM Table API index operations.
+
+   struct SessionOrderedKV
+   {
+      using Map = absl::btree_map<std::vector<char>, std::vector<char>>;
+
+      mutable std::shared_mutex mutex;
+      Map                       data;
+
+      void put(std::span<const char> key, std::span<const char> value)
+      {
+         std::unique_lock lock(mutex);
+         data[std::vector<char>(key.begin(), key.end())] =
+             std::vector<char>(value.begin(), value.end());
+      }
+
+      void remove(std::span<const char> key)
+      {
+         std::unique_lock lock(mutex);
+         data.erase(std::vector<char>(key.begin(), key.end()));
+      }
+
+      std::optional<std::vector<char>> get(std::span<const char> key) const
+      {
+         std::shared_lock lock(mutex);
+         auto             it = data.find(std::vector<char>(key.begin(), key.end()));
+         if (it == data.end())
+            return std::nullopt;
+         return it->second;
+      }
+
+      bool empty() const
+      {
+         std::shared_lock lock(mutex);
+         return data.empty();
+      }
+
+      void clear()
+      {
+         std::unique_lock lock(mutex);
+         data.clear();
+      }
+   };
 
    // ── Callbacks ────────────────────────────────────────────────────────
 
@@ -96,7 +150,6 @@ namespace psibase
       SharedDatabase clone() const;
 
       ConstRevisionPtr getHead(Writer& writer);
-      ConstRevisionPtr getHead();  // read-only path (creates temporary session)
       ConstRevisionPtr emptyRevision();
       WriteSessionPtr  createWriter();
       void             setHead(Writer& writer, ConstRevisionPtr revision);
@@ -118,8 +171,9 @@ namespace psibase
                                                        DbId                  db,
                                                        std::span<const char> key);
 
-      // Get an allocator session for read-only cursor access
-      sal::allocator_session_ptr readAllocatorSession() const;
+      // Returns the in-memory session maps (defined on SharedDatabaseImpl)
+      SessionOrderedKV& nativeSessionMap();
+      SessionOrderedKV& sessionMap();
 
       bool                               isSlow() const;
       std::vector<std::span<const char>> span() const;
@@ -143,12 +197,23 @@ namespace psibase
          psio::input_stream value;
       };
 
-      // Active transactions — set by BlockContext
+      // Active transactions — set by BlockContext for read/write paths
       psitri::transaction* consensus_tx  = nullptr;
-      psitri::transaction* subjective_tx = nullptr;
+      psitri::transaction* subjective_tx = nullptr;  // persistent subjective (root 1)
+
+      // Session databases — in-memory maps, no psitri needed
+      SessionOrderedKV* session_ordered_kv = nullptr;  // DbId::session (66)
+      SessionOrderedKV* session_native_kv  = nullptr;  // DbId::nativeSession (67)
+
+      // Read-only consensus cursor — used when no transaction is active
+      // (e.g. RevisionAccess for read-only queries against a specific revision)
+      std::optional<psitri::cursor> consensus_cursor;
 
       // Writer for read-only subjective access (reads current root without checkout)
       Writer* _writer = nullptr;
+
+      // SharedDatabase pointer for per-impl subjective root fallback reads
+      SharedDatabase* _shared_db = nullptr;
 
       // Ephemeral databases — in-memory only (temporary is per-transaction)
       using MemoryKV = std::map<std::vector<char>, std::vector<char>>;
@@ -249,8 +314,8 @@ namespace psibase
       // Prepend DbId byte to key, return view into _prefixedKey buffer
       std::string_view prefixKey(DbId db, std::span<const char> key);
 
-      // Read cursor that works for both checked-out and read-only subjective access
-      psitri::cursor readCursorForDb(DbId db);
+      // Read cursor — returns nullopt if no data source (empty database)
+      std::optional<psitri::cursor> readCursorForDb(DbId db);
 
       // Helpers for ephemeral database operations
       std::optional<psio::input_stream> ephemeralGet(MemoryKV& m, psio::input_stream key);
@@ -269,29 +334,26 @@ namespace psibase
 
    struct RevisionAccess
    {
-      KVStore             kv;
-      psitri::transaction tx;
+      KVStore                          kv;
+      std::optional<psitri::transaction> tx;
 
-      // Write access from revision (requires a write session)
+      // Read/write access to a revision (requires a write session)
       RevisionAccess(Writer& writer, ConstRevisionPtr revision)
-          : tx(writer.allocator_session(),
+          : tx(std::in_place,
+               writer.allocator_session(),
                std::move(revision),
                [](sal::smart_ptr<sal::alloc_header>) {},
                []() {},
                psitri::tx_mode::batch)
       {
-         kv.consensus_tx = &tx;
+         kv.consensus_tx = &*tx;
       }
 
-      // Read-only access from revision
-      RevisionAccess(SharedDatabase& shared, ConstRevisionPtr revision)
-          : tx(shared.readAllocatorSession(),
-               std::move(revision),
-               [](sal::smart_ptr<sal::alloc_header>) {},
-               []() {},
-               psitri::tx_mode::batch)
+      // Read-only access to a revision via cursor (no writer or session needed)
+      RevisionAccess(SharedDatabase&, ConstRevisionPtr revision)
       {
-         kv.consensus_tx = &tx;
+         if (revision)
+            kv.consensus_cursor.emplace(std::move(revision));
       }
 
       RevisionAccess(const RevisionAccess&)            = delete;

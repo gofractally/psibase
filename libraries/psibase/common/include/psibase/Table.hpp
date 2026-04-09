@@ -1152,7 +1152,7 @@ namespace psibase
    template <typename... Tables>
    using SubjectiveTables = DbTables<DbId::subjective, Tables...>;
 
-   /// Defines tables in the `temporary` database
+   /// Defines tables in the `session` database
    template <typename... Tables>
    using SessionTables = DbTables<DbId::session, Tables...>;
 

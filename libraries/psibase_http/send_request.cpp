@@ -171,8 +171,9 @@ namespace
          auto system = self->server.sharedState->getSystemContext();
 
          psio::finally f{[&]() { self->server.sharedState->addSystemContext(std::move(system)); }};
-         BlockContext  bc{*system, system->sharedDatabase.getHead(),
-                         system->sharedDatabase.createWriter(), true};
+         auto          w = system->sharedDatabase.createWriter();
+         BlockContext  bc{*system, system->sharedDatabase.getHead(*w),
+                         std::move(w), true};
          bc.start();
 
          self->writeInfo(*bc.writer);

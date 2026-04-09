@@ -2036,8 +2036,9 @@ namespace psibase
                        .rawData = psio::to_frac(std::tuple(sock.id, data, std::uint32_t{0}))};
 
          // TODO: This can run concurrently
-         BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
-                         systemContext->sharedDatabase.createWriter(), true};
+         auto             w = systemContext->sharedDatabase.createWriter();
+         BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(*w),
+                         std::move(w), true};
          TransactionTrace trace;
          try
          {
@@ -2089,7 +2090,7 @@ namespace psibase
          systemContext = sc;
          writer        = sc->sharedDatabase.createWriter();
 
-         RevisionAccess _ra{sc->sharedDatabase, sc->sharedDatabase.getHead()};
+         RevisionAccess _ra{*writer, sc->sharedDatabase.getHead(*writer)};
          auto&          db = _ra.kv;
          auto     status  = db.kvGet<StatusRow>(StatusRow::db, statusKey());
          if (!status || !status->head)
@@ -2099,7 +2100,7 @@ namespace psibase
             head = &states.begin()->second;
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
             byOrderIndex.insert({head->order(), head->blockId()});
-            head->revision = systemContext->sharedDatabase.getHead();
+            head->revision = systemContext->sharedDatabase.getHead(*writer);
             assert(!!head->revision);
          }
          else
@@ -2107,7 +2108,7 @@ namespace psibase
             // Add blocks in [irreversible, head]
             // for now ignore other forks
             auto blockId  = status->head->blockId;
-            auto revision = sc->sharedDatabase.getHead();
+            auto revision = sc->sharedDatabase.getHead(*writer);
             do
             {
                // Initialize state
