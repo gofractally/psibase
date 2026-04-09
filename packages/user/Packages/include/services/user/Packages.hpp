@@ -20,8 +20,9 @@ namespace UserService
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
    };
-   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts)
+   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts, services)
 
    struct PublishedPackage
    {
@@ -32,6 +33,7 @@ namespace UserService
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
       psibase::Checksum256                sha256;
       std::string                         file;
 
@@ -46,6 +48,7 @@ namespace UserService
                 description,
                 depends,
                 accounts,
+                services,
                 sha256,
                 file)
 
@@ -77,11 +80,12 @@ namespace UserService
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
       psibase::AccountNumber              owner;
 
       using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
-   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, owner)
+   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, services, owner)
 
    struct PackageDataFile
    {

@@ -349,16 +349,7 @@ impl<'a> DepGraph<'a> {
             .get(&meta.name)
             .map_or(false, |packages| packages.contains_key(&meta.version));
         if !is_known_package {
-            self.add(PackageInfo {
-                name: meta.name.clone(),
-                version: meta.version.clone(),
-                scope: meta.scope.clone(),
-                description: meta.description.clone(),
-                depends: meta.depends.clone(),
-                accounts: meta.accounts.clone(),
-                sha256: Default::default(),
-                file: String::new(),
-            });
+            self.add(meta.info(Default::default(), String::new()));
         }
         let name = meta.name.clone();
         self.existing.insert(name, (meta, disposition, false));

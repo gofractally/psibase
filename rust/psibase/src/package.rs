@@ -2,7 +2,7 @@
 
 use crate::services::{
     accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers,
-    setcode, sites, transact, verify_sig,
+    setcode, sites, transact, verify_sig, x_sites,
 };
 use crate::{
     reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
@@ -119,6 +119,8 @@ pub struct Meta {
     pub depends: Vec<PackageRef>,
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
+    #[serde(default)]
+    pub services: Vec<AccountNumber>,
 }
 
 impl Meta {
@@ -130,6 +132,7 @@ impl Meta {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
             sha256,
             file,
         };
@@ -149,6 +152,8 @@ pub struct PackageInfo {
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
+    pub services: Vec<AccountNumber>,
+    #[serde(default)]
     pub sha256: Checksum256,
     #[serde(default)]
     pub file: String,
@@ -163,6 +168,7 @@ impl PackageInfo {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
@@ -185,6 +191,7 @@ impl InstalledPackageInfo {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
         }
     }
 }
@@ -196,6 +203,7 @@ pub struct LocalPackageInfo {
     pub description: String,
     pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
+    pub services: Vec<AccountNumber>,
     pub sha256: Checksum256,
 }
 
@@ -208,6 +216,7 @@ impl LocalPackageInfo {
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
         }
     }
 }
@@ -243,6 +252,7 @@ pub struct PackagedService<R: Read + Seek> {
     services: Vec<(AccountNumber, usize, ServiceInfo)>,
     data: Vec<(AccountNumber, usize)>,
     postinstall: Vec<PrettyAction>,
+    hash: Checksum256,
 }
 
 pub type SchemaMap = HashMap<AccountNumber, Schema>;
@@ -337,7 +347,14 @@ fn read<T: Read>(reader: &mut T) -> Result<Vec<u8>, anyhow::Error> {
 }
 
 impl<R: Read + Seek> PackagedService<R> {
-    pub fn new(reader: R) -> Result<Self, anyhow::Error> {
+    pub fn new(mut reader: R) -> Result<Self, anyhow::Error> {
+        let mut hasher = Sha256::new();
+        std::io::copy(&mut reader, &mut hasher)?;
+        let hash: [u8; 32] = hasher.finalize().into();
+        reader.rewind()?;
+        Self::prehashed(reader, hash.into())
+    }
+    pub fn prehashed(reader: R, hash: Checksum256) -> Result<Self, anyhow::Error> {
         let mut archive = ZipArchive::new(reader)?;
         let mut info_files: HashMap<AccountNumber, usize> = HashMap::new();
         let mut service_files: Vec<(AccountNumber, usize)> = vec![];
@@ -403,6 +420,7 @@ impl<R: Read + Seek> PackagedService<R> {
             services: services,
             data: data,
             postinstall,
+            hash,
         })
     }
     pub fn name(&self) -> &str {
@@ -413,6 +431,9 @@ impl<R: Read + Seek> PackagedService<R> {
     }
     pub fn meta(&self) -> &Meta {
         &self.meta
+    }
+    pub fn hash(&self) -> &Checksum256 {
+        &self.hash
     }
     pub fn get_genesis(&mut self, services: &mut Vec<GenesisService>) -> Result<(), anyhow::Error> {
         for (account, index, info) in &self.services {
@@ -566,17 +587,12 @@ impl<R: Read + Seek> PackagedService<R> {
         result
     }
 
-    fn manifest_data(&mut self) -> Vec<PackageDataFile> {
+    fn manifest_data(&self) -> Vec<PackageDataFile> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
-            let file = self.archive.by_index(*index).unwrap();
-            let path = data_re
-                .captures(file.name())
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_str();
+            let file = self.archive.name_for_index(*index).unwrap();
+            let path = data_re.captures(file).unwrap().get(1).unwrap().as_str();
             manifest.push(PackageDataFile {
                 account: *sender,
                 filename: path.to_string(),
@@ -585,7 +601,7 @@ impl<R: Read + Seek> PackagedService<R> {
         manifest
     }
 
-    pub fn manifest(&mut self) -> PackageManifest {
+    pub fn manifest(&self) -> PackageManifest {
         let services = self.manifest_services();
         let data = self.manifest_data();
         PackageManifest { services, data }
@@ -712,19 +728,35 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut accounts = vec![];
         let mut services = vec![];
 
+        let local = &self.meta.scope == "local";
+
         for account in self.get_accounts() {
             if !self.has_service(*account) {
-                services.push(accounts::SERVICE)
+                if !local {
+                    services.push(accounts::SERVICE)
+                } else {
+                    Err(anyhow!(
+                        "Local packages do not support non-service accounts"
+                    ))?
+                }
             }
         }
 
         if !self.data.is_empty() {
-            services.push(sites::SERVICE);
+            if !local {
+                services.push(sites::SERVICE);
+            } else {
+                services.push(x_sites::SERVICE);
+            }
         }
 
         for (_, _, info) in &self.services {
             if let Some(_) = &info.server {
-                services.push(http_server::SERVICE)
+                if !local {
+                    services.push(http_server::SERVICE)
+                } else {
+                    // x-http is always present
+                }
             }
         }
 
@@ -1190,15 +1222,21 @@ fn get_transitive_services<'a>(
 
 fn build_package_order_graph<R: Read + Seek>(
     packages: &Vec<PackageOpFull<R>>,
+    existing: &PackageList,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut result: HashMap<String, Vec<String>> = HashMap::new();
     let mut provides_service: HashMap<AccountNumber, String> = HashMap::new();
     let mut has_postinstall = HashSet::new();
     let empty_deps = Vec::new();
     let mut service_deps = HashMap::new();
+    // Build the graph of service dependencies. Service dependencies
+    // can be cyclic as long as nothing calls any of the services in
+    // the cycle before all of them are installed.
     for package in packages {
         match package {
             PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                // Create lookup table to find the package that contains
+                // each service. Duplicates are an error.
                 for (service, _, _) in &package.services {
                     if let Some(prev) =
                         provides_service.insert(*service, package.name().to_string())
@@ -1213,24 +1251,6 @@ fn build_package_order_graph<R: Read + Seek>(
                 if !package.postinstall.is_empty() {
                     has_postinstall.insert(package.name());
                 }
-            }
-            PackageOpFull::Remove(_) => {}
-        }
-    }
-    // Build the graph of service dependencies. Service dependencies
-    // can be cyclic as long as nothing calls any of the services in
-    // the cycle before all of them are installed.
-    //
-    // TODO: indirect dependencies through a package not being
-    // updated, are not accounted for.
-    //
-    // A(install) -> B(keep) -> C(update) -> D(update)
-    //
-    // This is a problem, because the order D, A, C, may install
-    // A while C is unusable
-    for package in packages {
-        match package {
-            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
                 if !package.services.is_empty() {
                     // If a package provides any services, direct dependents can
                     // assume they are installed. This transitively requires all
@@ -1244,6 +1264,49 @@ fn build_package_order_graph<R: Read + Seek>(
                 }
             }
             PackageOpFull::Remove(_) => {}
+        }
+    }
+    // Collect packages that are updated, so we can exclude them
+    // when processing `existing`
+    let mut updated_packages: HashSet<&str> = HashSet::new();
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) => {
+                updated_packages.insert(package.name());
+            }
+            PackageOpFull::Replace(meta, package) => {
+                updated_packages.insert(&meta.name);
+                updated_packages.insert(package.name());
+            }
+            PackageOpFull::Remove(meta) => {
+                updated_packages.insert(&meta.name);
+            }
+        }
+    }
+    // Add existing packages that are unmodified to the graph
+    for (name, versions) in &existing.packages {
+        if !updated_packages.contains(&name.as_str()) {
+            for (_version, (meta, _origin)) in versions {
+                // Services provided by existing packages that are not
+                // being updated are available to be called during installation
+                for service in &meta.services {
+                    if let Some(prev) = provides_service.insert(*service, name.clone()) {
+                        Err(Error::ServiceConflict {
+                            name: *service,
+                            old: name.clone(),
+                            new: prev,
+                        })?
+                    }
+                }
+                // Transitive dependencies need to be in a consistent
+                // state, when any services in this package are called
+                if !meta.services.is_empty() {
+                    service_deps.insert(name.clone(), &meta.depends);
+                }
+                // We don't know whether this package has a postinstall
+                // script, and it doesn't matter, because it's already
+                // been executed and won't be executed again.
+            }
         }
     }
     // Construct a graph describing constraints on install order
@@ -1285,6 +1348,8 @@ fn build_package_order_graph<R: Read + Seek>(
                         }
                     }
                 }
+                // Drop packages that are not being modified
+                all_required_packages.retain(|name| updated_packages.contains(&name.as_str()));
                 result.insert(package.name().to_string(), all_required_packages);
             }
             PackageOpFull::Remove(_) => {
@@ -1324,13 +1389,14 @@ fn topological_sort_impl(
 
 fn get_package_order<R: Read + Seek>(
     packages: &Vec<PackageOpFull<R>>,
+    existing: &PackageList,
 ) -> Result<Vec<usize>, anyhow::Error> {
     let mut permutation = vec![usize::MAX; packages.len()];
     let mut indexes = HashMap::new();
     for (i, package) in packages.iter().enumerate() {
         indexes.insert(package.name().to_string(), i);
     }
-    let graph = build_package_order_graph(packages)?;
+    let graph = build_package_order_graph(packages, existing)?;
     for package in packages {
         topological_sort_impl(package.name(), &graph, &indexes, &mut permutation, 0)?;
     }
@@ -1346,10 +1412,14 @@ fn apply_permutation<T>(vec: &mut Vec<T>, permutation: &mut [usize]) {
     }
 }
 
+// existing should at least contain all packages that connect
+// packages being updated and packages that are direct dependencies
+// of packages being updated.
 pub fn sort_package_ops<R: Read + Seek>(
     packages: &mut Vec<PackageOpFull<R>>,
+    existing: &PackageList,
 ) -> Result<(), anyhow::Error> {
-    let mut order = get_package_order(packages)?;
+    let mut order = get_package_order(packages, existing)?;
     apply_permutation(packages, &mut order);
     Ok(())
 }
@@ -1620,7 +1690,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))
@@ -1907,7 +1977,7 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
             get_installed_manifest(base_url, client, &package.name, *owner).await
         }
         PackageOrigin::Repo { sha256, file } => {
-            let mut package = reg
+            let package = reg
                 .get_by_info(&package.info(sha256.clone(), file.clone()))
                 .await?;
             Ok(package.manifest())
@@ -1968,7 +2038,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
@@ -1989,7 +2059,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_local(edge.node);

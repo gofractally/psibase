@@ -67,6 +67,11 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
                 .into_iter()
                 .map(|a| a.as_str().into())
                 .collect(),
+            services: value
+                .services
+                .into_iter()
+                .map(|a| a.as_str().into())
+                .collect(),
             sha256: value.sha256.parse().unwrap(),
             file: value.file,
         }
@@ -82,6 +87,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
+            services: value.services.into_iter().map(|a| a.to_string()).collect(),
             sha256: value.sha256.to_string(),
             file: value.file,
         }
@@ -107,6 +113,7 @@ impl From<psibase::Meta> for types::Meta {
             description: value.description,
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
+            services: value.services.into_iter().map(|a| a.to_string()).collect(),
         }
     }
 }
