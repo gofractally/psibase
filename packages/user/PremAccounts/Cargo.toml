@@ -1,6 +1,6 @@
 [package]
-name = "prem-accounts-pkg"             # Crate name
-description = "An example application"
+name = "prem-accounts-pkg"          # Crate name
+description = "Premium name market"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -17,6 +17,9 @@ HttpServer = "0.23.0"
 Sites = "0.23.0"
 Permissions = "0.23.0"
 Tokens = "0.23.0"
+Nft = "0.23.0"
+Transact = "0.23.0"
+AuthSig = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]

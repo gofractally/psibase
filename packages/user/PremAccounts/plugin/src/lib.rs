@@ -7,6 +7,7 @@ use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin
 use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
 use bindings::exports::prem_accounts::plugin::queries::MarketPrice;
 use bindings::host::common::server as CommonServer;
+use bindings::host::crypto::keyvault as HostCryptoKeyVault;
 use bindings::host::types::types::Error;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
@@ -15,7 +16,6 @@ use bindings::transact::plugin::intf::add_action_to_transaction;
 use prem_accounts::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
 
 use crate::trust::*;
-use psibase::services::invite::SubjectPublicKeyInfo;
 use psibase::{define_trust, fracpack::Pack, AccountNumber};
 mod errors;
 use errors::ErrorType;
@@ -241,26 +241,16 @@ impl Api for PremAccountsPlugin {
         let account = account.trim().to_string();
         validate_premium_account_name(&account)?;
 
-        let keypair = AuthSigKeyVault::generate_unmanaged_keypair()?;
+        let keypair = AuthSigKeyVault::generate_unmanaged_keypair().unwrap();
 
-        // The pub_key string is PEM format
-        // SubjectPublicKeyInfo expects DER-encoded bytes
-        let pem_data = pem::parse(keypair.public_key.trim())
-            .map_err(|e| ErrorType::InvalidPublicKey(format!("Failed to parse PEM: {}", e)))?;
-
-        if pem_data.tag() != "PUBLIC KEY" {
-            return Err(ErrorType::InvalidPublicKey(format!(
-                "Expected PUBLIC KEY, got {}",
-                pem_data.tag()
-            ))
-            .into());
-        }
-
-        AuthSigKeyVault::import_key(&keypair.private_key)?;
+        AuthSigKeyVault::import_key(&keypair.private_key).unwrap();
 
         let packed_claim_args = prem_accounts::action_structs::claim {
             account: account.clone(),
-            pub_key: SubjectPublicKeyInfo::from(pem_data.contents().to_vec()),
+            // pub_key: SubjectPublicKeyInfo::from(pem_data.contents().to_vec()),
+            pub_key: HostCryptoKeyVault::to_der(&keypair.public_key)
+                .unwrap()
+                .into(),
         }
         .packed();
 

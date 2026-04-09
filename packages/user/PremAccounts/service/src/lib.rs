@@ -155,6 +155,10 @@ pub mod service {
         Transact::call().runAs(set_auth, vec![]);
     }
 
+    fn require_caller_is_self() -> bool {
+        return get_sender() == Wrapper::SERVICE;
+    }
+
     #[action]
     fn init() {
         let table = InitTable::new();
@@ -181,8 +185,6 @@ pub mod service {
     /// * `max_cost` - The maximum cost to pay for the account name (to account for during-call fluctuations)
     #[action]
     fn buy(account: String, max_cost: u64) {
-        check_init();
-
         let length = account.len() as u8;
         check(
             length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
@@ -263,8 +265,6 @@ pub mod service {
 
     #[action]
     fn claim(account: String, pub_key: SubjectPublicKeyInfo) {
-        check_init();
-
         let purchased_accounts_table = PurchasedAccountsTable::new();
         let acct_to_claim = check_some(
             AccountNumber::from_exact(&account).ok(),
@@ -321,7 +321,8 @@ pub mod service {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) {
-        check_init();
+        require_caller_is_self();
+
         check(
             length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
             &format!(
@@ -397,7 +398,8 @@ pub mod service {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) {
-        check_init();
+        require_caller_is_self();
+
         check(
             length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
             &format!(
@@ -429,7 +431,8 @@ pub mod service {
     /// Enable new purchases for a name-length market
     #[action]
     fn enable(length: u8) {
-        check_init();
+        require_caller_is_self();
+
         check(
             length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
             &format!(
@@ -452,7 +455,8 @@ pub mod service {
     /// Disable new purchases for a name-length market
     #[action]
     fn disable(length: u8) {
-        check_init();
+        require_caller_is_self();
+
         check(
             length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
             &format!(
