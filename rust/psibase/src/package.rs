@@ -1409,8 +1409,28 @@ fn get_package_order<R: Read + Seek>(
         indexes.insert(package.name().to_string(), i);
     }
     let graph = build_package_order_graph(packages, existing)?;
+
+    // Process packages containing essential services first
+    let essential_services = EssentialServices::new();
+    let mut i = 0;
     for package in packages {
-        topological_sort_impl(package.name(), &graph, &indexes, &mut permutation, 0)?;
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                if essential_services.intersects(&package.meta().accounts) {
+                    i = topological_sort_impl(
+                        package.name(),
+                        &graph,
+                        &indexes,
+                        &mut permutation,
+                        i,
+                    )?;
+                }
+            }
+            PackageOpFull::Remove(_) => {}
+        }
+    }
+    for package in packages {
+        i = topological_sort_impl(package.name(), &graph, &indexes, &mut permutation, i)?;
     }
     Ok(permutation)
 }
