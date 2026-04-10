@@ -63,29 +63,6 @@ mod service {
         user: Option<AccountNumber>,
     }
 
-    fn query_name_events(
-        q: &Query,
-        owner: AccountNumber,
-        first: Option<i32>,
-        last: Option<i32>,
-        before: Option<String>,
-        after: Option<String>,
-    ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
-        q.check_user_auth(owner.clone())?;
-
-        // Events are emitted by `prem-accounts`, not the `r-prem-accts` query service account.
-        EventQuery::new(format!(
-            "history.{}.premAcctEvent",
-            PremAccountsService::SERVICE
-        ))
-            .condition(format!("owner = '{}'", owner))
-            .first(first)
-            .last(last)
-            .before(before)
-            .after(after)
-            .query()
-    }
-
     impl Query {
         fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
             if self.user != Some(user) {
@@ -192,8 +169,18 @@ mod service {
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
-            self.require_authenticated()?;
-            query_name_events(self, owner, first, last, before, after)
+            self.check_user_auth(owner.clone())?;
+
+            EventQuery::new(format!(
+                "history.{}.premAcctEvent",
+                PremAccountsService::SERVICE
+            ))
+            .condition(format!("owner = '{}'", owner))
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
         }
     }
 

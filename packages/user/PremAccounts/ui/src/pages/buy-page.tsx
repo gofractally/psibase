@@ -113,29 +113,34 @@ export function BuyPage() {
 
     const loadPrices = async () => {
         try {
-            const pricesArray = (await supervisor.functionCall({
+            const query = "query { currentPrices { length price } }";
+            const raw = await supervisor.functionCall({
                 service: PREM_ACCOUNTS_SERVICE,
-                intf: "queries",
-                method: "getPrices",
-                params: [],
-            })) as unknown;
+                plugin: "plugin",
+                intf: "authorized",
+                method: "graphql",
+                params: [query],
+            });
+            const text = typeof raw === "string" ? raw : JSON.stringify(raw);
+            const body = JSON.parse(text) as {
+                data?: { currentPrices?: Array<{ length: number; price: string }> };
+                errors?: Array<{ message: string }>;
+            };
+            if (body.errors?.length) {
+                throw new Error(body.errors[0].message);
+            }
+            const rows = body.data?.currentPrices;
 
             const next = new Map<number, string>();
-            if (Array.isArray(pricesArray)) {
-                for (const row of pricesArray) {
-                    if (
-                        row &&
-                        typeof row === "object" &&
-                        "length" in row &&
-                        "price" in row
-                    ) {
-                        const len = Number((row as { length: unknown }).length);
-                        const rawPrice = (row as { price: unknown }).price;
+            if (Array.isArray(rows)) {
+                for (const row of rows) {
+                    if (row && typeof row === "object") {
+                        const len = Number(row.length);
                         const priceStr =
-                            typeof rawPrice === "string"
-                                ? rawPrice.trim()
-                                : rawPrice != null
-                                  ? String(rawPrice).trim()
+                            typeof row.price === "string"
+                                ? row.price.trim()
+                                : row.price != null
+                                  ? String(row.price).trim()
                                   : "";
                         if (
                             Number.isFinite(len) &&
@@ -148,7 +153,7 @@ export function BuyPage() {
                     }
                 }
             } else {
-                console.error("Unexpected prices format:", pricesArray);
+                console.error("Unexpected prices format:", body);
             }
 
             setPriceByLength(next);

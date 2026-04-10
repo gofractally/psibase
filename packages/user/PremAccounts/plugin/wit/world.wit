@@ -44,19 +44,20 @@ interface api {
     claim: func(account: string) -> result<string, error>;
 }
 
-interface queries {
+/// Interface that makes authorized queries to this app's http server.
+interface authorized {
     use host:types/types.{error};
 
-    /// `price` is the current ask in the network token as Quantity string
-    record market-price {
-        length: u8,
-        price: string,
-    }
-
-    get-prices: func() -> result<list<market-price>, error>;
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
 }
 
 world imports {
     import api;
-    import queries;
+    import authorized;
 }

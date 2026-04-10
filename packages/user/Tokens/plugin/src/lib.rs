@@ -129,7 +129,7 @@ impl User for TokensPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(High, whitelist = ["homepage", "prem-accounts"])]
+    #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
     fn uncredit(token_id: u32, debitor: String, amount: String, memo: String) -> Result<(), Error> {
         let amount = Self::non_zero(token_id, amount)?;
         let memo = memo.try_into().unwrap();

@@ -2530,6 +2530,7 @@ version = "0.23.0"
 dependencies = [
  "prem-accounts",
  "prem-accounts-plugin",
+ "psibase-user-workspace-hack",
  "r-prem-accts",
 ]
 
@@ -2541,8 +2542,10 @@ dependencies = [
  "prem-accounts",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_plugin",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "wit-bindgen-rt",
 ]
 

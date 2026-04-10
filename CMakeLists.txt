@@ -137,7 +137,7 @@ if(DEFINED WASI_SDK_PREFIX)
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
         CpuLimit Db Events EventIndex Explorer Invite
         Nop Packages PremAccounts Producers HttpServer Sites RAccounts
-        RAuthSig RAuthDelegate REvents RInvite RPackages RPremAccounts RProducers
+        RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact
         PSubjectiveService CounterService AsyncQueryService

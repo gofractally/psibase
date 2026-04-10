@@ -28,3 +28,4 @@ crate-type = ["rlib"]
 prem-accounts = { path = "service", version = "0.23.0" }
 r-prem-accts = { path = "query-service", version = "0.23.0" }
 prem-accounts-plugin = { path = "plugin", version = "0.23.0" }
+psibase-user-workspace-hack.workspace = true

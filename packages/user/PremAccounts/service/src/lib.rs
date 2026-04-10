@@ -86,7 +86,7 @@ pub mod service {
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::events;
-    use psibase::services::nft as Nfts;
+    use psibase::services::nft::{self as Nfts, NftHolderFlags};
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
     use psibase::services::tokens::{Quantity, TID};
     use psibase::services::transact::Wrapper as Transact;
@@ -119,40 +119,10 @@ pub mod service {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) {
-        check(target > 0, "target must be positive");
-        check(window_seconds > 0, "window seconds must be positive");
         DiffAdjust::call().set_window(nft_id, window_seconds);
         DiffAdjust::call().set_targets(nft_id, target, target);
         DiffAdjust::call().set_floor(nft_id, floor_price);
         DiffAdjust::call().set_ppm(nft_id, increase_ppm, decrease_ppm);
-    }
-
-    fn new_account(name: AccountNumber) {
-        Accounts::Wrapper::call().newAccount(name, AuthAny::SERVICE, true);
-        let set_owner = Action {
-            sender: name,
-            service: AuthDelegate::Wrapper::SERVICE,
-            method: AuthDelegate::action_structs::setOwner::ACTION_NAME.into(),
-            rawData: AuthDelegate::action_structs::setOwner {
-                owner: get_service(),
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_auth = Action {
-            sender: name,
-            service: Accounts::Wrapper::SERVICE,
-            method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: Accounts::action_structs::setAuthServ {
-                authService: AuthDelegate::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        Transact::call().runAs(set_owner, vec![]);
-        Transact::call().runAs(set_auth, vec![]);
     }
 
     fn require_caller_is_self() -> bool {
@@ -164,7 +134,7 @@ pub mod service {
         let table = InitTable::new();
         table.put(&InitRow {}).unwrap();
         Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-        Nfts::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
+        Nfts::Wrapper::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
         register_prem_acct_event_indices();
     }
@@ -181,28 +151,10 @@ pub mod service {
     /// Buy a premium account name
     ///
     /// # Arguments
-    /// * `account` - The account name to purchase
-    /// * `max_cost` - The maximum cost to pay for the account name (to account for during-call fluctuations)
+    /// * `account` - The account to purchase
     #[action]
-    fn buy(account: String, max_cost: u64) {
-        let length = account.len() as u8;
-        check(
-            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
-            &format!(
-                "account name must be {}-{} characters",
-                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
-            ),
-        );
-
-        let acct_to_buy = check_some(
-            AccountNumber::from_exact(&account).ok(),
-            "invalid account name: start with a letter; use only lowercase letters, numbers, and hyphens; may not end with '-' or start with 'x-'",
-        );
-
-        check(
-            !Accounts::Wrapper::call().exists(acct_to_buy),
-            "account already exists",
-        );
+    fn buy(account: AccountNumber) {
+        let length = account.to_string().len() as u8;
 
         let sys_token_id: TID = check_some(
             Tokens::Wrapper::call().getSysToken(),
@@ -224,55 +176,38 @@ pub mod service {
         let shared_bal = Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, get_service());
 
         check(
-            current_price <= max_cost,
-            "max cost is below the current price; raise max cost to at least the displayed ask",
-        );
-        check(
             current_price <= shared_bal.value,
             "insufficient balance allocated for this purchase; increase max cost so it covers the current price",
         );
 
-        new_account(acct_to_buy);
+        AuthDelegate::Wrapper::call().newAccount(account, get_service());
 
         PurchasedAccountsTable::new()
             .put(&PurchasedAccount {
-                account: acct_to_buy,
+                account: account,
                 owner: sender,
             })
             .unwrap();
 
         let cost = Quantity::from(current_price);
-        Tokens::Wrapper::call().debit(
-            sys_token_id,
-            sender,
-            cost,
-            "premium account purchase".to_string().try_into().unwrap(),
-        );
+        Tokens::Wrapper::call().debit(sys_token_id, sender, cost, "".into());
 
-        Tokens::Wrapper::call().reject(
-            sys_token_id,
-            sender,
-            "return change".to_string().try_into().unwrap(),
-        );
+        Tokens::Wrapper::call().reject(sys_token_id, sender, "return change".into());
 
         // Alert the DiffAdjust service to the purchase
         DiffAdjust::call().increment(auction.nft_id, 1);
 
         crate::Wrapper::emit()
             .history()
-            .premAcctEvent(sender, acct_to_buy, BOUGHT);
+            .premAcctEvent(sender, account, BOUGHT);
     }
 
     #[action]
-    fn claim(account: String, pub_key: SubjectPublicKeyInfo) {
+    fn claim(account: AccountNumber, pub_key: SubjectPublicKeyInfo) {
         let purchased_accounts_table = PurchasedAccountsTable::new();
-        let acct_to_claim = check_some(
-            AccountNumber::from_exact(&account).ok(),
-            "invalid account name: start with a letter; use only lowercase letters, numbers, and hyphens; may not end with '-' or start with 'x-'",
-        );
 
         let purchased_account = check_some(
-            purchased_accounts_table.get_index_pk().get(&acct_to_claim),
+            purchased_accounts_table.get_index_pk().get(&account),
             "account not purchased",
         );
 
@@ -281,35 +216,15 @@ pub mod service {
             "account not purchased by sender",
         );
 
-        let set_key_action = Action {
-            sender: acct_to_claim,
-            service: AuthSig::SERVICE,
-            method: AuthSig::action_structs::setKey::ACTION_NAME.into(),
-            rawData: AuthSig::action_structs::setKey {
-                key: pub_key.into(),
-            }
-            .packed()
-            .into(),
-        };
-        Transact::call().runAs(set_key_action, vec![]);
+        AuthSig::Wrapper::call_as(account).setKey(pub_key);
 
-        let set_auth_serv_action = Action {
-            sender: acct_to_claim,
-            service: Accounts::SERVICE,
-            method: Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: Accounts::action_structs::setAuthServ {
-                authService: AuthSig::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-        Transact::call().runAs(set_auth_serv_action, vec![]);
+        Accounts::Wrapper::call_as(account).setAuthServ(AuthSig::Wrapper::SERVICE);
 
         purchased_accounts_table.remove(&purchased_account);
 
         crate::Wrapper::emit()
             .history()
-            .premAcctEvent(get_sender(), acct_to_claim, CLAIMED);
+            .premAcctEvent(get_sender(), account.clone(), CLAIMED);
     }
 
     #[action]
@@ -330,23 +245,11 @@ pub mod service {
                 MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
             ),
         );
-        check(
-            increase_ppm > 0
-                && increase_ppm < 1_000_000
-                && decrease_ppm > 0
-                && decrease_ppm < 1_000_000,
-            "increase and decrease ppm must be between 1 and 999999",
-        );
         let auctions_table = AuctionsTable::new();
         check(
             auctions_table.get_index_pk().get(&length).is_none(),
             "market already exists",
         );
-        check(
-            initial_price >= floor_price,
-            "initial price must be at least floor price",
-        );
-        check(target > 0, "target must be positive");
         let nft_id = DiffAdjust::call().create(
             initial_price,
             MARKET_WINDOW_SECONDS,
@@ -356,13 +259,7 @@ pub mod service {
             increase_ppm,
             decrease_ppm,
         );
-        Nfts::Wrapper::call().debit(
-            nft_id,
-            "prem accounts rate limit NFT"
-                .to_string()
-                .try_into()
-                .unwrap(),
-        );
+        Nfts::Wrapper::call().debit(nft_id, "".into());
         auctions_table
             .put(&Auction {
                 length,

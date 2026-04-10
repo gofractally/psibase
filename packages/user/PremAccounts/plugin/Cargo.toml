@@ -6,6 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+psibase_plugin.workspace = true
 prem-accounts = { path = "../service/", version = "0.23.0" }
 psibase.workspace = true
 serde.workspace = true
@@ -13,6 +14,7 @@ serde_json.workspace = true
 wit-bindgen-rt.workspace = true
 psibase-user-workspace-hack.workspace = true
 pem = "3.0"
+thiserror.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -22,6 +24,9 @@ package = "prem-accounts:plugin"
 
 [package.metadata.component.target]
 world = "impl"
+
+[package.metadata.component.bindings.with]
+"host:types/types" = "psibase_plugin::types"
 
 [package.metadata.component.target.dependencies]
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }

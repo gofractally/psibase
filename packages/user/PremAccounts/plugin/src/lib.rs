@@ -3,56 +3,46 @@ mod bindings;
 
 use bindings::auth_sig::plugin::keyvault as AuthSigKeyVault;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
+use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
-use bindings::exports::prem_accounts::plugin::queries::Guest as Queries;
-use bindings::exports::prem_accounts::plugin::queries::MarketPrice;
 use bindings::host::common::server as CommonServer;
 use bindings::host::crypto::keyvault as HostCryptoKeyVault;
-use bindings::host::types::types::Error;
+// use bindings::host::types::types::Error;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use prem_accounts::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
 
-use crate::trust::*;
-use psibase::{define_trust, fracpack::Pack, AccountNumber};
+use psibase::services::accounts::Account;
+use psibase::{fracpack::Pack, AccountNumber};
 mod errors;
 use errors::ErrorType;
 
-fn validate_premium_account_name(account: &str) -> Result<(), Error> {
+use psibase_plugin::{trust::*, *};
+
+fn validate_premium_account_name(account: &str) -> Result<AccountNumber, Error> {
     let len = account.len();
     if !(MIN_PREMIUM_NAME_LENGTH as usize..=MAX_PREMIUM_NAME_LENGTH as usize).contains(&len) {
         return Err(ErrorType::InvalidPremiumAccountName.into());
     }
-    AccountNumber::from_exact(account)
-        .map(|_| ())
-        .map_err(|_| ErrorType::InvalidPremiumAccountName.into())
+    AccountNumber::from_exact(account).map_err(|_| ErrorType::InvalidPremiumAccountName.into())
 }
 
-define_trust! {
-    descriptions {
-        Low => "",
-        Medium => "
-        Medium trust grants the abilities of the Low trust level, plus these abilities:
-            - Claiming premium account names
-        ",
-        High => "
-        High trust grants the abilities of the Low trust level, plus these abilities:
-            - Purchasing premium account names
-            - Creating, configuring, enabling/disabling premium name markets
-        ",
-    }
-    functions {
-        Low => [],
-        Medium => [claim],
-        High => [buy, create, configure, enable, disable],
+impl TrustConfig for PremAccountsPlugin {
+    fn capabilities() -> Capabilities {
+        Capabilities {
+            low: &[],
+            medium: &["Claim premium account names"],
+            high: &["Purchase premium account names"],
+        }
     }
 }
 
 struct PremAccountsPlugin;
 
 impl MarketAdmin for PremAccountsPlugin {
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn create(
         length: u8,
         initial_price: String,
@@ -61,15 +51,7 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::create, vec!["config".into()])?;
-
-        if length < MIN_PREMIUM_NAME_LENGTH
-            || length > MAX_PREMIUM_NAME_LENGTH
-            || increase_ppm == 0
-            || increase_ppm >= 1_000_000
-            || decrease_ppm == 0
-            || decrease_ppm >= 1_000_000
-        {
+        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
             return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
@@ -102,6 +84,7 @@ impl MarketAdmin for PremAccountsPlugin {
         Ok(())
     }
 
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn configure(
         length: u8,
         window_seconds: u32,
@@ -110,17 +93,7 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::configure, vec!["config".into()])?;
-
-        if length < MIN_PREMIUM_NAME_LENGTH
-            || length > MAX_PREMIUM_NAME_LENGTH
-            || window_seconds == 0
-            || target == 0
-            || increase_ppm == 0
-            || increase_ppm >= 1_000_000
-            || decrease_ppm == 0
-            || decrease_ppm >= 1_000_000
-        {
+        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
             return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
@@ -148,9 +121,8 @@ impl MarketAdmin for PremAccountsPlugin {
         Ok(())
     }
 
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn enable(length: u8) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::enable, vec!["config".into()])?;
-
         if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
             return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
@@ -159,9 +131,8 @@ impl MarketAdmin for PremAccountsPlugin {
         Ok(())
     }
 
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn disable(length: u8) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::enable, vec!["config".into()])?;
-
         if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
             return Err(ErrorType::CreateMarketLengthInvalid.into());
         }
@@ -172,11 +143,9 @@ impl MarketAdmin for PremAccountsPlugin {
 }
 
 impl Api for PremAccountsPlugin {
+    #[psibase_plugin::authorized(High, whitelist = ["accounts"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::buy, vec!["accounts".into()])?;
-
-        let account = account.trim().to_string();
-        validate_premium_account_name(&account)?;
+        let acct_name = validate_premium_account_name(account.trim())?;
 
         let service_account = prem_accounts::SERVICE.to_string();
 
@@ -215,38 +184,23 @@ impl Api for PremAccountsPlugin {
             "premium account purchase",
         )?;
 
-        let packed_buy_args = prem_accounts::action_structs::buy {
-            account: account.clone(),
-            max_cost: max_cost_u64,
-        }
-        .packed();
+        let packed_buy_args = prem_accounts::action_structs::buy { account: acct_name }.packed();
 
-        let result = add_action_to_transaction("buy", &packed_buy_args);
-        if result.is_err() {
-            // TODO: if tx fails, pull back credit; if succeeds, pull back change
-            TokensUser::uncredit(
-                sys_token_id,
-                &service_account,
-                &max_cost,
-                "account purchase failed",
-            )?;
-            return Err(ErrorType::AccountPurchaseFailed(account.to_string()).into());
-        }
+        add_action_to_transaction("buy", &packed_buy_args)?;
+
         Ok(())
     }
 
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
     fn claim(account: String) -> Result<String, Error> {
-        assert_authorized_with_whitelist(FunctionName::claim, vec!["accounts".into()])?;
-
-        let account = account.trim().to_string();
-        validate_premium_account_name(&account)?;
+        let account = validate_premium_account_name(account.trim())?;
 
         let keypair = AuthSigKeyVault::generate_unmanaged_keypair().unwrap();
 
         AuthSigKeyVault::import_key(&keypair.private_key).unwrap();
 
         let packed_claim_args = prem_accounts::action_structs::claim {
-            account: account.clone(),
+            account,
             // pub_key: SubjectPublicKeyInfo::from(pem_data.contents().to_vec()),
             pub_key: HostCryptoKeyVault::to_der(&keypair.public_key)
                 .unwrap()
@@ -259,18 +213,6 @@ impl Api for PremAccountsPlugin {
         // TOOD: error handling: cleanup if something fails
         Ok(keypair.private_key)
     }
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GetPricesResponse {
-    data: GetPricesData,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GetPricesData {
-    current_prices: Vec<MarketPriceDto>,
 }
 
 #[derive(serde::Deserialize)]
@@ -340,27 +282,10 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
         .map_err(|_| ErrorType::QueryResponseParseError("invalid price".into()).into())
 }
 
-impl Queries for PremAccountsPlugin {
-    // TODO: Should this query also be an action for srv-to-srv calls?
-    fn get_prices() -> Result<Vec<MarketPrice>, Error> {
-        let graphql_str = "query { currentPrices { length price } }";
-
-        let response = serde_json::from_str::<GetPricesResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let response =
-            response.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(response
-            .data
-            .current_prices
-            .into_iter()
-            .map(|row| MarketPrice {
-                length: row.length,
-                price: row.price.to_string(),
-            })
-            .collect())
+impl Authorized for PremAccountsPlugin {
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "prem-accounts"])]
+    fn graphql(query: String) -> Result<String, Error> {
+        CommonServer::post_graphql_get_json(&query)
     }
 }
 

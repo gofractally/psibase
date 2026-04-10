@@ -10,5 +10,5 @@ world impl {
 
     export market-admin;
     export api;
-    export queries;
+    export authorized;
 }
