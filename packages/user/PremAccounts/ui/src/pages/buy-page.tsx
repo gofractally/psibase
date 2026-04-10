@@ -14,8 +14,8 @@ import {
     unitTokenAmountCanonical,
 } from "@shared/lib/quantity";
 import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
     zAccount,
 } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -136,20 +136,8 @@ export function BuyPage() {
             if (Array.isArray(rows)) {
                 for (const row of rows) {
                     if (row && typeof row === "object") {
-                        const len = Number(row.length);
-                        const priceStr =
-                            typeof row.price === "string"
-                                ? row.price.trim()
-                                : row.price != null
-                                  ? String(row.price).trim()
-                                  : "";
-                        if (
-                            Number.isFinite(len) &&
-                            len >= MIN_PREMIUM_NAME_LENGTH &&
-                            len <= MAX_PREMIUM_NAME_LENGTH &&
-                            priceStr.length > 0
-                        ) {
-                            next.set(len, priceStr);
+                        if (row.length && row.price) {
+                            next.set(Number(row.length), row.price);
                         }
                     }
                 }
@@ -321,7 +309,7 @@ export function BuyPage() {
                             setBuySuccessMessage("");
                         }}
                         value={accountName}
-                        placeholder={`e.g. my-name (letters, numbers, hyphens; ${MIN_PREMIUM_NAME_LENGTH}–${MAX_PREMIUM_NAME_LENGTH} chars)`}
+                        placeholder={`e.g. my-name (letters, numbers, hyphens; ${MIN_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} chars)`}
                     />
                 </div>
 

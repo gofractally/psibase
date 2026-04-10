@@ -6,6 +6,7 @@ import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { pemToB64 } from "@shared/lib/b64-key-utils";
+import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 
