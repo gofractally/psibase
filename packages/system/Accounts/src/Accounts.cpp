@@ -49,7 +49,8 @@ namespace SystemService
 
    void Accounts::preapproveAcc(AccountNumber name)
    {
-      check(getSender() == getReceiver(), "unauthorized");
+      check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
+            "unauthorized");
 
       preapprovedAccounts.push_back(name);
    }

@@ -3,7 +3,8 @@ mod bindings;
 use bindings::*;
 
 use exports::config::plugin::{
-    branding::Guest as Branding, packaging::Guest as Packaging, producers::Guest as Producers,
+    branding::Guest as Branding, packaging::Guest as Packaging,
+    prem_accounts::Guest as PremAccounts, producers::Guest as Producers,
     settings::Guest as Settings, symbol::Guest as Symbol, virtual_server::Guest as VirtualServer,
 };
 use host::types::types::Error;
@@ -83,6 +84,62 @@ impl Packaging for ConfigPlugin {
 
         let _ = packages::plugin::private_api::set_account_sources(&accounts);
 
+        Ok(())
+    }
+}
+
+impl PremAccounts for ConfigPlugin {
+    fn create(
+        length: u8,
+        initial_price: String,
+        target: u32,
+        floor_price: String,
+        increase_ppm: u32,
+        decrease_ppm: u32,
+    ) -> Result<(), Error> {
+        set_propose_latch(Some("prem-accounts"))?;
+
+        prem_accounts::plugin::market_admin::create(
+            length,
+            &initial_price,
+            target,
+            &floor_price,
+            increase_ppm,
+            decrease_ppm,
+        )?;
+        Ok(())
+    }
+    fn configure(
+        length: u8,
+        window_seconds: u32,
+        target: u32,
+        floor_price: String,
+        increase_ppm: u32,
+        decrease_ppm: u32,
+    ) -> Result<(), Error> {
+        set_propose_latch(Some("prem-accounts"))?;
+
+        prem_accounts::plugin::market_admin::configure(
+            length,
+            window_seconds,
+            target,
+            &floor_price,
+            increase_ppm,
+            decrease_ppm,
+        )?;
+        Ok(())
+    }
+    fn enable(length: u8) -> Result<(), Error> {
+        set_propose_latch(Some("prem-accounts"))?;
+
+        prem_accounts::plugin::market_admin::enable(length)?;
+        Ok(())
+    }
+
+    fn disable(length: u8) -> Result<(), Error> {
+        set_propose_latch(Some("prem-accounts"))?;
+
+        prem_accounts::plugin::market_admin::disable(length)?;
         Ok(())
     }
 }

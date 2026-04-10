@@ -7,14 +7,12 @@ use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
 use bindings::host::common::server as CommonServer;
 use bindings::host::crypto::keyvault as HostCryptoKeyVault;
-// use bindings::host::types::types::Error;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
 use prem_accounts::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
 
-use psibase::services::accounts::Account;
 use psibase::{fracpack::Pack, AccountNumber};
 mod errors;
 use errors::ErrorType;

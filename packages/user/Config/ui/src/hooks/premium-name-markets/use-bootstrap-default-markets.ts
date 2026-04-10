@@ -2,7 +2,6 @@ import { queryClient } from "@shared/lib/query-client";
 import {
     MAX_PREMIUM_NAME_LENGTH,
     MIN_PREMIUM_NAME_LENGTH,
-    zAccount,
 } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
@@ -10,21 +9,21 @@ import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
 import QueryKey from "@/lib/query-keys";
 
-const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
+import { CONFIG } from "@/lib/services";
 
 export const useBootstrapDefaultPremiumNameMarkets = () => {
     const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH}-${MAX_PREMIUM_NAME_LENGTH}`;
 
     return usePluginMutation<void>(
         {
-            service: PREM_ACCOUNTS,
-            intf: "marketAdmin",
+            service: CONFIG,
+            intf: "premAccounts",
             method: "create",
         },
         {
             mutationKey: [
-                PREM_ACCOUNTS,
-                "marketAdmin",
+                CONFIG,
+                "premAccounts",
                 "bootstrapDefaultPremiumNameMarkets",
             ] as const,
             customMutationFn: async () => {
@@ -34,8 +33,8 @@ export const useBootstrapDefaultPremiumNameMarkets = () => {
                     len++
                 ) {
                     await supervisor.functionCall({
-                        service: PREM_ACCOUNTS,
-                        intf: "marketAdmin",
+                        service: CONFIG,
+                        intf: "premAccounts",
                         method: "create",
                         params: [
                             len,

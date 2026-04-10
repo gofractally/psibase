@@ -7,13 +7,15 @@ world impl {
     include branding:plugin/imports;
     include transact:plugin/imports;
     include packages:plugin/imports;
+    include prem-accounts:plugin/imports;
     include virtual-server:plugin/imports;
 
+    import prem-accounts:plugin/market-admin;
     import tokens:plugin/admin;
     import packages:plugin/private-api;
     import symbol:plugin/admin;
 
-
+    export prem-accounts;
     export branding;
     export producers;
     export packaging;

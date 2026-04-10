@@ -78,9 +78,7 @@ pub mod service {
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
-    use psibase::fracpack::Pack;
     use psibase::services::accounts as Accounts;
-    use psibase::services::auth_any::Wrapper as AuthAny;
     use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::auth_sig as AuthSig;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
@@ -89,7 +87,6 @@ pub mod service {
     use psibase::services::nft::{self as Nfts, NftHolderFlags};
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
     use psibase::services::tokens::{Quantity, TID};
-    use psibase::services::transact::Wrapper as Transact;
     use psibase::AccountNumber;
     use psibase::*;
 
@@ -180,6 +177,7 @@ pub mod service {
             "insufficient balance allocated for this purchase; increase max cost so it covers the current price",
         );
 
+        Accounts::Wrapper::call().preapproveAcc(account);
         AuthDelegate::Wrapper::call().newAccount(account, get_service());
 
         PurchasedAccountsTable::new()

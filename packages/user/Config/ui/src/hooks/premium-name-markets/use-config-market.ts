@@ -1,17 +1,16 @@
-import { zAccount } from "@shared/lib/schemas/account";
 import { queryClient } from "@shared/lib/query-client";
 
 import QueryKey from "../../lib/query-keys";
 
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
 
-const PREM_ACCOUNTS = zAccount.parse("prem-accounts");
+import { CONFIG } from "@/lib/services";
 
 export const useConfigurePremiumNameMarket = () =>
     usePluginMutation<[number, number, number, string, number, number]>(
         {
-            service: PREM_ACCOUNTS,
-            intf: "marketAdmin",
+            service: CONFIG,
+            intf: "premAccounts",
             method: "configure",
         },
         {
