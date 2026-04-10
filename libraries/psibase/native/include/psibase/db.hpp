@@ -16,6 +16,7 @@
 #include <absl/container/btree_map.h>
 #include <psitri/database.hpp>
 #include <psitri/transaction.hpp>
+#include <psitri/write_session_impl.hpp>
 #include <sal/smart_ptr_impl.hpp>
 
 namespace psibase::net

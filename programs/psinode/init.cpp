@@ -84,12 +84,12 @@ void load_local_packages(TransactionContext&             tc,
              .flags    = serviceInfo.parseFlags(),
              .codeHash = codeHash,
          };
-         tc.blockContext.db.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
+         tc.blockContext.kv.kvPut(DbId::nativeSubjective, codeRow.key(), codeRow);
          CodeByHashRow codeByHashRow{
              .codeHash = codeHash,
              .code     = std::move(code),
          };
-         tc.blockContext.db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+         tc.blockContext.kv.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
 
          if (serviceInfo.server)
          {
@@ -143,7 +143,7 @@ void load_local_packages(TransactionContext&             tc,
 
    auto socket = std::make_shared<TempSocket>();
    tc.blockContext.systemContext.sockets->add(*tc.blockContext.writer, socket, &tc.ownedSockets,
-                                              &tc.blockContext.db);
+                                              &tc.blockContext.kv);
    for (const auto& request : requests)
    {
       ActionTrace& atrace = tc.transactionTrace.actionTraces.emplace_back();
@@ -179,7 +179,7 @@ void load_local_packages(TransactionContext&             tc,
    tc.ownedSockets.close(*tc.blockContext.writer, *tc.blockContext.systemContext.sockets,
                          std::nullopt);
    tc.blockContext.systemContext.sockets->remove(*tc.blockContext.writer, socket,
-                                                 &tc.blockContext.db);
+                                                 &tc.blockContext.kv);
 }
 
 std::filesystem::path package_path();
@@ -194,11 +194,11 @@ void initialize_database(SystemContext& context, const std::string& template_)
    TransactionContext tc{bc, trx, trace, DbMode::rpc()};
 
    auto cleanup =
-       psio::finally{[&, saved = bc.db.saveSubjective()] { bc.db.restoreSubjective(saved); }};
-   bc.db.checkoutSubjective();
+       psio::finally{[&, saved = bc.kv.saveSubjective()] { bc.kv.restoreSubjective(saved); }};
+   bc.kv.checkoutSubjective(*bc.writer, bc.systemContext.sharedDatabase);
 
    auto key = psio::convert_to_key(codePrefix());
-   if (!bc.db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
+   if (!bc.kv.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
    {
       DirectoryRegistry registry{package_path().string()};
       auto              packages = registry.resolve({&template_, 1});
@@ -207,7 +207,7 @@ void initialize_database(SystemContext& context, const std::string& template_)
    }
 
    SocketAutoCloseSet autoClose;
-   if (!bc.db.commitSubjective(*context.sockets, tc.ownedSockets))
+   if (!bc.kv.commitSubjective(*context.sockets, autoClose))
    {
       throw std::runtime_error("Failed to initialize database");
    }

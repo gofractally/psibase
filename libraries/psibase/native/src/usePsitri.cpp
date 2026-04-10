@@ -57,10 +57,18 @@ namespace psibase
       psitri::database_ptr db;
       DatabaseCallbacks*   callbacks = nullptr;
 
-      // Per-instance roots — each clone gets its own copy so mutations on one
-      // chain don't affect others (same semantics as triedent's topRoot).
-      ConstRevisionPtr metaRoot;        // revision management (head, block revisions)
-      ConstRevisionPtr subjectiveRoot;  // persistent subjective databases
+      // ── Clone isolation ──────────────────────────────────────────────
+      //
+      // Non-clones: roots are NEVER cached — always read fresh from psitri
+      // via ws.get_root(). This avoids cross-thread smart_ptr issues
+      // (psinode: main thread init → chain thread operation).
+      //
+      // Clones: subjective root is cached for snapshot isolation — the
+      // clone must not see the parent's subsequent subjective writes.
+      // Clones are single-threaded (tests only), so regular smart_ptr is fine.
+      bool             isClone_ = false;
+      ConstRevisionPtr cloneSubjectiveRoot;  // clone-only
+      ConstRevisionPtr cloneMetaRoot;        // clone-only
 
       // Session databases live in-memory — no psitri roots, no persistence.
       // Each SharedDatabaseImpl (including clones) has its own empty maps.
@@ -72,25 +80,51 @@ namespace psibase
                          psitri::open_mode              mode)
       {
          db = psitri::database::open(dir, mode, config);
-         // Load persisted roots
-         auto ws = db->start_write_session();
-         metaRoot       = ws->get_root(metaRootIndex);
-         subjectiveRoot = ws->get_root(subjectiveRootIndex);
+         // Non-clones don't cache roots — read from psitri on demand.
       }
 
       SharedDatabaseImpl(const SharedDatabaseImpl& other)
-          : db(other.db), metaRoot(other.metaRoot), subjectiveRoot(other.subjectiveRoot)
+          : db(other.db), isClone_(true)
       {
-         // Clone gets snapshots of both roots — subsequent mutations
-         // on either side are independent (COW semantics).
+         // Snapshot current subjective state using a temporary writer.
+         // The smart_ptr keeps the temp session alive via refcount.
+         auto ws             = db->start_write_session();
+         cloneSubjectiveRoot = ws->get_root(subjectiveRootIndex);
+         cloneMetaRoot       = ws->get_root(metaRootIndex);
          // Session databases start empty in clones.
+      }
+
+      // Get the current subjective root — from clone cache or psitri
+      ConstRevisionPtr getSubjectiveRoot(psitri::write_session& ws)
+      {
+         if (isClone_)
+            return cloneSubjectiveRoot;
+         return ws.get_root(subjectiveRootIndex);
+      }
+
+      // Get the current meta root — from clone cache or psitri
+      ConstRevisionPtr getMetaRoot(psitri::write_session& ws)
+      {
+         if (isClone_)
+            return cloneMetaRoot;
+         return ws.get_root(metaRootIndex);
+      }
+
+      // Persist meta root — to clone cache or psitri
+      void setMetaRoot(psitri::write_session& ws, ConstRevisionPtr root)
+      {
+         if (isClone_)
+            cloneMetaRoot = std::move(root);
+         else
+            ws.set_root(metaRootIndex, std::move(root), ws.get_sync());
       }
 
       ConstRevisionPtr getHead(psitri::write_session& ws)
       {
-         if (!metaRoot)
+         auto root = getMetaRoot(ws);
+         if (!root)
             return {};
-         psitri::cursor c(metaRoot);
+         psitri::cursor c(root);
          auto headKey = std::string_view(metaHeadKey, sizeof(metaHeadKey));
          if (!c.seek(headKey))
             return {};
@@ -99,20 +133,17 @@ namespace psibase
          return {};
       }
 
-      // Meta-tree operations use a write_cursor.  The meta root is per-impl
-      // (not stored in a psitri root), so no locking or root index needed.
-
       void setHead(psitri::write_session& ws, ConstRevisionPtr newHead)
       {
+         auto root = getMetaRoot(ws);
          // Update meta tree: store head pointer as subtree value
-         psitri::write_cursor wc = metaRoot ? psitri::write_cursor(std::move(metaRoot))
-                                            : *ws.create_write_cursor();
+         psitri::write_cursor wc = root ? psitri::write_cursor(std::move(root))
+                                        : *ws.create_write_cursor();
          auto headKey = std::string_view(metaHeadKey, sizeof(metaHeadKey));
          wc.upsert(headKey, newHead);
-         metaRoot = wc.root();
 
-         // Persist meta root to psitri root 2 for crash recovery
-         ws.set_root(metaRootIndex, metaRoot, ws.get_sync());
+         // Persist meta root
+         setMetaRoot(ws, wc.root());
 
          // Publish to root 0 so readers can snapshot the consensus tree
          ws.set_root(consensusRootIndex, std::move(newHead), ws.get_sync());
@@ -122,14 +153,14 @@ namespace psibase
                          const Checksum256&     blockId,
                          ConstRevisionPtr       root)
       {
-         psitri::write_cursor wc = metaRoot ? psitri::write_cursor(std::move(metaRoot))
-                                            : *ws.create_write_cursor();
+         auto mr = getMetaRoot(ws);
+         psitri::write_cursor wc = mr ? psitri::write_cursor(std::move(mr))
+                                      : *ws.create_write_cursor();
          auto key = metaRevisionById(blockId);
          wc.upsert(std::string_view(key.data(), key.size()), std::move(root));
-         metaRoot = wc.root();
 
-         // Persist meta root to psitri root 2
-         ws.set_root(metaRootIndex, metaRoot, ws.get_sync());
+         // Persist meta root
+         setMetaRoot(ws, wc.root());
       }
    };
 
@@ -172,10 +203,11 @@ namespace psibase
 
    ConstRevisionPtr SharedDatabase::getRevision(Writer& writer, const Checksum256& blockId)
    {
-      if (!impl->metaRoot)
+      auto root = impl->getMetaRoot(writer);
+      if (!root)
          return {};
 
-      psitri::cursor c(impl->metaRoot);
+      psitri::cursor c(root);
       auto           key = metaRevisionById(blockId);
       if (!c.seek(std::string_view(key.data(), key.size())))
          return {};
@@ -191,13 +223,12 @@ namespace psibase
 
    void SharedDatabase::removeRevisions(Writer& writer, const Checksum256& irreversible)
    {
-      // Get nativeSubjective root for snapshot checks
-      auto subjectiveRoot = impl->subjectiveRoot;
+      // Get roots from psitri (or clone cache for subjective)
+      auto subjectiveRoot = impl->getSubjectiveRoot(writer);
+      auto metaRoot       = impl->getMetaRoot(writer);
 
-      // Use write_cursor on the per-impl meta root (not psitri root 2 directly).
-      if (!impl->metaRoot)
+      if (!metaRoot)
          return;
-      auto metaRoot = impl->metaRoot;
 
       psitri::write_cursor wc(std::move(metaRoot));
       auto cursor = wc.read_cursor();
@@ -316,8 +347,7 @@ namespace psibase
             wc.remove(std::string_view(key.data(), key.size()));
       }
 
-      impl->metaRoot = wc.root();
-      writer.set_root(metaRootIndex, impl->metaRoot, writer.get_sync());
+      impl->setMetaRoot(writer, wc.root());
    }
 
    void SharedDatabase::kvPutSubjective(Writer&               writer,
@@ -334,14 +364,17 @@ namespace psibase
          return;
       }
 
-      // Create transaction from per-impl subjective root (not shared psitri root 1)
+      // Create transaction from subjective root (clone cache or psitri)
       auto* implPtr = impl.get();
+      auto  subRoot = impl->getSubjectiveRoot(writer);
       auto tx = psitri::transaction(
           writer.allocator_session(),
-          impl->subjectiveRoot,
+          std::move(subRoot),
           [implPtr, &writer](sal::smart_ptr<sal::alloc_header> new_root) {
-             implPtr->subjectiveRoot = new_root;
-             writer.set_root(subjectiveRootIndex, std::move(new_root), writer.get_sync());
+             if (implPtr->isClone_)
+                implPtr->cloneSubjectiveRoot = new_root;
+             else
+                writer.set_root(subjectiveRootIndex, std::move(new_root), writer.get_sync());
           },
           []() {},
           psitri::tx_mode::batch);
@@ -369,12 +402,15 @@ namespace psibase
       }
 
       auto* implPtr = impl.get();
+      auto  subRoot = impl->getSubjectiveRoot(writer);
       auto tx = psitri::transaction(
           writer.allocator_session(),
-          impl->subjectiveRoot,
+          std::move(subRoot),
           [implPtr, &writer](sal::smart_ptr<sal::alloc_header> new_root) {
-             implPtr->subjectiveRoot = new_root;
-             writer.set_root(subjectiveRootIndex, std::move(new_root), writer.get_sync());
+             if (implPtr->isClone_)
+                implPtr->cloneSubjectiveRoot = new_root;
+             else
+                writer.set_root(subjectiveRootIndex, std::move(new_root), writer.get_sync());
           },
           []() {},
           psitri::tx_mode::batch);
@@ -400,8 +436,8 @@ namespace psibase
             return impl->sessionKV.get(key);
       }
 
-      auto root = impl->subjectiveRoot;
-      if (!root)
+      auto subRoot = impl->getSubjectiveRoot(writer);
+      if (!subRoot)
          return std::nullopt;
 
       std::vector<char> prefixedKey;
@@ -409,7 +445,7 @@ namespace psibase
       prefixedKey.push_back(static_cast<char>(db));
       prefixedKey.insert(prefixedKey.end(), key.begin(), key.end());
 
-      psitri::cursor c(root);
+      psitri::cursor c(subRoot);
       return c.get<std::vector<char>>(
           std::string_view(prefixedKey.data(), prefixedKey.size()));
    }
@@ -551,9 +587,13 @@ namespace psibase
          // User-visible subjective database requires checkout
          check(db != DbId::subjective,
                "subjectiveCheckout is required to access the subjective database");
-         // nativeSubjective: fallback read from per-impl root (for XDb::open → isLocal)
+         // nativeSubjective: fallback read (for XDb::open → isLocal)
          check(_shared_db != nullptr, "no shared database for subjective read");
-         auto root = _shared_db->impl->subjectiveRoot;
+         ConstRevisionPtr root;
+         if (_shared_db->impl->isClone_)
+            root = _shared_db->impl->cloneSubjectiveRoot;
+         else if (_writer)
+            root = _writer->get_root(subjectiveRootIndex);
          if (!root)
             return std::nullopt;
          return psitri::cursor(std::move(root));
@@ -1006,15 +1046,17 @@ namespace psibase
       }
       _subjective_shared = &shared;
 
-      // Create transaction from per-impl subjective root (not shared psitri root 1).
-      // This ensures cloned chains have independent subjective state.
+      // Create transaction from subjective root (clone cache or psitri).
       auto* implPtr = shared.impl.get();
+      auto  subRoot = shared.impl->getSubjectiveRoot(ws);
       _subjective_tx_storage.emplace(
           ws.allocator_session(),
-          shared.impl->subjectiveRoot,
+          std::move(subRoot),
           [implPtr, &ws](sal::smart_ptr<sal::alloc_header> new_root) {
-             implPtr->subjectiveRoot = new_root;
-             ws.set_root(subjectiveRootIndex, std::move(new_root), ws.get_sync());
+             if (implPtr->isClone_)
+                implPtr->cloneSubjectiveRoot = new_root;
+             else
+                ws.set_root(subjectiveRootIndex, std::move(new_root), ws.get_sync());
           },
           []() {},
           psitri::tx_mode::batch);

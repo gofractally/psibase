@@ -1176,10 +1176,7 @@ void run(const std::string&              db_path,
 
    // TODO: configurable WasmCache size
    auto sharedState = std::make_shared<psibase::SharedState>(
-       SharedDatabase{
-           db_path,
-           {db_conf.hot_bytes, db_conf.warm_bytes, db_conf.cool_bytes, db_conf.cold_bytes},
-           triedent::open_mode::resize},
+       SharedDatabase{db_path, psitri::runtime_config{}, psitri::open_mode::create_or_open},
        WasmCache{128});
    auto system      = sharedState->getSystemContext();
    auto proofSystem = sharedState->getSystemContext();

@@ -2101,7 +2101,7 @@ namespace psibase
             byBlocknumIndex.insert({head->blockNum(), head->blockId()});
             byOrderIndex.insert({head->order(), head->blockId()});
             head->revision = systemContext->sharedDatabase.getHead(*writer);
-            assert(!!head->revision);
+            // revision may be null for a brand-new database (no blocks produced yet)
          }
          else
          {
