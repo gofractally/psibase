@@ -140,106 +140,35 @@ pub struct DepGraph<'a> {
     non_request_pref: PackagePreference,
 }
 
-fn get_removed_impl(
-    reg: &HashMap<String, PackageInfo>,
-    names: &[PackageRef],
-    existing: &HashMap<String, (Meta, PackageDisposition, bool)>,
-    found: &mut HashMap<String, bool>,
-    result: &mut Vec<PackageOp>,
-) {
-    for name in names {
-        if !found.contains_key(&name.name) {
-            let (package, disp, broken) = existing.get(&name.name).unwrap();
-            found.insert(name.name.clone(), true);
-            let should_remove = !reg.contains_key(&name.name) && disp.can_remove;
-            if !broken {
-                get_removed_impl(reg, &package.depends, existing, found, result);
-                if should_remove {
-                    result.push(PackageOp::Remove(
-                        existing.get(&name.name).unwrap().0.clone(),
-                    ));
-                }
-            }
-        }
-    }
-}
-
-fn get_installed_impl(
-    reg: &mut HashMap<String, PackageInfo>,
-    reinstall: &HashMap<String, String>,
-    names: &[PackageRef],
-    existing: &mut HashMap<String, (Meta, PackageDisposition, bool)>,
-    found: &mut HashMap<String, bool>,
-    result: &mut Vec<PackageOp>,
-) -> Result<(), anyhow::Error> {
-    for name in names {
-        if let Some(completed) = found.get(&name.name) {
-            if !completed {
-                Err(Error::DependencyCycle)?
-            }
-        } else {
-            let (nm, package) = reg.remove_entry(&name.name).unwrap();
-            found.insert(nm, false);
-            get_installed_impl(reg, reinstall, &package.depends, existing, found, result)?;
-            if let Some((meta, _, _)) = existing.remove(&name.name) {
-                if meta.version != package.version || reinstall.contains_key(&name.name) {
-                    result.push(PackageOp::Replace(meta, package));
-                }
-            } else {
-                result.push(PackageOp::Install(package));
-            }
-            *found.get_mut(&name.name).unwrap() = true;
-        }
-    }
-    Ok(())
-}
-
 // Takes the new and previous sets of packages and returns a list
 // of operations in the order in which they should be executed.
 //
 // A package is installed after and removed before all the packages
 // that it depends on.
 fn evaluate_changes(
-    mut packages: HashMap<String, PackageInfo>,
+    packages: HashMap<String, PackageInfo>,
     mut existing: HashMap<String, (Meta, PackageDisposition, bool)>,
     request: HashMap<String, String>,
-    preferred_order: Vec<String>,
+    _preferred_order: Vec<String>,
     reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
-    let existing_refs: Vec<_> = existing
-        .keys()
-        .map(|name| PackageRef {
-            name: name.clone(),
-            version: String::new(),
-        })
-        .collect();
     let mut result = vec![];
-    get_removed_impl(
-        &packages,
-        &existing_refs,
-        &existing,
-        &mut HashMap::new(),
-        &mut result,
-    );
-    result.reverse();
-
-    let installed_refs: Vec<_> = preferred_order
-        .iter()
-        .filter(|name| packages.contains_key(*name))
-        .chain(packages.keys())
-        .map(|name| PackageRef {
-            name: name.clone(),
-            version: String::new(),
-        })
-        .collect();
-    get_installed_impl(
-        &mut packages,
-        &if reinstall { request } else { HashMap::new() },
-        &installed_refs,
-        &mut existing,
-        &mut HashMap::new(),
-        &mut result,
-    )?;
+    let reinstall = if reinstall { request } else { HashMap::new() };
+    for package in packages.into_values() {
+        if let Some((meta, _, _)) = existing.remove(&package.name) {
+            if meta.version != package.version || reinstall.contains_key(&package.name) {
+                result.push(PackageOp::Replace(meta, package));
+            }
+        } else {
+            result.push(PackageOp::Install(package));
+        }
+    }
+    // Packages that are unchanged or updated have already been removed from existing
+    for (meta, disp, broken) in existing.into_values() {
+        if !broken && disp.can_remove {
+            result.push(PackageOp::Remove(meta));
+        }
+    }
     Ok(result)
 }
 
