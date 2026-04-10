@@ -1193,10 +1193,22 @@ pub enum PackageOpFull<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> PackageOpFull<R> {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
             PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => package.name(),
             PackageOpFull::Remove(meta) => &meta.name,
+        }
+    }
+    pub fn old(&self) -> Option<&Meta> {
+        match self {
+            PackageOpFull::Install(_) => None,
+            PackageOpFull::Replace(meta, _) | PackageOpFull::Remove(meta) => Some(meta),
+        }
+    }
+    pub fn new(&mut self) -> Option<&mut PackagedService<R>> {
+        match self {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => Some(package),
+            PackageOpFull::Remove(_) => None,
         }
     }
 }
