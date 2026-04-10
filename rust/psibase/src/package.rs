@@ -1438,9 +1438,11 @@ fn get_package_order<R: Read + Seek>(
 fn apply_permutation<T>(vec: &mut Vec<T>, permutation: &mut [usize]) {
     assert!(vec.len() == permutation.len());
     for i in 0..vec.len() {
-        let pos = permutation[i];
-        permutation.swap(i, pos);
-        vec.swap(i, pos);
+        while permutation[i] != i {
+            let pos = permutation[i];
+            permutation.swap(i, pos);
+            vec.swap(i, pos);
+        }
     }
 }
 
