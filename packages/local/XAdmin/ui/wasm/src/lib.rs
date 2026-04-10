@@ -45,10 +45,24 @@ impl Boot for XAdminPlugin {
         tx_signing_key: Option<Pem>,
         compression_level: u32,
     ) -> Result<(Tx, Vec<(Tx, u32, u32)>, Vec<String>), String> {
-        let mut services: Vec<PackagedService<Cursor<&[u8]>>> = vec![];
-        for s in &js_packages[..] {
-            services.push(PackagedService::new(Cursor::new(&s[..])).map_err(|e| e.to_string())?);
+        let mut ops = Vec::new();
+        for s in js_packages {
+            ops.push(PackageOpFull::Install(
+                PackagedService::new(Cursor::new(s)).map_err(|e| e.to_string())?,
+            ));
         }
+        sort_package_ops(&mut ops, &PackageList::new()).map_err(|e| e.to_string())?;
+
+        let mut packages: Vec<_> = ops
+            .into_iter()
+            .map(|op| {
+                if let PackageOpFull::Install(package) = op {
+                    package
+                } else {
+                    panic!("Only install is expected when there are no existing packages")
+                }
+            })
+            .collect();
 
         let now_plus_120secs = chrono::Utc::now() + chrono::Duration::seconds(120);
         let expiration = TimePointSec::from(now_plus_120secs);
@@ -63,7 +77,7 @@ impl Boot for XAdminPlugin {
             prod.into(),
             true,
             expiration,
-            &mut services[..],
+            &mut packages[..],
             compression_level,
         )
         .map_err(|e| e.to_string())?;
