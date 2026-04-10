@@ -2,12 +2,10 @@ import { useEffect, useState } from "react";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import {
-    PREM_ACCOUNTS_SERVICE,
-    zPremiumAccountName,
-} from "@/lib/prem-service";
+import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 
@@ -81,11 +79,9 @@ export function PurchasedPage() {
         setClaimSuccessMessage("");
         setClaimSuccessNotification(null);
 
-        const zod = zPremiumAccountName.safeParse(name.trim());
+        const zod = zAccount.safeParse(name.trim());
         if (!zod.success) {
-            setError(
-                zod.error.issues[0]?.message ?? "Invalid account name",
-            );
+            setError(zod.error.issues[0]?.message ?? "Invalid account name");
             setClaimingNames((prev) => {
                 const next = new Set(prev);
                 next.delete(name);
@@ -179,7 +175,7 @@ export function PurchasedPage() {
                             Private key (save this securely):
                         </p>
                         <p className="bg-muted/80 mb-4 break-all rounded p-2 font-mono text-sm">
-                            {claimSuccessNotification.privateKey}
+                            {pemToB64(claimSuccessNotification.privateKey)}
                         </p>
                         <Button
                             type="button"

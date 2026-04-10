@@ -1,18 +1,17 @@
-import { queryClient } from "@shared/lib/query-client";
-import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
-import { supervisor } from "@shared/lib/supervisor";
-
 import { usePluginMutation } from "@/hooks/use-plugin-mutation";
-import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
+import {
+    MAX_PREMIUM_NAME_LENGTH_MARKET,
+    MIN_PREMIUM_NAME_LENGTH_MARKET,
+    PREMIUM_MARKET_DEFAULTS,
+} from "@/lib/premium-name-market-defaults";
 import QueryKey from "@/lib/query-keys";
-
 import { CONFIG } from "@/lib/services";
 
+import { queryClient } from "@shared/lib/query-client";
+import { supervisor } from "@shared/lib/supervisor";
+
 export const useBootstrapDefaultPremiumNameMarkets = () => {
-    const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH}-${MAX_PREMIUM_NAME_LENGTH}`;
+    const nameLengthRangeStr = `${MIN_PREMIUM_NAME_LENGTH_MARKET}-${MAX_PREMIUM_NAME_LENGTH_MARKET}`;
 
     return usePluginMutation<void>(
         {
@@ -28,8 +27,8 @@ export const useBootstrapDefaultPremiumNameMarkets = () => {
             ] as const,
             customMutationFn: async () => {
                 for (
-                    let len = MIN_PREMIUM_NAME_LENGTH;
-                    len <= MAX_PREMIUM_NAME_LENGTH;
+                    let len = MIN_PREMIUM_NAME_LENGTH_MARKET;
+                    len <= MAX_PREMIUM_NAME_LENGTH_MARKET;
                     len++
                 ) {
                     await supervisor.functionCall({

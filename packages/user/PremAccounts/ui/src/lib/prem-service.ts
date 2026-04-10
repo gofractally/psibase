@@ -1,18 +1,9 @@
 import { supervisor } from "@shared/lib/supervisor";
-import {
-    MAX_PREMIUM_NAME_LENGTH,
-    zAccount,
-} from "@shared/lib/schemas/account";
 
 export const PREM_ACCOUNTS_SERVICE = "prem-accounts";
 
-/** Shared `zAccount` rules with the PremAccounts premium name length cap. */
-export const zPremiumAccountName = zAccount.refine(
-    (val) => val.length <= MAX_PREMIUM_NAME_LENGTH,
-    {
-        message: `Premium account names must be at most ${MAX_PREMIUM_NAME_LENGTH} characters.`,
-    },
-);
+export const MIN_PREMIUM_NAME_LENGTH = 1;
+export const MAX_PREMIUM_NAME_LENGTH = 10;
 
 export async function doesAccountExist(accountName: string): Promise<boolean> {
     try {

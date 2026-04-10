@@ -1,12 +1,9 @@
 import { z } from "zod";
 
-export const MIN_PREMIUM_NAME_LENGTH = 1;
-export const MAX_PREMIUM_NAME_LENGTH = 15;
-
 export const zAccount = z
     .string()
-    .min(MIN_PREMIUM_NAME_LENGTH, { message: "Account must be at least 1 character." })
-    .max(MAX_PREMIUM_NAME_LENGTH, { message: `Account must be at most ${MAX_PREMIUM_NAME_LENGTH} characters.` })
+    .min(1, { message: "Account must be at least 1 character." })
+    .max(18, { message: "Account must be at most 10 characters." })
     .regex(/^[a-z][a-z0-9-]*$/, {
         message:
             "Account must start with a letter and contain only lowercase letters, numbers, and hyphens.",

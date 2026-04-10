@@ -74,7 +74,7 @@ pub mod constants;
 
 #[psibase::service(name = "prem-accounts", tables = "tables")]
 pub mod service {
-    use crate::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
+    use crate::constants::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
@@ -237,10 +237,10 @@ pub mod service {
         require_caller_is_self();
 
         check(
-            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
             &format!(
                 "market name length must be {}-{}",
-                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
             ),
         );
         let auctions_table = AuctionsTable::new();
@@ -296,10 +296,10 @@ pub mod service {
         require_caller_is_self();
 
         check(
-            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
             &format!(
                 "market name length must be {}-{}",
-                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
             ),
         );
         let auctions_table = AuctionsTable::new();
@@ -329,10 +329,10 @@ pub mod service {
         require_caller_is_self();
 
         check(
-            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
             &format!(
                 "market name length must be {}-{}",
-                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
             ),
         );
         let auctions_table = AuctionsTable::new();
@@ -353,10 +353,10 @@ pub mod service {
         require_caller_is_self();
 
         check(
-            length >= MIN_PREMIUM_NAME_LENGTH && length <= MAX_PREMIUM_NAME_LENGTH,
+            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
             &format!(
                 "market name length must be {}-{}",
-                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH,
+                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
             ),
         );
         let auctions_table = AuctionsTable::new();

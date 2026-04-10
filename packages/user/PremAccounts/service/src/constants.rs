@@ -1,2 +1,4 @@
+pub const MIN_ACCOUNT_NAME_LENGTH: u8 = 1;
+pub const MAX_ACCOUNT_NAME_LENGTH: u8 = 10;
 pub const MIN_PREMIUM_NAME_LENGTH: u8 = 1;
-pub const MAX_PREMIUM_NAME_LENGTH: u8 = 15;
+pub const MAX_PREMIUM_NAME_LENGTH: u8 = 7;

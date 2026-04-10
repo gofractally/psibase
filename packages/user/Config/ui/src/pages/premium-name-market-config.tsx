@@ -1,18 +1,15 @@
 import { AlertCircle, ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useAddPremiumNameMarket } from "@/hooks/premium-name-markets/use-add-market";
 import { useBootstrapDefaultPremiumNameMarkets } from "@/hooks/premium-name-markets/use-bootstrap-default-markets";
 import { useConfigurePremiumNameMarket } from "@/hooks/premium-name-markets/use-config-market";
-import {
-    type ConfiguredPremiumNameMarketRow,
-    useConfiguredPremiumNameMarkets,
-} from "@/hooks/premium-name-markets/use-configured-markets";
+import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
 import { useDisablePremiumNameMarket } from "@/hooks/premium-name-markets/use-disable-market";
 import { useEnablePremiumNameMarket } from "@/hooks/premium-name-markets/use-enable-market";
 import {
-    PREMIUM_MARKET_DEFAULTS,
-    PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
+    MAX_PREMIUM_NAME_LENGTH_MARKET,
+    MIN_PREMIUM_NAME_LENGTH_MARKET,
 } from "@/lib/premium-name-market-defaults";
 
 import { PageContainer } from "@shared/components/page-container";
@@ -30,178 +27,10 @@ import {
 } from "@shared/shadcn/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import { Button } from "@shared/shadcn/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@shared/shadcn/ui/dialog";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 import { Switch } from "@shared/shadcn/ui/switch";
 
-function parseNameLength(raw: string): number | null {
-    const t = raw.trim();
-    if (!t) return null;
-    if (t.length > 2) return null;
-    if (!/^\d+$/.test(t)) return null;
-    const n = Number.parseInt(t, 10);
-    if (
-        !Number.isFinite(n) ||
-        n < MIN_PREMIUM_NAME_LENGTH ||
-        n > MAX_PREMIUM_NAME_LENGTH
-    ) {
-        return null;
-    }
-    return n;
-}
-
-function parsePositiveInt(raw: string): number | null {
-    const t = raw.trim();
-    if (!t || !/^\d+$/.test(t)) return null;
-    const n = Number.parseInt(t, 10);
-    if (!Number.isFinite(n) || n < 1) return null;
-    return n;
-}
-
-function parsePpm(raw: string): number | null {
-    const t = raw.trim();
-    if (!t || !/^\d+$/.test(t)) return null;
-    const n = Number.parseInt(t, 10);
-    if (!Number.isFinite(n) || n < 1 || n >= 1_000_000) return null;
-    return n;
-}
-
-function NameMarketRowPanel({
-    row,
-    saveConfig,
-    savingLength,
-    disablingLength,
-    enablingLength,
-    actionsDisabled,
-}: {
-    row: ConfiguredPremiumNameMarketRow;
-    saveConfig: ReturnType<typeof useConfigurePremiumNameMarket>["mutate"];
-    savingLength: number | null;
-    disablingLength: number | null;
-    enablingLength: number | null;
-    actionsDisabled: boolean;
-}) {
-    const [floorPrice, setFloorPrice] = useState(row.floorPrice);
-    const [targetRaw, setTargetRaw] = useState(String(row.target));
-    const [increasePpmRaw, setIncreasePpmRaw] = useState(
-        String(row.increasePpm),
-    );
-    const [decreasePpmRaw, setDecreasePpmRaw] = useState(
-        String(row.decreasePpm),
-    );
-
-    useEffect(() => {
-        setFloorPrice(row.floorPrice);
-        setTargetRaw(String(row.target));
-        setIncreasePpmRaw(String(row.increasePpm));
-        setDecreasePpmRaw(String(row.decreasePpm));
-    }, [
-        row.length,
-        row.floorPrice,
-        row.target,
-        row.increasePpm,
-        row.decreasePpm,
-    ]);
-
-    const target = parsePositiveInt(targetRaw);
-    const increasePpm = parsePpm(increasePpmRaw);
-    const decreasePpm = parsePpm(decreasePpmRaw);
-    const pricesOk =
-        floorPrice.trim() !== "" &&
-        target !== null &&
-        increasePpm !== null &&
-        decreasePpm !== null;
-
-    return (
-        <div className="flex max-w-lg flex-col gap-4 pt-2">
-            <div className="grid gap-2">
-                <Label htmlFor={`pm-floor-${row.length}`}>Floor price</Label>
-                <Input
-                    id={`pm-floor-${row.length}`}
-                    value={floorPrice}
-                    onChange={(e) => setFloorPrice(e.target.value)}
-                    autoComplete="off"
-                    className="font-mono"
-                    disabled={actionsDisabled}
-                />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor={`pm-target-${row.length}`}>
-                    Target sales per window
-                </Label>
-                <Input
-                    id={`pm-target-${row.length}`}
-                    inputMode="numeric"
-                    value={targetRaw}
-                    onChange={(e) => setTargetRaw(e.target.value)}
-                    autoComplete="off"
-                    className="font-mono"
-                    disabled={actionsDisabled}
-                />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor={`pm-inc-ppm-${row.length}`}>Increase PPM</Label>
-                <Input
-                    id={`pm-inc-ppm-${row.length}`}
-                    inputMode="numeric"
-                    value={increasePpmRaw}
-                    onChange={(e) => setIncreasePpmRaw(e.target.value)}
-                    autoComplete="off"
-                    className="font-mono"
-                    disabled={actionsDisabled}
-                />
-            </div>
-            <div className="grid gap-2">
-                <Label htmlFor={`pm-dec-ppm-${row.length}`}>Decrease PPM</Label>
-                <Input
-                    id={`pm-dec-ppm-${row.length}`}
-                    inputMode="numeric"
-                    value={decreasePpmRaw}
-                    onChange={(e) => setDecreasePpmRaw(e.target.value)}
-                    autoComplete="off"
-                    className="font-mono"
-                    disabled={actionsDisabled}
-                />
-            </div>
-            <Button
-                type="button"
-                disabled={
-                    actionsDisabled ||
-                    !pricesOk ||
-                    savingLength === row.length ||
-                    disablingLength === row.length ||
-                    enablingLength === row.length
-                }
-                onClick={() => {
-                    if (
-                        target === null ||
-                        increasePpm === null ||
-                        decreasePpm === null
-                    ) {
-                        return;
-                    }
-                    saveConfig([
-                        row.length,
-                        PREMIUM_MARKET_DEFAULT_WINDOW_SECONDS,
-                        target,
-                        floorPrice.trim(),
-                        increasePpm,
-                        decreasePpm,
-                    ]);
-                }}
-            >
-                {savingLength === row.length ? "Saving…" : "Save parameters"}
-            </Button>
-        </div>
-    );
-}
+import { AddMarketDialog } from "./premium-name-market/add-market-dialog";
+import { NameMarketRowPanel } from "./premium-name-market/name-market-row-panel";
 
 export const PremiumNameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
@@ -246,47 +75,6 @@ export const PremiumNameMarketConfig = () => {
         enablingPurchases && enableVars !== undefined ? enableVars[0] : null;
 
     const [showAdd, setShowAdd] = useState(false);
-    const [newLengthRaw, setNewLengthRaw] = useState("");
-    const [addInitial, setAddInitial] = useState<string>(
-        PREMIUM_MARKET_DEFAULTS.initialPrice,
-    );
-    const [addFloor, setAddFloor] = useState<string>(
-        PREMIUM_MARKET_DEFAULTS.floorPrice,
-    );
-    const [addTargetRaw, setAddTargetRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULTS.target),
-    );
-    const [addIncreasePpmRaw, setAddIncreasePpmRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULTS.increasePpm),
-    );
-    const [addDecreasePpmRaw, setAddDecreasePpmRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULTS.decreasePpm),
-    );
-
-    const parsedLength = useMemo(
-        () => parseNameLength(newLengthRaw),
-        [newLengthRaw],
-    );
-
-    const addTarget = parsePositiveInt(addTargetRaw);
-    const addIncreasePpm = parsePpm(addIncreasePpmRaw);
-    const addDecreasePpm = parsePpm(addDecreasePpmRaw);
-    const addPricesOk =
-        addInitial.trim() !== "" &&
-        addFloor.trim() !== "" &&
-        addTarget !== null &&
-        addIncreasePpm !== null &&
-        addDecreasePpm !== null;
-
-    const trimmedLen = newLengthRaw.trim();
-    const lengthTooLong =
-        trimmedLen.length > 2 ||
-        (/^\d+$/.test(trimmedLen) &&
-            Number.parseInt(trimmedLen, 10) > MAX_PREMIUM_NAME_LENGTH);
-
-    const duplicate =
-        parsedLength !== null &&
-        (rows?.some((r) => r.length === parsedLength) ?? false);
 
     const allLengthMarketsCreated = useMemo(() => {
         if (isLoading || isError || !rows) {
@@ -304,25 +92,6 @@ export const PremiumNameMarketConfig = () => {
         }
         return true;
     }, [rows, isLoading, isError]);
-
-    const canAdd =
-        !actionsDisabled &&
-        !allLengthMarketsCreated &&
-        parsedLength !== null &&
-        !duplicate &&
-        !isAdding &&
-        addPricesOk &&
-        !lengthTooLong;
-
-    const openAddForm = () => {
-        setShowAdd(true);
-        setNewLengthRaw("");
-        setAddInitial(PREMIUM_MARKET_DEFAULTS.initialPrice);
-        setAddFloor(PREMIUM_MARKET_DEFAULTS.floorPrice);
-        setAddTargetRaw(String(PREMIUM_MARKET_DEFAULTS.target));
-        setAddIncreasePpmRaw(String(PREMIUM_MARKET_DEFAULTS.increasePpm));
-        setAddDecreasePpmRaw(String(PREMIUM_MARKET_DEFAULTS.decreasePpm));
-    };
 
     return (
         <PageContainer className="space-y-6">
@@ -391,7 +160,7 @@ export const PremiumNameMarketConfig = () => {
                         allLengthMarketsCreated ||
                         bootstrapping
                     }
-                    onClick={openAddForm}
+                    onClick={() => setShowAdd(true)}
                 >
                     + Add market
                 </Button>
@@ -412,7 +181,7 @@ export const PremiumNameMarketConfig = () => {
                     >
                         {bootstrapping
                             ? "Configuring…"
-                            : "Configure name markets 1–9 with defaults"}
+                            : `Configure name markets ${MIN_PREMIUM_NAME_LENGTH_MARKET}-${MAX_PREMIUM_NAME_LENGTH_MARKET} with defaults`}
                     </Button>
                 </div>
             ) : null}
@@ -508,176 +277,16 @@ export const PremiumNameMarketConfig = () => {
                 </div>
             ) : null}
 
-            <Dialog open={showAdd} onOpenChange={setShowAdd}>
-                <DialogContent className="max-w-md sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Add market</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="new-premium-market-length">
-                                Name length (1–{MAX_PREMIUM_NAME_LENGTH})
-                            </Label>
-                            <Input
-                                id="new-premium-market-length"
-                                inputMode="numeric"
-                                autoComplete="off"
-                                maxLength={2}
-                                placeholder={`1–${MAX_PREMIUM_NAME_LENGTH}`}
-                                value={newLengthRaw}
-                                onChange={(e) =>
-                                    setNewLengthRaw(e.target.value)
-                                }
-                                disabled={actionsDisabled}
-                                aria-invalid={
-                                    trimmedLen !== "" &&
-                                    (parsedLength === null ||
-                                        duplicate ||
-                                        lengthTooLong)
-                                }
-                            />
-                            {lengthTooLong ? (
-                                <p className="text-destructive text-sm">
-                                    Name length must be at most{" "}
-                                    {MAX_PREMIUM_NAME_LENGTH}.
-                                </p>
-                            ) : null}
-                            {duplicate ? (
-                                <p className="text-destructive text-sm">
-                                    A market for this length already exists.
-                                </p>
-                            ) : null}
-                            {trimmedLen !== "" &&
-                            parsedLength === null &&
-                            !lengthTooLong ? (
-                                <p className="text-destructive text-sm">
-                                    Enter a whole number from 1 to{" "}
-                                    {MAX_PREMIUM_NAME_LENGTH}.
-                                </p>
-                            ) : null}
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="add-pm-initial">
-                                Initial price
-                            </Label>
-                            <Input
-                                id="add-pm-initial"
-                                value={addInitial}
-                                onChange={(e) => setAddInitial(e.target.value)}
-                                className="font-mono"
-                                disabled={actionsDisabled}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="add-pm-floor">Floor price</Label>
-                            <Input
-                                id="add-pm-floor"
-                                value={addFloor}
-                                onChange={(e) => setAddFloor(e.target.value)}
-                                className="font-mono"
-                                disabled={actionsDisabled}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="add-pm-target">
-                                Target sales per window
-                            </Label>
-                            <Input
-                                id="add-pm-target"
-                                inputMode="numeric"
-                                value={addTargetRaw}
-                                onChange={(e) =>
-                                    setAddTargetRaw(e.target.value)
-                                }
-                                className="font-mono"
-                                disabled={actionsDisabled}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="add-pm-inc-ppm">
-                                Increase PPM
-                            </Label>
-                            <Input
-                                id="add-pm-inc-ppm"
-                                inputMode="numeric"
-                                value={addIncreasePpmRaw}
-                                onChange={(e) =>
-                                    setAddIncreasePpmRaw(e.target.value)
-                                }
-                                autoComplete="off"
-                                className="font-mono"
-                                disabled={actionsDisabled}
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="add-pm-dec-ppm">
-                                Decrease PPM
-                            </Label>
-                            <Input
-                                id="add-pm-dec-ppm"
-                                inputMode="numeric"
-                                value={addDecreasePpmRaw}
-                                onChange={(e) =>
-                                    setAddDecreasePpmRaw(e.target.value)
-                                }
-                                autoComplete="off"
-                                className="font-mono"
-                                disabled={actionsDisabled}
-                            />
-                        </div>
-                        <p className="text-muted-foreground text-sm">
-                            New markets are created with purchases enabled. You
-                            can turn them off anytime using the switch on each
-                            row.
-                        </p>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => setShowAdd(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="button"
-                            disabled={!canAdd}
-                            onClick={() => {
-                                if (
-                                    parsedLength === null ||
-                                    addTarget === null ||
-                                    addIncreasePpm === null ||
-                                    addDecreasePpm === null
-                                ) {
-                                    return;
-                                }
-                                addMarket(
-                                    [
-                                        parsedLength,
-                                        addInitial.trim(),
-                                        addTarget,
-                                        addFloor.trim(),
-                                        addIncreasePpm,
-                                        addDecreasePpm,
-                                    ],
-                                    {
-                                        onSuccess: () => {
-                                            setShowAdd(false);
-                                            setNewLengthRaw("");
-                                        },
-                                    },
-                                );
-                            }}
-                        >
-                            {isAdding &&
-                            addVars &&
-                            addVars[0] === parsedLength
-                                ? "Saving…"
-                                : "Save"}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <AddMarketDialog
+                open={showAdd}
+                onOpenChange={setShowAdd}
+                rows={rows}
+                actionsDisabled={actionsDisabled}
+                allLengthMarketsCreated={allLengthMarketsCreated}
+                addMarket={addMarket}
+                isAdding={isAdding}
+                addVars={addVars}
+            />
         </PageContainer>
     );
 };

@@ -19,14 +19,6 @@ use errors::ErrorType;
 
 use psibase_plugin::{trust::*, *};
 
-fn validate_premium_account_name(account: &str) -> Result<AccountNumber, Error> {
-    let len = account.len();
-    if !(MIN_PREMIUM_NAME_LENGTH as usize..=MAX_PREMIUM_NAME_LENGTH as usize).contains(&len) {
-        return Err(ErrorType::InvalidPremiumAccountName.into());
-    }
-    AccountNumber::from_exact(account).map_err(|_| ErrorType::InvalidPremiumAccountName.into())
-}
-
 impl TrustConfig for PremAccountsPlugin {
     fn capabilities() -> Capabilities {
         Capabilities {
@@ -49,9 +41,6 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::CreateMarketLengthInvalid.into());
-        }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
             Some(id) => id,
             None => return Err(ErrorType::SystemTokenNotDefined.into()),
@@ -91,9 +80,6 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::CreateMarketLengthInvalid.into());
-        }
         let sys_token_id = match TokensHelpers::fetch_network_token()? {
             Some(id) => id,
             None => return Err(ErrorType::SystemTokenNotDefined.into()),
@@ -121,9 +107,6 @@ impl MarketAdmin for PremAccountsPlugin {
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn enable(length: u8) -> Result<(), Error> {
-        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::CreateMarketLengthInvalid.into());
-        }
         let packed = prem_accounts::action_structs::enable { length }.packed();
         add_action_to_transaction("enable", &packed)?;
         Ok(())
@@ -131,9 +114,6 @@ impl MarketAdmin for PremAccountsPlugin {
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn disable(length: u8) -> Result<(), Error> {
-        if length < MIN_PREMIUM_NAME_LENGTH || length > MAX_PREMIUM_NAME_LENGTH {
-            return Err(ErrorType::CreateMarketLengthInvalid.into());
-        }
         let packed = prem_accounts::action_structs::disable { length }.packed();
         add_action_to_transaction("disable", &packed)?;
         Ok(())
@@ -143,7 +123,7 @@ impl MarketAdmin for PremAccountsPlugin {
 impl Api for PremAccountsPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["accounts"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        let acct_name = validate_premium_account_name(account.trim())?;
+        let acct_name = AccountNumber::from_exact(account.trim()).unwrap();
 
         let service_account = prem_accounts::SERVICE.to_string();
 
@@ -191,7 +171,7 @@ impl Api for PremAccountsPlugin {
 
     #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
     fn claim(account: String) -> Result<String, Error> {
-        let account = validate_premium_account_name(account.trim())?;
+        let account = AccountNumber::from_exact(account.trim()).unwrap();
 
         let keypair = AuthSigKeyVault::generate_unmanaged_keypair().unwrap();
 

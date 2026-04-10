@@ -2,8 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "@shared/lib/graphql";
+import {
+    MAX_PREMIUM_NAME_LENGTH,
+    MIN_PREMIUM_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
+
 import QueryKey from "../../lib/query-keys";
-import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "@shared/lib/schemas/account";
 
 const zRow = z.object({
     length: z

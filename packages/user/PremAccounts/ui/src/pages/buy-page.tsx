@@ -5,18 +5,19 @@ import { useOutletContext } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { PREM_ACCOUNTS_SERVICE, doesAccountExist, zPremiumAccountName } from "@/lib/prem-service";
+import { PREM_ACCOUNTS_SERVICE, doesAccountExist } from "@/lib/prem-service";
 
-import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
 import {
     canonicalTokenAmountToRaw,
     expandToCanonicalTokenDecimal,
     formatCanonicalTokenAmount,
     unitTokenAmountCanonical,
 } from "@shared/lib/quantity";
+import {
+    MAX_PREMIUM_NAME_LENGTH,
+    MIN_PREMIUM_NAME_LENGTH,
+    zAccount,
+} from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -44,9 +45,7 @@ export function BuyPage() {
 
     const trimmedAccount = accountName.trim();
     const nameZodResult =
-        trimmedAccount.length > 0
-            ? zPremiumAccountName.safeParse(trimmedAccount)
-            : null;
+        trimmedAccount.length > 0 ? zAccount.safeParse(trimmedAccount) : null;
     const nameValidationMessage =
         nameZodResult && !nameZodResult.success
             ? (nameZodResult.error.issues[0]?.message ?? "Invalid account name")
@@ -123,7 +122,9 @@ export function BuyPage() {
             });
             const text = typeof raw === "string" ? raw : JSON.stringify(raw);
             const body = JSON.parse(text) as {
-                data?: { currentPrices?: Array<{ length: number; price: string }> };
+                data?: {
+                    currentPrices?: Array<{ length: number; price: string }>;
+                };
                 errors?: Array<{ message: string }>;
             };
             if (body.errors?.length) {
@@ -181,7 +182,7 @@ export function BuyPage() {
                 return;
             }
 
-            const zod = zPremiumAccountName.safeParse(trimmed);
+            const zod = zAccount.safeParse(trimmed);
             if (!zod.success) {
                 setAccountExists(null);
                 setPrice(null);
@@ -208,7 +209,7 @@ export function BuyPage() {
 
     const handleBuy = async () => {
         const trimmed = accountName.trim();
-        const zod = zPremiumAccountName.safeParse(trimmed);
+        const zod = zAccount.safeParse(trimmed);
         if (!zod.success) {
             setError(zod.error.issues[0]?.message ?? "Invalid account name");
             return;
