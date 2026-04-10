@@ -5,10 +5,10 @@ export const MAX_ACCOUNT_NAME_LENGTH = 10;
 
 export const zAccount = z
     .string()
-    .min(1, {
+    .min(MIN_ACCOUNT_NAME_LENGTH, {
         message: `Account must be at least ${MIN_ACCOUNT_NAME_LENGTH} characters.`,
     })
-    .max(18, {
+    .max(MAX_ACCOUNT_NAME_LENGTH, {
         message: `Account must be at most ${MAX_ACCOUNT_NAME_LENGTH} characters.`,
     })
     .regex(/^[a-z][a-z0-9-]*$/, {
