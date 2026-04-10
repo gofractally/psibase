@@ -1542,12 +1542,10 @@ pub trait PackageRegistry {
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let mut result = vec![];
         let index = self.index()?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
         for op in solve_dependencies(
             index,
             make_refs(packages)?,
             vec![],
-            essential,
             false,
             PackagePreference::Latest,
             PackagePreference::Current,
@@ -2168,12 +2166,10 @@ impl PackageList {
         local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
         let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
-            essential,
             reinstall,
             PackagePreference::Latest,
             PackagePreference::Current,
@@ -2189,12 +2185,10 @@ impl PackageList {
         local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
         let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
-            essential,
             false,
             pref,
             if packages.is_empty() {

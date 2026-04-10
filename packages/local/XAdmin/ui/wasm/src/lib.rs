@@ -119,13 +119,11 @@ impl Packages for XAdminPlugin {
         let index = serde_json::from_str(&index_json_str).map_err(|e| e.to_string())?;
         let pinned: Vec<(Meta, PackageDisposition)> = vec![];
         let refs = make_refs(&packages).map_err(|e| e.to_string())?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
 
         let solved = solve_dependencies(
             index,
             refs,
             pinned,
-            essential,
             false,
             PackagePreference::Latest,
             PackagePreference::Latest,

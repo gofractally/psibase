@@ -23,9 +23,9 @@ use exports::packages::plugin::queries::Guest as Queries;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
-    get_essential_packages, make_refs, method, solve_dependencies, AccountNumber, Action,
-    EssentialServices, InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest,
-    PackagedService, SchemaMap, StagedUpload, TransactionBuilder,
+    make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo,
+    PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, StagedUpload,
+    TransactionBuilder,
 };
 
 use psibase::services::{
@@ -420,12 +420,10 @@ impl PrivateApi for PackagesPlugin {
         assert_caller_config_or_self("resolve");
 
         let index = index.into_iter().map(|p| p.into()).collect();
-        let essential = get_essential_packages(&index, &EssentialServices::new());
         Ok(solve_dependencies(
             index,
             make_refs(&packages).unwrap(),
             as_upgradable(&get_installed_packages()?),
-            essential,
             false,
             request_pref.into(),
             non_request_pref.into(),

@@ -107,14 +107,12 @@ pub fn solve_dependencies(
     packages: Vec<PackageInfo>,
     input: Vec<PackageRef>,
     existing: Vec<(Meta, PackageDisposition)>,
-    preferred_order: Vec<String>,
     reinstall: bool,
     request_pref: PackagePreference,
     non_request_pref: PackagePreference,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let mut graph = DepGraph::new();
     graph.reinstall = reinstall;
-    graph.preferred_order = preferred_order;
     graph.request_pref = request_pref;
     graph.non_request_pref = non_request_pref;
     for package in packages {
@@ -133,7 +131,6 @@ pub struct DepGraph<'a> {
     packages: HashMap<String, HashMap<String, (PackageInfo, Lit)>>,
     request: HashMap<String, String>,
     existing: HashMap<String, (Meta, PackageDisposition, bool)>,
-    preferred_order: Vec<String>,
     solver: Solver<'a>,
     reinstall: bool,
     request_pref: PackagePreference,
@@ -149,7 +146,6 @@ fn evaluate_changes(
     packages: HashMap<String, PackageInfo>,
     mut existing: HashMap<String, (Meta, PackageDisposition, bool)>,
     request: HashMap<String, String>,
-    _preferred_order: Vec<String>,
     reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let mut result = vec![];
@@ -253,7 +249,6 @@ impl<'a> DepGraph<'a> {
             request: HashMap::new(),
             existing: HashMap::new(),
             solver: Solver::new(),
-            preferred_order: Vec::new(),
             reinstall: false,
             request_pref: PackagePreference::Latest,
             non_request_pref: PackagePreference::Current,
@@ -310,13 +305,7 @@ impl<'a> DepGraph<'a> {
                             }
                         }
                     }
-                    return evaluate_changes(
-                        result,
-                        self.existing,
-                        self.request,
-                        self.preferred_order,
-                        self.reinstall,
-                    );
+                    return evaluate_changes(result, self.existing, self.request, self.reinstall);
                 }
             }
         }
