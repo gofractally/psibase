@@ -1,6 +1,6 @@
 import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
 } from "@shared/lib/schemas/account";
 
 export function parseNameLength(raw: string): number | null {
@@ -11,8 +11,8 @@ export function parseNameLength(raw: string): number | null {
     const n = Number.parseInt(t, 10);
     if (
         !Number.isFinite(n) ||
-        n < MIN_PREMIUM_NAME_LENGTH ||
-        n > MAX_PREMIUM_NAME_LENGTH
+        n < MIN_ACCOUNT_NAME_LENGTH ||
+        n > MAX_ACCOUNT_NAME_LENGTH
     ) {
         return null;
     }

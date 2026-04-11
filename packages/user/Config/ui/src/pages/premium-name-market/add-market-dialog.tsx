@@ -1,13 +1,14 @@
+import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
 import type { UseMutateFunction } from "@tanstack/react-query";
+
 import { useEffect, useMemo, useState } from "react";
 
-import type { ConfiguredPremiumNameMarketRow } from "@/hooks/premium-name-markets/use-configured-markets";
 import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
-
 import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
+    MAX_PREMIUM_NAME_LENGTH_MARKET,
+    MIN_PREMIUM_NAME_LENGTH_MARKET,
+} from "@/lib/premium-name-market-defaults";
+
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -19,7 +20,7 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { parseNameLength, parsePpm, parsePositiveInt } from "./parsers";
+import { parseNameLength, parsePositiveInt, parsePpm } from "./parsers";
 
 type AddMarketParams = [number, string, number, string, number, number];
 
@@ -29,12 +30,7 @@ export type AddMarketDialogProps = {
     rows: ConfiguredPremiumNameMarketRow[] | undefined;
     actionsDisabled: boolean;
     allLengthMarketsCreated: boolean;
-    addMarket: UseMutateFunction<
-        unknown,
-        Error,
-        AddMarketParams,
-        unknown
-    >;
+    addMarket: UseMutateFunction<unknown, Error, AddMarketParams, unknown>;
     isAdding: boolean;
     addVars: AddMarketParams | undefined;
 };
@@ -95,7 +91,7 @@ export function AddMarketDialog({
     const lengthTooLong =
         trimmedLen.length > 2 ||
         (/^\d+$/.test(trimmedLen) &&
-            Number.parseInt(trimmedLen, 10) > MAX_PREMIUM_NAME_LENGTH);
+            Number.parseInt(trimmedLen, 10) > MAX_PREMIUM_NAME_LENGTH_MARKET);
 
     const duplicate =
         parsedLength !== null &&
@@ -119,14 +115,14 @@ export function AddMarketDialog({
                 <div className="flex flex-col gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="new-premium-market-length">
-                            Name length (1–{MAX_PREMIUM_NAME_LENGTH})
+                            Name length (1-{MAX_PREMIUM_NAME_LENGTH_MARKET})
                         </Label>
                         <Input
                             id="new-premium-market-length"
                             inputMode="numeric"
                             autoComplete="off"
                             maxLength={2}
-                            placeholder={`1–${MAX_PREMIUM_NAME_LENGTH}`}
+                            placeholder={`1-${MAX_PREMIUM_NAME_LENGTH_MARKET}`}
                             value={newLengthRaw}
                             onChange={(e) => setNewLengthRaw(e.target.value)}
                             disabled={actionsDisabled}
@@ -140,7 +136,7 @@ export function AddMarketDialog({
                         {lengthTooLong ? (
                             <p className="text-destructive text-sm">
                                 Name length must be at most{" "}
-                                {MAX_PREMIUM_NAME_LENGTH}.
+                                {MAX_PREMIUM_NAME_LENGTH_MARKET}.
                             </p>
                         ) : null}
                         {duplicate ? (
@@ -153,8 +149,8 @@ export function AddMarketDialog({
                         !lengthTooLong ? (
                             <p className="text-destructive text-sm">
                                 Enter a whole number from{" "}
-                                {MIN_PREMIUM_NAME_LENGTH} to{" "}
-                                {MAX_PREMIUM_NAME_LENGTH}.
+                                {MIN_PREMIUM_NAME_LENGTH_MARKET} to{" "}
+                                {MAX_PREMIUM_NAME_LENGTH_MARKET}.
                             </p>
                         ) : null}
                     </div>
@@ -262,9 +258,7 @@ export function AddMarketDialog({
                             );
                         }}
                     >
-                        {isAdding &&
-                        addVars &&
-                        addVars[0] === parsedLength
+                        {isAdding && addVars && addVars[0] === parsedLength
                             ? "Saving…"
                             : "Save"}
                     </Button>

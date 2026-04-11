@@ -14,10 +14,6 @@ import {
 
 import { PageContainer } from "@shared/components/page-container";
 import { useSystemToken } from "@shared/hooks/use-system-token";
-import {
-    MAX_PREMIUM_NAME_LENGTH,
-    MIN_PREMIUM_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import {
     Accordion,
@@ -82,8 +78,8 @@ export const PremiumNameMarketConfig = () => {
         }
         const lengths = new Set(rows.map((r) => r.length));
         for (
-            let len = MIN_PREMIUM_NAME_LENGTH;
-            len <= MAX_PREMIUM_NAME_LENGTH;
+            let len = MIN_PREMIUM_NAME_LENGTH_MARKET;
+            len <= MAX_PREMIUM_NAME_LENGTH_MARKET;
             len++
         ) {
             if (!lengths.has(len)) {
@@ -102,9 +98,9 @@ export const PremiumNameMarketConfig = () => {
                 <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
                     <li>
                         Each row is a premium account name length (1–
-                        {MAX_PREMIUM_NAME_LENGTH} characters). When you add a
-                        market, you set the initial price; it cannot be changed
-                        later.
+                        {MAX_PREMIUM_NAME_LENGTH_MARKET} characters). When you
+                        add a market, you set the initial price; it cannot be
+                        changed later.
                     </li>
                     <li>
                         Use the switch on each row to turn purchases on or off
