@@ -100,7 +100,7 @@ pub mod tables {
     }
 
     #[table(name = "RoleTable", index = 4)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Role {
         pub fractal: AccountNumber,
         pub role_id: u8,

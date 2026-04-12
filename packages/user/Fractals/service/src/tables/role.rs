@@ -40,6 +40,11 @@ impl Role {
         new_instance
     }
 
+    pub fn set_occupation(&mut self, new_occupation: AccountNumber) {
+        self.occupation = new_occupation;
+        self.save();
+    }
+
     fn save(&self) {
         RoleTable::read_write().put(&self).unwrap();
     }

@@ -65,7 +65,7 @@ pub mod constants {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::tables::{Fractal, FractalMember, RewardStream};
+    use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
 
     use psibase::*;
     use psibase::{
@@ -143,6 +143,31 @@ pub mod service {
     #[action]
     fn dist_token(fractal: AccountNumber) {
         Fractal::get_assert(fractal).distribute_tokens();
+    }
+
+    /// Sets the occupation for a fractal role.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID for fractal
+    /// * `new_occupation` - New occupation to set for role
+    #[action]
+    fn set_rol_oc(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
+        Fractal::get_assert(fractal).check_sender_is_legislature();
+        Role::get_assert(fractal, role_id).set_occupation(new_occupation);
+    }
+
+    /// Set ordered occupations
+    ///
+    /// Payment for each ordered occupation will be according to the fractals payment strategy.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `ordered_occupations` - Ordered occupations to set for the fractal
+    #[action]
+    fn set_ord_ocs(fractal: AccountNumber, ordered_occupations: Vec<AccountNumber>) {
+        Fractal::get_assert(fractal).check_sender_is_legislature();
+        Occupation::set_ordered_occupations(fractal, ordered_occupations);
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {

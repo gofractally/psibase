@@ -1,8 +1,6 @@
 use std::u64;
 
-use psibase::{
-    abort_message, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
-};
+use psibase::{check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
 
 use crate::{
     constants::MEMBER_STREAM_HALF_LIFE,

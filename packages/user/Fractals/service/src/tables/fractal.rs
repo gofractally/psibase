@@ -10,6 +10,7 @@ use crate::helpers::fib::EXTERNAL_S;
 use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
+    RoleTable,
 };
 use crate::tables::DistributionStrategy;
 use psibase::{
@@ -84,8 +85,7 @@ impl Fractal {
         let new_instance = Self::new(account, legislature, judiciary, name, mission);
 
         // create two new roles for the judiciary and legislature, with the fractal as the auth manager
-        Role::add(account, LEGISLATURE, account);
-        Role::add(account, JUDICIARY, account);
+
         // with auth dynamic create account
 
         // Save the fractal first prior to creating an account for it
@@ -93,6 +93,16 @@ impl Fractal {
         // auth service to AuthDyn.
         new_instance.save();
         new_instance.create_account();
+
+        let defacto_service = "de-facto".into();
+
+        check(
+            psibase::services::fractals::occu_wrapper::call_to(defacto_service)
+                .is_supported(account),
+            "occupation not supported",
+        );
+        Role::add(account, LEGISLATURE, defacto_service);
+        Role::add(account, JUDICIARY, defacto_service);
 
         // Create the legislature and judicial accounts of index 1 and index 2
         // Then set auth dynamic for the accounts with fractals as the auth policy manager
@@ -249,6 +259,25 @@ impl Fractal {
     ) -> async_graphql::Result<Connection<RawKey, FractalMember>> {
         TableQuery::subindex::<AccountNumber>(
             FractalMemberTable::with_service(fractals::SERVICE).get_index_pk(),
+            &(self.account),
+        )
+        .first(first)
+        .last(last)
+        .before(before)
+        .after(after)
+        .query()
+        .await
+    }
+
+    async fn roles(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<RawKey, Role>> {
+        TableQuery::subindex::<AccountNumber>(
+            RoleTable::with_service(fractals::SERVICE).get_index_pk(),
             &(self.account),
         )
         .first(first)
