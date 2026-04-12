@@ -10,7 +10,7 @@ publish.workspace = true
 
 [package.metadata.psibase]
 package-name = "Fractals"
-services = ["fractals", "de-facto"]
+services = ["fractals", "de-facto", "dir-pay"]
 
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
@@ -22,6 +22,7 @@ crate-type = ["rlib"]
 [dependencies]
 fractals = { path = "service", version = "0.23.0" }
 de-facto = { path = "de-facto", version = "0.23.0" }
+dir-pay = { path = "dir-pay", version = "0.23.0" }
 r-fractals = { path = "query-service", version = "0.23.0" }
 fractals-plugin = { path = "plugin", version = "0.23.0" }
 psibase-user-workspace-hack.workspace = true
