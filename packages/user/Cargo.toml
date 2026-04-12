@@ -56,8 +56,6 @@ members = [
     "Guilds/service",
     "Guilds/query-service",
     "Guilds/plugin",
-    "DeFacto",
-    "DeFacto/service",
 ]
 
 exclude = [

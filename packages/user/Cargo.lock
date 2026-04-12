@@ -932,7 +932,6 @@ name = "de-facto"
 version = "0.23.0"
 dependencies = [
  "async-graphql",
- "de-facto-pkg",
  "fractals",
  "psibase",
  "psibase-user-workspace-hack",
@@ -940,13 +939,6 @@ dependencies = [
  "psibase_service",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "de-facto-pkg"
-version = "0.23.0"
-dependencies = [
- "de-facto",
 ]
 
 [[package]]
@@ -1305,6 +1297,7 @@ dependencies = [
 name = "fractals-pkg"
 version = "0.23.0"
 dependencies = [
+ "de-facto",
  "fractals",
  "fractals-plugin",
  "psibase-user-workspace-hack",
