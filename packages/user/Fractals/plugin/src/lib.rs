@@ -58,7 +58,7 @@ define_trust! {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
         Medium => [apply_guild, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
-        High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
+        High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -75,37 +75,6 @@ impl Guild {
 struct FractallyPlugin;
 
 impl AdminFractal for FractallyPlugin {
-    fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_ranked_guild_slots)?;
-
-        let packed_args = fractals::action_structs::set_rank_g_s {
-            fractal: get_sender_app()?,
-            slots_count,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::set_rank_g_s::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
-    fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_ranked_guilds)?;
-
-        let packed_args = fractals::action_structs::rank_guilds {
-            fractal: get_sender_app()?,
-            guilds: ranked_guilds
-                .into_iter()
-                .map(|guild| AccountNumber::from(guild.as_str()))
-                .collect(),
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::rank_guilds::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
     fn create_fractal(
         fractal_account: String,
         guild_account: String,
@@ -136,20 +105,6 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::init_token::ACTION_NAME,
-            &packed_args,
-        )
-    }
-
-    fn set_token_threshold(threshold: u8) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_token_threshold)?;
-
-        let packed_args = fractals::action_structs::set_tkn_thrs {
-            fractal: get_sender_app()?,
-            threshold,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::set_dist_int::ACTION_NAME,
             &packed_args,
         )
     }
