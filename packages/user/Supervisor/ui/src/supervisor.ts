@@ -357,9 +357,8 @@ export class Supervisor implements AppInterface {
             this.setParentOrigination(callerOrigin);
 
             // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
-            // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
-            //   transpiling the component, bundling with rollup, and importing & instantiating the es module
-            //   in memory.
+            // This is the time-intensive step. It includes: downloading, parsing, building import
+            //   proxies, transpiling the component via jco, and instantiating the WASM modules.
             // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
             await this.preload([
                 {

@@ -89,17 +89,17 @@ function buildProxiedImports(
         `TODO: Plugins may not import freestanding functions.`,
     );
 
-    const interfaces = allInterfaces.filter(
-        (i) =>
-            i.namespace !== "wasi" &&
-            i.namespace !== "supervisor" &&
-            i.funcs.length !== 0,
-    );
-
     const imports: PluginImports = {};
-    for (const intf of interfaces) {
-        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
-        imports[key] = buildInterfaceProxy(intf, host);
+    for (const intf of allInterfaces) {
+        if (intf.namespace === "wasi" || intf.namespace === "supervisor") continue;
+
+        const key = `${intf.namespace}:${toKebabCase(intf.package)}/${toKebabCase(intf.name)}`;
+
+        if (intf.funcs.length === 0) {
+            imports[key] = {};
+        } else {
+            imports[key] = buildInterfaceProxy(intf, host);
+        }
     }
     return imports;
 }
@@ -145,6 +145,13 @@ function toPascalCase(str: string): string {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// The WIT parser returns camelCase names (e.g. "hookHandlers", "wallClock")
+// but jco uses the original WIT kebab-case (e.g. "hook-handlers", "wall-clock")
+// as import keys. Convert camelCase back to kebab-case.
+function toKebabCase(str: string): string {
+    return str.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`);
+}
+
 function addResourceProxy(
     proxy: Record<string, unknown>,
     intf: Interface,
@@ -184,7 +191,7 @@ function addResourceProxy(
             service: intf.namespace,
             plugin: intf.package,
             intf: intf.name,
-            type: rawResourceName,
+            type: className,
             handle,
             method: methodName,
             params: args,
@@ -249,10 +256,6 @@ async function loadWasmComponent(
     }
 
     assert(jsSource !== null, "jco generate produced no JS file");
-
-    console.log(
-        `[wasm-mem] ${debugFileName}: jco produced ${coreWasmFiles.length} core .wasm file(s) from ${transpiledFiles.length} total files`,
-    );
 
     // Pre-compile all core modules (cheap — no Memory allocated)
     const compiledModules = new Map<string, WebAssembly.Module>();
