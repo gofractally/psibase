@@ -1,6 +1,7 @@
 mod fractal;
 mod fractal_exile;
 pub mod fractal_member;
+mod levy;
 mod occupation;
 mod reward_stream;
 mod role;
@@ -123,6 +124,21 @@ pub mod tables {
     }
 
     impl Occupation {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u8) {
+            (self.fractal, self.index)
+        }
+    }
+
+    #[table(name = "LevyTable", index = 6)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct Levy {
+        pub fractal: AccountNumber,
+        pub index: u8,
+        pub occupation: AccountNumber,
+    }
+
+    impl Levy {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u8) {
             (self.fractal, self.index)
