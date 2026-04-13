@@ -32,7 +32,6 @@ pub mod tables {
         pub judiciary: AccountNumber,
         pub token_id: TID,
         pub dist_strat: u8,
-        pub payment: AccountNumber,
     }
 
     impl Fractal {

@@ -4,9 +4,10 @@ use crate::constants::{
     DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, FRACTAL_STREAM_HALF_LIFE,
     MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
 };
-use crate::tables::tables::{Fractal, RewardStream, RewardStreamTable};
+use crate::helpers::Stream;
+use crate::tables::tables::{RewardStream, RewardStreamTable};
 
-use psibase::services::tokens::{Quantity, Wrapper as Tokens, TID};
+use psibase::services::tokens::{Quantity, TID};
 use psibase::services::transact::Wrapper as TransactSvc;
 
 use psibase::services::token_stream::Wrapper as TokenStream;
@@ -45,15 +46,17 @@ impl RewardStream {
             .expect("failed to save");
     }
 
+    fn stream(&self) -> Stream {
+        Stream::new(self.stream_id)
+    }
+
     pub fn deposit(&self, amount: Quantity, memo: Memo) {
-        check(amount.value > 0, "deposit must be greater than 0");
-        Tokens::call().credit(self.fractal_token(), TokenStream::SERVICE, amount, memo);
-        TokenStream::call().deposit(self.stream_id, amount);
+        self.stream().deposit(amount, memo);
     }
 
     pub fn withdraw(&mut self) -> Quantity {
         self.check_can_distribute();
-        self.claim_token_stream()
+        self.stream().claim_token_stream()
     }
 
     fn check_can_distribute(&mut self) {
@@ -72,21 +75,6 @@ impl RewardStream {
         self.save();
     }
 
-    fn claim_token_stream(&self) -> Quantity {
-        let claimable = TokenStream::call().claim(self.stream_id);
-
-        if claimable.value > 0 {
-            Tokens::call().debit(
-                self.fractal_token(),
-                TokenStream::SERVICE,
-                claimable,
-                "Reward claim".into(),
-            );
-        }
-
-        claimable
-    }
-
     pub fn set_distribution_interval(&mut self, seconds: u32) {
         check(
             seconds >= MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
@@ -98,9 +86,5 @@ impl RewardStream {
         );
         self.dist_interval_secs = seconds;
         self.save();
-    }
-
-    fn fractal_token(&self) -> u32 {
-        Fractal::get_assert(self.fractal).token_id
     }
 }
