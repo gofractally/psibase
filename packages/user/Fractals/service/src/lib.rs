@@ -7,6 +7,8 @@ pub mod constants {
     pub const ONE_WEEK: u32 = ONE_DAY * 7;
     const ONE_YEAR: u32 = ONE_WEEK * 52;
 
+    pub const PPM: u32 = 1_000_000;
+
     pub mod roles {
         pub const LEGISLATURE: u8 = 1;
         pub const JUDICIARY: u8 = 2;

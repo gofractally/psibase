@@ -1,11 +1,9 @@
 use async_graphql::ComplexObject;
-use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
+use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Table};
 
 use crate::{
     constants::PPM,
-    tables::tables::{
-        Config, Fractal, FractalMember, GuildMember, Levy, LevyTable, RewardConsensus,
-    },
+    tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream},
 };
 
 impl Levy {
@@ -99,10 +97,15 @@ impl Levy {
 
         if payment.value > 0 {
             let memo = "Levy payment".into();
-            if let Some(fractal_member) = FractalMember::get(self.fractal, self.payee) {
-                fractal_member.credit_direct(payment, memo);
+
+            let payee_is_fractal = self.fractal == self.payee;
+
+            if payee_is_fractal {
+                RewardStream::get_assert(self.fractal).deposit(payment, memo);
             } else {
-                RewardConsensus::get_assert(self.payee).donate(payment, memo);
+                let token_id = Fractal::get_assert(self.fractal).token_id;
+                psibase::services::tokens::Wrapper::call()
+                    .credit(token_id, self.payee, payment, memo)
             }
         }
 
@@ -118,10 +121,6 @@ impl Levy {
 impl Levy {
     pub async fn fractal(&self) -> Fractal {
         Fractal::get_assert(self.fractal)
-    }
-
-    pub async fn guild_member(&self) -> GuildMember {
-        GuildMember::get_assert(self.fractal, self.member)
     }
 
     pub async fn fractal_member(&self) -> FractalMember {

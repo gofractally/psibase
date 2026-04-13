@@ -1,3 +1,4 @@
+mod config;
 mod fractal;
 mod fractal_exile;
 pub mod fractal_member;
@@ -14,11 +15,25 @@ pub enum DistributionStrategy {
 pub mod tables {
 
     use async_graphql::SimpleObject;
-    use psibase::{services::tokens::TID, AccountNumber, Fracpack, TimePointSec, ToSchema};
+    use psibase::{
+        services::tokens::{Quantity, TID},
+        AccountNumber, Fracpack, TimePointSec, ToSchema,
+    };
 
     use serde::{Deserialize, Serialize};
 
-    #[table(name = "FractalTable", index = 0)]
+    #[table(name = "ConfigTable", index = 0)]
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    pub struct Config {
+        pub last_levy_id: u32,
+    }
+
+    impl Config {
+        #[primary_key]
+        fn pk(&self) {}
+    }
+
+    #[table(name = "FractalTable", index = 1)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct Fractal {
@@ -47,7 +62,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "FractalMemberTable", index = 1)]
+    #[table(name = "FractalMemberTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct FractalMember {
@@ -69,7 +84,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "FractalExileTable", index = 2)]
+    #[table(name = "FractalExileTable", index = 3)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[graphql(complex)]
     pub struct FractalExile {
@@ -90,7 +105,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "RewardStreamTable", index = 3)]
+    #[table(name = "RewardStreamTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RewardStream {
         #[primary_key]
@@ -100,7 +115,7 @@ pub mod tables {
         pub dist_interval_secs: u32,
     }
 
-    #[table(name = "RoleTable", index = 4)]
+    #[table(name = "RoleTable", index = 5)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Role {
         pub fractal: AccountNumber,
@@ -115,7 +130,7 @@ pub mod tables {
         }
     }
 
-    #[table(name = "OccupationTable", index = 5)]
+    #[table(name = "OccupationTable", index = 6)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Occupation {
         pub fractal: AccountNumber,
@@ -130,18 +145,21 @@ pub mod tables {
         }
     }
 
-    #[table(name = "LevyTable", index = 6)]
+    #[table(name = "LevyTable", index = 7)]
     #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
     pub struct Levy {
+        pub id: u32,
         pub fractal: AccountNumber,
-        pub index: u8,
-        pub occupation: AccountNumber,
+        pub member: AccountNumber,
+        pub payee: AccountNumber,
+        pub ppm: u32,
+        pub remaining: Option<Quantity>,
     }
 
     impl Levy {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, u8) {
-            (self.fractal, self.index)
+        fn pk(&self) -> (AccountNumber, AccountNumber, u32) {
+            (self.fractal, self.member, self.id)
         }
     }
 }
