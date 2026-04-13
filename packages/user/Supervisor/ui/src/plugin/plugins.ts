@@ -50,4 +50,12 @@ export class Plugins {
         }
         await Promise.all(promises);
     }
+
+    public forEachPlugin(callback: (plugin: Plugin) => void): void {
+        for (const context of Object.values(this.serviceContexts)) {
+            for (const plugin of context.getAllPlugins()) {
+                callback(plugin);
+            }
+        }
+    }
 }

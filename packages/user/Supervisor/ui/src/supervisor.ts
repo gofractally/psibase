@@ -22,6 +22,7 @@ import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
+import { InstancePool } from "./plugin/instance-pool";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
@@ -52,6 +53,8 @@ export class Supervisor implements AppInterface {
     private plugins: Plugins;
 
     private loader: PluginLoader;
+
+    private pool: InstancePool;
 
     private context: CallContext | undefined;
 
@@ -94,7 +97,17 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    private async preload(plugins: QualifiedPluginId[]) {
+    private preloadLock: Promise<void> = Promise.resolve();
+
+    private preload(plugins: QualifiedPluginId[]): Promise<void> {
+        const myPreload = this.preloadLock
+            .catch(() => {})
+            .then(() => this.doPreload(plugins));
+        this.preloadLock = myPreload.catch(() => {});
+        return myPreload;
+    }
+
+    private async doPreload(plugins: QualifiedPluginId[]) {
         await chainIdPromise;
 
         if (plugins.length === 0) {
@@ -107,6 +120,12 @@ export class Supervisor implements AppInterface {
         await this.loader.processPlugins();
         await this.loader.awaitReady();
         await this.loader.ensureAllInstantiated();
+
+        // Pin all Phase 0 plugins — they are never evicted
+        this.plugins.forEachPlugin(p => {
+            if (p.isInstantiated) this.pool.register(p, true);
+        });
+        console.log(`[pool] system plugins pinned — ${this.pool.summary()}`);
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
@@ -147,6 +166,12 @@ export class Supervisor implements AppInterface {
         // Instantiate all remaining plugins (Phase 1 + Phase 2) before entry()
         // starts its synchronous call chain.
         await this.plugins.ensureAllInstantiated();
+
+        // Register newly instantiated plugins with the pool (not pinned)
+        this.plugins.forEachPlugin(p => {
+            if (p.isInstantiated) this.pool.register(p);
+        });
+        console.log(`[pool] preload complete — ${this.pool.summary()}`);
     }
 
     private replyToParent(id: string, result: any) {
@@ -211,6 +236,8 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
+
+        this.pool = new InstancePool();
     }
 
     getRootDomain(): string {
@@ -249,14 +276,13 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    // Manages callstack and calls plugins
     call(args: QualifiedFunctionCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
 
         const { service, plugin, intf, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
+        this.pool.touch(p);
 
-        // Manage the callstack and call the plugin
         this.context.stack.push(args.service, toString(args));
         let ret: any;
         try {
@@ -312,8 +338,8 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.context, "Uninitialized call context");
         const { service, plugin, intf, type, handle, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
+        this.pool.touch(p);
 
-        // Manage the callstack and call the plugin
         this.context.stack.push(service, toString(args));
         let ret: any;
         try {
@@ -398,9 +424,6 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             const err = getRecoverableError(e);
             if (err) {
-                // It is only recoverable at intermediate steps in the callstack.
-                // Since it is the final return value, it is no longer recoverable and is
-                //   converted to a PluginError to be handled by the client.
                 let newError;
                 if (err.code === REDIRECT_ERROR_CODE) {
                     newError = new RedirectErrorObject(
@@ -416,6 +439,11 @@ export class Supervisor implements AppInterface {
             }
 
             this.context = undefined;
+        } finally {
+            const evicted = this.pool.evictIdle();
+            if (evicted > 0) {
+                console.log(`[pool] post-entry eviction — ${this.pool.summary()}`);
+            }
         }
     }
 }
