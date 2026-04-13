@@ -94,7 +94,7 @@ namespace SystemService
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
       const auto& stat = getStatus();
-      emit().history().blockStart(stat.current.blockNum);
+      emit().history().blockStart(stat.current.blockNum, stat.current.time);
 
       // Remove expired transaction IDs. The iteration limit on the loop helps to
       // mitigate a potential attack.

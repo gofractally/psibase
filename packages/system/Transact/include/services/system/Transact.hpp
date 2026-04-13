@@ -465,7 +465,7 @@ namespace SystemService
          struct History
          {
             /// Emitted at the start of each block
-            void blockStart(psibase::BlockNum blockNum) {}
+            void blockStart(psibase::BlockNum blockNum, psibase::BlockTime blockTime) {}
          };
          struct Ui
          {
@@ -498,7 +498,7 @@ namespace SystemService
 
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
    PSIBASE_REFLECT_EVENTS(Transact);
-   PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum));
+   PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
    PSIBASE_REFLECT_UI_EVENTS(Transact);
    PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 
