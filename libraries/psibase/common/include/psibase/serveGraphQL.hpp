@@ -7,7 +7,6 @@
 #include <psibase/serviceEntry.hpp>
 #include <psio/graphql.hpp>
 #include <psio/to_hex.hpp>
-#include <unordered_map>
 
 namespace psibase
 {
@@ -928,9 +927,10 @@ namespace psibase
 
    struct EdgeBlockStart
    {
-      uint64_t edgeIndex;
-      BlockNum blockNum;
-      PSIO_REFLECT(EdgeBlockStart, edgeIndex, blockNum)
+      uint64_t  edgeIndex;
+      BlockNum  blockNum;
+      BlockTime blockTime;
+      PSIO_REFLECT(EdgeBlockStart, edgeIndex, blockNum, blockTime)
    };
 
    /// GraphQL Pagination through Event tables
@@ -1079,25 +1079,6 @@ namespace psibase
          if (edgeBlockStarts.empty())
             return;
 
-         std::unordered_map<BlockNum, BlockTime> blockTimeCache;
-
-         auto db            = proxyKvOpen(DbId::blockLog, {}, KvMode::read);
-         auto blockLogIndex = TableIndex<Block, uint32_t>{db, {}, false};
-
-         auto lookupBlockTime = [&](BlockNum bn) -> std::optional<BlockTime>
-         {
-            auto it = blockTimeCache.find(bn);
-            if (it != blockTimeCache.end())
-               return it->second;
-            auto block = blockLogIndex.get(bn);
-            if (block)
-            {
-               blockTimeCache[bn] = block->header.time;
-               return block->header.time;
-            }
-            return std::nullopt;
-         };
-
          for (const auto& edgeBlockStart : edgeBlockStarts)
          {
             if (edgeBlockStart.edgeIndex < edges.size())
@@ -1105,7 +1086,7 @@ namespace psibase
                auto  bn       = edgeBlockStart.blockNum;
                auto& edge     = edges[edgeBlockStart.edgeIndex];
                edge.blockNum  = bn;
-               edge.blockTime = lookupBlockTime(bn);
+               edge.blockTime = edgeBlockStart.blockTime;
             }
          }
       }
@@ -1128,7 +1109,7 @@ namespace psibase
 
          auto sql = std::format(
              "WITH edges(edgeIndex, edgeRowId) AS (VALUES {})"
-             " SELECT e.edgeIndex, m.blockNum"
+             " SELECT e.edgeIndex, m.blockNum, m.blockTime"
              " FROM edges e"
              " JOIN \"history.transact.blockStart\" m ON m.ROWID = ("
              "   SELECT ROWID"
