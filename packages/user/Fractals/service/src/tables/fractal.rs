@@ -44,7 +44,6 @@ impl Fractal {
             judiciary,
             legislature,
             dist_strat: DistributionStrategy::Constant as u8,
-            payment: "dir-pay".into(),
         }
     }
 
