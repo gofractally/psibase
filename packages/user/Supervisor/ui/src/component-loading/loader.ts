@@ -218,13 +218,17 @@ function addResourceProxy(
     }
 }
 
-// Transpile a WASM component using jco's instantiation mode, compile core
-// modules, then eagerly instantiate. Returns the plugin's exports.
-async function loadWasmComponent(
+export interface CompiledPlugin {
+    instantiate: () => Promise<Record<string, unknown>>;
+}
+
+// Transpile a WASM component via jco and pre-compile all core modules.
+// Returns a handle whose instantiate() allocates Memory and produces exports.
+async function compileWasmComponent(
     wasmBytes: Uint8Array,
     imports: PluginImports,
     debugFileName: string,
-): Promise<Record<string, unknown>> {
+): Promise<CompiledPlugin> {
     const name = "component";
     const opts: GenerateOptions = {
         name,
@@ -272,50 +276,42 @@ async function loadWasmComponent(
         return Promise.resolve(mod);
     };
 
-    // Create a blob URL module from the jco JS and import it
+    // Import the jco-generated JS module via blob URL
     const namedSource = `${jsSource}\n//# sourceURL=${debugFileName}`;
     const blob = new Blob([namedSource], { type: "text/javascript" });
     const url = URL.createObjectURL(blob);
+    const jcoModule = await import(url);
+    URL.revokeObjectURL(url);
 
-    try {
-        const mod = await import(url);
-
-        // Eagerly instantiate (Iter 2 will defer this to call-time)
-        const pluginExports = await mod.instantiate(
-            getCoreModule,
-            imports,
-        );
-
-        return pluginExports;
-    } finally {
-        URL.revokeObjectURL(url);
-    }
+    return {
+        instantiate: () => jcoModule.instantiate(getCoreModule, imports),
+    };
 }
 
-export async function loadPlugin(
+export async function compilePlugin(
     service: string,
     privileged: boolean,
     wasmBytes: Uint8Array,
     pluginHost: HostInterface,
     api: ComponentAPI,
-): Promise<Record<string, unknown>> {
+): Promise<CompiledPlugin> {
     await shimsReady;
     const imports: PluginImports = {
         ...getWasiImports(),
         ...(privileged ? buildPrivilegedImports(pluginHost) : {}),
         ...buildProxiedImports(api.importedFuncs, pluginHost),
     };
-    return loadWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
+    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
 }
 
-// Loads a transpiled component into an ES module, while only satisfying WASI imports.
-// Not sufficient for plugins, which require other direct host exports, but can be used
-// to run various other utilities in the browser that have been compiled into WASM
-// components.
+// Loads a utility WASM component (not a plugin) with only WASI imports.
+// Compiles and immediately instantiates since utilities like the parser
+// are always needed.
 export async function loadBasic(
     wasmBytes: Uint8Array,
     debugFileName: string,
 ): Promise<Record<string, unknown>> {
     await shimsReady;
-    return loadWasmComponent(wasmBytes, getWasiImports(), debugFileName);
+    const compiled = await compileWasmComponent(wasmBytes, getWasiImports(), debugFileName);
+    return compiled.instantiate();
 }

@@ -40,4 +40,14 @@ export class Plugins {
         );
         return loaded.plugin;
     }
+
+    public async ensureAllInstantiated(): Promise<void> {
+        const promises: Promise<void>[] = [];
+        for (const context of Object.values(this.serviceContexts)) {
+            for (const plugin of context.getAllPlugins()) {
+                promises.push(plugin.ensureInstantiated());
+            }
+        }
+        await Promise.all(promises);
+    }
 }

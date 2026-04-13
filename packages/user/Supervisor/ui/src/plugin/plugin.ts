@@ -5,7 +5,8 @@ import {
     siblingUrl,
 } from "@psibase/common-lib";
 
-import { loadPlugin } from "../component-loading/loader";
+import { compilePlugin } from "../component-loading/loader";
+import { CompiledPlugin } from "../component-loading";
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
 import { parser, wasmFromUrl } from "../utils";
@@ -25,9 +26,11 @@ export class Plugin {
 
     parsed: Promise<ComponentAPI>;
 
+    // Resolves when the plugin is compiled (cheap — no Memory allocated).
+    // After this, ensureInstantiated() can be called to allocate Memory.
     ready: Promise<void>;
 
-    // A module dynamically generated from a bundle including: transpiled component, wasi shims, and imports
+    private compiledPlugin: CompiledPlugin | undefined;
     private pluginModule: any;
 
     private resources: Map<number, any> = new Map();
@@ -97,7 +100,7 @@ export class Plugin {
     private async doReady(): Promise<void> {
         const api = await this.parsed;
         const privileged = this.id.service === "host";
-        this.pluginModule = await loadPlugin(
+        this.compiledPlugin = await compilePlugin(
             this.id.service,
             privileged,
             this.bytes!,
@@ -115,7 +118,22 @@ export class Plugin {
         this.ready = this.doReady();
     }
 
-    // Called by the supervisor to call into a plugin wasm
+    get isInstantiated(): boolean {
+        return this.pluginModule !== undefined;
+    }
+
+    async ensureInstantiated(): Promise<void> {
+        if (this.pluginModule) return;
+        if (!this.compiledPlugin) throw new PluginInvalid(this.id);
+        this.pluginModule = await this.compiledPlugin.instantiate();
+    }
+
+    dispose(): void {
+        this.pluginModule = undefined;
+        this.resources.clear();
+        this.nextResourceHandle = 1;
+    }
+
     call(intf: string | undefined, method: string, params: any[]) {
         if (!this.methodExists(intf, method)) {
             assertTruthy(this.componentAPI, "Component API undefined");
@@ -126,7 +144,7 @@ export class Plugin {
             throw new InvalidCall(this.id, intf, method);
         }
 
-        if (this.bytes === undefined || this.pluginModule === undefined) {
+        if (this.pluginModule === undefined) {
             throw new PluginInvalid(this.id);
         }
 
@@ -145,7 +163,7 @@ export class Plugin {
         method: string,
         params: any[],
     ) {
-        if (this.bytes === undefined || this.pluginModule === undefined) {
+        if (this.pluginModule === undefined) {
             throw new PluginInvalid(this.id);
         }
 
@@ -198,7 +216,6 @@ export class Plugin {
         return resource[method](...params);
     }
 
-    // Gets the JSON interface for a plugin
     getJson(): string {
         assertTruthy(this.componentAPI, "Component API undefined");
         return this.componentAPI.debug;

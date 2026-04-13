@@ -40,4 +40,8 @@ export class ServiceContext {
                 p.id.service === plugin.id.service,
         );
     }
+
+    getAllPlugins(): readonly Plugin[] {
+        return this.plugins;
+    }
 }

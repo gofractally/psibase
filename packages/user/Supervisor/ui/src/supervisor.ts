@@ -101,10 +101,12 @@ export class Supervisor implements AppInterface {
             return;
         }
 
-        // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
+        // Phase 0: Compile and instantiate system plugins (needed for sync
+        // calls between phases — getActivePrompt, getActiveQueryToken, etc.)
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
+        await this.loader.ensureAllInstantiated();
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
@@ -118,17 +120,14 @@ export class Supervisor implements AppInterface {
 
         setQueryToken(this.getActiveQueryToken());
 
-        // Loading dynamic plugins may require calling into the standard plugins
-        //   to look up information to know what plugin to load. Therefore,
-        //   loading happens in two phases: Load all regular plugins, then load
-        //   all dynamic plugins.
-
-        // Phase 1: Loads plugins requested by an app
+        // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
+        // The sync call to getAuthServices below only touches Phase 0 plugins.
         this.loader.trackPlugins([...plugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: Load the auth services for all connected accounts
+        // Phase 2: Load the auth services for all connected accounts.
+        // This sync call uses accounts:plugin (Phase 0, already instantiated).
         const auth_services: string[] = this.supervisorCall(
             getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
@@ -144,6 +143,10 @@ export class Supervisor implements AppInterface {
 
         await this.loader.processPlugins();
         await this.loader.awaitReady();
+
+        // Instantiate all remaining plugins (Phase 1 + Phase 2) before entry()
+        // starts its synchronous call chain.
+        await this.plugins.ensureAllInstantiated();
     }
 
     private replyToParent(id: string, result: any) {
@@ -357,8 +360,10 @@ export class Supervisor implements AppInterface {
             this.setParentOrigination(callerOrigin);
 
             // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
-            // This is the time-intensive step. It includes: downloading, parsing, building import
-            //   proxies, transpiling the component via jco, and instantiating the WASM modules.
+            // This includes: downloading, parsing, building import proxies, transpiling the
+            //   component via jco, compiling core WASM modules, and instantiating them.
+            // System plugins are instantiated first (Phase 0); app and auth plugins are compiled
+            //   in parallel, then instantiated before the synchronous call chain begins.
             // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
             await this.preload([
                 {
