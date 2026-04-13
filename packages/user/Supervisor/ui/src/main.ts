@@ -1,3 +1,24 @@
+// DEV ONLY: Count WebAssembly.instantiate calls to measure virtual address space pressure.
+// Each instantiation of a core module with its own memory reserves ~10GB of virtual
+// address space for guard regions. The Memory is created internally by V8 during
+// instantiate(), not via the JS WebAssembly.Memory constructor.
+// Check the count after page load via: __wasmInstanceCount() in the DevTools console.
+// (Brave/Chrome: type "allow pasting" in the console first to enable paste.)
+let _wasmInstanceCount = 0;
+const _origInstantiate = WebAssembly.instantiate;
+WebAssembly.instantiate = function (...args: any[]) {
+    _wasmInstanceCount++;
+    const isModule = args[0] instanceof WebAssembly.Module;
+    console.log(
+        `[wasm-mem] instantiate #${_wasmInstanceCount}`,
+        isModule ? "(from Module)" : "(from bytes)",
+    );
+    return (_origInstantiate as any).apply(WebAssembly, args);
+} as typeof WebAssembly.instantiate;
+(globalThis as Record<string, unknown>).__wasmInstanceCount = () =>
+    _wasmInstanceCount;
+console.log("[wasm-mem] WebAssembly.instantiate tracking enabled");
+
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 
