@@ -56,7 +56,7 @@ impl RewardStream {
 
     pub fn withdraw(&mut self) -> Quantity {
         self.check_can_distribute();
-        self.stream().claim_token_stream()
+        self.stream().withdraw()
     }
 
     fn check_can_distribute(&mut self) {
