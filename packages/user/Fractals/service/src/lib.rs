@@ -87,7 +87,7 @@ pub mod service {
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
-    fn create_fractal(
+    fn create_frac(
         fractal_account: AccountNumber,
         legislature: AccountNumber,
         judiciary: AccountNumber,
@@ -157,6 +157,17 @@ pub mod service {
     fn set_rol_oc(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
         Role::get_assert(fractal, role_id).set_occupation(new_occupation);
+    }
+
+    /// Claim member rewards
+    ///
+    /// Sends any vested token rewards to the fractal member after applying any pending levies.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn cl_mem_rwds(fractal: AccountNumber) {
+        FractalMember::get_assert(fractal, get_sender()).claim_member_rewards();
     }
 
     /// Set ordered occupations

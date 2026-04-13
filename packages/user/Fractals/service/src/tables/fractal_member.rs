@@ -1,10 +1,15 @@
 use std::u64;
 
-use psibase::{check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
+use psibase::{
+    check, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
+};
 
 use crate::{
     constants::MEMBER_STREAM_HALF_LIFE,
-    tables::tables::{Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable},
+    helpers::Stream,
+    tables::tables::{
+        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy,
+    },
 };
 
 use async_graphql::ComplexObject;
@@ -39,6 +44,25 @@ impl FractalMember {
             .get_index_pk()
             .range(&(fractal, AccountNumber::from(0))..&(fractal, AccountNumber::from(u64::MAX)))
             .collect()
+    }
+
+    pub fn credit_direct(&self, amount: Quantity, memo: Memo) {
+        let token_id = Fractal::get_assert(self.fractal).token_id;
+        psibase::services::tokens::Wrapper::call().credit(token_id, self.account, amount, memo)
+    }
+
+    pub fn claim_member_rewards(&self) {
+        let claimed = Stream::new(self.stream_id).withdraw();
+        check(claimed.value > 0, "nothing to withdraw");
+
+        let to_credit = Levy::levies_of_member(self.fractal, self.account)
+            .into_iter()
+            .fold(claimed, |remaining_amount, mut levy| {
+                let levy_paid = levy.apply_levy(claimed);
+                remaining_amount - levy_paid
+            });
+
+        self.credit_direct(to_credit, "Stream reward".into());
     }
 
     pub fn add(fractal: AccountNumber, account: AccountNumber) -> Self {

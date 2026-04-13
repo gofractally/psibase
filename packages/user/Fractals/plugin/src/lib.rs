@@ -82,7 +82,7 @@ impl AdminFractal for FractallyPlugin {
         mission: String,
     ) -> Result<(), Error> {
         assert_authorized(FunctionName::create_fractal)?;
-        let packed_args = fractals::action_structs::create_fractal {
+        let packed_args = fractals::action_structs::create_frac {
             fractal_account: fractal_account.parse().unwrap(),
             name,
             mission,
@@ -91,7 +91,7 @@ impl AdminFractal for FractallyPlugin {
         }
         .packed();
         add_action_to_transaction(
-            fractals::action_structs::create_fractal::ACTION_NAME,
+            fractals::action_structs::create_frac::ACTION_NAME,
             &packed_args,
         )
     }
