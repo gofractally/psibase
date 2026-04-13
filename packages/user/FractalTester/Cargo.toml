@@ -13,8 +13,6 @@ package-name = "FractalTester"
 services = ["frac-tester"]
 
 [package.metadata.psibase.dependencies]
-Sites = "0.23.0"
-HttpServer = "0.23.0"
 FractalGen = "0.23.0"
 
 [lib]
