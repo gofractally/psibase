@@ -1,0 +1,25 @@
+[package]
+name = "frac-tester-pkg"
+description = "Creates 18 auth-any test accounts and adds them as members of the system guild. Depends on FractalGen. Not for production use."
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "FractalTester"
+services = ["frac-tester"]
+
+[package.metadata.psibase.dependencies]
+Sites = "0.23.0"
+HttpServer = "0.23.0"
+FractalGen = "0.23.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+frac-tester = { path = "service", version = "0.23.0" }
+psibase-user-workspace-hack.workspace = true
