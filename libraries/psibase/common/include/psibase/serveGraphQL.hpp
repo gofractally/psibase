@@ -1189,11 +1189,6 @@ namespace psibase
          return b;
       }
 
-      uint64_t extract_cursor(const std::string& cursor) const
-      {
-         return extract_cursor(std::string_view{cursor});
-      }
-
       std::string generate_sql_query(std::optional<int32_t>     limit,
                                      bool                       descending,
                                      std::optional<std::string> before,
