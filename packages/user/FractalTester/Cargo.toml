@@ -12,9 +12,6 @@ publish.workspace = true
 package-name = "FractalTester"
 services = ["frac-tester"]
 
-[package.metadata.psibase.dependencies]
-FractalGen = "0.23.0"
-
 [lib]
 crate-type = ["rlib"]
 

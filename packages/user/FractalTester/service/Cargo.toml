@@ -19,5 +19,11 @@ psibase_service.workspace = true
 psibase-user-workspace-hack.workspace = true
 serde.workspace = true
 
+[package.metadata.psibase.dependencies]
+Accounts = "0.23.0"
+Fractals = "0.23.0"
+FractalGen = "0.23.0"
+Producers = "0.23.0"
+
 [dev-dependencies]
 frac-tester-pkg = { path = "..", version = "0.23.0" }
