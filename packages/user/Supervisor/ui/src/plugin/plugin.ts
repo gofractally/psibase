@@ -125,7 +125,29 @@ export class Plugin {
     async ensureInstantiated(): Promise<void> {
         if (this.pluginModule) return;
         if (!this.compiledPlugin) throw new PluginInvalid(this.id);
-        this.pluginModule = await this.compiledPlugin.instantiate();
+
+        const maxRetries = 3;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                this.pluginModule = await this.compiledPlugin.instantiate();
+                return;
+            } catch (e: unknown) {
+                const isOom =
+                    e instanceof WebAssembly.RuntimeError ||
+                    (e instanceof Error &&
+                        e.message.includes("Out of memory"));
+                if (attempt < maxRetries && isOom) {
+                    const delay = 250 * (attempt + 1);
+                    console.warn(
+                        `[pool] OOM instantiating ${pluginString(this.id)}, ` +
+                            `retry ${attempt + 1}/${maxRetries} after ${delay}ms`,
+                    );
+                    await new Promise((r) => setTimeout(r, delay));
+                    continue;
+                }
+                throw e;
+            }
+        }
     }
 
     dispose(): void {
