@@ -4,15 +4,20 @@
 #include <psibase/package.hpp>
 #include <psibase/semver.hpp>
 #include <psio/schema.hpp>
+#include <services/local/XSites.hpp>
+#include <services/system/Accounts.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/user/Packages.hpp>
 #include <services/user/Sites.hpp>
+#include <unordered_map>
+#include <unordered_set>
 
 #include <zlib.h>
 
 using namespace SystemService;
 using namespace UserService;
+using LocalService::XSites;
 
 namespace psibase
 {
@@ -80,6 +85,19 @@ namespace psibase
          return nullptr;
       }
 
+      std::vector<PrettyAction> readPostinstall(PackagedService& package)
+      {
+         std::vector<PrettyAction> result;
+         if (package.postinstallScript)
+         {
+            auto contents = package.archive.getEntry(*package.postinstallScript).read();
+            contents.push_back('\0');
+            psio::json_token_stream stream(contents.data());
+            psio::from_json(result, stream);
+         }
+         return result;
+      }
+
       Action to_action(PrettyAction&& act, std::span<const PackagedService> packages)
       {
          if (act.rawData)
@@ -100,6 +118,126 @@ namespace psibase
          psio::vector_stream stream{result.rawData};
          to_frac(*cty, *act.data, stream, cschema.builtin);
          return result;
+      }
+
+      bool hasService(const PackagedService& package, AccountNumber account)
+      {
+         return std::ranges::find(package.meta.services, account) != package.meta.services.end();
+      }
+
+      struct RequiredAccounts
+      {
+         explicit RequiredAccounts(PackagedService& package)
+         {
+            bool local = package.meta.scope == "local";
+
+            for (auto account : package.meta.accounts)
+            {
+               if (!hasService(package, account))
+               {
+                  if (!local)
+                     services.push_back(Accounts::service);
+                  else
+                     abortMessage("Local packages do not support non-service accounts");
+                  break;
+               }
+            }
+
+            if (!package.data.empty())
+            {
+               if (!local)
+                  services.push_back(Sites::service);
+               else
+                  services.push_back(XSites::service);
+            }
+
+            for (const auto& [account, file, info] : package.services)
+            {
+               if (info.server)
+               {
+                  if (!local)
+                     services.push_back(HttpServer::service);
+                  // x-http is always present
+                  break;
+               }
+            }
+
+            for (const auto& act : readPostinstall(package))
+            {
+               accounts.push_back(act.sender);
+               services.push_back(act.service);
+            }
+
+            std::ranges::sort(accounts);
+            {
+               auto res = std::ranges::unique(accounts);
+               accounts.erase(res.begin(), res.end());
+            }
+            std::ranges::sort(services);
+            {
+               auto res = std::ranges::unique(services);
+               services.erase(res.begin(), res.end());
+            }
+         }
+         std::vector<AccountNumber> accounts;
+         std::vector<AccountNumber> services;
+      };
+
+      // Finds all packages reachable from package in deps.
+      // Packages that should not be considered should be excluded from deps.
+      void get_transitive_services(
+          std::string_view                                                            package,
+          const std::unordered_map<std::string_view, const std::vector<PackageRef>*>& deps,
+          std::unordered_set<std::string_view>&                                       visited,
+          std::vector<std::string_view>&                                              out)
+      {
+         if (auto pos = deps.find(package); pos != deps.end())
+         {
+            if (visited.insert(package).second)
+            {
+               out.push_back(package);
+               for (const auto& dep : *pos->second)
+               {
+                  get_transitive_services(dep.name, deps, visited, out);
+               }
+            }
+         }
+      }
+
+      void sortPackagesImpl(
+          std::string_view                                                           package,
+          const std::unordered_map<std::string_view, std::vector<std::string_view>>& graph,
+          std::unordered_map<std::string_view, PackagedService*>&                    byName,
+          std::vector<PackagedService*>&                                             out)
+      {
+         if (auto pos = byName.find(package); pos != byName.end())
+         {
+            if (pos->second == nullptr)
+            {
+            }
+            auto packagePtr = pos->second;
+            pos->second     = nullptr;
+            auto deps       = graph.find(package);
+            if (deps == graph.end())
+               abortMessage("Missing vertex for " + std::string(package));
+            for (auto dep : deps->second)
+            {
+               sortPackagesImpl(dep, graph, byName, out);
+            }
+            out.push_back(packagePtr);
+            byName.erase(pos);
+         }
+      }
+
+      template <typename T>
+      void applyPermutation(std::span<T> dest, std::span<T*> order)
+      {
+         assert(dest.size() == order.size());
+         std::vector<T> tmp;
+         tmp.reserve(dest.size());
+         for (T* p : order)
+            tmp.push_back(std::move(*p));
+         std::ranges::move(tmp, dest.begin());
       }
    }  // namespace
 
@@ -128,7 +266,10 @@ namespace psibase
       return result;
    }
 
-   PackagedService::PackagedService(std::vector<char> buf) : buf(std::move(buf)), archive(this->buf)
+   PackagedService::PackagedService(std::vector<char> buf)
+       : buf(std::move(buf)),
+         archive(this->buf),
+         sha256(psibase::sha256(this->buf.data(), this->buf.size()))
    {
       std::map<AccountNumber, FileHeader>               info_files;
       std::vector<std::pair<AccountNumber, FileHeader>> service_files;
@@ -299,19 +440,11 @@ namespace psibase
    }
    bool PackagedService::needsUI()
    {
-      if (postinstallScript)
+      for (const auto& action : readPostinstall(*this))
       {
-         auto contents = archive.getEntry(*postinstallScript).read();
-         contents.push_back('\0');
-         psio::json_token_stream   stream(contents.data());
-         std::vector<PrettyAction> tmp;
-         psio::from_json(tmp, stream);
-         for (const auto& action : tmp)
+         if (action.service == Sites::service)
          {
-            if (action.service == Sites::service)
-            {
-               return true;
-            }
+            return true;
          }
       }
       return false;
@@ -319,17 +452,9 @@ namespace psibase
    void PackagedService::postinstall(std::vector<Action>&             actions,
                                      std::span<const PackagedService> packages)
    {
-      if (postinstallScript)
+      for (auto&& action : readPostinstall(*this))
       {
-         auto contents = archive.getEntry(*postinstallScript).read();
-         contents.push_back('\0');
-         psio::json_token_stream   stream(contents.data());
-         std::vector<PrettyAction> tmp;
-         psio::from_json(tmp, stream);
-         for (auto&& action : tmp)
-         {
-            actions.push_back(to_action(std::move(action), packages));
-         }
+         actions.push_back(to_action(std::move(action), packages));
       }
    }
 
@@ -432,23 +557,18 @@ namespace psibase
       abortMessage("No package matches " + ref.name + "(" + ref.version + ")");
    }
 
-   void dfs(std::vector<PackageInfo>&         index,
-            std::span<const PackageRef>       names,
-            std::map<std::string_view, bool>& found,
-            std::vector<PackageInfo*>&        result)
+   void dfs(std::vector<PackageInfo>&             index,
+            std::span<const PackageRef>           names,
+            std::unordered_set<std::string_view>& found,
+            std::vector<PackageInfo*>&            result)
    {
       for (const auto& ref : names)
       {
-         if (auto [pos, inserted] = found.try_emplace(ref.name, false); !inserted)
-         {
-            check(pos->second, "Cycle in service dependencies");
-         }
-         else
+         if (found.insert(ref.name).second)
          {
             auto& package = get(index, ref);
             dfs(index, package.depends, found, result);
             result.push_back(&package);
-            pos->second = true;
          }
       }
    }
@@ -484,9 +604,7 @@ namespace psibase
       return PackagedService(readWholeFile(filepath));
    }
 
-   std::vector<PackageInfo> DirectoryRegistry::resolve(
-       std::span<const std::string>   packages,
-       std::span<const AccountNumber> priorityServices)
+   std::vector<PackageInfo> DirectoryRegistry::resolve(std::span<const std::string> packages)
    {
       std::vector<PackageInfo> index = this->index();
 
@@ -498,48 +616,123 @@ namespace psibase
       }
       std::vector<PackageInfo*> selected;
       {
-         std::map<std::string_view, bool> found;
+         std::unordered_set<std::string_view> found;
          dfs(index, in, found, selected);
       }
-
-      // Make sure that packages containing the priority services are first
-      std::vector<PackageInfo*> ordered;
-      {
-         std::map<std::string_view, bool> found;
-         for (PackageInfo* package : selected)
-         {
-            for (auto account : package->accounts)
-            {
-               if (std::ranges::find(priorityServices, account) != priorityServices.end())
-               {
-                  if (auto [pos, inserted] = found.try_emplace(package->name, false); !inserted)
-                  {
-                     check(pos->second, "Cycle in service dependencies");
-                  }
-                  else
-                  {
-                     dfs(index, package->depends, found, ordered);
-                     ordered.push_back(package);
-                     pos->second = true;
-                  }
-                  break;
-               }
-            }
-         }
-         // The remaining packages are already in the correct order
-         for (PackageInfo* package : selected)
-         {
-            if (found.find(package->name) == found.end())
-               ordered.push_back(package);
-         }
-      }
-
       std::vector<PackageInfo> result;
-      for (const auto* package : ordered)
+      for (const auto* package : selected)
       {
          result.push_back(std::move(*package));
       }
       return result;
    }
 
+   void sortPackages(std::span<PackagedService>     packages,
+                     std::span<const AccountNumber> priorityServices)
+   {
+      std::map<AccountNumber, PackagedService*>                            provides_service;
+      std::unordered_set<std::string_view>                                 has_postinstall;
+      std::vector<PackageRef>                                              empty_deps;
+      std::unordered_map<std::string_view, const std::vector<PackageRef>*> service_deps;
+      std::unordered_map<std::string_view, std::vector<std::string_view>>  graph;
+      // Build the graph of service dependencies. Service dependencies
+      // can be cyclic as long as nothing calls any of the services in
+      // the cycle before all of them are installed.
+      for (PackagedService& package : packages)
+      {
+         // Create lookup table to find the package that contains
+         // each service. Duplicates are an error.
+         for (const auto& [service, header, info] : package.services)
+         {
+            auto [pos, inserted] = provides_service.insert({service, &package});
+            if (!inserted)
+            {
+               abortMessage("The service " + service.str() +
+                            " is defined by more than one package: " + pos->second->meta.name +
+                            ", " + package.meta.name);
+            }
+         }
+         bool postinstall = !readPostinstall(package).empty();
+         if (postinstall)
+         {
+            has_postinstall.insert(package.meta.name);
+         }
+         if (!package.services.empty())
+         {
+            // If a package provides any services, direct dependents can
+            // assume they are installed. This transitively requires all
+            // services that this package might use to be installed.
+            service_deps.insert({package.meta.name, &package.meta.depends});
+         }
+         else if (postinstall)
+         {
+            // If a package provides a postinstall script, direct dependents
+            // can assume that it has been run. Dependencies only need to
+            // be installed first if they are required to install this package
+            service_deps.insert({package.meta.name, &empty_deps});
+         }
+      }
+
+      // Construct a graph describing constraints on install order
+      // All services that might be run during installation must
+      // be installed first.
+      for (PackagedService& package : packages)
+      {
+         std::vector<std::string_view>        all_required_packages;
+         std::unordered_set<std::string_view> visited;
+         for (auto service : RequiredAccounts{package}.services)
+         {
+            auto pos = provides_service.find(service);
+            if (pos == provides_service.end())
+            {
+               abortMessage("The account " + service.str() + " required by " + package.meta.name +
+                            " is not defined by any package");
+            }
+            PackagedService* required_package = pos->second;
+            if (required_package != &package)
+            {
+               if (visited.insert(required_package->meta.name).second)
+               {
+                  all_required_packages.push_back(required_package->meta.name);
+               }
+            }
+            for (const PackageRef& dep : required_package->meta.depends)
+            {
+               get_transitive_services(dep.name, service_deps, visited, all_required_packages);
+            }
+         }
+         // The postinstall script can rely on direct dependencies'
+         // postinstall scripts having run first.
+         if (has_postinstall.find(package.meta.name) != has_postinstall.end())
+         {
+            for (const PackageRef& dep : package.meta.depends)
+            {
+               if (has_postinstall.find(dep.name) != has_postinstall.end() &&
+                   visited.insert(dep.name).second)
+               {
+                  all_required_packages.push_back(dep.name);
+               }
+            }
+         }
+         graph.insert({package.meta.name, std::move(all_required_packages)});
+      }
+      std::unordered_map<std::string_view, PackagedService*> by_name;
+      for (PackagedService& package : packages)
+      {
+         by_name.insert({package.meta.name, &package});
+      }
+      std::vector<PackagedService*> result;
+      for (AccountNumber service : priorityServices)
+      {
+         if (auto pos = provides_service.find(service); pos != provides_service.end())
+         {
+            sortPackagesImpl(pos->second->meta.name, graph, by_name, result);
+         }
+      }
+      for (PackagedService& package : packages)
+      {
+         sortPackagesImpl(package.meta.name, graph, by_name, result);
+      }
+      applyPermutation<PackagedService>(packages, result);
+   }
 }  // namespace psibase

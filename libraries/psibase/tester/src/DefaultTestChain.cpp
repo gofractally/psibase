@@ -192,12 +192,13 @@ std::string TestChain::defaultPackageDir()
 
 void TestChain::boot(const std::vector<std::string>& names, bool installUI)
 {
-   auto registry = DirectoryRegistry(defaultPackageDir());
+   auto                         registry = DirectoryRegistry(defaultPackageDir());
    std::vector<PackagedService> packages;
-   for (auto info : registry.resolve(names, essentialServices))
+   for (auto info : registry.resolve(names))
    {
       packages.push_back(registry.get(info));
    }
+   sortPackages(packages, essentialServices);
    setAutoBlockStart(false);
    startBlock();
    auto numEssential = countEssentialPackages(packages);

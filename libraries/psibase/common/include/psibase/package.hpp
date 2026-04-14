@@ -78,10 +78,15 @@ namespace psibase
       std::vector<char>                                                    buf;
       zip::ZipReader                                                       archive;
       PackageMeta                                                          meta;
+      Checksum256                                                          sha256;
       std::vector<std::tuple<AccountNumber, zip::FileHeader, ServiceInfo>> services;
       std::vector<std::pair<AccountNumber, zip::FileHeader>>               data;
       std::optional<zip::FileHeader>                                       postinstallScript;
    };
+
+   // Sorts packages in the correct order for installation
+   void sortPackages(std::span<PackagedService>     packages,
+                     std::span<const AccountNumber> priorityServices);
 
    class DirectoryRegistry
    {
@@ -89,13 +94,9 @@ namespace psibase
       DirectoryRegistry(std::string_view path);
       std::vector<PackageInfo> index() const;
 
-      PackagedService get(std::string_view name) const;
-      PackagedService get(const PackageInfo& info) const;
-      // Packages will be returned in the order that they should be
-      // installed. Packages containing services in priorityServices
-      // will be as close to the front as possible.
-      std::vector<PackageInfo> resolve(std::span<const std::string>   packages,
-                                       std::span<const AccountNumber> priorityServices = {});
+      PackagedService          get(std::string_view name) const;
+      PackagedService          get(const PackageInfo& info) const;
+      std::vector<PackageInfo> resolve(std::span<const std::string> packages);
 
      private:
       std::string path;
