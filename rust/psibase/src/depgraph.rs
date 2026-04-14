@@ -80,6 +80,16 @@ pub enum PackageOp {
     Remove(Meta),
 }
 
+impl PackageOp {
+    fn by_name(&self) -> (u8, &str) {
+        match self {
+            PackageOp::Install(info) => (0, &info.name),
+            PackageOp::Replace(_, info) => (1, &info.name),
+            PackageOp::Remove(meta) => (2, &meta.name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PackagePreference {
     // Prefer the latest version
@@ -165,6 +175,7 @@ fn evaluate_changes(
             result.push(PackageOp::Remove(meta));
         }
     }
+    result.sort_by(|a, b| a.by_name().cmp(&b.by_name()));
     Ok(result)
 }
 
