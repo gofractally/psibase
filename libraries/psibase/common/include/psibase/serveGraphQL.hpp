@@ -129,39 +129,64 @@ namespace psibase
       return ConnectionName.c_str();
    }
 
-   /// Additional fields on each event edge providing block context.
-   template <typename Node, psio::FixedString EdgeName>
-   struct EventEdge
+   /// Block context for an event row.
+   struct EventBlockInfo
    {
-      Node                              node;
-      std::string                       cursor;
       std::optional<psibase::BlockNum>  blockNum;
       std::optional<psibase::BlockTime> blockTime;
-      PSIO_REFLECT(EventEdge, node, cursor, blockNum, blockTime)
+      PSIO_REFLECT(EventBlockInfo, blockNum, blockTime)
    };
 
-   template <typename Node, psio::FixedString EdgeName>
-   constexpr const char* get_type_name(const EventEdge<Node, EdgeName>*)
+   /// Wraps a node type with block context for event queries.
+   template <typename T>
+   struct WithBlockContext
    {
-      return EdgeName.c_str();
+      EventBlockInfo block;
+      T              data;
+      PSIO_REFLECT(WithBlockContext, block, data)
+   };
+
+   template <typename T>
+   constexpr auto get_type_name(const WithBlockContext<T>*)
+   {
+      return psio::reflect<T>::name + "WithBlockContext";
    }
 
-   /// A connection type for event queries whose edges carry block context.
-   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
-   struct EventConnection
+   // Flatten T's fields alongside `block` in the schema for WithBlockContext<T>.
+   template <typename T, typename S>
+   void fill_gql_schema_members(const WithBlockContext<T>*, S& stream, bool is_input)
    {
-      using NodeType = Node;
-      using Edge     = psibase::EventEdge<Node, EdgeName>;
+      psio::write_str("    block: ", stream);
+      psio::write_str(psio::generate_gql_whole_name((EventBlockInfo*)nullptr, is_input), stream);
+      psio::write_str("\n", stream);
+      psio::fill_gql_schema_members((T*)nullptr, stream, is_input);
+   }
 
-      std::vector<Edge> edges;
-      PageInfo          pageInfo;
-      PSIO_REFLECT(EventConnection, edges, pageInfo)
-   };
-
-   template <typename Node, psio::FixedString ConnectionName, psio::FixedString EdgeName>
-   constexpr const char* get_type_name(const EventConnection<Node, ConnectionName, EdgeName>*)
+   // Resolve `block` from value.block, T's fields from value.data.
+   template <typename T, typename OS, typename E>
+   auto gql_query_inline(WithBlockContext<T>*,
+                         const WithBlockContext<T>& value,
+                         psio::gql_stream&          input_stream,
+                         OS&                        output_stream,
+                         const E&                   error,
+                         bool                       allow_unknown_members,
+                         bool&                      first)
    {
-      return ConnectionName.c_str();
+      auto resolve_data = psio::make_field_resolver(value.data, input_stream, output_stream, error,
+                                                    allow_unknown_members, first);
+      return psio::gql_query_inline(
+          psio::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
+          [&](std::string_view field_name, std::string_view alias) -> std::pair<bool, bool>
+          {
+             if (field_name == "block")
+             {
+                psio::detail::write_field_name(alias, first, output_stream);
+                return {true, gql_query(value.block, input_stream, output_stream, error,
+                                        allow_unknown_members)};
+             }
+             return resolve_data(field_name, alias);
+          },
+          input_stream, output_stream, error, allow_unknown_members, first);
    }
 
    /// GraphQL Pagination through TableIndex
@@ -925,13 +950,73 @@ namespace psibase
       PSIO_REFLECT(SqlRow, rowid, data)
    };
 
-   struct EdgeBlockStart
+   struct RowBlockStart
    {
-      uint64_t  edgeIndex;
+      uint64_t  rowIndex;
       BlockNum  blockNum;
       BlockTime blockTime;
-      PSIO_REFLECT(EdgeBlockStart, edgeIndex, blockNum, blockTime)
+      PSIO_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
    };
+
+   namespace
+   {
+      std::string sql_query(const std::string&              query,
+                            const std::vector<std::string>& params,
+                            bool                            debug)
+      {
+         if (debug)
+         {
+            printf("SQL query str: %s\n", query.c_str());
+            printf("SQL params: [");
+            for (size_t i = 0; i < params.size(); ++i)
+            {
+               if (i > 0)
+                  printf(", ");
+               printf("\"%s\"", params[i].c_str());
+            }
+            printf("]\n");
+         }
+
+         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
+
+         if (debug)
+         {
+            printf("Raw JSON response: %s\n", json_str.c_str());
+         }
+
+         return json_str;
+      }
+
+      std::vector<RowBlockStart> fetchBlockStarts(const std::vector<uint64_t>& rowids, bool debug)
+      {
+         if (rowids.empty())
+            return {};
+
+         std::string values;
+         for (size_t i = 0; i < rowids.size(); ++i)
+         {
+            if (i)
+               values += ", ";
+            std::format_to(std::back_inserter(values), "({}, {})", i, rowids[i]);
+         }
+
+         auto sql = std::format(
+             "WITH rows(rowIndex, rowId) AS (VALUES {})"
+             " SELECT r.rowIndex, m.blockNum, m.blockTime"
+             " FROM rows r"
+             " JOIN \"history.transact.blockStart\" m ON m.ROWID = ("
+             "   SELECT ROWID"
+             "   FROM \"history.transact.blockStart\""
+             "   WHERE ROWID <= r.rowId"
+             "   ORDER BY ROWID DESC"
+             "   LIMIT 1"
+             " )"
+             " ORDER BY r.rowIndex ASC",
+             values);
+         auto json = sql_query(sql, {}, debug);
+         return psio::convert_from_json<std::vector<RowBlockStart>>(json);
+      }
+   }  // namespace
 
    /// GraphQL Pagination through Event tables
    ///
@@ -1037,93 +1122,54 @@ namespace psibase
          return *this;
       }
 
-      /// Execute the query and return an EventConnection containing the results
+      /// Execute the query and return a Connection containing the results.
       ///
+      /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
       /// Returns error if both first and last are specified.
-      EventConnection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">
+      Connection<WithBlockContext<T>,
+                 psio::reflect<T>::name + "Connection",
+                 psio::reflect<T>::name + "Edge">
       query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using EdgeType = EventEdge<T, psio::reflect<T>::name + "Edge">;
-         using ConnType = EventConnection<T, psio::reflect<T>::name + "Connection",
-                                          psio::reflect<T>::name + "Edge">;
+         using ConnType = Connection<WithBlockContext<T>, psio::reflect<T>::name + "Connection",
+                                     psio::reflect<T>::name + "Edge">;
+         using EdgeType = typename ConnType::Edge;
+
+         std::vector<uint64_t> rowids;
+         rowids.reserve(rows.size());
+         for (const auto& row : rows)
+            rowids.push_back(row.rowid);
+
+         auto                        blockStarts = fetchBlockStarts(rowids, _debug);
+         std::vector<EventBlockInfo> blockInfos(rows.size());
+         for (const auto& bs : blockStarts)
+         {
+            if (bs.rowIndex < rows.size())
+               blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
+         }
 
          ConnType connection;
          connection.pageInfo.hasNextPage     = has_next_page;
          connection.pageInfo.hasPreviousPage = has_prev_page;
-
-         for (const auto& row : rows)
+         for (size_t i = 0; i < rows.size(); ++i)
          {
             EdgeType edge;
-            edge.node   = row.data;
-            edge.cursor = std::to_string(row.rowid);
+            edge.node   = WithBlockContext<T>{blockInfos[i], std::move(rows[i].data)};
+            edge.cursor = std::to_string(rows[i].rowid);
             connection.edges.push_back(std::move(edge));
          }
-
          if (!connection.edges.empty())
          {
             connection.pageInfo.startCursor = connection.edges.front().cursor;
             connection.pageInfo.endCursor   = connection.edges.back().cursor;
-
-            addBlockContext(connection.edges);
          }
 
          return connection;
       }
 
-      template <typename EdgeType>
-      void addBlockContext(std::vector<EdgeType>& edges) const
-      {
-         auto edgeBlockStarts = fetchEdgeBlockStarts(edges);
-         if (edgeBlockStarts.empty())
-            return;
-
-         for (const auto& edgeBlockStart : edgeBlockStarts)
-         {
-            if (edgeBlockStart.edgeIndex < edges.size())
-            {
-               auto  bn       = edgeBlockStart.blockNum;
-               auto& edge     = edges[edgeBlockStart.edgeIndex];
-               edge.blockNum  = bn;
-               edge.blockTime = edgeBlockStart.blockTime;
-            }
-         }
-      }
-
      private:
-      template <typename EdgeType>
-      std::vector<EdgeBlockStart> fetchEdgeBlockStarts(const std::vector<EdgeType>& edges) const
-      {
-         if (edges.empty())
-            return {};
-
-         std::string values;
-         for (size_t i = 0; i < edges.size(); ++i)
-         {
-            if (i)
-               values += ", ";
-            auto edgeRowId = extract_cursor(edges[i].cursor);
-            std::format_to(std::back_inserter(values), "({}, {})", i, edgeRowId);
-         }
-
-         auto sql = std::format(
-             "WITH edges(edgeIndex, edgeRowId) AS (VALUES {})"
-             " SELECT e.edgeIndex, m.blockNum, m.blockTime"
-             " FROM edges e"
-             " JOIN \"history.transact.blockStart\" m ON m.ROWID = ("
-             "   SELECT ROWID"
-             "   FROM \"history.transact.blockStart\""
-             "   WHERE ROWID <= e.edgeRowId"
-             "   ORDER BY ROWID DESC"
-             "   LIMIT 1"
-             " )"
-             " ORDER BY e.edgeIndex ASC",
-             values);
-         auto json = sql_query(sql, {}, _debug);
-         return psio::convert_from_json<std::vector<EdgeBlockStart>>(json);
-      }
-
       std::tuple<std::vector<SqlRow<T>>, bool, bool> all_edges() const
       {
          std::optional<int32_t> limit_plus_one;
@@ -1235,33 +1281,6 @@ namespace psibase
          }
 
          return query;
-      }
-
-      static std::string sql_query(const std::string&              query,
-                                   const std::vector<std::string>& params,
-                                   bool                            debug)
-      {
-         if (debug)
-         {
-            printf("[EventQuery] SQL query str: %s\n", query.c_str());
-            printf("[EventQuery] SQL params: [");
-            for (size_t i = 0; i < params.size(); ++i)
-            {
-               if (i > 0)
-                  printf(", ");
-               printf("\"%s\"", params[i].c_str());
-            }
-            printf("]\n");
-         }
-
-         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
-
-         if (debug)
-         {
-            printf("[EventQuery] Raw JSON response: %s\n", json_str.c_str());
-         }
-
-         return json_str;
       }
 
       std::string                _table_name;
