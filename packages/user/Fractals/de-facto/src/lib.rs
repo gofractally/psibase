@@ -34,20 +34,18 @@ pub mod service {
     /// Get policy action used by AuthDyn service.
     ///
     /// # Arguments
-    /// * `account` - Account being checked.
+    /// * `role_account` - Account being checked.
     #[action]
-    fn role_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
-        // account will be the legislature role account, then we look up the fractal
-        // and return the fractal members,
-
-        // ask fractals, what is the fractal for this role account?
-        // use a secondary key for now, delete later?
-        //
+    fn role_policy(role_account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
+        let fractal = check_some(
+            psibase::services::fractals::Wrapper::call().get_fractal_by_role(role_account),
+            "expected fractal from role account",
+        );
 
         let accounts: Vec<(AccountNumber, u8)> =
             ::fractals::tables::tables::FractalMemberTable::read()
                 .get_index_pk()
-                .range((account, AccountNumber::new(0))..=(account, AccountNumber::new(u64::MAX)))
+                .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
                 .map(|account| (account.account, 1))
                 .collect();
 

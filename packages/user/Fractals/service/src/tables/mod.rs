@@ -119,6 +119,7 @@ pub mod tables {
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Role {
         pub fractal: AccountNumber,
+        pub account: AccountNumber,
         pub role_id: u8,
         pub occupation: AccountNumber,
     }
@@ -127,6 +128,11 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u8) {
             (self.fractal, self.role_id)
+        }
+
+        #[secondary_key(1)]
+        fn by_account(&self) -> AccountNumber {
+            self.account
         }
     }
 

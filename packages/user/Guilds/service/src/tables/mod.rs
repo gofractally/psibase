@@ -4,6 +4,8 @@ mod guild_application;
 mod guild_attest;
 mod guild_invite;
 mod guild_member;
+mod ranking;
+mod role_map;
 
 #[psibase::service_tables]
 pub mod tables {
@@ -39,14 +41,19 @@ pub mod tables {
         pub candidacy_cooldown: u32,
     }
 
-    #[table(name = "OwnerSettingsTable", index = 2)]
+    #[table(name = "RankingTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
-    pub struct OwnerSettings {
+    pub struct Ranking {
+        pub fractal: AccountNumber,
+        pub guild: AccountNumber,
+        pub index: u8,
+    }
+
+    impl Ranking {
         #[primary_key]
-        pub owner: AccountNumber,
-        pub legislature: AccountNumber,
-        pub judiciary: AccountNumber,
-        pub guild_rankings: Vec<AccountNumber>,
+        fn pk(&self) -> (AccountNumber, u8, AccountNumber) {
+            (self.guild, self.index, self.guild)
+        }
     }
 
     define_flags!(GuildFlags, u8, {
@@ -189,6 +196,21 @@ pub mod tables {
         #[secondary_key(1)]
         pub fn by_evaluation(&self) -> u32 {
             self.evaluation_id
+        }
+    }
+
+    #[table(name = "RoleMapTable", index = 8)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct RoleMap {
+        pub fractal: AccountNumber,
+        pub role_id: u8,
+        pub guild: AccountNumber,
+    }
+
+    impl RoleMap {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, u8, AccountNumber) {
+            (self.fractal, self.role_id, self.guild)
         }
     }
 }

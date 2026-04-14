@@ -48,7 +48,7 @@ pub mod Hooks {
 )]
 #[allow(non_snake_case, unused_variables)]
 pub mod Occupation {
-    use crate::AccountNumber;
+    use crate::{services::auth_dyn, AccountNumber};
 
     #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
@@ -62,6 +62,11 @@ pub mod Occupation {
 
     #[action]
     fn is_supported(fractal: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
+    #[action]
+    fn role_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
         unimplemented!()
     }
 }
@@ -119,6 +124,15 @@ pub mod Service {
         council_role: AccountNumber,
         rep_role: AccountNumber,
     ) {
+        unimplemented!()
+    }
+
+    /// Get fratal by role
+    ///
+    /// # Arguments
+    /// * `account` - Account role to lookup.
+    #[action]
+    fn get_fractal_by_role(account: AccountNumber) -> Option<AccountNumber> {
         unimplemented!()
     }
 

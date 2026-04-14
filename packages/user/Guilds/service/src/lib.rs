@@ -5,9 +5,17 @@ pub mod tables;
 pub mod service {
     use crate::{
         helpers::RollingBits16,
-        tables::tables::{EvaluationInstance, Guild, GuildMember, GuildTable, InitRow, InitTable},
+        tables::tables::{
+            EvaluationInstance, Guild, GuildMember, GuildTable, InitRow, InitTable, RoleMap,
+        },
     };
-    use psibase::*;
+    use psibase::{
+        services::{
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            transact::ServiceMethod,
+        },
+        *,
+    };
 
     #[action]
     fn init() {
@@ -27,12 +35,14 @@ pub mod service {
     /// Creates a guild within a fractal.
     ///
     /// # Arguments
+    /// * `fractal` - Fractal to serve as juridiction of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
     /// * `council_role` - Council role account.
     /// * `rep_role` - Representative role account.
     #[action]
     fn create_guild(
+        fractal: AccountNumber,
         guild_account: AccountNumber,
         display_name: Memo,
         council_role: AccountNumber,
@@ -40,8 +50,15 @@ pub mod service {
     ) {
         let sender = get_sender();
 
+        let sender_is_fractal_member = ::fractals::tables::tables::FractalMemberTable::read()
+            .get_index_pk()
+            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
+            .any(|account| account.account == sender);
+
+        check(sender_is_fractal_member, "must be a fractal member");
+
         Guild::add(
-            sender,
+            fractal,
             guild_account,
             sender,
             display_name,
@@ -199,6 +216,82 @@ pub mod service {
         check_is_eval();
         EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .award_group_scores(group_number, group_result);
+    }
+
+    /// Get auth policy used by fractals service.
+    ///
+    /// # Arguments
+    /// * `fractal` - Account being checked.
+    /// * `role_id` - Role ID
+    #[action]
+    fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
+        let role = check_some(
+            RoleMap::get(fractal, role_id),
+            "no role map set by fractal for role_id",
+        );
+        Guild::get_assert(role.guild).auth_policy()
+    }
+
+    fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
+        Guild::get(account)
+            .map(|guild| guild.auth_policy())
+            .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth()))
+            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
+    }
+
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
+    /// * `method` - Optional method being checked.
+    #[action]
+    fn get_policy(
+        account: AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> auth_dyn::policy::DynamicAuthPolicy {
+        use psibase::services::accounts as Accounts;
+        use psibase::services::setcode as SetCode;
+        use psibase::services::staged_tx as StagedTx;
+
+        let policy = check_some(account_policy(account), "account not supported");
+
+        if method.is_some_and(|method| {
+            let banned_service_methods: Vec<ServiceMethod> = vec![
+                ServiceMethod::new(
+                    Accounts::SERVICE,
+                    Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
+                ),
+                ServiceMethod::new(
+                    SetCode::SERVICE,
+                    SetCode::action_structs::setCode::ACTION_NAME.into(),
+                ),
+                ServiceMethod::new(
+                    SetCode::SERVICE,
+                    SetCode::action_structs::setCodeStaged::ACTION_NAME.into(),
+                ),
+                ServiceMethod::new(
+                    StagedTx::SERVICE,
+                    StagedTx::action_structs::propose::ACTION_NAME.into(),
+                ),
+                ServiceMethod::new(
+                    StagedTx::SERVICE,
+                    StagedTx::action_structs::accept::ACTION_NAME.into(),
+                ),
+            ];
+
+            banned_service_methods
+                .iter()
+                .any(|sm| sm.method == method.method && sm.service == method.service)
+        }) {
+            DynamicAuthPolicy::impossible()
+        } else {
+            policy
+        }
+    }
+
+    #[action]
+    pub fn has_policy(account: AccountNumber) -> bool {
+        Guild::get(account).is_some()
     }
 
     #[event(history)]

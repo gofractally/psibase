@@ -1,3 +1,4 @@
+mod create_managed_account;
 pub mod distribute;
 pub mod fib;
 pub mod misc;
@@ -5,6 +6,7 @@ pub mod parse_rank_to_accounts;
 mod rolling_bitset;
 mod stream;
 
+pub use create_managed_account::create_managed_account;
 pub use distribute::distribute_by_weight;
 pub use fib::continuous_fibonacci;
 pub use misc::{assign_decreasing_levels, two_thirds_plus_one};

@@ -1010,20 +1010,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dir-pay"
-version = "0.23.0"
-dependencies = [
- "async-graphql",
- "fractals",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_macros",
- "psibase_service",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1312,7 +1298,6 @@ name = "fractals-pkg"
 version = "0.23.0"
 dependencies = [
  "de-facto",
- "dir-pay",
  "fractals",
  "fractals-plugin",
  "psibase-user-workspace-hack",

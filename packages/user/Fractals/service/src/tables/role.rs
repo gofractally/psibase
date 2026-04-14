@@ -2,9 +2,15 @@ use crate::tables::tables::{Role, RoleTable};
 use psibase::{check_none, check_some, AccountNumber, Table};
 
 impl Role {
-    fn new(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
+    fn new(
+        fractal: AccountNumber,
+        account: AccountNumber,
+        role_id: u8,
+        occupation: AccountNumber,
+    ) -> Self {
         Self {
             fractal,
+            account,
             role_id,
             occupation,
         }
@@ -25,7 +31,16 @@ impl Role {
         )
     }
 
-    pub fn add(fractal: AccountNumber, role_id: u8, occupation: AccountNumber) -> Self {
+    pub fn get_by_account(account: AccountNumber) -> Option<Self> {
+        RoleTable::read().get_index_by_account().get(&account)
+    }
+
+    pub fn add(
+        fractal: AccountNumber,
+        account: AccountNumber,
+        role_id: u8,
+        occupation: AccountNumber,
+    ) -> Self {
         check_none(
             Self::get(fractal, role_id),
             &format!(
@@ -35,7 +50,7 @@ impl Role {
             ),
         );
 
-        let new_instance = Self::new(fractal, role_id, occupation);
+        let new_instance = Self::new(fractal, account, role_id, occupation);
         new_instance.save();
         new_instance
     }

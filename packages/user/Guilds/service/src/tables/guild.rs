@@ -57,7 +57,7 @@ impl Guild {
     }
 
     pub fn add(
-        fractal: AccountNumber,
+        owner: AccountNumber,
         guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
@@ -66,8 +66,7 @@ impl Guild {
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
-        let new_guild_instance =
-            Self::new(fractal, guild, rep, display_name, council_role, rep_role);
+        let new_guild_instance = Self::new(owner, guild, rep, display_name, council_role, rep_role);
         new_guild_instance.save();
 
         GuildMember::add(new_guild_instance.account, rep);
@@ -181,7 +180,7 @@ impl Guild {
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
 
-    pub fn guild_auth(&self) -> DynamicAuthPolicy {
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(
             self.rep.map_or(self.council_role, |_| self.rep_role),
         )

@@ -1,13 +1,17 @@
 use std::collections::HashMap;
+use std::u64;
 
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
+use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
 use crate::constants::roles::{JUDICIARY, LEGISLATURE};
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::helpers::fib::EXTERNAL_S;
-use crate::helpers::{assign_decreasing_levels, continuous_fibonacci, distribute_by_weight};
+use crate::helpers::{
+    assign_decreasing_levels, continuous_fibonacci, create_managed_account, distribute_by_weight,
+};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -47,20 +51,6 @@ impl Fractal {
         }
     }
 
-    fn create_account(&self) {
-        let fractal_account = self.account;
-
-        use psibase::services::{accounts, auth_dyn, sites};
-        if !accounts::Wrapper::call().exists(fractal_account) {
-            accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
-        }
-
-        sites::Wrapper::call_as(fractal_account).setProxy("fractal-core".into());
-        auth_dyn::Wrapper::call_as(fractal_account)
-            .set_mgmt(fractal_account, crate::Wrapper::SERVICE);
-        accounts::Wrapper::call_as(fractal_account).setAuthServ(auth_dyn::Wrapper::SERVICE)
-    }
-
     fn distribution_strategy(&self) -> DistributionStrategy {
         match self.dist_strat {
             0 => DistributionStrategy::Constant,
@@ -75,14 +65,14 @@ impl Fractal {
     }
 
     pub fn add(
-        account: AccountNumber,
+        fractal: AccountNumber,
         legislature: AccountNumber,
         judiciary: AccountNumber,
         name: String,
         mission: String,
     ) -> Self {
-        check_none(Self::get(account), "fractal already exists");
-        let new_instance = Self::new(account, legislature, judiciary, name, mission);
+        check_none(Self::get(fractal), "fractal already exists");
+        let new_instance = Self::new(fractal, legislature, judiciary, name, mission);
 
         // create two new roles for the judiciary and legislature, with the fractal as the auth manager
 
@@ -92,17 +82,22 @@ impl Fractal {
         // as AuthDyn expects `has_policy` to return true when setting the fractals
         // auth service to AuthDyn.
         new_instance.save();
-        new_instance.create_account();
+        create_managed_account(fractal, || {
+            sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
+        });
+        create_managed_account(legislature, || {});
+        create_managed_account(judiciary, || {});
 
         let defacto_service = "de-facto".into();
 
         check(
             psibase::services::fractals::occu_wrapper::call_to(defacto_service)
-                .is_supported(account),
+                .is_supported(fractal),
             "occupation not supported",
         );
-        Role::add(account, LEGISLATURE, defacto_service);
-        Role::add(account, JUDICIARY, defacto_service);
+        Role::add(fractal, legislature, LEGISLATURE, defacto_service);
+        Role::add(fractal, judiciary, JUDICIARY, defacto_service);
+        FractalMember::add(fractal, get_sender());
 
         // Create the legislature and judicial accounts of index 1 and index 2
         // Then set auth dynamic for the accounts with fractals as the auth policy manager
@@ -112,6 +107,22 @@ impl Fractal {
         // Occuptation::get_policy and return that.
 
         new_instance
+    }
+
+    pub fn get_by_legislature(legislature: AccountNumber) -> Option<Self> {
+        FractalTable::read()
+            .get_index_by_legislature()
+            .range(
+                (legislature, AccountNumber::new(0))..=(legislature, AccountNumber::new(u64::MAX)),
+            )
+            .next()
+    }
+
+    pub fn get_by_judiciary(judiciary: AccountNumber) -> Option<Self> {
+        FractalTable::read()
+            .get_index_by_judiciary()
+            .range((judiciary, AccountNumber::new(0))..=(judiciary, AccountNumber::new(u64::MAX)))
+            .next()
     }
 
     pub fn check_sender_is_legislature(&self) {

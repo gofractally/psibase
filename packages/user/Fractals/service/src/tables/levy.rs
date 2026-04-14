@@ -98,14 +98,13 @@ impl Levy {
         if payment.value > 0 {
             let memo = "Levy payment".into();
 
-            let payee_is_fractal = self.fractal == self.payee;
+            let fractal = self.fractal;
+            let payee_is_fractal = fractal == self.payee;
 
             if payee_is_fractal {
-                RewardStream::get_assert(self.fractal).deposit(payment, memo);
+                RewardStream::get_assert(fractal).deposit(payment, memo);
             } else {
-                let token_id = Fractal::get_assert(self.fractal).token_id;
-                psibase::services::tokens::Wrapper::call()
-                    .credit(token_id, self.payee, payment, memo)
+                FractalMember::get_assert(fractal, self.payee).credit_direct(payment, memo);
             }
         }
 

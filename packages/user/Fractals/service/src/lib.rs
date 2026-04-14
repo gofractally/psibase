@@ -69,6 +69,7 @@ pub mod service {
 
     use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
 
+    use psibase::services::fractals::occu_wrapper;
     use psibase::*;
     use psibase::{
         services::{
@@ -183,11 +184,24 @@ pub mod service {
         Occupation::set_ordered_occupations(fractal, ordered_occupations);
     }
 
+    /// Get fratal by role
+    ///
+    /// This action might be temp...
+    ///
+    /// # Arguments
+    /// * `account` - Account role to lookup.
+    #[action]
+    fn get_fractal_by_role(account: AccountNumber) -> Option<AccountNumber> {
+        Role::get_by_account(account).map(|role| role.account)
+    }
+
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
-        Fractal::get(account).map(|fractal| fractal.auth_policy())
-        // .or(Guild::get(account).map(|guild| guild.guild_auth()))
-        // .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
-        // .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth()))
+        Fractal::get(account)
+            .map(|fractal| fractal.auth_policy())
+            .or(Role::get_by_account(account).map(|role| {
+                let occupation = role.occupation;
+                occu_wrapper::call_to(occupation).role_policy(account)
+            }))
     }
 
     /// Get policy action used by AuthDyn service.
@@ -205,11 +219,6 @@ pub mod service {
         use psibase::services::staged_tx as StagedTx;
 
         let policy = check_some(account_policy(account), "account not supported");
-
-        // What is the policy for save the whales legislature?
-        // Look up the the account on the roles table
-        // hit role_policy on the occupation, returning what its policy is.
-        //
 
         if method.is_some_and(|method| {
             let banned_service_methods: Vec<ServiceMethod> = vec![
