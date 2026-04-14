@@ -1256,7 +1256,7 @@ fn build_package_order_graph<R: Read + Seek>(
     existing: &PackageList,
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut result: HashMap<String, Vec<String>> = HashMap::new();
-    let mut provides_service: HashMap<AccountNumber, String> = HashMap::new();
+    let mut provides_service: HashMap<AccountNumber, &Meta> = HashMap::new();
     let mut has_postinstall = HashSet::new();
     let empty_deps = Vec::new();
     let mut service_deps = HashMap::new();
@@ -1269,12 +1269,10 @@ fn build_package_order_graph<R: Read + Seek>(
                 // Create lookup table to find the package that contains
                 // each service. Duplicates are an error.
                 for (service, _, _) in &package.services {
-                    if let Some(prev) =
-                        provides_service.insert(*service, package.name().to_string())
-                    {
+                    if let Some(prev) = provides_service.insert(*service, package.meta()) {
                         Err(Error::ServiceConflict {
                             name: *service,
-                            old: prev,
+                            old: prev.name.clone(),
                             new: package.name().to_string(),
                         })?
                     }
@@ -1321,11 +1319,11 @@ fn build_package_order_graph<R: Read + Seek>(
                 // Services provided by existing packages that are not
                 // being updated are available to be called during installation
                 for service in &meta.services {
-                    if let Some(prev) = provides_service.insert(*service, name.clone()) {
+                    if let Some(prev) = provides_service.insert(*service, meta) {
                         Err(Error::ServiceConflict {
                             name: *service,
                             old: name.clone(),
-                            new: prev,
+                            new: prev.name.clone(),
                         })?
                     }
                 }
@@ -1355,12 +1353,12 @@ fn build_package_order_graph<R: Read + Seek>(
                             package: package.name().to_string(),
                         })?
                     };
-                    if required_package != package.name() {
-                        if visited.insert(required_package.as_str()) {
-                            all_required_packages.push(required_package.to_string());
+                    if &required_package.name != package.name() {
+                        if visited.insert(required_package.name.as_str()) {
+                            all_required_packages.push(required_package.name.clone());
                         }
                     }
-                    for dep in &package.meta().depends {
+                    for dep in &required_package.depends {
                         get_transitive_services(
                             &dep.name,
                             &service_deps,
