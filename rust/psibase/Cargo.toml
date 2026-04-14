@@ -45,7 +45,7 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 serde-aux.workspace = true
 serde_json.workspace = true
 varisat = "0.2"
-zip = { version = "8.5", default-features = false, features = ["deflate"] }
+zip = { version = "7.2", default-features = false, features = ["deflate"] }
 sec1 = "0.7"
 spki = "0.7"
 der = { version = "0.7", features = ["alloc", "pem", "std"] }
