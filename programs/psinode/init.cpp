@@ -209,15 +209,8 @@ void initialize_database(SystemContext& context, const std::string& template_)
    auto key = psio::convert_to_key(codePrefix());
    if (!bc.db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
    {
-      DirectoryRegistry            registry{package_path().string()};
-      auto                         packageInfo = registry.resolve({&template_, 1});
-      std::vector<PackagedService> packages;
-      packages.reserve(packageInfo.size());
-      for (const auto& info : packageInfo)
-      {
-         packages.push_back(registry.get(info));
-      }
-      sortPackages(packages, {});
+      DirectoryRegistry registry{package_path().string()};
+      auto              packages = registry.resolve({&template_, 1}, {});
       bc.start();
       load_local_packages(tc, registry, packages);
    }

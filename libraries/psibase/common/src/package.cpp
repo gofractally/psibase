@@ -604,7 +604,7 @@ namespace psibase
       return PackagedService(readWholeFile(filepath));
    }
 
-   std::vector<PackageInfo> DirectoryRegistry::resolve(std::span<const std::string> packages)
+   std::vector<PackageInfo> DirectoryRegistry::resolveInfo(std::span<const std::string> packages)
    {
       std::vector<PackageInfo> index = this->index();
 
@@ -624,6 +624,21 @@ namespace psibase
       {
          result.push_back(std::move(*package));
       }
+      return result;
+   }
+
+   std::vector<PackagedService> DirectoryRegistry::resolve(
+       std::span<const std::string>   packages,
+       std::span<const AccountNumber> priorityServices)
+   {
+      auto                         packageInfo = resolveInfo(packages);
+      std::vector<PackagedService> result;
+      result.reserve(packageInfo.size());
+      for (const auto& info : packageInfo)
+      {
+         result.push_back(get(info));
+      }
+      sortPackages(result, priorityServices);
       return result;
    }
 

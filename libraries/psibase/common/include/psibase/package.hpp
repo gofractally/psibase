@@ -94,9 +94,13 @@ namespace psibase
       DirectoryRegistry(std::string_view path);
       std::vector<PackageInfo> index() const;
 
-      PackagedService          get(std::string_view name) const;
-      PackagedService          get(const PackageInfo& info) const;
-      std::vector<PackageInfo> resolve(std::span<const std::string> packages);
+      PackagedService get(std::string_view name) const;
+      PackagedService get(const PackageInfo& info) const;
+      // The order of the result is unspecified
+      std::vector<PackageInfo> resolveInfo(std::span<const std::string> packages);
+      // Returns packages in the correct order for installation
+      std::vector<PackagedService> resolve(std::span<const std::string>   packages,
+                                           std::span<const AccountNumber> priorityServices);
 
      private:
       std::string path;
