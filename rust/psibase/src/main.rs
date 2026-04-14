@@ -12,7 +12,7 @@ use futures::{
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{packages, sites, staged_tx, transact, x_packages};
 use psibase::{
-    account, apply_proxy, as_json, compress_content, create_boot_transactions,
+    account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
     get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
@@ -1220,20 +1220,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let packages = PackageList::new()
-        .resolve_changes(&package_registry, &package_names, false, false)
-        .await?;
-    let mut packages: Vec<_> = fetch_packages(&package_registry, packages, &PackageList::new())
-        .await?
-        .into_iter()
-        .map(|op| {
-            if let PackageOpFull::Install(package) = op {
-                package
-            } else {
-                panic!("Only install is expected when there are no existing packages")
-            }
-        })
-        .collect();
+    let mut packages = package_registry.resolve(&package_names).await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1600,25 +1587,6 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
 
     finish_progress(&args.sig_args, progress, num_transactions);
     Ok(())
-}
-
-async fn fetch_packages<R: PackageRegistry>(
-    reg: &R,
-    ops: Vec<PackageOp>,
-    existing: &PackageList,
-) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
-    let mut result = Vec::with_capacity(ops.len());
-    for op in ops {
-        result.push(match op {
-            PackageOp::Install(info) => PackageOpFull::Install(reg.get_by_info(&info).await?),
-            PackageOp::Replace(meta, info) => {
-                PackageOpFull::Replace(meta, reg.get_by_info(&info).await?)
-            }
-            PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
-        })
-    }
-    sort_package_ops(&mut result, existing)?;
-    Ok(result)
 }
 
 async fn apply_packages<

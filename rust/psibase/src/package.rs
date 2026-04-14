@@ -1213,6 +1213,25 @@ impl<R: Read + Seek> PackageOpFull<R> {
     }
 }
 
+pub async fn fetch_packages<R: PackageRegistry + ?Sized>(
+    reg: &R,
+    ops: Vec<PackageOp>,
+    existing: &PackageList,
+) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
+    let mut result = Vec::with_capacity(ops.len());
+    for op in ops {
+        result.push(match op {
+            PackageOp::Install(info) => PackageOpFull::Install(reg.get_by_info(&info).await?),
+            PackageOp::Replace(meta, info) => {
+                PackageOpFull::Replace(meta, reg.get_by_info(&info).await?)
+            }
+            PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
+        })
+    }
+    sort_package_ops(&mut result, existing)?;
+    Ok(result)
+}
+
 // Finds all packages reachable from package in deps.
 // Packages that should not be considered should be excluded from deps.
 fn get_transitive_services<'a>(
@@ -1540,23 +1559,21 @@ pub trait PackageRegistry {
         &self,
         packages: &[String],
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
-        let mut result = vec![];
-        let index = self.index()?;
-        for op in solve_dependencies(
-            index,
-            make_refs(packages)?,
-            vec![],
-            false,
-            PackagePreference::Latest,
-            PackagePreference::Current,
-        )? {
-            let PackageOp::Install(info) = op else {
-                panic!("Only install is expected when there are no existing packages");
-            };
-            result.push(self.get_by_info(&info).await?);
-        }
-
-        Ok(result)
+        let installed = PackageList::new();
+        let packages = installed
+            .resolve_changes(self, packages, false, false)
+            .await?;
+        Ok(fetch_packages(self, packages, &installed)
+            .await?
+            .into_iter()
+            .map(|op| {
+                if let PackageOpFull::Install(package) = op {
+                    package
+                } else {
+                    panic!("Only install is expected when there are no existing packages")
+                }
+            })
+            .collect())
     }
 }
 
