@@ -9,13 +9,14 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
-    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, ActionFormatter,
-    BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error,
-    HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, JointRegistry,
-    KvHandle, KvMode, PackageRegistry, PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap,
-    Seconds, SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec,
-    ToKey, Transaction, TransactionBuilder, TransactionTrace,
+    actions::login_action, check, create_boot_transactions, fetch_packages,
+    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
+    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
+    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
+    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
@@ -681,6 +682,7 @@ impl Chain {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
+        let packages = block_on(fetch_packages(reg, packages, &installed))?;
 
         let mut schemas = SchemaMap::new();
         let sender = services::producers::ROOT;
@@ -688,11 +690,14 @@ impl Chain {
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {
             match op {
-                PackageOp::Install(info) => {
+                PackageOpFull::Install(mut package) => {
                     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
-                    let mut package = block_on(reg.get_by_info(&info))?;
                     self.load_schemas(&mut package, &mut schemas)?;
-                    builder.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                    builder.set_label(format!(
+                        "Installing {}-{}",
+                        package.name(),
+                        package.version()
+                    ));
                     let mut account_actions = vec![];
                     package.install_accounts(&mut account_actions, None, sender, &None)?;
                     builder.push_all(account_actions)?;
