@@ -19,7 +19,7 @@ use crate::{
     TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
-use crate::{MicroSeconds, PackageList, PackageOp};
+use crate::{MicroSeconds, PackageList};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -150,7 +150,7 @@ impl Chain {
     }
 
     pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
-        let mut services = block_on(reg.resolve(services))?;
+        let mut services = block_on(reg.resolve(services, false))?;
 
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
@@ -246,20 +246,14 @@ impl Chain {
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
-        let packages =
-            block_on(PackageList::new().resolve_changes(&registry, &package_names, false, true))
-                .unwrap();
+        let packages = block_on(registry.resolve(&package_names, true)).unwrap();
         let mut requests = Vec::new();
         let mut early_requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
         let root_host = "\0";
-        for op in packages {
-            let PackageOp::Install(info) = op else {
-                panic!("Only install is expected when there are no existing packages")
-            };
-            let mut package = block_on(registry.get_by_info(&info)).unwrap();
+        for mut package in packages {
             for (account, info, code) in package.services() {
                 let hash: [u8; 32] = Sha256::digest(&code).into();
                 let code_hash: Checksum256 = hash.into();
@@ -322,7 +316,7 @@ impl Chain {
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "PUT".to_string(),
-                target: format!("/manifest/{}", info.sha256),
+                target: format!("/manifest/{}", package.hash()),
                 contentType: "application/json".to_string(),
                 headers: vec![],
                 body: serde_json::to_string(&package.manifest())
@@ -336,7 +330,12 @@ impl Chain {
                 target: "/postinstall".to_string(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(&info).unwrap().into_bytes().into(),
+                body: serde_json::to_string(
+                    &package.meta().info(package.hash().clone(), String::new()),
+                )
+                .unwrap()
+                .into_bytes()
+                .into(),
             });
         }
         check(

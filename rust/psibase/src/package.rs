@@ -1558,10 +1558,11 @@ pub trait PackageRegistry {
     async fn resolve(
         &self,
         packages: &[String],
+        local: bool,
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
         let installed = PackageList::new();
         let packages = installed
-            .resolve_changes(self, packages, false, false)
+            .resolve_changes(self, packages, false, local)
             .await?;
         Ok(fetch_packages(self, packages, &installed)
             .await?
