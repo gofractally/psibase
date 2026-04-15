@@ -1,8 +1,8 @@
 use std::u64;
 
-use psibase::{AccountNumber, Table};
+use psibase::{check_some, AccountNumber, Table};
 
-use crate::tables::tables::{RoleMap, RoleMapTable};
+use crate::tables::tables::{Guild, RoleMap, RoleMapTable};
 
 impl RoleMap {
     fn new(fractal: AccountNumber, role_id: u8, guild: AccountNumber) -> Self {
@@ -21,6 +21,7 @@ impl RoleMap {
 
     pub fn set(fractal: AccountNumber, role_id: u8, guild: AccountNumber) {
         let new_instance = Self::new(fractal, role_id, guild);
+        check_some(Guild::get(guild), "cannot map role_id to nonexistent guild");
         new_instance.save();
     }
 

@@ -1,5 +1,5 @@
 use crate::tables::tables::{Role, RoleTable};
-use psibase::{check_none, check_some, AccountNumber, Table};
+use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 impl Role {
     fn new(
@@ -49,6 +49,10 @@ impl Role {
                 fractal.to_string()
             ),
         );
+        check(
+            psibase::services::accounts::Wrapper::call().exists(occupation),
+            "occupation account does not exist",
+        );
 
         let new_instance = Self::new(fractal, account, role_id, occupation);
         new_instance.save();
@@ -56,6 +60,12 @@ impl Role {
     }
 
     pub fn set_occupation(&mut self, new_occupation: AccountNumber) {
+        check(
+            psibase::services::fractals::occu_wrapper::call_to(new_occupation)
+                .is_role_ok(self.fractal, self.role_id),
+            "occupation does not support role",
+        );
+
         self.occupation = new_occupation;
         self.save();
     }

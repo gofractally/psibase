@@ -19,12 +19,12 @@ pub mod service {
     fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
         ::fractals::tables::tables::FractalMemberTable::read()
             .get_index_pk()
-            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
-            .any(|account| account.account == member)
+            .get(&(fractal, member))
+            .is_some()
     }
 
     #[action]
-    fn is_supported(fractal: AccountNumber) -> bool {
+    fn is_role_ok(fractal: AccountNumber, _role_id: u8) -> bool {
         ::fractals::tables::tables::FractalTable::read()
             .get_index_pk()
             .get(&fractal)

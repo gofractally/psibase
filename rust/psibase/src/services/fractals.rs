@@ -61,12 +61,12 @@ pub mod Occupation {
     }
 
     #[action]
-    fn is_supported(fractal: AccountNumber) -> bool {
+    fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
         unimplemented!()
     }
 
     #[action]
-    fn role_policy(account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
+    fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         unimplemented!()
     }
 }

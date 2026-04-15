@@ -34,7 +34,6 @@ export const CreateFractalModal = ({
     const form = useAppForm({
         defaultValues: {
             fractalAccount: "",
-            guildAccount: '',
             mission: "",
             name: "",
         },
@@ -103,36 +102,13 @@ export const CreateFractalModal = ({
                             )}
                         />
 
-                        <form.AppField
-                            name="guildAccount"
-                            validators={{
-                                onChangeAsyncDebounceMs: 1000,
-                                onChangeAsync: async ({ value }) => {
-                                    const status =
-                                        await isAccountAvailable(value);
-                                    if (status === "Taken") {
-                                        return "Account name is already taken";
-                                    }
-                                    if (status === "Invalid") {
-                                        return "Invalid account name";
-                                    }
-                                    return undefined;
-                                },
-                            }}
-                            children={(field) => (
-                                <field.TextField
-                                    label="Genesis guild account name"
-                                    description="Unique identifier"
-                                />
-                            )}
-                        />
+
 
 
                         <form.AppForm>
                             <form.SubmitButton
                                 labels={[
                                     "Create fractal",
-                                    "Creating fractal...",
                                     "Created fractal",
                                 ]}
                             />

@@ -5,9 +5,7 @@ pub mod tables;
 pub mod service {
     use crate::{
         helpers::RollingBits16,
-        tables::tables::{
-            EvaluationInstance, Guild, GuildMember, GuildTable, InitRow, InitTable, RoleMap,
-        },
+        tables::tables::{EvaluationInstance, Guild, GuildMember, InitRow, InitTable, RoleMap},
     };
     use psibase::{
         services::{
@@ -52,8 +50,8 @@ pub mod service {
 
         let sender_is_fractal_member = ::fractals::tables::tables::FractalMemberTable::read()
             .get_index_pk()
-            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
-            .any(|account| account.account == sender);
+            .get(&(fractal, sender))
+            .is_some();
 
         check(sender_is_fractal_member, "must be a fractal member");
 
@@ -82,12 +80,8 @@ pub mod service {
     }
 
     #[action]
-    fn is_supported(fractal: AccountNumber) -> bool {
-        GuildTable::read()
-            .get_index_by_owner()
-            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
-            .next()
-            .is_some()
+    fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
+        RoleMap::get(fractal, role_id).is_some()
     }
 
     /// Set guild display name
@@ -97,6 +91,16 @@ pub mod service {
     #[action]
     fn set_g_disp(display_name: Memo) {
         Guild::by_sender().set_display_name(display_name);
+    }
+
+    /// Set role mapping
+    ///
+    /// # Arguments
+    /// * `role_id` - Role ID.
+    /// * `guild` - Guild account to map to
+    #[action]
+    fn set_role_map(role_id: u8, guild: AccountNumber) {
+        RoleMap::set(get_sender(), role_id, guild);
     }
 
     /// Set guild bio

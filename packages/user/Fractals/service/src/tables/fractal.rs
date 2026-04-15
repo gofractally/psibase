@@ -6,7 +6,7 @@ use async_graphql::ComplexObject;
 use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::roles::{JUDICIARY, LEGISLATURE};
+use crate::constants::roles::{EXECUTIVE, JUDICIARY, LEGISLATURE};
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::helpers::fib::EXTERNAL_S;
 use crate::helpers::{
@@ -68,43 +68,31 @@ impl Fractal {
         fractal: AccountNumber,
         legislature: AccountNumber,
         judiciary: AccountNumber,
+        executive: AccountNumber,
         name: String,
         mission: String,
     ) -> Self {
         check_none(Self::get(fractal), "fractal already exists");
         let new_instance = Self::new(fractal, legislature, judiciary, name, mission);
 
-        // create two new roles for the judiciary and legislature, with the fractal as the auth manager
-
-        // with auth dynamic create account
-
         // Save the fractal first prior to creating an account for it
         // as AuthDyn expects `has_policy` to return true when setting the fractals
         // auth service to AuthDyn.
         new_instance.save();
+
+        let defacto_service = "de-facto".into();
+
+        Role::add(fractal, legislature, LEGISLATURE, defacto_service);
+        Role::add(fractal, judiciary, JUDICIARY, defacto_service);
+        Role::add(fractal, executive, EXECUTIVE, defacto_service);
+
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
         });
         create_managed_account(legislature, || {});
         create_managed_account(judiciary, || {});
 
-        let defacto_service = "de-facto".into();
-
-        check(
-            psibase::services::fractals::occu_wrapper::call_to(defacto_service)
-                .is_supported(fractal),
-            "occupation not supported",
-        );
-        Role::add(fractal, legislature, LEGISLATURE, defacto_service);
-        Role::add(fractal, judiciary, JUDICIARY, defacto_service);
         FractalMember::add(fractal, get_sender());
-
-        // Create the legislature and judicial accounts of index 1 and index 2
-        // Then set auth dynamic for the accounts with fractals as the auth policy manager
-        // fractals::get_policy is then used
-        // if asked for legislature, then we check the occupation,
-        // Role table for the role and the occupation it has.
-        // Occuptation::get_policy and return that.
 
         new_instance
     }

@@ -75,12 +75,7 @@ impl Guild {
 struct FractallyPlugin;
 
 impl AdminFractal for FractallyPlugin {
-    fn create_fractal(
-        fractal_account: String,
-        guild_account: String,
-        name: String,
-        mission: String,
-    ) -> Result<(), Error> {
+    fn create_fractal(fractal_account: String, name: String, mission: String) -> Result<(), Error> {
         assert_authorized(FunctionName::create_fractal)?;
         let packed_args = fractals::action_structs::create_frac {
             fractal_account: fractal_account.parse().unwrap(),
@@ -88,6 +83,7 @@ impl AdminFractal for FractallyPlugin {
             mission,
             judiciary: gen_rand_account(None)?.as_str().into(),
             legislature: gen_rand_account(None)?.as_str().into(),
+            executive: gen_rand_account(None)?.as_str().into(),
         }
         .packed();
         add_action_to_transaction(

@@ -12,6 +12,7 @@ pub mod constants {
     pub mod roles {
         pub const LEGISLATURE: u8 = 1;
         pub const JUDICIARY: u8 = 2;
+        pub const EXECUTIVE: u8 = 3;
     }
     pub mod token_distributions {
         pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
@@ -92,10 +93,18 @@ pub mod service {
         fractal_account: AccountNumber,
         legislature: AccountNumber,
         judiciary: AccountNumber,
+        executive: AccountNumber,
         name: String,
         mission: String,
     ) {
-        Fractal::add(fractal_account, legislature, judiciary, name, mission);
+        Fractal::add(
+            fractal_account,
+            legislature,
+            judiciary,
+            executive,
+            name,
+            mission,
+        );
 
         Wrapper::emit().history().created_fractal(fractal_account);
     }
@@ -179,7 +188,7 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     /// * `ordered_occupations` - Ordered occupations to set for the fractal
     #[action]
-    fn set_ord_ocs(fractal: AccountNumber, ordered_occupations: Vec<AccountNumber>) {
+    fn set_paid_occupations(fractal: AccountNumber, ordered_occupations: Vec<AccountNumber>) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
         Occupation::set_ordered_occupations(fractal, ordered_occupations);
     }
@@ -199,8 +208,7 @@ pub mod service {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
             .or(Role::get_by_account(account).map(|role| {
-                let occupation = role.occupation;
-                occu_wrapper::call_to(occupation).role_policy(account)
+                occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
             }))
     }
 
