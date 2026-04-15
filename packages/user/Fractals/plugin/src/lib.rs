@@ -13,7 +13,6 @@ use psibase::fracpack::Pack;
 mod errors;
 mod graphql;
 mod helpers;
-use psibase::AccountNumber;
 
 use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
