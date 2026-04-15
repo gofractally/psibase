@@ -1,0 +1,9 @@
+package test:comp-c;
+
+interface api {
+    add: func(a: s32, b: s32) -> s32;
+}
+
+world comp-c {
+    export api;
+}

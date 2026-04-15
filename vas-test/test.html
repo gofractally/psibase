@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WASM Composition VAS Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+    h1 { color: #00d4ff; }
+    .result { margin: 16px 0; padding: 16px; border: 1px solid #333; border-radius: 4px; }
+    .result h2 { margin-top: 0; }
+    .pass { border-color: #4caf50; }
+    .info { color: #aaa; }
+    button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 4px;
+             background: #00d4ff; color: #1a1a2e; border: none; border-radius: 4px; font-weight: bold; }
+    button:disabled { background: #555; color: #999; cursor: not-allowed; }
+    table { border-collapse: collapse; margin-top: 10px; }
+    td, th { padding: 6px 16px; border: 1px solid #444; text-align: right; }
+    th { background: #2a2a4e; color: #00d4ff; }
+    .highlight { color: #ff6b6b; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>WASM Component Composition: Memory Test</h1>
+  <p class="info">
+    Tests whether composing 3 WASM components (A→B→C) into a single component
+    reduces the number of WebAssembly.instantiate calls (and thus Memory objects / VAS).
+  </p>
+  <div>
+    <button id="btn-separate" onclick="runSeparate()">1. Load Separate (A + B + C)</button>
+    <button id="btn-composed" onclick="runComposed()">2. Load Composed (ABC)</button>
+    <button id="btn-both" onclick="runBoth()">Run Both</button>
+  </div>
+  <div id="output"></div>
+
+<script type="module">
+const origInstantiate = WebAssembly.instantiate;
+const origMemory = WebAssembly.Memory;
+
+let instantiateCount = 0;
+let uniqueMemories = new Set();
+let memoryDetails = [];
+
+// Every WebAssembly.Memory instance represents one VAS reservation (~10GB).
+// We collect every unique Memory object from every instantiated module's exports
+// and from imported memories that get passed between modules.
+
+WebAssembly.instantiate = async function(moduleOrBytes, imports) {
+  instantiateCount++;
+  const result = await origInstantiate.call(WebAssembly, moduleOrBytes, imports);
+  const instance = result.instance || result;
+
+  // Scan exports for Memory objects
+  for (const [key, val] of Object.entries(instance.exports)) {
+    if (val instanceof origMemory && !uniqueMemories.has(val)) {
+      uniqueMemories.add(val);
+      memoryDetails.push({
+        source: `instantiate #${instantiateCount} export "${key}"`,
+        bufferByteLength: val.buffer.byteLength,
+        initial_pages: val.buffer.byteLength / 65536,
+      });
+    }
+  }
+
+  // Also scan imports for Memory objects being passed in (they're the same
+  // objects but let's verify they're already tracked)
+  if (imports) {
+    for (const [ns, obj] of Object.entries(imports)) {
+      if (obj && typeof obj === 'object') {
+        for (const [key, val] of Object.entries(obj)) {
+          if (val instanceof origMemory && !uniqueMemories.has(val)) {
+            uniqueMemories.add(val);
+            memoryDetails.push({
+              source: `import "${ns}"."${key}"`,
+              bufferByteLength: val.buffer.byteLength,
+              initial_pages: val.buffer.byteLength / 65536,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+};
+
+function resetCounters() {
+  instantiateCount = 0;
+  uniqueMemories = new Set();
+  memoryDetails = [];
+}
+
+async function loadSeparateComponents() {
+  resetCounters();
+
+  const modC = await import('./out/separate/c/comp_c.js');
+  const coreC = await WebAssembly.compileStreaming(fetch('./out/separate/c/comp_c.core.wasm'));
+  const instC = await modC.instantiate(
+    (name) => Promise.resolve(coreC),
+    {}
+  );
+
+  const modB = await import('./out/separate/b/comp_b.js');
+  const coreB = await WebAssembly.compileStreaming(fetch('./out/separate/b/comp_b.core.wasm'));
+  const instB = await modB.instantiate(
+    (name) => Promise.resolve(coreB),
+    { 'test:comp-c/api': instC['test:comp-c/api'] }
+  );
+
+  const modA = await import('./out/separate/a/comp_a.js');
+  const coreA = await WebAssembly.compileStreaming(fetch('./out/separate/a/comp_a.core.wasm'));
+  const instA = await modA.instantiate(
+    (name) => Promise.resolve(coreA),
+    { 'test:comp-b/api': instB['test:comp-b/api'] }
+  );
+
+  const result = instA.api.compute(5);
+  const vasGB = uniqueMemories.size * 10;
+  return {
+    instantiateCalls: instantiateCount,
+    uniqueMemories: uniqueMemories.size,
+    memoryDetails: [...memoryDetails],
+    vasEstimateGB: vasGB,
+    result,
+    label: '3 Separate Components'
+  };
+}
+
+async function loadComposedComponent() {
+  resetCounters();
+
+  const mod = await import('./out/composed/composed_abc.js');
+  await mod.$init;
+
+  const result = mod.api.compute(5);
+  const vasGB = uniqueMemories.size * 10;
+  return {
+    instantiateCalls: instantiateCount,
+    uniqueMemories: uniqueMemories.size,
+    memoryDetails: [...memoryDetails],
+    vasEstimateGB: vasGB,
+    result,
+    label: 'Single Composed Component'
+  };
+}
+
+function renderMemoryTable(details) {
+  if (!details.length) return '<p>No Memory objects detected</p>';
+  return `<table>
+    <tr><th>#</th><th>Source</th><th>Buffer Size</th><th>Pages</th><th>Est. VAS</th></tr>
+    ${details.map((d, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td style="text-align:left">${d.source}</td>
+        <td>${d.bufferByteLength.toLocaleString()} B</td>
+        <td>${d.initial_pages}</td>
+        <td>~10 GB</td>
+      </tr>
+    `).join('')}
+  </table>`;
+}
+
+function renderResult(data) {
+  return `
+    <div class="result pass">
+      <h2>${data.label}</h2>
+      <table>
+        <tr><th>Metric</th><th>Count</th></tr>
+        <tr><td>WebAssembly.instantiate() calls</td><td>${data.instantiateCalls}</td></tr>
+        <tr><td>Unique WebAssembly.Memory objects (= VAS reservations)</td><td class="highlight">${data.uniqueMemories}</td></tr>
+        <tr><td>Estimated VAS consumed</td><td class="highlight">~${data.vasEstimateGB} GB</td></tr>
+        <tr><td>compute(5) result</td><td>${data.result}</td></tr>
+      </table>
+      <h3>Memory Object Details</h3>
+      ${renderMemoryTable(data.memoryDetails)}
+    </div>
+  `;
+}
+
+function renderComparison(sep, comp) {
+  const instDiff = comp.instantiateCalls - sep.instantiateCalls;
+  const memDiff = comp.uniqueMemories - sep.uniqueMemories;
+  const vasDiff = comp.vasEstimateGB - sep.vasEstimateGB;
+  const diffStr = (n) => n > 0 ? `+${n}` : n === 0 ? 'SAME' : `${n}`;
+  return `
+    <div class="result">
+      <h2>Comparison</h2>
+      <table>
+        <tr><th>Metric</th><th>Separate</th><th>Composed</th><th>Diff</th></tr>
+        <tr>
+          <td>instantiate() calls</td>
+          <td>${sep.instantiateCalls}</td>
+          <td>${comp.instantiateCalls}</td>
+          <td class="highlight">${diffStr(instDiff)}</td>
+        </tr>
+        <tr>
+          <td>Unique Memory objects</td>
+          <td>${sep.uniqueMemories}</td>
+          <td>${comp.uniqueMemories}</td>
+          <td class="highlight">${diffStr(memDiff)}</td>
+        </tr>
+        <tr>
+          <td>VAS consumed</td>
+          <td>~${sep.vasEstimateGB} GB</td>
+          <td>~${comp.vasEstimateGB} GB</td>
+          <td class="highlight">${vasDiff === 0 ? 'SAME' : diffStr(vasDiff) + ' GB'}</td>
+        </tr>
+        <tr>
+          <td>compute(5)</td>
+          <td>${sep.result}</td>
+          <td>${comp.result}</td>
+          <td>${sep.result === comp.result ? 'MATCH' : 'MISMATCH!'}</td>
+        </tr>
+      </table>
+      <p style="margin-top:12px">
+        <strong>Conclusion:</strong>
+        ${memDiff === 0
+          ? 'Composition does NOT reduce the number of WebAssembly.Memory allocations. Each component retains its own isolated linear memory per the Component Model spec. <strong>VAS consumption is identical.</strong>'
+          : memDiff < 0
+            ? `Composition reduces Memory objects by ${Math.abs(memDiff)}, saving ~${Math.abs(vasDiff)} GB of VAS.`
+            : `Composition INCREASES Memory objects by ${memDiff}, costing an additional ~${vasDiff} GB of VAS.`
+        }
+        ${instDiff > 0 ? ` Additionally, composition adds ${instDiff} adapter shim instantiations.` : ''}
+      </p>
+    </div>
+  `;
+}
+
+const output = document.getElementById('output');
+
+window.runSeparate = async function() {
+  document.getElementById('btn-separate').disabled = true;
+  output.innerHTML = '<p>Loading separate components...</p>';
+  try {
+    const sep = await loadSeparateComponents();
+    output.innerHTML = renderResult(sep);
+    window._sepResult = sep;
+  } catch(e) {
+    output.innerHTML = `<pre style="color:red">${e.stack || e}</pre>`;
+  }
+  document.getElementById('btn-separate').disabled = false;
+};
+
+window.runComposed = async function() {
+  document.getElementById('btn-composed').disabled = true;
+  output.innerHTML = '<p>Loading composed component...</p>';
+  try {
+    const comp = await loadComposedComponent();
+    output.innerHTML = renderResult(comp);
+    window._compResult = comp;
+  } catch(e) {
+    output.innerHTML = `<pre style="color:red">${e.stack || e}</pre>`;
+  }
+  document.getElementById('btn-composed').disabled = false;
+};
+
+window.runBoth = async function() {
+  document.getElementById('btn-both').disabled = true;
+  output.innerHTML = '<p>Loading separate components...</p>';
+  try {
+    const sep = await loadSeparateComponents();
+    output.innerHTML = renderResult(sep) + '<p>Loading composed component...</p>';
+    const comp = await loadComposedComponent();
+    output.innerHTML = renderResult(sep) + renderResult(comp) + renderComparison(sep, comp);
+  } catch(e) {
+    output.innerHTML += `<pre style="color:red">${e.stack || e}</pre>`;
+  }
+  document.getElementById('btn-both').disabled = false;
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+package test:comp-b;
+
+interface api {
+    double-add: func(a: s32, b: s32) -> s32;
+}
+
+world comp-b {
+    import test:comp-c/api;
+    export api;
+}
