@@ -1,5 +1,6 @@
 import { ChevronRight, LucideIcon } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, useMatch } from "react-router-dom";
 
 import { cn } from "@shared/lib/utils";
 import {
@@ -42,17 +43,30 @@ const MenuItem = ({
     path,
     Icon,
     children,
-    basePath = "",
 }: {
     title: string;
     path?: string;
     Icon?: LucideIcon;
     children?: React.ReactNode;
-    basePath?: string;
 }) => {
+    // if menu item has children and the base path matches, open the collapsible
+    // still allows the user to manually open and close it
+    const match = useMatch(path ? `${path}/*` : "NO_MATCH");
+    const [open, setOpen] = useState(false);
+    useEffect(() => {
+        if (children && match) {
+            setOpen(true);
+        }
+    }, [children, match]);
+    // end of collapsible open state management
+
     if (children) {
         return (
-            <Collapsible className="group/collapsible list-none">
+            <Collapsible
+                className="group/collapsible list-none"
+                open={open}
+                onOpenChange={setOpen}
+            >
                 <SidebarMenuItem key={title} className="list-none">
                     <CollapsibleTrigger asChild>
                         <SidebarMenuButton tooltip={title}>
@@ -72,7 +86,7 @@ const MenuItem = ({
     if (!path) return null;
 
     return (
-        <NavLink key={title} to={`${basePath}${path}`} end>
+        <NavLink key={title} to={path} end>
             {({ isActive }) => (
                 <SidebarMenuItem
                     className={cn({

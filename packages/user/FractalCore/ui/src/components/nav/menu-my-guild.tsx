@@ -13,7 +13,7 @@ export const MyGuildMenu = ({
 }) => {
     const { data: roles } = useGuildMemberRoles(account);
     return (
-        <Menu.Item key={account} title={name}>
+        <Menu.Item key={account} title={name} path={`/guild/${account}`}>
             <Menu.SubItem
                 title="Overview"
                 path={`/guild/${account}`}
