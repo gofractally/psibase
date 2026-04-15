@@ -89,8 +89,6 @@ impl Fractal {
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
         });
-        create_managed_account(legislature, || {});
-        create_managed_account(judiciary, || {});
 
         FractalMember::add(fractal, get_sender());
 

@@ -118,7 +118,6 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn init_token(fractal: AccountNumber) {
-        // Init token should require that a symbol is actually mapped against it.
         let fractal = Fractal::get_assert(fractal);
         fractal.check_sender_is_legislature();
         fractal.init_token();
@@ -195,13 +194,13 @@ pub mod service {
 
     /// Get fratal by role
     ///
-    /// This action might be temp...
+    /// This action is temp until the arrival of sub-accounts.
     ///
     /// # Arguments
     /// * `account` - Account role to lookup.
     #[action]
-    fn get_fractal_by_role(account: AccountNumber) -> Option<AccountNumber> {
-        Role::get_by_account(account).map(|role| role.account)
+    fn frac_by_role(role_account: AccountNumber) -> Option<AccountNumber> {
+        Role::get_by_account(role_account).map(|role| role.account)
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {

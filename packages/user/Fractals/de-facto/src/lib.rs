@@ -36,9 +36,12 @@ pub mod service {
     /// # Arguments
     /// * `role_account` - Account being checked.
     #[action]
-    fn role_policy(role_account: AccountNumber) -> auth_dyn::policy::DynamicAuthPolicy {
+    fn role_policy(
+        role_account: AccountNumber,
+        _role_id: u8,
+    ) -> auth_dyn::policy::DynamicAuthPolicy {
         let fractal = check_some(
-            psibase::services::fractals::Wrapper::call().get_fractal_by_role(role_account),
+            psibase::services::fractals::Wrapper::call().frac_by_role(role_account),
             "expected fractal from role account",
         );
 

@@ -132,7 +132,7 @@ pub mod Service {
     /// # Arguments
     /// * `account` - Account role to lookup.
     #[action]
-    fn get_fractal_by_role(account: AccountNumber) -> Option<AccountNumber> {
+    fn frac_by_role(account: AccountNumber) -> Option<AccountNumber> {
         unimplemented!()
     }
 

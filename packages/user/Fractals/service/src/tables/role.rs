@@ -1,4 +1,7 @@
-use crate::tables::tables::{Role, RoleTable};
+use crate::{
+    helpers::create_managed_account,
+    tables::tables::{Role, RoleTable},
+};
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 impl Role {
@@ -56,6 +59,9 @@ impl Role {
 
         let new_instance = Self::new(fractal, account, role_id, occupation);
         new_instance.save();
+
+        create_managed_account(account, || {});
+
         new_instance
     }
 
