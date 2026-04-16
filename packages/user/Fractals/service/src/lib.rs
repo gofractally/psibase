@@ -33,9 +33,6 @@ pub mod constants {
 
     pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
 
-    pub const DEFAULT_TOKEN_INIT_THRESHOLD: u8 = 8;
-    pub const MIN_TOKEN_INIT_THRESHOLD: u8 = 4;
-
     // Simple limitation + also related to fibonacci function limit.
     pub const MAX_RANKED_GUILDS: u8 = 25;
 }
@@ -250,19 +247,4 @@ pub mod service {
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
-
-    #[event(history)]
-    pub fn evaluation_finished(guild: AccountNumber, evaluation_id: u32) {}
-
-    #[event(history)]
-    pub fn scheduled_evaluation(
-        fractal: AccountNumber,
-        guild: AccountNumber,
-        evaluation_id: u32,
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-    ) {
-    }
 }

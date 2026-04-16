@@ -299,6 +299,9 @@ pub mod service {
     }
 
     #[event(history)]
+    pub fn evaluation_finished(guild: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
     pub fn scheduled_evaluation(
         fractal: AccountNumber,
         guild: AccountNumber,
