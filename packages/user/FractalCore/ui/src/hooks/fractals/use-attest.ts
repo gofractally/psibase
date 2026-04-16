@@ -23,6 +23,7 @@ export const useAttest = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
+            // TODO: DOES THIS NOT THROW? And don't use await.
             await toast.promise(
                 getSupervisor().functionCall({
                     method: "attest",
@@ -45,8 +46,8 @@ export const useAttest = () => {
             // the real attestation will be over-written by the next graphql query
             updateAttestation(999999999999, [1, 2, 3, 4, 5, 6]);
         },
-        onSuccess: () => {
-            navigate(paths.guild.evaluations(fractal!));
+        onSuccess: (_data, { guildAccount }) => {
+            navigate(paths.guild.evaluations(guildAccount));
         },
     });
 };
