@@ -14,15 +14,16 @@ use psibase::services::{packages, sites, staged_tx, transact, x_packages};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
-    get_tapos_for_head, login_action, new_account_action, push_transaction,
-    push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, ActionFormatter,
-    AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
-    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOrigin,
-    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
-    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
-    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
+    get_tapos_for_head, login_action, new_account_action, new_account_key_action,
+    new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
+    push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
+    sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey, AnyPublicKey,
+    ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
+    FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
+    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference,
+    PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher, SchemaMap, Seconds,
+    ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
+    Transaction, TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -164,9 +165,13 @@ struct CreateArgs {
     /// Account to create
     account: ExactAccountNumber,
 
+    /// Set the owner of the new account
+    #[clap(short = 'o', long, value_name = "ACCOUNT", conflicts_with_all = ["key", "insecure"])]
+    owner: Option<ExactAccountNumber>,
+
     /// Set the account to authenticate using this key. Also works
     /// if the account already exists.
-    #[clap(short = 'k', long, value_name = "KEY")]
+    #[clap(short = 'k', long, value_name = "KEY", conflicts_with = "insecure")]
     key: Option<AnyPublicKey>,
 
     /// The account won't be secured; anyone can authorize as this
@@ -177,7 +182,7 @@ struct CreateArgs {
     insecure: bool,
 
     /// Sender to use when creating the account.
-    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
     sender: ExactAccountNumber,
 }
 
@@ -792,20 +797,23 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
-    if args.key.is_some() && args.insecure {
-        return Err(anyhow!("--key and --insecure cannot be used together"));
+    if let Some(preapprove) = preapprove_action(args.sender.into(), args.account.into()) {
+        actions.push(preapprove)
     }
-    if args.key.is_none() && !args.insecure {
-        return Err(anyhow!("either --key or --insecure must be used"));
-    }
-
-    actions.push(new_account_action(args.sender.into(), args.account.into()));
 
     if let Some(key) = &args.key {
-        actions.push(set_key_action(args.account.into(), &key));
-        actions.push(set_auth_service_action(
+        actions.push(new_account_key_action(
+            args.sender.into(),
             args.account.into(),
-            key.auth_service(),
+            key,
+        ))
+    } else if args.insecure {
+        actions.push(new_account_action(args.sender.into(), args.account.into()));
+    } else {
+        actions.push(new_account_owned_action(
+            args.sender.into(),
+            args.account.into(),
+            args.owner.unwrap_or(args.sender).into(),
         ));
     }
 
