@@ -218,8 +218,23 @@ function addResourceProxy(
     }
 }
 
+export interface InstantiateResult {
+    exports: Record<string, unknown>;
+    // Number of WebAssembly.Instance objects created (one per core module).
+    // A psibase plugin is a *component* that typically decomposes into a
+    // primary core module plus a WASI preview1 adapter, lift/lower
+    // trampolines, etc. Each gets its own Instance.
+    coreCount: number;
+    // Number of distinct WebAssembly.Memory objects exported by those
+    // instances. This is the real VAS cost — each Memory reserves ~10GB of
+    // virtual address space on V8 under the 64-bit guard-page allocation
+    // scheme. Instances that import memory from a peer module are not
+    // counted here (only the owner is).
+    memoryCount: number;
+}
+
 export interface CompiledPlugin {
-    instantiate: () => Promise<Record<string, unknown>>;
+    instantiate: () => Promise<InstantiateResult>;
 }
 
 // Transpile a WASM component via jco and pre-compile all core modules.
@@ -284,7 +299,30 @@ async function compileWasmComponent(
     URL.revokeObjectURL(url);
 
     return {
-        instantiate: () => jcoModule.instantiate(getCoreModule, imports),
+        instantiate: async () => {
+            let coreCount = 0;
+            let memoryCount = 0;
+            const countingInstantiateCore = async (
+                module: WebAssembly.Module,
+                importObj?: WebAssembly.Imports,
+            ): Promise<WebAssembly.Instance> => {
+                const instance = await WebAssembly.instantiate(
+                    module,
+                    importObj ?? {},
+                );
+                coreCount++;
+                for (const value of Object.values(instance.exports)) {
+                    if (value instanceof WebAssembly.Memory) memoryCount++;
+                }
+                return instance;
+            };
+            const exports = await jcoModule.instantiate(
+                getCoreModule,
+                imports,
+                countingInstantiateCore,
+            );
+            return { exports, coreCount, memoryCount };
+        },
     };
 }
 
@@ -310,7 +348,7 @@ export async function compilePlugin(
 export async function loadBasic(
     wasmBytes: Uint8Array,
     debugFileName: string,
-): Promise<Record<string, unknown>> {
+): Promise<InstantiateResult> {
     await shimsReady;
     const compiled = await compileWasmComponent(wasmBytes, getWasiImports(), debugFileName);
     return compiled.instantiate();

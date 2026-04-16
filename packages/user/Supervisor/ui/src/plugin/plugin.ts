@@ -13,6 +13,50 @@ import { parser, wasmFromUrl } from "../utils";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
+// Buffered GC reclaim log. The FinalizationRegistry callback fires when V8
+// has collected a disposed plugin's instance module — i.e. its
+// WebAssembly.Memory (and ~10GB of virtual address space reservation) has
+// been released. GCs typically reclaim many objects at once, so we batch
+// labels that arrive within the same ~50ms window into a single log line.
+const gcQueue: string[] = [];
+let gcFlushScheduled = false;
+function flushGcQueue() {
+    if (gcQueue.length === 0) {
+        gcFlushScheduled = false;
+        return;
+    }
+    const labels = gcQueue.splice(0);
+    console.log(
+        `[gc] reclaimed ${labels.length} plugin(s): [${labels.join(", ")}]`,
+    );
+    gcFlushScheduled = false;
+}
+const gcRegistry: FinalizationRegistry<string> | null =
+    typeof FinalizationRegistry !== "undefined"
+        ? new FinalizationRegistry<string>((label) => {
+              gcQueue.push(label);
+              if (!gcFlushScheduled) {
+                  gcFlushScheduled = true;
+                  setTimeout(flushGcQueue, 50);
+              }
+          })
+        : null;
+
+// Per-plugin instrumentation captured during preload. Zeroed until the
+// corresponding phase completes. Consumed once by
+// Plugins.collectPreloadStats() at the end of doPreload().
+export interface PluginStats {
+    fetchMs?: number;
+    fetchBytes?: number;
+    compileMs?: number;
+    // Populated on first successful instantiation. Deterministic per
+    // compiled component — a given plugin always decomposes into the same
+    // number of core module instances and the same number of Memories.
+    coreCount?: number;
+    memoryCount?: number;
+    reported: boolean;
+}
+
 export class Plugin {
     private host: HostInterface;
 
@@ -29,6 +73,12 @@ export class Plugin {
     // Resolves when the plugin is compiled (cheap — no Memory allocated).
     // After this, ensureInstantiated() can be called to allocate Memory.
     ready: Promise<void>;
+
+    // Pinned plugins (system plugins + their transitive deps) are instantiated
+    // once during preload and never disposed between entry() calls.
+    pinned: boolean = false;
+
+    stats: PluginStats = { reported: false };
 
     private compiledPlugin: CompiledPlugin | undefined;
     private pluginModule: any;
@@ -56,8 +106,11 @@ export class Plugin {
     private async doFetchPlugin(): Promise<Uint8Array> {
         const { service, plugin } = this.id;
         const url = siblingUrl(null, service, `/${plugin}.wasm`);
+        const t0 = performance.now();
         try {
             this.bytes = await wasmFromUrl(url);
+            this.stats.fetchMs = performance.now() - t0;
+            this.stats.fetchBytes = this.bytes.byteLength;
             return this.bytes;
         } catch (e) {
             if (e instanceof DownloadFailed) {
@@ -100,6 +153,7 @@ export class Plugin {
     private async doReady(): Promise<void> {
         const api = await this.parsed;
         const privileged = this.id.service === "host";
+        const t0 = performance.now();
         this.compiledPlugin = await compilePlugin(
             this.id.service,
             privileged,
@@ -107,6 +161,7 @@ export class Plugin {
             this.host,
             api,
         );
+        this.stats.compileMs = performance.now() - t0;
     }
 
     constructor(id: QualifiedPluginId, host: HostInterface) {
@@ -125,29 +180,15 @@ export class Plugin {
     async ensureInstantiated(): Promise<void> {
         if (this.pluginModule) return;
         if (!this.compiledPlugin) throw new PluginInvalid(this.id);
-
-        const maxRetries = 3;
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                this.pluginModule = await this.compiledPlugin.instantiate();
-                return;
-            } catch (e: unknown) {
-                const isOom =
-                    e instanceof WebAssembly.RuntimeError ||
-                    (e instanceof Error &&
-                        e.message.includes("Out of memory"));
-                if (attempt < maxRetries && isOom) {
-                    const delay = 250 * (attempt + 1);
-                    console.warn(
-                        `[pool] OOM instantiating ${pluginString(this.id)}, ` +
-                            `retry ${attempt + 1}/${maxRetries} after ${delay}ms`,
-                    );
-                    await new Promise((r) => setTimeout(r, delay));
-                    continue;
-                }
-                throw e;
-            }
-        }
+        const { exports, coreCount, memoryCount } =
+            await this.compiledPlugin.instantiate();
+        this.pluginModule = exports;
+        this.stats.coreCount = coreCount;
+        this.stats.memoryCount = memoryCount;
+        gcRegistry?.register(
+            this.pluginModule,
+            `${this.id.service}:${this.id.plugin}`,
+        );
     }
 
     dispose(): void {

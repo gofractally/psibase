@@ -22,7 +22,6 @@ import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
-import { InstancePool } from "./plugin/instance-pool";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
@@ -30,6 +29,8 @@ import {
     assert,
     chainIdPromise,
     isEmbedded,
+    getParserCoreCount,
+    getParserMemoryCount,
     parser,
     serviceFromOrigin,
     setQueryToken,
@@ -48,15 +49,23 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
+// Stats accumulated during a single entry() invocation for the post-call
+// report. Populated by call()/callResource() while non-undefined; ignored
+// when undefined (e.g. getJson path, or between entries).
+interface EntryStats {
+    callCount: number;
+    perPlugin: Map<string, number>;
+}
+
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
 
     private loader: PluginLoader;
 
-    private pool: InstancePool;
-
     private context: CallContext | undefined;
+
+    private entryStats: EntryStats | undefined;
 
     private embedder: string | undefined;
 
@@ -114,18 +123,18 @@ export class Supervisor implements AppInterface {
             return;
         }
 
-        // Phase 0: Compile and instantiate system plugins (needed for sync
-        // calls between phases — getActivePrompt, getActiveQueryToken, etc.)
+        const preT0 = performance.now();
+
+        // Phase 0: Compile system plugins and instantiate them so the
+        // internal sync calls below (getActivePrompt, getActiveQueryToken,
+        // getAuthServices) have live instances to hit. These instances are
+        // NOT pinned — the caller (entry / preloadPlugins / getJson) is
+        // responsible for disposing them after whatever follow-up work
+        // requires them. See the class-level flow comment on Supervisor.
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
         await this.loader.ensureAllInstantiated();
-
-        // Pin all Phase 0 plugins — they are never evicted
-        this.plugins.forEachPlugin(p => {
-            if (p.isInstantiated) this.pool.register(p, true);
-        });
-        console.log(`[pool] system plugins pinned — ${this.pool.summary()}`);
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
@@ -163,15 +172,47 @@ export class Supervisor implements AppInterface {
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Instantiate all remaining plugins (Phase 1 + Phase 2) before entry()
-        // starts its synchronous call chain.
-        await this.plugins.ensureAllInstantiated();
+        // Phase 1 + Phase 2 plugins are COMPILED only. Phase 0 plugins are
+        // still live at this point (instantiated above for the internal
+        // sync calls). The caller will dispose them together with the rest
+        // once its own work finishes.
 
-        // Register newly instantiated plugins with the pool (not pinned)
-        this.plugins.forEachPlugin(p => {
-            if (p.isInstantiated) this.pool.register(p);
-        });
-        console.log(`[pool] preload complete — ${this.pool.summary()}`);
+        this.emitPreloadReport(performance.now() - preT0);
+    }
+
+    private emitPreloadReport(wallMs: number): void {
+        const { fetched, compiled } = this.plugins.collectPreloadStats();
+        if (fetched.length === 0 && compiled.length === 0) {
+            return; // nothing new to report
+        }
+
+        const fmtKB = (b: number) => `${(b / 1024).toFixed(1)}KB`;
+        const fmtMB = (b: number) => `${(b / 1024 / 1024).toFixed(2)}MB`;
+
+        const totalBytes = fetched.reduce((s, f) => s + f.bytes, 0);
+        const fetchSumMs = fetched.reduce((s, f) => s + f.ms, 0);
+        const compileSumMs = compiled.reduce((s, c) => s + c.ms, 0);
+
+        const lines = [
+            `[preload] wall=${wallMs.toFixed(1)}ms ` +
+                `fetched=${fetched.length}(${fmtMB(totalBytes)}, Σ${fetchSumMs.toFixed(1)}ms) ` +
+                `compiled=${compiled.length}(Σ${compileSumMs.toFixed(1)}ms)`,
+        ];
+        if (fetched.length > 0) {
+            lines.push(
+                `    fetched: [${fetched
+                    .map((f) => `${f.label}(${f.ms.toFixed(0)}ms, ${fmtKB(f.bytes)})`)
+                    .join(", ")}]`,
+            );
+        }
+        if (compiled.length > 0) {
+            lines.push(
+                `    compiled: [${compiled
+                    .map((c) => `${c.label}(${c.ms.toFixed(0)}ms)`)
+                    .join(", ")}]`,
+            );
+        }
+        console.log(lines.join("\n"));
     }
 
     private replyToParent(id: string, result: any) {
@@ -236,8 +277,6 @@ export class Supervisor implements AppInterface {
         this.plugins = new Plugins(this);
 
         this.loader = new PluginLoader(this.plugins);
-
-        this.pool = new InstancePool();
     }
 
     getRootDomain(): string {
@@ -280,8 +319,15 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.context, "Uninitialized call context");
 
         const { service, plugin, intf, method, params } = args;
+        if (this.entryStats) {
+            this.entryStats.callCount++;
+            const key = `${service}:${plugin}`;
+            this.entryStats.perPlugin.set(
+                key,
+                (this.entryStats.perPlugin.get(key) ?? 0) + 1,
+            );
+        }
         const p = this.plugins.getAssertPlugin({ service, plugin });
-        this.pool.touch(p);
 
         this.context.stack.push(args.service, toString(args));
         let ret: any;
@@ -337,8 +383,15 @@ export class Supervisor implements AppInterface {
     callResource(args: QualifiedResourceCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
         const { service, plugin, intf, type, handle, method, params } = args;
+        if (this.entryStats) {
+            this.entryStats.callCount++;
+            const key = `${service}:${plugin}`;
+            this.entryStats.perPlugin.set(
+                key,
+                (this.entryStats.perPlugin.get(key) ?? 0) + 1,
+            );
+        }
         const p = this.plugins.getAssertPlugin({ service, plugin });
-        this.pool.touch(p);
 
         this.context.stack.push(service, toString(args));
         let ret: any;
@@ -360,6 +413,12 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, json);
         } catch (e) {
             this.replyToParent(id, e);
+        } finally {
+            // Release the Phase-0 system plugin instances that doPreload
+            // left live for its internal sync calls. With nothing pinned
+            // under the current policy, this sweeps every instantiated
+            // plugin.
+            this.plugins.disposeAllUnpinned();
         }
     }
 
@@ -373,7 +432,30 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
+        } finally {
+            // See getJson() — preload leaves system plugins instantiated
+            // for its internal sync calls; we release them here so the
+            // idle footprint between preloadPlugins() and the next
+            // entry() stays at zero non-parser memories.
+            this.plugins.disposeAllUnpinned();
         }
+    }
+
+    /**
+     * Tear down every instantiated plugin before the supervisor iframe is
+     * evicted or destroyed. Dropping `pluginModule` references here lets
+     * V8 reclaim the backing WebAssembly.Memory allocations (and their
+     * ~10GB of VAS reservation each) promptly on the next GC, regardless
+     * of whether the iframe ends up in bfcache or is fully torn down.
+     *
+     * Retains `compiledPlugin` handles (WebAssembly.Module objects carry
+     * no VAS), so bfcache restore can re-instantiate without re-fetching
+     * or re-compiling.
+     *
+     * Safe to call multiple times; idempotent.
+     */
+    shutdown(): string[] {
+        return this.plugins.disposeAll();
     }
 
     // This is an entrypoint for apps to call into plugins.
@@ -382,21 +464,65 @@ export class Supervisor implements AppInterface {
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
+        const entryLabel = `${args.service}:${args.plugin} ${args.intf ?? ""}.${args.method}`;
+        const t0 = performance.now();
+        let preloadMs = 0;
+        let instMs = 0;
+        let instantiatedThisCall: string[] = [];
+        let disposed: string[] = [];
+        let entryError: unknown = undefined;
+        // Keep stats in a local so a concurrent entry() cannot wipe them
+        // out. `this.entryStats` is only the pointer that call() /
+        // callResource() use to locate "the currently-active entry's
+        // stats". If a second entry() starts and overwrites the pointer,
+        // late call() hits from the first entry will be misattributed to
+        // the newer entry — but neither entry will crash in finally().
+        const stats: EntryStats = { callCount: 0, perPlugin: new Map() };
+        this.entryStats = stats;
+
+        // Snapshot before preload so everything instantiated during this
+        // entry (including Phase 0 system plugins brought live by preload
+        // for its internal sync calls) is attributed to this entry in the
+        // report. Matches the `disposed` set we capture in finally.
+        const preInst = new Set(this.plugins.listInstantiated());
+
         try {
             this.setParentOrigination(callerOrigin);
 
-            // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
-            // This includes: downloading, parsing, building import proxies, transpiling the
-            //   component via jco, compiling core WASM modules, and instantiating them.
-            // System plugins are instantiated first (Phase 0); app and auth plugins are compiled
-            //   in parallel, then instantiated before the synchronous call chain begins.
+            // Load the full plugin tree (downloading + parsing + transpiling
+            //   via jco + compiling core WASM modules). Phase 0 system
+            //   plugins are instantiated as a side-effect so the internal
+            //   sync calls inside preload have live instances; they are
+            //   NOT pinned, so the finally clause below will dispose them
+            //   alongside everything we instantiate ourselves.
             // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            await this.preload([
-                {
-                    service: args.service,
-                    plugin: args.plugin,
-                },
-            ]);
+            const preT0 = performance.now();
+            try {
+                await this.preload([
+                    {
+                        service: args.service,
+                        plugin: args.plugin,
+                    },
+                ]);
+            } finally {
+                preloadMs = performance.now() - preT0;
+            }
+
+            // Instantiate every remaining plugin (Phase 1 + Phase 2) so the
+            // synchronous call chain below has live instances to call into.
+            // Phase 0 plugins are already instantiated (no-op for them).
+            // On a partial failure (e.g. OOM while instantiating one of
+            // several peers), the finally clause still captures whatever
+            // completed before the throw so the report is accurate.
+            const instT0 = performance.now();
+            try {
+                await this.plugins.ensureAllInstantiated();
+            } finally {
+                instMs = performance.now() - instT0;
+                instantiatedThisCall = this.plugins
+                    .listInstantiated()
+                    .filter((name) => !preInst.has(name));
+            }
 
             this.context = this.getCallContext();
 
@@ -422,6 +548,7 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } catch (e) {
+            entryError = e;
             const err = getRecoverableError(e);
             if (err) {
                 let newError;
@@ -440,10 +567,65 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } finally {
-            const evicted = this.pool.evictIdle();
-            if (evicted > 0) {
-                console.log(`[pool] post-entry eviction — ${this.pool.summary()}`);
+            // Dispose every non-pinned instance so V8 can reclaim the
+            // backing WebAssembly.Memory (and its ~10GB of virtual address
+            // space) on the next GC. Pinned system plugins stay live.
+            // On a Phase 0 preload failure, system plugins that
+            // instantiated before the error remain instantiated-but-
+            // unpinned — so they also get caught by this sweep, which is
+            // what we want (no half-pinned state persists between calls).
+            disposed = this.plugins.disposeAllUnpinned();
+
+            // Only clear the shared pointer if it still refers to OUR
+            // stats object; otherwise a concurrent entry() owns it now.
+            if (this.entryStats === stats) {
+                this.entryStats = undefined;
             }
+            const totalMs = performance.now() - t0;
+
+            // Characterize cores/memories created during this entry.
+            // Under the current no-pinning policy the instantiated set
+            // should equal the disposed set (minus any teardown asymmetry
+            // from partial failures mid-instantiation).
+            const instCounts = this.plugins.countByLabels(instantiatedThisCall);
+            const disposedCounts = this.plugins.countByLabels(disposed);
+
+            // After dispose, the only persistent WASM allocation is the
+            // component-parser utility module loaded once at supervisor
+            // startup. Any instantiated plugins still alive here would
+            // indicate a leak (e.g. plugin.pinned set by future work).
+            const retained = this.plugins.countInstantiated();
+            const retainedPlugins = retained.plugins + 1;
+            const retainedCores = retained.cores + getParserCoreCount();
+            const retainedMemories = retained.memories + getParserMemoryCount();
+
+            const header =
+                `[entry] ${entryLabel}` +
+                (entryError !== undefined ? " FAILED" : "") +
+                ` — total=${totalMs.toFixed(1)}ms ` +
+                `preload=${preloadMs.toFixed(1)}ms ` +
+                `inst=${instMs.toFixed(1)}ms ` +
+                `calls=${stats.callCount} across ${stats.perPlugin.size} plugin(s)`;
+
+            const lines: string[] = [header];
+            if (entryError !== undefined) {
+                const msg =
+                    entryError instanceof Error
+                        ? entryError.message
+                        : String(entryError);
+                lines.push(`    error: ${msg}`);
+            }
+            lines.push(
+                instantiatedThisCall.length > 0
+                    ? `    instantiated (${instantiatedThisCall.length}p / ${instCounts.cores}c / ${instCounts.memories}m): [${instantiatedThisCall.join(", ")}]`
+                    : `    instantiated: (none)`,
+                disposed.length > 0
+                    ? `    disposed (${disposed.length}p / ${disposedCounts.cores}c / ${disposedCounts.memories}m): [${disposed.join(", ")}]`
+                    : `    disposed: (none)`,
+                `    retained: ${retainedPlugins}p / ${retainedCores}c / ${retainedMemories}m (parser)`,
+            );
+
+            console.log(lines.join("\n"));
         }
     }
 }
