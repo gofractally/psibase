@@ -7,10 +7,13 @@ import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 import { useGuild } from "@/hooks/use-guild";
 
 import { EmptyBlock } from "@shared/components/empty-block";
+import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -23,22 +26,24 @@ export const ActiveAndUpcoming = () => {
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
     return (
-        <PageContainer>
-            <div className="flex h-9 items-center justify-between">
-                <h1 className="text-lg font-semibold">Active & upcoming</h1>
-            </div>
-            <div className="mt-3">
-                {isUpcomingEvaluation && <CurrentEvaluationCard />}
+        <PageContainer className="space-y-6">
+            {isUpcomingEvaluation && <CurrentEvaluationCard />}
 
-                {isUpcomingEvaluation ? (
-                    <EvaluationsTable />
-                ) : (
-                    <EmptyBlock
-                        title="No scheduled evaluations"
-                        isLoading={isGuildPending}
-                    />
-                )}
-            </div>
+            {isUpcomingEvaluation ? (
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>Active &amp; upcoming evaluations</CardTitle>
+                    </CardHeader>
+                    <CardContent className="@container">
+                        <EvaluationsTable />
+                    </CardContent>
+                </GlowingCard>
+            ) : (
+                <EmptyBlock
+                    title="No scheduled evaluations"
+                    isLoading={isGuildPending}
+                />
+            )}
         </PageContainer>
     );
 };
@@ -69,6 +74,9 @@ const EvaluationsTable = () => {
                     </TableRow>
                 ))}
             </TableBody>
+            <TableCaption>
+                A list of all active and upcoming evaluations for this guild.
+            </TableCaption>
         </Table>
     );
 };
