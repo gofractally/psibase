@@ -31,14 +31,6 @@ mod service {
         finish_by: u32,
     }
 
-    #[derive(SimpleObject)]
-    struct GroupFinish {
-        evaluation_id: u32,
-        group_number: u32,
-        users: Vec<AccountNumber>,
-        result: Vec<AccountNumber>,
-    }
-
     #[derive(Deserialize, SimpleObject)]
     struct NewGroup {
         owner: AccountNumber,
@@ -47,31 +39,6 @@ mod service {
         #[serde(deserialize_with = "deserialize_number_from_string")]
         group_number: u32,
         users: Vec<AccountNumber>,
-    }
-
-    impl<'de> Deserialize<'de> for GroupFinish {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            #[derive(Deserialize)]
-            struct GroupFinishRaw {
-                #[serde(deserialize_with = "deserialize_number_from_string")]
-                evaluation_id: u32,
-                #[serde(deserialize_with = "deserialize_number_from_string")]
-                group_number: u32,
-                users: Vec<AccountNumber>,
-                result: Vec<u8>,
-            }
-
-            let raw = GroupFinishRaw::deserialize(deserializer)?;
-            Ok(GroupFinish {
-                evaluation_id: raw.evaluation_id,
-                group_number: raw.group_number,
-                users: raw.users.clone(),
-                result: fractals::helpers::parse_rank_to_accounts(raw.result, raw.users),
-            })
-        }
     }
 
     struct Query;
@@ -125,26 +92,6 @@ mod service {
         ) -> async_graphql::Result<Connection<u64, ScheduledEvaluation>> {
             EventQuery::new("history.fractals.scheduled_evaluation")
                 .condition(format!("guild = '{}'", guild))
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
-        }
-
-        async fn group_finishes(
-            &self,
-            evaluation_id: u32,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
-            EventQuery::new("history.evaluations.group_fin")
-                .condition(format!(
-                    "owner = 'fractals' AND evaluation_id = {}",
-                    evaluation_id
-                ))
                 .first(first)
                 .last(last)
                 .before(before)
