@@ -8,15 +8,13 @@ use psibase::services::tokens::{Precision, Quantity};
 
 use crate::constants::roles::{EXECUTIVE, JUDICIARY, LEGISLATURE};
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
-use crate::helpers::fib::EXTERNAL_S;
-use crate::helpers::{
-    assign_decreasing_levels, continuous_fibonacci, create_managed_account, distribute_by_weight,
-};
+use crate::helpers::{create_managed_account, distribute_by_weight};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
 };
 use crate::tables::DistributionStrategy;
+use psibase::weighted_normalization;
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
@@ -48,14 +46,6 @@ impl Fractal {
             judiciary,
             legislature,
             dist_strat: DistributionStrategy::Constant as u8,
-        }
-    }
-
-    fn distribution_strategy(&self) -> DistributionStrategy {
-        match self.dist_strat {
-            0 => DistributionStrategy::Constant,
-            1 => DistributionStrategy::Fibonacci,
-            _ => panic!("invalid distribution strategy"),
         }
     }
 
@@ -157,32 +147,13 @@ impl Fractal {
         &self,
         total_distribution: Quantity,
     ) -> (Vec<(Occupation, u64)>, u64) {
-        let occupations = Occupation::get_ordered(self.account);
-
-        match self.distribution_strategy() {
-            DistributionStrategy::Constant => {
-                distribute_by_weight(occupations, |_, __| 1, total_distribution.value)
-            }
-            DistributionStrategy::Fibonacci => {
-                // The first few indices of the fibonacci function have higher error than indices later in the curve,
-                // so we offset the input to incur reduced error.
-                const FIB_SCALE: u32 = EXTERNAL_S as u32;
-                const MAX_FIB: u32 = 32;
-
-                let leveled_occupations = assign_decreasing_levels(occupations, None);
-                let (occ, dust) = distribute_by_weight(
-                    leveled_occupations,
-                    |_, (level, _)| continuous_fibonacci((*level as u32) * FIB_SCALE),
-                    total_distribution.value,
-                );
-                (
-                    occ.into_iter()
-                        .map(|((_, occupation), weight)| (occupation, weight))
-                        .collect(),
-                    dust,
-                )
-            }
-        }
+        distribute_by_weight(
+            weighted_normalization(
+                self.dist_strat.into(),
+                Occupation::get_ordered(self.account),
+            ),
+            total_distribution.value,
+        )
     }
 
     pub fn distribute_tokens(&self) {
@@ -201,21 +172,19 @@ impl Fractal {
         total_dust += dust;
 
         for (occupation_distribution, distribution_dust) in occupation_distributions {
-            let scores: Vec<(AccountNumber, u32)> =
+            let scores: Vec<(AccountNumber, u64)> =
                 occu_wrapper::call_to(occupation_distribution.occupation)
                     .get_scores(self.account)
                     .into_iter()
                     .filter(|(mem, _)| members.iter().any(|member| member.account == *mem))
+                    .map(|(item, score)| (item, score as u64))
                     .collect();
 
-            let (member_distributions, member_dust) = distribute_by_weight(
-                scores,
-                |_, (__, member_score)| *member_score as u64,
-                distribution_dust,
-            );
+            let (member_distributions, member_dust) =
+                distribute_by_weight(scores, distribution_dust);
             total_dust += member_dust;
 
-            for ((member, _), amount) in member_distributions {
+            for (member, amount) in member_distributions {
                 if amount > 0 {
                     let new_balance =
                         *payable_members.entry(member).or_insert(0.into()) + amount.into();

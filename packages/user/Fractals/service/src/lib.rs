@@ -156,14 +156,14 @@ pub mod service {
         Fractal::get_assert(fractal).distribute_tokens();
     }
 
-    /// Sets the occupation for a fractal role.
+    /// Sets occupation on a fractal role.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     /// * `role_id` - Role ID for fractal
     /// * `new_occupation` - New occupation to set for role
     #[action]
-    fn set_rol_oc(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
+    fn set_occ_r(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
         Role::get_assert(fractal, role_id).set_occupation(new_occupation);
     }
@@ -175,7 +175,7 @@ pub mod service {
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     #[action]
-    fn cl_mem_rwds(fractal: AccountNumber) {
+    fn claim_rew(fractal: AccountNumber) {
         FractalMember::get_assert(fractal, get_sender()).claim_member_rewards();
     }
 
@@ -187,12 +187,12 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     /// * `ordered_occupations` - Ordered occupations to set for the fractal
     #[action]
-    fn set_paid_occupations(fractal: AccountNumber, ordered_occupations: Vec<AccountNumber>) {
+    fn set_paid_occ(fractal: AccountNumber, paid_occupations: Vec<AccountNumber>) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
-        Occupation::set_ordered_occupations(fractal, ordered_occupations);
+        Occupation::set_ordered_occupations(fractal, paid_occupations);
     }
 
-    /// Get fratal by role
+    /// Get fractal by role
     ///
     /// This action is temp until the arrival of sub-accounts.
     ///
