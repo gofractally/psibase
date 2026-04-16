@@ -1,0 +1,30 @@
+import { QueryableMailbox } from "@/apps/chainmail/types";
+
+type QueryKeyGenerator<Prefix extends string = string> = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...args: any[]
+) => readonly [prefix: Prefix, ...specifiers: unknown[]];
+
+const QueryKey = {
+    token: (tokenId: number | undefined) => ['token', tokenId] as const,
+    userSettings: (user?: string | null) => ["userSettings", user] as const,
+    userTokenBalances: (user?: string | null) =>
+        ["userTokenBalances", user] as const,
+    userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
+        ["userTokenBalanceChanges", user, tokenId] as const,
+    userLinesOfCredit: (user?: string | null) =>
+        ["userLinesOfCredit", user] as const,
+    profile: (account: string | undefined | null) =>
+        ["profile", account] as const,
+    connectedAccounts: () => ["connectedAccounts"] as const,
+    currentUser: () => ["currentUser"] as const,
+    producers: () => ["producers"] as const,
+    userResources: () => ["userResources"] as const,
+    mailbox: (mailbox: QueryableMailbox, user: string) =>
+        [mailbox, user] as const,
+} as const satisfies Record<string, QueryKeyGenerator>;
+
+export type QueryKeysType = typeof QueryKey;
+export type GeneratedQueryKey = ReturnType<QueryKeysType[keyof QueryKeysType]>;
+
+export default QueryKey;

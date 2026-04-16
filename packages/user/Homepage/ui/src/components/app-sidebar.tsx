@@ -15,7 +15,7 @@ import {
     SidebarMenuItem,
 } from "@shared/shadcn/ui/sidebar";
 
-import { Developers } from "./Developers";
+import { Developers } from "./developers";
 import { NavAdmin } from "./nav-admin";
 import { NavMain } from "./nav-main";
 import { NavSubNav } from "./nav-sub-nav";

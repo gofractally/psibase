@@ -2,8 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import { App } from "./App";
-import { ThemeProvider } from "./components/theme-provider";
+import { ThemeProvider } from "@shared/components/theme-provider";
+import "@shared/styles/globals.css";
+
+import { App } from "./app";
 
 const queryClient = new QueryClient();
 

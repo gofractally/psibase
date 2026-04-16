@@ -10,15 +10,17 @@
 
 use crate::{
     actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
-    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
-    Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, KvHandle, KvMode, PackageRegistry,
-    PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow, Table, TableRecord,
-    Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder, TransactionTrace,
+    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, ActionFormatter,
+    BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error,
+    HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, JointRegistry,
+    KvHandle, KvMode, PackageRegistry, PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap,
+    Seconds, SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec,
+    ToKey, Transaction, TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
 use crate::{MicroSeconds, PackageList, PackageOp};
 use anyhow::anyhow;
+use async_trait::async_trait;
 use chrono::Utc;
 use fracpack::{Pack, Unpack, UnpackOwned};
 use futures::executor::block_on;
@@ -27,7 +29,8 @@ use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
-use std::io::{Read, Seek};
+use std::fs::File;
+use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -125,6 +128,17 @@ impl Chain {
     pub fn boot(&self) -> Result<(), Error> {
         let default_services: Vec<String> = vec!["TestDefault".to_string()];
         self.boot_with(&Self::default_registry(), &default_services[..])
+    }
+
+    pub fn test_registry() -> JointRegistry<BufReader<File>> {
+        let mut registry = JointRegistry::new();
+        if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
+            for path in local_packages.split(':') {
+                registry.push(DirectoryRegistry::new(path.into())).unwrap();
+            }
+        }
+        registry.push(Self::default_registry()).unwrap();
+        registry
     }
 
     pub fn default_registry() -> DirectoryRegistry {
@@ -624,6 +638,7 @@ impl Chain {
                 let trace = self.push(&SignedTransaction {
                     transaction: trx.packed().into(),
                     proofs: Default::default(),
+                    subjectiveData: None,
                 });
                 ChainEmptyResult { trace }.get()?
             }
@@ -821,6 +836,7 @@ impl Chain {
         let strx = SignedTransaction {
             transaction: trx.packed().into(),
             proofs: vec![],
+            subjectiveData: None,
         };
 
         let reply = self.post(
@@ -839,6 +855,10 @@ impl Chain {
 
         let login_reply: LoginReply = reply.json()?;
         Ok(login_reply.access_token)
+    }
+
+    pub fn display_trace<'a>(&'a self, trace: &'a TransactionTrace) -> ChainDisplayTrace<'a> {
+        ChainDisplayTrace { chain: self, trace }
     }
 }
 
@@ -860,6 +880,41 @@ impl Chain {
                 trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
             }
         }
+    }
+}
+
+#[cfg(target_family = "wasm")]
+pub struct ChainDisplayTrace<'a> {
+    chain: &'a Chain,
+    trace: &'a TransactionTrace,
+}
+
+#[cfg(target_family = "wasm")]
+impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
+        let _ = block_on(formatter.prepare_transaction_trace(self.trace));
+        write!(f, "{}", formatter.display_transaction_trace(self.trace))
+    }
+}
+
+#[cfg(target_family = "wasm")]
+struct ChainSchemaFetcher<'a> {
+    chain: &'a Chain,
+}
+
+#[cfg(target_family = "wasm")]
+#[async_trait(?Send)]
+impl<'a> SchemaFetcher for ChainSchemaFetcher<'a> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        let index = self
+            .chain
+            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
+            .get_index_pk();
+        index
+            .get(&service)
+            .map(|row| row.schema)
+            .ok_or_else(|| anyhow!("Could not find schema for {service}"))
     }
 }
 
@@ -979,6 +1034,7 @@ impl<'a> Caller for ChainPusher<'a> {
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
+            subjectiveData: None,
         });
 
         if self.chain.is_auto_block_start {
@@ -1007,6 +1063,7 @@ impl<'a> Caller for ChainPusher<'a> {
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
+            subjectiveData: None,
         });
         let ret = ChainResult::<Ret> {
             trace,

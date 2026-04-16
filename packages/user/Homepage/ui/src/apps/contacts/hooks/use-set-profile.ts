@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
+import QueryKey from "@/lib/query-keys";
 
 import { ProfileResponse } from "@shared/hooks/use-profile";
+import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const zParams = z.object({

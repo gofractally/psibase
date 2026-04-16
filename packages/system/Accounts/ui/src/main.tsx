@@ -3,14 +3,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 
-import { getSupervisor } from "@psibase/common-lib";
-
 import { ThemeProvider } from "@shared/components/theme-provider";
 import { Toaster } from "@shared/shadcn/ui/sonner";
+import "@shared/styles/globals.css";
 
 import Router from "./router";
-
-export const supervisor = getSupervisor();
 
 const queryClient = new QueryClient();
 

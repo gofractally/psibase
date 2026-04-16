@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { supervisor } from "@/supervisor";
 
 import { toast } from "@shared/shadcn/ui/sonner";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 export const useFillGasTank = () => {
     return useMutation<void, Error, void>({

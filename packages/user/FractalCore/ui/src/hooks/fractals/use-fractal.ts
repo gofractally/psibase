@@ -1,14 +1,14 @@
-import { queryClient } from "@shared/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 import {
     FractalRes,
     getFractal,
     zFractalRes,
-} from "@/lib/graphql/fractals/getFractal";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
-
+} from "@shared/domains/fractal/lib/graphql/get-fractal";
 import { getSubDomain } from "@shared/lib/get-sub-domain";
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { useFractalAccount } from "./use-fractal-account";

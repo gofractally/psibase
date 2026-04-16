@@ -1,15 +1,14 @@
 import dayjs from "dayjs";
 import { Users } from "lucide-react";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
-import { COUNCIL_SEATS } from "@/lib/constants";
-import { getMemberLabel } from "@/lib/getMemberLabel";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
+import { getMemberLabel } from "@shared/domains/fractal/lib/get-member-label";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {

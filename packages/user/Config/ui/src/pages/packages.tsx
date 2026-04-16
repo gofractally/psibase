@@ -1,15 +1,16 @@
 import { Package, X } from "lucide-react";
 import { useState } from "react";
 
-import { useAppForm } from "@shared/components/form/app-form";
 import { PackageItem } from "@/components/package-item";
 
 import { useInstallPackages } from "@/hooks/use-install-packages";
 import { usePackages } from "@/hooks/use-packages";
 import { useSetAccountSources } from "@/hooks/use-set-sources";
 import { useSources } from "@/hooks/use-sources";
-import { zAccount } from "@/lib/zod/Account";
 
+import { useAppForm } from "@shared/components/form/app-form";
+import { PageContainer } from "@shared/components/page-container";
+import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Dialog,
@@ -62,7 +63,7 @@ export const Packages = () => {
     });
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div className="flex flex-col gap-3">
                 <div className="flex justify-between">
                     <div>
@@ -210,6 +211,6 @@ export const Packages = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </PageContainer>
     );
 };

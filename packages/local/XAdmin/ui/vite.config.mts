@@ -10,46 +10,32 @@ import {
     verifyViteCache,
 } from "../../../vite.shared";
 
-const serviceDir = path.resolve(__dirname);
-
-verifyViteCache(serviceDir);
+const appDirectory = path.resolve(__dirname);
+verifyViteCache(appDirectory);
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig((config) => ({
     plugins: [
         createSharedViteConfig({
-            projectDir: serviceDir,
             manualChunks: {
                 vendor: ["react", "react-dom", "react-router-dom"],
             },
         }),
-        createPsibaseConfig({
-            service: "x-admin",
-            serviceDir: serviceDir,
-            isServing: command === "serve",
-            useHttps: process.env.VITE_SECURE_LOCAL_DEV === "true",
+        createPsibaseConfig(config, {
+            appDirectory,
             additionalAliases: [
                 {
                     find: "wasm-transpiled",
                     replacement: path.resolve(
-                        serviceDir,
+                        appDirectory,
                         "./wasm-transpiled/x_admin",
                     ),
                 },
             ],
-            additionalProxies: {
-                "^/ws/.*": {
-                    target: "ws://localhost:8080/",
-                    ws: true,
-                    rewrite: (path) => path.replace(/^\/ws/, ""),
-                    timeout: 10000,
-                },
-            },
-            additionalProxyBypassConditions: [(req) => req.method !== "PUT"],
         }),
+        ...getSharedUIPlugins(),
         wasm(),
         topLevelAwait(),
-        ...getSharedUIPlugins(),
     ],
     build: {
         minify: true,

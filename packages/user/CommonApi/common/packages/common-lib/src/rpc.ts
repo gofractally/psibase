@@ -2,7 +2,7 @@ import {
     privateStringToKeyPair,
     publicKeyPairToDER,
     signatureToBin,
-} from "./keyConversions";
+} from "./key-conversions";
 import hashJs from "hash.js";
 
 export class RPCError extends Error {
@@ -43,7 +43,7 @@ export type MessageMetadata = {
 
 /**
  * Constructs a URL for a sibling service .
- * 
+ *
  * @param baseUrl - The base URL to use. If null or undefined, uses the current window location.
  * @param subDomain - The subdomain (service name) to target. If null or undefined, no subdomain is added.
  * @param path - The path to append to the URL. If null or undefined, no path is added.

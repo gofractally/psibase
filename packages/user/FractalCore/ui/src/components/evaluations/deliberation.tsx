@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { DeliberationPhase } from "@/lib/getStatus";
+import { DeliberationPhase } from "@/lib/get-status";
 import { paths } from "@/lib/paths";
 
 import { Button } from "@shared/shadcn/ui/button";

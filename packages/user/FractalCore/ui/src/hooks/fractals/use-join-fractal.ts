@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { assertUser } from "@shared/hooks/use-current-user";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 

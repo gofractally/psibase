@@ -16,12 +16,12 @@ import { ApplicationDetail } from "./pages/guilds/application-detail/index";
 import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
-import { GuildMembershipLayout } from "./pages/guilds/membership/_layout";
+import { GuildMembershipLayout } from "./pages/guilds/membership/layout";
 import { GuildApplicants } from "./pages/guilds/membership/applicants";
 import { GuildMembers } from "./pages/guilds/membership/members";
 import { GuildOverview } from "./pages/guilds/overview";
-import { Invite } from "./pages/invite-detail/Invite";
-import { InviteResponse } from "./pages/invite-detail/InviteResponse";
+import { Invite } from "./pages/invite-detail/invite";
+import { InviteResponse } from "./pages/invite-detail/invite-response";
 
 export const router = createBrowserRouter([
     {

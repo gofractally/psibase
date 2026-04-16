@@ -3,9 +3,9 @@ import { z } from "zod";
 
 import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
-import { getSources } from "@/lib/getSources";
-import QueryKey from "@/lib/queryKeys";
-import { PackageSchema } from "@/lib/zod/CommonPackage";
+import { getSources } from "@/lib/get-sources";
+import QueryKey from "@/lib/query-keys";
+import { PackageSchema } from "@/lib/zod/common-package";
 
 export const zPackageSchemaWithSha = PackageSchema.extend({
     file: z.string(),

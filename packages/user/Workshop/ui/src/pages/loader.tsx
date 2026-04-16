@@ -1,0 +1,82 @@
+import { Terminal } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { useTrackedApps } from "@/hooks/use-tracked-apps";
+
+import { useBranding } from "@shared/hooks/use-branding";
+import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { Button } from "@shared/shadcn/ui/button";
+import {
+    Card,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
+
+import { CreateAppModal } from "../components/create-app-modal";
+
+export const Loader = () => {
+    const { data: currentUser } = useCurrentUser();
+    const { mutate: login, isPending } = useConnectAccount();
+    const navigate = useNavigate();
+
+    const { apps } = useTrackedApps();
+
+    useEffect(() => {
+        if (apps.length > 0 && currentUser) {
+            navigate(`/app/${apps[0]!.account}`);
+        }
+    }, [apps, navigate, currentUser]);
+
+    const { data: networkName } = useBranding();
+
+    const isLoggedIn = typeof currentUser === "string";
+
+    const [showModal, setShowModal] = useState<boolean>(false);
+
+    return (
+        <Card className="mx-auto mt-4 w-[350px]">
+            <CreateAppModal
+                show={showModal}
+                openChange={(e) => {
+                    setShowModal(e);
+                }}
+            />
+            <CardHeader>
+                <div className="mx-auto">
+                    <Terminal className="h-12 w-12" />
+                </div>
+                <CardTitle>Workshop</CardTitle>
+                <CardDescription>
+                    {`The workshop app allows developers to deploy apps on the ${
+                        networkName ? `${networkName} ` : ""
+                    }network.`}
+                </CardDescription>
+
+                <CardDescription>
+                    {isLoggedIn
+                        ? "Add an app to continue"
+                        : "Login to continue"}
+                </CardDescription>
+                <CardFooter className="flex justify-end">
+                    {isLoggedIn ? (
+                        <Button
+                            onClick={() => {
+                                setShowModal(true);
+                            }}
+                        >
+                            Add app
+                        </Button>
+                    ) : (
+                        <Button disabled={isPending} onClick={() => login()}>
+                            Login
+                        </Button>
+                    )}
+                </CardFooter>
+            </CardHeader>
+        </Card>
+    );
+};

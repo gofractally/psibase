@@ -1,12 +1,8 @@
-import { useAppForm } from "@/form/app-form";
 import NumberFlow from "@number-flow/react";
 import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { ErrorCard } from "@/components/error-card";
-
-import { useCurrentUser } from "@/hooks";
 import { useClaim } from "@/hooks/use-claim";
 import { useDeleteStream } from "@/hooks/use-delete-stream";
 import { useDeposit } from "@/hooks/use-deposit";
@@ -14,6 +10,9 @@ import { useNft } from "@/hooks/use-nft";
 import { useStream } from "@/hooks/use-stream";
 import { useToken } from "@/hooks/use-token";
 
+import { ErrorCard } from "@shared/components/error-card";
+import { useAppForm } from "@shared/components/form/app-form";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -29,6 +28,7 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -47,7 +47,6 @@ export const Stream = () => {
 
     const { mutateAsync: deposit } = useDeposit();
     const { mutateAsync: claim, isPending: isClaiming } = useClaim();
-
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -85,8 +84,8 @@ export const Stream = () => {
         ? isEmpty
             ? 100
             : (Number(stream.stream.claimable) /
-                Number(stream.stream.unclaimed)) *
-            100
+                  Number(stream.stream.unclaimed)) *
+              100
         : 50;
 
     if (error) {
@@ -123,6 +122,12 @@ export const Stream = () => {
                                     Deposit
                                 </Button>
                                 <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Deposit</DialogTitle>
+                                        <DialogDescription>
+                                            Deposit tokens into the stream.
+                                        </DialogDescription>
+                                    </DialogHeader>
                                     <form
                                         onSubmit={(e) => {
                                             e.preventDefault();
@@ -147,13 +152,7 @@ export const Stream = () => {
 
                                         <div className="flex justify-between">
                                             <form.AppForm>
-                                                <form.SubmitButton
-                                                    labels={[
-                                                        "Save",
-                                                        "Saving",
-                                                        "Saved",
-                                                    ]}
-                                                />
+                                                <form.SubmitButton />
                                             </form.AppForm>
                                         </div>
                                     </form>
@@ -187,7 +186,7 @@ export const Stream = () => {
                             <Dialog
                                 open={showDeleteModal}
                                 onOpenChange={(show) => {
-                                    setShowCreateModal(show);
+                                    setShowDeleteModal(show);
                                 }}
                             >
                                 <Button
@@ -247,6 +246,13 @@ export const Stream = () => {
             </div>
             <div className="rounded-sm border p-3">
                 <Table className="text-sm">
+                    {!isLoadingStream && (
+                        <TableCaption>
+                            {stream?.updates.length == 0
+                                ? "No stream updates yet"
+                                : "Stream updates"}
+                        </TableCaption>
+                    )}
                     <TableHeader>
                         <TableRow>
                             <TableHead>Type</TableHead>
@@ -257,39 +263,39 @@ export const Stream = () => {
                     <TableBody className="text-muted-foreground">
                         {isLoadingStream
                             ? [...new Array(4)].map((_, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>
-                                        <Skeleton className="h-6 w-48" />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Skeleton className="h-6 w-48" />
-                                    </TableCell>
-                                    <TableCell className="flex justify-end text-right">
-                                        <Skeleton className="h-6 w-48" />
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                  <TableRow key={index}>
+                                      <TableCell>
+                                          <Skeleton className="h-6 w-48" />
+                                      </TableCell>
+                                      <TableCell>
+                                          <Skeleton className="h-6 w-48" />
+                                      </TableCell>
+                                      <TableCell className="flex justify-end text-right">
+                                          <Skeleton className="h-6 w-48" />
+                                      </TableCell>
+                                  </TableRow>
+                              ))
                             : stream?.updates?.map((update, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>
-                                        {update.txType == "claimed" ? (
-                                            <div className="flex items-center gap-2">
-                                                <ArrowDown />
-                                                Claimed
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <ArrowUp />
-                                                Deposited
-                                            </div>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>{update.actor}</TableCell>
-                                    <TableCell className="text-right">
-                                        {update.amount}
-                                    </TableCell>{" "}
-                                </TableRow>
-                            ))}
+                                  <TableRow key={index}>
+                                      <TableCell>
+                                          {update.txType == "claimed" ? (
+                                              <div className="flex items-center gap-2">
+                                                  <ArrowDown />
+                                                  Claimed
+                                              </div>
+                                          ) : (
+                                              <div className="flex items-center gap-2">
+                                                  <ArrowUp />
+                                                  Deposited
+                                              </div>
+                                          )}
+                                      </TableCell>
+                                      <TableCell>{update.actor}</TableCell>
+                                      <TableCell className="text-right">
+                                          {update.amount}
+                                      </TableCell>{" "}
+                                  </TableRow>
+                              ))}
                     </TableBody>
                 </Table>
             </div>

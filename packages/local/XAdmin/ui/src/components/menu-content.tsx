@@ -2,10 +2,9 @@ import { Moon, Power, RotateCcw, Sun } from "lucide-react";
 import { Cog } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { useTheme } from "@/components/theme-provider";
+import { chain } from "@/lib/chain-endpoints";
 
-import { chain } from "@/lib/chainEndpoints";
-
+import { useTheme } from "@shared/components/theme-provider";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     DropdownMenu,

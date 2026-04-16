@@ -7,9 +7,9 @@ import {
 } from "@/hooks/fractals/use-create-fractal";
 import { useMemberships } from "@/hooks/fractals/use-memberships";
 import { isAccountAvailable } from "@/hooks/use-account-status";
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Dialog,
     DialogContent,
@@ -104,12 +104,11 @@ export const CreateFractalModal = ({
 
 
 
-
                         <form.AppForm>
                             <form.SubmitButton
                                 labels={[
                                     "Create fractal",
-                                    "Created fractal",
+                                    "Creating fractal...",
                                 ]}
                             />
                         </form.AppForm>

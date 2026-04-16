@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import {
     CompletedEvaluation,
     getCompletedEvaluations,
-} from "@/lib/graphql/fractals/getCompletedEvaluations";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+} from "@/lib/graphql/fractals/get-completed-evaluations";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 export const useCompletedEvaluation = (guildAccount: OptionalAccount) => {
     return useQuery<CompletedEvaluation[]>({

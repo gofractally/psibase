@@ -3,6 +3,7 @@ import { z } from "zod";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { zAccount } from "@shared/lib/schemas/account";
+
 interface GraphQLError {
     message: string;
     locations?: { line: number; column: number }[];
@@ -19,7 +20,9 @@ function extractGraphQLErrorMessage(body: unknown): string | null {
         if (typeof first === "object" && first !== null) {
             const err = first as GraphQLError;
             if (typeof err.message === "string") return err.message;
-            const extMsg = err.extensions as Record<string, unknown> | undefined;
+            const extMsg = err.extensions as
+                | Record<string, unknown>
+                | undefined;
             if (extMsg && typeof extMsg.message === "string")
                 return extMsg.message;
         }
@@ -77,7 +80,7 @@ export const graphql = async <T>(
                 body !== null &&
                 "message" in body &&
                 typeof (body as { message: unknown }).message === "string"
-                ? ((body as { message: string }).message)
+                ? (body as { message: string }).message
                 : `Request failed with status ${res.status}`,
         );
     }

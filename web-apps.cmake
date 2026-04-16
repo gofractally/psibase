@@ -2,7 +2,6 @@ include(ExternalProject)
 
 # Static (not built) resource dependencies
 file(GLOB common-misc-resources LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/*)
-file(GLOB common-fonts LIST_DIRECTORIES false ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi/common/resources/fonts/*)
 
 add_custom_target(YarnInstall
     COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/packages && yarn --version && yarn
@@ -36,7 +35,6 @@ set(UI_PROJECTS
     user/Explorer/ui:Explorer_js
     user/Homepage/ui:Homepage_js
     user/Identity/ui:Identity_js
-    user/Packages/ui:Packages_js
     user/Permissions/ui:Permissions_js
     user/Supervisor/ui:Supervisor_js
     user/Workshop/ui:Workshop_js
@@ -45,7 +43,6 @@ set(UI_PROJECTS
     local/XProxy/ui:XProxy_js
 )
 
-message(STATUS "common-fonts: ${common-fonts}")
 message(STATUS "common-misc-resources: ${common-misc-resources}")
 # Create ExternalProject for each UI
 foreach(UI ${UI_PROJECTS})

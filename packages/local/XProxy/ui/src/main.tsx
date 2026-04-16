@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ReactDOM from "react-dom/client";
 
-import App from "./App";
+import "@shared/styles/globals.css";
+
+import App from "./app";
 
 const queryClient = new QueryClient();
 
