@@ -39,7 +39,7 @@ pub fn new_account_owned_action(
     account: AccountNumber,
     owner: AccountNumber,
 ) -> Action {
-    auth_delegate::Wrapper::pack_from(sender).newAccount(account, owner)
+    auth_delegate::Wrapper::pack_from(sender).newAccount(account, owner, true)
 }
 
 pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
@@ -48,6 +48,10 @@ pub fn set_key_action(account: AccountNumber, key: &AnyPublicKey) -> Action {
     } else {
         panic!("unknown account service");
     }
+}
+
+pub fn set_owner_action(account: AccountNumber, owner: AccountNumber) -> Action {
+    auth_delegate::Wrapper::pack_from(account).setOwner(owner)
 }
 
 pub fn set_auth_service_action(account: AccountNumber, auth_service: AccountNumber) -> Action {

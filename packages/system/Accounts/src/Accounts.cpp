@@ -54,7 +54,7 @@ namespace SystemService
       preapprovedAccounts.push_back(name);
    }
 
-   void Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
+   bool Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireMatch)
    {
       Tables tables{getReceiver()};
       auto   statusTable  = tables.open<AccountsStatusTable>();
@@ -86,11 +86,11 @@ namespace SystemService
       // Check compression roundtrip
       check(AccountNumber{strName}.value, "invalid account name");
 
-      if (accountIndex.get(name))
+      if (auto existing = accountIndex.get(name))
       {
-         if (requireNew)
+         if (requireMatch && existing->authService != authService)
             abortMessage("account already exists");
-         return;
+         return false;
       }
       check(accountIndex.get(authService) != std::nullopt, "unknown auth service");
 
@@ -102,6 +102,7 @@ namespace SystemService
 
       ++status->totalAccounts;
       statusTable.put(*status);
+      return true;
    }
 
    void Accounts::setAuthServ(psibase::AccountNumber authService)

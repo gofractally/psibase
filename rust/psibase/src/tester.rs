@@ -609,7 +609,8 @@ impl Chain {
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
         services::accounts::Wrapper::push(self)
             .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
-            .get()
+            .get()?;
+        Ok(())
     }
 
     /// Deploy a service
