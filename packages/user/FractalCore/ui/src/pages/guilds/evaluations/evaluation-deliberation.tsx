@@ -22,16 +22,14 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 const usePageParams = () => {
-    const { evaluationId, fractalName, groupNumber } = useParams<{
+    const { guildAccount, groupNumber } = useParams<{
+        guildAccount: string;
         groupNumber: string;
-        evaluationId: string;
-        fractalName: string;
     }>();
 
     return {
-        evaluationId: Number(evaluationId),
+        guildAccount,
         groupNumber: Number(groupNumber),
-        fractalName,
     };
 };
 
@@ -138,6 +136,9 @@ const GroupStatus = () => {
         if (status.mustSubmit) {
             description = isAttesting ? "Submitting..." : "Submit!";
             if (!isAttesting) variant = "destructive";
+        } else if (status.hasEnoughProposals === false) {
+            description = "Failed: Not enough proposals";
+            variant = "destructive";
         } else {
             description = "You do not need to submit.";
         }
