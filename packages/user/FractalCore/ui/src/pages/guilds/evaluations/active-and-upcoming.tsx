@@ -1,5 +1,7 @@
 import dayjs from "dayjs";
 
+import { CompletedEvaluationsCard } from "@/pages/guilds/evaluations/completed";
+
 import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
@@ -19,6 +21,12 @@ import {
     TableHeader,
     TableRow,
 } from "@shared/shadcn/ui/table";
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@shared/shadcn/ui/tabs";
 
 export const ActiveAndUpcoming = () => {
     const { data: guild, isPending: isGuildPending } = useGuild();
@@ -28,22 +36,32 @@ export const ActiveAndUpcoming = () => {
     return (
         <PageContainer className="space-y-6">
             {isUpcomingEvaluation && <CurrentEvaluationCard />}
-
-            {isUpcomingEvaluation ? (
-                <GlowingCard>
-                    <CardHeader>
-                        <CardTitle>Active &amp; upcoming evaluations</CardTitle>
-                    </CardHeader>
-                    <CardContent className="@container">
-                        <EvaluationsTable />
-                    </CardContent>
-                </GlowingCard>
-            ) : (
-                <EmptyBlock
-                    title="No scheduled evaluations"
-                    isLoading={isGuildPending}
-                />
-            )}
+            <Tabs defaultValue="upcoming" className="gap-4">
+                <TabsList>
+                    <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                    <TabsTrigger value="past">Past</TabsTrigger>
+                </TabsList>
+                <TabsContent value="upcoming" className="flex flex-col gap-6">
+                    {isUpcomingEvaluation ? (
+                        <GlowingCard>
+                            <CardHeader>
+                                <CardTitle>Upcoming evaluations</CardTitle>
+                            </CardHeader>
+                            <CardContent className="@container">
+                                <EvaluationsTable />
+                            </CardContent>
+                        </GlowingCard>
+                    ) : (
+                        <EmptyBlock
+                            title="No scheduled evaluations"
+                            isLoading={isGuildPending}
+                        />
+                    )}
+                </TabsContent>
+                <TabsContent value="past" className="flex flex-col gap-6">
+                    <CompletedEvaluationsCard />
+                </TabsContent>
+            </Tabs>
         </PageContainer>
     );
 };
