@@ -123,26 +123,6 @@ struct AccountArgs {
     insecure: bool,
 }
 
-/// account-related Args
-#[derive(Args, Debug)]
-#[clap(long_about = None)]
-#[group(required = true, multiple = false)]
-struct RequiredAccountArgs {
-    /// Set the owner of the account
-    #[clap(short = 'o', long, value_name = "ACCOUNT")]
-    owner: Option<ExactAccountNumber>,
-
-    /// Set the account to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
-
-    /// The account won't be secured; anyone can authorize as this
-    /// account without signing. Caution: this option should not
-    /// be used on production or public chains.
-    #[clap(short = 'i', long)]
-    insecure: bool,
-}
-
 #[derive(Args, Debug)]
 
 struct BootArgs {
@@ -225,7 +205,7 @@ struct ModifyArgs {
     tx_args: TxArgs,
 
     #[command(flatten)]
-    account_args: RequiredAccountArgs,
+    account_args: AccountArgs,
 
     /// Account to modify
     account: ExactAccountNumber,
@@ -521,9 +501,11 @@ enum Command {
     Create(CreateArgs),
 
     /// Modify an account
+    #[command(mut_group("AccountArgs", |g| g.required(true)))]
     Modify(ModifyArgs),
 
     /// Deploy a service
+    #[command(mut_group("AccountArgs", |g| g.requires("create")))]
     Deploy(DeployArgs),
 
     /// Upload a file to a service
