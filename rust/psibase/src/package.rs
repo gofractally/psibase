@@ -38,7 +38,7 @@ custom_error! {
     pub Error
         MissingMeta          = "Service does not contain meta.json",
     InvalidFlags = "Invalid service flags",
-    DependencyCycle = "Cycle in service dependencies",
+    DependencyCycle{package: String} =  "Cycle in install dependencies for {package}",
     UnknownFileType{path:String} = "Cannot determine Mime-Type for {path}",
     UnknownAccount{name:AccountNumber} = "Account {name} not defined in meta.json",
     ServiceConflict{name: AccountNumber, old: String, new: String} = "The service {name} is defined by more than one package: {old}, {new}",
@@ -1400,7 +1400,9 @@ fn topological_sort_impl(
     const ON_STACK: usize = NEW - 1;
     let index = *indexes.get(vertex).unwrap();
     if out[index] == ON_STACK {
-        Err(anyhow! {"Circular install dependency for {vertex}"})?
+        Err(Error::DependencyCycle {
+            package: vertex.to_string(),
+        })?
     } else if out[index] == NEW {
         out[index] = ON_STACK;
         let Some(edges) = graph.get(vertex) else {
