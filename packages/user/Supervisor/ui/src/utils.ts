@@ -49,20 +49,15 @@ export const assert = (condition: boolean, errorMessage: string): void => {
 
 let modulePromise: Promise<any>;
 
-// Captured once when the component parser is loaded. The parser is a
-// permanent, always-instantiated utility WASM component (same shape as a
-// plugin — primary core + WASI adapter etc.), so its Memory allocations
-// count toward the persistent VAS overhead. Under the current call-scoped
-// plugin policy it is the only WASM allocation retained between entry()
-// calls; supervisor reports surface these counts in the "retained" line.
-// Exposed via getters so callers always see the latest values regardless
-// of module/bundler live-binding semantics.
-let _parserCoreCount = 0;
-let _parserMemoryCount = 0;
-export const getParserCoreCount = (): number => _parserCoreCount;
-export const getParserMemoryCount = (): number => _parserMemoryCount;
-
-export const parser = (): Promise<any> => {
+// Memoized loader for the component-parser utility WASM. The optional
+// callback fires once on first load with the parser's core/memory counts;
+// it exists so instrumentation can include the parser in the "retained"
+// totals. Subsequent calls reuse the cached promise and ignore the
+// callback. See plugin/instrumentation.ts (REMOVAL CHECKLIST) for how
+// this hook gets cleaned up.
+export const parser = (
+    onFirstLoad?: (coreCount: number, memoryCount: number) => void,
+): Promise<any> => {
     if (!modulePromise) {
         const url = siblingUrl(
             null,
@@ -72,8 +67,7 @@ export const parser = (): Promise<any> => {
         modulePromise = wasmFromUrl(url)
             .then((bytes) => loadBasic(bytes, "component-parser.js"))
             .then(({ exports, coreCount, memoryCount }) => {
-                _parserCoreCount = coreCount;
-                _parserMemoryCount = memoryCount;
+                onFirstLoad?.(coreCount, memoryCount);
                 return exports;
             });
     }

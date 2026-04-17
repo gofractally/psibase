@@ -1,3 +1,44 @@
+/**
+ * Memory model — context for everything in this folder
+ *
+ * A psibase plugin is a WebAssembly *component* that decomposes (via jco)
+ * into one or more *core modules* — typically a primary core plus a WASI
+ * preview1 adapter and lift/lower trampolines. Each instantiated core
+ * module gets its own WebAssembly.Instance, and the ones that own memory
+ * each export their own WebAssembly.Memory.
+ *
+ * On 64-bit V8 each WebAssembly.Memory reserves ~10GB of *virtual address
+ * space* (VAS) under the guard-page allocation scheme, regardless of how
+ * little physical RAM the plugin actually touches. With dozens of plugins
+ * loaded, VAS exhaustion (not RAM exhaustion) is what makes further
+ * instantiations fail with "RangeError: WebAssembly.Memory(): could not
+ * allocate memory".
+ *
+ * The supervisor mitigates this by *call-scoping* plugin instances:
+ *   - Plugins are fetched + parsed + compiled eagerly during preload.
+ *     Compilation is cheap — no Memory allocated.
+ *   - Plugins are *instantiated* (Memory allocated) just before the
+ *     synchronous call chain runs, and *disposed* in finally(). Disposal
+ *     drops the pluginModule reference; V8 reclaims the Memory on the
+ *     next GC.
+ *   - The compiledPlugin handle (a WebAssembly.Module) is retained so
+ *     the next entry() can re-instantiate without re-fetching or
+ *     re-compiling.
+ *
+ * The `pinned` flag on Plugin opts a plugin out of the unpinned-sweep
+ * disposal path. Currently nothing sets it, so disposal is total. The
+ * flag exists as a tuning knob for hot-path plugins where instantiation
+ * overhead outweighs the VAS cost.
+ *
+ * The component-parser utility WASM (loaded once at supervisor startup,
+ * see utils.ts) is the only WASM allocation retained between entry()
+ * calls.
+ *
+ * Subsequent comments in this folder assume this context and will not
+ * re-derive it. Look here when something talks about "VAS", "Memory",
+ * "dispose", "pinned", or "retained" without further explanation.
+ */
+
 import {
     QualifiedPluginId,
     assertTruthy,
@@ -13,11 +54,10 @@ import { parser, wasmFromUrl } from "../utils";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
-// Buffered GC reclaim log. The FinalizationRegistry callback fires when V8
-// has collected a disposed plugin's instance module — i.e. its
-// WebAssembly.Memory (and ~10GB of virtual address space reservation) has
-// been released. GCs typically reclaim many objects at once, so we batch
-// labels that arrive within the same ~50ms window into a single log line.
+// Buffered GC reclaim log. The FinalizationRegistry callback fires when
+// V8 collects a disposed plugin's instance module. Batches labels that
+// arrive within ~50ms into a single line. (Instrumentation — see
+// instrumentation.ts REMOVAL CHECKLIST.)
 const gcQueue: string[] = [];
 let gcFlushScheduled = false;
 function flushGcQueue() {
@@ -42,16 +82,13 @@ const gcRegistry: FinalizationRegistry<string> | null =
           })
         : null;
 
-// Per-plugin instrumentation captured during preload. Zeroed until the
-// corresponding phase completes. Consumed once by
-// Plugins.collectPreloadStats() at the end of doPreload().
+// Per-plugin instrumentation captured during preload, consumed once by
+// Instrumentation.collectPreloadStats(). coreCount/memoryCount are
+// deterministic per compiled component.
 export interface PluginStats {
     fetchMs?: number;
     fetchBytes?: number;
     compileMs?: number;
-    // Populated on first successful instantiation. Deterministic per
-    // compiled component — a given plugin always decomposes into the same
-    // number of core module instances and the same number of Memories.
     coreCount?: number;
     memoryCount?: number;
     reported: boolean;
@@ -70,12 +107,12 @@ export class Plugin {
 
     parsed: Promise<ComponentAPI>;
 
-    // Resolves when the plugin is compiled (cheap — no Memory allocated).
-    // After this, ensureInstantiated() can be called to allocate Memory.
+    // Resolves once the plugin is compiled. ensureInstantiated() must
+    // still be called before use.
     ready: Promise<void>;
 
-    // Pinned plugins (system plugins + their transitive deps) are instantiated
-    // once during preload and never disposed between entry() calls.
+    // When true, disposeAllUnpinned() leaves this plugin's instance live.
+    // Currently always false; reserved as a future tuning knob.
     pinned: boolean = false;
 
     stats: PluginStats = { reported: false };

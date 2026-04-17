@@ -22,6 +22,7 @@ import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
+import { Instrumentation } from "./plugin/instrumentation";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
@@ -29,8 +30,6 @@ import {
     assert,
     chainIdPromise,
     isEmbedded,
-    getParserCoreCount,
-    getParserMemoryCount,
     parser,
     serviceFromOrigin,
     setQueryToken,
@@ -49,14 +48,6 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
-// Stats accumulated during a single entry() invocation for the post-call
-// report. Populated by call()/callResource() while non-undefined; ignored
-// when undefined (e.g. getJson path, or between entries).
-interface EntryStats {
-    callCount: number;
-    perPlugin: Map<string, number>;
-}
-
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -65,7 +56,7 @@ export class Supervisor implements AppInterface {
 
     private context: CallContext | undefined;
 
-    private entryStats: EntryStats | undefined;
+    private inst: Instrumentation;
 
     private embedder: string | undefined;
 
@@ -108,29 +99,26 @@ export class Supervisor implements AppInterface {
 
     private preloadLock: Promise<void> = Promise.resolve();
 
-    private preload(plugins: QualifiedPluginId[]): Promise<void> {
+    private preload(plugins: QualifiedPluginId[], reason: string): Promise<void> {
         const myPreload = this.preloadLock
             .catch(() => {})
-            .then(() => this.doPreload(plugins));
+            .then(() => this.doPreload(plugins, reason));
         this.preloadLock = myPreload.catch(() => {});
         return myPreload;
     }
 
-    private async doPreload(plugins: QualifiedPluginId[]) {
+    private async doPreload(plugins: QualifiedPluginId[], reason: string) {
         await chainIdPromise;
 
         if (plugins.length === 0) {
             return;
         }
 
-        const preT0 = performance.now();
+        const reportT0 = this.inst.preloadReportStart();
 
-        // Phase 0: Compile system plugins and instantiate them so the
-        // internal sync calls below (getActivePrompt, getActiveQueryToken,
-        // getAuthServices) have live instances to hit. These instances are
-        // NOT pinned — the caller (entry / preloadPlugins / getJson) is
-        // responsible for disposing them after whatever follow-up work
-        // requires them. See the class-level flow comment on Supervisor.
+        // Phase 0: compile + instantiate system plugins so the internal
+        // sync calls below have live instances. Not pinned — the caller
+        // disposes them in its finally clause.
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
@@ -148,14 +136,13 @@ export class Supervisor implements AppInterface {
 
         setQueryToken(this.getActiveQueryToken());
 
-        // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
-        // The sync call to getAuthServices below only touches Phase 0 plugins.
+        // Phase 1: compile app plugins (no instantiation — Memory deferred).
         this.loader.trackPlugins([...plugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: Load the auth services for all connected accounts.
-        // This sync call uses accounts:plugin (Phase 0, already instantiated).
+        // Phase 2: load auth-service plugins for connected accounts. This
+        // sync call uses accounts:plugin, instantiated in Phase 0.
         const auth_services: string[] = this.supervisorCall(
             getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
@@ -163,8 +150,7 @@ export class Supervisor implements AppInterface {
         const addtl_plugins: QualifiedPluginId[] = [];
         for (const service of auth_services) {
             if (!service) continue;
-
-            // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
+            // Limitation: an auth service plugin must be called "plugin".
             addtl_plugins.push(pluginId(service, "plugin"));
         }
         this.loader.trackPlugins(addtl_plugins);
@@ -172,47 +158,7 @@ export class Supervisor implements AppInterface {
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 1 + Phase 2 plugins are COMPILED only. Phase 0 plugins are
-        // still live at this point (instantiated above for the internal
-        // sync calls). The caller will dispose them together with the rest
-        // once its own work finishes.
-
-        this.emitPreloadReport(performance.now() - preT0);
-    }
-
-    private emitPreloadReport(wallMs: number): void {
-        const { fetched, compiled } = this.plugins.collectPreloadStats();
-        if (fetched.length === 0 && compiled.length === 0) {
-            return; // nothing new to report
-        }
-
-        const fmtKB = (b: number) => `${(b / 1024).toFixed(1)}KB`;
-        const fmtMB = (b: number) => `${(b / 1024 / 1024).toFixed(2)}MB`;
-
-        const totalBytes = fetched.reduce((s, f) => s + f.bytes, 0);
-        const fetchSumMs = fetched.reduce((s, f) => s + f.ms, 0);
-        const compileSumMs = compiled.reduce((s, c) => s + c.ms, 0);
-
-        const lines = [
-            `[preload] wall=${wallMs.toFixed(1)}ms ` +
-                `fetched=${fetched.length}(${fmtMB(totalBytes)}, Σ${fetchSumMs.toFixed(1)}ms) ` +
-                `compiled=${compiled.length}(Σ${compileSumMs.toFixed(1)}ms)`,
-        ];
-        if (fetched.length > 0) {
-            lines.push(
-                `    fetched: [${fetched
-                    .map((f) => `${f.label}(${f.ms.toFixed(0)}ms, ${fmtKB(f.bytes)})`)
-                    .join(", ")}]`,
-            );
-        }
-        if (compiled.length > 0) {
-            lines.push(
-                `    compiled: [${compiled
-                    .map((c) => `${c.label}(${c.ms.toFixed(0)}ms)`)
-                    .join(", ")}]`,
-            );
-        }
-        console.log(lines.join("\n"));
+        this.inst.preloadReportEnd(reportT0, reason);
     }
 
     private replyToParent(id: string, result: any) {
@@ -272,10 +218,9 @@ export class Supervisor implements AppInterface {
     }
 
     constructor() {
-        this.parser = parser();
-
         this.plugins = new Plugins(this);
-
+        this.inst = new Instrumentation(this.plugins);
+        this.parser = parser((c, m) => this.inst.onParserLoaded(c, m));
         this.loader = new PluginLoader(this.plugins);
     }
 
@@ -319,14 +264,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.context, "Uninitialized call context");
 
         const { service, plugin, intf, method, params } = args;
-        if (this.entryStats) {
-            this.entryStats.callCount++;
-            const key = `${service}:${plugin}`;
-            this.entryStats.perPlugin.set(
-                key,
-                (this.entryStats.perPlugin.get(key) ?? 0) + 1,
-            );
-        }
+        this.inst.onCall(service, plugin);
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(args.service, toString(args));
@@ -383,14 +321,7 @@ export class Supervisor implements AppInterface {
     callResource(args: QualifiedResourceCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
         const { service, plugin, intf, type, handle, method, params } = args;
-        if (this.entryStats) {
-            this.entryStats.callCount++;
-            const key = `${service}:${plugin}`;
-            this.entryStats.perPlugin.set(
-                key,
-                (this.entryStats.perPlugin.get(key) ?? 0) + 1,
-            );
-        }
+        this.inst.onCall(service, plugin);
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(service, toString(args));
@@ -404,138 +335,98 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    // This is an entrypoint that returns the JSON interface for a plugin.
+    // Returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
             this.setParentOrigination(callerOrigin);
-            await this.preload([plugin]);
+            await this.preload([plugin], `getJson:${plugin.service}:${plugin.plugin}`);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
             this.replyToParent(id, json);
         } catch (e) {
             this.replyToParent(id, e);
         } finally {
-            // Release the Phase-0 system plugin instances that doPreload
-            // left live for its internal sync calls. With nothing pinned
-            // under the current policy, this sweeps every instantiated
-            // plugin.
+            // Release Phase-0 system plugin instances left live by preload.
             this.plugins.disposeAllUnpinned();
         }
     }
 
-    // This is an entrypoint for apps to preload plugins.
-    // Intended to be used on pageload to prepare the plugins that an app requires,
-    //   which accelerates the responsiveness of the plugins for subsequent calls.
+    // Entrypoint for apps to preload plugins on pageload, decoupling
+    // download/parse/compile from the eventual call.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
             this.setParentOrigination(callerOrigin);
-            await this.preload(plugins);
+            const reason = `preloadPlugins:[${plugins
+                .map((p) => `${p.service}:${p.plugin}`)
+                .join(",")}]`;
+            await this.preload(plugins, reason);
         } catch (e) {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
         } finally {
-            // See getJson() — preload leaves system plugins instantiated
-            // for its internal sync calls; we release them here so the
-            // idle footprint between preloadPlugins() and the next
-            // entry() stays at zero non-parser memories.
             this.plugins.disposeAllUnpinned();
         }
     }
 
-    /**
-     * Tear down every instantiated plugin before the supervisor iframe is
-     * evicted or destroyed. Dropping `pluginModule` references here lets
-     * V8 reclaim the backing WebAssembly.Memory allocations (and their
-     * ~10GB of VAS reservation each) promptly on the next GC, regardless
-     * of whether the iframe ends up in bfcache or is fully torn down.
-     *
-     * Retains `compiledPlugin` handles (WebAssembly.Module objects carry
-     * no VAS), so bfcache restore can re-instantiate without re-fetching
-     * or re-compiling.
-     *
-     * Safe to call multiple times; idempotent.
-     */
+    /** Tear down every instantiated plugin before the supervisor iframe
+     *  is evicted. compiledPlugin handles are retained for bfcache restore.
+     *  Idempotent. */
     shutdown(): string[] {
         return this.plugins.disposeAll();
     }
 
-    // This is an entrypoint for apps to call into plugins.
+    // Entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
-        const entryLabel = `${args.service}:${args.plugin} ${args.intf ?? ""}.${args.method}`;
-        const t0 = performance.now();
-        let preloadMs = 0;
-        let instMs = 0;
-        let instantiatedThisCall: string[] = [];
-        let disposed: string[] = [];
+        const entryLabel = `${args.service}:${args.plugin} ${
+            args.intf ? `${args.intf}.` : ""
+        }${args.method}`;
+        const handle = this.inst.entryStart(entryLabel);
         let entryError: unknown = undefined;
-        // Keep stats in a local so a concurrent entry() cannot wipe them
-        // out. `this.entryStats` is only the pointer that call() /
-        // callResource() use to locate "the currently-active entry's
-        // stats". If a second entry() starts and overwrites the pointer,
-        // late call() hits from the first entry will be misattributed to
-        // the newer entry — but neither entry will crash in finally().
-        const stats: EntryStats = { callCount: 0, perPlugin: new Map() };
-        this.entryStats = stats;
-
-        // Snapshot before preload so everything instantiated during this
-        // entry (including Phase 0 system plugins brought live by preload
-        // for its internal sync calls) is attributed to this entry in the
-        // report. Matches the `disposed` set we capture in finally.
-        const preInst = new Set(this.plugins.listInstantiated());
+        let disposed: string[] = [];
 
         try {
             this.setParentOrigination(callerOrigin);
 
-            // Load the full plugin tree (downloading + parsing + transpiling
-            //   via jco + compiling core WASM modules). Phase 0 system
-            //   plugins are instantiated as a side-effect so the internal
-            //   sync calls inside preload have live instances; they are
-            //   NOT pinned, so the finally clause below will dispose them
-            //   alongside everything we instantiate ourselves.
-            // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
-            const preT0 = performance.now();
+            // Load the full plugin tree (download + parse + transpile + compile).
+            // System plugins are instantiated as a side effect for preload's
+            // internal sync calls; they're disposed in finally with the rest.
+            const preT0 = this.inst.entryPreloadStart();
             try {
-                await this.preload([
-                    {
-                        service: args.service,
-                        plugin: args.plugin,
-                    },
-                ]);
+                await this.preload(
+                    [
+                        {
+                            service: args.service,
+                            plugin: args.plugin,
+                        },
+                    ],
+                    `entry:${entryLabel}`,
+                );
             } finally {
-                preloadMs = performance.now() - preT0;
+                this.inst.entryPreloadEnd(preT0);
             }
 
-            // Instantiate every remaining plugin (Phase 1 + Phase 2) so the
-            // synchronous call chain below has live instances to call into.
-            // Phase 0 plugins are already instantiated (no-op for them).
-            // On a partial failure (e.g. OOM while instantiating one of
-            // several peers), the finally clause still captures whatever
-            // completed before the throw so the report is accurate.
-            const instT0 = performance.now();
+            // Instantiate everything else so the synchronous call chain
+            // has live instances. Phase 0 plugins are no-ops here.
+            const instT0 = this.inst.entryInstStart();
             try {
                 await this.plugins.ensureAllInstantiated();
             } finally {
-                instMs = performance.now() - instT0;
-                instantiatedThisCall = this.plugins
-                    .listInstantiated()
-                    .filter((name) => !preInst.has(name));
+                this.inst.entryInstEnd(instT0);
             }
 
             this.context = this.getCallContext();
 
-            // Starts the tx context.
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "startTx", []),
             );
 
-            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
-            //   preloaded.
+            // Synchronous — everything was preloaded.
             const result = this.call(args);
 
-            // Closes the current tx context. If actions were added, tx is submitted.
+            // Closes the tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "finishTx", []),
             );
@@ -543,7 +434,6 @@ export class Supervisor implements AppInterface {
                 console.warn(txResult);
             }
 
-            // Send plugin result to parent window
             this.replyToParent(id, result);
 
             this.context = undefined;
@@ -567,65 +457,11 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } finally {
-            // Dispose every non-pinned instance so V8 can reclaim the
-            // backing WebAssembly.Memory (and its ~10GB of virtual address
-            // space) on the next GC. Pinned system plugins stay live.
-            // On a Phase 0 preload failure, system plugins that
-            // instantiated before the error remain instantiated-but-
-            // unpinned — so they also get caught by this sweep, which is
-            // what we want (no half-pinned state persists between calls).
+            // Sweep all non-pinned instances. Catches partial-instantiation
+            // failures (system plugins that came up before a Phase-0 error)
+            // so no half-pinned state persists between calls.
             disposed = this.plugins.disposeAllUnpinned();
-
-            // Only clear the shared pointer if it still refers to OUR
-            // stats object; otherwise a concurrent entry() owns it now.
-            if (this.entryStats === stats) {
-                this.entryStats = undefined;
-            }
-            const totalMs = performance.now() - t0;
-
-            // Characterize cores/memories created during this entry.
-            // Under the current no-pinning policy the instantiated set
-            // should equal the disposed set (minus any teardown asymmetry
-            // from partial failures mid-instantiation).
-            const instCounts = this.plugins.countByLabels(instantiatedThisCall);
-            const disposedCounts = this.plugins.countByLabels(disposed);
-
-            // After dispose, the only persistent WASM allocation is the
-            // component-parser utility module loaded once at supervisor
-            // startup. Any instantiated plugins still alive here would
-            // indicate a leak (e.g. plugin.pinned set by future work).
-            const retained = this.plugins.countInstantiated();
-            const retainedPlugins = retained.plugins + 1;
-            const retainedCores = retained.cores + getParserCoreCount();
-            const retainedMemories = retained.memories + getParserMemoryCount();
-
-            const header =
-                `[entry] ${entryLabel}` +
-                (entryError !== undefined ? " FAILED" : "") +
-                ` — total=${totalMs.toFixed(1)}ms ` +
-                `preload=${preloadMs.toFixed(1)}ms ` +
-                `inst=${instMs.toFixed(1)}ms ` +
-                `calls=${stats.callCount} across ${stats.perPlugin.size} plugin(s)`;
-
-            const lines: string[] = [header];
-            if (entryError !== undefined) {
-                const msg =
-                    entryError instanceof Error
-                        ? entryError.message
-                        : String(entryError);
-                lines.push(`    error: ${msg}`);
-            }
-            lines.push(
-                instantiatedThisCall.length > 0
-                    ? `    instantiated (${instantiatedThisCall.length}p / ${instCounts.cores}c / ${instCounts.memories}m): [${instantiatedThisCall.join(", ")}]`
-                    : `    instantiated: (none)`,
-                disposed.length > 0
-                    ? `    disposed (${disposed.length}p / ${disposedCounts.cores}c / ${disposedCounts.memories}m): [${disposed.join(", ")}]`
-                    : `    disposed: (none)`,
-                `    retained: ${retainedPlugins}p / ${retainedCores}c / ${retainedMemories}m (parser)`,
-            );
-
-            console.log(lines.join("\n"));
+            this.inst.entryEnd(handle, disposed, entryError);
         }
     }
 }

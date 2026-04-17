@@ -220,16 +220,10 @@ function addResourceProxy(
 
 export interface InstantiateResult {
     exports: Record<string, unknown>;
-    // Number of WebAssembly.Instance objects created (one per core module).
-    // A psibase plugin is a *component* that typically decomposes into a
-    // primary core module plus a WASI preview1 adapter, lift/lower
-    // trampolines, etc. Each gets its own Instance.
+    // Per-instantiation counts — see plugin/plugin.ts header for VAS context.
+    // coreCount: WebAssembly.Instance count (one per core module).
+    // memoryCount: WebAssembly.Memory count (only owners; imported peers excluded).
     coreCount: number;
-    // Number of distinct WebAssembly.Memory objects exported by those
-    // instances. This is the real VAS cost — each Memory reserves ~10GB of
-    // virtual address space on V8 under the 64-bit guard-page allocation
-    // scheme. Instances that import memory from a peer module are not
-    // counted here (only the owner is).
     memoryCount: number;
 }
 
