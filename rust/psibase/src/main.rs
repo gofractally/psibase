@@ -103,6 +103,46 @@ struct SigArgs {
     proposer: Option<ExactAccountNumber>,
 }
 
+/// account-related Args
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+#[group(multiple = false)]
+struct AccountArgs {
+    /// Set the owner of the account
+    #[clap(short = 'o', long, value_name = "ACCOUNT")]
+    owner: Option<ExactAccountNumber>,
+
+    /// Set the account to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// The account won't be secured; anyone can authorize as this
+    /// account without signing. Caution: this option should not
+    /// be used on production or public chains.
+    #[clap(short = 'i', long)]
+    insecure: bool,
+}
+
+/// account-related Args
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+#[group(required = true, multiple = false)]
+struct RequiredAccountArgs {
+    /// Set the owner of the account
+    #[clap(short = 'o', long, value_name = "ACCOUNT")]
+    owner: Option<ExactAccountNumber>,
+
+    /// Set the account to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// The account won't be secured; anyone can authorize as this
+    /// account without signing. Caution: this option should not
+    /// be used on production or public chains.
+    #[clap(short = 'i', long)]
+    insecure: bool,
+}
+
 #[derive(Args, Debug)]
 
 struct BootArgs {
@@ -162,23 +202,11 @@ struct CreateArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
+    #[command(flatten)]
+    account_args: AccountArgs,
+
     /// Account to create
     account: ExactAccountNumber,
-
-    /// Set the owner of the new account
-    #[clap(short = 'o', long, value_name = "ACCOUNT", conflicts_with_all = ["key", "insecure"])]
-    owner: Option<ExactAccountNumber>,
-
-    /// Set the account to authenticate using this key. Also works
-    /// if the account already exists.
-    #[clap(short = 'k', long, value_name = "KEY", conflicts_with = "insecure")]
-    key: Option<AnyPublicKey>,
-
-    /// The account won't be secured; anyone can authorize as this
-    /// account without signing. Caution: this option should not
-    /// be used on production or public chains.
-    #[clap(short = 'i', long)]
-    insecure: bool,
 
     /// Sender to use when creating the account.
     #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
@@ -196,23 +224,11 @@ struct ModifyArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
+    #[command(flatten)]
+    account_args: RequiredAccountArgs,
+
     /// Account to modify
     account: ExactAccountNumber,
-
-    /// Set the owner of the account
-    #[clap(short = 'o', long, value_name = "ACCOUNT", conflicts_with_all = ["key", "insecure"])]
-    owner: Option<ExactAccountNumber>,
-
-    /// Set the account to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY", required_unless_present_any = ["owner", "insecure"], conflicts_with = "insecure")]
-    key: Option<AnyPublicKey>,
-
-    /// Make the account insecure, even if it has been previously
-    /// secured. Anyone will be able to authorize as this account
-    /// without signing. Caution: this option should not be used
-    /// on production or public chains.
-    #[clap(short = 'i', long)]
-    insecure: bool,
 
     /// Create the account if it doesn't already exist
     #[clap(short = 'c', long)]
@@ -818,19 +834,19 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
         actions.push(preapprove)
     }
 
-    if let Some(key) = &args.key {
+    if let Some(key) = &args.account_args.key {
         actions.push(new_account_key_action(
             args.sender.into(),
             args.account.into(),
             key,
         ))
-    } else if args.insecure {
+    } else if args.account_args.insecure {
         actions.push(new_account_action(args.sender.into(), args.account.into()));
     } else {
         actions.push(new_account_owned_action(
             args.sender.into(),
             args.account.into(),
-            args.owner.unwrap_or(args.sender).into(),
+            args.account_args.owner.unwrap_or(args.sender).into(),
         ));
     }
 
@@ -883,18 +899,18 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
         )
     }
 
-    if args.insecure {
+    if args.account_args.insecure {
         actions.push(set_auth_service_action(
             args.account.into(),
             account!("auth-any"),
         ));
-    } else if let Some(key) = &args.key {
+    } else if let Some(key) = &args.account_args.key {
         actions.push(set_key_action(args.account.into(), &key));
         actions.push(set_auth_service_action(
             args.account.into(),
             key.auth_service(),
         ));
-    } else if let Some(owner) = args.owner {
+    } else if let Some(owner) = args.account_args.owner {
         actions.push(set_owner_action(args.account.into(), owner.into()))
     }
 
