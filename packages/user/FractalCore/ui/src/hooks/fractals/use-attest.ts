@@ -23,21 +23,19 @@ export const useAttest = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            // TODO: DOES THIS NOT THROW? And don't use await.
-            await toast.promise(
-                getSupervisor().functionCall({
-                    method: "attest",
-                    service: fractal,
-                    intf: "userEval",
-                    params: [params.guildAccount, params.groupNumber],
-                }),
-                {
-                    error: (error) => {
-                        console.log("Attest error:", error);
-                        return "Unable to attest";
+            await toast
+                .promise(
+                    getSupervisor().functionCall({
+                        method: "attest",
+                        service: fractal,
+                        intf: "userEval",
+                        params: [params.guildAccount, params.groupNumber],
+                    }),
+                    {
+                        error: () => "Unable to attest",
                     },
-                },
-            );
+                )
+                .unwrap();
 
             // HACK
             // for optimistic update purposes
@@ -48,6 +46,9 @@ export const useAttest = () => {
         },
         onSuccess: (_data, { guildAccount }) => {
             navigate(paths.guild.evaluations(guildAccount));
+        },
+        onError: (error) => {
+            console.error("Attest error:", error);
         },
     });
 };
