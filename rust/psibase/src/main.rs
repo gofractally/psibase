@@ -256,6 +256,9 @@ struct DeployArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
+    #[command(flatten)]
+    account_args: AccountArgs,
+
     /// Account to deploy service on
     account: ExactAccountNumber,
 
@@ -265,16 +268,9 @@ struct DeployArgs {
     /// Filename containing the schema
     schema: PathBuf,
 
-    /// Create the account if it doesn't exist. Also set the account to
-    /// authenticate using this key, even if the account already existed.
-    #[clap(short = 'c', long, value_name = "KEY")]
-    create_account: Option<AnyPublicKey>,
-
-    /// Create the account if it doesn't exist. The account won't be secured;
-    /// anyone can authorize as this account without signing. Caution: this option
-    /// should not be used on production or public chains.
-    #[clap(short = 'i', long)]
-    create_insecure_account: bool,
+    /// Create the account if it doesn't already exist
+    #[clap(short = 'c', long)]
+    create: bool,
 
     /// Register the service with HttpServer. This allows the service to host a
     /// website, serve RPC requests, and serve GraphQL requests.
@@ -282,7 +278,13 @@ struct DeployArgs {
     register_proxy: bool,
 
     /// Sender to use when creating the account.
-    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
+    #[clap(
+        short = 'S',
+        long,
+        value_name = "SENDER",
+        default_value = "root",
+        requires = "create"
+    )]
     sender: ExactAccountNumber,
 }
 
@@ -826,29 +828,32 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+impl AccountArgs {
+    fn create(&self, sender: AccountNumber, account: AccountNumber, actions: &mut Vec<Action>) {
+        if let Some(preapprove) = preapprove_action(sender, account) {
+            actions.push(preapprove)
+        }
+
+        if let Some(key) = &self.key {
+            actions.push(new_account_key_action(sender, account, key))
+        } else if self.insecure {
+            actions.push(new_account_action(sender, account));
+        } else {
+            actions.push(new_account_owned_action(
+                sender,
+                account,
+                self.owner.map_or(sender, |owner| owner.into()),
+            ));
+        }
+    }
+}
+
 async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
-    if let Some(preapprove) = preapprove_action(args.sender.into(), args.account.into()) {
-        actions.push(preapprove)
-    }
-
-    if let Some(key) = &args.account_args.key {
-        actions.push(new_account_key_action(
-            args.sender.into(),
-            args.account.into(),
-            key,
-        ))
-    } else if args.account_args.insecure {
-        actions.push(new_account_action(args.sender.into(), args.account.into()));
-    } else {
-        actions.push(new_account_owned_action(
-            args.sender.into(),
-            args.account.into(),
-            args.account_args.owner.unwrap_or(args.sender).into(),
-        ));
-    }
+    args.account_args
+        .create(args.sender.into(), args.account.into(), &mut actions);
 
     let progress = make_spinner();
     progress.set_message("Preparing transaction");
@@ -957,28 +962,15 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
 
     let mut actions: Vec<Action> = Vec::new();
 
-    if args.create_account.is_some() && args.create_insecure_account {
-        return Err(anyhow!(
-            "--create-account and --create-insecure-account cannot be used together"
-        ));
-    }
-
-    if args.create_account.is_some() || args.create_insecure_account {
-        actions.push(new_account_action(args.sender.into(), args.account.into()));
-    }
-
     // This happens before the set_code as a safety measure.
     // If the set_code was first, and the user didn't actually
     // have the matching private key, then the transaction would
     // lock out the user. Putting this before the set_code causes
     // the set_code to require the private key, failing the transaction
     // if the user doesn't have it.
-    if let Some(key) = args.create_account.clone() {
-        actions.push(set_key_action(args.account.into(), &key));
-        actions.push(set_auth_service_action(
-            args.account.into(),
-            key.auth_service(),
-        ));
+    if args.create {
+        args.account_args
+            .create(args.sender.into(), args.account.into(), &mut actions)
     }
 
     actions.push(set_code_action(args.account.into(), wasm));
