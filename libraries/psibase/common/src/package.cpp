@@ -214,6 +214,7 @@ namespace psibase
          {
             if (pos->second == nullptr)
             {
+               abortMessage("Circular install dependency for: " + std::string(package));
             }
             auto packagePtr = pos->second;
             pos->second     = nullptr;
