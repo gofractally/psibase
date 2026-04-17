@@ -1240,6 +1240,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "frac-tester"
+version = "0.23.0"
+dependencies = [
+ "frac-tester-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "frac-tester-pkg"
+version = "0.23.0"
+dependencies = [
+ "frac-tester",
+ "psibase-user-workspace-hack",
+]
+
+[[package]]
 name = "fracpack"
 version = "0.23.0"
 dependencies = [
