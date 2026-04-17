@@ -494,6 +494,7 @@ namespace psibase
          {
             tc.execNonTrxAction(0, action, atrace);
          }
+         BOOST_LOG_SCOPED_LOGGER_TAG(trxLogger, "Trace", trace);
          PSIBASE_LOG(trxLogger, debug)
              << "async " << action.service.str() << "::" << action.method.str() << " succeeded";
       }
