@@ -2,7 +2,6 @@ import { Scale } from "lucide-react";
 import { useState } from "react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
-import { SetMinScorersModal } from "@/components/modals/set-min-scorers-modal";
 import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
 import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
 
@@ -37,8 +36,7 @@ export const Legislative = () => {
     const focusedGuild = fractal?.fractal?.legislature.account;
     const { data, error: guildError } = useGuild(focusedGuild);
 
-    const [showMinScorersModal, setShowMinScorers] = useState(false);
-    const [showRankedGuildsModal, setShowRankedGuildsModal] = useState(false);
+    const [showRankedGuildSlotsModal, setShowRankedGuildsModal] = useState(false);
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
 
     const error = fractalError || guildError;
@@ -56,13 +54,10 @@ export const Legislative = () => {
 
     return (
         <PageContainer className="space-y-6">
-            <SetMinScorersModal
-                openChange={setShowMinScorers}
-                show={showMinScorersModal}
-            />
+
             <SetRankedGuildSlots
                 openChange={setShowRankedGuildsModal}
-                show={showRankedGuildsModal}
+                show={showRankedGuildSlotsModal}
             />
             <SetRankedGuilds
                 openChange={setShowRankGuildsModal}
@@ -156,7 +151,7 @@ export const Legislative = () => {
                                             variant="outline"
                                             size="sm"
                                             onClick={() =>
-                                                setShowMinScorers(true)
+                                                setShowRankGuildsModal(true)
                                             }
                                         >
                                             Rank guilds
@@ -179,7 +174,7 @@ export const Legislative = () => {
                                             variant="outline"
                                             size="sm"
                                             onClick={() =>
-                                                setShowMinScorers(true)
+                                                setShowRankedGuildsModal(true)
                                             }
                                         >
                                             Set ranked guild slots

@@ -41,9 +41,7 @@ class AdminFractal extends PluginInterface {
     get setRankedGuildSlots() {
         return this._call<[slots: number]>("setRankedGuildSlots");
     }
-    get setTokenThreshold() {
-        return this._call<[threshold: number]>("setTokenThreshold");
-    }
+
     get setRankedGuilds() {
         return this._call<[guilds: Account[]]>("setRankedGuilds");
     }

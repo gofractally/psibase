@@ -1,8 +1,11 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::exports::guilds::plugin::admin_guild::Guest as AdminGuild;
+use bindings::exports::guilds::plugin::user_guild::Guest as UserGuild;
+
 use bindings::exports::guilds::plugin::api::Guest as Api;
-use bindings::exports::guilds::plugin::queries::Guest as Queries;
+
 use bindings::host::common::server as CommonServer;
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
@@ -12,6 +15,11 @@ use psibase::fracpack::Pack;
 
 mod errors;
 use errors::ErrorType;
+
+use bindings::evaluations::plugin::admin::close;
+use bindings::evaluations::plugin::user as EvaluationsUser;
+
+mod graphql;
 
 define_trust! {
     descriptions {
@@ -31,40 +39,23 @@ define_trust! {
 
 struct GuildsPlugin;
 
+impl AdminGuild for GuildsPlugin {
+    fn close_eval(guild_account: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account)?;
+        guild.assert_authorized(FunctionName::close_eval)?;
+
+        close(&"fractals".to_string(), guild.eval_id()?)
+    }
+}
+
+impl UserGuild for GuildsPlugin {}
+
 impl Api for GuildsPlugin {
     fn set_example_thing(thing: String) -> Result<(), Error> {
         // trust::assert_authorized(trust::FunctionName::set_example_thing)?;
         // let packed_example_thing_args = guilds::action_structs::setExampleThing { thing }.packed();
         // add_action_to_transaction("setExampleThing", &packed_example_thing_args).unwrap();
         Ok(())
-    }
-}
-
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingData {
-    example_thing: String,
-}
-#[derive(serde::Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct ExampleThingResponse {
-    data: ExampleThingData,
-}
-
-impl Queries for GuildsPlugin {
-    fn get_example_thing() -> Result<String, Error> {
-        trust::assert_authorized(trust::FunctionName::get_example_thing)?;
-
-        let graphql_str = "query { exampleThing }";
-
-        let examplething_val = serde_json::from_str::<ExampleThingResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str)?,
-        );
-
-        let examplething_val =
-            examplething_val.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
-
-        Ok(examplething_val.data.example_thing)
     }
 }
 

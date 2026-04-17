@@ -5,7 +5,9 @@ pub mod tables;
 pub mod service {
     use crate::{
         helpers::RollingBits16,
-        tables::tables::{EvaluationInstance, Guild, GuildMember, InitRow, InitTable, RoleMap},
+        tables::tables::{
+            EvaluationInstance, Guild, GuildMember, InitRow, InitTable, Ranking, RoleMap,
+        },
     };
     use psibase::{
         services::{
@@ -119,6 +121,24 @@ pub mod service {
     #[action]
     fn set_g_desc(description: String) {
         Guild::by_sender().set_description(description);
+    }
+
+    /// Set ranked guilds
+    ///
+    /// # Arguments
+    /// * `ranked_guilds` - Ordered guilds to be ranked, affects scores.
+    #[action]
+    fn set_rguilds(ranked_guilds: Vec<AccountNumber>) {
+        Ranking::set_ranked_guilds(get_sender(), ranked_guilds);
+    }
+
+    /// Set ranked guilds
+    ///
+    /// # Arguments
+    /// * `ranked_guilds` - Ordered guilds to be ranked, affects scores.
+    #[action]
+    fn set_thres(rank_ordering_threshold: u8) {
+        Guild::by_sender().set_rank_ordering_threshold(rank_ordering_threshold);
     }
 
     /// Kick member from guild

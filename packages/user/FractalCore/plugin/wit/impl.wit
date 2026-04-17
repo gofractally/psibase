@@ -5,10 +5,15 @@ world impl {
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include fractals:plugin/imports;
+    include guilds:plugin/imports;
+
     include staged-tx:plugin/imports;
     include host:db/imports;
 
 
+    export admin-guild;
     export admin-fractal;
+    export user-guild;
     export user-fractal;
+    export user-eval;
 }

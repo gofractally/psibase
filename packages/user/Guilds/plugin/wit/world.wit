@@ -5,12 +5,66 @@ interface api {
     set-example-thing: func(thing: string) -> result<_, error>;
 }
 
-interface queries {
+
+
+
+interface admin-guild {
     use host:types/types.{error};
-    get-example-thing: func() -> result<string, error>;
+
+    create-guild: func(display-name: string, account: string) -> result<_, error>;
+
+    set-display-name: func(display-name: string) -> result<_, error>;
+    set-bio: func(bio: string) -> result<_, error>;
+    set-description: func(description: string) -> result<_, error>;
+    set-schedule: func(registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32) -> result<_, error>;
+
+    start-eval: func(guild-account: string) -> result<_, error>;
+    close-eval: func(guild-account: string) -> result<_, error>;
+
+    set-guild-rep: func(rep: string) -> result<_, error>;
+    resign-guild-rep: func(guild-account: string) -> result<_, error>;
+    remove-guild-rep: func(guild-account: string) -> result<_, error>;
+
+    set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
+    set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
 }
+
+interface user-guild {
+    use host:types/types.{error};
+    register-candidacy: func(active: bool) -> result<_, error>;
+
+    draft-application: func(description: string) -> result<_, error>;
+    push-application: func(guild-account: string) -> result<_, error>;
+
+    set-guild-app-info: func(info: string) -> result<_, error>;
+
+    delete-guild-invite: func(invite-id: u32) -> result<_, error>;
+
+    invite-member: func(num-accounts: u16, pre-attest: bool) -> result<string, error>;
+    apply-guild: func(app: string) -> result<_, error>;
+    attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
+}
+
+interface user-eval {
+    use host:types/types.{error};
+
+    attest: func(guild-account: string, group-number: u32) -> result<_, error>;
+    propose: func(guild-account: string, group-number: u32, proposal: list<string>) -> result<_, error>;
+
+
+    register: func(guild-account: string) -> result<_, error>;
+    unregister: func(guild-account: string) -> result<_, error>;
+
+    get-group-users: func(guild-account: string, group-number: u32) -> result<list<string>, error>;
+    get-proposal: func(guild-account: string, group-number: u32) -> result<option<list<string>>, error>;
+
+}
+
 
 world imports {
     import api;
-    import queries;
+
+    import user-guild;
+    import admin-guild;
+    import user-eval;
 }
