@@ -48,7 +48,65 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
-// The supervisor facilitates all communication
+/**
+ * Supervisor — design notes for plugin lifecycle and WebAssembly memory
+ *
+ * The supervisor facilitates all communication between an app shell and its
+ * plugin tree. It is loaded as an iframe at supervisor.<root> by every app
+ * subdomain. Treat the rules below as load-bearing; violating them is what
+ * caused the original "RangeError: WebAssembly.Memory(): could not allocate
+ * memory" failures and motivated this file's current shape.
+ *
+ * Why call-scoped instantiation
+ *   Each WebAssembly.Memory reserves ~10GB of *virtual address space* (VAS)
+ *   on 64-bit V8 under the guard-page scheme, regardless of physical RAM
+ *   touched. Each plugin component decomposes into multiple core modules,
+ *   and the ones that own memory each export their own Memory. With dozens
+ *   of plugins live, VAS exhaustion (not RAM exhaustion) is the failure
+ *   mode.
+ *
+ *   On the original design, Plugin.ready instantiated the plugin and that
+ *   instance was retained for the iframe's lifetime. A single app's
+ *   dependency tree (~20 plugins) was usually under the per-process VAS
+ *   budget, but the budget is unbounded across iframes and across
+ *   navigations:
+ *     - Each app subdomain hosts its own supervisor iframe; same URL, but
+ *       *separate JS realms* with separate Plugins registries. Nothing
+ *       dedups across iframes.
+ *     - Cross-app workflows (e.g. Config calling into Accounts for login,
+ *       then into Permissions for a grant) compose multiple supervisor
+ *       iframes simultaneously, each with its full plugin set live.
+ *     - Detached/bfcached documents do not release their Memory
+ *       reservations until V8 actually GCs them, so even sequential
+ *       app-to-app navigation accumulates VAS.
+ *   The failure presents as random, but it is just whichever workflow
+ *   happens to compose enough live supervisors at once.
+ *
+ *   The current design fixes this by separating *fetch + compile* (cheap;
+ *   no Memory) from *instantiate* (allocates Memory). Plugin handles
+ *   (compiledPlugin, a WebAssembly.Module) are retained for reuse across
+ *   calls. Live instances are created in entry()/getJson()/preloadPlugins()
+ *   just before the synchronous call chain runs and disposed in finally(),
+ *   so the working set is bounded by *one entry's needs*, not by the
+ *   cumulative history of the iframe.
+ *
+ * Rules for anyone touching this file
+ *   - Do not move instantiation back into Plugin construction or onto
+ *     Plugin.ready. Keep the fetch/compile vs. instantiate split.
+ *   - Every entrypoint that instantiates plugins (entry, getJson,
+ *     preloadPlugins) MUST dispose in a finally clause, even on the error
+ *     path. Phase 0 of doPreload() leaves system-plugin instances live for
+ *     its own internal supervisorCall()s; the entrypoint's finally is what
+ *     releases them.
+ *   - Treat the systemPlugins set as the "always-needed-during-preload"
+ *     set, not the "always-live" set. Adding a plugin here costs Memory
+ *     during every preload, on every entry.
+ *   - The component-parser utility WASM (utils.ts::parser) is the only
+ *     intentionally-retained allocation between entries.
+ *   - Comments here assume the Memory model header in plugin/plugin.ts
+ *     for VAS / dispose / pinned / retained terminology. Keep it that way
+ *     instead of duplicating context.
+ */
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
 
