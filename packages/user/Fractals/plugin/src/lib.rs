@@ -61,16 +61,6 @@ define_trust! {
     }
 }
 
-impl Guild {
-    fn assert_authorized(&self, function: FunctionName) -> Result<(), Error> {
-        assert_authorized_with_whitelist(function, vec![self.fractal.to_string()])
-    }
-
-    fn eval_id(&self) -> Result<u32, ErrorType> {
-        self.evaluation_id.ok_or(ErrorType::NoPendingEvaluation)
-    }
-}
-
 struct FractallyPlugin;
 
 impl AdminFractal for FractallyPlugin {

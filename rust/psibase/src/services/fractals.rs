@@ -272,15 +272,6 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Starts an evaluation for the specified guild.
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    #[action]
-    fn start_eval(guild_account: AccountNumber) {
-        unimplemented!()
-    }
-
     /// Allows a user to join a fractal and immediately become a citizen.
     ///
     /// Cannot be called by a fractal.
