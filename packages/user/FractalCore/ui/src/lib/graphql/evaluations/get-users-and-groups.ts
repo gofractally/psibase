@@ -82,8 +82,6 @@ export const getUsersAndGroups = async (
         })
         .parse(res);
 
-    console.log({ response });
-
     return zUsersAndGroupsResponse.parse({
         users: response.getUsers.nodes,
         groups: response.getGroups.nodes,

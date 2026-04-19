@@ -1,13 +1,13 @@
 import { z } from "zod";
 
 import { Account } from "@shared/lib/schemas/account";
+import { zUnix } from "@shared/lib/schemas/unix";
 
 import { Evaluation } from "./graphql/evaluations/get-evaluation";
 import {
     UsersAndGroups,
     zResult,
 } from "./graphql/evaluations/get-users-and-groups";
-import { zUnix } from "@shared/lib/schemas/unix";
 
 const zTimeStatus = z.enum([
     "PENDING",
@@ -71,6 +71,8 @@ export type DeliberationPhase = z.infer<typeof zDeliberationPhase>;
 
 const zSubmissionPhase = z.object({
     type: z.literal("submission"),
+    isParticipant: z.boolean(),
+    hasEnoughProposals: z.boolean().optional(),
     mustSubmit: z.boolean(),
     groupNumber: z.number().optional(),
     evaluationId: z.number(),
@@ -119,6 +121,20 @@ export const getStatus = (
 
     const timeStatus = getTimeStatus(evaluation, currentTime);
 
+    const user = users.find((user) => user.user === currentUser);
+    const isUserParticipant = !!user;
+
+    // Calculate whether the user has enough proposals to submit
+    const usersInGroup = users.filter(
+        (u) => u.groupNumber === user?.groupNumber,
+    );
+    const numUsersInGroup = usersInGroup.length;
+    const numProposalsInGroup = usersInGroup.filter((u) => u.proposal).length;
+    const threshold = Math.ceil((2 / 3) * numUsersInGroup);
+    const hasEnoughProposals = isUserParticipant
+        ? numProposalsInGroup >= threshold
+        : undefined;
+
     if (timeStatus === PENDING) {
         const res: z.infer<typeof zWaitingRegistration> = {
             type: "waitingRegistration",
@@ -140,11 +156,10 @@ export const getStatus = (
             };
             return res;
         }
-        const place = users.find((user) => user.user === currentUser);
         return zDeliberationPhase.parse({
             type: "deliberation",
-            isParticipant: !!place,
-            groupNumber: place?.groupNumber,
+            isParticipant: isUserParticipant,
+            groupNumber: user?.groupNumber,
             deliberationDeadline: evaluation.submissionStarts,
         });
     } else if (timeStatus === SUBMISSION) {
@@ -155,10 +170,9 @@ export const getStatus = (
             });
         }
 
-        const user = users.find((user) => user.user === currentUser);
         const canCloseEarly = results.length == groups.length;
 
-        if (user) {
+        if (isUserParticipant) {
             const isGroupResult = results.some(
                 (result) => result.groupNumber === user.groupNumber,
             );
@@ -168,7 +182,10 @@ export const getStatus = (
 
             const res: SubmissionPhase = {
                 type: "submission",
-                mustSubmit: !userHasSubmitted && !isGroupResult,
+                isParticipant: isUserParticipant,
+                hasEnoughProposals,
+                mustSubmit:
+                    !userHasSubmitted && !isGroupResult && !!hasEnoughProposals,
                 groupNumber: user.groupNumber!,
                 evaluationId: evaluation.id,
                 submissionDeadline: evaluation.finishBy,
@@ -179,6 +196,7 @@ export const getStatus = (
         } else {
             const res: SubmissionPhase = {
                 type: "submission",
+                isParticipant: isUserParticipant,
                 mustSubmit: false,
                 canCloseEarly,
                 submissionDeadline: evaluation.finishBy,
