@@ -18,9 +18,8 @@ use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
 use crate::errors::ErrorType;
 use crate::graphql::fractal::get_fractal;
-use crate::graphql::guild::{get_guild, Guild};
 use crate::helpers::get_sender_app;
-use crate::trust::{assert_authorized, assert_authorized_with_whitelist};
+use crate::trust::assert_authorized;
 use psibase::define_trust;
 use trust::FunctionName;
 
@@ -136,17 +135,6 @@ impl UserFractal for FractallyPlugin {
 }
 
 impl Queries for FractallyPlugin {
-    fn get_guild(guild_account: String) -> Result<types::Guild, Error> {
-        let guild = get_guild(guild_account)?;
-        Ok(types::Guild {
-            fractal: guild.fractal.to_string(),
-            guild: guild.guild.to_string(),
-            evaluation_id: guild.evaluation_id,
-            council_role: guild.council_role.to_string(),
-            rep_role: guild.rep_role.to_string(),
-        })
-    }
-
     fn get_fractal(fractal_account: String) -> Result<types::Fractal, Error> {
         let fractal = get_fractal(fractal_account)?;
         Ok(types::Fractal {

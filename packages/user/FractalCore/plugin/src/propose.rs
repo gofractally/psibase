@@ -1,5 +1,8 @@
 use crate::bindings::fractals::plugin as FractalsPlugin;
-use crate::bindings::fractals::plugin::queries::{Fractal, Guild};
+use crate::bindings::fractals::plugin::queries::Fractal;
+use crate::bindings::guilds::plugin as GuildsPlugin;
+use crate::bindings::guilds::plugin::queries::Guild;
+
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
     host::common::client::get_receiver, staged_tx::plugin::proposer::set_propose_latch,
@@ -14,7 +17,7 @@ fn get_fractal() -> Result<Fractal, Error> {
 }
 
 fn get_guild(guild_account: &str) -> Result<Guild, Error> {
-    FractalsPlugin::queries::get_guild(guild_account)
+    GuildsPlugin::queries::get_guild(guild_account)
 }
 
 pub fn legislature() -> Result<(), Error> {

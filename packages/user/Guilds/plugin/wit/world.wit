@@ -5,7 +5,15 @@ interface api {
     set-example-thing: func(thing: string) -> result<_, error>;
 }
 
-
+interface types {
+    record guild {
+        fractal: string,
+        guild: string,
+        evaluation-id: option<u32>,
+        council-role: string,
+        rep-role: string
+    }
+}
 
 
 interface admin-guild {
@@ -60,10 +68,20 @@ interface user-eval {
 
 }
 
+interface queries {
+    use types.{guild};
+    use host:types/types.{error};
+
+    get-guild: func(guild-account: string) -> result<guild, error>;
+}
+
+
+
 
 world imports {
     import api;
 
+    import queries;
     import user-guild;
     import admin-guild;
     import user-eval;
