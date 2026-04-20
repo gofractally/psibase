@@ -1146,6 +1146,7 @@ namespace psibase
          std::vector<EventBlockInfo> blockInfos(rows.size());
          for (const auto& bs : blockStarts)
          {
+            check(bs.rowIndex < rows.size(), "rowIndex out of range");
             blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
          }
 
