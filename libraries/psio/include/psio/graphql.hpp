@@ -129,7 +129,7 @@ namespace psio
          if (is_input)
             return std::string{get_type_name((T*)nullptr)} + "_Input";
          else
-            return std::string{get_type_name((T*)nullptr)};
+            return get_type_name((T*)nullptr);
       else
          return get_gql_name((T*)nullptr);
    }

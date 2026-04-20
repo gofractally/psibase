@@ -147,9 +147,10 @@ namespace psibase
    };
 
    template <typename T>
-   constexpr auto get_type_name(const WithBlockContext<T>*)
+   const char* get_type_name(const WithBlockContext<T>*)
    {
-      return psio::reflect<T>::name + "WithBlockContext";
+      static constexpr auto name = psio::reflect<T>::name + "WithBlockContext";
+      return name.c_str();
    }
 
    // Flatten T's fields alongside `block` in the schema for WithBlockContext<T>.
