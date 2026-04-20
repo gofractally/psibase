@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     method, schema_types,
     services::{db, transact},
-    AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap,
+    AccountNumber, Action, Hex, MethodNumber, MethodString, Pack, Schema, SchemaMap,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -189,6 +189,47 @@ fn hide_action(action: &Action) -> bool {
         || action.service == transact::SERVICE && action.method == method!("kvNotify")
 }
 
+fn decode_into_value<'a>(
+    cschema: &mut CompiledSchema<'a>,
+    ty: &'a fracpack::AnyType,
+    raw: &[u8],
+) -> Option<serde_json::Value> {
+    cschema.extend(ty);
+    cschema.to_value(ty, raw).ok()
+}
+
+/// Decode an action's `rawData` into a JSON value using the provided service schema.
+pub fn unpack_action_data(
+    schema: &Schema,
+    method: &MethodNumber,
+    raw_data: &[u8],
+) -> Option<serde_json::Value> {
+    if raw_data.is_empty() {
+        return None;
+    }
+    let action_name = MethodString(method.to_string());
+    let action_type = schema.actions.get(&action_name)?;
+    let custom = schema_types();
+    let mut cschema = CompiledSchema::new(&schema.types, &custom);
+    decode_into_value(&mut cschema, &action_type.params, raw_data)
+}
+
+pub struct PrunedJson<'a>(pub &'a serde_json::Value);
+
+impl fmt::Display for PrunedJson<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_pruned_json(f, self.0)
+    }
+}
+
+pub struct PrunedJsonPretty<'a>(pub &'a serde_json::Value);
+
+impl fmt::Display for PrunedJsonPretty<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_pruned_json_pretty(f, self.0)
+    }
+}
+
 fn format_action_trace(
     schemas: &SchemaMap,
     atrace: &ActionTrace,
@@ -216,8 +257,9 @@ fn format_action_trace(
         let custom = schema_types();
         let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
         if !atrace.action.rawData.is_empty() {
-            cschema.extend(&action_type.params);
-            if let Ok(args) = cschema.to_value(&action_type.params, &atrace.action.rawData) {
+            if let Some(args) =
+                decode_into_value(&mut cschema, &action_type.params, &atrace.action.rawData)
+            {
                 if let serde_json::Value::Object(args) = args {
                     for (name, value) in args {
                         write!(f, "{:indent$}    {}: ", "", name)?;
@@ -235,9 +277,10 @@ fn format_action_trace(
         }
         if !atrace.raw_retval.is_empty() {
             if let Some(result_type) = &action_type.result {
-                cschema.extend(result_type);
                 write!(f, "{:indent$}    retval: ", "",)?;
-                if let Ok(result) = &cschema.to_value(result_type, &atrace.raw_retval) {
+                if let Some(result) =
+                    decode_into_value(&mut cschema, result_type, &atrace.raw_retval)
+                {
                     format_pruned_json(f, &result)?
                 } else {
                     write!(f, "<deserialization failed>")?
@@ -460,33 +503,65 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
     }
 }
 
-fn format_truncated_list<
-    T,
-    L: IntoIterator<Item = T>,
-    F: Fn(&mut fmt::Formatter<'_>, T) -> fmt::Result,
->(
+#[derive(Copy, Clone)]
+struct PruneStyle {
+    indent: Option<usize>,
+}
+
+impl PruneStyle {
+    const COMPACT: Self = Self { indent: None };
+    const PRETTY: Self = Self { indent: Some(0) };
+
+    fn child(self) -> Self {
+        Self {
+            indent: self.indent.map(|d| d + 2),
+        }
+    }
+
+    fn write_break(self, w: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(d) = self.indent {
+            write!(w, "\n{:width$}", "", width = d)?;
+        }
+        Ok(())
+    }
+}
+
+fn format_truncated_list<T, L, F>(
     writer: &mut fmt::Formatter<'_>,
     value: L,
     len: usize,
-    f: F,
-) -> fmt::Result {
+    style: PruneStyle,
+    mut f: F,
+) -> fmt::Result
+where
+    L: IntoIterator<Item = T>,
+    F: FnMut(&mut fmt::Formatter<'_>, T) -> fmt::Result,
+{
+    let child = style.child();
+    let mut any = false;
     for (i, item) in value.into_iter().enumerate() {
         if i != 0 {
             write!(writer, ",")?;
         }
+        child.write_break(writer)?;
+        any = true;
         if i >= len {
             write!(writer, "…")?;
             break;
         }
-        f(writer, item)?
+        f(writer, item)?;
+    }
+    if any {
+        style.write_break(writer)?;
     }
     Ok(())
 }
 
-fn format_pruned_json(
+fn format_pruned_json_inner(
     writer: &mut fmt::Formatter<'_>,
     value: &serde_json::Value,
-) -> std::fmt::Result {
+    style: PruneStyle,
+) -> fmt::Result {
     use serde_json::Value::*;
     match value {
         String(s) if s.len() > 20 => {
@@ -502,23 +577,40 @@ fn format_pruned_json(
             )?;
         }
         Array(a) => {
+            let child = style.child();
             write!(writer, "[")?;
-            format_truncated_list(writer, a, 5, |writer, item| {
-                format_pruned_json(writer, item)
+            format_truncated_list(writer, a, 5, style, |w, item| {
+                format_pruned_json_inner(w, item, child)
             })?;
             write!(writer, "]")?;
         }
         Object(a) => {
+            let child = style.child();
+            let kv_sep = if style.indent.is_some() { ": " } else { ":" };
             write!(writer, "{{")?;
-            format_truncated_list(writer, a, 5, |writer, (k, v)| {
-                write!(writer, "{}:", serde_json::to_string(k).unwrap())?;
-                format_pruned_json(writer, v)
+            format_truncated_list(writer, a, 5, style, |w, (k, v)| {
+                write!(w, "{}{}", serde_json::to_string(k).unwrap(), kv_sep)?;
+                format_pruned_json_inner(w, v, child)
             })?;
             write!(writer, "}}")?;
         }
         value => write!(writer, "{}", serde_json::to_string(value).unwrap())?,
     }
     Ok(())
+}
+
+fn format_pruned_json(
+    writer: &mut fmt::Formatter<'_>,
+    value: &serde_json::Value,
+) -> fmt::Result {
+    format_pruned_json_inner(writer, value, PruneStyle::COMPACT)
+}
+
+fn format_pruned_json_pretty(
+    writer: &mut fmt::Formatter<'_>,
+    value: &serde_json::Value,
+) -> fmt::Result {
+    format_pruned_json_inner(writer, value, PruneStyle::PRETTY)
 }
 
 struct UnpackedAction<'a> {
@@ -596,15 +688,13 @@ impl<'a, 'b> Serialize for UnpackedTrace<'a, &'b ActionTrace> {
             let custom = schema_types();
             let mut cschema = CompiledSchema::new(&schema.unwrap().types, &custom);
             if !atrace.action.rawData.is_empty() {
-                cschema.extend(&action_type.params);
-                unpacked_args = cschema
-                    .to_value(&action_type.params, &atrace.action.rawData)
-                    .ok()
+                unpacked_args =
+                    decode_into_value(&mut cschema, &action_type.params, &atrace.action.rawData);
             }
             if !atrace.raw_retval.is_empty() {
                 if let Some(result_type) = &action_type.result {
-                    cschema.extend(result_type);
-                    unpacked_retval = cschema.to_value(result_type, &atrace.raw_retval).ok()
+                    unpacked_retval =
+                        decode_into_value(&mut cschema, result_type, &atrace.raw_retval);
                 }
             }
         }
