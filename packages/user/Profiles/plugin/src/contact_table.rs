@@ -11,13 +11,13 @@ use crate::bindings::host::types::types::Error;
 use crate::errors;
 use errors::ErrorType;
 
-fn bucket() -> Bucket {
+fn contacts_table() -> Bucket {
     Bucket::new(
         Database {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
         },
-        "profiles",
+        "contacts",
     )
 }
 
@@ -57,7 +57,7 @@ impl ContactTable {
     }
 
     fn save_contacts(&self, contacts: Vec<ContactEntry>) {
-        bucket().set(&self.key(), &contacts.packed());
+        contacts_table().set(&self.key(), &contacts.packed());
     }
 
     pub fn set(&self, contact: Contact, overwrite: bool) -> Result<(), Error> {
@@ -79,7 +79,7 @@ impl ContactTable {
     }
 
     pub fn get_contacts(&self) -> Vec<ContactEntry> {
-        let contacts = bucket().get(&self.key());
+        let contacts = contacts_table().get(&self.key());
 
         contacts
             .map(|c| <Vec<ContactEntry>>::unpacked(&c).unwrap())

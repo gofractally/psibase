@@ -9,13 +9,13 @@ use psibase::{
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn bucket() -> Bucket {
+fn keys_table() -> Bucket {
     Bucket::new(
         Database {
             mode: DbMode::NonTransactional,
             duration: StorageDuration::Persistent,
         },
-        "evaluations",
+        "keys",
     )
 }
 
@@ -28,7 +28,7 @@ pub struct AsymKey {
 const KEY: &str = "asym_keys";
 
 pub fn get() -> Result<Vec<AsymKey>, Error> {
-    let keys = bucket().get(KEY);
+    let keys = keys_table().get(KEY);
     keys.map(|c| {
         <Vec<AsymKey>>::unpacked(&c).map_err(|_| ErrorType::KeyDeserializationFailed.into())
     })
@@ -40,7 +40,7 @@ pub fn get_latest() -> Option<AsymKey> {
 }
 
 pub fn save(keys: Vec<AsymKey>) {
-    bucket().set(KEY, &keys.packed());
+    keys_table().set(KEY, &keys.packed());
 }
 
 pub fn add(new_key: AsymKey) -> Result<(), Error> {
@@ -104,7 +104,7 @@ impl SymmetricKey {
         group_number: u32,
     ) -> Result<Option<Self>, Error> {
         let key = Self::storage_key(owner, evaluation_id, group_number);
-        let key_value = bucket().get(&key);
+        let key_value = keys_table().get(&key);
         Ok(match key_value {
             Some(value) => Some(
                 SymmetricKey::unpacked(&value).map_err(|_| ErrorType::KeyDeserializationFailed)?,
@@ -135,6 +135,6 @@ impl SymmetricKey {
     pub fn save(&self, owner: AccountNumber, evaluation_id: u32, group_number: u32) {
         let key = Self::storage_key(owner, evaluation_id, group_number);
         let packed_key = self.packed();
-        bucket().set(&key, &packed_key);
+        keys_table().set(&key, &packed_key);
     }
 }
