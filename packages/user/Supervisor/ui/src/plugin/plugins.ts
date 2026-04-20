@@ -51,8 +51,11 @@ export class Plugins {
         await Promise.all(promises);
     }
 
-    /** Compiled Module handles are retained; only the live instances are
-     *  dropped. Returns disposed plugin ids. */
+    /**
+     * Dispose every instantiated plugin. `compiledPlugin` references are
+     * preserved on each Plugin, so bfcache restore can re-instantiate
+     * without re-fetching or re-compiling.
+     */
     public disposeAll(): string[] {
         const disposed: string[] = [];
         for (const context of Object.values(this.serviceContexts)) {

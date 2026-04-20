@@ -1,18 +1,3 @@
-/**
- * Memory model
- *
- * On 64-bit V8 each WebAssembly.Memory reserves ~10GB of virtual address
- * space (VAS) for guard pages, regardless of physical RAM. With dozens of
- * plugins live, VAS exhaustion — not RAM — is what makes WebAssembly
- * instantiate fail with "could not allocate memory".
- *
- * Mitigation: keep fetch+compile separate from instantiate. Plugins are
- * instantiated just before the synchronous call chain and disposed in the
- * caller's finally(); the compiled Module handle is retained so the next
- * entry skips re-fetch/re-compile. utils.ts::parser is the only WASM
- * intentionally retained between entries.
- */
-
 import {
     QualifiedPluginId,
     assertTruthy,
@@ -41,7 +26,8 @@ export class Plugin {
 
     parsed: Promise<ComponentAPI>;
 
-    // Compiled, not yet instantiated; ensureInstantiated() before use.
+    // Resolves when the plugin is compiled (cheap — no Memory allocated).
+    // After this, ensureInstantiated() can be called to allocate Memory.
     ready: Promise<void>;
 
     private compiledPlugin: CompiledPlugin | undefined;

@@ -49,7 +49,6 @@ export const assert = (condition: boolean, errorMessage: string): void => {
 
 let modulePromise: Promise<any>;
 
-// Only WASM retained between supervisor entries (see plugin/plugin.ts).
 export const parser = (): Promise<any> => {
     if (!modulePromise) {
         const url = siblingUrl(

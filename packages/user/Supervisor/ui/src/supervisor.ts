@@ -36,7 +36,8 @@ import {
 
 const rootDomain = siblingUrl(null, null, null, true);
 
-// Adding here costs every entry the work of compiling + instantiating it.
+// System plugins are always loaded, even if they are not used
+//   in a given call context.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("host", "auth"),
@@ -46,19 +47,7 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
-/**
- * Plugin lifecycle is call-scoped. See plugin/plugin.ts memory-model header
- * for the VAS rationale, and the PR / issue history for the failure modes.
- *
- * Invariants:
- *   - Keep fetch/compile separate from instantiate; do not instantiate in
- *     Plugin construction or in Plugin.ready.
- *   - Every entrypoint that instantiates must dispose in `finally` (success
- *     and error). doPreload leaves Phase-0 instances live for its own sync
- *     calls; the entrypoint releases them.
- *   - No cross-entry caches of plugin instances: concurrent entries (from
- *     un-awaited postMessage dispatch) would race over shared lifecycle.
- */
+// The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
 
@@ -107,23 +96,27 @@ export class Supervisor implements AppInterface {
 
     private preloadLock: Promise<void> = Promise.resolve();
 
-    private preload(plugins: QualifiedPluginId[], reason: string): Promise<void> {
+    private preload(plugins: QualifiedPluginId[]): Promise<void> {
         const myPreload = this.preloadLock
             .catch(() => {})
-            .then(() => this.doPreload(plugins, reason));
+            .then(() => this.doPreload(plugins));
         this.preloadLock = myPreload.catch(() => {});
         return myPreload;
     }
 
-    private async doPreload(plugins: QualifiedPluginId[], reason: string) {
+    private async doPreload(plugins: QualifiedPluginId[]) {
         await chainIdPromise;
 
         if (plugins.length === 0) {
             return;
         }
 
-        // Phase 0 instantiates because the supervisorCall()s below need
-        // live targets; the entrypoint's finally disposes them.
+        // Phase 0: Compile system plugins and instantiate them so the
+        // internal sync calls below (getActivePrompt, getActiveQueryToken,
+        // getAuthServices) have live instances to hit. These instances
+        // are not retained between entries — the caller (entry /
+        // preloadPlugins / getJson) is responsible for disposing them
+        // after whatever follow-up work requires them.
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
@@ -141,11 +134,14 @@ export class Supervisor implements AppInterface {
 
         setQueryToken(this.getActiveQueryToken());
 
-        // Phases 1+2 compile only; instantiation is deferred to entry().
+        // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
+        // The sync call to getAuthServices below only touches Phase 0 plugins.
         this.loader.trackPlugins([...plugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
+        // Phase 2: Load the auth services for all connected accounts.
+        // This sync call uses accounts:plugin (Phase 0, already instantiated).
         const auth_services: string[] = this.supervisorCall(
             getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
@@ -153,13 +149,19 @@ export class Supervisor implements AppInterface {
         const addtl_plugins: QualifiedPluginId[] = [];
         for (const service of auth_services) {
             if (!service) continue;
-            // Limitation: an auth service plugin must be called "plugin".
+
+            // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
             addtl_plugins.push(pluginId(service, "plugin"));
         }
         this.loader.trackPlugins(addtl_plugins);
 
         await this.loader.processPlugins();
         await this.loader.awaitReady();
+
+        // Phase 1 + Phase 2 plugins are COMPILED only. Phase 0 plugins are
+        // still live at this point (instantiated above for the internal
+        // sync calls). The caller will dispose them together with the rest
+        // once its own work finishes.
     }
 
     private replyToParent(id: string, result: any) {
@@ -333,31 +335,38 @@ export class Supervisor implements AppInterface {
         return ret;
     }
 
-    // Returns the JSON interface for a plugin.
+    // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
             this.setParentOrigination(callerOrigin);
-            await this.preload([plugin], `getJson:${plugin.service}:${plugin.plugin}`);
+            await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
             this.replyToParent(id, json);
         } catch (e) {
             this.replyToParent(id, e);
         } finally {
+            // Release the Phase-0 system plugin instances that doPreload
+            // left live for its internal sync calls. Sweeps every
+            // instantiated plugin.
             this.plugins.disposeAll();
         }
     }
 
+    // This is an entrypoint for apps to preload plugins.
+    // Intended to be used on pageload to prepare the plugins that an app requires,
+    //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
             this.setParentOrigination(callerOrigin);
-            const reason = `preloadPlugins:[${plugins
-                .map((p) => `${p.service}:${p.plugin}`)
-                .join(",")}]`;
-            await this.preload(plugins, reason);
+            await this.preload(plugins);
         } catch (e) {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
         } finally {
+            // See getJson() — preload leaves system plugins instantiated
+            // for its internal sync calls; we release them here so the
+            // idle footprint between preloadPlugins() and the next
+            // entry() stays at zero non-parser memories.
             this.plugins.disposeAll();
         }
     }
@@ -367,39 +376,46 @@ export class Supervisor implements AppInterface {
         return this.plugins.disposeAll();
     }
 
+    // This is an entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
         id: string,
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
-        const entryLabel = `${args.service}:${args.plugin} ${
-            args.intf ? `${args.intf}.` : ""
-        }${args.method}`;
-
         try {
             this.setParentOrigination(callerOrigin);
 
-            await this.preload(
-                [
-                    {
-                        service: args.service,
-                        plugin: args.plugin,
-                    },
-                ],
-                `entry:${entryLabel}`,
-            );
+            // Load the full plugin tree (downloading + parsing + transpiling
+            //   via jco + compiling core WASM modules). Phase 0 system
+            //   plugins are instantiated as a side-effect so the internal
+            //   sync calls inside preload have live instances; the finally
+            //   clause below will dispose them alongside everything we
+            //   instantiate ourselves.
+            // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
+            await this.preload([
+                {
+                    service: args.service,
+                    plugin: args.plugin,
+                },
+            ]);
 
+            // Instantiate every remaining plugin (Phase 1 + Phase 2) so the
+            // synchronous call chain below has live instances to call into.
+            // Phase 0 plugins are already instantiated (no-op for them).
             await this.plugins.ensureAllInstantiated();
 
             this.context = this.getCallContext();
 
+            // Starts the tx context.
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "startTx", []),
             );
 
+            // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
+            //   preloaded.
             const result = this.call(args);
 
-            // Closes the tx context. If actions were added, tx is submitted.
+            // Closes the current tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "finishTx", []),
             );
@@ -407,6 +423,7 @@ export class Supervisor implements AppInterface {
                 console.warn(txResult);
             }
 
+            // Send plugin result to parent window
             this.replyToParent(id, result);
 
             this.context = undefined;
@@ -429,7 +446,11 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } finally {
-            // Also catches partial-instantiation failures from Phase 0.
+            // Dispose every instance so V8 can reclaim the backing
+            // WebAssembly.Memory (and its ~10GB of virtual address space)
+            // on the next GC. On a Phase 0 preload failure, system plugins
+            // that instantiated before the error are also caught by this
+            // sweep.
             this.plugins.disposeAll();
         }
     }

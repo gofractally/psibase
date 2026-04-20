@@ -220,11 +220,6 @@ function addResourceProxy(
 
 export interface InstantiateResult {
     exports: Record<string, unknown>;
-    // Per-instantiation counts — see plugin/plugin.ts header for VAS context.
-    // coreCount: WebAssembly.Instance count (one per core module).
-    // memoryCount: WebAssembly.Memory count (only owners; imported peers excluded).
-    coreCount: number;
-    memoryCount: number;
 }
 
 export interface CompiledPlugin {
@@ -293,30 +288,9 @@ async function compileWasmComponent(
     URL.revokeObjectURL(url);
 
     return {
-        instantiate: async () => {
-            let coreCount = 0;
-            let memoryCount = 0;
-            const countingInstantiateCore = async (
-                module: WebAssembly.Module,
-                importObj?: WebAssembly.Imports,
-            ): Promise<WebAssembly.Instance> => {
-                const instance = await WebAssembly.instantiate(
-                    module,
-                    importObj ?? {},
-                );
-                coreCount++;
-                for (const value of Object.values(instance.exports)) {
-                    if (value instanceof WebAssembly.Memory) memoryCount++;
-                }
-                return instance;
-            };
-            const exports = await jcoModule.instantiate(
-                getCoreModule,
-                imports,
-                countingInstantiateCore,
-            );
-            return { exports, coreCount, memoryCount };
-        },
+        instantiate: async () => ({
+            exports: await jcoModule.instantiate(getCoreModule, imports),
+        }),
     };
 }
 
