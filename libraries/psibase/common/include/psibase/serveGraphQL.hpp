@@ -1146,8 +1146,7 @@ namespace psibase
          std::vector<EventBlockInfo> blockInfos(rows.size());
          for (const auto& bs : blockStarts)
          {
-            if (bs.rowIndex < rows.size())
-               blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
+            blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
          }
 
          ConnType connection;

@@ -514,9 +514,6 @@ fn fetch_block_context(rowids: &[u64]) -> async_graphql::Result<HashMap<usize, E
 
     let block_starts = fetch_block_start_rows(rowids)?;
     for block_start in block_starts {
-        if block_start.row_index >= rowids.len() {
-            continue;
-        }
         result.insert(
             block_start.row_index,
             EventBlockInfo {
