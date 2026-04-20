@@ -1,7 +1,15 @@
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use psibase::fracpack::{Pack, Unpack};
 
-use crate::db::keys::DbKeys;
+fn connected_apps_table() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        },
+        "connected_apps",
+    )
+}
 
 #[derive(Pack, Unpack, Default)]
 struct ConnectedApps {
@@ -37,12 +45,8 @@ impl UserTable {
         }
     }
 
-    fn prefixed_key(&self, key: &str) -> String {
-        self.user.to_string() + "." + key
-    }
-
     pub fn add_connected_app(&self, app: &str) {
-        let connected_apps = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_APPS));
+        let connected_apps = connected_apps_table().get(&self.user);
         let mut connected_apps = connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
             .unwrap_or_default();
@@ -50,26 +54,20 @@ impl UserTable {
             return;
         }
         connected_apps.add(app);
-        Keyvalue::set(
-            &self.prefixed_key(DbKeys::CONNECTED_APPS),
-            &connected_apps.packed(),
-        );
+        connected_apps_table().set(&self.user, &connected_apps.packed());
     }
 
     pub fn remove_connected_app(&self, app: &str) {
-        let connected_apps = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_APPS));
+        let connected_apps = connected_apps_table().get(&self.user);
         let mut connected_apps = connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
             .unwrap_or_default();
         connected_apps.remove(app);
-        Keyvalue::set(
-            &self.prefixed_key(DbKeys::CONNECTED_APPS),
-            &connected_apps.packed(),
-        );
+        connected_apps_table().set(&self.user, &connected_apps.packed());
     }
 
     pub fn get_connected_apps(&self) -> Vec<String> {
-        let connected_apps = Keyvalue::get(&self.prefixed_key(DbKeys::CONNECTED_APPS));
+        let connected_apps = connected_apps_table().get(&self.user);
         connected_apps
             .map(|c| <ConnectedApps>::unpacked(&c).unwrap())
             .unwrap_or_default()
