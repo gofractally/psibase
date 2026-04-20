@@ -1,4 +1,4 @@
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use crate::bindings::host::types::types::Error;
 use crate::errors::ErrorType;
 use ecies::{utils::generate_keypair, PublicKey};
@@ -9,6 +9,16 @@ use psibase::{
 use rand::Rng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn bucket() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        },
+        "evaluations",
+    )
+}
+
 #[derive(Pack, Unpack, Debug, Default)]
 pub struct AsymKey {
     pub created_at: u32,
@@ -18,7 +28,7 @@ pub struct AsymKey {
 const KEY: &str = "asym_keys";
 
 pub fn get() -> Result<Vec<AsymKey>, Error> {
-    let keys = Keyvalue::get(KEY);
+    let keys = bucket().get(KEY);
     keys.map(|c| {
         <Vec<AsymKey>>::unpacked(&c).map_err(|_| ErrorType::KeyDeserializationFailed.into())
     })
@@ -30,7 +40,7 @@ pub fn get_latest() -> Option<AsymKey> {
 }
 
 pub fn save(keys: Vec<AsymKey>) {
-    Keyvalue::set(KEY, &keys.packed());
+    bucket().set(KEY, &keys.packed());
 }
 
 pub fn add(new_key: AsymKey) -> Result<(), Error> {
@@ -94,7 +104,7 @@ impl SymmetricKey {
         group_number: u32,
     ) -> Result<Option<Self>, Error> {
         let key = Self::storage_key(owner, evaluation_id, group_number);
-        let key_value = Keyvalue::get(&key);
+        let key_value = bucket().get(&key);
         Ok(match key_value {
             Some(value) => Some(
                 SymmetricKey::unpacked(&value).map_err(|_| ErrorType::KeyDeserializationFailed)?,
@@ -125,6 +135,6 @@ impl SymmetricKey {
     pub fn save(&self, owner: AccountNumber, evaluation_id: u32, group_number: u32) {
         let key = Self::storage_key(owner, evaluation_id, group_number);
         let packed_key = self.packed();
-        Keyvalue::set(&key, &packed_key);
+        bucket().set(&key, &packed_key);
     }
 }
