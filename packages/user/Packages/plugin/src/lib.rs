@@ -13,7 +13,7 @@ use host::types::types as HostTypes;
 use accounts::plugin::api as Accounts;
 use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
-use staged_tx::plugin::proposer as StagedTx;
+use transact::plugin::admin as TransactAdmin;
 
 use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::packages::plugin::types;
@@ -488,7 +488,7 @@ impl PrivateApi for PackagesPlugin {
         assert_caller_config_or_self("propose_install");
 
         let tx = <Vec<Action>>::unpacked(&tx).unwrap();
-        StagedTx::propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
+        TransactAdmin::propose(&tx.into_iter().map(|a| a.into()).collect::<Vec<_>>(), true)
     }
 
     fn set_account_sources(accounts: Vec<String>) -> Result<(), HostTypes::Error> {

@@ -48,7 +48,7 @@ psibase::define_trust! {
         None => [hook_action_auth, unhook_actions_sender, add_action_to_transaction],
         Low => [],
         High => [hook_actions_sender],
-        Max => [hook_tx_transform_label, set_snapshot_time, start_tx, finish_tx, get_query_token],
+        Max => [set_propose_latch, propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
     }
 }
 
@@ -57,18 +57,18 @@ psibase::define_trust! {
 // 1. start-tx
 //
 // 2. add-action-to-transaction
-// 3.   on-actions-sender           - the hooked plugin can set the sender of the action, otherwise the logged-in user is used by default
-// 4.   on-action-auth-claims      - the hooked plugin can add claims for this action
-// 5.   save action details
+// 3.   on-actions-sender           - the propose-latch account (if any) is used;
+//                                    otherwise the hooked plugin can set the sender of the action;
+//                                    otherwise the logged-in user is used by default.
+// 4.   on-action-auth-claims       - the hooked plugin can add claims for this action
 //
-// 6. finish-tx
-// 7.   on-user-claim              - the user auth plugin adds the user claim
-// 8.   on-tx-transform            - the hooked plugin can transform the set of actions in the transaction
-// 9.   construct transaction
-// 10.  hash-transaction
-// 11.  on-user-auth-proof         - the user auth plugin adds the user proof
-// 12.  on-action-auth-proofs      - the hooked plugin can add proofs for their action claims
-// 13.  publish transaction
+// 5. finish-tx
+// 6.   on-user-claim               - the user auth plugin adds the user claim
+// 7.   construct transaction
+// 8.   hash-transaction
+// 9.   on-user-auth-proof          - the user auth plugin adds the user proof
+// 10.  on-action-auth-proofs       - the hooked plugin can add proofs for their action claims
+// 11.  publish transaction
 
 struct TransactPlugin {}
 
@@ -78,11 +78,8 @@ impl Hooks for TransactPlugin {
     }
 
     fn hook_actions_sender() {
-        assert_authorized_with_whitelist(
-            FunctionName::hook_actions_sender,
-            vec!["staged-tx".into(), "invite".into()],
-        )
-        .unwrap();
+        assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
+            .unwrap();
 
         let sender_app = Host::client::get_sender();
 
@@ -101,24 +98,6 @@ impl Hooks for TransactPlugin {
                 ActionSenderHook::clear();
             }
         }
-    }
-
-    fn hook_tx_transform_label(label: Option<String>) {
-        assert_authorized_with_whitelist(
-            FunctionName::hook_tx_transform_label,
-            vec!["staged-tx".into()],
-        )
-        .unwrap();
-
-        let transformer = Host::client::get_sender();
-
-        if let Some(existing) = TxTransformLabel::get_transformer_plugin() {
-            if existing != transformer {
-                panic!("Error: Only one plugin can transform the transaction");
-            }
-        }
-
-        TxTransformLabel::set(transformer, label);
     }
 }
 
@@ -144,7 +123,11 @@ fn schedule_action(
         ActionClaims::push(plugin, claims);
     }
 
-    CurrentActions::push(action, TxTransformLabel::get_current_label());
+    if ProposeLatch::is_active() {
+        ProposeLatch::add(action);
+    } else {
+        TxActions::add(action);
+    }
 
     Ok(())
 }
@@ -172,15 +155,48 @@ impl Network for TransactPlugin {
     }
 }
 
+fn flush_propose_latch() -> Result<(), HostTypes::Error> {
+    let Some(latch) = ProposeLatch::take() else {
+        return Ok(());
+    };
+
+    if latch.actions.is_empty() {
+        return Ok(());
+    }
+
+    let Some(proposer) = accounts::plugin::api::get_current_user() else {
+        return Err(NotLoggedIn("flush_propose_latch").into());
+    };
+
+    let inner: Vec<psibase::Action> = latch.actions.into_iter().map(Into::into).collect();
+
+    let wrapper = Action {
+        sender: proposer,
+        service: psibase::services::staged_tx::SERVICE.to_string(),
+        method: psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
+        raw_data: psibase::services::staged_tx::action_structs::propose {
+            actions: inner,
+            auto_exec: true,
+        }
+        .packed(),
+    };
+    TxActions::add(wrapper);
+    Ok(())
+}
+
 impl Admin for TransactPlugin {
     fn start_tx() {
         assert_authorized_with_whitelist(FunctionName::start_tx, vec!["supervisor".into()])
             .unwrap();
 
         Store::clear_buffers();
-        if CurrentActions::has_actions() {
-            println!("[Warning] Transaction should already have been cleared.");
-            CurrentActions::clear();
+        if !TxActions::is_empty() {
+            println!("[Warning] Tx actions should already have been cleared.");
+            TxActions::reset();
+        }
+        if ProposeLatch::is_active() {
+            println!("[Warning] Propose latch should already have been cleared.");
+            ProposeLatch::clear();
         }
         if ActionAuthPlugins::has() {
             println!("[Warning] Auth plugins should already have been cleared.");
@@ -194,33 +210,63 @@ impl Admin for TransactPlugin {
             println!("[Warning] Action claims should already have been cleared.");
             ActionClaims::clear();
         }
-        if TxTransformLabel::has() {
-            println!("[Warning] Tx transform label should already have been cleared.");
-            TxTransformLabel::clear();
+    }
+
+    fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
+        assert_active_app("set_propose_latch");
+        assert_authorized(FunctionName::set_propose_latch)?;
+
+        let Some(acct) = account else {
+            return flush_propose_latch();
+        };
+
+        if accounts::plugin::api::get_account(&acct)?.is_none() {
+            return Err(InvalidAccount(&acct).into());
         }
+
+        if let Some(existing) = ProposeLatch::subsequent_action_sender() {
+            if existing == acct {
+                return Ok(());
+            }
+            flush_propose_latch()?;
+        }
+        ProposeLatch::open(acct);
+        Ok(())
+    }
+
+    fn propose(actions: Vec<Action>, auto_exec: bool) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
+
+        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+        let packed =
+            psibase::services::staged_tx::action_structs::propose { actions, auto_exec }.packed();
+
+        schedule_action(
+            psibase::services::staged_tx::SERVICE.to_string(),
+            psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
+            packed,
+        )
     }
 
     fn finish_tx() -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::finish_tx, vec!["supervisor".into()])?;
 
+        flush_propose_latch()?;
+
         ActionSenderHook::clear();
 
-        let actions = CurrentActions::get();
-        CurrentActions::clear();
+        let mut actions = TxActions::take();
 
         if actions.len() == 0 {
             Store::flush_transactional_data();
             return Ok(());
         }
 
-        let mut actions = transform_actions(actions)?;
-
         // This will automatically add the actions into the tx to
         // refill the user's gas tank if it is below some threshold
         // and the user is configured for auto-filling.
         VirtualServer::auto_fill_gas_tank(&actions[0].sender)?;
-        actions.extend(CurrentActions::get().into_iter().map(|a| a.action));
-        CurrentActions::clear();
+        actions.extend(TxActions::take());
 
         let tx = make_transaction(actions, 3);
 

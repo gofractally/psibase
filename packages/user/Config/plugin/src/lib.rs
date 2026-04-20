@@ -17,7 +17,7 @@ use virtual_server::plugin::types::{
     NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
 };
 
-use staged_tx::plugin::proposer::set_propose_latch;
+use transact::plugin::admin::set_propose_latch;
 
 struct ConfigPlugin;
 
