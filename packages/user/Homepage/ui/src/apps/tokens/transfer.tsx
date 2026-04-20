@@ -15,7 +15,7 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { useCreateContact } from "../contacts/hooks/use-create-contact";
 import { CreditTable } from "./components/credit-table";
 import { FieldAccount } from "./components/transfer/account-field";
-import { useCredit } from "./hooks/tokensPlugin/use-credit";
+import { useCredit } from "./hooks/tokens-plugin/use-credit";
 import { useTransferActions } from "./hooks/use-transfer-actions";
 import {
     defaultTransferValues,

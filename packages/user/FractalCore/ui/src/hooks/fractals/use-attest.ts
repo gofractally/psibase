@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getSupervisor } from "@psibase/common-lib";
 
 import { paths } from "@/lib/paths";
-import { zGuildAccount } from "@/lib/zod/Wrappers";
+import { zGuildAccount } from "@/lib/zod/wrappers";
 
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -23,20 +23,19 @@ export const useAttest = () => {
 
     return useMutation({
         mutationFn: async (params: z.infer<typeof zParams>) => {
-            await toast.promise(
-                getSupervisor().functionCall({
-                    method: "attest",
-                    service: fractal,
-                    intf: "userEval",
-                    params: [params.guildAccount, params.groupNumber],
-                }),
-                {
-                    error: (error) => {
-                        console.log("Attest error:", error);
-                        return "Unable to attest";
+            await toast
+                .promise(
+                    getSupervisor().functionCall({
+                        method: "attest",
+                        service: fractal,
+                        intf: "userEval",
+                        params: [params.guildAccount, params.groupNumber],
+                    }),
+                    {
+                        error: () => "Unable to attest",
                     },
-                },
-            );
+                )
+                .unwrap();
 
             // HACK
             // for optimistic update purposes
@@ -45,8 +44,11 @@ export const useAttest = () => {
             // the real attestation will be over-written by the next graphql query
             updateAttestation(999999999999, [1, 2, 3, 4, 5, 6]);
         },
-        onSuccess: () => {
-            navigate(paths.guild.evaluations(fractal!));
+        onSuccess: (_data, { guildAccount }) => {
+            navigate(paths.guild.evaluations(guildAccount));
+        },
+        onError: (error) => {
+            console.error("Attest error:", error);
         },
     });
 };

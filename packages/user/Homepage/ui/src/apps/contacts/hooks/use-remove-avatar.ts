@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 
 import { supervisor } from "@/supervisor";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import { zAccount } from "@shared/lib/schemas/account";

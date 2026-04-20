@@ -2,7 +2,8 @@ import { createBrowserRouter } from "react-router-dom";
 
 import { Members } from "@/pages/fractal/members";
 import { ActiveAndUpcoming } from "@/pages/guilds/evaluations/active-and-upcoming";
-import { Completed } from "@/pages/guilds/evaluations/completed";
+import { GuildEvaluationsLayout } from "@/pages/guilds/evaluations/layout";
+import { PastEvaluations } from "@/pages/guilds/evaluations/past";
 
 import { Layout } from "@/components/layout";
 
@@ -16,12 +17,12 @@ import { ApplicationDetail } from "./pages/guilds/application-detail/index";
 import { EvaluationDeliberation } from "./pages/guilds/evaluations/evaluation-deliberation";
 import { EvaluationResult } from "./pages/guilds/evaluations/evaluation-result";
 import { Leadership } from "./pages/guilds/leadership";
-import { GuildMembershipLayout } from "./pages/guilds/membership/_layout";
 import { GuildApplicants } from "./pages/guilds/membership/applicants";
+import { GuildMembershipLayout } from "./pages/guilds/membership/layout";
 import { GuildMembers } from "./pages/guilds/membership/members";
 import { GuildOverview } from "./pages/guilds/overview";
-import { Invite } from "./pages/invite-detail/Invite";
-import { InviteResponse } from "./pages/invite-detail/InviteResponse";
+import { Invite } from "./pages/invite-detail/invite";
+import { InviteResponse } from "./pages/invite-detail/invite-response";
 
 export const router = createBrowserRouter([
     {
@@ -38,9 +39,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: "/invite",
-                element: (
-                    <Invite />
-                ),
+                element: <Invite />,
             },
             {
                 path: "/legislative",
@@ -113,14 +112,6 @@ export const router = createBrowserRouter([
                         ],
                     },
                     {
-                        path: "evaluations",
-                        element: (
-                            <ProtectedRoute>
-                                <ActiveAndUpcoming />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
                         path: "membership/applicants/:applicant",
                         element: (
                             <ProtectedRoute>
@@ -129,15 +120,7 @@ export const router = createBrowserRouter([
                         ),
                     },
                     {
-                        path: "evaluations/completed",
-                        element: (
-                            <ProtectedRoute>
-                                <Completed />
-                            </ProtectedRoute>
-                        ),
-                    },
-                    {
-                        path: "evaluations/completed/:evaluationId",
+                        path: "evaluations/past/:evaluationId",
                         element: (
                             <ProtectedRoute>
                                 <EvaluationResult />
@@ -152,7 +135,24 @@ export const router = createBrowserRouter([
                             </ProtectedRoute>
                         ),
                     },
-
+                    {
+                        path: "evaluations",
+                        element: (
+                            <ProtectedRoute>
+                                <GuildEvaluationsLayout />
+                            </ProtectedRoute>
+                        ),
+                        children: [
+                            {
+                                path: "upcoming",
+                                element: <ActiveAndUpcoming />,
+                            },
+                            {
+                                path: "past",
+                                element: <PastEvaluations />,
+                            },
+                        ],
+                    },
                     {
                         path: "leadership",
                         element: (

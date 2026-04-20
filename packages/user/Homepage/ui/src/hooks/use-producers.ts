@@ -4,7 +4,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 
 import { type Producer, getProducers } from "@/lib/get-producers";
 import { GraphQLUrlOptions } from "@shared/lib/graphql";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 

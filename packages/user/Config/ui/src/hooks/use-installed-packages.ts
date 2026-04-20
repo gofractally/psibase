@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/queryKeys";
-import { PackageSchema } from "@/lib/zod/CommonPackage";
+import QueryKey from "@/lib/query-keys";
+import { PackageSchema } from "@/lib/zod/common-package";
 
 import { supervisor } from "@shared/lib/supervisor";
 

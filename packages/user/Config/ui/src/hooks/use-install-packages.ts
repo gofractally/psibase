@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 
 import { getArrayBuffer } from "@psibase/common-lib";
 
-import { checkLastTx } from "@/lib/checkStaging";
-import QueryKey from "@/lib/queryKeys";
+import { checkLastTx } from "@/lib/check-staging";
+import QueryKey from "@/lib/query-keys";
 
 import { queryClient } from "@shared/lib/query-client";
 import { supervisor } from "@shared/lib/supervisor";

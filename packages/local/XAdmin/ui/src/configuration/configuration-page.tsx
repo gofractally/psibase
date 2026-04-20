@@ -25,16 +25,17 @@ import {
     TabsTrigger,
 } from "@shared/shadcn/ui/tabs";
 
-import { useConfig, useConfigUpdate } from "../hooks/useConfig";
-import { useServerSpecs } from "../hooks/useServerSpecs";
+import { useConfig, useConfigUpdate } from "../hooks/use-config";
+import { useServerSpecs } from "../hooks/use-server-specs";
 import { Logger } from "../log/logger";
-import {
-    PsinodeConfigUI,
-    PsinodeConfigUpdate,
-} from "./interfaces";
+import { PsinodeConfigUI, PsinodeConfigUpdate } from "./interfaces";
 import { newId, writeConfig } from "./utils";
 
-const getHumanFriendlyNumber = (value: number, baseUnit: string, decimals: number = 0): string => {
+const getHumanFriendlyNumber = (
+    value: number,
+    baseUnit: string,
+    decimals: number = 0,
+): string => {
     if (value >= 1e15) {
         return `${(value / 1e15).toFixed(decimals)} P${baseUnit}`;
     }
@@ -59,7 +60,7 @@ const NodeSpecsContent = () => {
 
     return (
         <div className="space-y-4">
-            <div className="rounded-lg border p-4 space-y-4">
+            <div className="space-y-4 rounded-lg border p-4">
                 {isLoadingSpecs ? (
                     <div className="space-y-3">
                         <Skeleton className="h-6 w-32" />
@@ -68,30 +69,39 @@ const NodeSpecsContent = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="flex justify-between items-center">
+                        <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">
                                 Bandwidth:
                             </span>
                             <span className="text-sm">
                                 {serverSpecs
-                                    ? getHumanFriendlyNumber(serverSpecs.bandwidthBps, "bps", 1)
+                                    ? getHumanFriendlyNumber(
+                                          serverSpecs.bandwidthBps,
+                                          "bps",
+                                          1,
+                                      )
                                     : "N/A"}
                             </span>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">
                                 Storage:
                             </span>
                             <span className="text-sm">
                                 {serverSpecs
-                                    ? getHumanFriendlyNumber(serverSpecs.storageBytes, "B")
+                                    ? getHumanFriendlyNumber(
+                                          serverSpecs.storageBytes,
+                                          "B",
+                                      )
                                     : "N/A"}
                             </span>
                         </div>
-                        <div className="flex justify-between items-center">
+                        <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">RAM:</span>
                             <span className="text-sm">
-                                {ramBytes ? getHumanFriendlyNumber(ramBytes, "B") : "N/A"}
+                                {ramBytes
+                                    ? getHumanFriendlyNumber(ramBytes, "B")
+                                    : "N/A"}
                             </span>
                         </div>
                     </>
@@ -439,7 +449,7 @@ export const ConfigurationForm = ({
                                 </div>
                             )}
                         </TabsContent>
-                        
+
                         <TabsContent value="node-specs">
                             <NodeSpecsContent />
                         </TabsContent>

@@ -1333,6 +1333,7 @@ void RTransact::requeue()
          break;
       while (true)
       {
+         std::uint64_t foundSequence;
          PSIBASE_SUBJECTIVE_TX
          {
             auto iter = pendingBySequence.lower_bound(nextSequence);
@@ -1346,8 +1347,9 @@ void RTransact::requeue()
 
                scheduleVerify(item.id, data->trx, true, item.speculative);
             }
-            nextSequence = item.sequence + 1;
+            foundSequence = item.sequence;
          }
+         nextSequence = foundSequence + 1;
          if (nextSequence >= endSequence)
             break;
       }

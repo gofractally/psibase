@@ -1,4 +1,4 @@
-import { configuredApps } from "@/configuredApps";
+import { configuredApps } from "@/configured-apps";
 import { useLocation } from "react-router-dom";
 
 export const useNavLocation = () => {

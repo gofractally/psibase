@@ -1,16 +1,16 @@
 import dayjs from "dayjs";
 
-import { CurrentEvaluationCard } from "@/components/current-evaluation-card";
-
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
 import { useNextEvaluations } from "@/hooks/fractals/use-next-evaluations";
 import { useGuild } from "@/hooks/use-guild";
 
 import { EmptyBlock } from "@shared/components/empty-block";
-import { PageContainer } from "@shared/components/page-container";
+import { GlowingCard } from "@shared/components/glowing-card";
+import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
+    TableCaption,
     TableCell,
     TableHead,
     TableHeader,
@@ -23,23 +23,23 @@ export const ActiveAndUpcoming = () => {
     const isUpcomingEvaluation = !!guild?.evalInstance;
 
     return (
-        <PageContainer>
-            <div className="flex h-9 items-center justify-between">
-                <h1 className="text-lg font-semibold">Active & upcoming</h1>
-            </div>
-            <div className="mt-3">
-                {isUpcomingEvaluation && <CurrentEvaluationCard />}
-
-                {isUpcomingEvaluation ? (
-                    <EvaluationsTable />
-                ) : (
-                    <EmptyBlock
-                        title="No scheduled evaluations"
-                        isLoading={isGuildPending}
-                    />
-                )}
-            </div>
-        </PageContainer>
+        <div className="flex flex-col gap-6">
+            {isUpcomingEvaluation ? (
+                <GlowingCard>
+                    <CardHeader>
+                        <CardTitle>Upcoming evaluations</CardTitle>
+                    </CardHeader>
+                    <CardContent className="@container">
+                        <EvaluationsTable />
+                    </CardContent>
+                </GlowingCard>
+            ) : (
+                <EmptyBlock
+                    title="No scheduled evaluations"
+                    isLoading={isGuildPending}
+                />
+            )}
+        </div>
     );
 };
 
@@ -69,6 +69,9 @@ const EvaluationsTable = () => {
                     </TableRow>
                 ))}
             </TableBody>
+            <TableCaption>
+                A list of all active and upcoming evaluations for this guild.
+            </TableCaption>
         </Table>
     );
 };

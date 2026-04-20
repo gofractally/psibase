@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { useCloseEvaluation } from "@/hooks/fractals/use-close-evaluation";
 import { useFormatRelative } from "@/hooks/use-format-relative";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { SubmissionPhase } from "@/lib/getStatus";
+import { SubmissionPhase } from "@/lib/get-status";
 
 import { Button } from "@shared/shadcn/ui/button";
 
@@ -33,6 +33,18 @@ export const Submission = ({ status }: { status: SubmissionPhase }) => {
     } else {
         return (
             <div>
+                {status.hasEnoughProposals === false && (
+                    <div>
+                        Group deliberation failed: not enough proposals
+                        submitted
+                    </div>
+                )}
+                {status.hasEnoughProposals === true && (
+                    <div>Your group is submitting their results now</div>
+                )}
+                {status.isParticipant === false && (
+                    <div>You are not a participant in this evaluation.</div>
+                )}
                 ⏳ Evaluation closes at {date} ({label})
             </div>
         );

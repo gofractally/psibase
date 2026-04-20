@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 
-import { NavMain } from "@/components/nav-main";
+import { MainNavigation } from "@/components/nav";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
@@ -44,7 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarMenu>
             </SidebarHeader>
             <SidebarContent>
-                <NavMain />
+                <MainNavigation />
             </SidebarContent>
             <SidebarFooter>
                 <UserSidebarNavFooter />

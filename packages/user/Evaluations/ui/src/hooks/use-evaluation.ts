@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { Evaluation, getEvaluation } from "@/lib/graphql/getEvaluation";
+import { Evaluation, getEvaluation } from "@/lib/graphql/get-evaluation";
 
 import { type Account } from "@shared/lib/schemas/account";
 

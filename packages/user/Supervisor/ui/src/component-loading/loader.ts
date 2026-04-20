@@ -6,14 +6,14 @@ import * as io from "@bytecodealliance/preview2-shim/io";
 import * as random from "@bytecodealliance/preview2-shim/random";
 import { type WarningHandlerWithDefault, rollup } from "@rollup/browser";
 
-import { HostInterface } from "../hostInterface.js";
+import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
-import { ComponentAPI, Functions } from "../witExtraction.js";
-import { Code, FilePath, ImportDetails, PkgId } from "./importDetails.js";
+import { ComponentAPI, Functions } from "../wit-extraction.js";
+import { Code, FilePath, ImportDetails, PkgId } from "./import-details.js";
 import { plugin } from "./index.js";
 import privilegedShimCode from "./privileged-api.js?raw";
-import { ProxyPkg } from "./proxy/proxyPackage.js";
-import shimCode from "./shims/shimWrapper.js?raw";
+import { ProxyPkg } from "./proxy/proxy-package.js";
+import shimCode from "./shims/shim-wrapper.js?raw";
 
 // Set up the global reference for runtime access
 (globalThis as Record<string, unknown>).__preview2Shims = {

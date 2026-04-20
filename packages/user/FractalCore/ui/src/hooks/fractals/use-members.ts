@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getMembers } from "@/lib/graphql/fractals/getMembers";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { getMembers } from "@/lib/graphql/fractals/get-members";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 import { zAccount } from "@shared/lib/schemas/account";
 

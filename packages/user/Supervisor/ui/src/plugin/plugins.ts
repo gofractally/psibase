@@ -4,8 +4,8 @@ import { assert } from "@/utils";
 
 import { Supervisor } from "../supervisor";
 import { Plugin } from "./plugin";
-import { PluginHost } from "./pluginHost";
-import { LoadedPlugin, ServiceContext } from "./serviceContext";
+import { PluginHost } from "./plugin-host";
+import { LoadedPlugin, ServiceContext } from "./service-context";
 
 export class Plugins {
     private supervisor: Supervisor;
