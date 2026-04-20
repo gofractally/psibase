@@ -25,18 +25,13 @@
  *     the next entry() can re-instantiate without re-fetching or
  *     re-compiling.
  *
- * The `pinned` flag on Plugin opts a plugin out of the unpinned-sweep
- * disposal path. Currently nothing sets it, so disposal is total. The
- * flag exists as a tuning knob for hot-path plugins where instantiation
- * overhead outweighs the VAS cost.
- *
  * The component-parser utility WASM (loaded once at supervisor startup,
  * see utils.ts) is the only WASM allocation retained between entry()
  * calls.
  *
  * Subsequent comments in this folder assume this context and will not
  * re-derive it. Look here when something talks about "VAS", "Memory",
- * "dispose", "pinned", or "retained" without further explanation.
+ * "dispose", or "retained" without further explanation.
  */
 
 import {
@@ -110,10 +105,6 @@ export class Plugin {
     // Resolves once the plugin is compiled. ensureInstantiated() must
     // still be called before use.
     ready: Promise<void>;
-
-    // When true, disposeAllUnpinned() leaves this plugin's instance live.
-    // Currently always false; reserved as a future tuning knob.
-    pinned: boolean = false;
 
     stats: PluginStats = { reported: false };
 

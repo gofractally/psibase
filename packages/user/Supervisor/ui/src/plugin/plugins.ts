@@ -59,22 +59,13 @@ export class Plugins {
         }
     }
 
-    /** Dispose every instantiated, non-pinned plugin so V8 can reclaim
-     *  the backing Memory on the next GC. Returns disposed plugin ids. */
-    public disposeAllUnpinned(): string[] {
-        const disposed: string[] = [];
-        this.forEachPlugin((p) => {
-            if (p.isInstantiated && !p.pinned) {
-                p.dispose();
-                disposed.push(pluginString(p.id));
-            }
-        });
-        return disposed;
-    }
-
-    /** Dispose every instantiated plugin regardless of pinned state. Used
-     *  by the pagehide shutdown path. compiledPlugin handles are retained
-     *  so bfcache restore can re-instantiate without re-fetch / re-compile. */
+    /** Dispose every instantiated plugin so V8 can reclaim the backing
+     *  Memory on the next GC. Returns disposed plugin ids. Used after each
+     *  entry()/getJson()/preloadPlugins() call (the main VAS control).
+     *  main.ts also invokes this via shutdown() on pagehide — usually a
+     *  no-op once the entrypoint finally blocks have run; see comments there.
+     *  compiledPlugin handles are retained so the next entry can
+     *  re-instantiate without re-fetch / re-compile. */
     public disposeAll(): string[] {
         const disposed: string[] = [];
         this.forEachPlugin((p) => {

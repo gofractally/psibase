@@ -56,13 +56,22 @@ addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
 );
 registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
 
-// Drop every live plugin instance before the iframe enters bfcache or is
-// destroyed. WebAssembly.Memory objects reserve ~10GB of virtual address
-// space each on V8; leaving 20+ of them live across a cross-subdomain
-// navigation has triggered process-wide OOM in testing. Compiled Module
-// handles are preserved (they carry no VAS), so bfcache restore can
-// re-instantiate without re-fetching or re-compiling.
+// Supervisor iframe cleanup on pagehide — mostly a DX affordance:
+//   - Reduces the stack of supervisor iframes that can accumulate in the
+//     browser's Inspector after many navigations.
+//   - Every navigation loads a new supervisor iframe that will fetch/compile
+//     and instantiate plugins for its own calls; that work consumes VAS
+//     during active use regardless of this hook.
+//   - With call-scoped dispose (every entry()/getJson()/preloadPlugins()
+//     finally drops instances), completed calls leave no plugin Memories
+//     behind in an old iframe beyond the parser utility — so this hook is
+//     not the primary defense against Wasm instantiate / Memory OOM.
+//   - If plugin instances were ever pinned across calls again and this hook
+//     were removed, bfcached iframes could retain many WebAssembly.Memory
+//     objects and contribute to Instantiate OOM after enough navigations.
 //
+// Compiled Module handles are preserved (they carry no VAS), so bfcache
+// restore can re-instantiate without re-fetching or re-compiling.
 // `pagehide` fires for both bfcache entry (event.persisted === true) and
 // full destruction (false). Running dispose in both cases is safe under
 // the Module-retention policy — the next entry() after a pageshow will

@@ -43,11 +43,13 @@ flowchart TD
         e4 --> e5["GC reclaims Memory → VAS freed"]
     end
     subgraph Pagehide [window pagehide]
-        ph1["supervisor.shutdown()<br/>disposeAll() on every live plugin,<br/>retain compiled Module handles"]
+        ph1["supervisor.shutdown()<br/>disposeAll() — mostly DevTools hygiene;<br/>VAS is already cleared per entrypoint finally"]
     end
 ```
 
 The `pinned` flag is still present on each `Plugin` as dormant infrastructure for future re-use (e.g. `transact:plugin` retention if measurement justifies it), but no production code path currently sets it.
+
+`pagehide` → `shutdown()` is documented in `main.ts` as primarily a developer-experience affordance (fewer stale supervisor iframes in the Inspector). **Per-entry dispose** is what prevents idle `WebAssembly.Memory` objects from accumulating in bfcached iframes; the hook is not the primary Wasm OOM mitigation.
 
 **Key files:**
 
@@ -234,7 +236,7 @@ Implementation notes:
 
 ### Iteration 5: Drop pinning + pagehide shutdown ✅ COMPLETE
 
-**What was done**: Stopped marking any plugin as pinned. Every plugin (including Phase 0 system plugins) is now disposed at the end of each supervisor entrypoint (`entry()`, `preloadPlugins()`, `getJson()`), leaving only the component-parser retained between calls. Added a `pagehide` handler that disposes all live plugin instances before the iframe enters bfcache or is destroyed. Directly addresses the cross-iframe VAS exhaustion OOM observed in Iter 4 testing.
+**What was done**: Stopped marking any plugin as pinned. Every plugin (including Phase 0 system plugins) is now disposed at the end of each supervisor entrypoint (`entry()`, `preloadPlugins()`, `getJson()`), leaving only the component-parser retained between calls. That change (**Option A**) is what eliminated the cross-subdomain Instantiate OOM: outgoing bfcached pages no longer held ~20 idle `WebAssembly.Memory` objects from pinned Phase-0 work. Added a `pagehide` handler that calls `shutdown()` / `disposeAll()` — useful for DevTools hygiene and consistent teardown, but **not** the material fix once per-entry dispose is in place (after a normal call the finally blocks have already dropped instances).
 
 **Changes made**:
 
@@ -266,7 +268,7 @@ flowchart TD
     I1["✅ Iter 1: jco instantiation mode\n(loader.ts rewrite, Rollup removed)"] --> I2["✅ Iter 2: Plugin lifecycle\n(compile/instantiate/dispose)"]
     I2 --> I3["✅ Iter 3: Adaptive pool\n(LRU eviction, race fix)"]
     I3 --> I4["✅ Iter 4: Call-scoped instantiation\n(pool removed, pinned flag, instrumentation)"]
-    I4 --> I5["✅ Iter 5: Drop pinning + pagehide shutdown\n(parser is only retained WASM; cross-iframe OOM fix)"]
+    I4 --> I5["✅ Iter 5: Drop pinning + pagehide shutdown\n(idle VAS from pinning gone; pagehide = mostly DX)"]
     I5 --> D1["Deferred: E2E security\nverification & tuning"]
     I5 --> D2["Deferred: Pre-compilation\ncache (IndexedDB)"]
 ```
@@ -281,7 +283,7 @@ flowchart TD
 | Some plugins rely on cross-call linear memory state | State is reset every call for non-pinned plugins. Audit if symptoms appear. Plugins should use `clientdata` for persistence. |
 | Re-instantiation latency noticeable to users | Compile is cached; instantiation runs in parallel. Instrumentation (`[entry]`/`[call]` logs) lets us spot regressions. |
 | Pinned system plugins accumulate resource handles across calls | Pre-existing concern (pinned lifetime > handle lifetime). Not introduced by Iter 4. Track separately if a leak materializes. |
-| **Cross-iframe VAS collision during navigation** | See [Open Issue: Cross-iframe VAS exhaustion](#open-issue-cross-iframe-vas-exhaustion-during-navigation). |
+| **Cross-iframe VAS collision during navigation** | Addressed by dropping pinning (Option A); see [Open Issue: Cross-iframe VAS exhaustion](#open-issue-cross-iframe-vas-exhaustion-during-navigation) for the historical Iter 4 observation and why `pagehide` is ancillary. |
 
 ---
 
@@ -295,7 +297,7 @@ For the call-scoped approach (Iter 4 + 5), the built-in console instrumentation 
 - **Fetch / compile timings** — aggregated per-plugin lists + totals in the `[preload]` report.
 - **Instantiation latency** — `inst=Xms` in the `[entry]` report.
 - **Actual reclaim timing** — `[gc] reclaimed …` batched lines show when V8 released the memory.
-- **Pagehide teardown** — `[shutdown] disposed N plugin(s)` on navigation / bfcache entry.
+- **Pagehide teardown** — `[shutdown] disposed N plugin(s)` when anything was still instantiated at hide time (often silent once per-entry dispose runs first).
 
 **Success criterion**: Peak concurrent instances stays well below the threshold (~100) that triggers "Cannot allocate Wasm memory". With Iter 5, the steady-state between calls is 1 (parser) and peak is bounded by the dep tree of the active call.
 
@@ -333,6 +335,8 @@ Feasibility confirmed for all approaches. See [history doc](wasm-plugin-memory-h
 ---
 
 ## Open Issue: Cross-iframe VAS exhaustion during navigation
+
+**Status (post–Iter 5)**: Resolved for normal workflows by **dropping pinning** (Option A). The observation below was under **Iter 4**, when Phase-0 system plugins stayed instantiated between calls; `pagehide` → `shutdown()` shipped in the same iteration but **per-entry dispose + no idle pinned set** is what removed the collision. The `pagehide` hook remains mainly a DX affordance (see `Supervisor/ui/src/main.ts` comments).
 
 ### Observation
 
@@ -409,13 +413,15 @@ Keep pinning as-is but wrap `ensureInstantiated()` in a retry loop that catches 
 
 `pagehide` fires for both bfcache entry (`persisted=true`) and destruction (`persisted=false`). Running dispose in both cases is always safe under the Module-retention approach: bfcache restore just pays a small re-instantiation cost on the next call.
 
+**In hindsight (with Option A shipped)**: after every entrypoint's `finally` runs, there is usually nothing left for `shutdown()` to drop; the hook is documented in code as **primarily DevTools hygiene** (fewer stale supervisor iframes in the Inspector), not the primary Wasm OOM fix. It still helps edge cases (e.g. navigation while instances are mid-flight) and documents intent if pinning ever returns.
+
 Effect during bfcache: our `pagehide` runs *before* the heap is frozen, so the iframe enters bfcache with pluginModule references already dropped. V8 may not collect immediately (bfcache suspends GC), but on eventual eviction or restore, the cleanup path has far less to do.
 
 **Step 2: Disqualify the supervisor iframe from bfcache entirely.** **Not pursued.** Both available mechanisms — `Cache-Control: no-store` on the supervisor HTML response, or registering an `unload` listener client-side — disqualify not just the supervisor iframe but the entire hosting app page (Chrome's rule: if any frame in the page is bfcache-ineligible, the whole page is; parent inherits from iframe). Forcing bfcache opt-out on host apps — especially third-party apps that embed psibase — is a UX cost (Back/Forward takes a full page-load instead of instant restore, local form state lost) we don't get to unilaterally impose. Skipped unless Option A + Option D step 1 prove insufficient in measurement.
 
-- **Pros (Step 1 only)**: Promptly drops WebAssembly.Memory references before bfcache freeze, so cleanup on eventual eviction is fast. No impact on parent app bfcache eligibility. Cheap, purely additive code change.
-- **Cons (Step 1 only)**: Doesn't directly prevent VAS retention during bfcache; relies on Option A keeping steady-state VAS small enough that bfcache retention doesn't matter.
-- **Combined with Option A**: Under Option A's ~10 GiB idle footprint, even 10 bfcached supervisor iframes = ~100 GiB — well inside the 1 TiB limit. No collision at steady state. Step 1 handles the narrower case of navigation-during-active-call.
+- **Pros (Step 1 only)**: Consistent teardown reference drop on hide; DevTools ergonomics; narrow belt-and-suspenders if something is still instantiated when the frame hides. No impact on parent app bfcache eligibility. Cheap, purely additive code change.
+- **Cons (Step 1 only)**: Does not replace Option A: without per-entry dispose (and without dropping pinning), bfcached iframes could still retain large idle VAS regardless of this hook.
+- **Combined with Option A**: Under Option A's ~10 GiB idle footprint, even 10 bfcached supervisor iframes = ~100 GiB — well inside the 1 TiB limit. No collision at steady state. Option A is the fix; Step 1 is ancillary.
 
 **Option E — Lazy pinning**
 Pin-on-first-use instead of pin-at-preload. Phase 0 only compiles; the *first* call that references a system plugin instantiates it and marks it pinned. Amortizes startup cost across early calls.
@@ -427,7 +433,7 @@ Pin-on-first-use instead of pin-at-preload. Phase 0 only compiles; the *first* c
 ### Decision for next iteration
 
 - **Implement Option A.** Stop pinning (keep `pinned` as dormant field for future re-use). All plugins become call-scoped.
-- **Implement Option D step 1** (`pagehide` → `shutdown()`) at the same time — `shutdown()` calls `dispose()` on every plugin but retains `compiledPlugin` handles so bfcache restore is cheap. Purely additive, small change.
+- **Implement Option D step 1** (`pagehide` → `shutdown()`) at the same time — `shutdown()` calls `dispose()` on every plugin but retains `compiledPlugin` handles so bfcache restore is cheap. Documented as primarily DX / hygiene once Option A is in place; still worth keeping for edge cases and if pinning is ever reintroduced.
 - Measure per-call latency under Option A. If it regresses noticeably, fall back to **Option B** with the `transact:plugin` minimal set (re-activating the dormant `pinned` field).
 - **Option D step 2 is off the table** unless measurements prove A + D-step-1 insufficient. It would force bfcache opt-out on hosting app pages — including third-party apps that embed psibase. The UX cost (Back/Forward becomes a full page-load for every app, not just psibase-native ones) is not ours to unilaterally impose.
 - **Option C** is off the table: it treats symptoms, and Option A removes the symptom's root cause.

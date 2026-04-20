@@ -38,9 +38,9 @@ import { Plugins } from "./plugins";
  *      - if no other consumer remains, delete `forEachPlugin` and
  *        `listInstantiated`
  *
- * Operational concerns (the dispose-on-finally lifecycle, `pinned` flag,
- * the Memory model docblock at the top of plugin/plugin.ts) are NOT
- * instrumentation and stay.
+ * Operational concerns (the dispose-on-finally lifecycle, the Memory
+ * model docblock at the top of plugin/plugin.ts) are NOT instrumentation
+ * and stay.
  */
 
 export interface EntryHandle {
@@ -181,9 +181,9 @@ export class Instrumentation {
         const instCounts = this.countByLabels(this.instantiatedThisCall);
         const disposedCounts = this.countByLabels(disposed);
 
-        // Anything still instantiated here is non-pinned-and-leaked, or
-        // pinned by future tuning. The +1/+parser counts cover the
-        // permanent component-parser utility module.
+        // Anything still instantiated after dispose is a leak (or the
+        // component-parser utility, counted separately below). The +1/+parser
+        // counts cover the permanent component-parser utility module.
         const retained = this.countInstantiated();
         const retainedPlugins = retained.plugins + 1;
         const retainedCores = retained.cores + this.parserCoreCount;

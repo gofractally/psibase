@@ -37,8 +37,9 @@ import {
 
 const rootDomain = siblingUrl(null, null, null, true);
 
-// System plugins are always loaded, even if they are not used
-//   in a given call context.
+// System plugins are always loaded during preload Phase 0 so internal
+// sync calls (getActivePrompt, getAuthServices, etc.) have live instances.
+// Adding to this list increases what every entry pays in Phase 0 work.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("host", "auth"),
@@ -75,12 +76,18 @@ const systemPlugins: Array<QualifiedPluginId> = [
  *       dedups across iframes.
  *     - Cross-app workflows (e.g. Config calling into Accounts for login,
  *       then into Permissions for a grant) compose multiple supervisor
- *       iframes simultaneously, each with its full plugin set live.
- *     - Detached/bfcached documents do not release their Memory
- *       reservations until V8 actually GCs them, so even sequential
- *       app-to-app navigation accumulates VAS.
- *   The failure presents as random, but it is just whichever workflow
- *   happens to compose enough live supervisors at once.
+ *       iframes simultaneously. While each iframe has an entry in flight,
+ *       its dependency tree can hold many Memories at once — peak VAS adds
+ *       across concurrent supervisors (nothing dedups across realms).
+ *     - If many plugin Memories were kept alive *between* calls (historically
+ *       via pinning Phase-0 / system plugins), a bfcached outgoing page could
+ *       still hold ~20 Memories while a newly loaded subdomain instantiated
+ *       its own set — that produced `WebAssembly.instantiate(): Out of memory`
+ *       in testing. Call-scoped dispose removes that *idle* footprint (only
+ *       the parser utility retains Memory between calls), so old supervisor
+ *       iframes are not a material contributor to that failure mode anymore.
+ *   The failure presents as random when enough concurrent deep trees or
+ *   rare races align; it is not primarily "Inspector iframe count".
  *
  *   The current design fixes this by separating *fetch + compile* (cheap;
  *   no Memory) from *instantiate* (allocates Memory). Plugin handles
@@ -90,6 +97,36 @@ const systemPlugins: Array<QualifiedPluginId> = [
  *   so the working set is bounded by *one entry's needs*, not by the
  *   cumulative history of the iframe.
  *
+ * Supervisor iframe teardown (main.ts, pagehide → shutdown)
+ *   Primarily a developer-experience affordance: fewer stale supervisor
+ *   iframes stacked in DevTools after repeated navigations. It is not the
+ *   primary fix for Wasm Memory / instantiate OOM; per-entry dispose above
+ *   is. If instances were pinned across calls again and that hook went away,
+ *   bfcached iframes could once again retain enough Memories to matter.
+ *
+ * Why per-entry teardown (and not "sticky" working-set caching)
+ *   App UIs do not enter through a single top-level plugin in practice.
+ *   A typical page load fans out across multiple entry targets — e.g.
+ *   accounts:plugin api.getCurrentUser, branding:plugin queries.*,
+ *   host:prompt admin.getActivePrompt — interleaved within seconds.
+ *   The supervisor must therefore assume the plugin set "needed by the
+ *   current entry" changes often as the UI runs, which makes any cached
+ *   per-top-level-plugin working set thrash badly.
+ *
+ *   Compounding this, entrypoints are not strictly sequential: postMessage
+ *   handlers in main.ts dispatch entry()/preloadPlugins()/getJson() without
+ *   awaiting completion, so two entries can be in flight concurrently. A
+ *   "reuse last entry's instances" cache would race: entry 2 inspects the
+ *   cache, sees instances it needs, then entry 1's finally disposes them
+ *   under entry 2's feet.
+ *
+ *   The per-entry instantiate/dispose pattern sidesteps both: each entry
+ *   computes its own needed set, instantiates fresh, and tears down
+ *   whatever it brought up — no shared mutable lifecycle state across
+ *   entries to race on. The cost is repeat instantiation of recurring
+ *   plugins; shrinking the transitive dependency graph remains the
+ *   long-term lever — not caching instances across entries.
+ *
  * Rules for anyone touching this file
  *   - Do not move instantiation back into Plugin construction or onto
  *     Plugin.ready. Keep the fetch/compile vs. instantiate split.
@@ -98,14 +135,17 @@ const systemPlugins: Array<QualifiedPluginId> = [
  *     path. Phase 0 of doPreload() leaves system-plugin instances live for
  *     its own internal supervisorCall()s; the entrypoint's finally is what
  *     releases them.
- *   - Treat the systemPlugins set as the "always-needed-during-preload"
- *     set, not the "always-live" set. Adding a plugin here costs Memory
- *     during every preload, on every entry.
+ *   - Do not introduce cross-entry caches of plugin instances or working
+ *     sets. The concurrency model (un-awaited postMessage dispatch) makes
+ *     them race-prone, and the multi-top-level-plugin access pattern
+ *     makes them thrash.
+ *   - Treat systemPlugins as the "always-needed during preload Phase 0"
+ *     set. Adding a plugin here increases what every entry pays in Phase 0.
  *   - The component-parser utility WASM (utils.ts::parser) is the only
  *     intentionally-retained allocation between entries.
  *   - Comments here assume the Memory model header in plugin/plugin.ts
- *     for VAS / dispose / pinned / retained terminology. Keep it that way
- *     instead of duplicating context.
+ *     for VAS / dispose / retained terminology. Keep it that way instead
+ *     of duplicating context.
  */
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -175,8 +215,8 @@ export class Supervisor implements AppInterface {
         const reportT0 = this.inst.preloadReportStart();
 
         // Phase 0: compile + instantiate system plugins so the internal
-        // sync calls below have live instances. Not pinned — the caller
-        // disposes them in its finally clause.
+        // sync calls below have live instances. The entrypoint's finally
+        // disposes them after the call (same as every other plugin).
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
@@ -404,7 +444,7 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, e);
         } finally {
             // Release Phase-0 system plugin instances left live by preload.
-            this.plugins.disposeAllUnpinned();
+            this.plugins.disposeAll();
         }
     }
 
@@ -421,13 +461,16 @@ export class Supervisor implements AppInterface {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
         } finally {
-            this.plugins.disposeAllUnpinned();
+            this.plugins.disposeAll();
         }
     }
 
-    /** Tear down every instantiated plugin before the supervisor iframe
-     *  is evicted. compiledPlugin handles are retained for bfcache restore.
-     *  Idempotent. */
+    /** Drop any still-instantiated plugins when this iframe is hidden or
+     *  destroyed. Same dispose path as each entrypoint's finally(); with
+     *  call-scoped dispose there is usually nothing left — see main.ts
+     *  pagehide comments for why we still call this (DevTools hygiene, and
+     *  consistent teardown if lifecycle ever regresses). compiledPlugin
+     *  handles are retained for bfcache restore. Idempotent. */
     shutdown(): string[] {
         return this.plugins.disposeAll();
     }
@@ -515,10 +558,10 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } finally {
-            // Sweep all non-pinned instances. Catches partial-instantiation
-            // failures (system plugins that came up before a Phase-0 error)
-            // so no half-pinned state persists between calls.
-            disposed = this.plugins.disposeAllUnpinned();
+            // Sweep all instances. Catches partial-instantiation failures
+            // (system plugins that came up before a Phase-0 error) so no
+            // half-live state persists between calls.
+            disposed = this.plugins.disposeAll();
             this.inst.entryEnd(handle, disposed, entryError);
         }
     }
