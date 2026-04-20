@@ -14,17 +14,6 @@ use Host::server as Server;
 use regex::Regex;
 use sha2::{Digest, Sha256};
 
-pub fn assert_active_app(fn_name: &str) {
-    let sender = Host::client::get_sender();
-    let active_app = Host::client::get_active_app();
-    if sender != active_app {
-        panic!(
-            "{} can only be called by the active app (sender={}, active_app={})",
-            fn_name, sender, active_app
-        );
-    }
-}
-
 pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
     let re = Regex::new(r"^[a-zA-Z0-9_]+$").unwrap();
     if re.is_match(action_name) {

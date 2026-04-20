@@ -213,8 +213,10 @@ impl Admin for TransactPlugin {
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
-        assert_active_app("set_propose_latch");
-        assert_authorized(FunctionName::set_propose_latch)?;
+        assert_authorized_with_whitelist(
+            FunctionName::set_propose_latch,
+            vec![Host::client::get_active_app()],
+        )?;
 
         let Some(acct) = account else {
             return flush_propose_latch();
