@@ -173,21 +173,20 @@ namespace psibase
                          bool                       allow_unknown_members,
                          bool&                      first)
    {
-      auto resolve_data = psio::make_field_resolver(value.data, input_stream, output_stream, error,
-                                                    allow_unknown_members, first);
+      auto resolve_data =
+          psio::make_field_resolver(value.data, input_stream, output_stream, error, first);
       return psio::gql_query_inline(
           psio::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
-          [&](std::string_view field_name, std::string_view alias) -> std::pair<bool, bool>
+          [&](std::string_view field_name, std::string_view alias) -> bool
           {
              if (field_name == "block")
              {
                 psio::detail::write_field_name(alias, first, output_stream);
-                return {true, gql_query(value.block, input_stream, output_stream, error,
-                                        allow_unknown_members)};
+                return gql_query(value.block, input_stream, output_stream, error, false);
              }
              return resolve_data(field_name, alias);
           },
-          input_stream, output_stream, error, allow_unknown_members, first);
+          input_stream, output_stream, error, first);
    }
 
    /// GraphQL Pagination through TableIndex

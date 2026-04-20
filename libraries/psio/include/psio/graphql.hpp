@@ -1405,7 +1405,6 @@ namespace psio
                          gql_stream&      input_stream,
                          OS&              output_stream,
                          const E&         error,
-                         bool             allow_unknown_members,
                          bool&            first)
    {
       if (input_stream.current_punctuator != '{')
@@ -1426,8 +1425,7 @@ namespace psio
             if (input_stream.current_value == type_name)
             {
                input_stream.skip();
-               if (!gql_query_inline(type_name, resolve, input_stream, output_stream, error,
-                                     allow_unknown_members, first))
+               if (!gql_query_inline(type_name, resolve, input_stream, output_stream, error, first))
                   return false;
             }
             else
@@ -1454,18 +1452,8 @@ namespace psio
             input_stream.skip();
          }
 
-         auto [found, ok] = resolve(field_name, alias);
-         if (!ok)
-            return false;
-         if (!found)
-         {
-            if (!allow_unknown_members)
-               return error((std::string)field_name + " not found");
-            if (!gql_skip_args(input_stream, error))
-               return false;
-            if (!gql_skip_selection_set(input_stream, error))
-               return false;
-         }
+         if (!resolve(field_name, alias))
+            return error((std::string)field_name + " not found");
       }
       if (input_stream.current_punctuator != '}')
          return error("expected }");
@@ -1479,11 +1467,9 @@ namespace psio
                             gql_stream& input_stream,
                             OS&         output_stream,
                             const E&    error,
-                            bool        allow_unknown_members,
                             bool&       first)
    {
-      return [&, allow_unknown_members](std::string_view field_name,
-                                       std::string_view alias) -> std::pair<bool, bool>
+      return [&](std::string_view field_name, std::string_view alias) -> bool
       {
          bool ok = true;
          bool found =
@@ -1492,7 +1478,7 @@ namespace psio
                                       {
                                          detail::write_field_name(alias, first, output_stream);
                                          ok &= gql_query(value.*member, input_stream, output_stream,
-                                                         error, allow_unknown_members);
+                                                         error, false);
                                       });
          if (!found)
          {
@@ -1505,11 +1491,11 @@ namespace psio
                       found = true;
                       detail::write_field_name(alias, first, output_stream);
                       ok &= gql_query_fn(value, names.subspan(1), member, input_stream,
-                                         output_stream, error, allow_unknown_members);
+                                         output_stream, error, false);
                    }
                 });
          }
-         return {found, ok};
+         return found && ok;
       };
    }
 
@@ -1524,10 +1510,10 @@ namespace psio
                          bool        allow_unknown_members,
                          bool&       first)
    {
-      return gql_query_inline(generate_gql_partial_name((T*)nullptr, false),
-                              make_field_resolver(value, input_stream, output_stream, error,
-                                                  allow_unknown_members, first),
-                              input_stream, output_stream, error, allow_unknown_members, first);
+      return gql_query_inline(
+          generate_gql_partial_name((T*)nullptr, false),
+          make_field_resolver(value, input_stream, output_stream, error, first), input_stream,
+          output_stream, error, first);
    }
 
    template <typename T, typename OS, typename E>
