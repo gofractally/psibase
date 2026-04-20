@@ -51,37 +51,18 @@ export class Plugins {
         await Promise.all(promises);
     }
 
-    public forEachPlugin(callback: (plugin: Plugin) => void): void {
-        for (const context of Object.values(this.serviceContexts)) {
-            for (const plugin of context.getAllPlugins()) {
-                callback(plugin);
-            }
-        }
-    }
-
-    /** Dispose every instantiated plugin so V8 can reclaim the backing
-     *  Memory on the next GC. Returns disposed plugin ids. Used after each
-     *  entry()/getJson()/preloadPlugins() call (the main VAS control).
-     *  main.ts also invokes this via shutdown() on pagehide — usually a
-     *  no-op once the entrypoint finally blocks have run; see comments there.
-     *  compiledPlugin handles are retained so the next entry can
-     *  re-instantiate without re-fetch / re-compile. */
+    /** Compiled Module handles are retained; only the live instances are
+     *  dropped. Returns disposed plugin ids. */
     public disposeAll(): string[] {
         const disposed: string[] = [];
-        this.forEachPlugin((p) => {
-            if (p.isInstantiated) {
-                p.dispose();
-                disposed.push(pluginString(p.id));
+        for (const context of Object.values(this.serviceContexts)) {
+            for (const plugin of context.getAllPlugins()) {
+                if (plugin.isInstantiated) {
+                    plugin.dispose();
+                    disposed.push(pluginString(plugin.id));
+                }
             }
-        });
+        }
         return disposed;
-    }
-
-    public listInstantiated(): string[] {
-        const names: string[] = [];
-        this.forEachPlugin((p) => {
-            if (p.isInstantiated) names.push(pluginString(p.id));
-        });
-        return names;
     }
 }

@@ -56,7 +56,7 @@ The `pinned` flag is still present on each `Plugin` as dormant infrastructure fo
 - `[loader.ts](packages/user/Supervisor/ui/src/component-loading/loader.ts)` — `compilePlugin()` returns a `CompiledPlugin` handle (jco generate + WebAssembly.compile, no instantiation). `CompiledPlugin.instantiate()` allocates Memory on demand.
 - `[plugin.ts](packages/user/Supervisor/ui/src/plugin/plugin.ts)` — lifecycle states (`compiled`/`instantiated`/`disposed`), `pinned` flag, `ensureInstantiated()`, `dispose()`
 - `[plugin-loader.ts](packages/user/Supervisor/ui/src/plugin/plugin-loader.ts)` — multi-round dependency resolution; `awaitReady()` waits for compile, `ensureAllInstantiated()` instantiates
-- `[plugins.ts](packages/user/Supervisor/ui/src/plugin/plugins.ts)` — `ensureAllInstantiated()`, `disposeAllUnpinned()`, and `forEachPlugin()` across all service contexts
+- `[plugins.ts](packages/user/Supervisor/ui/src/plugin/plugins.ts)` — `ensureAllInstantiated()`, `disposeAll()` across all service contexts
 - `[supervisor.ts](packages/user/Supervisor/ui/src/supervisor.ts)` — serialized preload (race-fix), phased compile, Phase 0 pin, call-scoped instantiate + dispose
 - `[plugin-host.ts](packages/user/Supervisor/ui/src/plugin/plugin-host.ts)` — host bridge: HTTP, storage, call stack, crypto, prompts
 
@@ -177,14 +177,14 @@ Each iteration is a single reviewable PR with testable outcomes.
 
 ### Iteration 4: Call-scoped instantiation ✅ COMPLETE
 
-**What was done**: Deleted the LRU pool. Non-system plugins are now instantiated at the start of each `entry()` call (if not already live) and disposed in the `finally` block. System plugins (and their transitive deps) continue to be instantiated once during Phase 0 and pinned for the supervisor's lifetime. Added performance instrumentation.
+**What was done**: Deleted the LRU pool. Non-system plugins are now instantiated at the start of each `entry()` call (if not already live) and disposed in the `finally` block. System plugins (and their transitive deps) continue to be instantiated once during Phase 0 and pinned for the supervisor's lifetime. Temporary aggregate console logging was added during tuning and later removed from the tree.
 
 **Changes made**:
 
 - `plugin.ts`:
   - Added `pinned: boolean` field (default false). Supervisor sets `pinned = true` on Phase 0 plugins after their first instantiation.
   - Removed the OOM retry loop from `ensureInstantiated()` — single attempt only. GC timing is empirically reliable in the call-scoped model.
-  - Added fetch and compile timing instrumentation (see below).
+  - (Historical) fetch/compile timing was logged during tuning; removed once the model stabilized.
 - `supervisor.ts`:
   - Phase 0 unchanged: compile + instantiate + mark `pinned = true`.
   - Phase 1/2: **compile only**; no instantiation, no pool registration.
@@ -194,36 +194,7 @@ Each iteration is a single reviewable PR with testable outcomes.
 - `plugins.ts`: Added `disposeAllUnpinned()` returning the list of disposed plugin ids (used for logging).
 - `instance-pool.ts`: **deleted**. No imports remain.
 
-**Instrumentation** — all logs are aggregate reports; nothing is logged per cross-plugin call or per individual fetch/compile:
-
-Per `doPreload()` (one report, fires only if new work happened):
-
-```
-[preload] wall=Tms fetched=N(total MB, Σ fetch ms) compiled=M(Σ compile ms) pinned=+K(total P)
-    fetched: [a:x(120ms, 87KB), b:y(85ms, 45KB), ...]
-    compiled: [a:x(210ms), b:y(105ms), ...]
-```
-
-Per `entry()` (one report in the `finally`):
-
-```
-[entry] {service}:{plugin} {intf}.{method} — total=Tms preload=Pms inst=Ims calls=N across K plugin(s)
-    instantiated (M): [service:plugin, ...]
-    disposed (M): [service:plugin, ...]
-    pinned remaining: X
-```
-
-Per GC burst (batched via ~50ms debounce; clustered reclaims produce one line):
-
-```
-[gc] reclaimed N plugin(s): [service:plugin, ...]
-```
-
-Implementation notes:
-
-- Plugin-level timings are stored on `Plugin.stats` (fetchMs, fetchBytes, compileMs, reported flag) and consumed once by `Plugins.collectPreloadStats()` at the end of `doPreload()`. Plugins loaded in earlier preloads are not re-reported.
-- GC events are buffered through a module-level queue + `setTimeout(..., 50)` in `plugin.ts`, so V8's tendency to collect many disposed modules in one cycle produces a single console line.
-- No per-call or per-fetch logs anywhere — cross-plugin call chains and parallel downloads are too dense to log individually.
+**Runtime logging (removed)** — During development, aggregate `[preload]` / `[entry]` / `[gc]` lines and `Plugin.stats` were emitted from a dedicated instrumentation module; that code has been deleted. Re-measure with a temporary `WebAssembly.instantiate` monkey-patch (see [How to Measure Impact](#how-to-measure-impact)) if needed.
 
 **Expected runtime shape**:
 
@@ -243,10 +214,8 @@ Implementation notes:
 - `supervisor.ts`:
   - `doPreload()`: Phase 0 still instantiates system plugins (the internal sync calls need live instances), but no longer marks them `pinned`. Dropped the `newlyPinned` counter. Comment clarifies that callers are responsible for disposal.
   - `preloadPlugins()` / `getJson()`: added `finally { plugins.disposeAllUnpinned(); }` to release the Phase 0 instances that `doPreload()` leaves live for its own sync calls.
-  - `entry()`: unchanged pair of `ensureAllInstantiated()` + `disposeAllUnpinned()` — still works because every plugin is now non-pinned. Moved the `preInst` snapshot to *before* preload so the `instantiated` / `disposed` report lines are symmetrical.
+  - `entry()`: unchanged pair of `ensureAllInstantiated()` + `disposeAllUnpinned()` — still works because every plugin is now non-pinned.
   - Added `shutdown(): string[]`. Calls `plugins.disposeAll()` (ignores pinned) and returns the disposed label list. Retains `compiledPlugin` handles on every `Plugin` so bfcache restore can re-instantiate without re-fetching or re-compiling.
-  - `[entry]` report: "pinned remaining" renamed to "retained" and the "(none — all X were already pinned)" branch simplified to "(none)", reflecting that the only retained allocation is the parser.
-  - `[preload]` report: dropped the `pinned=+N` field.
 - `plugins.ts`: added `disposeAll(): string[]` (same shape as `disposeAllUnpinned()`, ignores `pinned`).
 - `main.ts`: registered `window.addEventListener("pagehide", …)` that invokes `supervisor.shutdown()` and logs a `[shutdown] disposed N plugin(s)` line.
 - `plugin.ts`: `pinned: boolean = false` field kept as dormant infrastructure. No production path sets it.
@@ -267,7 +236,7 @@ Implementation notes:
 flowchart TD
     I1["✅ Iter 1: jco instantiation mode\n(loader.ts rewrite, Rollup removed)"] --> I2["✅ Iter 2: Plugin lifecycle\n(compile/instantiate/dispose)"]
     I2 --> I3["✅ Iter 3: Adaptive pool\n(LRU eviction, race fix)"]
-    I3 --> I4["✅ Iter 4: Call-scoped instantiation\n(pool removed, pinned flag, instrumentation)"]
+    I3 --> I4["✅ Iter 4: Call-scoped instantiation\n(pool removed, pinned flag)"]
     I4 --> I5["✅ Iter 5: Drop pinning + pagehide shutdown\n(idle VAS from pinning gone; pagehide = mostly DX)"]
     I5 --> D1["Deferred: E2E security\nverification & tuning"]
     I5 --> D2["Deferred: Pre-compilation\ncache (IndexedDB)"]
@@ -281,7 +250,7 @@ flowchart TD
 |------|------------|
 | jco `--instantiation async` integration issues | ✅ Resolved in Iter 1 (camelCase/kebab-case mapping, type-only interfaces, resource PascalCase) |
 | Some plugins rely on cross-call linear memory state | State is reset every call for non-pinned plugins. Audit if symptoms appear. Plugins should use `clientdata` for persistence. |
-| Re-instantiation latency noticeable to users | Compile is cached; instantiation runs in parallel. Instrumentation (`[entry]`/`[call]` logs) lets us spot regressions. |
+| Re-instantiation latency noticeable to users | Compile is cached; instantiation runs in parallel. Profile with DevTools or a temporary instantiate counter if regressions are suspected. |
 | Pinned system plugins accumulate resource handles across calls | Pre-existing concern (pinned lifetime > handle lifetime). Not introduced by Iter 4. Track separately if a leak materializes. |
 | **Cross-iframe VAS collision during navigation** | Addressed by dropping pinning (Option A); see [Open Issue: Cross-iframe VAS exhaustion](#open-issue-cross-iframe-vas-exhaustion-during-navigation) for the historical Iter 4 observation and why `pagehide` is ancillary. |
 
@@ -291,36 +260,11 @@ flowchart TD
 
 The metric that matters is the **number of concurrent `WebAssembly.Memory` objects** (= concurrent instances). To measure, add temporary instrumentation to `main.ts` that monkey-patches `WebAssembly.instantiate` to count calls (see [history doc](wasm-plugin-memory-history.md) for the exact code used during investigation).
 
-For the call-scoped approach (Iter 4 + 5), the built-in console instrumentation provides:
-- **Peak per-call instance count** — from `[entry]`'s `retained + instantiated (M)` line (cores / memories).
-- **Idle instance count between calls** — `retained: Np / Cc / Mm (parser)` in the same report; under Iter 5 this is always `1p / 1c / 1m`.
-- **Fetch / compile timings** — aggregated per-plugin lists + totals in the `[preload]` report.
-- **Instantiation latency** — `inst=Xms` in the `[entry]` report.
-- **Actual reclaim timing** — `[gc] reclaimed …` batched lines show when V8 released the memory.
-- **Pagehide teardown** — `[shutdown] disposed N plugin(s)` when anything was still instantiated at hide time (often silent once per-entry dispose runs first).
-
 **Success criterion**: Peak concurrent instances stays well below the threshold (~100) that triggers "Cannot allocate Wasm memory". With Iter 5, the steady-state between calls is 1 (parser) and peak is bounded by the dep tree of the active call.
 
-### Known logging-quality follow-ups (Iter 5 observation, not fixed)
+### Historical note — console logging during Iter 5 tuning
 
-Deferred by choice — the logs are accurate enough to confirm Iter 5 is working. Revisit only if a future investigation needs more precision.
-
-1. **Unhelpful error stringification in `[entry] ... FAILED`.** Observed once in an Iter 5 trace:
-   ```
-   [entry] accounts:plugin activeApp.connectAccount FAILED — total=30.7ms ...
-       error: [object Object]
-   ```
-   The error displayer in `supervisor.ts`'s `finally` does `err instanceof Error ? err.message : String(err)`, which falls back to `"[object Object]"` for plain-object errors that carry `code` / `producer` / `message` fields only on their payload. Future fix: also serialize via `JSON.stringify(err)` (or a small helper that knows the psibase error shapes) when `err.message` is falsy.
-
-2. **`instantiated` vs `disposed` asymmetry under concurrent entries.** Sample from a trace where two `packages:plugin` entries overlapped:
-   ```
-   [entry] packages:plugin queries.getSources — ... calls=0 across 0 plugin(s)
-       instantiated (6p / 21c / 6m): [auth-any, branding, sites, packages, setcode, staged-tx]
-       disposed (25p / 96c / 25m): [accounts, host/auth, ..., staged-tx]
-   ```
-   Cause: the second entry's `preInst` snapshot (taken at its `entry()` entry-point) captured the 20 system plugins already instantiated by the first entry's in-flight `preload()`, so they look "pre-existing" to the second entry's reporting filter even though its `finally` legitimately disposed them. The `disposed` count is the truthful one; `instantiated` under-reports by the overlap size. Purely cosmetic — lifecycle is correct. If fixed, options: (a) a per-`Plugins` sequence number carried into preInst to detect concurrent mutation, or (b) compute `instantiatedThisCall` as `disposed ∖ preInst` symmetrically.
-
-3. **`[shutdown]` log is silent when there's nothing to dispose.** By design: the `pagehide` handler gates the log on `disposed.length > 0`, so steady-state navigations (plugins already disposed between entries) print nothing. Means we can't tell from the console whether the handler is wired or firing at all. If future debugging needs confirmation, either drop the length gate or always log `[shutdown] nothing to dispose` on the empty case.
+While aggregate `[entry]` / `[preload]` / `[gc]` / `[shutdown]` lines existed, we noted cosmetic logging issues (error stringification, concurrent-entry reporting asymmetry, silent `[shutdown]` when nothing to dispose). That instrumentation has been removed; if similar telemetry is reintroduced, revisit those UX details then.
 
 ---
 

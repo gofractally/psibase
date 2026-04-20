@@ -22,7 +22,6 @@ import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
 import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
-import { Instrumentation } from "./plugin/instrumentation";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
@@ -37,9 +36,7 @@ import {
 
 const rootDomain = siblingUrl(null, null, null, true);
 
-// System plugins are always loaded during preload Phase 0 so internal
-// sync calls (getActivePrompt, getAuthServices, etc.) have live instances.
-// Adding to this list increases what every entry pays in Phase 0 work.
+// Adding here costs every entry the work of compiling + instantiating it.
 const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("accounts", "plugin"),
     pluginId("host", "auth"),
@@ -50,102 +47,17 @@ const systemPlugins: Array<QualifiedPluginId> = [
 ];
 
 /**
- * Supervisor — design notes for plugin lifecycle and WebAssembly memory
+ * Plugin lifecycle is call-scoped. See plugin/plugin.ts memory-model header
+ * for the VAS rationale, and the PR / issue history for the failure modes.
  *
- * The supervisor facilitates all communication between an app shell and its
- * plugin tree. It is loaded as an iframe at supervisor.<root> by every app
- * subdomain. Treat the rules below as load-bearing; violating them is what
- * caused the original "RangeError: WebAssembly.Memory(): could not allocate
- * memory" failures and motivated this file's current shape.
- *
- * Why call-scoped instantiation
- *   Each WebAssembly.Memory reserves ~10GB of *virtual address space* (VAS)
- *   on 64-bit V8 under the guard-page scheme, regardless of physical RAM
- *   touched. Each plugin component decomposes into multiple core modules,
- *   and the ones that own memory each export their own Memory. With dozens
- *   of plugins live, VAS exhaustion (not RAM exhaustion) is the failure
- *   mode.
- *
- *   On the original design, Plugin.ready instantiated the plugin and that
- *   instance was retained for the iframe's lifetime. A single app's
- *   dependency tree (~20 plugins) was usually under the per-process VAS
- *   budget, but the budget is unbounded across iframes and across
- *   navigations:
- *     - Each app subdomain hosts its own supervisor iframe; same URL, but
- *       *separate JS realms* with separate Plugins registries. Nothing
- *       dedups across iframes.
- *     - Cross-app workflows (e.g. Config calling into Accounts for login,
- *       then into Permissions for a grant) compose multiple supervisor
- *       iframes simultaneously. While each iframe has an entry in flight,
- *       its dependency tree can hold many Memories at once — peak VAS adds
- *       across concurrent supervisors (nothing dedups across realms).
- *     - If many plugin Memories were kept alive *between* calls (historically
- *       via pinning Phase-0 / system plugins), a bfcached outgoing page could
- *       still hold ~20 Memories while a newly loaded subdomain instantiated
- *       its own set — that produced `WebAssembly.instantiate(): Out of memory`
- *       in testing. Call-scoped dispose removes that *idle* footprint (only
- *       the parser utility retains Memory between calls), so old supervisor
- *       iframes are not a material contributor to that failure mode anymore.
- *   The failure presents as random when enough concurrent deep trees or
- *   rare races align; it is not primarily "Inspector iframe count".
- *
- *   The current design fixes this by separating *fetch + compile* (cheap;
- *   no Memory) from *instantiate* (allocates Memory). Plugin handles
- *   (compiledPlugin, a WebAssembly.Module) are retained for reuse across
- *   calls. Live instances are created in entry()/getJson()/preloadPlugins()
- *   just before the synchronous call chain runs and disposed in finally(),
- *   so the working set is bounded by *one entry's needs*, not by the
- *   cumulative history of the iframe.
- *
- * Supervisor iframe teardown (main.ts, pagehide → shutdown)
- *   Primarily a developer-experience affordance: fewer stale supervisor
- *   iframes stacked in DevTools after repeated navigations. It is not the
- *   primary fix for Wasm Memory / instantiate OOM; per-entry dispose above
- *   is. If instances were pinned across calls again and that hook went away,
- *   bfcached iframes could once again retain enough Memories to matter.
- *
- * Why per-entry teardown (and not "sticky" working-set caching)
- *   App UIs do not enter through a single top-level plugin in practice.
- *   A typical page load fans out across multiple entry targets — e.g.
- *   accounts:plugin api.getCurrentUser, branding:plugin queries.*,
- *   host:prompt admin.getActivePrompt — interleaved within seconds.
- *   The supervisor must therefore assume the plugin set "needed by the
- *   current entry" changes often as the UI runs, which makes any cached
- *   per-top-level-plugin working set thrash badly.
- *
- *   Compounding this, entrypoints are not strictly sequential: postMessage
- *   handlers in main.ts dispatch entry()/preloadPlugins()/getJson() without
- *   awaiting completion, so two entries can be in flight concurrently. A
- *   "reuse last entry's instances" cache would race: entry 2 inspects the
- *   cache, sees instances it needs, then entry 1's finally disposes them
- *   under entry 2's feet.
- *
- *   The per-entry instantiate/dispose pattern sidesteps both: each entry
- *   computes its own needed set, instantiates fresh, and tears down
- *   whatever it brought up — no shared mutable lifecycle state across
- *   entries to race on. The cost is repeat instantiation of recurring
- *   plugins; shrinking the transitive dependency graph remains the
- *   long-term lever — not caching instances across entries.
- *
- * Rules for anyone touching this file
- *   - Do not move instantiation back into Plugin construction or onto
- *     Plugin.ready. Keep the fetch/compile vs. instantiate split.
- *   - Every entrypoint that instantiates plugins (entry, getJson,
- *     preloadPlugins) MUST dispose in a finally clause, even on the error
- *     path. Phase 0 of doPreload() leaves system-plugin instances live for
- *     its own internal supervisorCall()s; the entrypoint's finally is what
- *     releases them.
- *   - Do not introduce cross-entry caches of plugin instances or working
- *     sets. The concurrency model (un-awaited postMessage dispatch) makes
- *     them race-prone, and the multi-top-level-plugin access pattern
- *     makes them thrash.
- *   - Treat systemPlugins as the "always-needed during preload Phase 0"
- *     set. Adding a plugin here increases what every entry pays in Phase 0.
- *   - The component-parser utility WASM (utils.ts::parser) is the only
- *     intentionally-retained allocation between entries.
- *   - Comments here assume the Memory model header in plugin/plugin.ts
- *     for VAS / dispose / retained terminology. Keep it that way instead
- *     of duplicating context.
+ * Invariants:
+ *   - Keep fetch/compile separate from instantiate; do not instantiate in
+ *     Plugin construction or in Plugin.ready.
+ *   - Every entrypoint that instantiates must dispose in `finally` (success
+ *     and error). doPreload leaves Phase-0 instances live for its own sync
+ *     calls; the entrypoint releases them.
+ *   - No cross-entry caches of plugin instances: concurrent entries (from
+ *     un-awaited postMessage dispatch) would race over shared lifecycle.
  */
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -153,8 +65,6 @@ export class Supervisor implements AppInterface {
     private loader: PluginLoader;
 
     private context: CallContext | undefined;
-
-    private inst: Instrumentation;
 
     private embedder: string | undefined;
 
@@ -212,11 +122,8 @@ export class Supervisor implements AppInterface {
             return;
         }
 
-        const reportT0 = this.inst.preloadReportStart();
-
-        // Phase 0: compile + instantiate system plugins so the internal
-        // sync calls below have live instances. The entrypoint's finally
-        // disposes them after the call (same as every other plugin).
+        // Phase 0 instantiates because the supervisorCall()s below need
+        // live targets; the entrypoint's finally disposes them.
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
@@ -234,13 +141,11 @@ export class Supervisor implements AppInterface {
 
         setQueryToken(this.getActiveQueryToken());
 
-        // Phase 1: compile app plugins (no instantiation — Memory deferred).
+        // Phases 1+2 compile only; instantiation is deferred to entry().
         this.loader.trackPlugins([...plugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: load auth-service plugins for connected accounts. This
-        // sync call uses accounts:plugin, instantiated in Phase 0.
         const auth_services: string[] = this.supervisorCall(
             getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
@@ -255,8 +160,6 @@ export class Supervisor implements AppInterface {
 
         await this.loader.processPlugins();
         await this.loader.awaitReady();
-
-        this.inst.preloadReportEnd(reportT0, reason);
     }
 
     private replyToParent(id: string, result: any) {
@@ -317,8 +220,7 @@ export class Supervisor implements AppInterface {
 
     constructor() {
         this.plugins = new Plugins(this);
-        this.inst = new Instrumentation(this.plugins);
-        this.parser = parser((c, m) => this.inst.onParserLoaded(c, m));
+        this.parser = parser();
         this.loader = new PluginLoader(this.plugins);
     }
 
@@ -362,7 +264,6 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.context, "Uninitialized call context");
 
         const { service, plugin, intf, method, params } = args;
-        this.inst.onCall(service, plugin);
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(args.service, toString(args));
@@ -419,7 +320,6 @@ export class Supervisor implements AppInterface {
     callResource(args: QualifiedResourceCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
         const { service, plugin, intf, type, handle, method, params } = args;
-        this.inst.onCall(service, plugin);
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
         this.context.stack.push(service, toString(args));
@@ -443,13 +343,10 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             this.replyToParent(id, e);
         } finally {
-            // Release Phase-0 system plugin instances left live by preload.
             this.plugins.disposeAll();
         }
     }
 
-    // Entrypoint for apps to preload plugins on pageload, decoupling
-    // download/parse/compile from the eventual call.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
             this.setParentOrigination(callerOrigin);
@@ -465,17 +362,11 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    /** Drop any still-instantiated plugins when this iframe is hidden or
-     *  destroyed. Same dispose path as each entrypoint's finally(); with
-     *  call-scoped dispose there is usually nothing left — see main.ts
-     *  pagehide comments for why we still call this (DevTools hygiene, and
-     *  consistent teardown if lifecycle ever regresses). compiledPlugin
-     *  handles are retained for bfcache restore. Idempotent. */
+    /** See main.ts pagehide handler. Idempotent. */
     shutdown(): string[] {
         return this.plugins.disposeAll();
     }
 
-    // Entrypoint for apps to call into plugins.
     async entry(
         callerOrigin: string,
         id: string,
@@ -484,39 +375,21 @@ export class Supervisor implements AppInterface {
         const entryLabel = `${args.service}:${args.plugin} ${
             args.intf ? `${args.intf}.` : ""
         }${args.method}`;
-        const handle = this.inst.entryStart(entryLabel);
-        let entryError: unknown = undefined;
-        let disposed: string[] = [];
 
         try {
             this.setParentOrigination(callerOrigin);
 
-            // Load the full plugin tree (download + parse + transpile + compile).
-            // System plugins are instantiated as a side effect for preload's
-            // internal sync calls; they're disposed in finally with the rest.
-            const preT0 = this.inst.entryPreloadStart();
-            try {
-                await this.preload(
-                    [
-                        {
-                            service: args.service,
-                            plugin: args.plugin,
-                        },
-                    ],
-                    `entry:${entryLabel}`,
-                );
-            } finally {
-                this.inst.entryPreloadEnd(preT0);
-            }
+            await this.preload(
+                [
+                    {
+                        service: args.service,
+                        plugin: args.plugin,
+                    },
+                ],
+                `entry:${entryLabel}`,
+            );
 
-            // Instantiate everything else so the synchronous call chain
-            // has live instances. Phase 0 plugins are no-ops here.
-            const instT0 = this.inst.entryInstStart();
-            try {
-                await this.plugins.ensureAllInstantiated();
-            } finally {
-                this.inst.entryInstEnd(instT0);
-            }
+            await this.plugins.ensureAllInstantiated();
 
             this.context = this.getCallContext();
 
@@ -524,7 +397,6 @@ export class Supervisor implements AppInterface {
                 getCallArgs("transact", "plugin", "admin", "startTx", []),
             );
 
-            // Synchronous — everything was preloaded.
             const result = this.call(args);
 
             // Closes the tx context. If actions were added, tx is submitted.
@@ -539,7 +411,6 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } catch (e) {
-            entryError = e;
             const err = getRecoverableError(e);
             if (err) {
                 let newError;
@@ -558,11 +429,8 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } finally {
-            // Sweep all instances. Catches partial-instantiation failures
-            // (system plugins that came up before a Phase-0 error) so no
-            // half-live state persists between calls.
-            disposed = this.plugins.disposeAll();
-            this.inst.entryEnd(handle, disposed, entryError);
+            // Also catches partial-instantiation failures from Phase 0.
+            this.plugins.disposeAll();
         }
     }
 }

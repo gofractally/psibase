@@ -49,15 +49,8 @@ export const assert = (condition: boolean, errorMessage: string): void => {
 
 let modulePromise: Promise<any>;
 
-// Memoized loader for the component-parser utility WASM. The optional
-// callback fires once on first load with the parser's core/memory counts;
-// it exists so instrumentation can include the parser in the "retained"
-// totals. Subsequent calls reuse the cached promise and ignore the
-// callback. See plugin/instrumentation.ts (REMOVAL CHECKLIST) for how
-// this hook gets cleaned up.
-export const parser = (
-    onFirstLoad?: (coreCount: number, memoryCount: number) => void,
-): Promise<any> => {
+// Only WASM retained between supervisor entries (see plugin/plugin.ts).
+export const parser = (): Promise<any> => {
     if (!modulePromise) {
         const url = siblingUrl(
             null,
@@ -66,10 +59,7 @@ export const parser = (
         );
         modulePromise = wasmFromUrl(url)
             .then((bytes) => loadBasic(bytes, "component-parser.js"))
-            .then(({ exports, coreCount, memoryCount }) => {
-                onFirstLoad?.(coreCount, memoryCount);
-                return exports;
-            });
+            .then(({ exports }) => exports);
     }
     return modulePromise;
 };

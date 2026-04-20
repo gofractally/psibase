@@ -1,37 +1,16 @@
 /**
- * Memory model — context for everything in this folder
+ * Memory model
  *
- * A psibase plugin is a WebAssembly *component* that decomposes (via jco)
- * into one or more *core modules* — typically a primary core plus a WASI
- * preview1 adapter and lift/lower trampolines. Each instantiated core
- * module gets its own WebAssembly.Instance, and the ones that own memory
- * each export their own WebAssembly.Memory.
+ * On 64-bit V8 each WebAssembly.Memory reserves ~10GB of virtual address
+ * space (VAS) for guard pages, regardless of physical RAM. With dozens of
+ * plugins live, VAS exhaustion — not RAM — is what makes WebAssembly
+ * instantiate fail with "could not allocate memory".
  *
- * On 64-bit V8 each WebAssembly.Memory reserves ~10GB of *virtual address
- * space* (VAS) under the guard-page allocation scheme, regardless of how
- * little physical RAM the plugin actually touches. With dozens of plugins
- * loaded, VAS exhaustion (not RAM exhaustion) is what makes further
- * instantiations fail with "RangeError: WebAssembly.Memory(): could not
- * allocate memory".
- *
- * The supervisor mitigates this by *call-scoping* plugin instances:
- *   - Plugins are fetched + parsed + compiled eagerly during preload.
- *     Compilation is cheap — no Memory allocated.
- *   - Plugins are *instantiated* (Memory allocated) just before the
- *     synchronous call chain runs, and *disposed* in finally(). Disposal
- *     drops the pluginModule reference; V8 reclaims the Memory on the
- *     next GC.
- *   - The compiledPlugin handle (a WebAssembly.Module) is retained so
- *     the next entry() can re-instantiate without re-fetching or
- *     re-compiling.
- *
- * The component-parser utility WASM (loaded once at supervisor startup,
- * see utils.ts) is the only WASM allocation retained between entry()
- * calls.
- *
- * Subsequent comments in this folder assume this context and will not
- * re-derive it. Look here when something talks about "VAS", "Memory",
- * "dispose", or "retained" without further explanation.
+ * Mitigation: keep fetch+compile separate from instantiate. Plugins are
+ * instantiated just before the synchronous call chain and disposed in the
+ * caller's finally(); the compiled Module handle is retained so the next
+ * entry skips re-fetch/re-compile. utils.ts::parser is the only WASM
+ * intentionally retained between entries.
  */
 
 import {
@@ -49,46 +28,6 @@ import { parser, wasmFromUrl } from "../utils";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
-// Buffered GC reclaim log. The FinalizationRegistry callback fires when
-// V8 collects a disposed plugin's instance module. Batches labels that
-// arrive within ~50ms into a single line. (Instrumentation — see
-// instrumentation.ts REMOVAL CHECKLIST.)
-const gcQueue: string[] = [];
-let gcFlushScheduled = false;
-function flushGcQueue() {
-    if (gcQueue.length === 0) {
-        gcFlushScheduled = false;
-        return;
-    }
-    const labels = gcQueue.splice(0);
-    console.log(
-        `[gc] reclaimed ${labels.length} plugin(s): [${labels.join(", ")}]`,
-    );
-    gcFlushScheduled = false;
-}
-const gcRegistry: FinalizationRegistry<string> | null =
-    typeof FinalizationRegistry !== "undefined"
-        ? new FinalizationRegistry<string>((label) => {
-              gcQueue.push(label);
-              if (!gcFlushScheduled) {
-                  gcFlushScheduled = true;
-                  setTimeout(flushGcQueue, 50);
-              }
-          })
-        : null;
-
-// Per-plugin instrumentation captured during preload, consumed once by
-// Instrumentation.collectPreloadStats(). coreCount/memoryCount are
-// deterministic per compiled component.
-export interface PluginStats {
-    fetchMs?: number;
-    fetchBytes?: number;
-    compileMs?: number;
-    coreCount?: number;
-    memoryCount?: number;
-    reported: boolean;
-}
-
 export class Plugin {
     private host: HostInterface;
 
@@ -102,11 +41,8 @@ export class Plugin {
 
     parsed: Promise<ComponentAPI>;
 
-    // Resolves once the plugin is compiled. ensureInstantiated() must
-    // still be called before use.
+    // Compiled, not yet instantiated; ensureInstantiated() before use.
     ready: Promise<void>;
-
-    stats: PluginStats = { reported: false };
 
     private compiledPlugin: CompiledPlugin | undefined;
     private pluginModule: any;
@@ -134,11 +70,8 @@ export class Plugin {
     private async doFetchPlugin(): Promise<Uint8Array> {
         const { service, plugin } = this.id;
         const url = siblingUrl(null, service, `/${plugin}.wasm`);
-        const t0 = performance.now();
         try {
             this.bytes = await wasmFromUrl(url);
-            this.stats.fetchMs = performance.now() - t0;
-            this.stats.fetchBytes = this.bytes.byteLength;
             return this.bytes;
         } catch (e) {
             if (e instanceof DownloadFailed) {
@@ -181,7 +114,6 @@ export class Plugin {
     private async doReady(): Promise<void> {
         const api = await this.parsed;
         const privileged = this.id.service === "host";
-        const t0 = performance.now();
         this.compiledPlugin = await compilePlugin(
             this.id.service,
             privileged,
@@ -189,7 +121,6 @@ export class Plugin {
             this.host,
             api,
         );
-        this.stats.compileMs = performance.now() - t0;
     }
 
     constructor(id: QualifiedPluginId, host: HostInterface) {
@@ -208,15 +139,8 @@ export class Plugin {
     async ensureInstantiated(): Promise<void> {
         if (this.pluginModule) return;
         if (!this.compiledPlugin) throw new PluginInvalid(this.id);
-        const { exports, coreCount, memoryCount } =
-            await this.compiledPlugin.instantiate();
+        const { exports } = await this.compiledPlugin.instantiate();
         this.pluginModule = exports;
-        this.stats.coreCount = coreCount;
-        this.stats.memoryCount = memoryCount;
-        gcRegistry?.register(
-            this.pluginModule,
-            `${this.id.service}:${this.id.plugin}`,
-        );
     }
 
     dispose(): void {
