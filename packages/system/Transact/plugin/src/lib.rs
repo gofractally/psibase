@@ -139,6 +139,30 @@ impl Intf for TransactPlugin {
     ) -> Result<(), HostTypes::Error> {
         schedule_action(Host::client::get_sender(), method_name, packed_args)
     }
+
+    fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
+        assert_authorized_with_whitelist(
+            FunctionName::set_propose_latch,
+            vec![Host::client::get_active_app()],
+        )?;
+
+        let Some(acct) = account else {
+            return flush_propose_latch();
+        };
+
+        if accounts::plugin::api::get_account(&acct)?.is_none() {
+            return Err(InvalidAccount(&acct).into());
+        }
+
+        if let Some(existing) = ProposeLatch::subsequent_action_sender() {
+            if existing == acct {
+                return Ok(());
+            }
+            flush_propose_latch()?;
+        }
+        ProposeLatch::open(acct);
+        Ok(())
+    }
 }
 
 impl Network for TransactPlugin {
@@ -217,30 +241,6 @@ impl Admin for TransactPlugin {
             println!("[Warning] Action claims should already have been cleared.");
             ActionClaims::clear();
         }
-    }
-
-    fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
-        assert_authorized_with_whitelist(
-            FunctionName::set_propose_latch,
-            vec![Host::client::get_active_app()],
-        )?;
-
-        let Some(acct) = account else {
-            return flush_propose_latch();
-        };
-
-        if accounts::plugin::api::get_account(&acct)?.is_none() {
-            return Err(InvalidAccount(&acct).into());
-        }
-
-        if let Some(existing) = ProposeLatch::subsequent_action_sender() {
-            if existing == acct {
-                return Ok(());
-            }
-            flush_propose_latch()?;
-        }
-        ProposeLatch::open(acct);
-        Ok(())
     }
 
     fn propose(actions: Vec<Action>, auto_exec: bool) -> Result<(), HostTypes::Error> {

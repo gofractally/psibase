@@ -2,7 +2,7 @@
 /// (accept, reject, execute) and lets the proposer remove a staged transaction.
 ///
 /// Proposing a staged transaction is done via the transact plugin's
-/// `set-propose-latch` / `propose` admin functions.
+/// `set-propose-latch` and `propose` functions.
 package staged-tx:plugin;
 
 interface proposer {
@@ -11,7 +11,7 @@ interface proposer {
     /// Removes (deletes) the specified staged transaction
     ///
     /// This is only callable by the proposer of the staged transaction
-    /// 
+    ///
     /// Parameters:
     /// * `id`: The ID of the database record containing the staged transaction
     remove: func(id: u32) -> result<_, error>;
@@ -23,7 +23,7 @@ interface respondent {
     /// Accept the specified staged transaction
     ///
     /// Depending on the staging rules enforced by the auth service of the sender
-    /// of the staged transaction, this could result in the execution of the staged 
+    /// of the staged transaction, this could result in the execution of the staged
     /// transaction.
     ///
     /// Parameters:
@@ -33,7 +33,7 @@ interface respondent {
     /// Reject the specified staged transaction
     ///
     /// Depending on the staging rules enforced by the auth service of the sender
-    /// of the staged transaction, this could result in the complete rejection and deletion of the 
+    /// of the staged transaction, this could result in the complete rejection and deletion of the
     /// staged transaction.
     ///
     /// Parameters:

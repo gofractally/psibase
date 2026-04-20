@@ -57,23 +57,6 @@ interface admin {
     /// signed transaction.
     finish-tx: func() -> result<_, error>;
 
-    /// Set or clear the propose-latch.
-    ///
-    /// While a latch is set, actions added via add-action-to-transaction are routed
-    /// into a staged transaction proposed by the currently logged-in user on behalf
-    /// of `account`, and use `account` as their sender. Clearing the latch (or
-    /// finishing the transaction) wraps the collected actions into a single
-    /// `staged-tx::propose` action and appends it to the transaction.
-    ///
-    /// Setting the latch to a different account while one is already set flushes the
-    /// current latch (producing a proposal) and starts a new latch for the new account.
-    /// Setting it to the same account is a no-op. Only callable by the active app.
-    ///
-    /// `account` - The account on behalf of which the currently logged-in user is
-    ///             proposing transactions. Pass `none` to flush the current latch
-    ///             without starting a new one.
-    set-propose-latch: func(account: option<string>) -> result<_, error>;
-
     /// Submit the given actions as a single staged transaction proposed by the
     /// logged-in user. Only callable by the `packages` plugin.
     ///
@@ -96,6 +79,25 @@ interface intf {
     /// * `method-name`: The method name of the action being called
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
+
+    /// Set or clear the propose-latch.
+    ///
+    /// While a latch is set, actions added via add-action-to-transaction are routed
+    /// into a staged transaction proposed by the currently logged-in user on behalf
+    /// of `account`, and use `account` as their sender. Clearing the latch (or
+    /// finishing the transaction) wraps the collected actions into a single
+    /// `staged-tx::propose` action and appends it to the transaction.
+    ///
+    /// Setting the latch to a different account while one is already set flushes the
+    /// current latch (producing a proposal) and starts a new latch for the new account.
+    /// Setting it to the same account is a no-op.
+    ///
+    /// Only callable by the active app.
+    ///
+    /// `account` - The account on behalf of which the currently logged-in user is
+    ///             proposing transactions. Pass `none` to flush the current latch
+    ///             without starting a new one.
+    set-propose-latch: func(account: option<string>) -> result<_, error>;
 }
 
 interface auth {
