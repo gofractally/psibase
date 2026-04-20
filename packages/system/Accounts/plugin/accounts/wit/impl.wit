@@ -74,7 +74,7 @@ world impl {
     include host:common/privileged;
     include host:auth/imports;
     include host:prompt/imports;
-    include clientdata:plugin/imports;
+    include host:db/imports;
     include transact:plugin/imports;
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
