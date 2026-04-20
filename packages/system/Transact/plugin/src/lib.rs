@@ -155,6 +155,19 @@ impl Network for TransactPlugin {
     }
 }
 
+fn pack_staged_propose(actions: Vec<Action>, auto_exec: bool) -> (String, String, Vec<u8>) {
+    let inner: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+    (
+        psibase::services::staged_tx::SERVICE.to_string(),
+        psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
+        psibase::services::staged_tx::action_structs::propose {
+            actions: inner,
+            auto_exec,
+        }
+        .packed(),
+    )
+}
+
 fn flush_propose_latch() -> Result<(), HostTypes::Error> {
     let Some(latch) = ProposeLatch::take() else {
         return Ok(());
@@ -168,19 +181,13 @@ fn flush_propose_latch() -> Result<(), HostTypes::Error> {
         return Err(NotLoggedIn("flush_propose_latch").into());
     };
 
-    let inner: Vec<psibase::Action> = latch.actions.into_iter().map(Into::into).collect();
-
-    let wrapper = Action {
+    let (service, method, raw_data) = pack_staged_propose(latch.actions, true);
+    TxActions::add(Action {
         sender: proposer,
-        service: psibase::services::staged_tx::SERVICE.to_string(),
-        method: psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
-        raw_data: psibase::services::staged_tx::action_structs::propose {
-            actions: inner,
-            auto_exec: true,
-        }
-        .packed(),
-    };
-    TxActions::add(wrapper);
+        service,
+        method,
+        raw_data,
+    });
     Ok(())
 }
 
@@ -239,15 +246,8 @@ impl Admin for TransactPlugin {
     fn propose(actions: Vec<Action>, auto_exec: bool) -> Result<(), HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::propose, vec!["packages".into()])?;
 
-        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
-        let packed =
-            psibase::services::staged_tx::action_structs::propose { actions, auto_exec }.packed();
-
-        schedule_action(
-            psibase::services::staged_tx::SERVICE.to_string(),
-            psibase::services::staged_tx::action_structs::propose::ACTION_NAME.to_string(),
-            packed,
-        )
+        let (service, method, packed) = pack_staged_propose(actions, auto_exec);
+        schedule_action(service, method, packed)
     }
 
     fn finish_tx() -> Result<(), HostTypes::Error> {
