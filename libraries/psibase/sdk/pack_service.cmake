@@ -106,7 +106,7 @@ function(json_append_exports VAR KEY)
 endfunction()
 
 function(write_meta)
-    cmake_parse_arguments(PARSE_ARGV 0 "" "" "NAME;VERSION;SCOPE;DESCRIPTION;OUTPUT" "DEPENDS;ACCOUNTS;EXPORTS")
+    cmake_parse_arguments(PARSE_ARGV 0 "" "" "NAME;VERSION;SCOPE;DESCRIPTION;OUTPUT" "DEPENDS;ACCOUNTS;SERVICES;EXPORTS")
     set(result)
     string(APPEND result "{")
     json_append_key(result "name" ${_NAME})
@@ -115,6 +115,7 @@ function(write_meta)
     json_append_key(result "description" ${_DESCRIPTION})
     json_append_deps(result "depends" ${_DEPENDS})
     json_append_list(result "accounts" ${_ACCOUNTS})
+    json_append_list(result "services" ${_SERVICES})
     json_append_exports(result "exports" ${_EXPORTS})
     string(APPEND result "}")
     file(GENERATE OUTPUT ${_OUTPUT} CONTENT ${result})
@@ -239,8 +240,10 @@ function(psibase_package)
     set(contents meta.json)
     set(zip-deps ${outdir}/meta.json)
     set(init-services)
+    set(wasm-services)
     foreach(service IN LISTS _SERVICES)
         if(_WASM_${service} OR _TARGET_${service})
+            list(APPEND wasm-services ${service})
             if(NOT _SCHEMA_${service})
                 if(_TARGET_${service})
                     set(_SCHEMA_${service} ${CMAKE_CURRENT_BINARY_DIR}/${service}-schema.json)
@@ -356,6 +359,7 @@ function(psibase_package)
         SCOPE ${_SCOPE}
         DESCRIPTION ${_DESCRIPTION}
         ACCOUNTS ${_ACCOUNTS} ${_SERVICES}
+        SERVICES ${wasm-services}
         DEPENDS ${_PACKAGE_DEPENDS}
         EXPORTS ${exports}
     )

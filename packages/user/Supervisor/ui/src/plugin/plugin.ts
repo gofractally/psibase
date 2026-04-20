@@ -11,9 +11,9 @@ import {
     loadPlugin,
 } from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
-import { HostInterface } from "../hostInterface";
+import { HostInterface } from "../host-interface";
 import { parser, wasmFromUrl } from "../utils";
-import { ComponentAPI } from "../witExtraction";
+import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
 export class Plugin {

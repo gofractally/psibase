@@ -12,7 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Seek, Write};
 use std::path::{Path, PathBuf};
-use zip::write::{FileOptions, ZipWriter};
+use zip::write::{SimpleFileOptions, ZipWriter};
 
 #[derive(Serialize, Deserialize, Default)]
 struct DataFiles {
@@ -370,7 +370,8 @@ impl<'a> PackageBuilder<'a> {
             )
         };
 
-        let accounts: Vec<_> = service_wasms.iter().map(|p| p.0).collect();
+        let services: Vec<_> = service_wasms.iter().map(|p| p.0).collect();
+        let accounts = services.clone();
 
         let crate_to_account: HashMap<&str, AccountNumber> = service_crates
             .iter()
@@ -398,6 +399,7 @@ impl<'a> PackageBuilder<'a> {
             description: package_description.unwrap_or_else(|| package_name.to_string()),
             depends,
             accounts,
+            services,
             exports,
         };
 
@@ -416,7 +418,7 @@ impl<'a> PackageBuilder<'a> {
                         .truncate(true)
                         .open(&out_path)?,
                 );
-                let options: FileOptions = FileOptions::default();
+                let options = SimpleFileOptions::DEFAULT;
                 out.start_file("meta.json", options)?;
                 write!(out, "{}", &serde_json::to_string(&meta)?)?;
                 for (service, info, path) in service_wasms {

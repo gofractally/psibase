@@ -5,15 +5,15 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useAppForm } from "@shared/components/form/app-form";
-import { FieldErrors } from "@shared/components/form/internal/field-errors";
-
 import { useCandidates } from "@/hooks/use-candidates";
 import { useConfigPlugin } from "@/hooks/use-config-plugin";
 import { useProducersPlugin } from "@/hooks/use-producers-plugin";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Params, SetProducerParams } from "@/lib/producers";
 
+import { useAppForm } from "@shared/components/form/app-form";
+import { FieldErrors } from "@shared/components/form/internal/field-errors";
+import { PageContainer } from "@shared/components/page-container";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
@@ -135,7 +135,7 @@ export const BlockProduction = () => {
     };
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6">
+        <PageContainer className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Producers</h2>
                 <p className="text-muted-foreground text-sm">
@@ -450,6 +450,6 @@ export const BlockProduction = () => {
                     </TableBody>
                 </Table>
             </div>
-        </div>
+        </PageContainer>
     );
 };

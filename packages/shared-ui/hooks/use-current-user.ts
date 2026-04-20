@@ -4,8 +4,8 @@ import type { QueryClient } from "@tanstack/react-query";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
+import { queryClient as defaultQueryClient } from "../lib/query-client";
 import QueryKey from "../lib/query-keys";
-import { queryClient as defaultQueryClient } from "../lib/queryClient";
 import { Account, zAccount } from "../lib/schemas/account";
 import { supervisor } from "../lib/supervisor";
 
@@ -26,12 +26,15 @@ export const queryCurrentUser = queryOptions({
 });
 
 export const useCurrentUser = (
-    options?: Omit<UndefinedInitialDataOptions<
-        string | null,
-        Error,
-        GetCurrentUserRes,
-        ReturnType<typeof QueryKey.currentUser>
-    >, "queryKey" | "queryFn">,
+    options?: Omit<
+        UndefinedInitialDataOptions<
+            string | null,
+            Error,
+            GetCurrentUserRes,
+            ReturnType<typeof QueryKey.currentUser>
+        >,
+        "queryKey" | "queryFn"
+    >,
 ) => {
     const queryOptions = options ?? {};
     return useQuery({ ...queryCurrentUser, ...queryOptions });

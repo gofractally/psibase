@@ -2,7 +2,7 @@ import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import {
     type Token,
     useUserTokenBalances,
-} from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
+} from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 import { useEffect, useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 
@@ -64,7 +64,7 @@ export const TokensLayout = () => {
 
     return (
         <div className="p-4">
-            <div className="mx-auto max-w-screen-md">
+            <div className="mx-auto max-w-3xl">
                 {isNoTokens ? (
                     <NoTokensWarning />
                 ) : (

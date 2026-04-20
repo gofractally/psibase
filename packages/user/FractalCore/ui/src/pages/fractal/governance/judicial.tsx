@@ -9,7 +9,7 @@ import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
+import { PageContainer } from "@shared/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {

@@ -5,10 +5,10 @@ import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
-import { PageContainer } from "@shared/domains/fractal/components/page-container";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
-import { getMemberLabel } from "@shared/domains/fractal/lib/getMemberLabel";
+import { getMemberLabel } from "@shared/domains/fractal/lib/get-member-label";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {

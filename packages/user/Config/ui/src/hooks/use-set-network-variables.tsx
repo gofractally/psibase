@@ -1,9 +1,10 @@
-import { queryClient } from "@/queryClient";
+import type { VirtualServerResources } from "./use-virtual-server-resources";
 
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
 import { CONFIG } from "@/lib/services";
 
-import type { VirtualServerResources } from "./use-virtual-server-resources";
+import { queryClient } from "@shared/lib/query-client";
+
 import { usePluginMutation } from "./use-plugin-mutation";
 
 interface NetworkVariables {
@@ -40,4 +41,3 @@ export const useSetNetworkVariables = () =>
             },
         },
     );
-

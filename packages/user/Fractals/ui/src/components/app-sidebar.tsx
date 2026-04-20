@@ -13,9 +13,7 @@ import {
     SidebarContent,
     SidebarFooter,
     SidebarHeader,
-    SidebarMenu,
     SidebarMenuButton,
-    SidebarMenuItem,
     SidebarRail,
 } from "@shared/shadcn/ui/sidebar";
 
@@ -33,15 +31,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 show={createFractalOpen}
             />
             <SidebarHeader>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <Link to={siblingUrl()}>
-                            <SidebarMenuButton size="lg" asChild>
-                                <NetworkLogo />
-                            </SidebarMenuButton>
-                        </Link>
-                    </SidebarMenuItem>
-                </SidebarMenu>
+                <Link to={siblingUrl()}>
+                    <SidebarMenuButton size="lg" asChild>
+                        <NetworkLogo />
+                    </SidebarMenuButton>
+                </Link>
             </SidebarHeader>
             <SidebarContent>
                 <NavMain onOpenCreateFractal={openCreateFractal} />

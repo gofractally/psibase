@@ -17,6 +17,7 @@ interface types {
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
         exports: list<package-export>,
         sha256: string,
         file: string,
@@ -29,6 +30,7 @@ interface types {
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
         exports: list<package-export>,
     }
     /// The location of a package repository.

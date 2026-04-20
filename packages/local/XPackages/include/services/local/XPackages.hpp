@@ -13,10 +13,11 @@ namespace LocalService
       std::string                         description;
       std::vector<psibase::PackageRef>    depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
       std::vector<psibase::PackageExport> exports;
       psibase::Checksum256                sha256;
    };
-   PSIO_REFLECT(LocalPackage, name, version, description, depends, accounts, exports, sha256)
+   PSIO_REFLECT(LocalPackage, name, version, description, depends, accounts, services, exports, sha256)
    using LocalPackagesTable = psibase::Table<LocalPackage, &LocalPackage::name>;
    PSIO_REFLECT_TYPENAME(LocalPackagesTable)
 
@@ -27,6 +28,7 @@ namespace LocalService
       std::string                         description;
       std::vector<psibase::PackageRef>    depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
       std::vector<psibase::PackageExport> exports;
       psibase::Checksum256                sha256;
       bool                                removing = false;
@@ -41,6 +43,7 @@ namespace LocalService
                 description,
                 depends,
                 accounts,
+                services,
                 exports,
                 sha256,
                 removing)

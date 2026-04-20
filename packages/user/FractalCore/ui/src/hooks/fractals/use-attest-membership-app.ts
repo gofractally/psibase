@@ -1,12 +1,12 @@
-import { queryClient } from "@shared/lib/queryClient";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
-import { getGuildApplication } from "@/lib/graphql/fractals/getGuildApplication";
+import { getGuildApplication } from "@/lib/graphql/fractals/get-guild-application";
 import { fractalCorePlugin } from "@/lib/plugin";
-import QueryKey from "@/lib/queryKeys";
-import { zGuildAccount } from "@/lib/zod/Wrappers";
+import QueryKey from "@/lib/query-keys";
+import { zGuildAccount } from "@/lib/zod/wrappers";
 
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 import { toast } from "@shared/shadcn/ui/sonner";
 

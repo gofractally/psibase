@@ -29,6 +29,7 @@ mod service {
         pub description: String,
         pub depends: Vec<PackageRef>,
         pub accounts: Vec<AccountNumber>,
+        pub services: Vec<AccountNumber>,
         pub owner: AccountNumber,
         pub exports: Vec<PackageExport>,
     }

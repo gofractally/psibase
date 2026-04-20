@@ -1,13 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import QueryKey from "@/lib/queryKeys";
-import { zUnix } from "@/lib/zod/Unix";
-import { zGuildAccount } from "@/lib/zod/Wrappers";
+import QueryKey from "@/lib/query-keys";
+import { zGuildAccount } from "@/lib/zod/wrappers";
 
 import { assertUser } from "@shared/hooks/use-current-user";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
+import { zUnix } from "@shared/lib/schemas/unix";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 

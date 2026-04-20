@@ -12,15 +12,16 @@ use futures::{
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{packages, sites, staged_tx, transact, x_packages};
 use psibase::{
-    account, apply_proxy, as_json, compress_content, create_boot_transactions,
+    account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
     get_tapos_for_head, login_action, new_account_action, push_transaction,
     push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, AnyPrivateKey,
-    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
-    FilteredRegistry, HTTPRegistry, JointRegistry, Meta, PackageDataFile, PackageInfo, PackageList,
-    PackageOp, PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService,
-    PrettyAction, SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
+    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, ActionFormatter,
+    AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
+    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
+    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
+    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
+    SchemaFetcher, SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
     TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
     Version,
 };
@@ -765,13 +766,22 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message("Pushing transaction");
 
+    let afmt = ActionFormatter::with_schemas(
+        schemas,
+        HttpSchemaFetcher {
+            client: &client,
+            base_url: &args.node_args.api,
+        },
+    );
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
 
@@ -812,13 +822,19 @@ async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message(format!("Creating {}", args.account));
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
 
@@ -864,13 +880,19 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message(format!("Setting auth for {}", args.account));
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
     finish_progress(&args.sig_args, progress, 1);
@@ -929,13 +951,20 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
         &args.sig_args.proposer,
         true,
     );
+
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
     finish_progress(&args.sig_args, progress, 1);
@@ -987,13 +1016,19 @@ async fn upload(args: &UploadArgs) -> Result<(), anyhow::Error> {
         true,
     );
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     push_transaction(
         &args.node_args.api,
-        client,
+        client.clone(),
         sign_transaction(trx, &args.sig_args.sign)?.packed(),
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        &afmt,
     )
     .await?;
     finish_progress(&args.sig_args, progress, 1);
@@ -1053,13 +1088,14 @@ fn fill_tree(
     Ok(())
 }
 
-async fn monitor_trx(
+async fn monitor_trx<F: SchemaFetcher>(
     args: &UploadArgs,
     client: &reqwest::Client,
     files: Vec<String>,
     trx: SignedTransaction,
     progress: ProgressBar,
     n: u64,
+    afmt: &ActionFormatter<'_, F>,
 ) -> Result<(), anyhow::Error> {
     let result = push_transaction(
         &args.node_args.api,
@@ -1068,6 +1104,7 @@ async fn monitor_trx(
         args.tx_args.trace,
         args.tx_args.console,
         Some(&progress),
+        afmt,
     )
     .await;
     if let Err(err) = result {
@@ -1183,7 +1220,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names).await?;
+    let mut packages = package_registry.resolve(&package_names, false).await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1194,6 +1231,12 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
+    let mut schemas = SchemaMap::new();
+    for package in &packages {
+        package.get_all_schemas(&mut schemas)?;
+    }
+    let mut afmt = ActionFormatter::with_schemas(schemas, NullSchemaFetcher);
+
     let num_transactions: usize = groups.iter().map(|group| group.1.len()).sum();
     let progress = ProgressBar::new((num_transactions + boot_transactions.len()) as u64)
         .with_style(ProgressStyle::with_template(
@@ -1201,7 +1244,14 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         )?);
 
     progress.set_message("Initializing chain");
-    push_boot(args, &client, boot_transactions.packed(), &progress).await?;
+    push_boot(
+        args,
+        &client,
+        boot_transactions.packed(),
+        &progress,
+        &mut afmt,
+    )
+    .await?;
     progress.inc(boot_transactions.len() as u64);
     for (label, transactions, _) in groups {
         progress.set_message(label);
@@ -1213,6 +1263,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
                 args.tx_args.trace,
                 args.tx_args.console,
                 Some(&progress),
+                &afmt,
             )
             .await?;
             progress.inc(1)
@@ -1228,6 +1279,7 @@ async fn push_boot(
     client: &reqwest::Client,
     packed: Vec<u8>,
     progress: &ProgressBar,
+    afmt: &mut ActionFormatter<'_, NullSchemaFetcher>,
 ) -> Result<(), anyhow::Error> {
     let trace: TransactionTrace = as_json(
         client
@@ -1244,7 +1296,8 @@ async fn push_boot(
     }
     args.tx_args
         .trace
-        .error_for_trace(trace, Some(progress))
+        .error_for_trace(trace, Some(progress), afmt)
+        .await
         .context("Failed to boot")
 }
 
@@ -1276,6 +1329,11 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
         args.compression_level,
     )?;
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     let tapos = get_tapos_for_head(&args.node_args.api, client.clone()).await?;
     let mut running = Vec::new();
     let progress = ProgressBar::new(actions.len() as u64).with_style(ProgressStyle::with_template(
@@ -1300,6 +1358,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
             sign_transaction(trx, &args.sig_args.sign)?,
             progress.clone(),
             n as u64,
+            &afmt,
         ));
     }
 
@@ -1318,7 +1377,7 @@ async fn upload_tree(args: &UploadArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn push_transactions_parallel<'a>(
+async fn push_transactions_parallel<'a, F: SchemaFetcher + 'a>(
     base_url: &'a Url,
     client: &'a reqwest::Client,
     signer: &TransactionSigner<'a>,
@@ -1327,6 +1386,7 @@ async fn push_transactions_parallel<'a>(
     console: bool,
     progress: &ProgressBar,
     max_simultaneous_transactions: usize,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     struct GroupCount {
         n: u64,
@@ -1376,6 +1436,7 @@ async fn push_transactions_parallel<'a>(
                         fmt,
                         console,
                         Some(progress),
+                        afmt,
                     )
                     .await
                     .with_context(|| label.to_string())?;
@@ -1500,6 +1561,11 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
 
     progress.set_message("Publishing packages");
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.node_args.api,
+    });
+
     let result: Result<_, anyhow::Error> = push_transactions_parallel(
         &args.node_args.api,
         &client,
@@ -1509,6 +1575,7 @@ async fn publish(args: &PublishArgs) -> Result<(), anyhow::Error> {
         args.tx_args.console,
         &progress,
         4,
+        &afmt,
     )
     .await;
     if result.is_ok() {
@@ -1537,20 +1604,24 @@ async fn apply_packages<
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
-    installed_packages: PackageList,
-) -> Result<(), anyhow::Error> {
-    let updated_packages = installed_packages.into_updated(&ops);
+    existing: PackageList,
+) -> Result<SchemaMap, anyhow::Error> {
+    let ops = fetch_packages(reg, ops, &existing).await?;
+    let updated_packages = existing.into_updated(&ops);
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
-            PackageOp::Install(info) => {
-                // TODO: verify ownership of existing accounts
-                let mut package = reg.get_by_info(&info).await?;
+            PackageOpFull::Install(mut package) => {
                 package.load_schemas(base_url, client, &mut schemas).await?;
-                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                out.set_label(format!(
+                    "Installing {}-{}",
+                    package.name(),
+                    package.version()
+                ));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
-                    &info.name, &info.version
+                    package.name(),
+                    package.version()
                 ));
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
@@ -1568,17 +1639,20 @@ async fn apply_packages<
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
-            PackageOp::Replace(meta, info) => {
-                let mut package = reg.get_by_info(&info).await?;
+            PackageOpFull::Replace(meta, mut package) => {
                 package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
-                    &meta.name, &meta.version, &info.name, &info.version
+                    &meta.name,
+                    &meta.version,
+                    package.name(),
+                    package.version()
                 ));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
-                    &info.name, &info.version
+                    package.name(),
+                    package.version()
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
@@ -1600,7 +1674,7 @@ async fn apply_packages<
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
-            PackageOp::Remove(meta) => {
+            PackageOpFull::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
@@ -1608,7 +1682,7 @@ async fn apply_packages<
             }
         }
     }
-    Ok(())
+    Ok(schemas)
 }
 
 async fn do_install<T: Read + Seek>(
@@ -1621,7 +1695,7 @@ async fn do_install<T: Read + Seek>(
     tx_args: &TxArgs,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
-    installed_packages: PackageList,
+    existing: PackageList,
 ) -> Result<(), anyhow::Error> {
     let tapos = get_tapos_for_head(&node_args.api, client.clone()).await?;
 
@@ -1662,7 +1736,7 @@ async fn do_install<T: Read + Seek>(
             )?)
         },
     );
-    apply_packages(
+    let schemas = apply_packages(
         &node_args.api,
         &mut client,
         &package_registry,
@@ -1673,13 +1747,21 @@ async fn do_install<T: Read + Seek>(
         sender,
         key,
         compression_level,
-        installed_packages,
+        existing,
     )
     .await?;
 
     if trx_builder.num_transactions() != 0 {
         trx_builder.push(packages::Wrapper::pack_from(sender).removeOrder(id.clone()))?;
     }
+
+    let afmt = ActionFormatter::with_schemas(
+        schemas,
+        HttpSchemaFetcher {
+            client: &client,
+            base_url: &node_args.api,
+        },
+    );
 
     let upload_transactions = upload_builder.finish()?;
     {
@@ -1709,6 +1791,7 @@ async fn do_install<T: Read + Seek>(
                         tx_args.trace,
                         tx_args.console,
                         Some(&progress),
+                        &afmt,
                     )
                     .await?;
                     progress.inc(len);
@@ -1743,6 +1826,7 @@ async fn do_install<T: Read + Seek>(
         tx_args.trace,
         tx_args.console,
         &progress,
+        &afmt,
     )
     .await?;
 
@@ -1859,6 +1943,20 @@ impl<'a> From<&'a PackageInfo> for LocalPackage<'a> {
     }
 }
 
+impl<'a, R: Read + Seek> From<&'a PackagedService<R>> for LocalPackage<'a> {
+    fn from(other: &'a PackagedService<R>) -> Self {
+        let meta = other.meta();
+        LocalPackage {
+            name: &meta.name,
+            version: &meta.version,
+            description: &meta.description,
+            depends: &meta.depends,
+            accounts: &meta.accounts,
+            sha256: other.hash(),
+        }
+    }
+}
+
 impl<'a> From<&'a (Meta, PackageOrigin)> for LocalPackage<'a> {
     fn from(other: &'a (Meta, PackageOrigin)) -> Self {
         let PackageOrigin::Local { sha256 } = &other.1 else {
@@ -1894,7 +1992,7 @@ async fn put_local_manifest<'a, R: Read + Seek>(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
     info: &LocalPackage<'a>,
-    package: &mut PackagedService<R>,
+    package: &PackagedService<R>,
 ) -> Result<(), anyhow::Error> {
     let manifest = package.manifest();
     let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
@@ -1943,43 +2041,75 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
+    let to_install = fetch_packages(&package_registry, to_install, &installed).await?;
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {
             match op {
-                PackageOp::Install(info) => {
-                    let mut package = package_registry.get_by_info(&info).await?;
-                    let info: LocalPackage = (&info).into();
-                    post_local_info(&node_args.api, &mut client, &info, "/preinstall").await?;
-                    put_local_manifest(&node_args.api, &mut client, &info, &mut package).await?;
+                PackageOpFull::Install(mut package) => {
+                    post_local_info(
+                        &node_args.api,
+                        &mut client,
+                        &(&package).into(),
+                        "/preinstall",
+                    )
+                    .await?;
+                    put_local_manifest(&node_args.api, &mut client, &(&package).into(), &package)
+                        .await?;
                     package
                         .install_local(&node_args.api, &mut client, compression_level)
                         .await?;
-                    post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+                    post_local_info(
+                        &node_args.api,
+                        &mut client,
+                        &(&package).into(),
+                        "/postinstall",
+                    )
+                    .await?;
                 }
-                PackageOp::Replace(old, new) => {
-                    let mut package = package_registry.get_by_info(&new).await?;
+                PackageOpFull::Replace(old, mut package) => {
                     let old_info: LocalPackage = installed.get_by_name(&old.name)?.unwrap().into();
-                    if old_info.sha256 == &new.sha256 {
+                    if old_info.sha256 == package.hash() {
                         // The only reason to install a package that is identical
                         // to the currently installed package is to fix corrupted
                         // files. Nothing needs to be removed (in particular, the
                         // manifest must not be removed), and we don't need
                         // to keep track of partial success.
-                        let info: LocalPackage = (&new).into();
-                        put_local_manifest(&node_args.api, &mut client, &info, &mut package)
-                            .await?;
+                        put_local_manifest(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            &package,
+                        )
+                        .await?;
                         package
                             .install_local(&node_args.api, &mut client, compression_level)
                             .await?;
-                        post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+                        post_local_info(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            "/postinstall",
+                        )
+                        .await?;
                     } else {
                         let old_manifest =
                             get_local_manifest(&node_args.api, &mut client, &old_info.sha256)
                                 .await?;
-                        let new: LocalPackage = (&new).into();
-                        post_local_info(&node_args.api, &mut client, &new, "/preinstall").await?;
-                        put_local_manifest(&node_args.api, &mut client, &new, &mut package).await?;
+                        post_local_info(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            "/preinstall",
+                        )
+                        .await?;
+                        put_local_manifest(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            &package,
+                        )
+                        .await?;
                         post_local_info(&node_args.api, &mut client, &old_info, "/prerm").await?;
                         package
                             .install_local(&node_args.api, &mut client, compression_level)
@@ -1989,10 +2119,16 @@ async fn do_install_local<T: Read + Seek>(
                             .await?;
                         delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
                         post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;
-                        post_local_info(&node_args.api, &mut client, &new, "/postinstall").await?;
+                        post_local_info(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            "/postinstall",
+                        )
+                        .await?;
                     }
                 }
-                PackageOp::Remove(meta) => {
+                PackageOpFull::Remove(meta) => {
                     let info: LocalPackage = installed.get_by_name(&meta.name)?.unwrap().into();
                     let old_manifest =
                         get_local_manifest(&node_args.api, &mut client, info.sha256).await?;

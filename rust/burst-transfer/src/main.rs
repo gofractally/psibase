@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicI32;
 
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
-use psibase::{AnyPrivateKey, TraceFormat};
+use psibase::{ActionFormatter, AnyPrivateKey, HttpSchemaFetcher, TraceFormat};
 
 /// Randomly push transfers to a blockchain in bursts
 #[derive(clap::Parser, Debug)]
@@ -173,13 +173,21 @@ async fn transfer_impl(
         actions,
         claims: vec![],
     };
+    let client = reqwest::Client::new();
+
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.api,
+    });
+
     psibase::push_transaction(
         &args.api,
-        reqwest::Client::new(),
+        client.clone(),
         psibase::sign_transaction(trx, &args.sign)?.packed(),
         args.trace,
         args.console,
         None,
+        &afmt,
     )
     .await?;
     Ok(())

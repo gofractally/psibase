@@ -79,6 +79,7 @@ std::optional<psibase::HttpReply> XPackages::serveSys(psibase::HttpRequest      
              .description = std::move(package.description),
              .depends     = std::move(package.depends),
              .accounts    = std::move(package.accounts),
+             .services    = std::move(package.services),
              .exports     = std::move(package.exports),
              .sha256      = std::move(package.sha256),
              .removing    = target == "/prerm",

@@ -16,9 +16,16 @@ type ChainTypeShape = z.infer<typeof chainTypeSchema>;
 interface Props {
     form: UseFormReturn<ChainTypeShape>;
     next: () => Promise<void>;
+    devTemplateDescription: string;
+    prodTemplateDescription: string;
 }
 
-export const ChainTypeForm = ({ form, next }: Props) => {
+export const ChainTypeForm = ({
+    form,
+    next,
+    devTemplateDescription,
+    prodTemplateDescription,
+}: Props) => {
     return (
         <Form {...form}>
             <form className="space-y-6">
@@ -47,11 +54,11 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                                         },
                                     )}
                                 >
-                                    <h2 className="text-2xl">Development</h2>
-                                    <p className="text-muted-foreground text-center text-sm">
-                                        Boot chain with development apps,
-                                        pre-built users and insecure
-                                        authentication
+                                    <h2 className="text-2xl">
+                                        Development
+                                    </h2>
+                                    <p className="text-muted-foreground text-center text-sm max-w-[35ch] mx-auto">
+                                        {devTemplateDescription}
                                     </p>
                                 </Button>
                                 <div className="flex flex-1 has-[:disabled]:cursor-not-allowed">
@@ -75,10 +82,11 @@ export const ChainTypeForm = ({ form, next }: Props) => {
                                         )}
                                         disabled={!window.isSecureContext}
                                     >
-                                        <h2 className="text-2xl">Production</h2>
-                                        <p className="text-muted-foreground text-center text-sm">
-                                            Create a secure production
-                                            blockchain
+                                        <h2 className="text-2xl">
+                                            Production
+                                        </h2>
+                                        <p className="text-muted-foreground text-center text-sm max-w-[35ch] mx-auto">
+                                            {prodTemplateDescription}
                                         </p>
                                         {!window.isSecureContext ? (
                                             <p className="text-muted-foreground text-center text-sm">

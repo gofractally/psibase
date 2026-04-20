@@ -6,12 +6,12 @@ import { z } from "zod";
 import {
     getUsersAndGroups,
     zUsersAndGroupsResponse,
-} from "@/lib/graphql/evaluations/getUsersAndGroups";
-import QueryKey from "@/lib/queryKeys";
+} from "@/lib/graphql/evaluations/get-users-and-groups";
+import QueryKey from "@/lib/query-keys";
 
 import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { assertUser } from "@shared/hooks/use-current-user";
-import { queryClient } from "@shared/lib/queryClient";
+import { queryClient } from "@shared/lib/query-client";
 import { updateArray } from "@shared/lib/update-array";
 
 let attestedEvaluationId: number | undefined;
