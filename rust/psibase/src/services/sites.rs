@@ -61,7 +61,6 @@ pub mod service {
         pub cache: bool,
         pub globalCsp: Option<String>,
         pub proxyAccount: Option<AccountNumber>,
-        pub redirect: Option<AccountNumber>,
     }
 
     #[table(name = "SitesDataTable", index = 2)]
@@ -185,19 +184,6 @@ pub mod service {
     /// Removes the proxy set with `setProxy`.
     #[action]
     fn clearProxy() {
-        unimplemented!()
-    }
-
-    /// Configures the caller's subdomain to 308 redirect all requests to the destination subdomain.
-    #[action]
-    fn setRedirect(destination: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Removes the redirect set with `setRedirect`.
-    /// No-op if no redirect is set.
-    #[action]
-    fn clearRedirect() {
         unimplemented!()
     }
 }

@@ -395,13 +395,6 @@ namespace SystemService
          return to<DecompressorInterface>(decompressorAccount).decompress(content);
       }
 
-      std::optional<AccountNumber> getRedirect(const psibase::AccountNumber& account)
-      {
-         auto record =
-             Sites::Tables{getReceiver(), KvMode::read}.open<SiteConfigTable>().get(account);
-         return record ? record->redirect : std::nullopt;
-      }
-
    }  // namespace
 
    std::optional<HttpReply> Sites::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
@@ -413,19 +406,6 @@ namespace SystemService
       }
 
       auto account = getTargetService(request, rootHost);
-
-      auto redirect = getRedirect(account);
-      if (redirect)
-      {
-         auto redirectUrl = to<HttpServer>().getSiblingUrl(request, socket, *redirect, true);
-
-         auto hdrs = allowCors();
-         hdrs.push_back({"Location", redirectUrl});
-         HttpReply reply{.status      = HttpStatus::permanentRedirect,
-                         .contentType = "text/html",
-                         .headers     = std::move(hdrs)};
-         return std::move(reply);
-      }
 
       // Override target service for common api requests
       if (request.target.starts_with(HttpServer::commonApiPrefix))
@@ -718,29 +698,6 @@ namespace SystemService
          return;
       }
       row->proxyAccount = std::nullopt;
-      table.put(*row);
-   }
-
-   void Sites::setRedirect(psibase::AccountNumber destination)
-   {
-      auto table   = Tables{}.open<SiteConfigTable>();
-      auto row     = table.get(getSender()).value_or(SiteConfigRow{.account = getSender()});
-      row.redirect = std::optional{std::move(destination)};
-      table.put(row);
-   }
-
-   void Sites::clearRedirect()
-   {
-      auto table = Tables{}.open<SiteConfigTable>();
-      auto row   = table.get(getSender());
-      psibase::check(!!row, "Site not found");
-
-      if (!row->redirect)
-      {
-         return;
-      }
-
-      row->redirect = std::nullopt;
       table.put(*row);
    }
 

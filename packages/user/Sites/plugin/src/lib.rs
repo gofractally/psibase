@@ -8,7 +8,7 @@ use bindings::transact::plugin::intf as Transact;
 use psibase::compress_content;
 use psibase::fracpack::Pack;
 use psibase::services::sites::action_structs as Actions;
-use psibase::{AccountNumber, Hex};
+use psibase::Hex;
 
 mod errors;
 use crate::trust::*;
@@ -30,7 +30,7 @@ psibase::define_trust! {
         None => [],
         Low => [],
         Medium => [set_cache_mode],
-        High => [upload, upload_encoded, upload_tree, remove, enable_spa, set_csp, delete_csp, set_proxy, clear_proxy, set_redirect, clear_redirect],
+        High => [upload, upload_encoded, upload_tree, remove, enable_spa, set_csp, delete_csp, set_proxy, clear_proxy],
     }
 }
 
@@ -202,36 +202,6 @@ impl Sites for SitesPlugin {
             .unwrap();
     }
 
-    fn set_redirect(destination: String) {
-        assert_authorized_with_whitelist(
-            FunctionName::set_redirect,
-            vec!["workshop".into(), "config".into()],
-        )
-        .unwrap();
-
-        let destination = AccountNumber::from_exact(destination.as_str())
-            .expect("Invalid destination account name");
-
-        Transact::add_action_to_transaction(
-            Actions::setRedirect::ACTION_NAME,
-            &Actions::setRedirect { destination }.packed(),
-        )
-        .unwrap();
-    }
-
-    fn clear_redirect() {
-        assert_authorized_with_whitelist(
-            FunctionName::clear_redirect,
-            vec!["workshop".into(), "config".into()],
-        )
-        .unwrap();
-
-        Transact::add_action_to_transaction(
-            Actions::clearRedirect::ACTION_NAME,
-            &Actions::clearRedirect {}.packed(),
-        )
-        .unwrap();
-    }
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);
