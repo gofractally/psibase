@@ -6,7 +6,6 @@ world impl {
     include staged-tx:plugin/imports;
     include setcode:plugin/imports;
     include chainmail:plugin/imports;
-    include clientdata:plugin/imports;
     include registry:plugin/imports;
     include auth-delegate:plugin/imports;
     include accounts:plugin/imports;
