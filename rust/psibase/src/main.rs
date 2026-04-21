@@ -1924,6 +1924,7 @@ pub struct LocalPackage<'a> {
     pub description: &'a String,
     pub depends: &'a Vec<PackageRef>,
     pub accounts: &'a Vec<AccountNumber>,
+    pub services: &'a Vec<AccountNumber>,
     pub sha256: &'a Checksum256,
 }
 
@@ -1935,6 +1936,7 @@ impl<'a> From<&'a PackageInfo> for LocalPackage<'a> {
             description: &other.description,
             depends: &other.depends,
             accounts: &other.accounts,
+            services: &other.services,
             sha256: &other.sha256,
         }
     }
@@ -1949,6 +1951,7 @@ impl<'a, R: Read + Seek> From<&'a PackagedService<R>> for LocalPackage<'a> {
             description: &meta.description,
             depends: &meta.depends,
             accounts: &meta.accounts,
+            services: &meta.services,
             sha256: other.hash(),
         }
     }
@@ -1965,6 +1968,7 @@ impl<'a> From<&'a (Meta, PackageOrigin)> for LocalPackage<'a> {
             description: &other.0.description,
             depends: &other.0.depends,
             accounts: &other.0.accounts,
+            services: &other.0.services,
             sha256: sha256,
         }
     }
