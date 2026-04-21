@@ -451,7 +451,7 @@ impl<T: OutputType + ContainerType> TypeName for WithBlockContext<T> {
     }
 }
 
-/// Event history connection: each edge `node` is [`EventWithBlockInfo`] (includes block context)
+/// Event history connection: each edge `node` is a [`WithBlockContext<T>`] (includes block context).
 pub type EventConnection<T> = Connection<u64, WithBlockContext<T>, EmptyFields, EmptyFields>;
 
 #[derive(Deserialize)]
