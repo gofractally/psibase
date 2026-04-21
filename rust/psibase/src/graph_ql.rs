@@ -433,8 +433,10 @@ struct SqlRowWithBlockContext {
     data: Value,
 }
 
-/// GraphQL object that adds block context (`block`) to a typed event payload
-/// Convertible from SqlRowWithBlockContext if a valid inner payload type is provided
+/// GraphQL object that adds block context (`block`) to a typed event payload.
+///
+/// `T`'s fields are flattened alongside `block`. `T` must not have a field named
+/// `block`.
 #[derive(SimpleObject)]
 #[graphql(name_type)]
 pub struct WithBlockContext<T: OutputType + ContainerType> {

@@ -137,10 +137,24 @@ namespace psibase
       PSIO_REFLECT(EventBlockInfo, blockNum, blockTime)
    };
 
+   namespace detail
+   {
+      template <typename T>
+      consteval bool has_block_member()
+      {
+         for (const char* n : psio::reflect<T>::data_member_names)
+            if (std::string_view{n} == "block")
+               return true;
+         return false;
+      }
+   }  // namespace detail
+
    /// Wraps a node type with block context for event queries.
    template <typename T>
    struct WithBlockContext
    {
+      static_assert(!detail::has_block_member<T>(),
+                    "WithBlockContext<T>: T already has a 'block' field");
       EventBlockInfo block;
       T              data;
       PSIO_REFLECT(WithBlockContext, block, data)
