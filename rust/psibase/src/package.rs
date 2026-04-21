@@ -1532,19 +1532,6 @@ impl EssentialServices {
     }
 }
 
-pub fn get_essential_packages(
-    packages: &Vec<PackageInfo>,
-    essential_services: &EssentialServices,
-) -> Vec<String> {
-    let mut result = Vec::new();
-    for info in packages {
-        if essential_services.intersects(&info.accounts) {
-            result.push(info.name.clone());
-        }
-    }
-    result
-}
-
 #[async_trait(?Send)]
 pub trait PackageRegistry {
     type R: Read + Seek;
