@@ -474,17 +474,18 @@ struct RowBlockStartRow {
 }
 
 /// Fetches block metadata for each event rowid.
-fn fetch_block_start_rows(rowids: &[u64]) -> async_graphql::Result<Vec<RowBlockStartRow>> {
-    if rowids.is_empty() {
-        return Ok(Vec::new());
-    }
-
+fn fetch_block_start_rows(
+    rows: impl IntoIterator<Item = (usize, u64)>,
+) -> async_graphql::Result<Vec<RowBlockStartRow>> {
     let mut values = String::new();
-    for (i, rowid) in rowids.iter().enumerate() {
-        if i > 0 {
+    for (i, rowid) in rows {
+        if !values.is_empty() {
             values.push_str(", ");
         }
         let _ = write!(values, "({}, {})", i, rowid);
+    }
+    if values.is_empty() {
+        return Ok(Vec::new());
     }
 
     let sql = format!(
@@ -508,14 +509,11 @@ fn fetch_block_start_rows(rowids: &[u64]) -> async_graphql::Result<Vec<RowBlockS
     })
 }
 
-fn fetch_block_context(rowids: &[u64]) -> async_graphql::Result<HashMap<usize, EventBlockInfo>> {
+fn fetch_block_context(
+    rows: impl IntoIterator<Item = (usize, u64)>,
+) -> async_graphql::Result<HashMap<usize, EventBlockInfo>> {
     let mut result = HashMap::new();
-    if rowids.is_empty() {
-        return Ok(result);
-    }
-
-    let block_starts = fetch_block_start_rows(rowids)?;
-    for block_start in block_starts {
+    for block_start in fetch_block_start_rows(rows)? {
         result.insert(
             block_start.row_index,
             EventBlockInfo {
@@ -529,8 +527,7 @@ fn fetch_block_context(rowids: &[u64]) -> async_graphql::Result<HashMap<usize, E
 }
 
 fn add_block_context(rows: Vec<SqlRow>) -> async_graphql::Result<Vec<SqlRowWithBlockContext>> {
-    let rowids: Vec<u64> = rows.iter().map(|row| row.rowid).collect();
-    let mut block_info = fetch_block_context(&rowids)?;
+    let mut block_info = fetch_block_context(rows.iter().enumerate().map(|(i, r)| (i, r.rowid)))?;
 
     let mut events = Vec::with_capacity(rows.len());
     for (i, row) in rows.into_iter().enumerate() {
