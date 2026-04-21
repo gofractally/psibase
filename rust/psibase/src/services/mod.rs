@@ -1,6 +1,7 @@
 //! Interfaces for standard services
 
 pub mod accounts;
+pub mod auth_any;
 pub mod auth_delegate;
 pub mod auth_dyn;
 pub mod auth_sig;
@@ -29,6 +30,7 @@ pub mod staged_tx;
 pub mod subgroups;
 pub mod symbol;
 pub mod token_stream;
+pub mod token_swap;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;

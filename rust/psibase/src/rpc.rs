@@ -1,6 +1,10 @@
-use crate::{services::transact, AccountNumber, SignedTransaction, TransactionTrace};
+use crate::{
+    services::{packages, transact},
+    AccountNumber, ActionFormatter, Schema, SchemaFetcher, SignedTransaction, TransactionTrace,
+};
 use anyhow::Context;
 use async_graphql::{InputObject, SimpleObject};
+use async_trait::async_trait;
 use custom_error::custom_error;
 use fracpack::{Pack, UnpackOwned};
 use indicatif::ProgressBar;
@@ -100,28 +104,38 @@ pub enum TraceFormat {
 }
 
 impl TraceFormat {
-    pub fn error_for_trace(
+    pub async fn error_for_trace<'a, F: SchemaFetcher>(
         &self,
         trace: TransactionTrace,
         progress: Option<&ProgressBar>,
+        afmt: &ActionFormatter<'a, F>,
     ) -> Result<(), anyhow::Error> {
         match self {
-            TraceFormat::Full => progress.suspend(|| -> Result<(), anyhow::Error> {
-                println!("{}", trace.to_string());
-                Ok(std::io::stdout().flush()?)
-            })?,
-            TraceFormat::Json => progress.suspend(|| -> Result<(), anyhow::Error> {
-                serde_json::to_writer_pretty(std::io::stdout().lock(), &trace)?;
-                println!("");
-                Ok(std::io::stdout().flush()?)
-            })?,
+            TraceFormat::Full => {
+                let _ = afmt.prepare_transaction_trace(&trace).await;
+                progress.suspend(|| -> Result<(), anyhow::Error> {
+                    println!("{}", afmt.display_transaction_trace(&trace));
+                    Ok(std::io::stdout().flush()?)
+                })?
+            }
+            TraceFormat::Json => {
+                let _ = afmt.prepare_transaction_trace(&trace).await;
+                progress.suspend(|| -> Result<(), anyhow::Error> {
+                    trace.write_json_pretty(afmt, std::io::stdout().lock())?;
+                    println!("");
+                    Ok(std::io::stdout().flush()?)
+                })?
+            }
             _ => {}
         }
         if let Some(e) = &trace.error {
             if !e.is_empty() {
                 let message = match self {
                     TraceFormat::Error => e.to_string(),
-                    TraceFormat::Stack => trace.fmt_stack(),
+                    TraceFormat::Stack => {
+                        let _ = afmt.prepare_transaction_error_stack(&trace).await;
+                        trace.fmt_stack(afmt)
+                    }
                     TraceFormat::Full => e.to_string(),
                     TraceFormat::Json => e.to_string(),
                 };
@@ -145,6 +159,34 @@ impl FromStr for TraceFormat {
     }
 }
 
+pub struct HttpSchemaFetcher<'a> {
+    pub client: &'a reqwest::Client,
+    pub base_url: &'a reqwest::Url,
+}
+
+#[async_trait(?Send)]
+impl<'a> SchemaFetcher for HttpSchemaFetcher<'a> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        as_json(
+            self.client.get(
+                packages::SERVICE
+                    .url(self.base_url)?
+                    .join(&format!("/schema?service={service}"))?,
+            ),
+        )
+        .await
+    }
+}
+
+pub struct NullSchemaFetcher;
+
+#[async_trait(?Send)]
+impl SchemaFetcher for NullSchemaFetcher {
+    async fn fetch_schema(&self, _service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        Err(anyhow::anyhow!("Schema fetching disabled"))
+    }
+}
+
 trait OptionProgressBar {
     fn suspend<F: FnOnce() -> R, R>(&self, f: F) -> R;
 }
@@ -159,7 +201,7 @@ impl OptionProgressBar for Option<&ProgressBar> {
     }
 }
 
-async fn push_transaction_impl(
+async fn push_transaction_impl<'a, F: SchemaFetcher>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
@@ -167,6 +209,7 @@ async fn push_transaction_impl(
     console: bool,
     progress: Option<&ProgressBar>,
     wait_for: Option<String>,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     let wait_for = wait_for
         .map(|wait| format!("?wait_for={}", wait))
@@ -191,30 +234,41 @@ async fn push_transaction_impl(
             std::io::stdout().flush()
         })?;
     }
-    fmt.error_for_trace(trace, progress)
+    fmt.error_for_trace(trace, progress, afmt).await
 }
 
-pub async fn push_transaction(
+pub async fn push_transaction<'a, F: SchemaFetcher + 'a>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
     console: bool,
     progress: Option<&ProgressBar>,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
-    push_transaction_impl(base_url, client, packed, fmt, console, progress, None)
-        .await
-        .context("Failed to push transaction")?;
+    push_transaction_impl(
+        base_url,
+        client.clone(),
+        packed,
+        fmt,
+        console,
+        progress,
+        None,
+        afmt,
+    )
+    .await
+    .context("Failed to push transaction")?;
     Ok(())
 }
 
-pub async fn push_transaction_optimistic(
+pub async fn push_transaction_optimistic<'a, F: SchemaFetcher + 'a>(
     base_url: &Url,
     client: reqwest::Client,
     packed: Vec<u8>,
     fmt: TraceFormat,
     console: bool,
     progress: Option<&ProgressBar>,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     push_transaction_impl(
         base_url,
@@ -224,19 +278,21 @@ pub async fn push_transaction_optimistic(
         console,
         progress,
         Some("applied".to_string()),
+        afmt,
     )
     .await
     .context("Failed to push transaction")?;
     Ok(())
 }
 
-pub async fn push_transactions(
+pub async fn push_transactions<'a, F: SchemaFetcher + 'a>(
     base_url: &Url,
     client: reqwest::Client,
     transaction_groups: Vec<(String, Vec<SignedTransaction>, bool)>,
     fmt: TraceFormat,
     console: bool,
     progress: &ProgressBar,
+    afmt: &ActionFormatter<'a, F>,
 ) -> Result<(), anyhow::Error> {
     let mut n = 0;
     for (label, transactions, carry) in transaction_groups {
@@ -253,6 +309,7 @@ pub async fn push_transactions(
                 fmt,
                 console,
                 Some(progress),
+                afmt,
             )
             .await;
 

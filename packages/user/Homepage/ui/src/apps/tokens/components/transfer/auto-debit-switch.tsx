@@ -18,7 +18,7 @@ import { Switch } from "@shared/shadcn/ui/switch";
 import {
     useToggleUserManualDebit,
     useUserManualDebit,
-} from "../../hooks/tokensPlugin/use-user-manual-debit";
+} from "../../hooks/tokens-plugin/use-user-manual-debit";
 
 export const AutoDebitSwitch = ({
     currentUser,

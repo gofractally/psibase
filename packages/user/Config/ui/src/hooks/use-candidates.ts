@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { siblingUrl } from "@psibase/common-lib";
+import QueryKey from "@/lib/query-keys";
 
-import { graphql } from "@/lib/graphql";
-import QueryKey from "@/lib/queryKeys";
+import { graphql } from "@shared/lib/graphql";
 
 interface CandidateInfo {
     account: string;
@@ -45,10 +44,9 @@ export const useCandidates = () => {
                 }
             `;
 
-            const res = await graphql<CandidatesResponse>(
-                query,
-                siblingUrl(null, "producers", "/graphql"),
-            );
+            const res = await graphql<CandidatesResponse>(query, {
+                service: "producers",
+            });
 
             return res.allCandidates.edges.map((edge) => edge.node);
         },

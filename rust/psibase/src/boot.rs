@@ -74,6 +74,7 @@ fn genesis_transaction<R: Read + Seek>(
     Ok(SignedTransaction {
         transaction: without_tapos(actions, expiration).packed().into(),
         proofs: vec![],
+        subjectiveData: None,
     })
 }
 
@@ -262,6 +263,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         Ok(SignedTransaction {
             transaction: without_tapos(actions, expiration).packed().into(),
             proofs: vec![],
+            subjectiveData: None,
         })
     });
     get_initial_actions(
@@ -289,6 +291,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .packed()
         .into(),
         proofs: vec![],
+        subjectiveData: None,
     });
 
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
@@ -307,6 +310,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .packed()
         .into(),
         proofs: vec![],
+        subjectiveData: None,
     });
     Ok((boot_transactions, transaction_groups))
 }

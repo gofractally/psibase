@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { ZodError, z } from "zod";
 
-import { fileToBase64 } from "@/lib/fileToBase64";
+import { fileToBase64 } from "@/lib/file-to-base64";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {

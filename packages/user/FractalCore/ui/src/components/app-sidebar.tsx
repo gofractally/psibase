@@ -1,12 +1,13 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 
-import { NavMain } from "@/components/nav-main";
+import { MainNavigation } from "@/components/nav";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 
 import { UserSidebarNavFooter } from "@shared/components/user-sidebar-nav-footer";
+import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
 import {
     Sidebar,
     SidebarContent,
@@ -17,8 +18,6 @@ import {
     SidebarMenuItem,
     SidebarRail,
 } from "@shared/shadcn/ui/sidebar";
-
-import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const navigate = useNavigate();
@@ -45,7 +44,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </SidebarMenu>
             </SidebarHeader>
             <SidebarContent>
-                <NavMain />
+                <MainNavigation />
             </SidebarContent>
             <SidebarFooter>
                 <UserSidebarNavFooter />

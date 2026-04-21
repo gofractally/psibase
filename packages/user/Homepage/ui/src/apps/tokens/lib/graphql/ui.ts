@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { supervisor } from "@/supervisor";
 
-import { zAccount } from "@/lib/zod/Account";
+
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { graphql } from "@shared/lib/graphql";
 

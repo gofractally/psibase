@@ -3,14 +3,13 @@ import { UserCheck, UserX } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useGuildApplication } from "@/hooks/fractals/use-guild-application";
 import { useGuild } from "@/hooks/use-guild";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Badge } from "@shared/shadcn/ui/badge";
@@ -109,7 +108,8 @@ export const ApplicationDetail = () => {
                     <div className="space-y-2">
                         <p className="text-sm font-medium">Score</p>
                         <p className="text-muted-foreground whitespace-pre-wrap text-sm">
-                            {application?.score.current} / {application?.score.required}
+                            {application?.score.current} /{" "}
+                            {application?.score.required}
                         </p>
                     </div>
                 </CardContent>

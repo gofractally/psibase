@@ -11,6 +11,7 @@ import { useSetLogo } from "@/hooks/use-set-logo";
 import { useSetNetworkName } from "@/hooks/use-set-network-name";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { PageContainer } from "@shared/components/page-container";
 import { useBranding } from "@shared/hooks/use-branding";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -95,7 +96,7 @@ export const Branding = () => {
     }, [isBrandingLoading, networkName]);
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Branding</h2>
                 <p className="text-muted-foreground text-sm">
@@ -273,6 +274,6 @@ export const Branding = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </PageContainer>
     );
 };

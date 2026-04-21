@@ -2,15 +2,15 @@ import { Crown, Pencil, User, Users } from "lucide-react";
 import { useState } from "react";
 import z from "zod";
 
-import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
-
-import { useGuild } from "@/hooks/use-guild";
-import { Guild } from "@/lib/graphql/fractals/getGuild";
-
 import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
+
+import { useGuildMemberRoles } from "@/hooks/fractals/use-guild-member-roles";
+import { useGuild } from "@/hooks/use-guild";
+import { Guild } from "@/lib/graphql/fractals/get-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -33,6 +33,7 @@ export const GuildOverviewCard = ({
     guildAccount?: string;
 }) => {
     const { data: guild, isPending, error } = useGuild(guildAccount);
+    const { data: roles } = useGuildMemberRoles(guildAccount);
     const leadershipStatus = getLeadershipStatus(guild);
     const [metadataModalOpen, setMetadataModalOpen] = useState(false);
 
@@ -74,14 +75,16 @@ export const GuildOverviewCard = ({
                     name={guild?.displayName}
                     account={guild?.account}
                 />
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMetadataModalOpen(true)}
-                    aria-label="Edit guild metadata"
-                >
-                    <Pencil className="size-4" />
-                </Button>
+                {roles?.isGuildAdmin && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setMetadataModalOpen(true)}
+                        aria-label="Edit guild metadata"
+                    >
+                        <Pencil className="size-4" />
+                    </Button>
+                )}
             </CardHeader>
             <SetGuildMetadataModal
                 show={metadataModalOpen}

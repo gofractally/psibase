@@ -5,13 +5,13 @@ import { GuildOverviewCard } from "@/components/guild-overview-card";
 import { SetMinScorersModal } from "@/components/modals/set-min-scorers-modal";
 import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
 import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
-import { PageContainer } from "@/components/page-container";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useGuild } from "@/hooks/use-guild";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import {

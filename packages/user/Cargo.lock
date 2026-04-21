@@ -1251,6 +1251,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "frac-tester"
+version = "0.23.0"
+dependencies = [
+ "frac-tester-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "frac-tester-pkg"
+version = "0.23.0"
+dependencies = [
+ "frac-tester",
+ "psibase-user-workspace-hack",
+]
+
+[[package]]
 name = "fracpack"
 version = "0.23.0"
 dependencies = [
@@ -1262,6 +1281,25 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
+]
+
+[[package]]
+name = "fractal-gen"
+version = "0.23.0"
+dependencies = [
+ "fractal-gen-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "fractal-gen-pkg"
+version = "0.23.0"
+dependencies = [
+ "fractal-gen",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
@@ -2924,6 +2962,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "r-token-swap"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "token-swap",
+]
+
+[[package]]
 name = "r-tokens"
 version = "0.23.0"
 dependencies = [
@@ -3835,6 +3886,41 @@ dependencies = [
  "serde",
  "serde_json",
  "token-stream",
+ "wit-bindgen-rt",
+]
+
+[[package]]
+name = "token-swap"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "token-swap-pkg",
+]
+
+[[package]]
+name = "token-swap-pkg"
+version = "0.23.0"
+dependencies = [
+ "r-token-swap",
+ "token-swap",
+ "token-swap-plugin",
+]
+
+[[package]]
+name = "token-swap-plugin"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "token-swap",
  "wit-bindgen-rt",
 ]
 

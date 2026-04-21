@@ -2,7 +2,7 @@ import {
     privateStringToKeyPair,
     publicKeyPairToDER,
     signatureToBin,
-} from "./keyConversions";
+} from "./key-conversions";
 import hashJs from "hash.js";
 
 export class RPCError extends Error {

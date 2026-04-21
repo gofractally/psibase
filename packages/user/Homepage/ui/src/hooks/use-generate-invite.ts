@@ -4,7 +4,7 @@ import { z } from "zod";
 import { supervisor } from "@/supervisor";
 import { siblingUrl } from "@psibase/common-lib";
 
-import { modifyUrlParams } from "../lib/modifyUrlParams";
+import { modifyUrlParams } from "@shared/lib/modify-url-params";
 
 export const useGenerateInvite = () =>
     useMutation({

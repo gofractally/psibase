@@ -2,7 +2,7 @@ import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance"
 import { useRegister } from "@/hooks/fractals/use-register";
 import { useUnregister } from "@/hooks/fractals/use-unregister";
 import { useGuildAccount } from "@/hooks/use-guild-account";
-import { RegistrationPhase } from "@/lib/getStatus";
+import { RegistrationPhase } from "@/lib/get-status";
 
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { humanize } from "@shared/lib/humanize";

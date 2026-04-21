@@ -9,15 +9,15 @@ import {
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib/rpc";
 
-import { AppInterface } from "./appInterace";
-import { MainPage } from "./mainPage";
+import { AppInterface } from "./app-interface";
+import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
 import {
     CallHandler,
     addCallHandler,
     registerCallHandlers,
-} from "./windowMessaging";
+} from "./window-messaging";
 
 const appContainer = document.querySelector<HTMLDivElement>("#app")!;
 const root = createRoot(appContainer);

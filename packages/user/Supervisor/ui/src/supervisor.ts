@@ -15,14 +15,14 @@ import {
 import {
     getCallArgs,
     toString,
-} from "@psibase/common-lib/messaging/FunctionCallRequest";
-import { pluginId } from "@psibase/common-lib/messaging/PluginId";
+} from "@psibase/common-lib/messaging/function-call-request";
+import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
-import { AppInterface } from "./appInterace";
-import { CallContext } from "./callContext";
+import { AppInterface } from "./app-interface";
+import { CallContext } from "./call-context";
 import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
-import { PluginLoader } from "./plugin/pluginLoader";
+import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
 import {
     OriginationData,

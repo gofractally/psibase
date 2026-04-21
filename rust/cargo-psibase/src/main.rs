@@ -59,11 +59,6 @@ enum PsibaseCommand {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Sign transactions with one or more keys.
-    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
-    #[clap(short = 's', long, value_name = "KEY")]
-    sign: Vec<String>,
-
     /// Path to Cargo.toml
     #[clap(long, global = true, value_name = "PATH")]
     manifest_path: Option<PathBuf>,
@@ -92,6 +87,20 @@ struct Args {
     command: Command,
 }
 
+/// Signing and staged-transaction options, using the same flags as `psibase`'s `SigArgs` (flattened the same way).
+#[derive(clap::Args, Debug)]
+#[clap(long_about = None)]
+struct SigArgs {
+    /// Sign transactions with one or more keys.
+    /// Each KEY may be a PKCS #11 URI or a path to a PEM/DER-encoded private key file.
+    #[clap(short = 's', long, value_name = "KEY")]
+    sign: Vec<String>,
+
+    /// Stages transactions instead of executing them immediately
+    #[clap(long, value_name = "ACCOUNT")]
+    proposer: Option<ExactAccountNumber>,
+}
+
 #[derive(Parser, Debug)]
 struct InstallCommand {
     /// API Endpoint URL (ie https://psibase-api.example.com) or a Host Alias (ie prod, dev). See `psibase config --help` for more details.
@@ -102,6 +111,9 @@ struct InstallCommand {
         env = "PSINODE_URL"
     )]
     api: Option<String>,
+
+    #[command(flatten)]
+    sig_args: SigArgs,
 
     /// Sender to use for installing. The packages and all accounts
     /// that they create will be owned by this account.
@@ -585,16 +597,13 @@ impl<
                         .await
                         .with_context(|| format!("Failed to acquire job"))?,
                 );
-                println!("first slot acquired")
             } else {
                 match select(new_slot, self.running.next()).await {
                     Either::Left((slot, _)) => {
                         self.acquired
                             .push(slot.with_context(|| format!("Failed to acquire job"))?);
-                        println!("slot acquired");
                     }
                     Either::Right((res, slot)) => {
-                        println!("job finished");
                         res.unwrap()?;
                         self.pending = Some(slot)
                     }
@@ -1122,8 +1131,11 @@ async fn install(
     let mut command = std::process::Command::new(&args.psibase);
 
     command.arg("install");
-    for key in &args.sign {
+    for key in &opts.sig_args.sign {
         command.args(["--sign", key]);
+    }
+    if let Some(proposer) = &opts.sig_args.proposer {
+        command.args(["--proposer", &proposer.to_string()]);
     }
     if let Some(api) = &opts.api {
         command.args(["--api", api.as_str()]);

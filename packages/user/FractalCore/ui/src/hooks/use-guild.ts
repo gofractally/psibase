@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getGuild } from "@/lib/graphql/fractals/getGuild";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { getGuild } from "@/lib/graphql/fractals/get-guild";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 import { useGuildAccount } from "./use-guild-account";
 
@@ -12,7 +12,7 @@ export const useGuild = (optionalGuildAccount?: OptionalAccount) => {
     return useQuery({
         queryKey: QueryKey.guild(guildAccount),
         queryFn: async () => {
-            return getGuild(guildAccount!);
+            return await getGuild(guildAccount!);
         },
         staleTime: 10000,
         enabled: !!guildAccount,

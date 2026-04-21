@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { EvaluationStatus } from "@/lib/getStatus";
+import { EvaluationStatus } from "@/lib/get-status";
 import { paths } from "@/lib/paths";
 
 import { useGuildAccount } from "../use-guild-account";

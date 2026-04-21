@@ -1,7 +1,7 @@
-import { queryClient } from "@/queryClient";
-
-import QueryKey from "@/lib/queryKeys";
 import { CONFIG } from "@/lib/services";
+
+import { queryClient } from "@shared/lib/query-client";
+import SharedQueryKey from "@shared/lib/query-keys";
 
 import { usePluginMutation } from "./use-plugin-mutation";
 
@@ -19,7 +19,10 @@ export const useSetNetworkName = () =>
             isStagable: true,
             onSuccess: (networkName, status) => {
                 if (status.type == "executed") {
-                    queryClient.setQueryData(QueryKey.branding(), networkName);
+                    queryClient.setQueryData(
+                        SharedQueryKey.branding(),
+                        networkName,
+                    );
                 }
             },
         },
