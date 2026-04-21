@@ -57,6 +57,16 @@ mod service {
         unimplemented!()
     }
 
+    /// Register sender's subdomain
+    ///
+    /// After any subdomain redirect (see `setRedirect`) and `/common/` paths are handled,
+    /// `http-server` calls the registered server's `serveSys`. If there is no registered server,
+    /// the request is forwarded to `sites` for static hosting.
+    ///
+    /// Registered services may optionally:
+    /// * Serve files via HTTP
+    /// * Respond to RPC requests
+    /// * Respond to GraphQL requests
     #[action]
     fn registerServer(server: AccountNumber) {
         unimplemented!()
@@ -92,8 +102,16 @@ mod service {
         unimplemented!()
     }
 
-    /// Configures the sender's subdomain to permanently (308) redirect all
-    /// requests to the destination subdomain under the same root host.
+    /// Configures the sender's subdomain to permanently redirect (HTTP 308) all
+    /// requests to the `destination` subdomain under the same root host. `Location`
+    /// URL preserves the original path and query.
+    ///
+    /// Precedence:
+    ///   * Requests whose path starts with `/common/` are handled immediately by `common-api`.
+    ///   * All other requests are redirected to the `destination` subdomain (if configured)
+    ///     before any routing to the registered server (if any) or to `sites` for static content.
+    ///
+    /// A caller may not redirect to its own subdomain.
     #[action]
     fn setRedirect(destination: AccountNumber) {
         unimplemented!()

@@ -21,18 +21,20 @@ flowchart TD
    R -->|yes| homeRedir[redirect to homepage subdomain] --> 308
    R -->|no| G{{target begins with '/common/'?}}
    G -->|yes| common['common-api' service's serveSys action] --> serveSys
-   G -->|no| J{{Has registered server?}}
+   G -->|no| SR{{subdomain has HttpServer redirect?}}
+   SR -->|yes| sibRedir[308 redirect to sibling subdomain] --> 308
+   SR -->|no| J{{Has registered server?}}
    J -->|yes| L[registered server's serveSys action] --> serveSys
    J -->|no| sites
    serveSys -->|yes| 200
    serveSys -->|no| sites
 ```
 
-`psinode` passes most HTTP requests to the [SystemService::HttpServer] service. Requests to the root host (no subdomain) are answered with a redirect to the homepage subdomain; otherwise the server routes to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
+`psinode` passes most HTTP requests to the [SystemService::HttpServer] service. Requests to the `/common/*` path are always routed to [SystemService::CommonApi]. Requests to the root host (no subdomain) are answered with a redirect to the homepage subdomain. If a subdomain owner configured [SystemService::HttpServer::setRedirect], matching requests get a permanent redirect to the destination subdomain (path and query preserved); Otherwise the server routes to the appropriate service's [serveSys](#psibaseserverinterfaceservesys) action (see diagram). The services run in RPC mode; this prevents them from writing to the database, but allows them to read data they normally can't. See [psibase::DbId].
 
 [SystemService::CommonApi] provides services common to all domains under the `/common/` tree.
 
-[SystemService::Sites] provides web hosting for non-service accounts or service accounts that did not [register](#registration) for HTTP handling.
+[SystemService::Sites] provides web hosting for static content. Within `sites`, [SystemService::Sites::setProxy] allows requests to missing paths to fall back to another account's uploaded files (same-path lookup, optional chain); see the action documentation for details.
 
 `psinode` directly handles requests which start with `/native`, e.g. `/native/admin/status`. Services don't serve these.
 

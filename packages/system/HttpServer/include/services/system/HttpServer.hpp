@@ -86,9 +86,9 @@ namespace SystemService
 
       /// Register sender's subdomain
       ///
-      /// When requests to a subdomain cannot be filled by 'sites', then `http-server` will
-      /// forward the request into the `serveSys` action of the subdomain's registered `server`
-      /// for it to handle the request.
+      /// After any subdomain redirect (see `setRedirect`) and `/common/` paths are handled,
+      /// `http-server` calls the registered server's `serveSys`. If there is no registered server,
+      /// the request is forwarded to `sites` for static hosting.
       ///
       /// Registered services may optionally:
       /// * Serve files via HTTP
@@ -113,11 +113,19 @@ namespace SystemService
                                 psibase::AccountNumber      destination,
                                 bool                        keepTarget);
 
-      /// Configures the sender's subdomain to permanently (308) redirect all
-      /// requests to the destination subdomain under the same root host.
+      /// Configures the sender's subdomain to permanently redirect (HTTP 308) all
+      /// requests to the `destination` subdomain under the same root host. `Location`
+      /// URL preserves the original path and query.
+      ///
+      /// Precedence:
+      ///   * Requests whose path starts with `/common/` are handled immediately by `common-api`.
+      ///   * All other requests are redirected to the `destination` subdomain (if configured)
+      ///     before any routing to the registered server (if any) or to `sites` for static content.
+      ///
+      /// A caller may not redirect to its own subdomain.
       void setRedirect(psibase::AccountNumber destination);
 
-      /// Removes the redirect set with `setRedirect`. No-op if none is set.
+      /// Removes the redirect set with `setRedirect` for the sender's subdomain. No-op if none is set.
       void clearRedirect();
    };
    PSIO_REFLECT(HttpServer,

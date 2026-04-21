@@ -174,14 +174,19 @@ pub mod service {
         unimplemented!()
     }
 
-    /// If content is not found on the caller's subdomain, transparently serve it from
-    /// the specified account's subdomain instead (reverse proxy).
+    /// When `serveSys` looks up a path on the caller's site, and no file matches (after SPA and
+    /// index rules), it tries the same path on `proxy`'s uploaded content, then on that site's
+    /// proxy if configured, and so on.
+    ///
+    /// Files that exist on the caller's site always take precedence.
+    ///
+    ///  A proxy chain must not contain a cycle or `setProxy` aborts.
     #[action]
     fn setProxy(proxy: AccountNumber) {
         unimplemented!()
     }
 
-    /// Removes the proxy set with `setProxy`.
+    /// Removes the proxy fallback for the caller's site. No-op if none is set.
     #[action]
     fn clearProxy() {
         unimplemented!()
