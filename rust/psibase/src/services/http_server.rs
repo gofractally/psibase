@@ -91,6 +91,22 @@ mod service {
     ) -> String {
         unimplemented!()
     }
+
+    /// Configures the sender's subdomain to permanently (308) redirect all
+    /// requests to the destination subdomain under the same root host.
+    ///
+    /// The redirect takes precedence over the sender's registered server
+    /// (if any) and over the `sites` fallback handler.
+    #[action]
+    fn setRedirect(destination: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Removes the redirect set with `setRedirect`. No-op if none is set.
+    #[action]
+    fn clearRedirect() {
+        unimplemented!()
+    }
 }
 
 #[test]

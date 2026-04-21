@@ -24,6 +24,15 @@ namespace SystemService
    using RegServTable = psibase::Table<RegisteredServiceRow, &RegisteredServiceRow::service>;
    PSIO_REFLECT_TYPENAME(RegServTable)
 
+   struct RedirectRow
+   {
+      psibase::AccountNumber account;
+      psibase::AccountNumber destination;
+   };
+   PSIO_REFLECT(RedirectRow, account, destination)
+   using RedirectTable = psibase::Table<RedirectRow, &RedirectRow::account>;
+   PSIO_REFLECT_TYPENAME(RedirectTable)
+
    /// The `http-server` service routes HTTP requests to the appropriate service
    ///
    /// See [C++ Web Services](../development/services/cpp-service/reference/web-services.md) or
@@ -46,7 +55,7 @@ namespace SystemService
       static constexpr auto commonApiService = psibase::AccountNumber("common-api");
       static constexpr auto commonApiPrefix  = "/common/";
       static constexpr auto homepageService  = psibase::AccountNumber("homepage");
-      using Tables                           = psibase::ServiceTables<RegServTable>;
+      using Tables                           = psibase::ServiceTables<RegServTable, RedirectTable>;
 
       using Session = psibase::SessionTables<PendingRequestTable>;
 
@@ -103,6 +112,16 @@ namespace SystemService
                                 std::optional<std::int32_t> socket,
                                 psibase::AccountNumber      destination,
                                 bool                        keepTarget);
+
+      /// Configures the sender's subdomain to permanently (308) redirect all
+      /// requests to the destination subdomain under the same root host.
+      ///
+      /// The redirect takes precedence over the sender's registered server
+      /// (if any) and over the `sites` fallback handler.
+      void setRedirect(psibase::AccountNumber destination);
+
+      /// Removes the redirect set with `setRedirect`. No-op if none is set.
+      void clearRedirect();
    };
    PSIO_REFLECT(HttpServer,
                 method(sendProds, action),
@@ -115,7 +134,9 @@ namespace SystemService
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
                 method(rootHost, host),
-                method(getSiblingUrl, req, socket, destination, keepTarget))
+                method(getSiblingUrl, req, socket, destination, keepTarget),
+                method(setRedirect, destination),
+                method(clearRedirect))
 
    PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Session)
 }  // namespace SystemService

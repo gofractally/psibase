@@ -32,6 +32,16 @@ namespace SystemService
              .get(server);
       }
 
+      std::optional<AccountNumber> getRedirect(const AccountNumber& account)
+      {
+         auto row = HttpServer::Tables(HttpServer::service, KvMode::read)
+                        .open<RedirectTable>()
+                        .get(account);
+         if (row)
+            return row->destination;
+         return std::nullopt;
+      }
+
       std::optional<AccountNumber> getTargetService(const HttpRequest& req,
                                                     std::string_view   rootHost)
       {
@@ -300,6 +310,15 @@ namespace SystemService
          return;
       }
 
+      // If the subdomain has a redirect set, that takes precedence over the
+      // registered server (if any), the sites fallback, and even the common
+      // api override.
+      if (auto dest = getRedirect(*service_opt))
+      {
+         redirect(*dest);
+         return;
+      }
+
       // If the path is to the common api, force proxy to the common api service
       auto service =
           (req.target.starts_with(HttpServer::commonApiPrefix) ? HttpServer::commonApiService
@@ -386,6 +405,23 @@ namespace SystemService
       url += (keepTarget ? req.target : "/");
 
       return url;
+   }
+
+   void HttpServer::setRedirect(AccountNumber destination)
+   {
+      auto sender = getSender();
+      check(destination != sender, "redirect destination must not be the sender");
+      Tables{getReceiver()}.open<RedirectTable>().put(RedirectRow{
+          .account     = sender,
+          .destination = destination,
+      });
+   }
+
+   void HttpServer::clearRedirect()
+   {
+      auto table = Tables{getReceiver()}.open<RedirectTable>();
+      if (auto row = table.get(getSender()))
+         table.remove(*row);
    }
 }  // namespace SystemService
 
