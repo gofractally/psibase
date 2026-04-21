@@ -1453,7 +1453,7 @@ namespace psio
          }
 
          if (!resolve(field_name, alias))
-            return error((std::string)field_name + " not found");
+            return false;
       }
       if (input_stream.current_punctuator != '}')
          return error("expected }");
@@ -1471,15 +1471,14 @@ namespace psio
    {
       return [&](std::string_view field_name, std::string_view alias) -> bool
       {
-         bool ok = true;
-         bool found =
-             psio::get_data_member<T>(field_name,
-                                      [&](auto member)
-                                      {
-                                         detail::write_field_name(alias, first, output_stream);
-                                         ok &= gql_query(value.*member, input_stream, output_stream,
-                                                         error, false);
-                                      });
+         bool ok    = true;
+         bool found = psio::get_data_member<T>(
+             field_name,
+             [&](auto member)
+             {
+                detail::write_field_name(alias, first, output_stream);
+                ok &= gql_query(value.*member, input_stream, output_stream, error, false);
+             });
          if (!found)
          {
             psio::get_member_function<T>(
@@ -1495,7 +1494,9 @@ namespace psio
                    }
                 });
          }
-         return found && ok;
+         if (!found)
+            return error((std::string)field_name + " not found");
+         return ok;
       };
    }
 
@@ -1510,10 +1511,9 @@ namespace psio
                          bool        allow_unknown_members,
                          bool&       first)
    {
-      return gql_query_inline(
-          generate_gql_partial_name((T*)nullptr, false),
-          make_field_resolver(value, input_stream, output_stream, error, first), input_stream,
-          output_stream, error, first);
+      return gql_query_inline(generate_gql_partial_name((T*)nullptr, false),
+                              make_field_resolver(value, input_stream, output_stream, error, first),
+                              input_stream, output_stream, error, first);
    }
 
    template <typename T, typename OS, typename E>
