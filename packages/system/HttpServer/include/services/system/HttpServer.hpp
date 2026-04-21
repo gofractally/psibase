@@ -115,7 +115,7 @@ namespace SystemService
                 method(recv, socket, data, flags),
                 method(serve, socket, req),
                 method(rootHost, host),
-                method(getSiblingUrl, req, socket, destination))
+                method(getSiblingUrl, req, socket, destination, keepTarget))
 
    PSIBASE_REFLECT_TABLES(HttpServer, HttpServer::Tables, HttpServer::Session)
 }  // namespace SystemService
