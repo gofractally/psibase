@@ -48,9 +48,8 @@ namespace SystemService
       bool                                  cache        = true;
       std::optional<std::string>            globalCsp    = std::nullopt;
       std::optional<psibase::AccountNumber> proxyAccount = std::nullopt;
-      std::optional<psibase::AccountNumber> redirect     = std::nullopt;
    };
-   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount, redirect)
+   PSIO_REFLECT(SiteConfigRow, account, spa, cache, globalCsp, proxyAccount)
    using SiteConfigTable = psibase::Table<SiteConfigRow, &SiteConfigRow::account>;
    PSIO_REFLECT_TYPENAME(SiteConfigTable)
 
@@ -151,13 +150,6 @@ namespace SystemService
       /// Removes the proxy set with `setProxy`.
       void clearProxy();
 
-      /// Configures the caller's subdomain to 308 redirect all requests to the destination subdomain.
-      void setRedirect(psibase::AccountNumber destination);
-
-      /// Removes the redirect set with `setRedirect`.
-      /// No-op if no redirect is set.
-      void clearRedirect();
-
      private:
       bool                              useCache(const psibase::AccountNumber& account);
       std::optional<psibase::HttpReply> serveSitesApp(const psibase::HttpRequest& request);
@@ -178,9 +170,7 @@ namespace SystemService
                 method(deleteCsp, path),
                 method(enableCache, enable),
                 method(setProxy, proxy),
-                method(clearProxy),
-                method(setRedirect, destination),
-                method(clearRedirect))
+                method(clearProxy))
 
    PSIBASE_REFLECT_TABLES(Sites, Sites::Tables)
 }  // namespace SystemService

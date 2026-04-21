@@ -92,13 +92,6 @@ interface api {
 
     /// Clears the reverse-proxy set with `set-proxy`
     clear-proxy: func();
-
-    /// Configures the caller's subdomain to 308 redirect all requests to the destination subdomain.
-    set-redirect: func(destination: string);
-
-    /// Clears the redirect set with `set-redirect`
-    /// No-op if no redirect is set.
-    clear-redirect: func();
 }
 
 world imports {
