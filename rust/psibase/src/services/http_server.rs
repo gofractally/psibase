@@ -94,9 +94,6 @@ mod service {
 
     /// Configures the sender's subdomain to permanently (308) redirect all
     /// requests to the destination subdomain under the same root host.
-    ///
-    /// The redirect takes precedence over the sender's registered server
-    /// (if any) and over the `sites` fallback handler.
     #[action]
     fn setRedirect(destination: AccountNumber) {
         unimplemented!()

@@ -15,7 +15,6 @@ services = ["branding"]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
-StagedTx = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]

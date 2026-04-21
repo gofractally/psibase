@@ -27,25 +27,21 @@ mod tables {
 mod service {
     use crate::tables::*;
     use async_graphql::Object;
-    use psibase::fracpack::Pack;
     use psibase::services::auth_delegate::Wrapper as AuthDelegate;
-    use psibase::services::http_server::action_structs::setRedirect as HttpSetRedirect;
+    use psibase::services::http_server::Wrapper as HttpServer;
     use psibase::services::sites::Wrapper as Sites;
-    use psibase::services::staged_tx::Wrapper as StagedTx;
     use psibase::*;
 
-    /// Sets the network name for the current network
+    /// Sets the network name for the current network.
     ///
-    /// The specified name must be a valid account name.
-    /// The specified name must either:
-    /// * Not yet exist as an account, or
-    /// * Exist but be owned by the "branding" account (using auth-delegate)
+    /// The specified name must be a valid account name. It must either not
+    /// yet exist as an account, or exist but be owned by the "branding"
+    /// account (using auth-delegate).
     ///
-    /// The specified network name will reverse proxy its content to the
-    /// homepage service. If a previous network name was set, this action
-    /// also proposes a staged transaction that points the homepage and the
-    /// previous network name's subdomain at the new name via http-server's
-    /// `setRedirect`.
+    /// The new name's subdomain reverse-proxies the homepage service, and
+    /// the homepage's subdomain is redirected to it. If a previous network
+    /// name was set, that name's subdomain is also redirected to the new
+    /// one.
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
@@ -59,45 +55,15 @@ mod service {
         AuthDelegate::call().newAccount(account, SERVICE);
         Sites::call_as(account).setProxy(account!("homepage"));
 
-        // If a previous network name was set, stage redirects so the
-        // homepage and the old name both 308 to the new name. We skip
-        // this on the very first install (no prior name exists in the
-        // table) because the bootstrap redirect is supplied by
-        // Homepage's postinstall.json and there is no old account to
-        // redirect from.
-        let prev = NetworkNameTable::new().get_index_pk().get(&());
-        if let Some(prev) = prev {
-            let prev_account = AccountNumber::from_exact(prev.name.as_str())
-                .expect("stored network name is not a valid account");
+        let table = NetworkNameTable::new();
+        if let Some(prev) = table.get_index_pk().get(&()) {
+            let prev_account = AccountNumber::from_exact(prev.name.as_str()).unwrap();
             if prev_account != account {
-                let http_server = account!("http-server");
-                let method = HttpSetRedirect::ACTION_NAME.into();
-                let raw_data: Hex<Vec<u8>> = HttpSetRedirect {
-                    destination: account,
-                }
-                .packed()
-                .into();
-                let actions = vec![
-                    Action {
-                        sender: account!("homepage"),
-                        service: http_server,
-                        method,
-                        rawData: raw_data.clone(),
-                    },
-                    Action {
-                        sender: prev_account,
-                        service: http_server,
-                        method,
-                        rawData: raw_data,
-                    },
-                ];
-                StagedTx::call().propose(actions, true);
+                HttpServer::call_as(prev_account).setRedirect(account);
             }
         }
 
-        NetworkNameTable::new()
-            .put(&NetworkName { name: name.clone() })
-            .unwrap();
+        table.put(&NetworkName { name: name.clone() }).unwrap();
 
         Wrapper::emit().history().networkNameChanged(name);
     }

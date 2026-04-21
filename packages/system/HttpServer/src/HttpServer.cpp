@@ -310,19 +310,22 @@ namespace SystemService
          return;
       }
 
-      // If the subdomain has a redirect set, that takes precedence over the
-      // registered server (if any), the sites fallback, and even the common
-      // api override.
-      if (auto dest = getRedirect(*service_opt))
-      {
-         redirect(*dest);
-         return;
-      }
-
-      // If the path is to the common api, force proxy to the common api service
+      // /common/* is a framework-level mount point that must always route
+      // to the common-api service, regardless of any subdomain redirect.
       auto service =
           (req.target.starts_with(HttpServer::commonApiPrefix) ? HttpServer::commonApiService
                                                                : service_opt.value());
+
+      // For non-/common/ requests, a subdomain redirect takes precedence
+      // over the registered server (if any) and the sites fallback.
+      if (service != HttpServer::commonApiService)
+      {
+         if (auto dest = getRedirect(*service_opt))
+         {
+            redirect(*dest);
+            return;
+         }
+      }
 
       // First check the registered server
       auto                     registered = getServer(service);
