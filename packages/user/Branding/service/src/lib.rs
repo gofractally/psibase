@@ -27,8 +27,11 @@ mod tables {
 mod service {
     use crate::tables::*;
     use async_graphql::Object;
+    use psibase::fracpack::Pack;
     use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+    use psibase::services::http_server::action_structs::setRedirect as HttpSetRedirect;
     use psibase::services::sites::Wrapper as Sites;
+    use psibase::services::staged_tx::Wrapper as StagedTx;
     use psibase::*;
 
     /// Sets the network name for the current network
@@ -39,7 +42,10 @@ mod service {
     /// * Exist but be owned by the "branding" account (using auth-delegate)
     ///
     /// The specified network name will reverse proxy its content to the
-    /// homepage service.
+    /// homepage service. If a previous network name was set, this action
+    /// also proposes a staged transaction that points the homepage and the
+    /// previous network name's subdomain at the new name via http-server's
+    /// `setRedirect`.
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
@@ -52,6 +58,42 @@ mod service {
 
         AuthDelegate::call().newAccount(account, SERVICE);
         Sites::call_as(account).setProxy(account!("homepage"));
+
+        // If a previous network name was set, stage redirects so the
+        // homepage and the old name both 308 to the new name. We skip
+        // this on the very first install (no prior name exists in the
+        // table) because the bootstrap redirect is supplied by
+        // Homepage's postinstall.json and there is no old account to
+        // redirect from.
+        let prev = NetworkNameTable::new().get_index_pk().get(&());
+        if let Some(prev) = prev {
+            let prev_account = AccountNumber::from_exact(prev.name.as_str())
+                .expect("stored network name is not a valid account");
+            if prev_account != account {
+                let http_server = account!("http-server");
+                let method = HttpSetRedirect::ACTION_NAME.into();
+                let raw_data: Hex<Vec<u8>> = HttpSetRedirect {
+                    destination: account,
+                }
+                .packed()
+                .into();
+                let actions = vec![
+                    Action {
+                        sender: account!("homepage"),
+                        service: http_server,
+                        method,
+                        rawData: raw_data.clone(),
+                    },
+                    Action {
+                        sender: prev_account,
+                        service: http_server,
+                        method,
+                        rawData: raw_data,
+                    },
+                ];
+                StagedTx::call().propose(actions, true);
+            }
+        }
 
         NetworkNameTable::new()
             .put(&NetworkName { name: name.clone() })
