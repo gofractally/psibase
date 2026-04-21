@@ -70,19 +70,11 @@ impl Branding for ConfigPlugin {
     }
 
     fn set_network_name(name: String) -> Result<(), Error> {
-        let old_network_name = branding::plugin::queries::get_network_name().unwrap();
-
         set_propose_latch(Some("accounts"))?;
         accounts::plugin::admin::preapprove_account(&name);
 
         set_propose_latch(Some("branding"))?;
         branding::plugin::api::set_network_name(&name);
-
-        set_propose_latch(Some("homepage"))?;
-        sites::plugin::api::set_redirect(&name);
-
-        set_propose_latch(Some(&old_network_name))?;
-        sites::plugin::api::set_redirect(&name);
 
         Ok(())
     }
