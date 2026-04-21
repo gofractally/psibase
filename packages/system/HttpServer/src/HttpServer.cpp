@@ -381,8 +381,7 @@ namespace SystemService
 
       std::string url = scheme + siblingUrlHost;
 
-      if (auto suf = hostHeaderPortSuffix(req); !suf.empty())
-         url.append(suf);
+      url.append(hostHeaderPortSuffix(req));
 
       url += (keepTarget ? req.target : "/");
 
