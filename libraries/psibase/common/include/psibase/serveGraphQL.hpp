@@ -958,11 +958,11 @@ namespace psibase
       PSIO_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
    };
 
-   namespace
+   namespace detail
    {
-      std::string sql_query(const std::string&              query,
-                            const std::vector<std::string>& params,
-                            bool                            debug)
+      inline std::string sql_query(const std::string&              query,
+                                   const std::vector<std::string>& params,
+                                   bool                            debug)
       {
          if (debug)
          {
@@ -987,7 +987,8 @@ namespace psibase
          return json_str;
       }
 
-      std::vector<RowBlockStart> fetchBlockStarts(const std::vector<uint64_t>& rowids, bool debug)
+      inline std::vector<RowBlockStart> fetchBlockStarts(const std::vector<uint64_t>& rowids,
+                                                         bool                         debug)
       {
          if (rowids.empty())
             return {};
@@ -1016,7 +1017,7 @@ namespace psibase
          auto json = sql_query(sql, {}, debug);
          return psio::convert_from_json<std::vector<RowBlockStart>>(json);
       }
-   }  // namespace
+   }  // namespace detail
 
    /// GraphQL Pagination through Event tables
    ///
@@ -1142,7 +1143,7 @@ namespace psibase
          for (const auto& row : rows)
             rowids.push_back(row.rowid);
 
-         auto                        blockStarts = fetchBlockStarts(rowids, _debug);
+         auto                        blockStarts = detail::fetchBlockStarts(rowids, _debug);
          std::vector<EventBlockInfo> blockInfos(rows.size());
          for (const auto& bs : blockStarts)
          {
@@ -1186,7 +1187,7 @@ namespace psibase
          }
 
          auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
-         auto json_str  = sql_query(query_str, _params, _debug);
+         auto json_str  = detail::sql_query(query_str, _params, _debug);
          auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
 
          if (_debug)
