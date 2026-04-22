@@ -6,7 +6,6 @@ import {
     type Membership,
     getMembership,
 } from "@shared/domains/fractal/lib/graphql/get-membership";
-import { MemberStatus } from "@shared/domains/fractal/lib/schemas/member-status";
 import { queryClient } from "@shared/lib/query-client";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -42,7 +41,6 @@ export const setDefaultMembership = (
             fractal: zAccount.parse(fractal),
             account: zAccount.parse(user),
             createdAt: new Date().toISOString(),
-            memberStatus: MemberStatus.Citizen,
         };
         return defaultMember;
     });

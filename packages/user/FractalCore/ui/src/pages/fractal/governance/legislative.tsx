@@ -2,7 +2,6 @@ import { Scale } from "lucide-react";
 import { useState } from "react";
 
 import { GuildOverviewCard } from "@/components/guild-overview-card";
-import { SetRankedGuildSlots } from "@/components/modals/set-ranked-guild-slots-modal";
 import { SetRankedGuilds } from "@/components/modals/set-ranked-guilds-modal";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
@@ -27,17 +26,18 @@ import {
     ItemDescription,
     ItemTitle,
 } from "@shared/shadcn/ui/item";
+import { InitTokenModal } from "@/components/modals/init-token-modal";
 
 export const Legislative = () => {
     const { data: fractal, error: fractalError } = useFractal();
 
-    const awaitingConsensusReward = !fractal?.fractal?.consensusReward;
+    const awaitingConsensusReward = !fractal?.fractal?.stream;
 
     const focusedGuild = fractal?.fractal?.legislature.account;
     const { data, error: guildError } = useGuild(focusedGuild);
 
-    const [showRankedGuildSlotsModal, setShowRankedGuildsModal] = useState(false);
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
+    const [showTokenModal, setShowTokenModal] = useState(false);
 
     const error = fractalError || guildError;
 
@@ -55,13 +55,14 @@ export const Legislative = () => {
     return (
         <PageContainer className="space-y-6">
 
-            <SetRankedGuildSlots
-                openChange={setShowRankedGuildsModal}
-                show={showRankedGuildSlotsModal}
-            />
+
             <SetRankedGuilds
                 openChange={setShowRankGuildsModal}
                 show={showRankGuildsModal}
+            />
+            <InitTokenModal
+                openChange={setShowTokenModal}
+                show={showTokenModal}
             />
 
             <GlowingCard>
@@ -118,20 +119,18 @@ export const Legislative = () => {
                         {awaitingConsensusReward && (
                             <Item variant="muted">
                                 <ItemContent>
-                                    <ItemTitle>Set minimum scorers</ItemTitle>
+                                    <ItemTitle>Init token</ItemTitle>
                                     <ItemDescription>
-                                        Set the minimum amount of users in an
-                                        evaluation required to initialise the
-                                        Fractal token and consensus rewards.
+                                        Mint the tokens supply and send to the fractal stream.
                                     </ItemDescription>
                                 </ItemContent>
                                 <ItemActions>
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => setShowMinScorers(true)}
+                                        onClick={() => setShowTokenModal(true)}
                                     >
-                                        Set minimum scorers
+                                        Initialise token
                                     </Button>
                                 </ItemActions>
                             </Item>

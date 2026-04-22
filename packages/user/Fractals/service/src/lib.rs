@@ -179,7 +179,7 @@ pub mod service {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
             .or(Role::get_by_account(account).map(|role| {
-                occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
+                occu_wrapper::call_to(role.occupation).role_policy(role.account, role.role_id)
             }))
     }
 

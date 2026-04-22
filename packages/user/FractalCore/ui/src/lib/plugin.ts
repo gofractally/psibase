@@ -35,11 +35,14 @@ class AdminFractal extends PluginInterface {
     get exileMember() {
         return this._call<[member: Account]>("exileMember");
     }
+
+
+    get initToken() {
+        return this._call<[]>("initToken");
+    }
+
     get setDistInterval() {
         return this._call<[interval: number]>("setDistInterval");
-    }
-    get setRankedGuildSlots() {
-        return this._call<[slots: number]>("setRankedGuildSlots");
     }
 
     get setRankedGuilds() {
@@ -56,6 +59,10 @@ class UserFractal extends PluginInterface {
 
     get distToken() {
         return this._call<[]>("distToken");
+    }
+
+    get claimRewards() {
+        return this._call<[]>("claimRewards");
     }
 }
 

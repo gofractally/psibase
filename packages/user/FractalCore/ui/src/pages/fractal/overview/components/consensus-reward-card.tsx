@@ -24,15 +24,15 @@ export const ConsensusRewardCard = () => {
         useDistToken();
 
     if (isLoading) return null;
-    if (!fractal?.fractal?.consensusReward) return null;
+    if (!fractal?.fractal?.stream) return null;
 
     const intervalPeriod = humanize(
-        fractal.fractal.consensusReward.stream.distIntervalSecs * 1000,
+        fractal.fractal.stream.distIntervalSecs * 1000,
     );
-    const nextPeriod = fractal.fractal.consensusReward.stream.lastDistributed;
+    const nextPeriod = fractal.fractal.stream.lastDistributed;
 
     const nextClaimTime = dayjs(nextPeriod).add(
-        fractal.fractal.consensusReward.stream.distIntervalSecs,
+        fractal.fractal.stream.distIntervalSecs,
         "seconds",
     );
     const isClaimTime = nextClaimTime.unix() < now;

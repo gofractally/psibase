@@ -16,6 +16,7 @@ interface user-fractal {
     use host:types/types.{error};
 
     dist-token: func() -> result<_, error>;
+    claim-rewards: func() -> result<_, error>;
 
 
 }

@@ -18,7 +18,9 @@ import { router } from "./router";
 dayjs.extend(advancedFormat);
 dayjs.extend(timezone);
 dayjs.extend(duration);
+
 dayjs.extend(localizedFormat);
+
 
 createRoot(document.getElementById("root")!).render(
     <StrictMode>

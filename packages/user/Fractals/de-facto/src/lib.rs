@@ -42,7 +42,11 @@ pub mod service {
     ) -> auth_dyn::policy::DynamicAuthPolicy {
         let fractal = check_some(
             psibase::services::fractals::Wrapper::call().frac_by_role(role_account),
-            "expected fractal from role account",
+            &format!(
+                "expected fractal for role account {} , the role id is {}",
+                role_account.to_string(),
+                _role_id
+            ),
         );
 
         let accounts: Vec<(AccountNumber, u8)> =

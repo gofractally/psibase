@@ -55,7 +55,7 @@ define_trust! {
     functions {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
-        Medium => [apply_guild, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
+        Medium => [apply_guild, claim_rewards, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
         High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule],
     }
 }
@@ -121,6 +121,18 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl UserFractal for FractallyPlugin {
+    fn claim_rewards() -> Result<(), Error> {
+        assert_authorized(FunctionName::claim_rewards)?;
+        let packed_args = fractals::action_structs::claim_rew {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::claim_rew::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn dist_token() -> Result<(), Error> {
         assert_authorized(FunctionName::dist_token)?;
         let packed_args = fractals::action_structs::dist_token {

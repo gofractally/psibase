@@ -5,24 +5,16 @@ import { FRACTALS_SERVICE } from "../constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
-import { zU8 } from "@shared/lib/schemas/u8";
 
 export const zFractal = z
     .object({
         account: zAccount,
-        tokenInitThreshold: zU8,
         createdAt: zDateTime,
         name: z.string(),
-        consensusReward: z
-            .object({
-                rankedGuilds: zAccount.array(),
-                rankedGuildSlotCount: zU8,
-                stream: z.object({
-                    lastDistributed: zDateTime,
-                    distIntervalSecs: z.number().int(),
-                }),
-            })
-            .nullable(),
+        stream: z.object({
+            lastDistributed: zDateTime,
+            distIntervalSecs: z.number().int(),
+        }).nullable(),
         mission: z.string(),
         judiciary: z.object({
             account: zAccount,
@@ -65,17 +57,12 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
     {
         fractal(fractal: "${owner}") {     
             account
-            tokenInitThreshold
             createdAt
             mission
             name
-            consensusReward {
-                rankedGuilds
-                rankedGuildSlotCount
-                stream {
-                    lastDistributed
-                    distIntervalSecs
-                }
+            stream {
+                lastDistributed
+                distIntervalSecs
             }
             judiciary { 
                 account
