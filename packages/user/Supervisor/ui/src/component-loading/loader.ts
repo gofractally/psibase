@@ -152,9 +152,13 @@ function addResourceProxy(
     proxy: Record<string, unknown>,
     intf: Interface,
     funcName: string,
-    _isDynamic: boolean,
+    isDynamic: boolean,
     host: HostInterface,
 ): void {
+    if (isDynamic) {
+        throw new Error(`Dynamic resource methods are not supported`);
+    }
+
     const bracketIndex = funcName.indexOf("]");
     const dotIndex = funcName.indexOf(".", bracketIndex);
     const rawResourceName =
@@ -204,6 +208,10 @@ function addResourceProxy(
                 this.handle = callResource(undefined, ...args) as number;
             }
         };
+
+        // WIT does not mandate that the constructor appears before static methods in the
+        //   source, so a static method may already be attached to the placeholder class
+        Object.assign(newClass, resourceClass);
         Object.assign(newClass.prototype, origProto);
         proxy[className] = newClass;
     } else if (funcName.includes("[static]")) {
@@ -260,6 +268,18 @@ async function compileWasmComponent(
     }
 
     assert(jsSource !== null, "jco generate produced no JS file");
+
+    // If a future jco version (or some adversarial input) ever caused it to emit a
+    //   static `import`/`export ... from`, the browser would silently fetch it.
+    //
+    // Refuse to load anything we don't recognize.
+    const staticImportRegex =
+        /^[ \t]*(?:import\s+(?:['"]|[\w*${}\s,]+from\s+['"])|export\s+(?:\*|[\w*${}\s,]+)\s+from\s+['"])/m;
+    if (staticImportRegex.test(jsSource)) {
+        throw new Error(
+            `Refusing to load ${debugFileName}: jco-generated JS contains unexpected module-level import/export-from statements`,
+        );
+    }
 
     // Pre-compile all core modules (cheap — no Memory allocated)
     const compiledModules = new Map<string, WebAssembly.Module>();
