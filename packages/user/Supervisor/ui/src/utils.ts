@@ -7,7 +7,7 @@ export const wasmFromUrl = async (url: string) => {
     let headers: [string, string][] = [];
     if (queryToken) {
         headers = [["Authorization", `Bearer ${queryToken}`]];
-    } 
+    }
     return fetch(url, {
         headers,
     })
@@ -43,9 +43,12 @@ export interface QualifiedOriginationData extends OriginationData {
     app: string;
 }
 
-export const assert = (condition: boolean, errorMessage: string): void => {
+export function assert(
+    condition: unknown,
+    errorMessage: string,
+): asserts condition {
     if (!condition) throw new Error(errorMessage);
-};
+}
 
 let modulePromise: Promise<any>;
 
@@ -64,7 +67,8 @@ export const parser = (): Promise<any> => {
 };
 
 let queryToken: string | undefined;
-export const setQueryToken = (token: string | undefined) => (queryToken = token);
+export const setQueryToken = (token: string | undefined) =>
+    (queryToken = token);
 
 export let chainId: string | undefined;
 const getChainId = (): Promise<string> => {

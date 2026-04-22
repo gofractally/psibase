@@ -62,13 +62,9 @@ function buildPrivilegedImports(host: HostInterface): PluginImports {
         },
         "supervisor:bridge/database": {
             get: (...args: unknown[]) =>
-                host.dbGet(
-                    ...(args as Parameters<HostInterface["dbGet"]>),
-                ),
+                host.dbGet(...(args as Parameters<HostInterface["dbGet"]>)),
             set: (...args: unknown[]) =>
-                host.dbSet(
-                    ...(args as Parameters<HostInterface["dbSet"]>),
-                ),
+                host.dbSet(...(args as Parameters<HostInterface["dbSet"]>)),
             remove: (...args: unknown[]) =>
                 host.dbRemove(
                     ...(args as Parameters<HostInterface["dbRemove"]>),
@@ -91,7 +87,8 @@ function buildProxiedImports(
 
     const imports: PluginImports = {};
     for (const intf of allInterfaces) {
-        if (intf.namespace === "wasi" || intf.namespace === "supervisor") continue;
+        if (intf.namespace === "wasi" || intf.namespace === "supervisor")
+            continue;
 
         const key = `${intf.namespace}:${toKebabCase(intf.package)}/${toKebabCase(intf.name)}`;
 
@@ -113,7 +110,10 @@ function buildInterfaceProxy(
         if (isResourceMethod(func.name)) {
             addResourceProxy(proxy, intf, func.name, func.dynamicLink, host);
         } else if (func.dynamicLink) {
-            proxy[func.name] = (pluginRef: { handle: number }, ...args: unknown[]) =>
+            proxy[func.name] = (
+                pluginRef: { handle: number },
+                ...args: unknown[]
+            ) =>
                 host.syncCallDyn({
                     handle: pluginRef.handle,
                     method: func.name,
@@ -141,10 +141,6 @@ function isResourceMethod(name: string): boolean {
     );
 }
 
-function toPascalCase(str: string): string {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 // The WIT parser returns camelCase names (e.g. "hookHandlers", "wallClock")
 // but jco uses the original WIT kebab-case (e.g. "hook-handlers", "wall-clock")
 // as import keys. Convert camelCase back to kebab-case.
@@ -156,16 +152,25 @@ function addResourceProxy(
     proxy: Record<string, unknown>,
     intf: Interface,
     funcName: string,
-    _isDynamic: boolean,
+    isDynamic: boolean,
     host: HostInterface,
 ): void {
+    if (isDynamic) {
+        throw new Error(`Dynamic resource methods are not supported`);
+    }
+
     const bracketIndex = funcName.indexOf("]");
     const dotIndex = funcName.indexOf(".", bracketIndex);
     const rawResourceName =
         dotIndex !== -1
             ? funcName.substring(bracketIndex + 1, dotIndex)
             : funcName.substring(bracketIndex + 1);
-    const className = toPascalCase(rawResourceName);
+
+    // jco expects the resource class name in PascalCase. The component parser
+    //   already converts kebab-case to camelCase before we see it, so all we
+    //   need to do here is capitalize the first letter.
+    const className =
+        rawResourceName.charAt(0).toUpperCase() + rawResourceName.slice(1);
 
     let resourceClass = proxy[className] as any;
     if (!resourceClass) {
@@ -178,9 +183,7 @@ function addResourceProxy(
     let methodName: string;
     if (funcName.includes("[constructor]")) {
         methodName = "constructor";
-    } else if (funcName.includes("[method]")) {
-        methodName = funcName.split("]")[1].split(".")[1];
-    } else if (funcName.includes("[static]")) {
+    } else if (funcName.includes("[method]") || funcName.includes("[static]")) {
         methodName = funcName.split("]")[1].split(".")[1];
     } else {
         throw new Error(`Invalid resource method name: ${funcName}`);
@@ -205,16 +208,22 @@ function addResourceProxy(
                 this.handle = callResource(undefined, ...args) as number;
             }
         };
+
+        // WIT does not mandate that the constructor appears before static methods in the
+        //   source, so a static method may already be attached to the placeholder class
+        Object.assign(newClass, resourceClass);
         Object.assign(newClass.prototype, origProto);
         proxy[className] = newClass;
     } else if (funcName.includes("[static]")) {
         resourceClass[methodName] = (...args: unknown[]) =>
             callResource(undefined, ...args);
     } else {
-        resourceClass.prototype[methodName] =
-            function (this: { handle: number | undefined }, ...args: unknown[]) {
-                return callResource(this.handle, ...args);
-            };
+        resourceClass.prototype[methodName] = function (
+            this: { handle: number | undefined },
+            ...args: unknown[]
+        ) {
+            return callResource(this.handle, ...args);
+        };
     }
 }
 
@@ -252,32 +261,42 @@ async function compileWasmComponent(
 
     for (const [fileName, content] of transpiledFiles) {
         if (fileName.endsWith(".wasm")) {
-            assert(content instanceof Uint8Array, `Expected Uint8Array for ${fileName}`);
-            coreWasmFiles.push([fileName, content as Uint8Array]);
+            coreWasmFiles.push([fileName, content]);
         } else if (fileName.endsWith(".js")) {
-            assert(typeof content === "string" || content instanceof Uint8Array,
-                `Expected string or Uint8Array for ${fileName}`);
-            jsSource = typeof content === "string"
-                ? content
-                : new TextDecoder().decode(content);
+            jsSource = new TextDecoder().decode(content);
         }
     }
 
     assert(jsSource !== null, "jco generate produced no JS file");
 
+    // If a future jco version (or some adversarial input) ever caused it to emit a
+    //   static `import`/`export ... from`, the browser would silently fetch it.
+    //
+    // Refuse to load anything we don't recognize.
+    const staticImportRegex =
+        /^[ \t]*(?:import\s+(?:['"]|[\w*${}\s,]+from\s+['"])|export\s+(?:\*|[\w*${}\s,]+)\s+from\s+['"])/m;
+    if (staticImportRegex.test(jsSource)) {
+        throw new Error(
+            `Refusing to load ${debugFileName}: jco-generated JS contains unexpected module-level import/export-from statements`,
+        );
+    }
+
     // Pre-compile all core modules (cheap — no Memory allocated)
     const compiledModules = new Map<string, WebAssembly.Module>();
     await Promise.all(
         coreWasmFiles.map(async ([fileName, bytes]) => {
-            const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+            const buffer = bytes.buffer.slice(
+                bytes.byteOffset,
+                bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer;
             compiledModules.set(fileName, await WebAssembly.compile(buffer));
         }),
     );
 
-    const getCoreModule = (path: string): Promise<WebAssembly.Module> => {
+    const getCoreModule = async (path: string): Promise<WebAssembly.Module> => {
         const mod = compiledModules.get(path);
         if (!mod) throw new Error(`Core module not found: ${path}`);
-        return Promise.resolve(mod);
+        return mod;
     };
 
     // Import the jco-generated JS module via blob URL
@@ -318,6 +337,10 @@ export async function loadBasic(
     debugFileName: string,
 ): Promise<InstantiateResult> {
     await shimsReady;
-    const compiled = await compileWasmComponent(wasmBytes, getWasiImports(), debugFileName);
+    const compiled = await compileWasmComponent(
+        wasmBytes,
+        getWasiImports(),
+        debugFileName,
+    );
     return compiled.instantiate();
 }
