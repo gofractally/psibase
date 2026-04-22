@@ -120,7 +120,7 @@ export class PluginLoader {
         await Promise.all(
             this.allLoadedPlugins
                 .values()
-                .map((p) => this.plugins.getPlugin(p).plugin.ensureInstantiated()),
+                .map((p) => this.plugins.getPlugin(p).plugin.instantiate()),
         );
     }
 }
