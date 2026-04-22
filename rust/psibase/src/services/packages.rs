@@ -30,8 +30,8 @@ mod service {
         pub depends: Vec<PackageRef>,
         pub accounts: Vec<AccountNumber>,
         pub services: Vec<AccountNumber>,
-        pub owner: AccountNumber,
         pub exports: Vec<PackageExport>,
+        pub owner: AccountNumber,
     }
 
     impl InstalledPackage {

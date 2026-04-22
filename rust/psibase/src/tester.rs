@@ -675,6 +675,7 @@ impl Chain {
         packages: &[String],
     ) -> Result<(), anyhow::Error> {
         use crate::Table;
+        let sender = services::producers::ROOT;
         let installed_table = self.open::<services::packages::InstalledPackage, services::packages::InstalledPackageTable>();
         let mut installed = PackageList::new();
         for p in &installed_table.get_index_pk() {
@@ -682,10 +683,9 @@ impl Chain {
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
         let packages = block_on(fetch_packages(reg, packages, &installed))?;
-        let updated_packages = installed.into_updated(&packages);
+        let updated_packages = installed.into_updated(&packages, sender);
 
         let mut schemas = SchemaMap::new();
-        let sender = services::producers::ROOT;
         const TARGET_SIZE: usize = 1024 * 1024;
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {

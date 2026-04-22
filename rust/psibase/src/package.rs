@@ -1,8 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers,
-    setcode, sites, transact, verify_sig, x_sites,
+    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages,
+    producers, setcode, sites, transact, verify_sig, x_sites,
 };
 use crate::{
     reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
@@ -164,6 +164,7 @@ pub struct PackageInfo {
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
     pub services: Vec<AccountNumber>,
+    #[serde(default)]
     pub exports: Vec<PackageExport>,
     #[serde(default)]
     pub sha256: Checksum256,
@@ -2350,17 +2351,21 @@ impl PackageList {
     }
     // If self is the current set of installed packages, returns the
     // set of installed packages after ops are applied.
-    pub fn into_updated(mut self, ops: &Vec<PackageOp>) -> Self {
+    pub fn into_updated<R: Read + Seek>(
+        mut self,
+        ops: &Vec<PackageOpFull<R>>,
+        owner: AccountNumber,
+    ) -> Self {
         for op in ops {
             match op {
-                PackageOp::Install(info) => {
-                    self.insert_info(info.clone());
+                PackageOpFull::Install(package) => {
+                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
                 }
-                PackageOp::Replace(old, info) => {
+                PackageOpFull::Replace(old, package) => {
                     self.packages.remove(&old.name);
-                    self.insert_info(info.clone());
+                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
                 }
-                PackageOp::Remove(meta) => {
+                PackageOpFull::Remove(meta) => {
                     self.packages.remove(&meta.name);
                 }
             }

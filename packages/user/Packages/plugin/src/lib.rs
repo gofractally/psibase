@@ -23,9 +23,9 @@ use exports::packages::plugin::queries::Guest as Queries;
 use psibase::fracpack::{Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
-    make_refs, method, solve_dependencies, AccountNumber, Action,
-    InstalledPackageInfo, PackageDisposition, PackageList, PackageManifest,
-    PackageOrigin, PackagedService, SchemaMap, StagedUpload, TransactionBuilder,
+    make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo,
+    PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, StagedUpload,
+    TransactionBuilder,
 };
 
 use psibase::services::{
@@ -157,6 +157,7 @@ impl From<types::Meta> for psibase::Meta {
                 .into_iter()
                 .map(|a| a.parse().unwrap())
                 .collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
         }
     }
 }
@@ -341,24 +342,6 @@ fn get_accounts_to_create(
     Ok(result.data.newAccounts)
 }
 
-fn make_updated(
-    mut installed: PackageList,
-    ops: &Vec<types::PackageOpFull>,
-    owner: AccountNumber,
-) -> Result<PackageList, HostTypes::Error> {
-    for op in ops {
-        if let Some(old) = &op.old {
-            installed.remove_all_versions(&old.name);
-        }
-        if let Some(new) = &op.new {
-            let package = PackagedService::new(Cursor::new(&new[..]))
-                .map_err(|e| ErrorType::PackageFormatError(e.to_string()))?;
-            installed.insert(package.meta().clone(), PackageOrigin::Installed { owner })
-        }
-    }
-    Ok(installed)
-}
-
 fn apply_packages<
     R,
     F: Fn(Vec<Action>) -> Result<R, anyhow::Error>,
@@ -373,7 +356,7 @@ fn apply_packages<
     installed: PackageList,
 ) -> Result<(), HostTypes::Error> {
     let mut schemas = SchemaMap::new();
-    let updated_packages = make_updated(installed, &ops, sender)?;
+    let updated_packages = installed.into_updated(&ops, sender);
     for mut op in ops {
         match &op {
             psibase::PackageOpFull::Install(package) => {
@@ -392,7 +375,9 @@ fn apply_packages<
                     package.version()
                 ));
                 let old_manifest = get_installed_manifest(&old.name, sender)?;
-                old_manifest.upgrade(package.manifest(), &old.name, out).unwrap();
+                old_manifest
+                    .upgrade(package.manifest(), &old.name, out)
+                    .unwrap();
             }
             psibase::PackageOpFull::Remove(old) => {
                 out.set_label(format!("Removing {}", old.name));

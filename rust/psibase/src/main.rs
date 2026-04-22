@@ -1607,7 +1607,7 @@ async fn apply_packages<
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
     let ops = fetch_packages(reg, ops, &existing).await?;
-    let updated_packages = existing.into_updated(&ops);
+    let updated_packages = existing.into_updated(&ops, sender);
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
