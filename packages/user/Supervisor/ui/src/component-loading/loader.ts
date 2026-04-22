@@ -1,5 +1,6 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
 
+import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
@@ -90,7 +91,7 @@ function buildProxiedImports(
         if (intf.namespace === "wasi" || intf.namespace === "supervisor")
             continue;
 
-        const key = `${intf.namespace}:${toKebabCase(intf.package)}/${toKebabCase(intf.name)}`;
+        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
 
         if (intf.funcs.length === 0) {
             imports[key] = {};
@@ -110,7 +111,7 @@ function buildInterfaceProxy(
         if (isResourceMethod(func.name)) {
             addResourceProxy(proxy, intf, func.name, func.dynamicLink, host);
         } else if (func.dynamicLink) {
-            proxy[func.name] = (
+            proxy[kebabToCamel(func.name)] = (
                 pluginRef: { handle: number },
                 ...args: unknown[]
             ) =>
@@ -120,7 +121,7 @@ function buildInterfaceProxy(
                     params: args,
                 });
         } else {
-            proxy[func.name] = (...args: unknown[]) =>
+            proxy[kebabToCamel(func.name)] = (...args: unknown[]) =>
                 host.syncCall({
                     service: intf.namespace,
                     plugin: intf.package,
@@ -141,13 +142,6 @@ function isResourceMethod(name: string): boolean {
     );
 }
 
-// The WIT parser returns camelCase names (e.g. "hookHandlers", "wallClock")
-// but jco uses the original WIT kebab-case (e.g. "hook-handlers", "wall-clock")
-// as import keys. Convert camelCase back to kebab-case.
-function toKebabCase(str: string): string {
-    return str.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`);
-}
-
 function addResourceProxy(
     proxy: Record<string, unknown>,
     intf: Interface,
@@ -166,11 +160,9 @@ function addResourceProxy(
             ? funcName.substring(bracketIndex + 1, dotIndex)
             : funcName.substring(bracketIndex + 1);
 
-    // jco expects the resource class name in PascalCase. The component parser
-    //   already converts kebab-case to camelCase before we see it, so all we
-    //   need to do here is capitalize the first letter.
-    const className =
-        rawResourceName.charAt(0).toUpperCase() + rawResourceName.slice(1);
+    // The component parser returns raw WIT kebab-case names; jco expects the
+    //   resource class in PascalCase and methods in camelCase as JS identifiers.
+    const className = kebabToPascal(rawResourceName);
 
     let resourceClass = proxy[className] as any;
     if (!resourceClass) {
@@ -180,27 +172,28 @@ function addResourceProxy(
         proxy[className] = resourceClass;
     }
 
-    let methodName: string;
+    let rawMethodName: string;
     if (funcName.includes("[constructor]")) {
-        methodName = "constructor";
+        rawMethodName = "constructor";
     } else if (funcName.includes("[method]") || funcName.includes("[static]")) {
-        methodName = funcName.split("]")[1].split(".")[1];
+        rawMethodName = funcName.split("]")[1].split(".")[1];
     } else {
         throw new Error(`Invalid resource method name: ${funcName}`);
     }
+    const jsMethodName = kebabToCamel(rawMethodName);
 
     const callResource = (handle: number | undefined, ...args: unknown[]) =>
         host.syncCallResource({
             service: intf.namespace,
             plugin: intf.package,
             intf: intf.name,
-            type: className,
+            type: rawResourceName,
             handle,
-            method: methodName,
+            method: rawMethodName,
             params: args,
         });
 
-    if (methodName === "constructor") {
+    if (rawMethodName === "constructor") {
         const origProto = resourceClass.prototype;
         const newClass = class {
             handle: number | undefined;
@@ -215,10 +208,10 @@ function addResourceProxy(
         Object.assign(newClass.prototype, origProto);
         proxy[className] = newClass;
     } else if (funcName.includes("[static]")) {
-        resourceClass[methodName] = (...args: unknown[]) =>
+        resourceClass[jsMethodName] = (...args: unknown[]) =>
             callResource(undefined, ...args);
     } else {
-        resourceClass.prototype[methodName] = function (
+        resourceClass.prototype[jsMethodName] = function (
             this: { handle: number | undefined },
             ...args: unknown[]
         ) {

@@ -5,6 +5,7 @@ import {
     siblingUrl,
 } from "@psibase/common-lib";
 
+import { kebabToCamel, kebabToPascal } from "../case";
 import { CompiledPlugin } from "../component-loading";
 import { compilePlugin } from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
@@ -152,10 +153,11 @@ export class Plugin {
             throw new PluginInvalid(this.id);
         }
 
+        const jsMethod = kebabToCamel(method);
         const func =
             typeof intf === "undefined" || intf === ""
-                ? this.pluginModule[method]
-                : this.pluginModule[intf][method];
+                ? this.pluginModule[jsMethod]
+                : this.pluginModule[kebabToCamel(intf)][jsMethod];
 
         return func(...params);
     }
@@ -171,6 +173,9 @@ export class Plugin {
             throw new PluginInvalid(this.id);
         }
 
+        const jsType = kebabToPascal(type);
+        const jsMethod = kebabToCamel(method);
+
         if (method === "constructor") {
             if (handle !== undefined) {
                 throw new InvalidCall(
@@ -179,8 +184,10 @@ export class Plugin {
                     `Handle is not allowed for ${type}.constructor`,
                 );
             }
-            const module = intf ? this.pluginModule[intf] : this.pluginModule;
-            const resourceClass = module?.[type];
+            const module = intf
+                ? this.pluginModule[kebabToCamel(intf)]
+                : this.pluginModule;
+            const resourceClass = module?.[jsType];
             if (!resourceClass) {
                 throw new InvalidCall(this.id, intf, `${type}.constructor`);
             }
@@ -209,7 +216,7 @@ export class Plugin {
             );
         }
 
-        if (typeof resource[method] !== "function") {
+        if (typeof resource[jsMethod] !== "function") {
             throw new InvalidCall(
                 this.id,
                 intf,
@@ -217,7 +224,7 @@ export class Plugin {
             );
         }
 
-        return resource[method](...params);
+        return resource[jsMethod](...params);
     }
 
     getJson(): string {
