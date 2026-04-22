@@ -129,6 +129,80 @@ namespace psibase
       return ConnectionName.c_str();
    }
 
+   /// Block context for an event row.
+   struct EventBlockInfo
+   {
+      std::optional<psibase::BlockNum>  blockNum;
+      std::optional<psibase::BlockTime> blockTime;
+      PSIO_REFLECT(EventBlockInfo, blockNum, blockTime)
+   };
+
+   namespace detail
+   {
+      template <typename T>
+      consteval bool has_block_member()
+      {
+         for (const char* n : psio::reflect<T>::data_member_names)
+            if (std::string_view{n} == "block")
+               return true;
+         return false;
+      }
+   }  // namespace detail
+
+   /// Wraps a node type with block context for event queries.
+   template <typename T>
+   struct WithBlockContext
+   {
+      static_assert(!detail::has_block_member<T>(),
+                    "WithBlockContext<T>: T already has a 'block' field");
+      EventBlockInfo block;
+      T              data;
+      PSIO_REFLECT(WithBlockContext, block, data)
+   };
+
+   template <typename T>
+   const char* get_type_name(const WithBlockContext<T>*)
+   {
+      static constexpr auto name = psio::reflect<T>::name + "WithBlockContext";
+      return name.c_str();
+   }
+
+   // Flatten T's fields alongside `block` in the schema for WithBlockContext<T>.
+   template <typename T, typename S>
+   void fill_gql_schema_members(const WithBlockContext<T>*, S& stream, bool is_input)
+   {
+      psio::write_str("    block: ", stream);
+      psio::write_str(psio::generate_gql_whole_name((EventBlockInfo*)nullptr, is_input), stream);
+      psio::write_str("\n", stream);
+      psio::fill_gql_schema_members((T*)nullptr, stream, is_input);
+   }
+
+   // Resolve `block` from value.block, T's fields from value.data.
+   template <typename T, typename OS, typename E>
+   auto gql_query_inline(WithBlockContext<T>*,
+                         const WithBlockContext<T>& value,
+                         psio::gql_stream&          input_stream,
+                         OS&                        output_stream,
+                         const E&                   error,
+                         bool                       allow_unknown_members,
+                         bool&                      first)
+   {
+      auto resolve_data =
+          psio::make_field_resolver(value.data, input_stream, output_stream, error, first);
+      return psio::gql_query_inline(
+          psio::generate_gql_partial_name((const WithBlockContext<T>*)nullptr, false),
+          [&](std::string_view field_name, std::string_view alias) -> bool
+          {
+             if (field_name == "block")
+             {
+                psio::detail::write_field_name(alias, first, output_stream);
+                return gql_query(value.block, input_stream, output_stream, error, false);
+             }
+             return resolve_data(field_name, alias);
+          },
+          input_stream, output_stream, error, first);
+   }
+
    /// GraphQL Pagination through TableIndex
    ///
    /// You rarely need to call this directly; see [the example](#makeconnection-example).
@@ -890,6 +964,75 @@ namespace psibase
       PSIO_REFLECT(SqlRow, rowid, data)
    };
 
+   struct RowBlockStart
+   {
+      uint64_t  rowIndex;
+      BlockNum  blockNum;
+      BlockTime blockTime;
+      PSIO_REFLECT(RowBlockStart, rowIndex, blockNum, blockTime)
+   };
+
+   namespace detail
+   {
+      inline std::string sql_query(const std::string&              query,
+                                   const std::vector<std::string>& params,
+                                   bool                            debug)
+      {
+         if (debug)
+         {
+            printf("SQL query str: %s\n", query.c_str());
+            printf("SQL params: [");
+            for (size_t i = 0; i < params.size(); ++i)
+            {
+               if (i > 0)
+                  printf(", ");
+               printf("\"%s\"", params[i].c_str());
+            }
+            printf("]\n");
+         }
+
+         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
+
+         if (debug)
+         {
+            printf("Raw JSON response: %s\n", json_str.c_str());
+         }
+
+         return json_str;
+      }
+
+      inline std::vector<RowBlockStart> fetchBlockStarts(const std::vector<uint64_t>& rowids,
+                                                         bool                         debug)
+      {
+         if (rowids.empty())
+            return {};
+
+         std::string values;
+         for (size_t i = 0; i < rowids.size(); ++i)
+         {
+            if (i)
+               values += ", ";
+            std::format_to(std::back_inserter(values), "({}, {})", i, rowids[i]);
+         }
+
+         auto sql = std::format(
+             "WITH rows(rowIndex, rowId) AS (VALUES {})"
+             " SELECT r.rowIndex, m.blockNum, m.blockTime"
+             " FROM rows r"
+             " JOIN \"history.transact.blockStart\" m ON m.ROWID = ("
+             "   SELECT ROWID"
+             "   FROM \"history.transact.blockStart\""
+             "   WHERE ROWID <= r.rowId"
+             "   ORDER BY ROWID DESC"
+             "   LIMIT 1"
+             " )"
+             " ORDER BY r.rowIndex ASC",
+             values);
+         auto json = sql_query(sql, {}, debug);
+         return psio::convert_from_json<std::vector<RowBlockStart>>(json);
+      }
+   }  // namespace detail
+
    /// GraphQL Pagination through Event tables
    ///
    /// Event tables are stored in an SQLite database in a service.
@@ -994,30 +1137,44 @@ namespace psibase
          return *this;
       }
 
-      /// Execute the query and return a Connection containing the results
+      /// Execute the query and return a Connection containing the results.
       ///
+      /// Each node is wrapped in WithBlockContext<T> carrying block metadata.
       /// Returns error if both first and last are specified.
-      Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge"> query()
-          const
+      Connection<WithBlockContext<T>,
+                 psio::reflect<T>::name + "Connection",
+                 psio::reflect<T>::name + "Edge">
+      query() const
       {
          auto [rows, has_next_page, has_prev_page] = all_edges();
 
-         using EdgeType = Edge<T, psio::reflect<T>::name + "Edge">;
-         using ConnType =
-             Connection<T, psio::reflect<T>::name + "Connection", psio::reflect<T>::name + "Edge">;
+         using ConnType = Connection<WithBlockContext<T>, psio::reflect<T>::name + "Connection",
+                                     psio::reflect<T>::name + "Edge">;
+         using EdgeType = typename ConnType::Edge;
+
+         std::vector<uint64_t> rowids;
+         rowids.reserve(rows.size());
+         for (const auto& row : rows)
+            rowids.push_back(row.rowid);
+
+         auto                        blockStarts = detail::fetchBlockStarts(rowids, _debug);
+         std::vector<EventBlockInfo> blockInfos(rows.size());
+         for (const auto& bs : blockStarts)
+         {
+            check(bs.rowIndex < rows.size(), "rowIndex out of range");
+            blockInfos[bs.rowIndex] = EventBlockInfo{bs.blockNum, bs.blockTime};
+         }
 
          ConnType connection;
          connection.pageInfo.hasNextPage     = has_next_page;
          connection.pageInfo.hasPreviousPage = has_prev_page;
-
-         for (const auto& row : rows)
+         for (size_t i = 0; i < rows.size(); ++i)
          {
             EdgeType edge;
-            edge.node   = row.data;
-            edge.cursor = std::to_string(row.rowid);
+            edge.node   = WithBlockContext<T>{blockInfos[i], std::move(rows[i].data)};
+            edge.cursor = std::to_string(rows[i].rowid);
             connection.edges.push_back(std::move(edge));
          }
-
          if (!connection.edges.empty())
          {
             connection.pageInfo.startCursor = connection.edges.front().cursor;
@@ -1044,7 +1201,7 @@ namespace psibase
          }
 
          auto query_str = generate_sql_query(limit_plus_one, descending, _before, _after);
-         auto json_str  = sql_query(query_str, _params, _debug);
+         auto json_str  = detail::sql_query(query_str, _params, _debug);
          auto rows      = psio::convert_from_json<std::vector<SqlRow<T>>>(json_str);
 
          if (_debug)
@@ -1084,11 +1241,10 @@ namespace psibase
          return {rows, has_next_page, has_prev_page};
       }
 
-      uint64_t extract_cursor(std::optional<std::string> cursor) const
+      uint64_t extract_cursor(std::string_view c) const
       {
-         uint64_t         b{};
-         std::string_view c = *cursor;
-         auto [ptr, ec]     = std::from_chars(c.data(), c.data() + c.size(), b);
+         uint64_t b{};
+         auto [ptr, ec] = std::from_chars(c.data(), c.data() + c.size(), b);
          check(ec == std::errc{}, "Invalid cursor");
          check(ptr == c.data() + c.size(), "Invalid cursor: not all characters consumed");
          return b;
@@ -1108,12 +1264,12 @@ namespace psibase
 
          if (before.has_value())
          {
-            filters.push_back(std::format("ROWID < {}", extract_cursor(before)));
+            filters.push_back(std::format("ROWID < {}", extract_cursor(*before)));
          }
 
          if (after.has_value())
          {
-            filters.push_back(std::format("ROWID > {}", extract_cursor(after)));
+            filters.push_back(std::format("ROWID > {}", extract_cursor(*after)));
          }
 
          auto order = descending ? "DESC" : "ASC";
@@ -1140,33 +1296,6 @@ namespace psibase
          }
 
          return query;
-      }
-
-      static std::string sql_query(const std::string&              query,
-                                   const std::vector<std::string>& params,
-                                   bool                            debug)
-      {
-         if (debug)
-         {
-            printf("[EventQuery] SQL query str: %s\n", query.c_str());
-            printf("[EventQuery] SQL params: [");
-            for (size_t i = 0; i < params.size(); ++i)
-            {
-               if (i > 0)
-                  printf(", ");
-               printf("\"%s\"", params[i].c_str());
-            }
-            printf("]\n");
-         }
-
-         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
-
-         if (debug)
-         {
-            printf("[EventQuery] Raw JSON response: %s\n", json_str.c_str());
-         }
-
-         return json_str;
       }
 
       std::string                _table_name;
