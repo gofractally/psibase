@@ -9,6 +9,7 @@ import {
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib/rpc";
 
+import { AppInterface } from "./app-interface";
 import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
@@ -22,7 +23,7 @@ const appContainer = document.querySelector<HTMLDivElement>("#app")!;
 const root = createRoot(appContainer);
 root.render(React.createElement(MainPage));
 
-const supervisor = new Supervisor();
+const supervisor: AppInterface = new Supervisor();
 const callHandlers: CallHandler[] = [];
 
 const shouldHandleMessage = (message: MessageEvent) => {
@@ -55,17 +56,4 @@ addCallHandler(callHandlers, isGetJsonRequest, (msg) =>
     supervisor.getJson(msg.origin, msg.data.id, msg.data.payload.plugin),
 );
 registerCallHandlers(callHandlers, (msg) => shouldHandleMessage(msg));
-
-// DX cleanup of stale supervisor iframes after navigation. Not load-bearing
-// for VAS — per-entry dispose handles that. Would matter if plugins are
-// ever pinned across calls again.
-window.addEventListener("pagehide", () => {
-    const disposed = supervisor.shutdown();
-    if (disposed.length > 0) {
-        console.log(
-            `[shutdown] disposed ${disposed.length} plugin(s): [${disposed.join(", ")}]`,
-        );
-    }
-});
-
 window.parent.postMessage(buildMessageSupervisorInitialized(), "*");

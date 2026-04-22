@@ -96,6 +96,14 @@ export class Supervisor implements AppInterface {
 
     private preloadLock: Promise<void> = Promise.resolve();
 
+    // This step loads the full plugin tree (downloading + parsing + JCO transpiling)
+    //
+    // This does not instantiate wasms, with the exception of core system plugin wasms,
+    //   which are instantiated as they are required to be executed during the preloading
+    //   of all other plugins.
+    //
+    // The caller should dispose of all instantiated plugins after the entry function
+    //  finishes.
     private preload(plugins: QualifiedPluginId[]): Promise<void> {
         const myPreload = this.preloadLock
             .catch(() => {})
@@ -111,16 +119,13 @@ export class Supervisor implements AppInterface {
             return;
         }
 
-        // Phase 0: Compile system plugins and instantiate them so the
-        // internal sync calls below (getActivePrompt, getActiveQueryToken,
-        // getAuthServices) have live instances to hit. These instances
-        // are not retained between entries — the caller (entry /
-        // preloadPlugins / getJson) is responsible for disposing them
-        // after whatever follow-up work requires them.
+        // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
-        await this.loader.ensureAllInstantiated();
+
+        // Required to instantiate system plugins to execute the plugin calls below
+        await this.plugins.instantiateAll();
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
@@ -157,11 +162,6 @@ export class Supervisor implements AppInterface {
 
         await this.loader.processPlugins();
         await this.loader.awaitReady();
-
-        // Phase 1 + Phase 2 plugins are COMPILED only. Phase 0 plugins are
-        // still live at this point (instantiated above for the internal
-        // sync calls). The caller will dispose them together with the rest
-        // once its own work finishes.
     }
 
     private replyToParent(id: string, result: any) {
@@ -220,10 +220,20 @@ export class Supervisor implements AppInterface {
         return token;
     }
 
+    // Cleanly tear down the supervisor, free any resources, etc.
+    private shutdown(): string[] {
+        return this.plugins.disposeAll();
+    }
+
     constructor() {
         this.plugins = new Plugins(this);
         this.parser = parser();
         this.loader = new PluginLoader(this.plugins);
+
+        // Without this, in some browsers (e.g. chromium), stale supervisor iframes persist
+        //  after navigation events. This ensures that after navigations, dev tools look
+        //  clean.
+        window.addEventListener("pagehide", () => this.shutdown());
     }
 
     getRootDomain(): string {
@@ -345,9 +355,6 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             this.replyToParent(id, e);
         } finally {
-            // Release the Phase-0 system plugin instances that doPreload
-            // left live for its internal sync calls. Sweeps every
-            // instantiated plugin.
             this.plugins.disposeAll();
         }
     }
@@ -363,17 +370,8 @@ export class Supervisor implements AppInterface {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
         } finally {
-            // See getJson() — preload leaves system plugins instantiated
-            // for its internal sync calls; we release them here so the
-            // idle footprint between preloadPlugins() and the next
-            // entry() stays at zero non-parser memories.
             this.plugins.disposeAll();
         }
-    }
-
-    /** See main.ts pagehide handler. Idempotent. */
-    shutdown(): string[] {
-        return this.plugins.disposeAll();
     }
 
     // This is an entrypoint for apps to call into plugins.
@@ -385,13 +383,9 @@ export class Supervisor implements AppInterface {
         try {
             this.setParentOrigination(callerOrigin);
 
-            // Load the full plugin tree (downloading + parsing + transpiling
-            //   via jco + compiling core WASM modules). Phase 0 system
-            //   plugins are instantiated as a side-effect so the internal
-            //   sync calls inside preload have live instances; the finally
-            //   clause below will dispose them alongside everything we
-            //   instantiate ourselves.
-            // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
+            // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
+            //   each plugin component. Everything needed to prepare for instantiation and execution.
+            // UIs can use `preloadPlugins` to decouple this task from the actual call to the plugin.
             await this.preload([
                 {
                     service: args.service,
@@ -399,10 +393,7 @@ export class Supervisor implements AppInterface {
                 },
             ]);
 
-            // Instantiate every remaining plugin (Phase 1 + Phase 2) so the
-            // synchronous call chain below has live instances to call into.
-            // Phase 0 plugins are already instantiated (no-op for them).
-            await this.plugins.ensureAllInstantiated();
+            await this.plugins.instantiateAll();
 
             this.context = this.getCallContext();
 
@@ -446,11 +437,6 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } finally {
-            // Dispose every instance so V8 can reclaim the backing
-            // WebAssembly.Memory (and its ~10GB of virtual address space)
-            // on the next GC. On a Phase 0 preload failure, system plugins
-            // that instantiated before the error are also caught by this
-            // sweep.
             this.plugins.disposeAll();
         }
     }

@@ -5,8 +5,8 @@ import {
     siblingUrl,
 } from "@psibase/common-lib";
 
-import { compilePlugin } from "../component-loading/loader";
 import { CompiledPlugin } from "../component-loading";
+import { compilePlugin } from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
 import { parser, wasmFromUrl } from "../utils";
@@ -27,7 +27,7 @@ export class Plugin {
     parsed: Promise<ComponentAPI>;
 
     // Resolves when the plugin is compiled (cheap — no Memory allocated).
-    // After this, ensureInstantiated() can be called to allocate Memory.
+    // After this, instantiate() can be called to allocate Memory.
     ready: Promise<void>;
 
     private compiledPlugin: CompiledPlugin | undefined;
@@ -109,6 +109,10 @@ export class Plugin {
         );
     }
 
+    private get isInstantiated(): boolean {
+        return this.pluginModule !== undefined;
+    }
+
     constructor(id: QualifiedPluginId, host: HostInterface) {
         this.id = id;
         this.host = host;
@@ -118,21 +122,20 @@ export class Plugin {
         this.ready = this.doReady();
     }
 
-    get isInstantiated(): boolean {
-        return this.pluginModule !== undefined;
-    }
-
-    async ensureInstantiated(): Promise<void> {
+    async instantiate(): Promise<void> {
         if (this.pluginModule) return;
         if (!this.compiledPlugin) throw new PluginInvalid(this.id);
         const { exports } = await this.compiledPlugin.instantiate();
         this.pluginModule = exports;
     }
 
-    dispose(): void {
+    dispose(): boolean {
+        if (!this.isInstantiated) return false;
+
         this.pluginModule = undefined;
         this.resources.clear();
         this.nextResourceHandle = 1;
+        return true;
     }
 
     call(intf: string | undefined, method: string, params: any[]) {
@@ -145,7 +148,7 @@ export class Plugin {
             throw new InvalidCall(this.id, intf, method);
         }
 
-        if (this.pluginModule === undefined) {
+        if (!this.isInstantiated) {
             throw new PluginInvalid(this.id);
         }
 
@@ -164,7 +167,7 @@ export class Plugin {
         method: string,
         params: any[],
     ) {
-        if (this.pluginModule === undefined) {
+        if (!this.isInstantiated) {
             throw new PluginInvalid(this.id);
         }
 
