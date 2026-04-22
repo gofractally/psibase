@@ -51,7 +51,7 @@ mod service {
     }
 
     #[action]
-    fn newAccount(name: AccountNumber, owner: AccountNumber) {
+    fn newAccount(name: AccountNumber, owner: AccountNumber, require_match: bool) -> bool {
         unimplemented!()
     }
 }

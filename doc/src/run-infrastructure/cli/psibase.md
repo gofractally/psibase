@@ -7,13 +7,13 @@ psibase - The psibase blockchain command line client
 ## SYNOPSIS
 
 `psibase` `boot` [`-a` *url*] [`-p` *name*] [`-k` *public-key*] [*packages*\.\.\.]  
-`psibase` `create` [`-a` *url*] [`-i` | `-k` *public-key*] [`-S` *sender*] *name*  
+`psibase` `create` [`-a` *url*] [`-i` | `-k` *public-key* | `-o` *account*] [`-S` *sender*] *name*  
 `psibase` `deploy` [`-a` *url*] [`-p`] *account* *wasm* *schema*  
 `psibase` `info` [`-a` *url*] *packages*\.\.\.  
 `psibase` `install` [`-a` *url*] [`-k` *public-key*] *packages*\.\.\.  
 `psibase` `list` [`-a` *url*] [`--all` | `--available` | `--installed` | `--updates`]  
 `psibase` `login` [`-a` *url*] *account*  
-`psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key*] *account*  
+`psibase` `modify` [`-a` *url*] [`-i` | `-k` *public-key* | `-o` *account*] *account*  
 `psibase` `publish` [`-a` *url*] `-S` *sender* *files*\.\.\.  
 `psibase` `push` [`-a` *url*] *files*\.\.\.  
 `psibase` `search` [`-a` *url*] *regex*\.\.\.  
@@ -101,21 +101,25 @@ The boot command deploys a set of system services and web interfaces suitable fo
 
 `psibase` `create` [`-a` *url*] [`-i` | `-k` *public-key*] [`-S` *sender*] *name*  
 
-Create or modify an account
+Create an account. If the account already exists, verify that its authentication is the same as what would be created.
 
 - `-i`, `--insecure`
 
-  The account won't be secured; anyone can authorize as this account without signing. This option does nothing if the account already exists. Caution: this option should not be used on production or public chains.
+  The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public chains.
 
 - `-k`, `--key` *public-key*
 
-  Set the account to authenticate using this key. Also works if the account already exists. The public key can be any of the following:
+  Set the account to authenticate using this key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
 
+- `-o`, `--owner` *account*
+
+  Set the account to be owned by another account [default: *sender*]
+
 - `-S`, `--sender` *account*
 
-  Sender to use when creating the account [default: accounts].
+  Sender to use when creating the account [default: root].
 
 ### deploy
 
@@ -135,13 +139,21 @@ Deploy a service
 
   Path to a JSON file containing the schema for the service
 
-- `-c`, `--create-account` *public-key*
+- `-c`, `--create`
 
-  Create the account if it doesn't exist. Also set the account to authenticate using this key, even if the account already existed
+  Create the account if it doesn't exist. If the account does exist, verify that its authentication is that same as what would be created.
 
-- `-i`, `--create-insecure-account`
+- `-i`, `--insecure`
 
-  Create the account if it doesn't exist. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public.
+  Requires `--create`. The account won't be secured; anyone can authorize as this account without signing. Caution: this option should not be used on production or public.
+
+- `-k`, `--key`
+
+  Requires `--create`. Set a new account to authenticate using this key.
+
+- `-o`, `--owner` *owner*
+
+  Requires `--create`. Set the account to be owned by another account [default: *sender*]
 
 - `-p`, `--register-proxy`
 
@@ -149,7 +161,7 @@ Deploy a service
 
 - `-S`, `--sender` *sender*
 
-  Sender to use when creating the account [default: accounts]
+  Requires `--create`. Sender to use when creating the account [default: root]
 
 ### info
 
@@ -255,15 +267,27 @@ Get a bearer token that can used to access authenticated APIs. The token can onl
 
 Modify an account
 
+- `-c`, `--create`
+
+  Create the account if it doesn't already exist
+
 - `-i`, `--insecure`
 
   Make the account insecure, even if it has been previously secured. Anyone will be able to authorize as this account without signing. Caution: this option should not be used on production or public chains
   
-- `-k`, `--key`
+- `-k`, `--key` *public-key*
 
   Set the account to authenticate using this key. The public key can be any of the following:
   - A file containing a PEM or DER encoded public key
   - A PKCS #11 URI
+
+- `-o`, `--owner` *owner*
+
+  Set the account to be owned by *owner* [default: *sender*]
+
+- `-S`, `--sender` *sender*
+
+  Requires `--create`. Sender to use when creating the account [default: root]
 
 ### publish
 
