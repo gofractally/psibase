@@ -64,14 +64,6 @@ define_trust! {
 struct FractalCorePlugin;
 
 impl AdminFractal for FractalCorePlugin {
-    fn set_ranked_guild_slots(slots_count: u8) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_ranked_guild_slots)?;
-        propose::legislature()?;
-
-        // TODO: Are we still doing this?
-        Ok(())
-    }
-
     fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
         assert_authorized(FunctionName::set_ranked_guilds)?;
         propose::legislature()?;

@@ -158,28 +158,7 @@ export const Legislative = () => {
                                     </ItemActions>
                                 </Item>
 
-                                <Item variant="muted">
-                                    <ItemContent>
-                                        <ItemTitle>
-                                            Set ranked guild slots
-                                        </ItemTitle>
-                                        <ItemDescription>
-                                            Adjust how many guilds to pay
-                                            consensus rewards.
-                                        </ItemDescription>
-                                    </ItemContent>
-                                    <ItemActions>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                setShowRankedGuildsModal(true)
-                                            }
-                                        >
-                                            Set ranked guild slots
-                                        </Button>
-                                    </ItemActions>
-                                </Item>
+
                             </>
                         )}
                     </CardContent>

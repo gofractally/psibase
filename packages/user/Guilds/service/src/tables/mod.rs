@@ -52,7 +52,7 @@ pub mod tables {
     impl Ranking {
         #[primary_key]
         fn pk(&self) -> (AccountNumber, u8, AccountNumber) {
-            (self.guild, self.index, self.guild)
+            (self.fractal, self.index, self.guild)
         }
     }
 

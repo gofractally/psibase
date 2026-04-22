@@ -27,26 +27,6 @@ export const zFractal = z
 
 export const zFractalRes = z.object({
     fractal: zFractal,
-    guilds: z.object({
-        nodes: z
-            .object({
-                account: zAccount,
-                rep: z
-                    .object({
-                        member: zAccount,
-                    })
-                    .optional(),
-                displayName: z.string(),
-                council: z.array(zAccount).nullable(),
-                bio: z.string(),
-                evalInstance: z
-                    .object({
-                        evaluationId: z.number().int(),
-                    })
-                    .nullable(),
-            })
-            .array(),
-    }),
 });
 
 export type FractalRes = z.infer<typeof zFractalRes>;
@@ -69,20 +49,6 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
             }
             legislature { 
                 account
-            }
-        }
-        guilds(fractal: "${owner}") {
-            nodes {
-                account
-                rep {
-                    member
-                }
-                displayName
-                council
-                bio
-                evalInstance {
-                  evaluationId
-                }
             }
         }
     }`,

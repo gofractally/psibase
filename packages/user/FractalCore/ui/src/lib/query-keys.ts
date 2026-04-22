@@ -16,6 +16,7 @@ const QueryKey = {
         ["guildMembership", guild, member] as const,
     guild: (guild: OptionalAccount) => ["guild", guild] as const,
     fractal: (account: OptionalAccount) => ["fractal", account] as const,
+    guilds: (fractal: OptionalAccount) => ['guilds', fractal] as const,
     members: (fractalAccount: OptionalAccount) =>
         ["members", fractalAccount] as const,
     scores: (guildAccount: OptionalAccount) =>

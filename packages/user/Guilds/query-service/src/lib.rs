@@ -1,7 +1,10 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
+    use std::u64;
+
     use async_graphql::{connection::Connection, *};
+    use guilds::tables::tables::RankingTable;
     use psibase::*;
     use serde::Deserialize;
 
@@ -15,6 +18,20 @@ mod service {
 
     #[Object]
     impl Query {
+        async fn ranked_guilds(&self, fractal: AccountNumber) -> Vec<AccountNumber> {
+            let mut guilds: Vec<_> = RankingTable::read()
+                .get_index_pk()
+                .range(
+                    (fractal, u8::MIN, AccountNumber::new(0))
+                        ..=(fractal, u8::MAX, AccountNumber::new(u64::MAX)),
+                )
+                .collect();
+
+            guilds.sort_by_key(|x| x.index);
+
+            guilds.into_iter().map(|ranking| ranking.guild).collect()
+        }
+
         async fn example_thing(&self) -> String {
             "guilds::Wrapper::call().getExampleThing()".to_string()
         }
