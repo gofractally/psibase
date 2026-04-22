@@ -73,7 +73,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, StatusUpdate>> {
+        ) -> async_graphql::Result<EventConnection<StatusUpdate>> {
             let app = ExactAccountNumber::from_str(&app).unwrap();
             EventQuery::new("history.registry.appStatusChanged")
                 .condition(format!("app_account_id = '{}'", app))

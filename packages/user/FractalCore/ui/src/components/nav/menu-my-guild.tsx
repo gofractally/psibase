@@ -26,7 +26,7 @@ export const MyGuildMenu = ({
             />
             <Menu.SubItem
                 title="Evaluations"
-                path={`/guild/${account}/evaluations`}
+                path={`/guild/${account}/evaluations/upcoming`}
                 Icon={Calendar}
             />
             {roles && roles.isGuildAdmin && (

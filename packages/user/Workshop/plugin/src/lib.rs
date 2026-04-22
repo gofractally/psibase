@@ -12,7 +12,7 @@ use exports::workshop::plugin::{
 };
 use host::types::types::Error;
 use psibase::MethodNumber;
-use staged_tx::plugin::proposer::set_propose_latch;
+use transact::plugin::intf::set_propose_latch;
 use std::str::FromStr;
 
 use crate::trust::*;

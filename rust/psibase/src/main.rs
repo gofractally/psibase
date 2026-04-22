@@ -10,20 +10,20 @@ use futures::{
     FutureExt, StreamExt,
 };
 use indicatif::{ProgressBar, ProgressStyle};
-use psibase::services::{packages, sites, staged_tx, transact, x_packages};
+use psibase::services::{auth_delegate, packages, sites, staged_tx, transact, x_packages};
 use psibase::{
     account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
-    get_tapos_for_head, login_action, new_account_action, push_transaction,
-    push_transaction_optimistic, push_transactions, reg_server, set_auth_service_action,
-    set_code_action, set_key_action, sign_transaction, AccountNumber, Action, ActionFormatter,
-    AnyPrivateKey, AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber,
-    FileSetRegistry, FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta,
-    NullSchemaFetcher, PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull,
-    PackageOrigin, PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction,
-    SchemaFetcher, SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos,
-    TaposRefBlock, TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace,
-    Version,
+    get_tapos_for_head, login_action, new_account_action, new_account_key_action,
+    new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
+    push_transactions, reg_server, set_auth_service_action, set_code_action, set_key_action,
+    set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
+    AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
+    FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
+    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
+    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
+    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -103,6 +103,26 @@ struct SigArgs {
     proposer: Option<ExactAccountNumber>,
 }
 
+/// account-related Args
+#[derive(Args, Debug)]
+#[clap(long_about = None)]
+#[group(multiple = false)]
+struct AccountArgs {
+    /// Set the owner of the account
+    #[clap(short = 'o', long, value_name = "ACCOUNT")]
+    owner: Option<ExactAccountNumber>,
+
+    /// Set the account to authenticate using this key
+    #[clap(short = 'k', long, value_name = "KEY")]
+    key: Option<AnyPublicKey>,
+
+    /// The account won't be secured; anyone can authorize as this
+    /// account without signing. Caution: this option should not
+    /// be used on production or public chains.
+    #[clap(short = 'i', long)]
+    insecure: bool,
+}
+
 #[derive(Args, Debug)]
 
 struct BootArgs {
@@ -162,23 +182,14 @@ struct CreateArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
+    #[command(flatten)]
+    account_args: AccountArgs,
+
     /// Account to create
     account: ExactAccountNumber,
 
-    /// Set the account to authenticate using this key. Also works
-    /// if the account already exists.
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
-
-    /// The account won't be secured; anyone can authorize as this
-    /// account without signing. This option does nothing if the
-    /// account already exists. Caution: this option should not
-    /// be used on production or public chains.
-    #[clap(short = 'i', long)]
-    insecure: bool,
-
     /// Sender to use when creating the account.
-    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
+    #[clap(short = 'S', long, value_name = "SENDER", default_value = "root")]
     sender: ExactAccountNumber,
 }
 
@@ -193,19 +204,25 @@ struct ModifyArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
+    #[command(flatten)]
+    account_args: AccountArgs,
+
     /// Account to modify
     account: ExactAccountNumber,
 
-    /// Set the account to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
+    /// Create the account if it doesn't already exist
+    #[clap(short = 'c', long)]
+    create: bool,
 
-    /// Make the account insecure, even if it has been previously
-    /// secured. Anyone will be able to authorize as this account
-    /// without signing. Caution: this option should not be used
-    /// on production or public chains.
-    #[clap(short = 'i', long)]
-    insecure: bool,
+    /// Sender to use when creating a new account
+    #[clap(
+        short = 'S',
+        long,
+        value_name = "SENDER",
+        default_value = "root",
+        requires = "create"
+    )]
+    sender: ExactAccountNumber,
 }
 
 #[derive(Args, Debug)]
@@ -219,6 +236,9 @@ struct DeployArgs {
     #[command(flatten)]
     tx_args: TxArgs,
 
+    #[command(flatten)]
+    account_args: AccountArgs,
+
     /// Account to deploy service on
     account: ExactAccountNumber,
 
@@ -228,16 +248,9 @@ struct DeployArgs {
     /// Filename containing the schema
     schema: PathBuf,
 
-    /// Create the account if it doesn't exist. Also set the account to
-    /// authenticate using this key, even if the account already existed.
-    #[clap(short = 'c', long, value_name = "KEY")]
-    create_account: Option<AnyPublicKey>,
-
-    /// Create the account if it doesn't exist. The account won't be secured;
-    /// anyone can authorize as this account without signing. Caution: this option
-    /// should not be used on production or public chains.
-    #[clap(short = 'i', long)]
-    create_insecure_account: bool,
+    /// Create the account if it doesn't already exist
+    #[clap(short = 'c', long)]
+    create: bool,
 
     /// Register the service with HttpServer. This allows the service to host a
     /// website, serve RPC requests, and serve GraphQL requests.
@@ -245,7 +258,13 @@ struct DeployArgs {
     register_proxy: bool,
 
     /// Sender to use when creating the account.
-    #[clap(short = 'S', long, value_name = "SENDER", default_value = "accounts")]
+    #[clap(
+        short = 'S',
+        long,
+        value_name = "SENDER",
+        default_value = "root",
+        requires = "create"
+    )]
     sender: ExactAccountNumber,
 }
 
@@ -478,13 +497,15 @@ enum Command {
     /// Push a transaction to the chain
     Push(PushArgs),
 
-    /// Create or modify an account
+    /// Create an account
     Create(CreateArgs),
 
     /// Modify an account
+    #[command(mut_group("AccountArgs", |g| g.required(true)))]
     Modify(ModifyArgs),
 
     /// Deploy a service
+    #[command(mut_group("AccountArgs", |g| g.requires("create")))]
     Deploy(DeployArgs),
 
     /// Upload a file to a service
@@ -789,26 +810,32 @@ async fn push(mut args: PushArgs) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+impl AccountArgs {
+    fn create(&self, sender: AccountNumber, account: AccountNumber, actions: &mut Vec<Action>) {
+        if let Some(preapprove) = preapprove_action(sender, account) {
+            actions.push(preapprove)
+        }
+
+        if let Some(key) = &self.key {
+            actions.push(new_account_key_action(sender, account, key))
+        } else if self.insecure {
+            actions.push(new_account_action(sender, account));
+        } else {
+            actions.push(new_account_owned_action(
+                sender,
+                account,
+                self.owner.map_or(sender, |owner| owner.into()),
+            ));
+        }
+    }
+}
+
 async fn create(args: &CreateArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
-    if args.key.is_some() && args.insecure {
-        return Err(anyhow!("--key and --insecure cannot be used together"));
-    }
-    if args.key.is_none() && !args.insecure {
-        return Err(anyhow!("either --key or --insecure must be used"));
-    }
-
-    actions.push(new_account_action(args.sender.into(), args.account.into()));
-
-    if let Some(key) = &args.key {
-        actions.push(set_key_action(args.account.into(), &key));
-        actions.push(set_auth_service_action(
-            args.account.into(),
-            key.auth_service(),
-        ));
-    }
+    args.account_args
+        .create(args.sender.into(), args.account.into(), &mut actions);
 
     let progress = make_spinner();
     progress.set_message("Preparing transaction");
@@ -846,26 +873,32 @@ async fn modify(args: &ModifyArgs) -> Result<(), anyhow::Error> {
     let client = build_client(&args.node_args.proxy).await?;
     let mut actions: Vec<Action> = Vec::new();
 
-    if args.key.is_some() && args.insecure {
-        return Err(anyhow!("--key and --insecure cannot be used together"));
-    }
-    if args.key.is_none() && !args.insecure {
-        return Err(anyhow!("either --key or --insecure must be used"));
+    if args.create {
+        if let Some(preapprove) = preapprove_action(args.sender.into(), args.account.into()) {
+            actions.push(preapprove)
+        }
+        actions.push(
+            auth_delegate::Wrapper::pack_from(args.sender.into()).newAccount(
+                args.account.into(),
+                args.sender.into(),
+                false,
+            ),
+        )
     }
 
-    if let Some(key) = &args.key {
+    if args.account_args.insecure {
+        actions.push(set_auth_service_action(
+            args.account.into(),
+            account!("auth-any"),
+        ));
+    } else if let Some(key) = &args.account_args.key {
         actions.push(set_key_action(args.account.into(), &key));
         actions.push(set_auth_service_action(
             args.account.into(),
             key.auth_service(),
         ));
-    }
-
-    if args.insecure {
-        actions.push(set_auth_service_action(
-            args.account.into(),
-            account!("auth-any"),
-        ));
+    } else if let Some(owner) = args.account_args.owner {
+        actions.push(set_owner_action(args.account.into(), owner.into()))
     }
 
     let progress = make_spinner();
@@ -911,28 +944,15 @@ async fn deploy(args: &DeployArgs) -> Result<(), anyhow::Error> {
 
     let mut actions: Vec<Action> = Vec::new();
 
-    if args.create_account.is_some() && args.create_insecure_account {
-        return Err(anyhow!(
-            "--create-account and --create-insecure-account cannot be used together"
-        ));
-    }
-
-    if args.create_account.is_some() || args.create_insecure_account {
-        actions.push(new_account_action(args.sender.into(), args.account.into()));
-    }
-
     // This happens before the set_code as a safety measure.
     // If the set_code was first, and the user didn't actually
     // have the matching private key, then the transaction would
     // lock out the user. Putting this before the set_code causes
     // the set_code to require the private key, failing the transaction
     // if the user doesn't have it.
-    if let Some(key) = args.create_account.clone() {
-        actions.push(set_key_action(args.account.into(), &key));
-        actions.push(set_auth_service_action(
-            args.account.into(),
-            key.auth_service(),
-        ));
+    if args.create {
+        args.account_args
+            .create(args.sender.into(), args.account.into(), &mut actions)
     }
 
     actions.push(set_code_action(args.account.into(), wasm));
