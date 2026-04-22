@@ -45,38 +45,6 @@ function getWasiImports(): PluginImports {
     };
 }
 
-function buildPrivilegedImports(host: HostInterface): PluginImports {
-    return {
-        "supervisor:bridge/intf": {
-            sendRequest: (...args: unknown[]) =>
-                host.sendRequest(
-                    ...(args as Parameters<HostInterface["sendRequest"]>),
-                ),
-            serviceStack: () => host.getServiceStack(),
-            getRootDomain: () => host.getRootDomain(),
-            getChainId: () => host.getChainId(),
-            importKey: (privateKey: string) => host.importKey(privateKey),
-            signExplicit: (msg: Uint8Array, privateKey: string) =>
-                host.signExplicit(msg, privateKey),
-            sign: (msg: Uint8Array, publicKey: string) =>
-                host.sign(msg, publicKey),
-        },
-        "supervisor:bridge/database": {
-            get: (...args: unknown[]) =>
-                host.dbGet(...(args as Parameters<HostInterface["dbGet"]>)),
-            set: (...args: unknown[]) =>
-                host.dbSet(...(args as Parameters<HostInterface["dbSet"]>)),
-            remove: (...args: unknown[]) =>
-                host.dbRemove(
-                    ...(args as Parameters<HostInterface["dbRemove"]>),
-                ),
-        },
-        "supervisor:bridge/prompt": {
-            requestPrompt: () => host.requestPrompt(),
-        },
-    };
-}
-
 function buildProxiedImports(
     { interfaces: allInterfaces, funcs: freeFunctions }: Functions,
     host: HostInterface,
@@ -306,6 +274,44 @@ async function compileWasmComponent(
     };
 }
 
+function assertSupervisorImportsSatisfied(
+    service: string,
+    privileged: boolean,
+    importedFuncs: Functions,
+    imports: PluginImports,
+): void {
+    for (const intf of importedFuncs.interfaces) {
+        if (intf.namespace !== "supervisor") continue;
+
+        if (intf.funcs.length === 0) continue;
+
+        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
+
+        if (!privileged) {
+            throw new Error(
+                `Plugin ${service} imports ${key} but is not privileged`,
+            );
+        }
+
+        const provided = imports[key];
+        if (!provided) {
+            throw new Error(
+                `Plugin ${service} imports ${key}, but the host does not provide it`,
+            );
+        }
+
+        for (const func of intf.funcs) {
+            if (isResourceMethod(func.name)) continue;
+            const jsName = kebabToCamel(func.name);
+            if (typeof provided[jsName] !== "function") {
+                throw new Error(
+                    `Plugin ${service} imports ${key}.${func.name}, but the host does not provide it`,
+                );
+            }
+        }
+    }
+}
+
 export async function compilePlugin(
     service: string,
     privileged: boolean,
@@ -316,9 +322,15 @@ export async function compilePlugin(
     await shimsReady;
     const imports: PluginImports = {
         ...getWasiImports(),
-        ...(privileged ? buildPrivilegedImports(pluginHost) : {}),
+        ...(privileged ? pluginHost.bridge : {}),
         ...buildProxiedImports(api.importedFuncs, pluginHost),
     };
+    assertSupervisorImportsSatisfied(
+        service,
+        privileged,
+        api.importedFuncs,
+        imports,
+    );
     return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
 }
 
