@@ -313,8 +313,8 @@ set(SERVICE_DIR ${CMAKE_CURRENT_BINARY_DIR}/share/psibase/packages)
 set(PSIBASE_VERSION 0.23)
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Transact.psi
-    NAME Transact
+    OUTPUT ${SERVICE_DIR}/TransactService.psi
+    NAME TransactService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "All transactions enter the chain through this service"
     SERVICE transact
@@ -322,15 +322,41 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Transact-schema.json
         FLAGS isPrivileged
         SERVER r-transact
-        DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     SERVICE r-transact
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
         FLAGS isPrivileged
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Transact/src/postinstall.json
     DEPENDS wasm
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Transact.psi
+    NAME Transact
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "All transactions enter the chain through this service"
+    SERVICE transact
+        DATA ${Plugins_OUTPUT_FILE_transact} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "CpuLimit(^${PSIBASE_VERSION}.0)" "Db(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "VirtualServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/AccountsService.psi
+    NAME AccountsService
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "This service facilitates the creation of new accounts"
+    SERVICE accounts
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Accounts-schema.json
+        SERVER r-accounts
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
+    SERVICE r-accounts
+        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
+        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
+    DEPENDS wasm
+    PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -339,19 +365,12 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "This service facilitates the creation of new accounts"
     SERVICE accounts
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Accounts-schema.json
-        SERVER r-accounts
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_accounts} /plugin.wasm
-        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
-    SERVICE r-accounts
-        WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
-        SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
+        POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
-    DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "AuthAny(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -359,7 +378,7 @@ psibase_package(
     NAME Base64
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Base64 encoding and decoding"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE base64
         DATA ${Plugins_OUTPUT_FILE_base64} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -403,7 +422,7 @@ psibase_package(
     NAME Aes
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "AES encryption"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Kdf(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE aes
         DATA ${Plugins_OUTPUT_FILE_aes} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -414,7 +433,7 @@ psibase_package(
     NAME ClientData
     DESCRIPTION "Plugin for enabling simpler interactions with client-side data storage"
     VERSION ${PSIBASE_VERSION}.0
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Supervisor(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Supervisor(^${PSIBASE_VERSION}.0)"
     SERVICE clientdata
         DATA ${Plugins_OUTPUT_FILE_clientdata} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -428,7 +447,7 @@ psibase_package(
     SERVICE webcrypto
         DATA ${Plugins_OUTPUT_FILE_web_crypto} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Host.psi
@@ -444,7 +463,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_host_auth} /auth.wasm
         DATA ${Plugins_OUTPUT_FILE_host_crypto} /crypto.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
 )
 
 cargo_psibase_package(
@@ -579,14 +598,13 @@ cargo_psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthSig.psi
-    NAME AuthSig
+    OUTPUT ${SERVICE_DIR}/AuthSigService.psi
+    NAME AuthSigService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service using Botan to verify signatures"
     SERVICE auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthSig-schema.json
-        DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
         SERVER r-auth-sig
     SERVICE r-auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
@@ -596,8 +614,18 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/VerifySig-schema.json
         FLAGS isVerify
     DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthSig.psi
+    NAME AuthSig
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Auth service using Botan to verify signatures"
+    SERVICE auth-sig
+        DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AuthSigService(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi)
@@ -753,7 +781,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_sites} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "BrotliSvc(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "BrotliSvc(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -773,7 +801,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -829,7 +857,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -848,25 +876,32 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/Invite.psi
-    NAME Invite
+    OUTPUT ${SERVICE_DIR}/InviteService.psi
+    NAME InviteService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Create invite links to apps. An invite can facilitate the creation of one or more new accounts."
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)"
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json
         SERVER r-invite
         INIT
-        DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
     SERVICE r-invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RInvite-schema.json
     DEPENDS wasm
-    DEPENDS ${Plugins_DEP}
 )
 
-
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/Invite.psi
+    NAME Invite
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Create invite links to apps. An invite can facilitate the creation of one or more new accounts."
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Aes(^${PSIBASE_VERSION}.0)" "Base64(^${PSIBASE_VERSION}.0)" "Credentials(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    SERVICE invite
+        DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
+    DEPENDS ${Plugins_DEP}
+)
 
 psibase_package(
     OUTPUT ${SERVICE_DIR}/Supervisor.psi
@@ -883,7 +918,7 @@ psibase_package(
     NAME Permissions
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Handler for client-side permissions"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/postinstall.json
     SERVICE permissions
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
@@ -1206,19 +1241,21 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap Transact Homepage VirtualServer WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
           ${SERVICE_DIR}/Accounts.psi
+          ${SERVICE_DIR}/AccountsService.psi
           ${SERVICE_DIR}/Aes.psi
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
           ${SERVICE_DIR}/AuthSig.psi
+          ${SERVICE_DIR}/AuthSigService.psi
           ${SERVICE_DIR}/Base64.psi
           ${SERVICE_DIR}/Branding.psi
           ${SERVICE_DIR}/BrotliCodec.psi
@@ -1270,6 +1307,7 @@ install(
           ${SERVICE_DIR}/TokenSwap.psi
           ${SERVICE_DIR}/TokenUsers.psi
           ${SERVICE_DIR}/Transact.psi
+          ${SERVICE_DIR}/TransactService.psi
           ${SERVICE_DIR}/VirtualServer.psi
           ${SERVICE_DIR}/WebCrypto.psi
           ${SERVICE_DIR}/Workshop.psi

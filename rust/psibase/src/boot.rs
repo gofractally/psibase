@@ -52,7 +52,7 @@ fn genesis_transaction<R: Read + Seek>(
     for s in service_packages {
         s.get_genesis(&mut services)?;
         // Only install the transact service and its dependencies
-        essential.remove(s.get_accounts());
+        essential.remove(s.get_services());
         if essential.is_empty() {
             break;
         }
@@ -90,7 +90,7 @@ fn genesis_block_actions<R: Read + Seek>(
     let mut actions = Vec::new();
 
     for s in &mut service_packages[..] {
-        if s.get_accounts().contains(&transact::SERVICE) {
+        if s.get_services().contains(&transact::SERVICE) {
             s.reg_server(&mut actions)?;
             s.postinstall(schemas, &mut actions)?;
         }
@@ -133,7 +133,7 @@ pub fn get_initial_actions<
                 builder.push(act)?;
             }
         } else {
-            essential.remove(s.get_accounts());
+            essential.remove(s.get_services());
         }
     }
 

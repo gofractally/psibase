@@ -102,6 +102,7 @@ export class Plugin {
             if (e instanceof PluginDownloadFailed) {
                 return [];
             } else {
+                console.error(`Error fetching dependencies of plugin: ${pluginString(this.id)}`);
                 throw e;
             }
         }

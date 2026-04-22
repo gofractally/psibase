@@ -573,6 +573,9 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn get_accounts(&self) -> &[AccountNumber] {
         &self.meta.accounts
     }
+    pub fn get_services(&self) -> &[AccountNumber] {
+        &self.meta.services
+    }
     pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
         Ok(self.postinstall.clone())
     }
@@ -750,18 +753,6 @@ impl<R: Read + Seek> PackagedService<R> {
 
         let local = &self.meta.scope == "local";
 
-        for account in self.get_accounts() {
-            if !self.has_service(*account) {
-                if !local {
-                    services.push(accounts::SERVICE)
-                } else {
-                    Err(anyhow!(
-                        "Local packages do not support non-service accounts"
-                    ))?
-                }
-            }
-        }
-
         if !self.data.is_empty() {
             if !local {
                 services.push(sites::SERVICE);
@@ -894,6 +885,12 @@ impl<R: Read + Seek> PackagedService<R> {
     ) -> Result<(), anyhow::Error> {
         let mut visited_imports = HashMap::new();
         let mut imports = Vec::new();
+        for export in &self.meta.exports {
+            imports.push(dyn_ld::DynDep {
+                name: export.name.clone(),
+                service: export.service.clone(),
+            });
+        }
         for dep in &self.meta.depends {
             let Some((meta, _)) = packages.get_by_ref(dep)? else {
                 Err(anyhow!(
@@ -1373,7 +1370,6 @@ fn build_package_order_graph<R: Read + Seek>(
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut result: HashMap<String, Vec<String>> = HashMap::new();
     let mut provides_service: HashMap<AccountNumber, &Meta> = HashMap::new();
-    let mut has_postinstall = HashSet::new();
     let empty_deps = Vec::new();
     let mut service_deps = HashMap::new();
     // Build the graph of service dependencies. Service dependencies
@@ -1392,9 +1388,6 @@ fn build_package_order_graph<R: Read + Seek>(
                             new: package.name().to_string(),
                         })?
                     }
-                }
-                if !package.postinstall.is_empty() {
-                    has_postinstall.insert(package.name());
                 }
                 if !package.services.is_empty() {
                     // If a package provides any services, direct dependents can
@@ -1481,16 +1474,6 @@ fn build_package_order_graph<R: Read + Seek>(
                             &mut visited,
                             &mut all_required_packages,
                         )?;
-                    }
-                }
-                // The postinstall script can rely on direct dependencies'
-                // postinstall scripts having run first.
-                if has_postinstall.contains(&package.name()) {
-                    for dep in &package.meta().depends {
-                        if has_postinstall.contains(&dep.name.as_str()) && visited.insert(&dep.name)
-                        {
-                            all_required_packages.push(dep.name.clone());
-                        }
                     }
                 }
                 // Drop packages that are not being modified

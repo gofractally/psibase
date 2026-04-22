@@ -131,18 +131,6 @@ namespace psibase
          {
             bool local = package.meta.scope == "local";
 
-            for (auto account : package.meta.accounts)
-            {
-               if (!hasService(package, account))
-               {
-                  if (!local)
-                     services.push_back(Accounts::service);
-                  else
-                     abortMessage("Local packages do not support non-service accounts");
-                  break;
-               }
-            }
-
             if (!package.data.empty())
             {
                if (!local)
