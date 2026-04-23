@@ -133,7 +133,7 @@ export class Supervisor implements AppInterface {
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
-                getCallArgs("host", "prompt", "admin", "getActivePrompt", []),
+                getCallArgs("host", "prompt", "admin", "get-active-prompt", []),
             );
             if (promptDetails) {
                 this.embedder = promptDetails.activeApp;
@@ -152,7 +152,7 @@ export class Supervisor implements AppInterface {
         // Phase 2: Load the auth services for all connected accounts.
         // This sync call uses accounts:plugin (Phase 0, already instantiated).
         const auth_services: string[] = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
+            getCallArgs("accounts", "plugin", "admin", "get-auth-services", []),
         );
 
         const addtl_plugins: QualifiedPluginId[] = [];
@@ -208,7 +208,7 @@ export class Supervisor implements AppInterface {
         assertTruthy(this.parentOrigination.app, "Root app unrecognized");
 
         const user = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "getCurrentUser", []),
+            getCallArgs("accounts", "plugin", "api", "get-current-user", []),
         );
 
         if (!user) {
@@ -216,7 +216,7 @@ export class Supervisor implements AppInterface {
         }
 
         const token = this.supervisorCall(
-            getCallArgs("host", "auth", "api", "getActiveQueryToken", [
+            getCallArgs("host", "auth", "api", "get-active-query-token", [
                 this.parentOrigination.app,
                 user,
             ]),
@@ -253,7 +253,7 @@ export class Supervisor implements AppInterface {
         // future: call out to SubtleCrypto
         // future: store privateKey, indexed by pubKey
         return this.supervisorCall(
-            getCallArgs("webcrypto", "plugin", "api", "importKey", [
+            getCallArgs("webcrypto", "plugin", "api", "import-key", [
                 privateKey,
             ]),
         );
@@ -262,7 +262,7 @@ export class Supervisor implements AppInterface {
     signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
         // future: call out to SubtleCrypto
         return this.supervisorCall(
-            getCallArgs("webcrypto", "plugin", "api", "signExplicit", [
+            getCallArgs("webcrypto", "plugin", "api", "sign-explicit", [
                 msg,
                 privateKey,
             ]),
@@ -299,9 +299,9 @@ export class Supervisor implements AppInterface {
                 "host",
                 "types",
                 "api",
-                "PluginRef",
+                "plugin-ref",
                 args.handle,
-                "getService",
+                "get-service",
                 [],
             ),
         );
@@ -310,9 +310,9 @@ export class Supervisor implements AppInterface {
                 "host",
                 "types",
                 "api",
-                "PluginRef",
+                "plugin-ref",
                 args.handle,
-                "getPlugin",
+                "get-plugin",
                 [],
             ),
         );
@@ -321,9 +321,9 @@ export class Supervisor implements AppInterface {
                 "host",
                 "types",
                 "api",
-                "PluginRef",
+                "plugin-ref",
                 args.handle,
-                "getIntf",
+                "get-intf",
                 [],
             ),
         );
@@ -406,7 +406,7 @@ export class Supervisor implements AppInterface {
 
             // Starts the tx context.
             this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "startTx", []),
+                getCallArgs("transact", "plugin", "admin", "start-tx", []),
             );
 
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
@@ -415,7 +415,7 @@ export class Supervisor implements AppInterface {
 
             // Closes the current tx context. If actions were added, tx is submitted.
             const txResult = this.supervisorCall(
-                getCallArgs("transact", "plugin", "admin", "finishTx", []),
+                getCallArgs("transact", "plugin", "admin", "finish-tx", []),
             );
             if (txResult !== null && txResult !== undefined) {
                 console.warn(txResult);
