@@ -16,6 +16,13 @@ interface types {
 }
 
 
+interface admin-fractal {
+    use host:types/types.{error};
+
+    set-role-map: func(role-id: u8, guild: string) -> result<_, error>;
+
+}
+
 interface admin-guild {
     use host:types/types.{error};
 
@@ -35,6 +42,7 @@ interface admin-guild {
 
     set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
     set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
+
 }
 
 interface user-guild {
@@ -85,4 +93,5 @@ world imports {
     import user-guild;
     import admin-guild;
     import user-eval;
+    import admin-fractal;
 }

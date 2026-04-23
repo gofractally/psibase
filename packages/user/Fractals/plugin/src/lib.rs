@@ -56,7 +56,7 @@ define_trust! {
         None => [exile_member, get_group_users, init_token, set_dist_interval],
         Low => [close_eval, dist_token, start],
         Medium => [apply_guild, claim_rewards, delete_guild_invite, set_guild_app_info, invite_member, attest_membership_app, create_fractal, get_proposal, join, register, register_candidacy, unregister],
-        High => [attest, create_guild, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule],
+        High => [attest, create_guild, set_role_occupation, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -76,6 +76,20 @@ impl AdminFractal for FractallyPlugin {
         .packed();
         add_action_to_transaction(
             fractals::action_structs::create_frac::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_role_occupation)?;
+        let packed_args = fractals::action_structs::set_r_occ {
+            fractal: get_sender_app()?,
+            new_occupation: occupation.as_str().into(),
+            role_id,
+        }
+        .packed();
+        add_action_to_transaction(
+            fractals::action_structs::set_r_occ::ACTION_NAME,
             &packed_args,
         )
     }

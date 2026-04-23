@@ -28,6 +28,10 @@ pub fn judiciary() -> Result<(), Error> {
     get_fractal().and_then(|fractal| latch(&fractal.judiciary))
 }
 
+pub fn fractal() -> Result<(), Error> {
+    latch(&get_receiver())
+}
+
 pub fn guild(guild_account: &str) -> Result<(), Error> {
     latch(guild_account)
 }

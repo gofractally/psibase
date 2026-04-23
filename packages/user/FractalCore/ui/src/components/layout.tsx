@@ -7,8 +7,14 @@ import {
     SidebarProvider,
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
+import { useInitGuilds } from "@/hooks/use-init-guilds";
+
+
+
 
 export const Layout = () => {
+
+    useInitGuilds()
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />

@@ -57,7 +57,7 @@ define_trust! {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
         Medium => [apply_guild, claim_rewards, push_application, draft_application, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, create_guild, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
     }
 }
 
@@ -83,6 +83,27 @@ impl AdminFractal for FractalCorePlugin {
         propose::judiciary()?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
+    }
+
+    fn set_role_mapping(role_id: u8, guild: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_role_mapping)?;
+        propose::fractal()?;
+
+        GuildsPlugin::admin_fractal::set_role_map(role_id, &guild)
+    }
+
+    fn migrate_guilds(genesis_guild: String) -> Result<(), Error> {
+        GuildsPlugin::admin_guild::create_guild("Genesis", &genesis_guild)?;
+
+        Self::set_role_mapping(1, genesis_guild.clone())?;
+        Self::set_role_occupation(1, "guilds".to_string())
+    }
+
+    fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_role_occupation)?;
+        propose::legislature()?;
+
+        FractalsPlugin::admin_fractal::set_role_occupation(role_id, &occupation)
     }
 
     fn init_token() -> Result<(), Error> {

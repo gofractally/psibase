@@ -3,7 +3,9 @@ mod bindings;
 
 use std::str::FromStr;
 
+use bindings::exports::guilds::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::guilds::plugin::admin_guild::Guest as AdminGuild;
+
 use bindings::exports::guilds::plugin::api::Guest as Api;
 use bindings::exports::guilds::plugin::user_eval::Guest as UserEval;
 use bindings::exports::guilds::plugin::user_guild::Guest as UserGuild;
@@ -79,7 +81,7 @@ define_trust! {
             set_ranked_guilds,
             set_schedule,
             start_eval,
-            // set_example_thing,   // example only
+            set_role_map
         ],
     }
 }
@@ -95,6 +97,22 @@ impl graphql::guild::Guild {
 }
 
 struct GuildsPlugin;
+
+impl AdminFractal for GuildsPlugin {
+    fn set_role_map(role_id: u8, guild: String) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_role_map)?;
+
+        let packed_args = guilds::action_structs::set_role_map {
+            role_id,
+            guild: guild.as_str().into(),
+        }
+        .packed();
+        add_action_to_transaction(
+            guilds::action_structs::set_role_map::ACTION_NAME,
+            &packed_args,
+        )
+    }
+}
 
 impl UserEval for GuildsPlugin {
     fn register(guild_account: String) -> Result<(), Error> {

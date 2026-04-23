@@ -32,6 +32,21 @@ abstract class PluginInterface {
 class AdminFractal extends PluginInterface {
     protected override readonly _intf = "adminFractal" as const;
 
+    get setRoleOccupation() {
+        return this._call<[roleId: number, occupation: string]>("setRoleOccupation")
+    }
+
+
+
+    get migrateGuilds() {
+        return this._call<[guild: string]>("migrateGuilds")
+    }
+
+
+    get setRoleMapping() {
+        return this._call<[roleId: number, guild: string]>("setRoleMapping")
+    }
+
     get exileMember() {
         return this._call<[member: Account]>("exileMember");
     }

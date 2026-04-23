@@ -135,7 +135,7 @@ pub mod service {
     /// * `role_id` - Role ID for fractal
     /// * `new_occupation` - New occupation to set for role
     #[action]
-    fn set_occ_r(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
+    fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
         Role::get_assert(fractal, role_id).set_occupation(new_occupation);
     }
@@ -179,6 +179,10 @@ pub mod service {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
             .or(Role::get_by_account(account).map(|role| {
+                print!(
+                    "going to role account {} with role id {}",
+                    role.account, role.role_id
+                );
                 occu_wrapper::call_to(role.occupation).role_policy(role.account, role.role_id)
             }))
     }
@@ -229,6 +233,8 @@ pub mod service {
         }) {
             DynamicAuthPolicy::impossible()
         } else {
+            print!("XXXXXXXXXXXXXXXXXX");
+            print!("{:?}", policy);
             policy
         }
     }
