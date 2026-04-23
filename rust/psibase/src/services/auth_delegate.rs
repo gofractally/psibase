@@ -90,7 +90,9 @@ mod service {
 
     /// Create a new account with the specified name, owned by the specified `owner` account.
     ///
-    /// If the account already exists and is owned by the same `owner`, this action is a no-op.
+    /// Existing accounts will not be modified. If the `requireMatch` flag
+    /// is set, then the action will fail if the account exists but is not
+    /// already owned by the specified owner.
     #[action]
     fn newAccount(name: AccountNumber, owner: AccountNumber, require_match: bool) -> bool {
         unimplemented!()

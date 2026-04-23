@@ -52,7 +52,7 @@ mod service {
 
         let account = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
 
-        AuthDelegate::call().newAccount(account, SERVICE);
+        AuthDelegate::call().newAccount(account, SERVICE, true);
         Sites::call_as(account).setProxy(account!("homepage"));
 
         let table = NetworkNameTable::new();
