@@ -115,12 +115,4 @@ export class PluginLoader {
                 .map((p) => this.plugins.getPlugin(p).plugin.ready),
         );
     }
-
-    public async ensureAllInstantiated() {
-        await Promise.all(
-            this.allLoadedPlugins
-                .values()
-                .map((p) => this.plugins.getPlugin(p).plugin.instantiate()),
-        );
-    }
 }
