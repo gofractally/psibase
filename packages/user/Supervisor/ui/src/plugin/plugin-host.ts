@@ -7,7 +7,12 @@ import {
     assertTruthy,
 } from "@psibase/common-lib";
 
-import { HostInterface, HttpRequest, HttpResponse } from "../host-interface";
+import {
+    BridgeImports,
+    HostInterface,
+    HttpRequest,
+    HttpResponse,
+} from "../host-interface";
 import { Supervisor } from "../supervisor";
 import { chainId, isEmbedded } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
@@ -26,17 +31,6 @@ function convertBack(
     headers: Array<[string, string]>,
 ): { key: string; value: string }[] {
     return headers.map(([key, value]) => ({ key, value }));
-}
-
-function kebabToCamel<T extends { intf?: string }>(args: T): T {
-    return {
-        ...args,
-        intf: args.intf ? kebabToCamelStr(args.intf) : args.intf,
-    };
-}
-
-function kebabToCamelStr(str: string): string {
-    return str.replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase());
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -61,6 +55,13 @@ enum storageDuration {
 //   identity is automatically managed and plugins may not self-report their identity.
 export class PluginHost implements HostInterface {
     private supervisor: Supervisor;
+
+    public bridge: BridgeImports;
+
+    constructor(supervisor: Supervisor) {
+        this.supervisor = supervisor;
+        this.bridge = this.privilegedPluginImports();
+    }
 
     private recoverableError(message: string): RecoverableErrorPayload {
         return {
@@ -87,11 +88,20 @@ export class PluginHost implements HostInterface {
         }
     }
 
+    private getStorage(duration: number): Storage {
+        return duration === storageDuration.session
+            ? sessionStorage
+            : localStorage;
+    }
+
     // A synchronous web request.
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
     //    from BytecodeAlliance's JCO project.
-    public sendRequest(req: HttpRequest, withCredentials: boolean = false): HttpResponse {
+    private sendRequest(
+        req: HttpRequest,
+        withCredentials: boolean = false,
+    ): HttpResponse {
         try {
             const xhr = new XMLHttpRequest();
             xhr.open(req.method.toString(), req.uri, false);
@@ -157,17 +167,7 @@ export class PluginHost implements HostInterface {
         }
     }
 
-    private getStorage(duration: number): Storage {
-        return duration === storageDuration.session
-            ? sessionStorage
-            : localStorage;
-    }
-
-    constructor(supervisor: Supervisor) {
-        this.supervisor = supervisor;
-    }
-
-    dbGet(duration: number, key: string): Uint8Array | null {
+    private dbGet(duration: number, key: string): Uint8Array | null {
         const storage = this.getStorage(duration);
         const storedValue = storage.getItem(key);
         if (storedValue === null) {
@@ -176,25 +176,57 @@ export class PluginHost implements HostInterface {
         return base64ToBytes(storedValue);
     }
 
-    dbSet(duration: number, key: string, value: Uint8Array): void {
+    private dbSet(duration: number, key: string, value: Uint8Array): void {
         const storage = this.getStorage(duration);
         const base64Value = bytesToBase64(value);
         storage.setItem(key, base64Value);
     }
 
-    dbRemove(duration: number, key: string): void {
+    private dbRemove(duration: number, key: string): void {
         const storage = this.getStorage(duration);
         storage.removeItem(key);
     }
 
-    getChainId(): string {
-        assertTruthy(chainId, "Chain ID not initialized");
-        return chainId;
+    private privilegedPluginImports(): BridgeImports {
+        return {
+            "supervisor:bridge/intf": {
+                sendRequest: (req, withCredentials) =>
+                    this.sendRequest(req, withCredentials),
+                serviceStack: () => this.supervisor.getServiceStack(),
+                getRootDomain: () => this.supervisor.getRootDomain(),
+                getChainId: () => {
+                    assertTruthy(chainId, "Chain ID not initialized");
+                    return chainId;
+                },
+                sign: (msg, publicKey) => this.supervisor.sign(msg, publicKey),
+                signExplicit: (msg, privateKey) =>
+                    this.supervisor.signExplicit(msg, privateKey),
+                importKey: (privateKey) =>
+                    this.supervisor.importKey(privateKey),
+            },
+            "supervisor:bridge/database": {
+                get: (duration, key) => this.dbGet(duration, key),
+                set: (duration, key, value) => this.dbSet(duration, key, value),
+                remove: (duration, key) => this.dbRemove(duration, key),
+            },
+            "supervisor:bridge/prompt": {
+                requestPrompt: () => {
+                    if (isEmbedded) {
+                        throw this.recoverableError(
+                            "Cannot prompt in embedded mode",
+                        );
+                    }
+                    const err = this.recoverableError("user_prompt_request");
+                    err.code = REDIRECT_ERROR_CODE;
+                    throw err;
+                },
+            },
+        };
     }
 
-    // Interface for the autogenerated proxy package
+    // Args arrive in canonical WIT kebab-case from loader.ts.
     syncCall(args: QualifiedFunctionCallArgs) {
-        return this.supervisor.call(kebabToCamel(args));
+        return this.supervisor.call(args);
     }
 
     syncCallDyn(args: QualifiedDynCallArgs) {
@@ -202,36 +234,6 @@ export class PluginHost implements HostInterface {
     }
 
     syncCallResource(args: QualifiedResourceCallArgs) {
-        return this.supervisor.callResource(kebabToCamel(args));
-    }
-
-    getServiceStack(): string[] {
-        return this.supervisor.getServiceStack();
-    }
-
-    getRootDomain(): string {
-        return this.supervisor.getRootDomain();
-    }
-
-    requestPrompt(): void {
-        if (isEmbedded) {
-            throw this.recoverableError("Cannot prompt in embedded mode");
-        } else {
-            const err = this.recoverableError("user_prompt_request");
-            err.code = REDIRECT_ERROR_CODE;
-            throw err;
-        }
-    }
-
-    importKey(privateKey: string): string {
-        return this.supervisor.importKey(privateKey);
-    }
-
-    signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
-        return this.supervisor.signExplicit(msg, privateKey);
-    }
-
-    sign(msg: Uint8Array, publicKey: string): Uint8Array {
-        return this.supervisor.sign(msg, publicKey);
+        return this.supervisor.callResource(args);
     }
 }
