@@ -158,7 +158,7 @@ impl Chain {
             &None,
             PRODUCER_ACCOUNT,
             false,
-            TimePointSec { seconds: 10 },
+            TimePointSec { seconds: 120 },
             &mut services[..],
             COMPRESSION_LEVEL,
         )
