@@ -1398,16 +1398,14 @@ namespace psio
       }
    }  // namespace detail
 
-   // T is the actual type
-   // ContextT is the type declared in the GraphQL document
-   template <typename ContextT, typename T, typename OS, typename E>
-   auto gql_query_inline(ContextT*,
-                         const T&    value,
-                         gql_stream& input_stream,
-                         OS&         output_stream,
-                         const E&    error,
-                         bool        allow_unknown_members,
-                         bool&       first)
+   // Processes a GraphQL selection set `{ ... }`, dispatching each field to a resolver function.
+   template <typename OS, typename E, typename Resolver>
+   auto gql_query_inline(std::string_view type_name,
+                         const Resolver&  resolve,
+                         gql_stream&      input_stream,
+                         OS&              output_stream,
+                         const E&         error,
+                         bool&            first)
    {
       if (input_stream.current_punctuator != '{')
          return error("expected {");
@@ -1424,11 +1422,10 @@ namespace psio
             if (input_stream.current_value != "on")
                return error("not implemented: fragments");
             input_stream.skip();
-            if (input_stream.current_value == generate_gql_partial_name((T*)nullptr, false))
+            if (input_stream.current_value == type_name)
             {
                input_stream.skip();
-               if (!gql_query_inline((T*)nullptr, value, input_stream, output_stream, error,
-                                     allow_unknown_members, first))
+               if (!gql_query_inline(type_name, resolve, input_stream, output_stream, error, first))
                   return false;
             }
             else
@@ -1443,7 +1440,6 @@ namespace psio
          {
             break;
          }
-         bool ok         = true;
          auto alias      = input_stream.current_value;
          auto field_name = alias;
          input_stream.skip();
@@ -1456,14 +1452,33 @@ namespace psio
             input_stream.skip();
          }
 
-         bool found =
-             psio::get_data_member<T>(field_name,
-                                      [&](auto member)
-                                      {
-                                         detail::write_field_name(alias, first, output_stream);
-                                         ok &= gql_query(value.*member, input_stream, output_stream,
-                                                         error, allow_unknown_members);
-                                      });
+         if (!resolve(field_name, alias))
+            return false;
+      }
+      if (input_stream.current_punctuator != '}')
+         return error("expected }");
+      input_stream.skip();
+      return true;
+   }
+
+   // Build a field resolver for reflected type T that tries data members then member functions.
+   template <typename T, typename OS, typename E>
+   auto make_field_resolver(const T&    value,
+                            gql_stream& input_stream,
+                            OS&         output_stream,
+                            const E&    error,
+                            bool&       first)
+   {
+      return [&](std::string_view field_name, std::string_view alias) -> bool
+      {
+         bool ok    = true;
+         bool found = psio::get_data_member<T>(
+             field_name,
+             [&](auto member)
+             {
+                detail::write_field_name(alias, first, output_stream);
+                ok &= gql_query(value.*member, input_stream, output_stream, error, false);
+             });
          if (!found)
          {
             psio::get_member_function<T>(
@@ -1475,27 +1490,30 @@ namespace psio
                       found = true;
                       detail::write_field_name(alias, first, output_stream);
                       ok &= gql_query_fn(value, names.subspan(1), member, input_stream,
-                                         output_stream, error, allow_unknown_members);
+                                         output_stream, error, false);
                    }
                 });
          }
-
-         if (!ok)
-            return false;
          if (!found)
-         {
-            if (!allow_unknown_members)
-               return error((std::string)field_name + " not found");
-            if (!gql_skip_args(input_stream, error))
-               return false;
-            if (!gql_skip_selection_set(input_stream, error))
-               return false;
-         }
-      }
-      if (input_stream.current_punctuator != '}')
-         return error("expected }");
-      input_stream.skip();
-      return true;
+            return error((std::string)field_name + " not found");
+         return ok;
+      };
+   }
+
+   // T is the actual type
+   // ContextT is the type declared in the GraphQL document
+   template <typename ContextT, typename T, typename OS, typename E>
+   auto gql_query_inline(ContextT*,
+                         const T&    value,
+                         gql_stream& input_stream,
+                         OS&         output_stream,
+                         const E&    error,
+                         bool        allow_unknown_members,
+                         bool&       first)
+   {
+      return gql_query_inline(generate_gql_partial_name((T*)nullptr, false),
+                              make_field_resolver(value, input_stream, output_stream, error, first),
+                              input_stream, output_stream, error, first);
    }
 
    template <typename T, typename OS, typename E>

@@ -95,8 +95,10 @@ namespace SystemService
 
       /// Create a new account with the specified name, owned by the specified `owner` account.
       ///
-      /// If the account already exists and is owned by the same `owner`, this action is a no-op.
-      void newAccount(psibase::AccountNumber name, psibase::AccountNumber owner);
+      /// Existing accounts will not be modified. If the `requireMatch` flag
+      /// is set, then the action will fail if the account exists but is not
+      /// already owned by the specified owner.
+      bool newAccount(psibase::AccountNumber name, psibase::AccountNumber owner, bool requireMatch);
 
       /// Gets the owner account of the specified account
       psibase::AccountNumber getOwner(psibase::AccountNumber account);
@@ -110,7 +112,7 @@ namespace SystemService
                 method(isAuthSys, sender, authorizers, method, authSet),
                 method(isRejectSys, sender, rejecters, method, authSet),
                 method(setOwner, owner),
-                method(newAccount, name, owner),
+                method(newAccount, name, owner, requireMatch),
                 method(getOwner, owner)
                 //
    )

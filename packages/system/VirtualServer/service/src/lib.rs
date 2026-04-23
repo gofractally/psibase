@@ -105,7 +105,7 @@ mod service {
         match resource_id {
             CPU => "CPU",
             NET => "Net",
-            _ => "Unknown",
+            _ => "UnknownResource",
         }
     }
 
@@ -113,7 +113,7 @@ mod service {
         match resource_id {
             CPU => "ns",
             NET => "bytes",
-            _ => "Unknown",
+            _ => "UnknownUnit",
         }
     }
 
@@ -138,7 +138,6 @@ mod service {
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
-        events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("block_summary"), 0);
 
         // TODO: Iterate over the system service tables and aggregate code rows as pre-allocated objective disk space
         // (the accounts service init already does such iterating, use as reference.)
@@ -564,7 +563,7 @@ mod service {
         if block_num % 10 == 0 {
             Wrapper::emit()
                 .history()
-                .block_summary(block_num, net_usage, cpu_usage);
+                .block_summary(net_usage, cpu_usage);
         }
     }
 
@@ -641,7 +640,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 }
 
 #[cfg(test)]

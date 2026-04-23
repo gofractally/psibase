@@ -98,7 +98,25 @@ export class Supervisor implements AppInterface {
         }
     }
 
-    private async preload(plugins: QualifiedPluginId[]) {
+    private preloadLock: Promise<void> = Promise.resolve();
+
+    // This step loads the full plugin tree (downloading + parsing + JCO transpiling)
+    //
+    // This does not instantiate wasms, with the exception of core system plugin wasms,
+    //   which are instantiated as they are required to be executed during the preloading
+    //   of all other plugins.
+    //
+    // The caller should dispose of all instantiated plugins after the entry function
+    //  finishes.
+    private preload(plugins: QualifiedPluginId[]): Promise<void> {
+        const myPreload = this.preloadLock
+            .catch(() => {})
+            .then(() => this.doPreload(plugins));
+        this.preloadLock = myPreload.catch(() => {});
+        return myPreload;
+    }
+
+    private async doPreload(plugins: QualifiedPluginId[]) {
         await chainIdPromise;
 
         if (plugins.length === 0) {
@@ -109,6 +127,9 @@ export class Supervisor implements AppInterface {
         this.loader.trackPlugins([...systemPlugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
+
+        // Required to instantiate system plugins to execute the plugin calls below
+        await this.plugins.instantiateAll();
 
         if (isEmbedded) {
             const promptDetails = await this.supervisorCall(
@@ -122,17 +143,14 @@ export class Supervisor implements AppInterface {
 
         setQueryToken(this.getActiveQueryToken());
 
-        // Loading dynamic plugins may require calling into the standard plugins
-        //   to look up information to know what plugin to load. Therefore,
-        //   loading happens in two phases: Load all regular plugins, then load
-        //   all dynamic plugins.
-
-        // Phase 1: Loads plugins requested by an app
+        // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
+        // The sync call to getAuthServices below only touches Phase 0 plugins.
         this.loader.trackPlugins([...plugins]);
         await this.loader.processPlugins();
         await this.loader.awaitReady();
 
-        // Phase 2: Load the auth services for all connected accounts
+        // Phase 2: Load the auth services for all connected accounts.
+        // This sync call uses accounts:plugin (Phase 0, already instantiated).
         const auth_services: string[] = this.supervisorCall(
             getCallArgs("accounts", "plugin", "admin", "getAuthServices", []),
         );
@@ -206,12 +224,20 @@ export class Supervisor implements AppInterface {
         return token;
     }
 
+    // Cleanly tear down the supervisor, free any resources, etc.
+    private shutdown(): string[] {
+        return this.plugins.disposeAll();
+    }
+
     constructor() {
-        this.parser = parser();
-
         this.plugins = new Plugins(this);
-
+        this.parser = parser();
         this.loader = new PluginLoader(this.plugins);
+
+        // Without this, in some browsers (e.g. chromium), stale supervisor iframes persist
+        //  after navigation events. This ensures that after navigations, dev tools look
+        //  clean.
+        window.addEventListener("pagehide", () => this.shutdown());
     }
 
     getRootDomain(): string {
@@ -250,14 +276,12 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    // Manages callstack and calls plugins
     call(args: QualifiedFunctionCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
 
         const { service, plugin, intf, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
-        // Manage the callstack and call the plugin
         this.context.stack.push(args.service, toString(args));
         let ret: any;
         try {
@@ -314,7 +338,6 @@ export class Supervisor implements AppInterface {
         const { service, plugin, intf, type, handle, method, params } = args;
         const p = this.plugins.getAssertPlugin({ service, plugin });
 
-        // Manage the callstack and call the plugin
         this.context.stack.push(service, toString(args));
         let ret: any;
         try {
@@ -336,6 +359,8 @@ export class Supervisor implements AppInterface {
             this.replyToParent(id, json);
         } catch (e) {
             this.replyToParent(id, e);
+        } finally {
+            this.plugins.disposeAll();
         }
     }
 
@@ -350,6 +375,8 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             console.error("TODO: Return an error to the caller.");
             console.error(e);
+        } finally {
+            this.plugins.disposeAll();
         }
     }
 
@@ -363,17 +390,17 @@ export class Supervisor implements AppInterface {
             await networkNamePromise;
             this.setParentOrigination(callerOrigin);
 
-            // Wait to load the full plugin tree (a plugin and all its dependencies, recursively).
-            // This is the time-intensive step. It includes: downloading, parsing, generating import fills,
-            //   transpiling the component, bundling with rollup, and importing & instantiating the es module
-            //   in memory.
-            // UIs should use `preloadPlugins` to decouple this task from the actual call to the plugin.
+            // This is the time-intensive step. It includes: downloading, parsing, and transpiling the
+            //   each plugin component. Everything needed to prepare for instantiation and execution.
+            // UIs can use `preloadPlugins` to decouple this task from the actual call to the plugin.
             await this.preload([
                 {
                     service: args.service,
                     plugin: args.plugin,
                 },
             ]);
+
+            await this.plugins.instantiateAll();
 
             this.context = this.getCallContext();
 
@@ -401,9 +428,6 @@ export class Supervisor implements AppInterface {
         } catch (e) {
             const err = getRecoverableError(e);
             if (err) {
-                // It is only recoverable at intermediate steps in the callstack.
-                // Since it is the final return value, it is no longer recoverable and is
-                //   converted to a PluginError to be handled by the client.
                 let newError;
                 if (err.code === REDIRECT_ERROR_CODE) {
                     newError = new RedirectErrorObject(
@@ -419,6 +443,8 @@ export class Supervisor implements AppInterface {
             }
 
             this.context = undefined;
+        } finally {
+            this.plugins.disposeAll();
         }
     }
 }

@@ -92,7 +92,7 @@ mod service {
     ///
     /// If the account already exists and is owned by the same `owner`, this action is a no-op.
     #[action]
-    fn newAccount(name: AccountNumber, owner: AccountNumber) {
+    fn newAccount(name: AccountNumber, owner: AccountNumber, require_match: bool) -> bool {
         unimplemented!()
     }
 }

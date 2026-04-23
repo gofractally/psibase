@@ -5,7 +5,7 @@ use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRe
 use crate::bindings::transact::plugin::hook_handlers::*;
 use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
-use crate::{ActionAuthPlugins, ActionClaims, ActionMetadata, ActionSenderHook, TxTransformLabel};
+use crate::{ActionAuthPlugins, ActionClaims, ActionSenderHook, ProposeLatch};
 use psibase::fracpack::Pack;
 use psibase::{AccountNumber, Hex, MethodNumber, SignedTransaction, Tapos, Transaction};
 use serde::Serialize;
@@ -23,6 +23,9 @@ pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
 }
 
 pub fn get_action_sender(service: &str, method: &str) -> Result<String, HostTypes::Error> {
+    if let Some(sender) = ProposeLatch::subsequent_action_sender() {
+        return Ok(sender);
+    }
     if let Some(plugin) = ActionSenderHook::get() {
         if let Some(s) = on_actions_sender(
             PluginRef::new(plugin.as_str(), "plugin", "transact-hook-actions-sender"),
@@ -54,43 +57,6 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(data);
     hasher.finalize().into()
-}
-
-pub fn transform_actions(actions: Vec<ActionMetadata>) -> Result<Vec<Action>, HostTypes::Error> {
-    if actions.len() == 0 {
-        return Ok(vec![]);
-    }
-
-    if !TxTransformLabel::has() {
-        let actions: Vec<Action> = actions.into_iter().map(|a| a.action).collect();
-        return Ok(actions);
-    }
-
-    let action_groups: Vec<ActionGroup> = partition_by_label(actions);
-    let transformer_plugin = TxTransformLabel::get_transformer_plugin().unwrap();
-
-    let mut actions: Vec<Action> = vec![];
-
-    for group in action_groups {
-        // TODO: Hooks should take a PluginRef&
-        let plugin_ref = PluginRef::new(
-            transformer_plugin.as_str(),
-            "plugin",
-            "transact-hook-tx-transform",
-        );
-
-        let transformed_actions =
-            on_tx_transform(plugin_ref, group.label.as_deref(), &group.actions)?;
-        if transformed_actions.is_some() {
-            actions.extend(transformed_actions.unwrap());
-        } else {
-            actions.extend(group.actions);
-        }
-    }
-
-    TxTransformLabel::clear();
-
-    Ok(actions)
 }
 
 // The auth service can parameterize what claims to add to a transaction by both the sender
@@ -262,103 +228,5 @@ impl Publish for SignedTransaction {
             endpoint: "/push_transaction".to_string(),
             body: HostTypes::BodyTypes::Bytes(self.packed()),
         })?)
-    }
-}
-
-pub struct ActionGroup {
-    pub label: Option<String>,
-    pub actions: Vec<Action>,
-}
-
-pub fn partition_by_label(actions: Vec<ActionMetadata>) -> Vec<ActionGroup> {
-    let mut groups: Vec<ActionGroup> = Vec::new();
-    let mut current_actions: Vec<Action> = Vec::new();
-    let mut last_label = None;
-
-    for action_meta in actions {
-        let label = action_meta.label;
-
-        if last_label != label && !current_actions.is_empty() {
-            groups.push(ActionGroup {
-                label: last_label,
-                actions: current_actions,
-            });
-            current_actions = Vec::new();
-        }
-
-        current_actions.push(action_meta.action);
-        last_label = label;
-    }
-
-    if !current_actions.is_empty() {
-        groups.push(ActionGroup {
-            label: last_label,
-            actions: current_actions,
-        });
-    }
-
-    groups
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn make_action() -> Action {
-        Action {
-            sender: "user1".to_string(),
-            service: "service1".to_string(),
-            method: "method1".to_string(),
-            raw_data: vec![],
-        }
-    }
-
-    fn make_action_metadata(label: Option<&str>) -> ActionMetadata {
-        ActionMetadata {
-            action: make_action(),
-            label: label.map(|s| s.to_string()),
-        }
-    }
-
-    fn check_group(group: &ActionGroup, label: Option<&str>, size: usize) {
-        assert_eq!(group.label, label.map(|s| s.to_string()));
-        assert_eq!(group.actions.len(), size);
-    }
-
-    #[test]
-    fn test_partition_by_label_with_split_labels() {
-        let groups = partition_by_label(vec![
-            make_action_metadata(Some("label1")),
-            make_action_metadata(Some("label1")),
-            make_action_metadata(Some("label2")),
-            make_action_metadata(Some("label1")),
-        ]);
-
-        assert_eq!(groups.len(), 3);
-        check_group(&groups[0], Some("label1"), 2);
-        check_group(&groups[1], Some("label2"), 1);
-        check_group(&groups[2], Some("label1"), 1);
-    }
-
-    #[test]
-    fn test_partition_by_label_with_no_labels() {
-        let groups = partition_by_label(vec![
-            make_action_metadata(None),
-            make_action_metadata(None),
-            make_action_metadata(Some("label1")),
-            make_action_metadata(None),
-            make_action_metadata(Some("label1")),
-            make_action_metadata(Some("label2")),
-            make_action_metadata(Some("label2")),
-            make_action_metadata(None),
-        ]);
-
-        assert_eq!(groups.len(), 6);
-        check_group(&groups[0], None, 2);
-        check_group(&groups[1], Some("label1"), 1);
-        check_group(&groups[2], None, 1);
-        check_group(&groups[3], Some("label1"), 1);
-        check_group(&groups[4], Some("label2"), 2);
-        check_group(&groups[5], None, 1);
     }
 }

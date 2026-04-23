@@ -43,9 +43,12 @@ export interface QualifiedOriginationData extends OriginationData {
     app: string;
 }
 
-export const assert = (condition: boolean, errorMessage: string): void => {
+export function assert(
+    condition: unknown,
+    errorMessage: string,
+): asserts condition {
     if (!condition) throw new Error(errorMessage);
-};
+}
 
 let modulePromise: Promise<any>;
 
@@ -56,9 +59,9 @@ export const parser = (): Promise<any> => {
             "supervisor",
             "/common/component_parser.wasm",
         );
-        modulePromise = wasmFromUrl(url).then((bytes) =>
-            loadBasic(bytes, "component-parser.js"),
-        );
+        modulePromise = wasmFromUrl(url)
+            .then((bytes) => loadBasic(bytes, "component-parser.js"))
+            .then(({ exports }) => exports);
     }
     return modulePromise;
 };
