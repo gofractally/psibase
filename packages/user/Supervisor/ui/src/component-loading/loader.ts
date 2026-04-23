@@ -1,4 +1,9 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
+import * as cliNs from "@bytecodealliance/preview2-shim/cli";
+import * as clocksNs from "@bytecodealliance/preview2-shim/clocks";
+import * as filesystemNs from "@bytecodealliance/preview2-shim/filesystem";
+import * as ioNs from "@bytecodealliance/preview2-shim/io";
+import * as randomNs from "@bytecodealliance/preview2-shim/random";
 
 import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
@@ -7,28 +12,16 @@ import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
-// The preview2-shim type definitions use `export type *` which are type-only.
-// The runtime modules have the actual values, so we import as `any`.
-const shimModules: Record<string, any> = {};
-
-async function loadShims(): Promise<void> {
-    const [cli, clocks, filesystem, io, random] = await Promise.all([
-        import("@bytecodealliance/preview2-shim/cli"),
-        import("@bytecodealliance/preview2-shim/clocks"),
-        import("@bytecodealliance/preview2-shim/filesystem"),
-        import("@bytecodealliance/preview2-shim/io"),
-        import("@bytecodealliance/preview2-shim/random"),
-    ]);
-    Object.assign(shimModules, { cli, clocks, filesystem, io, random });
-}
-
-const shimsReady = loadShims();
+const cli = cliNs as any;
+const clocks = clocksNs as any;
+const filesystem = filesystemNs as any;
+const io = ioNs as any;
+const random = randomNs as any;
 
 // Whitelisted WASI imports. Each entry maps a WIT interface to its shim object.
 // As we discover that plugins need additional WASI imports, we can add them,
 // but each added shim should be validated.
 function getWasiImports(): PluginImports {
-    const { cli, clocks, filesystem, io, random } = shimModules;
     return {
         "wasi:cli/environment": cli.environment,
         "wasi:cli/exit": cli.exit,
@@ -319,7 +312,6 @@ export async function compilePlugin(
     pluginHost: HostInterface,
     api: ComponentAPI,
 ): Promise<CompiledPlugin> {
-    await shimsReady;
     const imports: PluginImports = {
         ...getWasiImports(),
         ...(privileged ? pluginHost.bridge : {}),
@@ -341,7 +333,6 @@ export async function loadBasic(
     wasmBytes: Uint8Array,
     debugFileName: string,
 ): Promise<InstantiateResult> {
-    await shimsReady;
     const compiled = await compileWasmComponent(
         wasmBytes,
         getWasiImports(),
