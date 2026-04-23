@@ -444,8 +444,7 @@ impl<R: Read + Seek> PackagedService<R> {
                 vmType: 0,
                 vmVersion: 0,
                 code: read(&mut self.archive.by_index(*index)?)?.into(),
-            });
-            println!("{}: {}", account, services.last().unwrap().code.len());
+            })
         }
         Ok(())
     }
