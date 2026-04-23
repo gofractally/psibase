@@ -51,6 +51,7 @@ fn genesis_transaction<R: Read + Seek>(
     let mut essential = EssentialServices::new();
     for s in service_packages {
         s.get_genesis(&mut services)?;
+        println!("genesis package: {}", s.name());
         // Only install the transact service and its dependencies
         essential.remove(s.get_accounts());
         if essential.is_empty() {
