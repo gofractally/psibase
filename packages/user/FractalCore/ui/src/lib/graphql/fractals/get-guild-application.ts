@@ -13,7 +13,7 @@ export const getGuildApplication = async (
     const res = await graphql(
         `
             {
-                guildApplication(guild: ${guildAccount}, applicant: "${applicant}") {
+                guildApplication(guild: "${guildAccount}", applicant: "${applicant}") {
                         applicant
                         extraInfo
                         createdAt

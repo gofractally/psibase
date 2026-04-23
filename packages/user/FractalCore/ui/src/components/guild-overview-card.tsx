@@ -4,6 +4,7 @@ import z from "zod";
 
 import { SetGuildMetadataModal } from "@/pages/guilds/components/set-guild-metadata-modal";
 
+import { useGuildMemberRoles } from "@/hooks/fractals/use-guild-member-roles";
 import { useGuild } from "@/hooks/use-guild";
 import { Guild } from "@/lib/graphql/fractals/get-guild";
 
@@ -32,6 +33,7 @@ export const GuildOverviewCard = ({
     guildAccount?: string;
 }) => {
     const { data: guild, isPending, error } = useGuild(guildAccount);
+    const { data: roles } = useGuildMemberRoles(guildAccount);
     const leadershipStatus = getLeadershipStatus(guild);
     const [metadataModalOpen, setMetadataModalOpen] = useState(false);
 
@@ -73,14 +75,16 @@ export const GuildOverviewCard = ({
                     name={guild?.displayName}
                     account={guild?.account}
                 />
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMetadataModalOpen(true)}
-                    aria-label="Edit guild metadata"
-                >
-                    <Pencil className="size-4" />
-                </Button>
+                {roles?.isGuildAdmin && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setMetadataModalOpen(true)}
+                        aria-label="Edit guild metadata"
+                    >
+                        <Pencil className="size-4" />
+                    </Button>
+                )}
             </CardHeader>
             <SetGuildMetadataModal
                 show={metadataModalOpen}

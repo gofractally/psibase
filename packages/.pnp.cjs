@@ -2908,7 +2908,6 @@ const RAW_RUNTIME_STATE =
           ["@bytecodealliance/preview2-shim", "npm:0.17.6"],\
           ["@psibase/common-lib", "workspace:user/CommonApi/common/packages/common-lib"],\
           ["@psibase/supervisor-ui", "workspace:user/Supervisor/ui"],\
-          ["@rollup/browser", "npm:4.55.1"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.16"],\
           ["@types/node", "npm:22.19.6"],\
           ["@types/react", "npm:19.2.8"],\

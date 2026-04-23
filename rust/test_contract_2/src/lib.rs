@@ -6,7 +6,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::*;
     use psibase::*;
     use serde::{Deserialize, Serialize};
     use serde_aux::field_attributes::deserialize_number_from_string;
@@ -133,7 +133,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> Result<Connection<u64, AddEvent>, async_graphql::Error> {
+        ) -> Result<EventConnection<AddEvent>, async_graphql::Error> {
             let mut q = EventQuery::new("history.example.add")
                 .first(first)
                 .last(last)
@@ -153,7 +153,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> Result<Connection<u64, ExampleRecordWrapper>, async_graphql::Error> {
+        ) -> Result<EventConnection<ExampleRecordWrapper>, async_graphql::Error> {
             EventQuery::new("history.example.save_record")
                 .first(first)
                 .last(last)

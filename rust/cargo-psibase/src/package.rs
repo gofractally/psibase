@@ -496,8 +496,10 @@ impl<'a> FlattenServices<'a> {
         }
         // Sort by package_index
         for i in 0..expanded.len() {
-            let j = expanded[i].package_index;
-            expanded.swap(i, j);
+            while i != expanded[i].package_index {
+                let j = expanded[i].package_index;
+                expanded.swap(i, j);
+            }
         }
         // Split into groups matching the original builders
         let mut result = Vec::new();

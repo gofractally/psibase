@@ -21,6 +21,8 @@ members = [
     "FaucetTok/plugin",
     "FractalGen",
     "FractalGen/service",
+    "FractalTester",
+    "FractalTester/service",
     "Fractals",
     "Fractals/service",
     "Fractals/plugin",

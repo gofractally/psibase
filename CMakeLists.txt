@@ -531,6 +531,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/FractalTester.psi
+    PATH packages/user/FractalTester
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Branding.psi
     PATH packages/user/Branding
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -1193,7 +1199,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore FractalGen Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1227,6 +1233,7 @@ install(
           ${SERVICE_DIR}/Fractals.psi
           ${SERVICE_DIR}/FractalCore.psi
           ${SERVICE_DIR}/FractalGen.psi
+          ${SERVICE_DIR}/FractalTester.psi
           ${SERVICE_DIR}/Host.psi
           ${SERVICE_DIR}/HttpServer.psi
           ${SERVICE_DIR}/Homepage.psi

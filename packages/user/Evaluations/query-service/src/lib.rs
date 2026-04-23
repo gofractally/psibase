@@ -64,7 +64,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, NewGroup>> {
+        ) -> async_graphql::Result<EventConnection<NewGroup>> {
             EventQuery::new("history.evaluations.new_group")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {}",
@@ -82,7 +82,7 @@ mod service {
             evaluation_owner: AccountNumber,
             evaluation_id: u32,
             group_number: u32,
-        ) -> async_graphql::Result<Connection<u64, KeysSet>> {
+        ) -> async_graphql::Result<EventConnection<KeysSet>> {
             EventQuery::new("history.evaluations.keysset")
                 .condition(format!(
                     "owner = '{}' AND evaluation_id = {} AND group_number = {}",
@@ -96,7 +96,7 @@ mod service {
             evaluation_owner: AccountNumber,
             evaluation_id: u32,
             group_number: Option<u32>,
-        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+        ) -> async_graphql::Result<EventConnection<GroupFinish>> {
             let mut conditions = vec![
                 format!("owner = '{}'", evaluation_owner),
                 format!("evaluation_id = {}", evaluation_id),
