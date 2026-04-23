@@ -14,7 +14,7 @@ export const useGuildMembershipsOfUser = (user: OptionalAccount) => {
             try {
                 return (await getGuildMemberships(user!)).filter(
                     (membership) =>
-                        membership.guild.fractal.account === fractal,
+                        membership.guild.owner === fractal,
                 );
             } catch (error) {
                 const message = "Error getting memberships";

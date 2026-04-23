@@ -27,7 +27,6 @@ pub mod tables {
     pub struct Guild {
         #[primary_key]
         pub account: AccountNumber,
-        #[graphql(skip)]
         pub owner: AccountNumber,
         pub display_name: Memo,
         #[graphql(skip)]

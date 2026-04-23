@@ -20,6 +20,7 @@ mod graphql;
 mod helpers;
 
 use crate::graphql::guild::get_guild;
+use crate::helpers::get_sender_app;
 use crate::trust::{assert_authorized, assert_authorized_with_whitelist, FunctionName};
 use errors::ErrorType;
 
@@ -189,11 +190,11 @@ impl AdminGuild for GuildsPlugin {
     }
 
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
-        let guild = get_guild(guild_account.clone())?;
-        guild.assert_authorized(FunctionName::create_guild)?;
+        // let guild = get_guild(guild_account.clone())?;
+        // guild.assert_authorized(FunctionName::create_guild)?;
 
         let packed_args = guilds::action_structs::create_guild {
-            fractal: guild.fractal,
+            fractal: get_sender_app()?,
             display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
             council_role: accounts::plugin::api::gen_rand_account(Some("c-"))?

@@ -1,4 +1,5 @@
 use async_graphql::ComplexObject;
+use fractals::tables::tables::Fractal;
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
 use psibase::{check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, Table};

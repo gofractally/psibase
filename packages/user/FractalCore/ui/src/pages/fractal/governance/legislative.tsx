@@ -34,7 +34,7 @@ export const Legislative = () => {
     const awaitingConsensusReward = !fractal?.fractal?.stream;
 
     const focusedGuild = fractal?.fractal?.legislature.account;
-    const { data, error: guildError } = useGuild(focusedGuild);
+    const { data: guild, error: guildError } = useGuild(focusedGuild);
 
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
     const [showTokenModal, setShowTokenModal] = useState(false);
@@ -44,9 +44,12 @@ export const Legislative = () => {
     const { data: currentUser } = useCurrentUser();
 
     const isAdministrativeUser =
-        currentUser == data?.rep?.member ||
+        currentUser == guild?.rep?.member ||
         (typeof currentUser == "string" &&
-            data?.council?.includes(currentUser));
+            guild?.council?.includes(currentUser));
+
+
+    console.log({ isAdministrativeUser })
 
     if (error) {
         return <ErrorCard error={error} />;
@@ -90,14 +93,14 @@ export const Legislative = () => {
                     <p className="text-muted-foreground text-sm">
                         The{" "}
                         <span className="text-primary font-medium">
-                            {data?.account}
+                            {guild?.account}
                         </span>{" "}
                         guild is selected to act as the legislature led by{" "}
-                        {data?.rep ? (
+                        {guild?.rep ? (
                             <>
                                 its representative{" "}
                                 <span className="text-primary font-medium">
-                                    {data.rep.member}
+                                    {guild.rep.member}
                                 </span>
                                 .
                             </>
@@ -108,7 +111,7 @@ export const Legislative = () => {
                 </CardFooter>
             </GlowingCard>
 
-            <GuildOverviewCard guildAccount={data?.account} />
+            <GuildOverviewCard guildAccount={guild?.account} />
 
             {isAdministrativeUser && (
                 <GlowingCard>

@@ -12,6 +12,7 @@ import { useFractalAccount } from "./use-fractal-account";
 
 export const useRankedGuilds = () => {
     const currentFractal = useFractalAccount();
+
     return useQuery({
         queryKey: QueryKey.guilds(currentFractal),
         enabled: Boolean(currentFractal),
