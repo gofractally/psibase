@@ -173,6 +173,7 @@ impl Chain {
         for (_, group, _) in subsequent_tx {
             for trx in group {
                 self.push(&trx).ok()?;
+                self.start_block();
             }
         }
 
@@ -641,6 +642,7 @@ impl Chain {
                     proofs: Default::default(),
                     subjectiveData: None,
                 });
+                self.start_block();
                 ChainEmptyResult { trace }.get()?
             }
         }
