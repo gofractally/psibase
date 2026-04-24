@@ -63,7 +63,10 @@ impl Api for WebCryptoShim {
     fn sign(hashed_message: Vec<u8>, public_key: Vec<u8>) -> Result<Vec<u8>, HostTypes::Error> {
         assert!(Client::get_sender() == "supervisor");
 
-        let private_key = ManagedKeys::get(&pub_from_der(public_key)?);
+        let pubkey_pem = pub_from_der(public_key)?;
+        let private_key = ManagedKeys::get(&pubkey_pem)
+            .or_else(|| TempKeys::get(&pubkey_pem))
+            .expect("WebCrypto::sign: Key not found");
         Self::sign_explicit(hashed_message, private_key)
     }
 
@@ -76,6 +79,14 @@ impl Api for WebCryptoShim {
 
         // Hypothetical call out to SubtleCrypto
         // convert SubtleCrypto types to psibase types
+        Ok(public_key)
+    }
+
+    fn import_temporary(private_key: Pem) -> Result<Pem, HostTypes::Error> {
+        assert!(Client::get_sender() == "supervisor");
+
+        let public_key = pub_from_priv(private_key.clone())?;
+        TempKeys::add(&public_key, &to_der(private_key)?);
         Ok(public_key)
     }
 }

@@ -255,6 +255,14 @@ export class Supervisor implements AppInterface {
         );
     }
 
+    importTemporary(privateKey: string): string {
+        return this.supervisorCall(
+            getCallArgs("webcrypto", "plugin", "api", "importTemporary", [
+                privateKey,
+            ]),
+        );
+    }
+
     signExplicit(msg: Uint8Array, privateKey: string): Uint8Array {
         // future: call out to SubtleCrypto
         return this.supervisorCall(

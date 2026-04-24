@@ -25,6 +25,11 @@ interface keyvault {
     /// Imports a PEM-encoded private key into the keyvault.
     /// Returns the corresponding public key in PEM format.
     import-key: func(private-key: pem) -> result<pem, error>;
+
+    /// Imports a PEM-encoded private key into a transient keyvault that
+    /// is automatically cleared at the end of the current transaction
+    /// context. Returns the corresponding public key in PEM format.
+    import-temporary: func(private-key: pem) -> result<pem, error>;
 }
 
 world imports {

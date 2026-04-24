@@ -203,6 +203,8 @@ export class PluginHost implements HostInterface {
                     this.supervisor.signExplicit(msg, privateKey),
                 importKey: (privateKey) =>
                     this.supervisor.importKey(privateKey),
+                importTemporary: (privateKey) =>
+                    this.supervisor.importTemporary(privateKey),
             },
             "supervisor:bridge/database": {
                 get: (duration, key) => this.dbGet(duration, key),

@@ -12,6 +12,16 @@ fn keys_table() -> Bucket {
     )
 }
 
+fn temp_keys_table() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Ephemeral,
+        },
+        "temp_keys",
+    )
+}
+
 fn get_hash(key: &Pem) -> String {
     let pem = pem::Pem::try_from_pem_str(&key).expect("Failed to hash key");
     let digest = seahash::hash(&pem.contents().to_vec());
@@ -25,17 +35,19 @@ impl ManagedKeys {
         keys_table().set(&get_hash(pubkey), &privkey);
     }
 
-    pub fn get(pubkey: &Pem) -> Vec<u8> {
-        keys_table()
-            .get(&get_hash(pubkey))
-            .expect("ManagedKeys::get: Key not found")
+    pub fn get(pubkey: &Pem) -> Option<Vec<u8>> {
+        keys_table().get(&get_hash(pubkey))
+    }
+}
+
+pub struct TempKeys;
+
+impl TempKeys {
+    pub fn add(pubkey: &Pem, privkey: &[u8]) {
+        temp_keys_table().set(&get_hash(pubkey), &privkey);
     }
 
-    pub fn _has(pubkey: &Pem) -> bool {
-        keys_table().get(&get_hash(pubkey)).is_some()
-    }
-
-    pub fn _delete(pubkey: &Pem) {
-        keys_table().delete(&get_hash(pubkey));
+    pub fn get(pubkey: &Pem) -> Option<Vec<u8>> {
+        temp_keys_table().get(&get_hash(pubkey))
     }
 }
