@@ -1,10 +1,41 @@
 package host:auth;
 
+/// Credential type forwarded through `api.new-session` to
+/// `transact:plugin/auth.get-query-token` to mint a fresh `/login`
+/// token.
+interface types {
+    record claim {
+        verify-service: string,
+        raw-data: list<u8>,
+    }
+}
+
 interface api {
     use host:types/types.{error};
+    use types.{claim};
 
-    /// Notify of new logged in user
-    set-logged-in-user: func(user: string, app: string) -> result<_, error>;
+    /// Install an existing query-token cookie for `(user, app)`.
+    ///
+    /// On cache miss, returns a `ReauthorizationRequired` error: the
+    /// account needs to be reconnected before authenticated queries
+    /// can be made.
+    ///
+    /// Only callable by `accounts`.
+    use-session: func(user: string, app: string) -> result<_, error>;
+
+    /// Mint a fresh query token for `(user, app)`, cache it, and
+    /// install it as the auth cookie. Always overwrites the cache for
+    /// `(user, app)`.
+    ///
+    /// The user's `claim` is used to prove authorization when generating
+    /// the query token.
+    ///
+    /// Only callable by `accounts`.
+    new-session: func(
+        user: string,
+        app: string,
+        claim: option<claim>,
+    ) -> result<_, error>;
 
     /// Notify of user logout
     log-out-user: func(user: string, app: string);
