@@ -664,9 +664,6 @@ dependencies = [
  "credentials",
  "psibase",
  "psibase-system-workspace-hack",
- "serde",
- "serde_json",
- "sha2",
  "wit-bindgen-rt",
 ]
 
