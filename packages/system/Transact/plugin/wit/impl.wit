@@ -2,13 +2,6 @@ package transact:plugin;
 
 interface hook-handlers {
     use host:types/types.{error, plugin-ref};
-    use types.{claim, proof, action};
-
-    on-user-auth-claim: func(plugin: plugin-ref, account-name: string) -> result<option<claim>, error>;
-    on-user-auth-proof: func(plugin: plugin-ref, account-name: string, transaction-hash: list<u8>) -> result<option<proof>, error>;
-
-    on-action-auth-claims: func(plugin: plugin-ref, action: action) -> result<list<claim>, error>;
-    on-action-auth-proofs: func(plugin: plugin-ref, claims: list<claim>, transaction-hash: list<u8>) -> result<list<proof>, error>;
 
     on-actions-sender: func(plugin: plugin-ref, service: string, method: string) -> result<option<string>, error>;
 }
@@ -21,6 +14,7 @@ world impl {
     include permissions:plugin/imports;
     
     import virtual-server:plugin/transact;
+    include host:crypto/imports;
 
     export admin;
     export intf;
