@@ -11,8 +11,8 @@ use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use prem_accounts::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
-
+use psibase::services::invite::SubjectPublicKeyInfo;
+use psibase::services::tokens::Quantity;
 use psibase::{fracpack::Pack, AccountNumber};
 mod errors;
 use errors::ErrorType;
@@ -41,33 +41,19 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        let sys_token_id = match TokensHelpers::fetch_network_token()? {
-            Some(id) => id,
-            None => return Err(ErrorType::SystemTokenNotDefined.into()),
-        };
-        let initial_price = initial_price.trim().to_string();
-        let floor_price = floor_price.trim().to_string();
-        if initial_price.is_empty() || floor_price.is_empty() {
-            return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
-        }
-        let initial_price_u64 = match TokensHelpers::decimal_to_u64(sys_token_id, &initial_price) {
-            Ok(v) => v,
-            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
-        };
-        let floor_price_u64 = match TokensHelpers::decimal_to_u64(sys_token_id, &floor_price) {
-            Ok(v) => v,
-            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
-        };
-        let packed = prem_accounts::action_structs::create {
+        let sys_token_id = TokensHelpers::fetch_network_token()?
+            // .map_err(|_| ErrorType::SystemTokenNotDefined)?
+            .ok_or(ErrorType::SystemTokenNotDefined)?;
+        let initial_price = TokensHelpers::decimal_to_u64(sys_token_id, &initial_price)?;
+        let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
+        prem_accounts::Wrapper::add_to_tx().create(
             length,
-            initial_price: initial_price_u64,
+            Quantity::from(initial_price),
             target,
-            floor_price: floor_price_u64,
+            Quantity::from(floor_price),
             increase_ppm,
             decrease_ppm,
-        }
-        .packed();
-        add_action_to_transaction("create", &packed)?;
+        );
         Ok(())
     }
 
@@ -84,38 +70,27 @@ impl MarketAdmin for PremAccountsPlugin {
             Some(id) => id,
             None => return Err(ErrorType::SystemTokenNotDefined.into()),
         };
-        let floor_price = floor_price.trim().to_string();
-        if floor_price.is_empty() {
-            return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
-        }
-        let floor_price_u64 = match TokensHelpers::decimal_to_u64(sys_token_id, &floor_price) {
-            Ok(v) => v,
-            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
-        };
-        let packed = prem_accounts::action_structs::configure {
+        let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
+        prem_accounts::Wrapper::add_to_tx().configure(
             length,
             window_seconds,
             target,
-            floor_price: floor_price_u64,
+            Quantity::from(floor_price),
             increase_ppm,
             decrease_ppm,
-        }
-        .packed();
-        add_action_to_transaction("configure", &packed)?;
+        );
         Ok(())
     }
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn enable(length: u8) -> Result<(), Error> {
-        let packed = prem_accounts::action_structs::enable { length }.packed();
-        add_action_to_transaction("enable", &packed)?;
+        prem_accounts::Wrapper::add_to_tx().enable(length);
         Ok(())
     }
 
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn disable(length: u8) -> Result<(), Error> {
-        let packed = prem_accounts::action_structs::disable { length }.packed();
-        add_action_to_transaction("disable", &packed)?;
+        prem_accounts::Wrapper::add_to_tx().disable(length);
         Ok(())
     }
 }
@@ -133,18 +108,8 @@ impl Api for PremAccountsPlugin {
         };
 
         let max_cost = max_cost.trim().to_string();
-        if max_cost.is_empty() {
-            return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
-        }
-
-        let max_cost_u64 = match TokensHelpers::decimal_to_u64(sys_token_id, &max_cost) {
-            Ok(v) => v,
-            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
-        };
-        let canonical = match TokensHelpers::u64_to_decimal(sys_token_id, max_cost_u64) {
-            Ok(v) => v,
-            Err(_) => return Err(ErrorType::MaxCostNotCanonicalDecimal.into()),
-        };
+        let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
+        let canonical = TokensHelpers::u64_to_decimal(sys_token_id, max_cost_u64)?;
         if canonical != max_cost {
             return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
         }
@@ -162,9 +127,7 @@ impl Api for PremAccountsPlugin {
             "premium account purchase",
         )?;
 
-        let packed_buy_args = prem_accounts::action_structs::buy { account: acct_name }.packed();
-
-        add_action_to_transaction("buy", &packed_buy_args)?;
+        prem_accounts::Wrapper::add_to_tx().buy(acct_name);
 
         Ok(())
     }
@@ -177,18 +140,11 @@ impl Api for PremAccountsPlugin {
 
         AuthSigKeyVault::import_key(&keypair.private_key).unwrap();
 
-        let packed_claim_args = prem_accounts::action_structs::claim {
+        prem_accounts::Wrapper::add_to_tx().claim(
             account,
-            // pub_key: SubjectPublicKeyInfo::from(pem_data.contents().to_vec()),
-            pub_key: HostCryptoKeyVault::to_der(&keypair.public_key)
-                .unwrap()
-                .into(),
-        }
-        .packed();
+            SubjectPublicKeyInfo::from(HostCryptoKeyVault::to_der(&keypair.public_key).unwrap()),
+        );
 
-        add_action_to_transaction("claim", &packed_claim_args).unwrap();
-
-        // TOOD: error handling: cleanup if something fails
         Ok(keypair.private_key)
     }
 }
@@ -261,7 +217,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
 }
 
 impl Authorized for PremAccountsPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "prem-accounts"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }

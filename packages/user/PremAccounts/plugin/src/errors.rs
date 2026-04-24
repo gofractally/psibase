@@ -9,8 +9,6 @@ pub enum ErrorType {
     MaxCostNotCanonicalDecimal,
     #[error("Max cost below current ask")]
     MaxCostBelowCurrentAsk,
-    #[error("Invalid premium account name")]
-    InvalidPremiumAccountName,
     #[error("Premium name length not offered")]
     PremiumNameLengthNotOffered,
     #[error("Premium name market disabled")]

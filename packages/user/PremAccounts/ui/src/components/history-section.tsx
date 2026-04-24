@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { graphql } from "@shared/lib/graphql";
 
-import { siblingUrl } from "@psibase/common-lib";
-
+import { zNameEventsPageData } from "@/lib/graphql/prem-accounts.schemas";
 import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 type Props = {
@@ -30,24 +30,24 @@ export function HistorySection({ historyNonce = 0 }: Props) {
             setHistoryError("");
 
             try {
-                const premAccountsGraphqlUrl = siblingUrl(
-                    null,
-                    PREM_ACCOUNTS_SERVICE,
-                    "/graphql",
-                );
-
                 const allEvents: { account: string; action: string }[] = [];
                 let hasNextPage = true;
                 let afterCursor: string | null = null;
 
                 while (hasNextPage) {
-                    const response = await fetch(premAccountsGraphqlUrl, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            query: `
-                                query NameEvents($owner: String!, $first: Int, $after: String) {
-                                    nameEvents(owner: $owner, first: $first, after: $after) {
+                    const page = zNameEventsPageData.parse(
+                        await graphql(
+                            `
+                                query NameEvents(
+                                    $owner: String!,
+                                    $first: Int,
+                                    $after: String
+                                ) {
+                                    nameEvents(
+                                        owner: $owner,
+                                        first: $first,
+                                        after: $after
+                                    ) {
                                         edges {
                                             node {
                                                 account
@@ -61,61 +61,24 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                                     }
                                 }
                             `,
-                            variables: {
-                                owner: loggedInUser,
-                                first: 50,
-                                after: afterCursor,
+                            {
+                                service: PREM_ACCOUNTS_SERVICE,
+                                variables: {
+                                    owner: loggedInUser,
+                                    first: 50,
+                                    after: afterCursor,
+                                },
                             },
-                        }),
-                    });
-
-                    const raw = await response.text();
-                    let data: {
-                        data?: {
-                            nameEvents?: {
-                                edges?: Array<{
-                                    node?: {
-                                        account?: string;
-                                        action?: string;
-                                    } | null;
-                                } | null>;
-                                pageInfo?: {
-                                    hasNextPage?: boolean;
-                                    endCursor?: string | null;
-                                };
-                            };
-                        };
-                        errors?: Array<{ message: string }>;
-                    };
-                    try {
-                        data = JSON.parse(raw) as typeof data;
-                    } catch {
-                        const snippet =
-                            raw.length === 0
-                                ? `History request failed (HTTP ${response.status})`
-                                : raw.length > 300
-                                  ? `${raw.slice(0, 300)}…`
-                                  : raw;
-                        throw new Error(snippet);
-                    }
-
-                    if (data.errors && data.errors.length > 0) {
-                        throw new Error(data.errors[0].message);
-                    }
-
-                    const connection = data.data?.nameEvents;
+                        ),
+                    );
+                    const connection = page.nameEvents;
                     if (!connection) {
                         break;
                     }
 
-                    const edges = connection.edges ?? [];
-                    for (const edge of edges) {
-                        const node = edge?.node;
-                        if (
-                            node &&
-                            typeof node.account === "string" &&
-                            typeof node.action === "string"
-                        ) {
+                    for (const edge of connection.edges) {
+                        const node = edge.node;
+                        if (node) {
                             allEvents.push({
                                 account: node.account,
                                 action: node.action,

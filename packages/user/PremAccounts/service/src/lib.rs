@@ -1,6 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
+    use psibase::services::tokens::Quantity;
     use psibase::AccountNumber;
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -16,12 +17,13 @@ pub mod tables {
     #[table(name = "AuctionsTable", index = 1)]
     #[derive(Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct Auction {
+        #[primary_key]
         pub length: u8,
         pub nft_id: u32,
         pub enabled: bool,
-        pub initial_price: u64,
+        pub initial_price: Quantity,
         pub target: u32,
-        pub floor_price: u64,
+        pub floor_price: Quantity,
         pub window_seconds: u32,
         pub increase_ppm: u32,
         pub decrease_ppm: u32,
@@ -33,9 +35,9 @@ pub mod tables {
                 length: 0,
                 nft_id: 0,
                 enabled: true,
-                initial_price: 0,
+                initial_price: Quantity::from(0),
                 target: 0,
-                floor_price: 0,
+                floor_price: Quantity::from(0),
                 window_seconds: 0,
                 increase_ppm: 0,
                 decrease_ppm: 0,
@@ -43,26 +45,15 @@ pub mod tables {
         }
     }
 
-    impl Auction {
-        #[primary_key]
-        fn pk(&self) -> u8 {
-            self.length
-        }
-    }
-
     #[table(name = "PurchasedAccountsTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PurchasedAccount {
+        #[primary_key]
         pub account: AccountNumber,
         pub owner: AccountNumber,
     }
 
     impl PurchasedAccount {
-        #[primary_key]
-        fn pk(&self) -> AccountNumber {
-            self.account
-        }
-
         #[secondary_key(1)]
         fn by_owner(&self) -> (AccountNumber, AccountNumber) {
             (self.owner, self.account)
@@ -97,7 +88,7 @@ pub mod service {
         let add_index = |method: &str, column: u8| {
             events::Wrapper::call().addIndex(
                 DbId::HistoryEvent,
-                Wrapper::SERVICE,
+                get_service(),
                 MethodNumber::from(method),
                 column,
             );
@@ -112,23 +103,28 @@ pub mod service {
         nft_id: u32,
         window_seconds: u32,
         target: u32,
-        floor_price: u64,
+        floor_price: Quantity,
         increase_ppm: u32,
         decrease_ppm: u32,
     ) {
         DiffAdjust::call().set_window(nft_id, window_seconds);
         DiffAdjust::call().set_targets(nft_id, target, target);
-        DiffAdjust::call().set_floor(nft_id, floor_price);
+        DiffAdjust::call().set_floor(nft_id, floor_price.value);
         DiffAdjust::call().set_ppm(nft_id, increase_ppm, decrease_ppm);
     }
 
     fn require_caller_is_self() -> bool {
-        return get_sender() == Wrapper::SERVICE;
+        return get_sender() == get_service();
     }
 
     #[action]
     fn init() {
         let table = InitTable::new();
+
+        if table.get_index_pk().get(&()).is_some() {
+            return;
+        }
+
         table.put(&InitRow {}).unwrap();
         Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Nfts::Wrapper::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
@@ -168,17 +164,11 @@ pub mod service {
 
         check(auction.enabled, "market is disabled");
 
-        let current_price = DiffAdjust::call().get_diff(auction.nft_id);
-
-        let shared_bal = Tokens::Wrapper::call().getSharedBal(sys_token_id, sender, get_service());
-
-        check(
-            current_price <= shared_bal.value,
-            "insufficient balance allocated for this purchase; increase max cost so it covers the current price",
-        );
+        // Alert the DiffAdjust service to the purchase
+        let current_price = Quantity::from(DiffAdjust::call().increment(auction.nft_id, 1));
 
         Accounts::Wrapper::call().preapproveAcc(account);
-        AuthDelegate::Wrapper::call().newAccount(account, get_service());
+        AuthDelegate::Wrapper::call().newAccount(account, get_service(), true);
 
         PurchasedAccountsTable::new()
             .put(&PurchasedAccount {
@@ -187,13 +177,10 @@ pub mod service {
             })
             .unwrap();
 
-        let cost = Quantity::from(current_price);
+        let cost = current_price;
         Tokens::Wrapper::call().debit(sys_token_id, sender, cost, "".into());
 
         Tokens::Wrapper::call().reject(sys_token_id, sender, "return change".into());
-
-        // Alert the DiffAdjust service to the purchase
-        DiffAdjust::call().increment(auction.nft_id, 1);
 
         crate::Wrapper::emit()
             .history()
@@ -228,9 +215,9 @@ pub mod service {
     #[action]
     fn create(
         length: u8,
-        initial_price: u64,
+        initial_price: Quantity,
         target: u32,
-        floor_price: u64,
+        floor_price: Quantity,
         increase_ppm: u32,
         decrease_ppm: u32,
     ) {
@@ -249,11 +236,11 @@ pub mod service {
             "market already exists",
         );
         let nft_id = DiffAdjust::call().create(
-            initial_price,
+            initial_price.value,
             MARKET_WINDOW_SECONDS,
             1,
             target,
-            floor_price,
+            floor_price.value,
             increase_ppm,
             decrease_ppm,
         );
@@ -263,9 +250,9 @@ pub mod service {
                 length,
                 nft_id,
                 enabled: true,
-                initial_price,
+                initial_price: initial_price.into(),
                 target,
-                floor_price,
+                floor_price: floor_price.into(),
                 window_seconds: MARKET_WINDOW_SECONDS,
                 increase_ppm,
                 decrease_ppm,
@@ -289,7 +276,7 @@ pub mod service {
         length: u8,
         window_seconds: u32,
         target: u32,
-        floor_price: u64,
+        floor_price: Quantity,
         increase_ppm: u32,
         decrease_ppm: u32,
     ) {
@@ -323,9 +310,7 @@ pub mod service {
         auctions_table.put(&auction).unwrap();
     }
 
-    /// Enable new purchases for a name-length market
-    #[action]
-    fn enable(length: u8) {
+    fn toggle_market(length: u8, enabled: bool) {
         require_caller_is_self();
 
         check(
@@ -340,32 +325,23 @@ pub mod service {
             auctions_table.get_index_pk().get(&length),
             "auction not found for this length",
         );
-        if auction.enabled {
+        if auction.enabled == enabled {
             return;
         }
-        auction.enabled = true;
+        auction.enabled = enabled;
         auctions_table.put(&auction).unwrap();
+    }
+
+    /// Enable new purchases for a name-length market
+    #[action]
+    fn enable(length: u8) {
+        toggle_market(length, true);
     }
 
     /// Disable new purchases for a name-length market
     #[action]
     fn disable(length: u8) {
-        require_caller_is_self();
-
-        check(
-            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
-            &format!(
-                "market name length must be {}-{}",
-                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
-            ),
-        );
-        let auctions_table = AuctionsTable::new();
-        let mut auction = check_some(
-            auctions_table.get_index_pk().get(&length),
-            "auction not found for this length",
-        );
-        auction.enabled = false;
-        auctions_table.put(&auction).unwrap();
+        toggle_market(length, false);
     }
 
     pub const BOUGHT: u8 = 0;

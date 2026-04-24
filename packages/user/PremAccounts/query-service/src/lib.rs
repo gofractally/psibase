@@ -1,11 +1,11 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::connection::Connection;
     use async_graphql::*;
     use diff_adjust::tables::RateLimitTable;
     use prem_accounts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
     use prem_accounts::Wrapper as PremAccountsService;
+    // use psibase::services::diff_adjust::tables::RateLimitTable;
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -105,8 +105,8 @@ mod service {
                         .map(|mut rate_limit| rate_limit.check_difficulty_decrease())
                         .unwrap_or(0);
                     // DiffAdjust can read 0 before the rate row is populated or in edge cases
-                    if auction.enabled && price_raw == 0 && auction.initial_price > 0 {
-                        price_raw = auction.initial_price;
+                    if auction.enabled && price_raw == 0 && auction.initial_price.value > 0 {
+                        price_raw = auction.initial_price.value;
                     }
                     MarketPrice {
                         length: auction.length,
@@ -168,7 +168,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, PremiumAccountEvent>> {
+        ) -> async_graphql::Result<EventConnection<PremiumAccountEvent>> {
             self.check_user_auth(owner.clone())?;
 
             EventQuery::new(format!(

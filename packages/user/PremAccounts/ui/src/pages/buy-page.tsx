@@ -3,10 +3,13 @@ import type { PremAccountsOutletContext } from "@/components/prem-accounts-main"
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
-import { siblingUrl } from "@psibase/common-lib";
-
+import {
+    zCurrentPricesData,
+    zTokenQueryData,
+} from "@/lib/graphql/prem-accounts.schemas";
 import { PREM_ACCOUNTS_SERVICE, doesAccountExist } from "@/lib/prem-service";
 
+import { graphql } from "@shared/lib/graphql";
 import {
     canonicalTokenAmountToRaw,
     expandToCanonicalTokenDecimal,
@@ -69,35 +72,23 @@ export function BuyPage() {
             const sysTid =
                 typeof sysTidRaw === "bigint" ? Number(sysTidRaw) : sysTidRaw;
 
-            const tokensGraphqlUrl = siblingUrl(null, "tokens", "/graphql");
-
-            const tokenResponse = await fetch(tokensGraphqlUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    query: `
-                        query {
-                            token(tokenId: "${sysTid}") {
-                                precision
-                                symbol
-                            }
+            const raw = await graphql(
+                `
+                    {
+                        token(tokenId: ${sysTid}) {
+                            precision
+                            symbol
                         }
-                    `,
-                }),
-            });
-            const tokenData = (await tokenResponse.json()) as {
-                data?: { token?: { precision?: number; symbol?: string } };
-                errors?: Array<{ message: string }>;
-            };
-            if (tokenData.errors) {
-                throw new Error(tokenData.errors[0].message);
-            }
+                    }
+                `,
+                { service: "tokens" },
+            );
+            const { token } = zTokenQueryData.parse(raw);
 
-            const token = tokenData.data?.token;
-            if (token && typeof token.precision === "number") {
+            if (token) {
                 setSystemToken({
                     precision: token.precision,
-                    symbol: token.symbol,
+                    symbol: token.symbol ?? undefined,
                     id: sysTid,
                 });
                 if (!maxCostDefaultSynced.current) {
@@ -112,37 +103,22 @@ export function BuyPage() {
 
     const loadPrices = async () => {
         try {
-            const query = "query { currentPrices { length price } }";
-            const raw = await supervisor.functionCall({
-                service: PREM_ACCOUNTS_SERVICE,
-                plugin: "plugin",
-                intf: "authorized",
-                method: "graphql",
-                params: [query],
-            });
-            const text = typeof raw === "string" ? raw : JSON.stringify(raw);
-            const body = JSON.parse(text) as {
-                data?: {
-                    currentPrices?: Array<{ length: number; price: string }>;
-                };
-                errors?: Array<{ message: string }>;
-            };
-            if (body.errors?.length) {
-                throw new Error(body.errors[0].message);
-            }
-            const rows = body.data?.currentPrices;
-
-            const next = new Map<number, string>();
-            if (Array.isArray(rows)) {
-                for (const row of rows) {
-                    if (row && typeof row === "object") {
-                        if (row.length && row.price) {
-                            next.set(Number(row.length), row.price);
+            const raw = await graphql(
+                `
+                    query {
+                        currentPrices {
+                            length
+                            price
                         }
                     }
-                }
-            } else {
-                console.error("Unexpected prices format:", body);
+                `,
+                { service: PREM_ACCOUNTS_SERVICE },
+            );
+            const { currentPrices: rows } = zCurrentPricesData.parse(raw);
+
+            const next = new Map<number, string>();
+            for (const row of rows) {
+                next.set(row.length, row.price);
             }
 
             setPriceByLength(next);
@@ -164,12 +140,6 @@ export function BuyPage() {
     useEffect(() => {
         const checkAccount = async () => {
             const trimmed = accountName.trim();
-            if (!trimmed) {
-                setAccountExists(null);
-                setPrice(null);
-                return;
-            }
-
             const zod = zAccount.safeParse(trimmed);
             if (!zod.success) {
                 setAccountExists(null);
