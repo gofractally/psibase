@@ -4,10 +4,6 @@ import type { UseMutateFunction } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
-import {
-    DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET,
-    DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET,
-} from "@/lib/premium-name-market-defaults";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -21,6 +17,10 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
 import { parseAccountNameLength, parsePositiveInt, parsePpm } from "./parsers";
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
 
 type AddMarketParams = [number, string, number, string, number, number];
 
@@ -91,8 +91,7 @@ export function AddMarketDialog({
     const lengthTooLong =
         trimmedLen.length > 2 ||
         (/^\d+$/.test(trimmedLen) &&
-            Number.parseInt(trimmedLen, 10) >
-                DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET);
+            Number.parseInt(trimmedLen, 10) > MAX_ACCOUNT_NAME_LENGTH);
 
     const duplicate =
         parsedLength !== null &&
@@ -116,15 +115,15 @@ export function AddMarketDialog({
                 <div className="flex flex-col gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="new-premium-market-length">
-                            Name length (1-
-                            {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET})
+                            Name length ({MIN_ACCOUNT_NAME_LENGTH}–
+                            {MAX_ACCOUNT_NAME_LENGTH})
                         </Label>
                         <Input
                             id="new-premium-market-length"
                             inputMode="numeric"
                             autoComplete="off"
                             maxLength={2}
-                            placeholder={`1-${DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET}`}
+                            placeholder={`${MIN_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH}`}
                             value={newLengthRaw}
                             onChange={(e) => setNewLengthRaw(e.target.value)}
                             disabled={actionsDisabled}
@@ -137,8 +136,7 @@ export function AddMarketDialog({
                         />
                         {lengthTooLong ? (
                             <p className="text-destructive text-sm">
-                                Name length must be at most{" "}
-                                {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET}.
+                                Name length must be at most {MAX_ACCOUNT_NAME_LENGTH}.
                             </p>
                         ) : null}
                         {duplicate ? (
@@ -150,9 +148,8 @@ export function AddMarketDialog({
                         parsedLength === null &&
                         !lengthTooLong ? (
                             <p className="text-destructive text-sm">
-                                Enter a whole number from{" "}
-                                {DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET} to{" "}
-                                {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET}.
+                                Enter a whole number from {MIN_ACCOUNT_NAME_LENGTH}{" "}
+                                to {MAX_ACCOUNT_NAME_LENGTH}.
                             </p>
                         ) : null}
                     </div>

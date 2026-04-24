@@ -13,6 +13,10 @@ import {
 } from "@/lib/premium-name-market-defaults";
 
 import { PageContainer } from "@shared/components/page-container";
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { cn } from "@shared/lib/utils";
 import {
@@ -81,8 +85,8 @@ export const PremiumNameMarketConfig = () => {
         }
         const lengths = new Set(rows.map((r) => r.length));
         for (
-            let len = DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET;
-            len <= DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET;
+            let len = MIN_ACCOUNT_NAME_LENGTH;
+            len <= MAX_ACCOUNT_NAME_LENGTH;
             len++
         ) {
             if (!lengths.has(len)) {
