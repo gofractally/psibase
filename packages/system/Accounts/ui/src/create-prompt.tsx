@@ -27,7 +27,7 @@ import { Progress } from "@shared/shadcn/ui/progress";
 import { CopyButton } from "./components/copy-button";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
-import { useConnectAccount } from "./hooks/use-connect-account";
+import { useLogin } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 
@@ -43,7 +43,7 @@ export const CreatePrompt = () => {
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
-    const connectAccountMutation = useConnectAccount();
+    const loginAccountMutation = useLogin();
 
     const createForm = useAppForm({
         defaultValues: {
@@ -153,7 +153,7 @@ export const CreatePrompt = () => {
                 account: account,
                 key: pemFormatted,
             });
-            await connectAccountMutation.mutateAsync(account);
+            await loginAccountMutation.mutateAsync(account);
             prompt.finished();
         } catch (e) {
             console.error("Import and login failed");

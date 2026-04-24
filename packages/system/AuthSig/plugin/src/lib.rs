@@ -9,16 +9,21 @@ mod types;
 use trust::*;
 
 // Other plugins
-use bindings::host::crypto::keyvault as HostCrypto;
-use bindings::host::types::types as HostTypes;
-use bindings::host::types::types::{Keypair, Pem};
-use bindings::transact::plugin::intf as Transact;
+use bindings::{
+    accounts::plugin::{self as AccountsPlugin, types as AccountsTypes},
+    host::{
+        common::client as Client,
+        crypto::keyvault as HostCrypto,
+        types::types::{self as HostTypes, Error, Keypair, Pem},
+    },
+    transact::plugin::{intf as Transact, types::Claim},
+};
 
 // Exported interfaces
 use bindings::exports::auth_sig::plugin::{
     actions::Guest as Actions, api::Guest as Api, keyvault::Guest as KeyVault,
+    session::Guest as Session,
 };
-use bindings::exports::transact_hook_user_auth::{Guest as HookUserAuth, *};
 
 // Services
 use psibase::services::auth_sig::action_structs as MyService;
@@ -52,29 +57,47 @@ psibase::define_trust! {
 
 struct AuthSig;
 
-impl HookUserAuth for AuthSig {
-    fn on_user_auth_claim(account_name: String) -> Result<Option<Claim>, Error> {
-        if !from_transact() {
-            return Err(Unauthorized("on_user_auth_claim".to_string()).into());
+fn resolve_credential(account_name: &str) -> Result<Claim, Error> {
+    let pubkey_der = AuthSig::to_der(get_pubkey(account_name)?)?;
+    Ok(Claim {
+        verify_service: psibase::services::verify_sig::SERVICE.to_string(),
+        raw_data: pubkey_der,
+    })
+}
+
+fn do_authorize(account_name: &str) -> Result<Claim, Error> {
+    let claim = resolve_credential(account_name)?;
+    Transact::add_signature(&claim)?;
+    Ok(claim)
+}
+
+impl Session for AuthSig {
+    fn authorize(account_name: String) -> Result<(), Error> {
+        if Client::get_sender() != "supervisor" {
+            return Err(Unauthorized("session::authorize".to_string()).into());
         }
 
-        Ok(Some(Claim {
-            verify_service: psibase::services::verify_sig::SERVICE.to_string(),
-            raw_data: AuthSig::to_der(get_pubkey(&account_name)?)?,
-        }))
+        do_authorize(&account_name)?;
+        Ok(())
     }
 
-    fn on_user_auth_proof(
-        account_name: String,
-        transaction_hash: Vec<u8>,
-    ) -> Result<Option<Proof>, Error> {
-        if !from_transact() {
-            return Err(Unauthorized("get_proofs".to_string()).into());
+    fn login(account_name: String) -> Result<(), Error> {
+        if Client::get_sender() != "accounts" {
+            return Err(Unauthorized("session::login".to_string()).into());
         }
 
-        let public_key = HostCrypto::to_der(&get_pubkey(&account_name)?)?;
-        let signature = AuthSig::sign(transaction_hash, public_key)?;
-        Ok(Some(Proof { signature }))
+        // We authorize on login, because there are some cases where accounts will attempt to
+        //   schedule a transaction on behalf of the account that was just logged in (e.g. invite acceptance)
+        // The `authorize` is done here because it wasn't done by the supervisor on tx_start because
+        //   the account wasn't logged in yet.
+        let claim = do_authorize(&account_name)?;
+
+        let accounts_claim = AccountsTypes::Claim {
+            verify_service: claim.verify_service.clone(),
+            raw_data: claim.raw_data.clone(),
+        };
+
+        AccountsPlugin::auth_svc::connect(&account_name, Some(&accounts_claim))
     }
 }
 

@@ -1,10 +1,23 @@
 package auth-delegate:plugin;
 
+interface session {
+    use host:types/types.{error};
+
+    /// Called by the supervisor at the start of every transaction for
+    /// the currently logged-in user.
+    authorize: func(account-name: string) -> result<_, error>;
+
+    /// Log `account-name` into the currently active app.
+    ///
+    /// Can only be called by the `accounts` app.
+    login: func(account-name: string) -> result<_, error>;
+}
+
 world impl {
     include host:common/imports;
-    include transact:plugin/hook-user-auth;
     include transact:plugin/imports;
     include permissions:plugin/imports;
 
+    export session;
     export api;
 }

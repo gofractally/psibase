@@ -220,6 +220,28 @@ export class Supervisor implements AppInterface {
         return token;
     }
 
+    private authorizeCurrentUser(): void {
+        const user = this.supervisorCall(
+            getCallArgs("accounts", "plugin", "api", "getCurrentUser", []),
+        );
+        if (!user) {
+            return;
+        }
+
+        const account = this.supervisorCall(
+            getCallArgs("accounts", "plugin", "api", "getAccount", [user]),
+        );
+        if (!account) {
+            return;
+        }
+
+        this.supervisorCall(
+            getCallArgs(account.authService, "plugin", "session", "authorize", [
+                user,
+            ]),
+        );
+    }
+
     // Cleanly tear down the supervisor, free any resources, etc.
     private shutdown(): string[] {
         return this.plugins.disposeAll();
@@ -409,6 +431,9 @@ export class Supervisor implements AppInterface {
             this.supervisorCall(
                 getCallArgs("transact", "plugin", "admin", "start-tx", []),
             );
+
+            // Ensures any tx constructed during the call is authorized by the current user
+            this.authorizeCurrentUser();
 
             // Make a *synchronous* call into the plugin. It can be fully synchronous since everything was
             //   preloaded.

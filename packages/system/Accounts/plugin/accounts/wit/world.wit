@@ -7,6 +7,32 @@ interface types {
         account-num: string,
         auth-service: string,
     }
+
+    /// The claim is something that the submitter of a transaction claims to know (e.g. a public key)
+    /// and includes the service that can verify the claim.
+    record claim {
+        verify-service: string,
+        raw-data: list<u8>,
+    }
+}
+
+/// This interface is only callable by the user's auth-service plugin
+interface auth-svc {
+    use host:types/types.{error};
+    use types.{claim};
+
+
+    /// An account's auth service may call this to log `account` into the active app.
+    /// If this device is holding an invite to the active app, it will be accepted.
+    ///
+    /// If no valid session token for `(account, app)` yet exists, then this function
+    /// will attempt to mint a new one.
+    ///
+    /// The specified account must be imported on this device before this call.
+    connect: func(
+        account: string,
+        claim: option<claim>,
+    ) -> result<_, error>;
 }
 
 /// This interface is only available to the top-level app, or its plugin.
@@ -49,7 +75,7 @@ interface api {
 
     /// Sets the auth service used to authenticate the currently logged-in user
     /// Currently calling this is restricted to the homepage app.
-    set-auth-service: func(service-name: string) -> result<_, error>; 
+    set-auth-service: func(service-name: string) -> result<_, error>;
 
     /// Gets the account name of the user logged into the active application.
     /// May also return None if no user is logged in.
@@ -63,4 +89,5 @@ interface api {
 world imports {
     import api;
     import active-app;
+    import auth-svc;
 }
