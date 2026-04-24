@@ -32,7 +32,11 @@ export const PremiumNameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
         useSystemToken();
     const hasSystemToken = Boolean(systemToken?.id);
-    const actionsDisabled = systemTokenLoading || !hasSystemToken;
+    /** Rows / dialog fields: wait for token so toggles do not fire blind. */
+    const rowActionsDisabled = systemTokenLoading || !hasSystemToken;
+    /** Add-market entry points: only block once we know the token is missing. */
+    const tokenMissingConfirmed =
+        !systemTokenLoading && !hasSystemToken;
 
     const {
         data: rows,
@@ -152,7 +156,7 @@ export const PremiumNameMarketConfig = () => {
                     type="button"
                     variant="outline"
                     disabled={
-                        actionsDisabled ||
+                        tokenMissingConfirmed ||
                         allLengthMarketsCreated ||
                         bootstrapping
                     }
@@ -172,7 +176,7 @@ export const PremiumNameMarketConfig = () => {
                     </p>
                     <Button
                         type="button"
-                        disabled={actionsDisabled || bootstrapping}
+                        disabled={tokenMissingConfirmed || bootstrapping}
                         onClick={() => bootstrapNameMarkets()}
                     >
                         {bootstrapping
@@ -238,7 +242,7 @@ export const PremiumNameMarketConfig = () => {
                                             <Switch
                                                 checked={row.enabled}
                                                 disabled={
-                                                    actionsDisabled ||
+                                                    rowActionsDisabled ||
                                                     toggleBusy
                                                 }
                                                 aria-label={`Purchases for length-${row.length} names`}
@@ -263,7 +267,7 @@ export const PremiumNameMarketConfig = () => {
                                             savingLength={savingLength}
                                             disablingLength={disablingLength}
                                             enablingLength={enablingLength}
-                                            actionsDisabled={actionsDisabled}
+                                            actionsDisabled={rowActionsDisabled}
                                         />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -277,7 +281,7 @@ export const PremiumNameMarketConfig = () => {
                 open={showAdd}
                 onOpenChange={setShowAdd}
                 rows={rows}
-                actionsDisabled={actionsDisabled}
+                actionsDisabled={rowActionsDisabled}
                 allLengthMarketsCreated={allLengthMarketsCreated}
                 addMarket={addMarket}
                 isAdding={isAdding}

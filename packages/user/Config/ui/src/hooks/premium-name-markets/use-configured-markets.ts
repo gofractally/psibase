@@ -18,7 +18,6 @@ const zRow = z.object({
         .max(MAX_PREMIUM_NAME_LENGTH_MARKET),
     enabled: z.boolean(),
     target: z.number().int().min(1),
-    initialPrice: z.string(),
     floorPrice: z.string(),
     increasePpm: z.number().int().min(1).max(999_999),
     decreasePpm: z.number().int().min(1).max(999_999),
@@ -40,7 +39,6 @@ export const useConfiguredPremiumNameMarkets = () =>
                         length
                         enabled
                         target
-                        initialPrice
                         floorPrice
                         increasePpm
                         decreasePpm

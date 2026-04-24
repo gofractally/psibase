@@ -16,8 +16,6 @@ mod service {
         length: u8,
         enabled: bool,
         target: u32,
-        #[graphql(name = "initialPrice")]
-        initial_price: Decimal,
         #[graphql(name = "floorPrice")]
         floor_price: Decimal,
         #[graphql(name = "windowSeconds")]
@@ -99,15 +97,19 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .map(|auction| {
-                    let mut price_raw = rate_table
+                    let price_raw = rate_table
                         .get_index_pk()
                         .get(&auction.nft_id)
-                        .map(|mut rate_limit| rate_limit.check_difficulty_decrease())
+                        .map(|mut rate_limit| {
+                            let active = rate_limit.check_difficulty_decrease();
+                            // Defensive: in edge cases active can read 0; fall back to floor.
+                            if auction.enabled && active == 0 {
+                                rate_limit.floor_difficulty
+                            } else {
+                                active
+                            }
+                        })
                         .unwrap_or(0);
-                    // DiffAdjust can read 0 before the rate row is populated or in edge cases
-                    if auction.enabled && price_raw == 0 && auction.initial_price.value > 0 {
-                        price_raw = auction.initial_price.value;
-                    }
                     MarketPrice {
                         length: auction.length,
                         price: Decimal::new(Quantity::from(price_raw), precision),
@@ -125,18 +127,24 @@ mod service {
             };
             let precision = token.precision;
             let auctions_table = AuctionsTable::read();
+            let rate_table = RateLimitTable::read();
             let rows: Vec<MarketParams> = auctions_table
                 .get_index_pk()
                 .iter()
-                .map(|a| MarketParams {
-                    length: a.length,
-                    enabled: a.enabled,
-                    target: a.target,
-                    initial_price: Decimal::new(Quantity::from(a.initial_price), precision),
-                    floor_price: Decimal::new(Quantity::from(a.floor_price), precision),
-                    window_seconds: a.window_seconds,
-                    increase_ppm: a.increase_ppm,
-                    decrease_ppm: a.decrease_ppm,
+                .filter_map(|auction| {
+                    let rate_limit = rate_table.get_index_pk().get(&auction.nft_id)?;
+                    Some(MarketParams {
+                        length: auction.length,
+                        enabled: auction.enabled,
+                        target: rate_limit.target_min, // target_min == target_max in our usage
+                        floor_price: Decimal::new(
+                            Quantity::from(rate_limit.floor_difficulty),
+                            precision,
+                        ),
+                        window_seconds: rate_limit.window_seconds,
+                        increase_ppm: rate_limit.increase_ppm,
+                        decrease_ppm: rate_limit.decrease_ppm,
+                    })
                 })
                 .collect();
             rows

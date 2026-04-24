@@ -1,4 +1,6 @@
+import type { PremAccountsOutletContext } from "@/components/prem-accounts-main";
 import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 
 import { siblingUrl } from "@psibase/common-lib";
 
@@ -11,6 +13,7 @@ import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 
 export function PurchasedPage() {
+    const { bumpHistory } = useOutletContext<PremAccountsOutletContext>();
     const { data: loggedInUser } = useCurrentUser();
     const [boughtNames, setBoughtNames] = useState<string[]>([]);
     const [isLoadingNames, setIsLoadingNames] = useState(false);
@@ -104,6 +107,7 @@ export function PurchasedPage() {
             setClaimSuccessNotification({ accountName: name, privateKey });
 
             await loadBoughtNames();
+            bumpHistory();
 
             setTimeout(() => setClaimSuccessMessage(""), 5000);
         } catch (e) {

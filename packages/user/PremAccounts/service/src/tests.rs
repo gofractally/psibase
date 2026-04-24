@@ -288,7 +288,7 @@ mod tests {
 
         let raw: serde_json::Value = chain.graphql(
             PremAccounts::SERVICE,
-            "query { marketParams { length enabled target initialPrice floorPrice windowSeconds increasePpm decreasePpm } }",
+            "query { marketParams { length enabled target floorPrice windowSeconds increasePpm decreasePpm } }",
         )?;
         let markets = raw
             .pointer("/data/marketParams")
@@ -300,7 +300,6 @@ mod tests {
             .expect("marketParams row for length 5");
         assert_eq!(cfg.get("enabled"), Some(&serde_json::json!(true)));
         assert_eq!(cfg.get("target"), Some(&serde_json::json!(8)));
-        assert_eq!(cfg.get("initialPrice"), Some(&serde_json::json!("0.1000")));
         assert_eq!(cfg.get("floorPrice"), Some(&serde_json::json!("0.0150")));
         assert_eq!(
             cfg.get("windowSeconds"),

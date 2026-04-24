@@ -1,7 +1,6 @@
 #[psibase::service_tables]
 pub mod tables {
     use async_graphql::SimpleObject;
-    use psibase::services::tokens::Quantity;
     use psibase::AccountNumber;
     use psibase::{Fracpack, ToSchema};
     use serde::{Deserialize, Serialize};
@@ -21,12 +20,6 @@ pub mod tables {
         pub length: u8,
         pub nft_id: u32,
         pub enabled: bool,
-        pub initial_price: Quantity,
-        pub target: u32,
-        pub floor_price: Quantity,
-        pub window_seconds: u32,
-        pub increase_ppm: u32,
-        pub decrease_ppm: u32,
     }
 
     impl Default for Auction {
@@ -35,12 +28,6 @@ pub mod tables {
                 length: 0,
                 nft_id: 0,
                 enabled: true,
-                initial_price: Quantity::from(0),
-                target: 0,
-                floor_price: Quantity::from(0),
-                window_seconds: 0,
-                increase_ppm: 0,
-                decrease_ppm: 0,
             }
         }
     }
@@ -98,7 +85,7 @@ pub mod service {
     }
 
     /// Apply full DiffAdjust admin params from `configure`.
-    /// Does not set active difficulty; price evolves soley via sales and decay after market creation.
+    /// The local AuctionsTable only stores length/nft_id/enabled; all pricing params live in DiffAdjust.
     fn apply_diff_adjust_configure(
         nft_id: u32,
         window_seconds: u32,
@@ -250,17 +237,11 @@ pub mod service {
                 length,
                 nft_id,
                 enabled: true,
-                initial_price: initial_price.into(),
-                target,
-                floor_price: floor_price.into(),
-                window_seconds: MARKET_WINDOW_SECONDS,
-                increase_ppm,
-                decrease_ppm,
             })
             .unwrap();
     }
 
-    /// Update the params for a name-length market
+    /// Update the params for a name-length market (stored in DiffAdjust).
     ///
     /// # Arguments
     /// * `length` - The length of the name-length market
@@ -269,8 +250,6 @@ pub mod service {
     /// * `floor_price` - The floor price for the name-length market
     /// * `increase_ppm` - The increase ppm for the name-length market
     /// * `decrease_ppm` - The decrease ppm for the name-length market
-    ///
-    /// # Note: Does not change `initial_price` or enabled status.
     #[action]
     fn configure(
         length: u8,
@@ -290,7 +269,7 @@ pub mod service {
             ),
         );
         let auctions_table = AuctionsTable::new();
-        let mut auction = check_some(
+        let auction = check_some(
             auctions_table.get_index_pk().get(&length),
             "auction not found for this length",
         );
@@ -302,12 +281,6 @@ pub mod service {
             increase_ppm,
             decrease_ppm,
         );
-        auction.target = target;
-        auction.floor_price = floor_price;
-        auction.window_seconds = window_seconds;
-        auction.increase_ppm = increase_ppm;
-        auction.decrease_ppm = decrease_ppm;
-        auctions_table.put(&auction).unwrap();
     }
 
     fn toggle_market(length: u8, enabled: bool) {

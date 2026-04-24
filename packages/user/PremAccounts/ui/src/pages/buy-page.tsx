@@ -75,7 +75,7 @@ export function BuyPage() {
             const raw = await graphql(
                 `
                     {
-                        token(tokenId: ${sysTid}) {
+                        token(tokenId: "${sysTid}") {
                             precision
                             symbol
                         }
