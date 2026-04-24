@@ -8,8 +8,8 @@ import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/us
 import { useDisablePremiumNameMarket } from "@/hooks/premium-name-markets/use-disable-market";
 import { useEnablePremiumNameMarket } from "@/hooks/premium-name-markets/use-enable-market";
 import {
-    MAX_PREMIUM_NAME_LENGTH_MARKET,
-    MIN_PREMIUM_NAME_LENGTH_MARKET,
+    DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET,
+    DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET,
 } from "@/lib/premium-name-market-defaults";
 
 import { PageContainer } from "@shared/components/page-container";
@@ -35,8 +35,7 @@ export const PremiumNameMarketConfig = () => {
     /** Rows / dialog fields: wait for token so toggles do not fire blind. */
     const rowActionsDisabled = systemTokenLoading || !hasSystemToken;
     /** Add-market entry points: only block once we know the token is missing. */
-    const tokenMissingConfirmed =
-        !systemTokenLoading && !hasSystemToken;
+    const tokenMissingConfirmed = !systemTokenLoading && !hasSystemToken;
 
     const {
         data: rows,
@@ -82,8 +81,8 @@ export const PremiumNameMarketConfig = () => {
         }
         const lengths = new Set(rows.map((r) => r.length));
         for (
-            let len = MIN_PREMIUM_NAME_LENGTH_MARKET;
-            len <= MAX_PREMIUM_NAME_LENGTH_MARKET;
+            let len = DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET;
+            len <= DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET;
             len++
         ) {
             if (!lengths.has(len)) {
@@ -102,9 +101,9 @@ export const PremiumNameMarketConfig = () => {
                 <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
                     <li>
                         Each row is a premium account name length (1–
-                        {MAX_PREMIUM_NAME_LENGTH_MARKET} characters). When you
-                        add a market, you set the initial price; it cannot be
-                        changed later.
+                        {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET} characters).
+                        When you add a market, you set the initial price; it
+                        cannot be changed later.
                     </li>
                     <li>
                         Use the switch on each row to turn purchases on or off
@@ -181,7 +180,7 @@ export const PremiumNameMarketConfig = () => {
                     >
                         {bootstrapping
                             ? "Configuring…"
-                            : `Configure name markets ${MIN_PREMIUM_NAME_LENGTH_MARKET}-${MAX_PREMIUM_NAME_LENGTH_MARKET} with defaults`}
+                            : `Configure name markets ${DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET}-${DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET} with defaults`}
                     </Button>
                 </div>
             ) : null}

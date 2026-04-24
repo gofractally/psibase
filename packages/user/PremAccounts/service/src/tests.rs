@@ -5,7 +5,9 @@ mod tests {
     /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PPM` for `create` actions.
     const DEFAULT_CREATE_PPM: u32 = 50_000;
 
-    use crate::constants::{MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH};
+    use crate::constants::{
+        DEFAULT_MAX_PREMIUM_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH,
+    };
     use crate::Wrapper as PremAccounts;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::nft::Wrapper as Nfts;
@@ -62,21 +64,21 @@ mod tests {
         Ok(())
     }
 
-    /// Former on-chain defaults (markets are no longer created in `init`).
-    fn bootstrap_markets_1_9(
+    /// One market per premium name length 1..=7 (matches Config default bootstrap range).
+    fn bootstrap_markets_1_7(
         chain: &psibase::Chain,
         admin: AccountNumber,
     ) -> Result<(), psibase::Error> {
         const INITIAL: u64 = 1000;
         const FLOOR: u64 = 100;
         const TARGET: u32 = 10;
-        for len in 1u8..=9u8 {
+        for len in 1u8..=DEFAULT_MAX_PREMIUM_NAME_LENGTH {
             PremAccounts::push_from(chain, admin)
                 .create(
                     len,
-                    INITIAL,
+                    Quantity::from(INITIAL),
                     TARGET,
-                    FLOOR,
+                    Quantity::from(FLOOR),
                     DEFAULT_CREATE_PPM,
                     DEFAULT_CREATE_PPM,
                 )
@@ -87,28 +89,15 @@ mod tests {
 
     /// Full PremAccounts integration on one chain (serial steps; avoids parallel `psitest` races).
     #[psibase::test_case(packages("Tokens", "Nft", "PremAccounts"))]
-    fn prem_accounts_service_integration_serial(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    fn prem_accounts_service_integration_serial(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
         let alice = AccountNumber::from("alice");
 
         // --- setup_tokens ---
         setup_tokens(&chain)?;
 
-        bootstrap_markets_1_9(&chain, alice)?;
-
-        // max_cost below current ask (shared balance is sufficient; max_cost is the binding constraint)
-        Tokens::push_from(&chain, alice)
-            .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
-            .get()?;
-
-        let err = PremAccounts::push_from(&chain, alice)
-            .buy("a".to_string(), 1u64)
-            .trace
-            .error
-            .expect("buy should fail when max_cost is below current price");
-        assert!(
-            err.contains("max cost") || err.contains("max_cost"),
-            "unexpected error: {err}"
-        );
+        bootstrap_markets_1_7(&chain, alice)?;
 
         let raw: serde_json::Value = chain.graphql(
             PremAccounts::SERVICE,
@@ -118,7 +107,7 @@ mod tests {
             .pointer("/data/marketParams")
             .and_then(|v| v.as_array())
             .expect("marketParams array");
-        assert_eq!(listed.len(), 9);
+        assert_eq!(listed.len(), 7);
 
         // --- disable + buy rules + claim ---
         Tokens::push_from(&chain, alice)
@@ -126,7 +115,7 @@ mod tests {
             .get()?;
 
         PremAccounts::push_from(&chain, alice)
-            .buy("test".to_string(), 1000_0000u64)
+            .buy(account!("test"))
             .get()?;
 
         PremAccounts::push_from(&chain, alice).disable(4).get()?;
@@ -150,7 +139,7 @@ mod tests {
         );
 
         let err = PremAccounts::push_from(&chain, alice)
-            .buy("abcd".to_string(), 1000_0000u64)
+            .buy(account!("abcd"))
             .trace
             .error
             .expect("buy should fail when market disabled");
@@ -165,10 +154,7 @@ mod tests {
             .into_contents();
 
         PremAccounts::push_from(&chain, alice)
-            .claim(
-                "test".to_string(),
-                SubjectPublicKeyInfo::from(der),
-            )
+            .claim(account!("test"), SubjectPublicKeyInfo::from(der))
             .get()?;
 
         // --- marketParams + configure ---
@@ -184,7 +170,11 @@ mod tests {
             .pointer("/data/marketParams")
             .and_then(|v| v.as_array())
             .expect("marketParams array");
-        assert_eq!(status.len(), 9, "sparse row per configured market after bootstrap");
+        assert_eq!(
+            status.len(),
+            7,
+            "sparse row per configured market after bootstrap"
+        );
 
         PremAccounts::push_from(&chain, alice).disable(6).get()?;
 
@@ -199,11 +189,7 @@ mod tests {
             .expect("row for length 6");
         assert_eq!(row6.get("enabled"), Some(&serde_json::json!(false)));
 
-        // --- create(10), currentPrices, duplicate create(10) fails ---
-        PremAccounts::push_from(&chain, alice)
-            .create(10, 1000, 10, 100, DEFAULT_CREATE_PPM, DEFAULT_CREATE_PPM)
-            .get()?;
-
+        // --- currentPrices, duplicate create(7) fails ---
         let raw: serde_json::Value = chain.graphql(
             PremAccounts::SERVICE,
             "query { currentPrices { length price } }",
@@ -213,12 +199,20 @@ mod tests {
             .and_then(|v| v.as_array())
             .expect("currentPrices array");
         assert!(
-            rows.iter().any(|v| v.get("length") == Some(&serde_json::json!(10))),
-            "expected length-10 market in currentPrices: {rows:?}"
+            rows.iter()
+                .any(|v| v.get("length") == Some(&serde_json::json!(7))),
+            "expected length-7 market in currentPrices: {rows:?}"
         );
 
         let err = PremAccounts::push_from(&chain, alice)
-            .create(10, 1000, 10, 100, DEFAULT_CREATE_PPM, DEFAULT_CREATE_PPM)
+            .create(
+                7,
+                Quantity::from(1000u64),
+                10,
+                Quantity::from(100u64),
+                DEFAULT_CREATE_PPM,
+                DEFAULT_CREATE_PPM,
+            )
             .trace
             .error
             .expect("duplicate create should fail");
@@ -229,7 +223,14 @@ mod tests {
 
         // --- create(3) rejected (init market) ---
         let err = PremAccounts::push_from(&chain, alice)
-            .create(3, 1000, 10, 100, DEFAULT_CREATE_PPM, DEFAULT_CREATE_PPM)
+            .create(
+                3,
+                Quantity::from(1000u64),
+                10,
+                Quantity::from(100u64),
+                DEFAULT_CREATE_PPM,
+                DEFAULT_CREATE_PPM,
+            )
             .trace
             .error
             .expect("create for existing bootstrap market should fail");
@@ -238,14 +239,26 @@ mod tests {
             "unexpected error: {err}"
         );
 
-        // --- invalid lengths ---
-        for length in [0u8, MAX_PREMIUM_NAME_LENGTH + 1] {
+        // --- create(8) succeeds: valid on-chain name length, no market yet (bootstrap is 1..=7) ---
+        PremAccounts::push_from(&chain, alice)
+            .create(
+                8,
+                Quantity::from(1000u64),
+                10,
+                Quantity::from(100u64),
+                DEFAULT_CREATE_PPM,
+                DEFAULT_CREATE_PPM,
+            )
+            .get()?;
+
+        // --- invalid lengths: must be a valid on-chain account name length (1..=18) ---
+        for length in [0u8, MAX_ACCOUNT_NAME_LENGTH + 1] {
             let err = PremAccounts::push_from(&chain, alice)
                 .create(
                     length,
-                    1000,
+                    Quantity::from(1000u64),
                     10,
-                    100,
+                    Quantity::from(100u64),
                     DEFAULT_CREATE_PPM,
                     DEFAULT_CREATE_PPM,
                 )
@@ -254,7 +267,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("create({length}) should fail"));
             let expected = format!(
                 "market name length must be {}-{}",
-                MIN_PREMIUM_NAME_LENGTH, MAX_PREMIUM_NAME_LENGTH
+                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH
             );
             assert!(
                 err.contains(&expected),
@@ -262,13 +275,13 @@ mod tests {
             );
         }
 
-        // --- buy on length-10 market (already added) ---
+        // --- buy on max premium length (7) ---
         Tokens::push_from(&chain, alice)
             .credit(1, PremAccounts::SERVICE, 1000_0000u64.into(), "".into())
             .get()?;
 
         PremAccounts::push_from(&chain, alice)
-            .buy("abcdefghij".to_string(), 1000_0000u64)
+            .buy(account!("abcdefg"))
             .get()?;
 
         // --- marketParams ---
@@ -280,7 +293,7 @@ mod tests {
                 5,
                 TEST_WINDOW_SECS,
                 8,
-                150,
+                Quantity::from(150u64),
                 TEST_INCREASE_PPM,
                 TEST_DECREASE_PPM,
             )
@@ -322,10 +335,8 @@ mod tests {
         chain: psibase::Chain,
     ) -> Result<(), psibase::Error> {
         setup_tokens(&chain)?;
-        let raw: serde_json::Value = chain.graphql(
-            PremAccounts::SERVICE,
-            "query { marketParams { length } }",
-        )?;
+        let raw: serde_json::Value =
+            chain.graphql(PremAccounts::SERVICE, "query { marketParams { length } }")?;
         let cfg = raw
             .pointer("/data/marketParams")
             .and_then(|v| v.as_array())

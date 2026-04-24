@@ -3,7 +3,7 @@ import {
     MIN_ACCOUNT_NAME_LENGTH,
 } from "@shared/lib/schemas/account";
 
-export function parseNameLength(raw: string): number | null {
+export function parseAccountNameLength(raw: string): number | null {
     const t = raw.trim();
     if (!t) return null;
     if (t.length > 2) return null;

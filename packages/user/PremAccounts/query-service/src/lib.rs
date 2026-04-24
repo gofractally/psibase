@@ -2,10 +2,9 @@
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;
-    use diff_adjust::tables::RateLimitTable;
     use prem_accounts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
     use prem_accounts::Wrapper as PremAccountsService;
-    // use psibase::services::diff_adjust::tables::RateLimitTable;
+    use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::tokens::{Decimal, Quantity, Wrapper as TokensWrapper};
     use psibase::*;
     use serde::Deserialize;
@@ -97,19 +96,16 @@ mod service {
                 .get_index_pk()
                 .iter()
                 .map(|auction| {
-                    let price_raw = rate_table
-                        .get_index_pk()
-                        .get(&auction.nft_id)
-                        .map(|mut rate_limit| {
-                            let active = rate_limit.check_difficulty_decrease();
-                            // Defensive: in edge cases active can read 0; fall back to floor.
-                            if auction.enabled && active == 0 {
-                                rate_limit.floor_difficulty
-                            } else {
-                                active
-                            }
-                        })
-                        .unwrap_or(0);
+                    // Delegate effective difficulty to DiffAdjust (same as `get_diff` action).
+                    let mut price_raw = DiffAdjust::call().get_diff(auction.nft_id);
+                    // Defensive: in edge cases active can read 0; fall back to stored floor.
+                    if auction.enabled && price_raw == 0 {
+                        price_raw = rate_table
+                            .get_index_pk()
+                            .get(&auction.nft_id)
+                            .map(|r| r.floor_difficulty)
+                            .unwrap_or(0);
+                    }
                     MarketPrice {
                         length: auction.length,
                         price: Decimal::new(Quantity::from(price_raw), precision),

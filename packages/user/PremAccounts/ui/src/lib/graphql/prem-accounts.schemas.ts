@@ -1,13 +1,16 @@
 import { z } from "zod";
 
-import { MAX_PREMIUM_NAME_LENGTH, MIN_PREMIUM_NAME_LENGTH } from "../prem-service";
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
 
 export const zCurrentPriceRow = z.object({
     length: z
         .number()
         .int()
-        .min(MIN_PREMIUM_NAME_LENGTH)
-        .max(MAX_PREMIUM_NAME_LENGTH),
+        .min(MIN_ACCOUNT_NAME_LENGTH)
+        .max(MAX_ACCOUNT_NAME_LENGTH),
     price: z.string(),
 });
 

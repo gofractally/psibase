@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const MIN_ACCOUNT_NAME_LENGTH = 1;
-export const MAX_ACCOUNT_NAME_LENGTH = 10;
+export const MAX_ACCOUNT_NAME_LENGTH = 18;
 
 export const zAccount = z
     .string()

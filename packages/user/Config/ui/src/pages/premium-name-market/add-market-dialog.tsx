@@ -3,10 +3,10 @@ import type { UseMutateFunction } from "@tanstack/react-query";
 
 import { useEffect, useMemo, useState } from "react";
 
-import { PREMIUM_MARKET_DEFAULTS } from "@/lib/premium-name-market-defaults";
+import { PREMIUM_MARKET_DEFAULT_PARAMS } from "@/lib/premium-name-market-defaults";
 import {
-    MAX_PREMIUM_NAME_LENGTH_MARKET,
-    MIN_PREMIUM_NAME_LENGTH_MARKET,
+    DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET,
+    DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET,
 } from "@/lib/premium-name-market-defaults";
 
 import { Button } from "@shared/shadcn/ui/button";
@@ -20,7 +20,7 @@ import {
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { parseNameLength, parsePositiveInt, parsePpm } from "./parsers";
+import { parseAccountNameLength, parsePositiveInt, parsePpm } from "./parsers";
 
 type AddMarketParams = [number, string, number, string, number, number];
 
@@ -47,33 +47,33 @@ export function AddMarketDialog({
 }: AddMarketDialogProps) {
     const [newLengthRaw, setNewLengthRaw] = useState("");
     const [addInitial, setAddInitial] = useState<string>(
-        PREMIUM_MARKET_DEFAULTS.initialPrice,
+        PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice,
     );
     const [addFloor, setAddFloor] = useState<string>(
-        PREMIUM_MARKET_DEFAULTS.floorPrice,
+        PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice,
     );
     const [addTargetRaw, setAddTargetRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULTS.target),
+        String(PREMIUM_MARKET_DEFAULT_PARAMS.target),
     );
     const [addIncreasePpmRaw, setAddIncreasePpmRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULTS.increasePpm),
+        String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm),
     );
     const [addDecreasePpmRaw, setAddDecreasePpmRaw] = useState(
-        String(PREMIUM_MARKET_DEFAULTS.decreasePpm),
+        String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm),
     );
 
     useEffect(() => {
         if (!open) return;
         setNewLengthRaw("");
-        setAddInitial(PREMIUM_MARKET_DEFAULTS.initialPrice);
-        setAddFloor(PREMIUM_MARKET_DEFAULTS.floorPrice);
-        setAddTargetRaw(String(PREMIUM_MARKET_DEFAULTS.target));
-        setAddIncreasePpmRaw(String(PREMIUM_MARKET_DEFAULTS.increasePpm));
-        setAddDecreasePpmRaw(String(PREMIUM_MARKET_DEFAULTS.decreasePpm));
+        setAddInitial(PREMIUM_MARKET_DEFAULT_PARAMS.initialPrice);
+        setAddFloor(PREMIUM_MARKET_DEFAULT_PARAMS.floorPrice);
+        setAddTargetRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.target));
+        setAddIncreasePpmRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.increasePpm));
+        setAddDecreasePpmRaw(String(PREMIUM_MARKET_DEFAULT_PARAMS.decreasePpm));
     }, [open]);
 
     const parsedLength = useMemo(
-        () => parseNameLength(newLengthRaw),
+        () => parseAccountNameLength(newLengthRaw),
         [newLengthRaw],
     );
 
@@ -91,7 +91,8 @@ export function AddMarketDialog({
     const lengthTooLong =
         trimmedLen.length > 2 ||
         (/^\d+$/.test(trimmedLen) &&
-            Number.parseInt(trimmedLen, 10) > MAX_PREMIUM_NAME_LENGTH_MARKET);
+            Number.parseInt(trimmedLen, 10) >
+                DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET);
 
     const duplicate =
         parsedLength !== null &&
@@ -115,14 +116,15 @@ export function AddMarketDialog({
                 <div className="flex flex-col gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="new-premium-market-length">
-                            Name length (1-{MAX_PREMIUM_NAME_LENGTH_MARKET})
+                            Name length (1-
+                            {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET})
                         </Label>
                         <Input
                             id="new-premium-market-length"
                             inputMode="numeric"
                             autoComplete="off"
                             maxLength={2}
-                            placeholder={`1-${MAX_PREMIUM_NAME_LENGTH_MARKET}`}
+                            placeholder={`1-${DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET}`}
                             value={newLengthRaw}
                             onChange={(e) => setNewLengthRaw(e.target.value)}
                             disabled={actionsDisabled}
@@ -136,7 +138,7 @@ export function AddMarketDialog({
                         {lengthTooLong ? (
                             <p className="text-destructive text-sm">
                                 Name length must be at most{" "}
-                                {MAX_PREMIUM_NAME_LENGTH_MARKET}.
+                                {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET}.
                             </p>
                         ) : null}
                         {duplicate ? (
@@ -149,8 +151,8 @@ export function AddMarketDialog({
                         !lengthTooLong ? (
                             <p className="text-destructive text-sm">
                                 Enter a whole number from{" "}
-                                {MIN_PREMIUM_NAME_LENGTH_MARKET} to{" "}
-                                {MAX_PREMIUM_NAME_LENGTH_MARKET}.
+                                {DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET} to{" "}
+                                {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET}.
                             </p>
                         ) : null}
                     </div>
