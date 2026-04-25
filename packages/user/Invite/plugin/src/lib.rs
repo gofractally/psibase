@@ -162,9 +162,7 @@ impl Invitee for InvitePlugin {
 fn use_active_invite() {
     hook_actions_sender();
 
-    credentials::api::sign_latch(&credentials::types::Credential {
-        p256_priv: InviteTokensTable::active_credential_key().unwrap(),
-    });
+    credentials::api::use_p256_credential(&InviteTokensTable::active_credential_key().unwrap());
 }
 
 impl Redemption for InvitePlugin {

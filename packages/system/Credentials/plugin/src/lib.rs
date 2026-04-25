@@ -2,17 +2,17 @@
 mod bindings;
 
 use bindings::*;
-use exports::credentials::plugin::{api::Guest as Api, types::Credential};
+use exports::credentials::plugin::api::Guest as Api;
 use host::crypto::keyvault as HostCrypto;
+use host::types::types::{Claim, Pem};
 use transact::plugin::intf as Transact;
-use transact::plugin::types::Claim;
 
 struct Credentials;
 
 impl Api for Credentials {
-    fn sign_latch(credential: Credential) {
-        let pubkey_pem = HostCrypto::import_temporary(&credential.p256_priv)
-            .expect("host:crypto::import_temporary failed");
+    fn use_p256_credential(p256_priv: Pem) {
+        let pubkey_pem = HostCrypto::import_key_transient(&p256_priv)
+            .expect("host:crypto::import_key_transient failed");
         let pubkey_der = HostCrypto::to_der(&pubkey_pem).expect("host:crypto::to_der failed");
 
         let claim = Claim {
