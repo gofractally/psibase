@@ -82,7 +82,7 @@ impl Api for WebCryptoShim {
         Ok(public_key)
     }
 
-    fn import_temporary(private_key: Pem) -> Result<Pem, HostTypes::Error> {
+    fn import_key_transient(private_key: Pem) -> Result<Pem, HostTypes::Error> {
         assert!(Client::get_sender() == "supervisor");
 
         let public_key = pub_from_priv(private_key.clone())?;

@@ -277,9 +277,9 @@ export class Supervisor implements AppInterface {
         );
     }
 
-    importTemporary(privateKey: string): string {
+    importKeyTransient(privateKey: string): string {
         return this.supervisorCall(
-            getCallArgs("webcrypto", "plugin", "api", "importTemporary", [
+            getCallArgs("webcrypto", "plugin", "api", "importKeyTransient", [
                 privateKey,
             ]),
         );

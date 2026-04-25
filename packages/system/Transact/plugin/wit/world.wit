@@ -62,14 +62,7 @@ interface intf {
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
 
-    /// Append a `claim` to the current transaction. At finish-tx, Transact
-    /// produces the matching proof by calling `host:crypto/keyvault.sign`
-    /// with `claim.raw-data` (typically a DER-encoded public key); the host
-    /// keystore (persistent or transient — see
-    /// `host:crypto/keyvault.import-temporary`) must contain the matching
-    /// private key.
-    ///
-    /// May be called any number of times during transaction construction.
+    /// Appends a `claim` and its corresponding proof/signature to the current transaction.
     add-signature: func(claim: claim) -> result<_, error>;
 
     /// Set or clear the propose-latch.
