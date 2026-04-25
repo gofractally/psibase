@@ -79,8 +79,8 @@ impl Api for HostAuth {
         Ok(())
     }
 
-    fn log_out_user(user: String, app: String) {
-        check_caller(&["accounts"], "log_out_user@host:auth/api");
+    fn end_session(user: String, app: String) {
+        check_caller(&["accounts"], "end-session@host:auth/api");
         remove_active_query_token(&app, &user);
     }
 

@@ -26,8 +26,8 @@ interface api {
         claim: option<claim>,
     ) -> result<_, error>;
 
-    /// Notify of user logout
-    log-out-user: func(user: string, app: string);
+    /// End the cached session for `(user, app)`.
+    end-session: func(user: string, app: string);
 
     /// Privileged apps can get the query token to make calls on user's behalf
     get-active-query-token: func(app: string, user: string) -> option<string>;
