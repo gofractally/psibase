@@ -143,10 +143,6 @@ mod service {
             .await
         }
 
-        async fn example_thing(&self) -> String {
-            "guilds::Wrapper::call().getExampleThing()".to_string()
-        }
-
         /// This query gets paginated historical updates of the Example Thing.
         async fn historical_updates(
             &self,

@@ -5,6 +5,8 @@ use std::str::FromStr;
 
 use bindings::exports::guilds::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::guilds::plugin::admin_guild::Guest as AdminGuild;
+use bindings::exports::guilds::plugin::queries::Guest as Queries;
+use bindings::exports::guilds::plugin::queries::Guild as GuildWit;
 use bindings::exports::guilds::plugin::user_eval::Guest as UserEval;
 use bindings::exports::guilds::plugin::user_guild::Guest as UserGuild;
 
@@ -95,6 +97,12 @@ impl graphql::guild::Guild {
 }
 
 struct GuildsPlugin;
+
+impl Queries for GuildsPlugin {
+    fn get_guild(guild_account: String) -> Result<GuildWit, Error> {
+        get_guild(guild_account).map(|guild| guild.into())
+    }
+}
 
 impl AdminFractal for GuildsPlugin {
     fn set_role_map(role_id: u8, guild: String) -> Result<(), Error> {

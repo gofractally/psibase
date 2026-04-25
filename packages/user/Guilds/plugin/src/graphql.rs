@@ -1,4 +1,5 @@
 pub mod guild {
+    use crate::bindings::exports::guilds::plugin::queries::Guild as GuildWit;
     use crate::bindings::host::types::types as HostTypes;
     use crate::bindings::host::types::types::Error;
     use crate::{bindings::host::common::server as CommonServer, errors::ErrorType};
@@ -86,5 +87,17 @@ pub mod guild {
 
     pub fn get_guild(guild: String) -> Result<Guild, Error> {
         fetch_guild(guild.as_str().into()).map(|guild| Guild::from(guild))
+    }
+
+    impl From<Guild> for GuildWit {
+        fn from(value: Guild) -> Self {
+            Self {
+                council_role: value.council_role.to_string(),
+                evaluation_id: value.evaluation_id,
+                fractal: value.fractal.to_string(),
+                guild: value.guild.to_string(),
+                rep_role: value.rep_role.to_string(),
+            }
+        }
     }
 }
