@@ -4,7 +4,7 @@ import { zUnix } from "@shared/lib/schemas/unix";
 
 import {
     EVALUATIONS_SERVICE,
-    FRACTALS_SERVICE,
+    GUILDS_SERVICE,
 } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
@@ -28,7 +28,7 @@ export const getEvaluation = async (id: number) => {
     const evaluation = await graphql(
         `
     {
-        getEvaluation(owner: "${FRACTALS_SERVICE}", evaluationId: ${id}) {     
+        getEvaluation(owner: "${GUILDS_SERVICE}", evaluationId: ${id}) {     
             id,
             createdAt,
             owner,

@@ -8,7 +8,7 @@ mod service {
         Guild, GuildApplication, GuildApplicationTable, GuildMember, GuildMemberTable, GuildTable,
         RankingTable, RoleMap, RoleMapTable,
     };
-    use psibase::*;
+    use psibase::{AccountNumber, *};
     use serde::Deserialize;
 
     #[derive(Deserialize, SimpleObject)]
@@ -55,6 +55,16 @@ mod service {
                 .query()
                 .await
             }
+        }
+
+        async fn guild_membership(
+            &self,
+            guild: AccountNumber,
+            member: AccountNumber,
+        ) -> Option<GuildMember> {
+            GuildMemberTable::read()
+                .get_index_pk()
+                .get(&(guild, member))
         }
 
         async fn guilds_by_owner(
@@ -104,6 +114,26 @@ mod service {
             TableQuery::subindex::<AccountNumber>(
                 GuildMemberTable::with_service(guilds::SERVICE).get_index_by_member(),
                 &(member),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
+        async fn scores(
+            &self,
+            guild: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, GuildMember>> {
+            TableQuery::subindex::<AccountNumber>(
+                GuildMemberTable::with_service(guilds::SERVICE).get_index_pk(),
+                &(guild),
             )
             .first(first)
             .last(last)

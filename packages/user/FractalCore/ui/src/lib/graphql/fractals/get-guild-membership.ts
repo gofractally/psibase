@@ -1,13 +1,10 @@
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
 
-const FractalSchema = z.object({
-    account: zAccount,
-});
 
 const RepSchema = z.object({
     member: zAccount,
@@ -18,7 +15,6 @@ const GuildSchema = z.object({
     displayName: z.string(),
     candidacyCooldown: z.number().int(),
     council: zAccount.array().nullable(),
-    fractal: FractalSchema,
     rep: RepSchema,
 });
 
@@ -50,9 +46,6 @@ export const getGuildMembership = async (guild: Account, member: Account) => {
                     displayName
                     candidacyCooldown
                     council
-                    fractal {
-                        account
-                    }
                     rep {
                         member
                     }
@@ -61,7 +54,7 @@ export const getGuildMembership = async (guild: Account, member: Account) => {
             }
         }
     `,
-        { service: FRACTALS_SERVICE },
+        { service: GUILDS_SERVICE },
     );
 
     return DataSchema.parse(res).guildMembership;
