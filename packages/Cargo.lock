@@ -655,7 +655,9 @@ checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 name = "config"
 version = "0.23.0"
 dependencies = [
+ "psibase",
  "psibase-plugin-workspace-hack",
+ "serde_json",
  "wit-bindgen-rt",
 ]
 
