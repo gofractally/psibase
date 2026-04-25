@@ -206,8 +206,7 @@ impl AdminGuild for GuildsPlugin {
     }
 
     fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
-        // let guild = get_guild(guild_account.clone())?;
-        // guild.assert_authorized(FunctionName::create_guild)?;
+        assert_authorized(FunctionName::create_guild)?;
 
         let packed_args = guilds::action_structs::create_guild {
             fractal: get_sender_app()?,
@@ -302,10 +301,7 @@ impl AdminGuild for GuildsPlugin {
             rank_ordering_threshold: threshold,
         }
         .packed();
-        add_action_to_transaction(
-            guilds::action_structs::set_thres::ACTION_NAME, // Note: check if this is correct in guilds
-            &packed_args,
-        )
+        add_action_to_transaction(guilds::action_structs::set_thres::ACTION_NAME, &packed_args)
     }
 
     fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
@@ -368,7 +364,6 @@ impl AdminGuild for GuildsPlugin {
 
 impl UserGuild for GuildsPlugin {
     fn apply_guild(guild_account: String, extra_info: String) -> Result<(), Error> {
-        // fixed signature
         get_guild(guild_account.clone())?.assert_authorized(FunctionName::apply_guild)?;
 
         let packed_args = guilds::action_structs::apply_guild {
@@ -438,8 +433,7 @@ impl UserGuild for GuildsPlugin {
         add_action_to_transaction(
             guilds::action_structs::inv_g_member::ACTION_NAME,
             &packed_args,
-        )
-        .unwrap(); // consider handling this error properly
+        )?;
 
         Ok(d.invite_token)
     }
