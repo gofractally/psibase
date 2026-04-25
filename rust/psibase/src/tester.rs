@@ -1079,6 +1079,71 @@ impl<'a> Caller for ChainPusher<'a> {
     }
 }
 
+/// A [`Caller`] that uses [`staged_tx::propose`](crate::services::staged_tx)
+/// to wrap an action call (to a service from itself) in a proposal by `proposer`.
+#[derive(Clone, Debug)]
+pub struct ProposalPusher<'a> {
+    pub chain: &'a Chain,
+    pub proposer: AccountNumber,
+    pub service: AccountNumber,
+}
+
+impl<'a> Caller for ProposalPusher<'a> {
+    type ReturnsNothing = ChainEmptyResult;
+    type ReturnType<T: fracpack::UnpackOwned> = ChainEmptyResult;
+
+    fn call_returns_nothing<Args: fracpack::Pack>(
+        &self,
+        method: crate::MethodNumber,
+        args: Args,
+    ) -> Self::ReturnsNothing {
+        let action = Action {
+            sender: self.service,
+            service: self.service,
+            method,
+            rawData: args.packed().into(),
+        };
+        let result = crate::services::staged_tx::Wrapper::push_from(self.chain, self.proposer)
+            .propose(vec![action], true);
+        ChainEmptyResult {
+            trace: result.trace,
+        }
+    }
+
+    fn call<Ret: fracpack::UnpackOwned, Args: fracpack::Pack>(
+        &self,
+        method: crate::MethodNumber,
+        args: Args,
+    ) -> Self::ReturnType<Ret> {
+        self.call_returns_nothing(method, args)
+    }
+}
+
+/// Extension trait for service wrappers that enables tests to propose actions
+/// through [`staged_tx`](crate::services::staged_tx).
+///
+/// Implement with a one-liner on any service `Wrapper`:
+/// ```ignore
+/// impl ProposeExt for Wrapper {}
+/// ```
+///
+/// Then use it in tests:
+/// ```ignore
+/// Wrapper::propose(&chain, proposer).some_action(args).get()?;
+/// ```
+pub trait ProposeExt: crate::ToServiceSchema + crate::ServiceWrapper {
+    fn propose(
+        chain: &Chain,
+        proposer: AccountNumber,
+    ) -> <Self as crate::ServiceWrapper>::Actions<ProposalPusher<'_>> {
+        Self::with_caller(ProposalPusher {
+            chain,
+            proposer,
+            service: <Self as crate::ToServiceSchema>::SERVICE,
+        })
+    }
+}
+
 #[cfg(target_family = "wasm")]
 #[allow(non_snake_case)]
 pub mod polyfill {
