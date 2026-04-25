@@ -157,7 +157,7 @@ impl Guild {
     }
 
     pub fn council_members(&self) -> Option<Vec<GuildMember>> {
-        let council: Vec<GuildMember> = GuildMemberTable::read()
+        let members: Vec<_> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
                 (self.account, true, 0, AccountNumber::new(0))
@@ -168,7 +168,7 @@ impl Guild {
             .filter(|member| member.score != 0)
             .collect();
 
-        (council.len() > 0).then_some(council)
+        (members.len() > 0).then_some(members)
     }
 
     pub fn representative(&self) -> Option<GuildMember> {
