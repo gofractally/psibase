@@ -31,7 +31,7 @@ export const useUserResources = (
 
             const query = `
                 query {
-                    userResources(user: "${user}") {
+                    userResources(account: "${user}") {
                         balance
                         bufferCapacity
                         autoFillThresholdPercent
