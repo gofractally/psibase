@@ -1,5 +1,5 @@
 use crate::bindings::host::common as Host;
-use crate::bindings::transact::plugin::types::*;
+use crate::bindings::host::types::types::Claim;
 use psibase::{AccountNumber, Hex, Tapos, TimePointSec};
 use serde::Deserialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

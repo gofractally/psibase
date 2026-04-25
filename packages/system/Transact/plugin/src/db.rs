@@ -1,5 +1,6 @@
 use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
-use crate::bindings::transact::plugin::types::{Action, Claim};
+use crate::bindings::host::types::types::Claim;
+use crate::bindings::transact::plugin::types::Action;
 use psibase::fracpack::{Pack, Unpack};
 use std::cell::RefCell;
 use std::thread_local;

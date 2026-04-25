@@ -1,15 +1,7 @@
 package transact:plugin;
 
 interface types {
-    /// A list of `claim` objects is added to every submitted transaction.
-    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
-    record claim {
-        /// The name of the service used to verify the claim is valid
-        verify-service: string,
-        /// The raw claim data (typically the DER-encoded public key
-        /// whose matching private key produces the proof)
-        raw-data: list<u8>,
-    }
+    use host:types/types.{claim};
 
     /// Action data from a transaction
     record action {

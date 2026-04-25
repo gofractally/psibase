@@ -13,13 +13,12 @@ use exports::host::auth::api::Guest as Api;
 use psibase::fracpack::{Pack, Unpack};
 
 use crate::bindings::{
-    exports::host::auth::api::Claim,
     host::{
         common::admin as HostAdmin,
         db::store::{Bucket, Database, DbMode, StorageDuration},
-        types::types::{BodyTypes, Error, PostRequest},
+        types::types::{BodyTypes, Claim, Error, PostRequest},
     },
-    transact::plugin::{auth as Transact, types as TxTypes},
+    transact::plugin::auth as Transact,
 };
 
 struct HostAuth;
@@ -74,12 +73,7 @@ impl Api for HostAuth {
     fn new_session(user: String, app: String, claim: Option<Claim>) -> Result<(), Error> {
         check_caller(&["accounts"], "new-session@host:auth/api");
 
-        let tx_claim = claim.as_ref().map(|c| TxTypes::Claim {
-            verify_service: c.verify_service.clone(),
-            raw_data: c.raw_data.clone(),
-        });
-
-        let token = Transact::get_query_token(&app, &user, tx_claim.as_ref())?;
+        let token = Transact::get_query_token(&app, &user, claim.as_ref())?;
         cache_token(&token, &app, &user);
         install_cookie(&token, &app);
         Ok(())

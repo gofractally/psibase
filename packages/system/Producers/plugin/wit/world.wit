@@ -1,15 +1,11 @@
 package producers:plugin;
 
 interface types {
+    use host:types/types.{claim};
 
     variant claim-type {
         pubkey-pem(string),
         generic(claim),
-    }
-
-    record claim {
-        verify-service: string,
-        raw-data: list<u8>,
     }
 }
 

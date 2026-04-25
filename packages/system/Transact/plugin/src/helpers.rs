@@ -1,8 +1,8 @@
 use crate::bindings::accounts::plugin::api::get_current_user;
 use crate::bindings::host::common as Host;
 use crate::bindings::host::crypto::keyvault as HostCrypto;
-use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, PluginRef};
-use crate::bindings::transact::plugin::types::{Action, Claim};
+use crate::bindings::host::types::types::{self as HostTypes, BodyTypes, Claim, PluginRef};
+use crate::bindings::transact::plugin::types::Action;
 use crate::errors::ErrorType::*;
 use crate::types::FromExpirationTime;
 use crate::{ActionSenderHook, ProposeLatch, TxSignatures};

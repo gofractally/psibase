@@ -1,18 +1,7 @@
 package host:auth;
 
-/// Credential type forwarded through `api.new-session` to
-/// `transact:plugin/auth.get-query-token` to mint a fresh `/login`
-/// token.
-interface types {
-    record claim {
-        verify-service: string,
-        raw-data: list<u8>,
-    }
-}
-
 interface api {
-    use host:types/types.{error};
-    use types.{claim};
+    use host:types/types.{claim, error};
 
     /// Install an existing query-token cookie for `(user, app)`.
     ///

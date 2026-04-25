@@ -13,8 +13,8 @@ use db::*;
 
 use host::common::{self as Host, server as Server};
 use host::db::store as Store;
-use host::types::types::{self as HostTypes, BodyTypes};
-use transact::plugin::types::{Action, Claim};
+use host::types::types::{self as HostTypes, BodyTypes, Claim};
+use transact::plugin::types::Action;
 use virtual_server::plugin::transact as VirtualServer;
 
 use exports::transact::plugin::{
@@ -297,9 +297,7 @@ impl Auth for TransactPlugin {
             raw_data: (root_host,).packed(),
         };
 
-        let tx_claim = claim
-            .as_ref()
-            .map(|c| psibase::Claim::from(c.clone()));
+        let tx_claim = claim.as_ref().map(|c| psibase::Claim::from(c.clone()));
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
