@@ -222,14 +222,14 @@ export class Supervisor implements AppInterface {
 
     private authorizeCurrentUser(): void {
         const user = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "getCurrentUser", []),
+            getCallArgs("accounts", "plugin", "api", "get-current-user", []),
         );
         if (!user) {
             return;
         }
 
         const account = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "api", "getAccount", [user]),
+            getCallArgs("accounts", "plugin", "api", "get-account", [user]),
         );
         if (!account) {
             return;
@@ -279,7 +279,7 @@ export class Supervisor implements AppInterface {
 
     importKeyTransient(privateKey: string): string {
         return this.supervisorCall(
-            getCallArgs("webcrypto", "plugin", "api", "importKeyTransient", [
+            getCallArgs("webcrypto", "plugin", "api", "import-key-transient", [
                 privateKey,
             ]),
         );
