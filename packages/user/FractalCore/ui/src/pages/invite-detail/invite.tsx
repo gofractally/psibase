@@ -33,7 +33,7 @@ export const Invite = () => {
     const token = searchParams.get("token");
 
 
-    const { data: fractal } = useFractal()
+    const { data: fractal } = useFractal();
     const {
         data: invite,
         error,
