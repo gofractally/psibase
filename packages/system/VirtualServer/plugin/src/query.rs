@@ -24,16 +24,16 @@ struct UserResources {
     auto_fill_threshold_percent: u64,
 }
 
-pub fn get_user_resources(user: &str) -> Result<(u64, u64, u64), Error> {
+pub fn get_user_resources(account: &str) -> Result<(u64, u64, u64), Error> {
     let query = format!(
         r#"query {{
-            userResources(user: "{}") {{
+            userResources(account: "{}") {{
                 balance
                 bufferCapacity
                 autoFillThresholdPercent
             }}
         }}"#,
-        user
+        account
     );
 
     let response_str = server::post_graphql_get_json(&query)?;

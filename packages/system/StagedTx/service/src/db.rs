@@ -245,7 +245,7 @@ pub mod impls {
     }
 
     impl LastUsed {
-        fn get_next_id() -> u32 {
+        pub fn get_next_id() -> u32 {
             let table = LastUsedTable::new();
             let mut last_used = table.get_index_pk().get(&()).unwrap_or_default();
             last_used.id += 1;

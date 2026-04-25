@@ -77,14 +77,16 @@ impl Admin for VirtualServerPlugin {
             block_replay_factor: variables.block_replay_factor,
             per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
             obj_storage_bytes: variables.obj_storage_bytes,
+            subj_storage_bytes: variables.subj_storage_bytes,
         });
         Ok(())
     }
 
-    fn enable_billing(enabled: bool) -> Result<(), Error> {
+    fn enable_billing(enabled: bool, payer: Option<String>) -> Result<(), Error> {
         assert_caller(&["config"], "enable_billing");
 
-        VirtualServer::add_to_tx().enable_billing(enabled);
+        let payer = payer.map(|p| AccountNumber::from(p.as_str()));
+        VirtualServer::add_to_tx().enable_billing(enabled, payer);
         Ok(())
     }
 

@@ -24,6 +24,8 @@ pub struct NetworkVariables {
     pub per_block_sys_cpu_ns: u64,
     /// Amount of storage space in bytes allocated to objective state
     pub obj_storage_bytes: u64,
+    /// Amount of storage space in bytes allocated to subjective (node-local) state
+    pub subj_storage_bytes: u64,
 }
 
 /// Parameters related to the automatic management of an account resource buffer.
@@ -40,19 +42,47 @@ pub struct BufferConfig {
 
 /// Virtual Server Service
 ///
-/// This service defines a "virtual server" that represents the "server" with which
-/// a user interacts when they connect to any full node on the network.
+/// This service defines a "virtual server" that represents the subset of a real server that
+/// a node operator dedicates to running their network node. A user then interacts with one
+/// or more virtual servers that are peered together to form a network. The network has
+/// effective specifications that are derived from (and necessarily lower than) the virtual
+/// server specs. The difference in specs comes from various overhead costs incurred by the
+/// management of the network.
 ///
-/// This service distinguishes between the specs of the network itself, and
-/// the specs of an individual node that runs the virtual server. The actual node
-/// specs must meet or exceed the specs defined for the virtual server. And the
-/// derived network specs will always be less than the virtual server specs to account
-/// for various overheads (e.g. from running a distributed network, desired replay
-/// speed, etc).
+/// Example diagram:
 ///
-/// This service also defines a billing system that allows for the network to meter
-/// the consumption of resources by users. A user must send system tokens to this service,
-/// which are then held in reserve for the user.
+/// .------------------------.  .------------------------.  .------------------------.
+/// |     Actual Server 1    |  |     Actual Server 2    |  |     Actual Server 3    |
+/// |                        |  |                        |  |                        |
+/// |    100 Gbps network    |  |    50 Gbps network     |  |    100 Gbps network    |
+/// |       2 TB disk        |  |       1 TB disk        |  |      300 GB disk       |
+/// |                        |  |                        |  |                        |
+/// | .--------------------. |  | .--------------------. |  | .--------------------. |
+/// | |  Virtual Server 1  | |  | |  Virtual Server 2  | |  | |  Virtual Server 3  | |
+/// | |  10 Gbps network   | |  | |  10 Gbps network   | |  | |  10 Gbps network   | |
+/// | |    100 GB disk     | |  | |    100 GB disk     | |  | |    100 GB disk     | |
+/// | '---------+----------' |  | '---------+----------' |  | '--------------------' |
+/// '-----------|------------'  '-----------|------------'  '-----------+------------'
+///             |                           |                           |
+///             |                           V                           |
+///             |        .--------------------------------------.       |
+///             |        |               Network                |       |
+///             +------->|  .--------------------------------.  |<------+
+///                      |  |            1 Gbps              |  |
+///                      |  |    50 GB replicated storage    |  |
+///                      |  |    50 GB node-local storage    |  |
+///                      |  '-------------------------------'   |
+///                      '-------------------^------------------'
+///                                          |
+///                                          v
+///                                    .-----------.
+///                                    |   User    |
+///                                    '-----------'
+///
+/// This service also manages monitoring all of the network's resource consumption, and exposes
+/// an interface that can be used to tune a billing system for rate-limiting per-account resource
+/// consumption. Users can send system tokens into a "reserve" that can be subsequently redeemed for
+/// resource consumption.
 ///
 /// As physical resources (CPU, disk space, network bandwidth, etc.) are consumed, the
 /// real-time price of the resource is billed to the user's reserved balance. Reserved system
@@ -70,9 +100,11 @@ pub struct BufferConfig {
 /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
 ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
 ///     receive all of the system token fees paid for resources by users.
-/// 3 - Call `enable_billing`: When ready (when existing users have accumulated system tokens),
-///     calling this action will enable the billing system. To call this, the caller must have
-///     already filled their resource buffer because the action to enable billing is itself billed.
+/// 3 - Call `enable_billing(true, Some(payer))`: When ready, calling this action enables the
+///     billing system. Two requirements: (a) the caller must have already filled their resource
+///     buffer because this action is itself billed, and (b) `payer` must have credited sufficient
+///     system tokens to this service to settle any net disk consumption that accumulated while
+///     billing was disabled (see the `enableBillingCost` GraphQL query for the required amount).
 ///
 /// > Note: typically, step 1 should be called at system boot, and therefore the network should
 /// >       always at least have some server specs and derived network specs.
@@ -99,8 +131,7 @@ mod service {
 
     /// Initializes the billing system
     ///
-    /// If no specs are provided, some default specs are used that define a server
-    ///   with minimal specs.
+    /// The `fee_receiver` account will receive all resource billing fees.
     ///
     /// After calling this action, the billing system is NOT yet enabled. The
     /// `enable_billing` action must be called explicitly to enable user billing.
@@ -142,8 +173,12 @@ mod service {
     /// If billing is disabled, resource consumption will still be tracked, but the resources will
     /// not be automatically metered by the network. This is insecure and allows users to abuse
     /// the network by consuming all of the network's resources.
+    ///
+    /// `payer` is required only when `enabled = true`: that account must have previously credited
+    /// sufficient system tokens to this service to cover the settlement cost of any net disk
+    /// consumption that occurred while billing was disabled.
     #[action]
-    fn enable_billing(enabled: bool) {
+    fn enable_billing(enabled: bool, payer: Option<AccountNumber>) {
         unimplemented!()
     }
 
@@ -232,7 +267,7 @@ mod service {
         unimplemented!()
     }
 
-    /// Returns the current cost (in system tokens) of a typically sized resource buffer
+    /// Returns the current cost of a typically sized resource buffer
     #[action]
     fn std_buffer_cost() -> Quantity {
         unimplemented!()
@@ -344,6 +379,27 @@ mod service {
         unimplemented!()
     }
 
+    /// Reduce the disk-pricing reserve budget by `delta_supply`.
+    ///
+    /// The reserve budget caps the system tokens that may be sold into the disk-pricing
+    /// relay. Reducing it lowers the spot price of disk.
+    #[action]
+    fn reduce_disk_budget(delta_supply: Quantity) {
+        unimplemented!()
+    }
+
+    /// Returns the current cost of consuming the specified number of bytes
+    #[action]
+    fn get_disk_cost(bytes: u64) -> Quantity {
+        unimplemented!()
+    }
+
+    /// Gets the estimated refund amount for freeing the specified number of bytes
+    #[action]
+    fn disk_ref_quote(bytes: u64) -> Quantity {
+        unimplemented!()
+    }
+
     /// Called by the system to indicate that the specified user has consumed a
     /// given amount of network bandwidth.
     ///
@@ -361,6 +417,38 @@ mod service {
     /// this resource.
     #[action]
     fn useCpuSys(user: AccountNumber, amount_ns: u64) {
+        unimplemented!()
+    }
+
+    /// Suppress billing/tracking for the next `num_writes` `useDiskSys` calls.
+    ///
+    /// Intended for wrapping privileged-service writes that should not
+    /// be billed. The caller is expected to perform exactly `num_writes`
+    /// writes/frees and then call `end_skip_billing`.
+    ///
+    /// Only callable by privileged services.
+    #[action]
+    fn skip_billing(num_writes: u32) {
+        unimplemented!()
+    }
+
+    /// Asserts that all writes promised by `skip_billing` were consumed.
+    ///
+    /// Only callable by privileged services.
+    #[action]
+    fn end_skip_billing() {
+        unimplemented!()
+    }
+
+    /// Called by the system when `user` causes a write to any database.
+    ///
+    /// `amount_bytes` is positive for consumption and negative for a free
+    ///
+    /// If billing is enabled, the user may be billed from (or refunded to)
+    ///   their resource buffer, depending on the specified database and the
+    ///  amount of bytes consumed/freed.
+    #[action]
+    fn useDiskSys(user: AccountNumber, db_id: DbId, amount_bytes: i64) {
         unimplemented!()
     }
 
@@ -406,7 +494,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32, disk_usage_ppm: u32) {}
 }
 
 #[test]

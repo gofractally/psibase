@@ -1,7 +1,5 @@
 #[psibase::service_tables]
 pub mod tables {
-    use std::u64;
-
     use async_graphql::SimpleObject;
     use psibase::services::tokens::TID;
     use psibase::*;
@@ -9,19 +7,30 @@ pub mod tables {
 
     #[table(name = "InitTable", index = 0)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
-    pub struct InitRow {}
+    pub struct InitRow {
+        pub code_bytes: u64,
+    }
     impl InitRow {
         #[primary_key]
         fn pk(&self) {}
     }
 
     impl InitRow {
-        pub fn init() {
-            InitTable::read_write().put(&InitRow {}).unwrap();
+        pub fn init(code_bytes: u64) {
+            InitTable::read_write()
+                .put(&InitRow { code_bytes })
+                .unwrap();
         }
 
         pub fn is_init() -> bool {
             InitTable::read().get_index_pk().get(&()).is_some()
+        }
+
+        pub fn code_bytes() -> u64 {
+            InitTable::read()
+                .get_index_pk()
+                .get(&())
+                .map_or(0, |r| r.code_bytes)
         }
 
         pub fn check_init() {
@@ -32,6 +41,7 @@ pub mod tables {
     #[table(name = "BillingConfigTable", index = 1)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[serde(rename_all = "camelCase")]
+    #[graphql(complex)]
     pub struct BillingConfig {
         /// ID of the system token used for resource billing
         pub sys: TID,
@@ -82,6 +92,8 @@ pub mod tables {
         pub per_block_sys_cpu_ns: u64,
         /// Amount of storage space in bytes allocated to objective state
         pub obj_storage_bytes: u64,
+        /// Amount of storage space in bytes allocated to subjective (node-local) state
+        pub subj_storage_bytes: u64,
     }
     impl NetworkVariables {
         #[primary_key]
@@ -91,8 +103,9 @@ pub mod tables {
         fn default() -> Self {
             NetworkVariables {
                 block_replay_factor: 5,
-                per_block_sys_cpu_ns: 20_000_000,  // 20ms
-                obj_storage_bytes: 20_000_000_000, // 20 GB
+                per_block_sys_cpu_ns: 20_000_000,   // 20ms
+                obj_storage_bytes: 20_000_000_000,  // 20 GB
+                subj_storage_bytes: 20_000_000_000, // 20 GB
             }
         }
     }
@@ -147,14 +160,14 @@ pub mod tables {
         pub capacity: u64,
     }
 
-    /// Pricing configuration for a bandwidth-like resource.
+    /// Pricing configuration for a rate-limited resource.
     ///
-    /// A bandwidth-like resource is one that has a max capacity per unit time and uses
+    /// A rate-limited resource is one that has a max capacity per unit time and uses
     /// a "difficulty adjustment" algorithm to adjust price based on congestion.
-    #[table(name = "BandwidthPricingTable", index = 6)]
+    #[table(name = "RateLimitPricingTable", index = 6)]
     #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
     #[graphql(complex)]
-    pub struct BandwidthPricing {
+    pub struct RateLimitPricing {
         #[primary_key]
         pub resource_id: u8,
 
@@ -162,8 +175,8 @@ pub mod tables {
         pub num_blocks_to_average: u8,
 
         #[graphql(skip)]
-        /// The actual usage history over the last `num_blocks_to_average` blocks
-        pub usage_history: Vec<u64>,
+        /// The average usage over the last `num_blocks_to_average` blocks
+        pub avg_usage: u64,
 
         #[graphql(skip)]
         /// The usage consumed during the current block
@@ -183,14 +196,53 @@ pub mod tables {
         /// is rounded up to the nearest billable unit.
         pub billable_unit: u64,
     }
+
+    /// Tracks the token discrepancy between the relay curve state and the
+    /// actual relay reserve while billing is disabled. Using two u64s to ensure no
+    /// overflow can occur, but exposing a signed i128 interface to make it easier
+    /// to reason about.
+    #[derive(Default, Clone, Debug, Serialize, Deserialize, ToSchema, Fracpack)]
+    pub struct VirtualBalance {
+        /// Relay shortfall: tokens owed but not deposited while billing was disabled
+        pub shortfall: u64,
+        /// Relay excess: tokens in relay beyond what the curve expects
+        pub excess: u64,
+    }
+
+    /// Capacity-limited pricing state
+    #[table(name = "CapacityPricingTable", index = 7)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[graphql(complex)]
+    pub struct CapacityPricing {
+        #[primary_key]
+        pub resource_id: u8,
+
+        /// Reserve tokens held in relay
+        #[graphql(skip)]
+        pub reserve: u64,
+        /// Remaining billable resource capacity
+        pub remaining_capacity: u64,
+        /// Max reserve tokens that may be sold into the relay (e.g. max issued supply)
+        #[graphql(skip)]
+        pub max_reserve: u64,
+        /// Total resource capacity
+        pub max_capacity: u64,
+        /// Curve / virtual-offset parameter
+        pub curve_d: u64,
+        /// Fee on refunds, parts per million
+        pub fee_ppm: u32,
+        /// Virtual balance tracking for billing-disabled periods
+        pub virtual_balance: VirtualBalance,
+    }
 }
 
-mod bandwidth_pricing;
 mod billing_config;
+pub(crate) mod capacity_limit_pricing;
 mod network_specs;
 mod network_variables;
+mod rate_limit_pricing;
 mod server_specs;
 mod user_settings;
 
-pub use bandwidth_pricing::*;
+pub use rate_limit_pricing::*;
 pub use user_settings::DEFAULT_AUTO_FILL_THRESHOLD_PERCENT;
