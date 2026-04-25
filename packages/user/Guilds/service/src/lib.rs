@@ -1,7 +1,7 @@
 pub mod constants;
 pub mod helpers;
 pub mod tables;
-#[psibase::service(name = "guilds", tables = "tables::tables")]
+#[psibase::service(name = "guilds", tables = "tables::tables", recursive = true)]
 pub mod service {
     use crate::{
         helpers::RollingBits16,
@@ -171,6 +171,19 @@ pub mod service {
     #[action]
     fn set_thres(rank_ordering_threshold: u8) {
         Guild::by_sender().set_rank_ordering_threshold(rank_ordering_threshold);
+    }
+
+    /// On Invite Accept.
+    ///
+    /// Used by invite hook
+    ///
+    /// # Arguments
+    /// * `invite_id` - Unique ID of invite.
+    /// * `accepter` - Account name which accepted the invite
+    #[action]
+    #[allow(non_snake_case)]
+    fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
+        GuildInvite::get_assert(invite_id).accept(accepter);
     }
 
     /// Kick member from guild

@@ -5,17 +5,10 @@ mod service {
 
     use async_graphql::{connection::Connection, *};
     use guilds::tables::tables::{
-        Guild, GuildApplication, GuildApplicationTable, GuildMember, GuildMemberTable, GuildTable,
-        RankingTable, RoleMap, RoleMapTable,
+        Guild, GuildApplication, GuildApplicationTable, GuildInvite, GuildInviteTable, GuildMember,
+        GuildMemberTable, GuildTable, RankingTable, RoleMap, RoleMapTable,
     };
     use psibase::{AccountNumber, *};
-    use serde::Deserialize;
-
-    #[derive(Deserialize, SimpleObject)]
-    struct HistoricalUpdate {
-        old_thing: String,
-        new_thing: String,
-    }
 
     struct Query;
 
@@ -65,6 +58,12 @@ mod service {
             GuildMemberTable::read()
                 .get_index_pk()
                 .get(&(guild, member))
+        }
+
+        async fn guild_invite(&self, id: u32) -> Option<GuildInvite> {
+            GuildInviteTable::with_service(guilds::SERVICE)
+                .get_index_pk()
+                .get(&id)
         }
 
         async fn guilds_by_owner(
@@ -141,22 +140,6 @@ mod service {
             .after(after)
             .query()
             .await
-        }
-
-        /// This query gets paginated historical updates of the Example Thing.
-        async fn historical_updates(
-            &self,
-            first: Option<i32>,
-            last: Option<i32>,
-            before: Option<String>,
-            after: Option<String>,
-        ) -> async_graphql::Result<EventConnection<HistoricalUpdate>> {
-            EventQuery::new("history.guilds.updated")
-                .first(first)
-                .last(last)
-                .before(before)
-                .after(after)
-                .query()
         }
     }
 

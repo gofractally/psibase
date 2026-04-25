@@ -467,10 +467,7 @@ impl UserGuild for GuildsPlugin {
         }
         .packed();
 
-        add_action_to_transaction(
-            guilds::action_structs::set_g_app::ACTION_NAME, // fixed: was "set"
-            &packed_args,
-        )
+        add_action_to_transaction(guilds::action_structs::set_g_app::ACTION_NAME, &packed_args)
     }
 }
 
