@@ -94,12 +94,6 @@ pub mod service {
 
     #[action]
     fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
-        println!(
-            "is_role_ok: fractal: {} | role_id: {} = {}",
-            fractal,
-            role_id,
-            RoleMap::get(fractal, role_id).is_some()
-        );
         RoleMap::get(fractal, role_id).is_some()
     }
 
