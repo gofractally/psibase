@@ -13,7 +13,6 @@ interface admin-fractal {
 
     set-role-mapping: func(role-id: u8, guild: string) -> result<_, error>;
 
-    migrate-guilds: func(guild-account: string) -> result<_, error>;
 }
 
 interface user-fractal {

@@ -29,6 +29,7 @@ mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
         auth_delegate::Wrapper as AuthDelegate, fractals::Wrapper as Fractals,
+        guilds::Wrapper as Guilds, guilds::SERVICE as GUILDS_SERVICE,
         producers::Wrapper as Producers,
     };
     use psibase::*;
@@ -49,14 +50,35 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        Fractals::call_from(*producer).create_fractal(
+        let legislature = "legislature".into();
+        let judiciary = "judiciary-a".into();
+        let executive = "executive-a".into();
+
+        Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
-            SYS_GUILD,
+            legislature,
+            judiciary,
+            executive,
             "Network Governance".into(),
             "To establish, maintain, and grow the network.".into(),
-            account!("c-role-001"),
-            account!("r-role-001"),
         );
+
+        let guilds = Guilds::call_from(*producer);
+        guilds.create_guild(
+            SYS_FRACTAL,
+            SYS_GUILD,
+            "Genesis".into(),
+            "c-role-001".into(),
+            "r-role-001".into(),
+        );
+
+        Guilds::call_from(SYS_FRACTAL).set_role_map(1, SYS_GUILD);
+        Guilds::call_from(SYS_FRACTAL).set_role_map(2, SYS_GUILD);
+        Guilds::call_from(SYS_FRACTAL).set_role_map(3, SYS_GUILD);
+
+        Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, 1, GUILDS_SERVICE);
+        Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, 2, GUILDS_SERVICE);
+        Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, 3, GUILDS_SERVICE);
 
         // Give the core fractal ownership of the network
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);

@@ -92,13 +92,6 @@ impl AdminFractal for FractalCorePlugin {
         GuildsPlugin::admin_fractal::set_role_map(role_id, &guild)
     }
 
-    fn migrate_guilds(genesis_guild: String) -> Result<(), Error> {
-        GuildsPlugin::admin_guild::create_guild("Genesis", &genesis_guild)?;
-
-        Self::set_role_mapping(1, genesis_guild.clone())?;
-        Self::set_role_occupation(1, "guilds".to_string())
-    }
-
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_role_occupation)?;
         propose::legislature()?;

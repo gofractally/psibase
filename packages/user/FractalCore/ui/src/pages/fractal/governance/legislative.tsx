@@ -33,8 +33,8 @@ export const Legislative = () => {
 
     const awaitingConsensusReward = !fractal?.fractal?.stream;
 
-    const focusedGuild = fractal?.fractal?.legislature.account;
-    const { data: guild, error: guildError } = useGuild(focusedGuild);
+    const legislatureRoleAccount = fractal?.fractal?.legislature.account;
+    const { data: guild, error: guildError } = useGuild(legislatureRoleAccount);
 
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
     const [showTokenModal, setShowTokenModal] = useState(false);
@@ -43,13 +43,15 @@ export const Legislative = () => {
 
     const { data: currentUser } = useCurrentUser();
 
+    console.log({ guild })
+
     const isAdministrativeUser =
         currentUser == guild?.rep?.member ||
         (typeof currentUser == "string" &&
             guild?.council?.includes(currentUser));
 
 
-    console.log({ isAdministrativeUser })
+    console.log({ isAdministrativeUser, focusedGuild: legislatureRoleAccount, fractal })
 
     if (error) {
         return <ErrorCard error={error} />;

@@ -110,20 +110,31 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
-    /// * `guild_account` - The account number for the associated guild.
+    /// * `legislature` - Legislature role account.
+    /// * `judiciary` - Judiciary role account.
+    /// * `executive` - Executive role account
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_fractal(
+    fn create_frac(
         fractal_account: AccountNumber,
-        guild_account: AccountNumber,
+        legislature: AccountNumber,
+        judiciary: AccountNumber,
+        executive: AccountNumber,
         name: String,
         mission: String,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
     ) {
+        unimplemented!()
+    }
+
+    /// Sets occupation on a fractal role.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID for fractal
+    /// * `new_occupation` - New occupation to set for role
+    #[action]
+    fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
         unimplemented!()
     }
 

@@ -58,6 +58,7 @@ pub mod service {
     /// * `fractal_account` - The account number for the new fractal.
     /// * `legislature` - Legislature role account.
     /// * `judiciary` - Judiciary role account.
+    /// * `executive` - Executive role account
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]

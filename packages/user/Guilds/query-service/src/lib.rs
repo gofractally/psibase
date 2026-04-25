@@ -6,7 +6,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use guilds::tables::tables::{
         Guild, GuildApplication, GuildApplicationTable, GuildMember, GuildMemberTable, GuildTable,
-        RankingTable,
+        RankingTable, RoleMap, RoleMapTable,
     };
     use psibase::*;
     use serde::Deserialize;
@@ -33,6 +33,28 @@ mod service {
             guilds.sort_by_key(|x| x.index);
 
             guilds.into_iter().map(|ranking| ranking.guild).collect()
+        }
+
+        async fn role_map(
+            &self,
+            owner: AccountNumber,
+            role_id: Option<u8>,
+        ) -> async_graphql::Result<Connection<RawKey, RoleMap>> {
+            if let Some(role_id) = role_id {
+                TableQuery::subindex::<AccountNumber>(
+                    RoleMapTable::with_service(guilds::SERVICE).get_index_pk(),
+                    &(owner, role_id),
+                )
+                .query()
+                .await
+            } else {
+                TableQuery::subindex::<AccountNumber>(
+                    RoleMapTable::with_service(guilds::SERVICE).get_index_pk(),
+                    &(owner),
+                )
+                .query()
+                .await
+            }
         }
 
         async fn guilds_by_owner(

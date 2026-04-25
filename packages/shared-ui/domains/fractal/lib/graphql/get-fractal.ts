@@ -19,14 +19,17 @@ export const zFractal = z
         judiciary: z.object({
             account: zAccount,
             occupation: zAccount,
+            roleId: z.number().int()
         }),
         legislature: z.object({
             account: zAccount,
             occupation: zAccount,
+            roleId: z.number().int()
         }),
         executive: z.object({
             account: zAccount,
             occupation: zAccount,
+            roleId: z.number().int()
         })
     })
     .or(z.null());
@@ -53,14 +56,17 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
             judiciary { 
                 account
                 occupation
+                roleId
             }
             legislature { 
                 account
                 occupation
+                roleId
             }
             executive { 
                 account
                 occupation
+                roleId
             }
         }
     }`,
