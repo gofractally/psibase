@@ -10,13 +10,13 @@ use trust::*;
 
 // Other plugins
 use bindings::{
-    accounts::plugin::{self as AccountsPlugin, types as AccountsTypes},
+    accounts::plugin as AccountsPlugin,
     host::{
         common::client as Client,
         crypto::keyvault as HostCrypto,
-        types::types::{self as HostTypes, Error, Keypair, Pem},
+        types::types::{self as HostTypes, Claim, Error, Keypair, Pem},
     },
-    transact::plugin::{intf as Transact, types::Claim},
+    transact::plugin::intf as Transact,
 };
 
 // Exported interfaces
@@ -92,12 +92,7 @@ impl Session for AuthSig {
         //   the account wasn't logged in yet.
         let claim = do_authorize(&account_name)?;
 
-        let accounts_claim = AccountsTypes::Claim {
-            verify_service: claim.verify_service.clone(),
-            raw_data: claim.raw_data.clone(),
-        };
-
-        AccountsPlugin::auth_svc::connect(&account_name, Some(&accounts_claim))
+        AccountsPlugin::auth_svc::login(&account_name, Some(&claim))
     }
 }
 

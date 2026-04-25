@@ -13,7 +13,7 @@ impl Session for AuthAny {
     }
 
     fn login(account_name: String) -> Result<(), Error> {
-        AccountsAuthSvc::connect(&account_name, None)
+        AccountsAuthSvc::login(&account_name, None)
     }
 }
 

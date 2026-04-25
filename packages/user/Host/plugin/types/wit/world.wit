@@ -58,8 +58,9 @@ interface types {
     /// PEM type is just a string
     type pem = string;
 
-    /// A claim specifies `raw-data` to identify an account, and specifies a
-    /// `verify-service` that identifies the service able to verify `raw-data`.
+    /// The claim is something that the submitter of a transaction claims to
+    /// know (e.g. a public key) and includes the service that can verify the
+    /// claim.
     record claim {
         verify-service: string,
         raw-data: list<u8>,

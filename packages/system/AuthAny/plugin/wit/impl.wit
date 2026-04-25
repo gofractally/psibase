@@ -15,7 +15,7 @@ interface session {
 
 world impl {
     include host:common/imports;
-    include accounts:plugin/imports;
+    import accounts:plugin/auth-svc;
 
     export session;
 }

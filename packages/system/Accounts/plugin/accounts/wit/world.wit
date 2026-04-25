@@ -7,19 +7,11 @@ interface types {
         account-num: string,
         auth-service: string,
     }
-
-    /// The claim is something that the submitter of a transaction claims to know (e.g. a public key)
-    /// and includes the service that can verify the claim.
-    record claim {
-        verify-service: string,
-        raw-data: list<u8>,
-    }
 }
 
 /// This interface is only callable by the user's auth-service plugin
 interface auth-svc {
-    use host:types/types.{error};
-    use types.{claim};
+    use host:types/types.{claim, error};
 
 
     /// An account's auth service may call this to log `account` into the active app.
@@ -29,7 +21,7 @@ interface auth-svc {
     /// will attempt to mint a new one.
     ///
     /// The specified account must be imported on this device before this call.
-    connect: func(
+    login: func(
         account: string,
         claim: option<claim>,
     ) -> result<_, error>;
@@ -89,5 +81,4 @@ interface api {
 world imports {
     import api;
     import active-app;
-    import auth-svc;
 }

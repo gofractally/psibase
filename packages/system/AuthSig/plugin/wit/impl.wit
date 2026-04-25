@@ -14,7 +14,7 @@ interface session {
 }
 
 world impl {
-    include accounts:plugin/imports;
+    import accounts:plugin/auth-svc;
     include transact:plugin/imports;
     include host:common/imports;
     include host:crypto/imports;
