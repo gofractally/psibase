@@ -157,7 +157,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
-    /// * `ordered_occupations` - Ordered occupations to set for the fractal
+    /// * `paid_occupations` - Ordered occupations to set for the fractal
     #[action]
     fn set_paid_occ(fractal: AccountNumber, paid_occupations: Vec<AccountNumber>) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
@@ -179,10 +179,6 @@ pub mod service {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
             .or(Role::get_by_account(account).map(|role| {
-                print!(
-                    "going to role account {} with role id {}",
-                    role.account, role.role_id
-                );
                 occu_wrapper::call_to(role.occupation).role_policy(role.account, role.role_id)
             }))
     }
@@ -233,8 +229,6 @@ pub mod service {
         }) {
             DynamicAuthPolicy::impossible()
         } else {
-            print!("XXXXXXXXXXXXXXXXXX");
-            print!("{:?}", policy);
             policy
         }
     }
