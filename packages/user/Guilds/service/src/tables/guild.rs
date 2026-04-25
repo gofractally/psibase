@@ -168,11 +168,7 @@ impl Guild {
             .filter(|member| member.score != 0)
             .collect();
 
-        if council.len() > 0 {
-            return Some(council);
-        } else {
-            return None;
-        }
+        (council.len() > 0).then_some(council)
     }
 
     pub fn representative(&self) -> Option<GuildMember> {
