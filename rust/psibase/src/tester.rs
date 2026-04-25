@@ -861,6 +861,18 @@ impl Chain {
     pub fn display_trace<'a>(&'a self, trace: &'a TransactionTrace) -> ChainDisplayTrace<'a> {
         ChainDisplayTrace { chain: self, trace }
     }
+
+    pub fn trace_disk_usage<'a>(
+        &'a self,
+        trace: &'a TransactionTrace,
+        show_all_ops: bool,
+    ) -> ChainDisplayDiskUsage<'a> {
+        ChainDisplayDiskUsage {
+            chain: self,
+            trace,
+            show_all_ops,
+        }
+    }
 }
 
 impl Chain {
@@ -896,6 +908,26 @@ impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
         let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
         let _ = block_on(formatter.prepare_transaction_trace(self.trace));
         write!(f, "{}", formatter.display_transaction_trace(self.trace))
+    }
+}
+
+#[cfg(target_family = "wasm")]
+pub struct ChainDisplayDiskUsage<'a> {
+    chain: &'a Chain,
+    trace: &'a TransactionTrace,
+    show_all_ops: bool,
+}
+
+#[cfg(target_family = "wasm")]
+impl<'a> std::fmt::Display for ChainDisplayDiskUsage<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
+        let _ = block_on(formatter.prepare_transaction_trace(self.trace));
+        write!(
+            f,
+            "{}",
+            formatter.display_disk_usage_trace(self.trace, self.show_all_ops)
+        )
     }
 }
 
