@@ -27,8 +27,8 @@ namespace UserService
    {
       psibase::AccountNumber              owner;
       std::string                         name;
-      std::string                         scope;
       std::string                         version;
+      std::string                         scope;
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;

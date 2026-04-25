@@ -1,3 +1,5 @@
+import { pluginString } from "@psibase/common-lib";
+
 import { HostInterface } from "../host-interface";
 import { Plugin } from "./plugin";
 
@@ -39,5 +41,19 @@ export class ServiceContext {
                 p.id.plugin === plugin.id.plugin &&
                 p.id.service === plugin.id.service,
         );
+    }
+
+    async instantiateAll(): Promise<void> {
+        await Promise.all(this.plugins.map((p) => p.instantiate()));
+    }
+
+    disposeAll(): string[] {
+        const disposed: string[] = [];
+        for (const plugin of this.plugins) {
+            if (plugin.dispose()) {
+                disposed.push(pluginString(plugin.id));
+            }
+        }
+        return disposed;
     }
 }

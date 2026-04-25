@@ -75,6 +75,7 @@ impl Api for AuthDelegate {
         let new_account = new_account_action {
             name: get_account_number(name.as_str())?,
             owner: get_account_number(owner.as_str())?,
+            require_match: true,
         };
         Ok(add_action_to_transaction(
             new_account_action::ACTION_NAME,

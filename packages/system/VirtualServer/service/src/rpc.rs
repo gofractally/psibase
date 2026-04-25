@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     math_utils::ppm_to_pct,
     service::{get_measurement_unit, get_resource_name, resources},
@@ -7,14 +9,14 @@ use crate::{
     },
 };
 
-use async_graphql::{connection::Connection, *};
+use async_graphql::*;
 use psibase::{
     is_auth,
     services::{
         tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
     },
-    AccountNumber, EventQuery, MethodNumber, Table,
+    AccountNumber, EventConnection, EventQuery, MethodNumber, Table,
 };
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
@@ -45,6 +47,9 @@ impl ConsumptionEvent {
     }
 
     pub async fn cost(&self) -> Decimal {
+        if BillingConfig::get().is_none() {
+            return Decimal::from_str("0").unwrap();
+        }
         let token = BillingConfig::get_sys_token();
         Decimal::new(Quantity::from(self.cost), token.precision)
     }
@@ -69,23 +74,17 @@ impl SubsidyEvent {
     }
 }
 
-#[derive(Deserialize, SimpleObject)]
-#[graphql(complex)]
+#[derive(Deserialize)]
 pub struct BlockUsageEvent {
-    /// The block number
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    block_num: psibase::BlockNum,
     // The amount of network usage in the block in ppm (parts per million) of total capacity
-    #[graphql(skip)]
     #[serde(deserialize_with = "deserialize_number_from_string")]
     net_usage_ppm: u32,
     // The amount of CPU usage in the block in ppm (parts per million) of total capacity
-    #[graphql(skip)]
     #[serde(deserialize_with = "deserialize_number_from_string")]
     cpu_usage_ppm: u32,
 }
 
-#[ComplexObject]
+#[Object]
 impl BlockUsageEvent {
     /// The amount of network usage in the block as a percentage of total capacity
     pub async fn net_usage_pct(&self) -> Decimal {
@@ -256,7 +255,7 @@ impl Query {
         last: Option<i32>,
         before: Option<String>,
         after: Option<String>,
-    ) -> async_graphql::Result<Connection<u64, ConsumptionEvent>> {
+    ) -> async_graphql::Result<EventConnection<ConsumptionEvent>> {
         self.check_user_auth(account)?;
 
         let condition = "account = ?".to_string();
@@ -284,7 +283,7 @@ impl Query {
         last: Option<i32>,
         before: Option<String>,
         after: Option<String>,
-    ) -> async_graphql::Result<Connection<u64, SubsidyEvent>> {
+    ) -> async_graphql::Result<EventConnection<SubsidyEvent>> {
         if purchaser.is_none() && recipient.is_none() {
             return Err(async_graphql::Error::new(
                 "Either 'purchaser' or 'recipient' (or both) must be specified",
@@ -330,7 +329,7 @@ impl Query {
         last: Option<i32>,
         before: Option<String>,
         after: Option<String>,
-    ) -> async_graphql::Result<Connection<u64, BlockUsageEvent>> {
+    ) -> async_graphql::Result<EventConnection<BlockUsageEvent>> {
         EventQuery::new("history.virtual-server.block_summary")
             .first(first)
             .last(last)

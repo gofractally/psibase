@@ -1,185 +1,206 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
-import * as cli from "@bytecodealliance/preview2-shim/cli";
-import * as clocks from "@bytecodealliance/preview2-shim/clocks";
-import * as filesystem from "@bytecodealliance/preview2-shim/filesystem";
-import * as io from "@bytecodealliance/preview2-shim/io";
-import * as random from "@bytecodealliance/preview2-shim/random";
-import { type WarningHandlerWithDefault, rollup } from "@rollup/browser";
+import * as cliNs from "@bytecodealliance/preview2-shim/cli";
+import * as clocksNs from "@bytecodealliance/preview2-shim/clocks";
+import * as filesystemNs from "@bytecodealliance/preview2-shim/filesystem";
+import * as ioNs from "@bytecodealliance/preview2-shim/io";
+import * as randomNs from "@bytecodealliance/preview2-shim/random";
 
+import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
-import { ComponentAPI, Functions } from "../wit-extraction.js";
-import { Code, FilePath, ImportDetails, PkgId } from "./import-details.js";
-import { plugin } from "./index.js";
-import privilegedShimCode from "./privileged-api.js?raw";
-import { ProxyPkg } from "./proxy/proxy-package.js";
-import shimCode from "./shims/shim-wrapper.js?raw";
+import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
 
-// Set up the global reference for runtime access
-(globalThis as Record<string, unknown>).__preview2Shims = {
-    cli,
-    clocks,
-    filesystem,
-    io,
-    random,
-};
+type PluginImports = Record<string, Record<string, unknown>>;
 
-class ProxyPkgs {
-    packages: ProxyPkg[] = [];
+const cli = cliNs as any;
+const clocks = clocksNs as any;
+const filesystem = filesystemNs as any;
+const io = ioNs as any;
+const random = randomNs as any;
 
-    [Symbol.iterator]() {
-        return this.packages.values();
-    }
-
-    get = (ns: string, id: string): ProxyPkg => {
-        let pkg = this.packages.find((p) => p.namespace === ns && p.id === id);
-        if (pkg) {
-            return pkg;
-        }
-        pkg = new ProxyPkg(ns, id);
-        this.packages.push(pkg);
-        return pkg;
+// Whitelisted WASI imports. Each entry maps a WIT interface to its shim object.
+// As we discover that plugins need additional WASI imports, we can add them,
+// but each added shim should be validated.
+function getWasiImports(): PluginImports {
+    return {
+        "wasi:cli/environment": cli.environment,
+        "wasi:cli/exit": cli.exit,
+        "wasi:cli/stderr": cli.stderr,
+        "wasi:cli/stdin": cli.stdin,
+        "wasi:cli/stdout": cli.stdout,
+        "wasi:clocks/wall-clock": clocks.wallClock,
+        "wasi:clocks/monotonic-clock": clocks.monotonicClock,
+        "wasi:filesystem/types": filesystem.types,
+        "wasi:filesystem/preopens": filesystem.preopens,
+        "wasi:io/error": io.error,
+        "wasi:io/streams": io.streams,
+        "wasi:random/random": random.random,
     };
-
-    map<T>(
-        callback: (pkg: ProxyPkg, index: number, array: ProxyPkg[]) => T,
-    ): T[] {
-        return this.packages.map(callback);
-    }
 }
 
-function getProxiedImports({
-    interfaces: allInterfaces,
-    funcs: freeFunctions,
-}: Functions): ImportDetails {
+function buildProxiedImports(
+    { interfaces: allInterfaces, funcs: freeFunctions }: Functions,
+    host: HostInterface,
+): PluginImports {
     assert(
         freeFunctions.length === 0,
         `TODO: Plugins may not import freestanding functions.`,
     );
 
-    const interfaces = allInterfaces.filter(
-        (i) =>
-            i.namespace !== "wasi" &&
-            i.namespace !== "supervisor" &&
-            i.funcs.length !== 0,
-    );
+    const imports: PluginImports = {};
+    for (const intf of allInterfaces) {
+        if (intf.namespace === "wasi" || intf.namespace === "supervisor")
+            continue;
 
-    if (interfaces.length === 0) {
-        return new ImportDetails([], []);
+        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
+
+        if (intf.funcs.length === 0) {
+            imports[key] = {};
+        } else {
+            imports[key] = buildInterfaceProxy(intf, host);
+        }
+    }
+    return imports;
+}
+
+function buildInterfaceProxy(
+    intf: Interface,
+    host: HostInterface,
+): Record<string, unknown> {
+    const proxy: Record<string, unknown> = {};
+    for (const func of intf.funcs) {
+        if (isResourceMethod(func.name)) {
+            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host);
+        } else if (func.dynamicLink) {
+            proxy[kebabToCamel(func.name)] = (
+                pluginRef: { handle: number },
+                ...args: unknown[]
+            ) =>
+                host.syncCallDyn({
+                    handle: pluginRef.handle,
+                    method: func.name,
+                    params: args,
+                });
+        } else {
+            proxy[kebabToCamel(func.name)] = (...args: unknown[]) =>
+                host.syncCall({
+                    service: intf.namespace,
+                    plugin: intf.package,
+                    intf: intf.name,
+                    method: func.name,
+                    params: args,
+                });
+        }
+    }
+    return proxy;
+}
+
+function isResourceMethod(name: string): boolean {
+    return (
+        name.includes("[constructor]") ||
+        name.includes("[method]") ||
+        name.includes("[static]")
+    );
+}
+
+function addResourceProxy(
+    proxy: Record<string, unknown>,
+    intf: Interface,
+    funcName: string,
+    isDynamic: boolean,
+    host: HostInterface,
+): void {
+    if (isDynamic) {
+        throw new Error(`Dynamic resource methods are not supported`);
     }
 
-    const packages = new ProxyPkgs();
-    for (const i of interfaces) {
-        packages.get(i.namespace, i.package).add(i.name, i.funcs);
+    const bracketIndex = funcName.indexOf("]");
+    const dotIndex = funcName.indexOf(".", bracketIndex);
+    const rawResourceName =
+        dotIndex !== -1
+            ? funcName.substring(bracketIndex + 1, dotIndex)
+            : funcName.substring(bracketIndex + 1);
+
+    // The component parser returns raw WIT kebab-case names; jco expects the
+    //   resource class in PascalCase and methods in camelCase as JS identifiers.
+    const className = kebabToPascal(rawResourceName);
+
+    let resourceClass = proxy[className] as any;
+    if (!resourceClass) {
+        resourceClass = class {
+            handle: number | undefined;
+        };
+        proxy[className] = resourceClass;
     }
 
-    const imports: ImportDetails[] = packages.map((p) => p.getImportDetails());
-    return mergeImports(imports);
+    let rawMethodName: string;
+    if (funcName.includes("[constructor]")) {
+        rawMethodName = "constructor";
+    } else if (funcName.includes("[method]") || funcName.includes("[static]")) {
+        rawMethodName = funcName.split("]")[1].split(".")[1];
+    } else {
+        throw new Error(`Invalid resource method name: ${funcName}`);
+    }
+    const jsMethodName = kebabToCamel(rawMethodName);
+
+    const callResource = (handle: number | undefined, ...args: unknown[]) =>
+        host.syncCallResource({
+            service: intf.namespace,
+            plugin: intf.package,
+            intf: intf.name,
+            type: rawResourceName,
+            handle,
+            method: rawMethodName,
+            params: args,
+        });
+
+    if (rawMethodName === "constructor") {
+        const origProto = resourceClass.prototype;
+        const newClass = class {
+            handle: number | undefined;
+            constructor(...args: unknown[]) {
+                this.handle = callResource(undefined, ...args) as number;
+            }
+        };
+
+        // WIT does not mandate that the constructor appears before static methods in the
+        //   source, so a static method may already be attached to the placeholder class
+        Object.assign(newClass, resourceClass);
+        Object.assign(newClass.prototype, origProto);
+        proxy[className] = newClass;
+    } else if (funcName.includes("[static]")) {
+        resourceClass[jsMethodName] = (...args: unknown[]) =>
+            callResource(undefined, ...args);
+    } else {
+        resourceClass.prototype[jsMethodName] = function (
+            this: { handle: number | undefined },
+            ...args: unknown[]
+        ) {
+            return callResource(this.handle, ...args);
+        };
+    }
 }
 
-async function getWasiImports(): Promise<ImportDetails> {
-    /*
-      I'm taking a whitelisting approach, as opposed to providing all wasi imports by default.
-      As we discover that plugins need additional wasi imports, we can add them, but each added
-      shim should be validated.
-    */
-
-    const wasi_shimName = "./wasi-shim.js"; // Internal name used by bundler
-    const wasi_nameMapping: Array<[PkgId, FilePath]> = [
-        // e.g. importing an entire package ["wasi:cli/*", `${wasi_shimName}#*`],
-
-        ["wasi:cli/environment", `${wasi_shimName}#environment`],
-        ["wasi:cli/exit", `${wasi_shimName}#exit`],
-        ["wasi:io/error", `${wasi_shimName}#error`],
-        ["wasi:io/streams", `${wasi_shimName}#streams`],
-        ["wasi:cli/stdin", `${wasi_shimName}#stdin`],
-        ["wasi:cli/stdout", `${wasi_shimName}#stdout`],
-        ["wasi:cli/stderr", `${wasi_shimName}#stderr`],
-        ["wasi:clocks/wall-clock", `${wasi_shimName}#wallClock`],
-        ["wasi:clocks/monotonic-clock", `${wasi_shimName}#monotonicClock`],
-        ["wasi:filesystem/types", `${wasi_shimName}#types`],
-        ["wasi:filesystem/preopens", `${wasi_shimName}#preopens`],
-        ["wasi:random/random", `${wasi_shimName}#random`],
-        // ["wasi:io/*", `${wasi_shimName}#*`],
-        // ["wasi:sockets/*", `${wasi_shimName}#*`],
-
-        //  ~~~~~~~~~~~~~~~ BLACKLISTED ~~~~~~~~~~~~~~~
-        // ["wasi:http/*", `${wasi_shimName}#*`],
-        // We should not provide the http shim.
-        // Plugins should not be able to make HTTP requests except those that are wrapped in an
-        //   interface provided by the host imports.
-    ];
-    // If the transpiled library contains bizarre inputs, such as:
-    //    import {  as _, } from './shim.js';
-    // It is very likely an issue with an invalid import mapping.
-
-    const wasi_shimCode = shimCode;
-    const wasi_ShimFile: [FilePath, Code] = [wasi_shimName, wasi_shimCode];
-    return {
-        importMap: wasi_nameMapping,
-        files: [wasi_ShimFile],
-    };
+export interface InstantiateResult {
+    exports: Record<string, unknown>;
 }
 
-async function getPrivilegedImports(): Promise<ImportDetails> {
-    const privilegedShimName = "./privileged-api.js"; // internal name used by bundler
-    const privileged_importMap: Array<[PkgId, FilePath]> = [
-        [`supervisor:bridge/*`, `${privilegedShimName}#*`],
-    ];
-    const privileged_ShimFile: [FilePath, Code] = [
-        privilegedShimName,
-        privilegedShimCode,
-    ];
-    return {
-        importMap: privileged_importMap,
-        files: [privileged_ShimFile],
-    };
+export interface CompiledPlugin {
+    instantiate: () => Promise<InstantiateResult>;
 }
 
-function mergeImports(importDetails: ImportDetails[]): ImportDetails {
-    const importMap: Array<[PkgId, FilePath]> = importDetails.flatMap(
-        (detail) => detail.importMap,
-    );
-    const files: Array<[FilePath, Code]> = importDetails.flatMap(
-        (detail) => detail.files,
-    );
-    return new ImportDetails(importMap, files);
-}
-
-export async function loadPlugin(
-    service: string,
-    privileged: boolean,
+// Transpile a WASM component via jco and pre-compile all core modules.
+// Returns a handle whose instantiate() allocates Memory and produces exports.
+async function compileWasmComponent(
     wasmBytes: Uint8Array,
-    pluginHost: HostInterface,
-    api: ComponentAPI,
-) {
-    const imports = mergeImports(
-        await Promise.all([
-            getWasiImports(),
-            privileged ? getPrivilegedImports() : new ImportDetails([], []),
-            getProxiedImports(api.importedFuncs),
-        ]),
-    );
-    const pluginModule = await load(wasmBytes, imports, `${service}.plugin.js`);
-    pluginModule.__setHost(pluginHost);
-
-    return pluginModule;
-}
-
-// transpile WASM, bundle with shims/imports, and load the module
-async function loadWasmComponent(
-    wasmBytes: Uint8Array,
-    importMap: Array<[PkgId, FilePath]>,
-    importFiles: Array<[FilePath, Code]>,
-    useSetupFunction: boolean,
+    imports: PluginImports,
     debugFileName: string,
-) {
+): Promise<CompiledPlugin> {
     const name = "component";
     const opts: GenerateOptions = {
         name,
         noTypescript: true,
-        map: importMap ?? [],
-        base64Cutoff: 4096,
+        instantiation: { tag: "async" },
         noNodejsCompat: true,
         tlaCompat: false,
         validLiftingOptimization: false,
@@ -189,66 +210,133 @@ async function loadWasmComponent(
 
     const { files: transpiledFiles } = await generate(wasmBytes, opts);
 
-    const onwarn: WarningHandlerWithDefault = (warning, warn) => {
-        if (warning.code !== "CIRCULAR_DEPENDENCY") {
-            warn(warning);
+    const coreWasmFiles: Array<[string, Uint8Array]> = [];
+    let jsSource: string | null = null;
+
+    for (const [fileName, content] of transpiledFiles) {
+        if (fileName.endsWith(".wasm")) {
+            coreWasmFiles.push([fileName, content]);
+        } else if (fileName.endsWith(".js")) {
+            jsSource = new TextDecoder().decode(content);
         }
+    }
+
+    assert(jsSource !== null, "jco generate produced no JS file");
+
+    // If a future jco version (or some adversarial input) ever caused it to emit a
+    //   static `import`/`export ... from`, the browser would silently fetch it.
+    //
+    // Refuse to load anything we don't recognize.
+    const staticImportRegex =
+        /^[ \t]*(?:import\s+(?:['"]|[\w*${}\s,]+from\s+['"])|export\s+(?:\*|[\w*${}\s,]+)\s+from\s+['"])/m;
+    if (staticImportRegex.test(jsSource)) {
+        throw new Error(
+            `Refusing to load ${debugFileName}: jco-generated JS contains unexpected module-level import/export-from statements`,
+        );
+    }
+
+    // Pre-compile all core modules (cheap — no Memory allocated)
+    const compiledModules = new Map<string, WebAssembly.Module>();
+    await Promise.all(
+        coreWasmFiles.map(async ([fileName, bytes]) => {
+            const buffer = bytes.buffer.slice(
+                bytes.byteOffset,
+                bytes.byteOffset + bytes.byteLength,
+            ) as ArrayBuffer;
+            compiledModules.set(fileName, await WebAssembly.compile(buffer));
+        }),
+    );
+
+    const getCoreModule = async (path: string): Promise<WebAssembly.Module> => {
+        const mod = compiledModules.get(path);
+        if (!mod) throw new Error(`Core module not found: ${path}`);
+        return mod;
     };
 
-    const bundleCode: string = await rollup({
-        input: name + ".js",
-        plugins: [
-            plugin(
-                [...transpiledFiles, ...importFiles],
-                useSetupFunction,
-                debugFileName,
-            ),
-        ],
-        onwarn,
-        treeshake: false,
-    })
-        .then((bundle) => bundle.generate({ format: "es" }))
-        .then(({ output }) => output[0].code);
-
-    const namedBundleCode = `${bundleCode}\n//# sourceURL=${debugFileName}`;
-    const blob = new Blob([namedBundleCode], { type: "text/javascript" });
+    // Import the jco-generated JS module via blob URL
+    const namedSource = `${jsSource}\n//# sourceURL=${debugFileName}`;
+    const blob = new Blob([namedSource], { type: "text/javascript" });
     const url = URL.createObjectURL(blob);
+    const jcoModule = await import(url);
+    URL.revokeObjectURL(url);
 
-    try {
-        const mod = await import(url);
-        return mod;
-    } finally {
-        URL.revokeObjectURL(url); // Lets the browser know not to keep the file ref any longer
+    return {
+        instantiate: async () => ({
+            exports: await jcoModule.instantiate(getCoreModule, imports),
+        }),
+    };
+}
+
+function assertSupervisorImportsSatisfied(
+    service: string,
+    privileged: boolean,
+    importedFuncs: Functions,
+    imports: PluginImports,
+): void {
+    for (const intf of importedFuncs.interfaces) {
+        if (intf.namespace !== "supervisor") continue;
+
+        if (intf.funcs.length === 0) continue;
+
+        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
+
+        if (!privileged) {
+            throw new Error(
+                `Plugin ${service} imports ${key} but is not privileged`,
+            );
+        }
+
+        const provided = imports[key];
+        if (!provided) {
+            throw new Error(
+                `Plugin ${service} imports ${key}, but the host does not provide it`,
+            );
+        }
+
+        for (const func of intf.funcs) {
+            if (isResourceMethod(func.name)) continue;
+            const jsName = kebabToCamel(func.name);
+            if (typeof provided[jsName] !== "function") {
+                throw new Error(
+                    `Plugin ${service} imports ${key}.${func.name}, but the host does not provide it`,
+                );
+            }
+        }
     }
 }
 
-async function load(
+export async function compilePlugin(
+    service: string,
+    privileged: boolean,
     wasmBytes: Uint8Array,
-    imports: ImportDetails,
-    debugFileName: string,
-) {
-    const pluginModule = await loadWasmComponent(
-        wasmBytes,
-        imports.importMap,
-        imports.files,
-        true,
-        debugFileName,
+    pluginHost: HostInterface,
+    api: ComponentAPI,
+): Promise<CompiledPlugin> {
+    const imports: PluginImports = {
+        ...getWasiImports(),
+        ...(privileged ? pluginHost.bridge : {}),
+        ...buildProxiedImports(api.importedFuncs, pluginHost),
+    };
+    assertSupervisorImportsSatisfied(
+        service,
+        privileged,
+        api.importedFuncs,
+        imports,
     );
-    return pluginModule;
+    return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
 }
 
-// Loads a transpiled component into an ES module, while only satisfying wasi imports
-// Not sufficient for plugins, which require other direct host exports, but can be used
-//   to run various other utilities in the browser that have been compiled into wasm
-//   components.
-export async function loadBasic(wasmBytes: Uint8Array, debugFileName: string) {
-    const wasiImports = await getWasiImports();
-    const basicModule = await loadWasmComponent(
+// Loads a utility WASM component (not a plugin) with only WASI imports.
+// Compiles and immediately instantiates since utilities like the parser
+// are always needed.
+export async function loadBasic(
+    wasmBytes: Uint8Array,
+    debugFileName: string,
+): Promise<InstantiateResult> {
+    const compiled = await compileWasmComponent(
         wasmBytes,
-        wasiImports.importMap,
-        wasiImports.files,
-        false,
+        getWasiImports(),
         debugFileName,
     );
-    return basicModule;
+    return compiled.instantiate();
 }
