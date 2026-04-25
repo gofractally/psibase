@@ -154,7 +154,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
+        ) -> async_graphql::Result<EventConnection<HistoricalUpdate>> {
             EventQuery::new("history.guilds.updated")
                 .first(first)
                 .last(last)
