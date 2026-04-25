@@ -20,7 +20,7 @@ pub mod Service {
     }
 
     #[action]
-    fn is_supported(fractal: AccountNumber) -> bool {
+    pub fn has_policy(account: AccountNumber) -> bool {
         unimplemented!()
     }
 

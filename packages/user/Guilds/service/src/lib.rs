@@ -79,6 +79,13 @@ pub mod service {
             .collect()
     }
 
+    /// Is active
+    ///
+    /// Advises if the occupation considers a fractal member account an active member
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal.
+    /// * `member` - Fractal member.
     #[action]
     fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
         GuildMember::get(fractal, member)
