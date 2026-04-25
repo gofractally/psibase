@@ -27,19 +27,22 @@ import {
     ItemTitle,
 } from "@shared/shadcn/ui/item";
 import { InitTokenModal } from "@/components/modals/init-token-modal";
+import { useRoleGuild } from "@/hooks/use-role-guild";
 
 export const Legislative = () => {
     const { data: fractal, error: fractalError } = useFractal();
 
     const awaitingConsensusReward = !fractal?.fractal?.stream;
 
-    const legislatureRoleAccount = fractal?.fractal?.legislature.account;
-    const { data: guild, error: guildError } = useGuild(legislatureRoleAccount);
+    const roleId = fractal?.fractal?.legislature.roleId;
+    const { data: role, error: roleError } = useRoleGuild(roleId);
+
+    const { data: guild, error: guildError } = useGuild(role?.guild);
 
     const [showRankGuildsModal, setShowRankGuildsModal] = useState(false);
     const [showTokenModal, setShowTokenModal] = useState(false);
 
-    const error = fractalError || guildError;
+    const error = fractalError || guildError || roleError;
 
     const { data: currentUser } = useCurrentUser();
 
@@ -51,7 +54,6 @@ export const Legislative = () => {
             guild?.council?.includes(currentUser));
 
 
-    console.log({ isAdministrativeUser, focusedGuild: legislatureRoleAccount, fractal })
 
     if (error) {
         return <ErrorCard error={error} />;
