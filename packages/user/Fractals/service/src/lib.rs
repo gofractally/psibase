@@ -1,5 +1,4 @@
 pub mod helpers;
-mod scoring;
 pub mod tables;
 
 pub mod constants {

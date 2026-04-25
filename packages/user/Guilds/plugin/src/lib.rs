@@ -472,14 +472,6 @@ impl UserGuild for GuildsPlugin {
             &packed_args,
         )
     }
-
-    // Placeholder functions — implement when ready
-    fn draft_application(description: String) -> Result<(), Error> {
-        Ok(())
-    }
-    fn push_application(guild_account: String) -> Result<(), Error> {
-        Ok(())
-    }
 }
 
 impl Api for GuildsPlugin {

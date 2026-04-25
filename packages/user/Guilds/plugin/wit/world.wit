@@ -49,9 +49,6 @@ interface user-guild {
     use host:types/types.{error};
     register-candidacy: func(guild-account: string, active: bool) -> result<_, error>;
 
-    draft-application: func(description: string) -> result<_, error>;
-    push-application: func(guild-account: string) -> result<_, error>;
-
     set-guild-app-info: func(guild-account: string, info: string) -> result<_, error>;
 
     delete-guild-invite: func(invite-id: u32) -> result<_, error>;
