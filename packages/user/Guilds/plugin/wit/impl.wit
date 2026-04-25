@@ -10,7 +10,6 @@ world impl {
 
 
 
-    export api;
     export admin-guild;
     export user-guild;
     export user-eval;

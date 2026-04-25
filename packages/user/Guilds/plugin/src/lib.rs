@@ -5,8 +5,6 @@ use std::str::FromStr;
 
 use bindings::exports::guilds::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::guilds::plugin::admin_guild::Guest as AdminGuild;
-
-use bindings::exports::guilds::plugin::api::Guest as Api;
 use bindings::exports::guilds::plugin::user_eval::Guest as UserEval;
 use bindings::exports::guilds::plugin::user_guild::Guest as UserGuild;
 
@@ -471,14 +469,6 @@ impl UserGuild for GuildsPlugin {
             guilds::action_structs::set_g_app::ACTION_NAME, // fixed: was "set"
             &packed_args,
         )
-    }
-}
-
-impl Api for GuildsPlugin {
-    fn set_example_thing(thing: String) -> Result<(), Error> {
-        // TODO: implement when ready
-        // assert_authorized(FunctionName::set_example_thing)?;
-        Ok(())
     }
 }
 

@@ -1,10 +1,5 @@
 package guilds:plugin;
 
-interface api {
-    use host:types/types.{error};
-    set-example-thing: func(thing: string) -> result<_, error>;
-}
-
 interface types {
     record guild {
         fractal: string,
@@ -84,8 +79,6 @@ interface queries {
 
 
 world imports {
-    import api;
-
     import queries;
     import user-guild;
     import admin-guild;
