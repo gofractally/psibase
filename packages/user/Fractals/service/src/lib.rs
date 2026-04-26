@@ -164,17 +164,6 @@ pub mod service {
         Occupation::set_ordered_occupations(fractal, paid_occupations);
     }
 
-    /// Get fractal by role
-    ///
-    /// This action is temp until the arrival of sub-accounts.
-    ///
-    /// # Arguments
-    /// * `account` - Account role to lookup.
-    #[action]
-    fn frac_by_role(role_account: AccountNumber) -> Option<AccountNumber> {
-        Role::get_by_account(role_account).map(|role| role.fractal)
-    }
-
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())

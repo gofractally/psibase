@@ -138,15 +138,6 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Get fratal by role
-    ///
-    /// # Arguments
-    /// * `account` - Account role to lookup.
-    #[action]
-    fn frac_by_role(account: AccountNumber) -> Option<AccountNumber> {
-        unimplemented!()
-    }
-
     /// On Invite Accept.
     ///
     /// Used by invite hook
