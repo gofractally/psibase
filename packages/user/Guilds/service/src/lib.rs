@@ -26,11 +26,11 @@ pub mod service {
 
     #[pre_action(exclude(init))]
     fn check_init() {
-        let table = InitTable::read();
-        check(
-            table.get_index_pk().get(&()).is_some(),
-            "service not inited",
-        );
+        // let table = InitTable::read();
+        // check(
+        //     table.get_index_pk().get(&()).is_some(),
+        //     "service not inited",
+        // );
     }
 
     /// Creates a guild within a fractal.

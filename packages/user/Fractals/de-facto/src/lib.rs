@@ -36,19 +36,7 @@ pub mod service {
     /// # Arguments
     /// * `role_account` - Account being checked.
     #[action]
-    fn role_policy(
-        role_account: AccountNumber,
-        _role_id: u8,
-    ) -> auth_dyn::policy::DynamicAuthPolicy {
-        let fractal = check_some(
-            psibase::services::fractals::Wrapper::call().frac_by_role(role_account),
-            &format!(
-                "expected fractal for role account {} , the role id is {}",
-                role_account.to_string(),
-                _role_id
-            ),
-        );
-
+    fn role_policy(fractal: AccountNumber, _role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         let accounts: Vec<(AccountNumber, u8)> =
             ::fractals::tables::tables::FractalMemberTable::read()
                 .get_index_pk()

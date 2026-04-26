@@ -172,14 +172,14 @@ pub mod service {
     /// * `account` - Account role to lookup.
     #[action]
     fn frac_by_role(role_account: AccountNumber) -> Option<AccountNumber> {
-        Role::get_by_account(role_account).map(|role| role.account)
+        Role::get_by_account(role_account).map(|role| role.fractal)
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
             .or(Role::get_by_account(account).map(|role| {
-                occu_wrapper::call_to(role.occupation).role_policy(role.account, role.role_id)
+                occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
             }))
     }
 
