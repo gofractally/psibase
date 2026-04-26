@@ -31,9 +31,6 @@ pub mod constants {
     pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
 
     pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
-
-    // Simple limitation + also related to fibonacci function limit.
-    pub const MAX_RANKED_GUILDS: u8 = 25;
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]

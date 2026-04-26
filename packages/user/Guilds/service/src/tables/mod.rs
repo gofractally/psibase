@@ -208,8 +208,8 @@ pub mod tables {
 
     impl RoleMap {
         #[primary_key]
-        fn pk(&self) -> (AccountNumber, u8, AccountNumber) {
-            (self.fractal, self.role_id, self.guild)
+        fn pk(&self) -> (AccountNumber, u8) {
+            (self.fractal, self.role_id)
         }
     }
 }

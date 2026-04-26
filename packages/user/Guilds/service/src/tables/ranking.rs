@@ -2,7 +2,10 @@ use std::u64;
 
 use psibase::{check, AccountNumber, Table};
 
-use crate::tables::tables::{Ranking, RankingTable};
+use crate::{
+    constants::MAX_RANKED_GUILDS,
+    tables::tables::{Ranking, RankingTable},
+};
 
 impl Ranking {
     fn new(fractal: AccountNumber, index: u8, guild: AccountNumber) -> Self {
@@ -37,7 +40,7 @@ impl Ranking {
         let ranked_guilds_length = new_ranked_guilds.len();
 
         check(
-            ranked_guilds_length <= u8::MAX as usize,
+            ranked_guilds_length <= MAX_RANKED_GUILDS as usize,
             "too many ranked guilds",
         );
 

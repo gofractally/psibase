@@ -1,5 +1,3 @@
-use std::u64;
-
 use psibase::{check_some, AccountNumber, Table};
 
 use crate::tables::tables::{Guild, RoleMap, RoleMapTable};
@@ -26,12 +24,6 @@ impl RoleMap {
     }
 
     pub fn get(fractal: AccountNumber, role_id: u8) -> Option<Self> {
-        RoleMapTable::read()
-            .get_index_pk()
-            .range(
-                (fractal, role_id, AccountNumber::new(0))
-                    ..=(fractal, role_id, AccountNumber::new(u64::MAX)),
-            )
-            .next()
+        RoleMapTable::read().get_index_pk().get(&(fractal, role_id))
     }
 }
