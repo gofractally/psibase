@@ -101,7 +101,7 @@ impl AdminFractal for FractalCorePlugin {
 
     fn init_token() -> Result<(), Error> {
         assert_authorized(FunctionName::init_token)?;
-        propose::judiciary()?;
+        propose::legislature()?;
 
         FractalsPlugin::admin_fractal::init_token()
     }
