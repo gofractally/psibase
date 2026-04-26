@@ -88,8 +88,10 @@ pub mod service {
     /// * `member` - Fractal member.
     #[action]
     fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
-        GuildMember::get(fractal, member)
-            .is_some_and(|member| RollingBits16::from(member.attendance).count_recent_ones(4) >= 2)
+        GuildMember::memberships_of_member(member)
+            .into_iter()
+            .filter(|member| RollingBits16::from(member.attendance).count_recent_ones(4) >= 2)
+            .any(|member| Guild::get_assert(member.guild).account == fractal)
     }
 
     #[action]
