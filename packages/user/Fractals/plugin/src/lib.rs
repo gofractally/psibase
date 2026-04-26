@@ -16,7 +16,6 @@ mod helpers;
 
 use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
-use crate::errors::ErrorType;
 use crate::graphql::fractal::get_fractal;
 use crate::helpers::get_sender_app;
 use crate::trust::assert_authorized;
