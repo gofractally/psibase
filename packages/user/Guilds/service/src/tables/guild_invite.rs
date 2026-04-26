@@ -46,7 +46,7 @@ impl GuildInvite {
     ) {
         let inviter = get_sender();
         check(
-            Self::by_inviter(guild, inviter).len() <= MAX_GUILD_INVITES_PER_MEMBER.into(),
+            Self::by_inviter(guild, inviter).len() < MAX_GUILD_INVITES_PER_MEMBER.into(),
             "too many pending invites",
         );
         check_some(
@@ -72,7 +72,7 @@ impl GuildInvite {
     }
 
     pub fn get_assert(invite_id: u32) -> Self {
-        check_some(Self::get(invite_id), "guild application does not exist")
+        check_some(Self::get(invite_id), "guild invite does not exist")
     }
 
     pub fn accept(&self, accepter: AccountNumber) {
