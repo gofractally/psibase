@@ -36,7 +36,7 @@ pub mod service {
     /// Creates a guild within a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to serve as juridiction of guild.
+    /// * `fractal` - Fractal to serve as owner of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
     /// * `council_role` - Council role account.
@@ -133,10 +133,11 @@ pub mod service {
         Guild::by_sender().set_description(description);
     }
 
-    /// Set guild description
+    /// Set guild application extra info
     ///
     /// # Arguments
-    /// * `description` - New description of the guild.
+    /// * `guild_account` - The guild being applied to.
+    /// * `extra_info` - Extra information to update on the application.
     #[action]
     fn set_g_app(guild_account: AccountNumber, extra_info: String) {
         GuildApplication::get_assert(guild_account, get_sender()).set_extra_info(extra_info);
@@ -154,7 +155,6 @@ pub mod service {
     /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `fractal` - Fractal settings to update.
     /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
     fn set_dstrat(distribution_strategy: u8) {
@@ -164,7 +164,7 @@ pub mod service {
 
     /// Register candidacy.
     ///
-    /// Register your candidacy to serve on a Guild council.  
+    /// Register your candidacy to serve on a Guild council.
     ///
     /// # Arguments
     /// * `guild` - Guild candidate is member of
@@ -174,10 +174,10 @@ pub mod service {
         GuildMember::get_assert(guild, get_sender()).set_candidacy(active);
     }
 
-    /// Set ranked guilds
+    /// Set rank ordering threshold
     ///
     /// # Arguments
-    /// * `ranked_guilds` - Ordered guilds to be ranked, affects scores.
+    /// * `rank_ordering_threshold` - Minimum number of scorers required to enable rank ordering.
     #[action]
     fn set_thres(rank_ordering_threshold: u8) {
         Guild::by_sender().set_rank_ordering_threshold(rank_ordering_threshold);
@@ -231,7 +231,7 @@ pub mod service {
     ///
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
-    /// * `member` - Member to attest.
+    /// * `applicant` - Applicant to attest.
     /// * `comment` - Any comment relevant to the application.
     /// * `endorses` - True if in favour of the application.
     #[action]
@@ -377,7 +377,7 @@ pub mod service {
 
     /// Invite a guild member.
     ///
-    /// Must be called by pre existing guild member.  
+    /// Must be called by pre existing guild member.
     ///
     /// # Arguments
     /// * `guild` - Guild invitee will join.
