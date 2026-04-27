@@ -50,7 +50,7 @@ impl Role {
         occupation: AccountNumber,
     ) -> Self {
         check_none(
-            Self::get(fractal, role.into()),
+            Self::get(fractal, role),
             &format!(
                 "role with id {} already exists for fractal {}",
                 role as u8,
