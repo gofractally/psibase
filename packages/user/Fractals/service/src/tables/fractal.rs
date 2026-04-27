@@ -243,15 +243,15 @@ impl Fractal {
     }
 
     async fn legislature(&self) -> Role {
-        Role::get_assert(self.account, Legislature.into())
+        Role::get_assert(self.account, Legislature)
     }
 
     async fn judiciary(&self) -> Role {
-        Role::get_assert(self.account, Judiciary.into())
+        Role::get_assert(self.account, Judiciary)
     }
 
     async fn executive(&self) -> Role {
-        Role::get_assert(self.account, Executive.into())
+        Role::get_assert(self.account, Executive)
     }
 
     async fn stream(&self) -> Option<RewardStream> {

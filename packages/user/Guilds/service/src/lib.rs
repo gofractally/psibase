@@ -91,7 +91,7 @@ pub mod service {
         GuildMember::memberships_of_member(member)
             .into_iter()
             .filter(|member| RollingBits16::from(member.attendance).count_recent_ones(4) >= 2)
-            .any(|member| Guild::get_assert(member.guild).account == fractal)
+            .any(|member| Guild::get_assert(member.guild).owner == fractal)
     }
 
     #[action]
