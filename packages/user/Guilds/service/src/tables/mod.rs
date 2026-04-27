@@ -1,4 +1,5 @@
 mod evaluation_instance;
+mod fractal_settings;
 mod guild;
 mod guild_application;
 mod guild_attest;
@@ -211,5 +212,13 @@ pub mod tables {
         fn pk(&self) -> (AccountNumber, u8) {
             (self.fractal, self.role_id)
         }
+    }
+
+    #[table(name = "FractalSettingsTable", index = 9)]
+    #[derive(Default, Fracpack, SimpleObject, ToSchema, Serialize, Deserialize, Debug)]
+    pub struct FractalSettings {
+        #[primary_key]
+        pub fractal: AccountNumber,
+        pub dist_strat: u8,
     }
 }

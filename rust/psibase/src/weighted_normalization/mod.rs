@@ -22,6 +22,12 @@ impl From<u8> for Algorithm {
     }
 }
 
+impl From<Algorithm> for u8 {
+    fn from(value: Algorithm) -> Self {
+        value as u8
+    }
+}
+
 pub fn weighted_normalization<T>(algo: Algorithm, items: Vec<T>) -> Vec<(T, u64)> {
     match algo {
         Algorithm::Constant => constant(items),

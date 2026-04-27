@@ -6,10 +6,6 @@ mod levy;
 mod occupation;
 mod reward_stream;
 mod role;
-pub enum DistributionStrategy {
-    Constant = 0,
-    Fibonacci = 1,
-}
 
 #[psibase::service_tables]
 pub mod tables {

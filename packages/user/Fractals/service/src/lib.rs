@@ -72,6 +72,18 @@ pub mod service {
         RewardStream::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
     }
 
+    /// Set distribution strategy
+    ///
+    /// # Arguments
+    /// * `fractal` - Ordered guilds to be ranked, affects scores.
+    /// * `distribution_strategy` - Algoritm for weighted distribution.
+    #[action]
+    fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
+        let mut fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_legislature();
+        fractal.set_distribution_strategy(distribution_strategy.into());
+    }
+
     /// Exile a fractal member.
     ///
     /// Must be called by judiciary.  

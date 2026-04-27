@@ -17,11 +17,10 @@ use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
 };
-use crate::tables::DistributionStrategy;
-use psibase::weighted_normalization;
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
+use psibase::{weighted_normalization, Algorithm};
 
 use psibase::services::fractals::{self, occu_wrapper};
 use psibase::services::tokens::Wrapper as Tokens;
@@ -41,11 +40,11 @@ impl Fractal {
             created_at: now,
             mission,
             name,
-            dist_strat: DistributionStrategy::Constant as u8,
+            dist_strat: Algorithm::Constant as u8,
         }
     }
 
-    pub fn set_distribution_strategy(&mut self, strategy: DistributionStrategy) {
+    pub fn set_distribution_strategy(&mut self, strategy: Algorithm) {
         self.dist_strat = strategy as u8;
         self.save();
     }

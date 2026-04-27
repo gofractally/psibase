@@ -79,7 +79,7 @@ pub use to_key::*;
 pub use trace::*;
 pub use transaction_builder::*;
 pub use web_services::*;
-pub use weighted_normalization::weighted_normalization;
+pub use weighted_normalization::{weighted_normalization, Algorithm};
 
 use internal_macros::*;
 

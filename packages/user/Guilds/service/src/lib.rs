@@ -6,8 +6,8 @@ pub mod service {
     use crate::{
         helpers::RollingBits16,
         tables::tables::{
-            EvaluationInstance, Guild, GuildApplication, GuildInvite, GuildMember, InitRow,
-            InitTable, Ranking, RoleMap,
+            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildInvite, GuildMember,
+            InitRow, InitTable, Ranking, RoleMap,
         },
     };
     use psibase::{
@@ -73,10 +73,7 @@ pub mod service {
 
     #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
-        GuildMember::memberships_of_guild(fractal)
-            .into_iter()
-            .map(|membership| (membership.member, membership.score))
-            .collect()
+        FractalSettings::get_or_default(fractal).scores()
     }
 
     /// Is active
@@ -152,6 +149,16 @@ pub mod service {
     #[action]
     fn set_rguilds(ranked_guilds: Vec<AccountNumber>) {
         Ranking::set_ranked_guilds(get_sender(), ranked_guilds);
+    }
+
+    /// Set distribution strategy
+    ///
+    /// # Arguments
+    /// * `fractal` - Ordered guilds to be ranked, affects scores.
+    /// * `distribution_strategy` - Algoritm for weighted distribution.
+    #[action]
+    fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
+        FractalSettings::get_or_default(fractal).set_dist_strategy(distribution_strategy.into());
     }
 
     /// Register candidacy.
