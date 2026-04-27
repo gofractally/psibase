@@ -24,6 +24,28 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// On Invite Accept.
+    ///
+    /// Used by invite hook
+    ///
+    /// # Arguments
+    /// * `invite_id` - Unique ID of invite.
+    /// * `accepter` - Account name which accepted the invite
+    #[action]
+    #[allow(non_snake_case)]
+    fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Set distribution strategy
+    ///
+    /// # Arguments
+    /// * `distribution_strategy` - Algorithm for weighted distribution.
+    #[action]
+    fn set_dstrat(distribution_strategy: u8) {
+        unimplemented!()
+    }
+
     #[action]
     pub fn has_policy(account: AccountNumber) -> bool {
         unimplemented!()
@@ -316,6 +338,21 @@ pub mod Service {
         method: Option<ServiceMethod>,
     ) -> auth_dyn::policy::DynamicAuthPolicy {
         unimplemented!()
+    }
+
+    #[event(history)]
+    pub fn evaluation_finished(guild: AccountNumber, evaluation_id: u32) {}
+
+    #[event(history)]
+    pub fn scheduled_evaluation(
+        fractal: AccountNumber,
+        guild: AccountNumber,
+        evaluation_id: u32,
+        registration: u32,
+        deliberation: u32,
+        submission: u32,
+        finish_by: u32,
+    ) {
     }
 }
 
