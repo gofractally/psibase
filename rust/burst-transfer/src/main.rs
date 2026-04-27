@@ -4,16 +4,26 @@ use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
 use psibase::{ActionFormatter, AnyPrivateKey, HttpSchemaFetcher, TraceFormat};
 
+fn parse_api_endpoint(api_str: &str) -> Result<url::Url, anyhow::Error> {
+    if let Ok(api_url) = url::Url::parse(api_str) {
+        Ok(api_url)
+    } else {
+        let host_url = psibase::cli::config::read_host_url(api_str)?;
+        Ok(url::Url::parse(&host_url)?)
+    }
+}
+
 /// Randomly push transfers to a blockchain in bursts
 #[derive(clap::Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// API Endpoint
+    /// API Endpoint URL or host alias from `psibase config`
     #[clap(
         short = 'a',
         long,
-        value_name = "URL",
-        default_value = "http://psibase.localhost:8080/"
+        value_name = "URL_OR_HOST_ALIAS",
+        default_value = "http://psibase.localhost:8080/",
+        value_parser = parse_api_endpoint
     )]
     api: url::Url,
 
