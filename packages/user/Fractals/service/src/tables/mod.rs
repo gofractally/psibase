@@ -156,10 +156,10 @@ pub mod tables {
     pub struct Levy {
         pub id: u32,
         pub fractal: AccountNumber,
-        pub member: AccountNumber,
-        pub payee: AccountNumber,
-        pub ppm: u32,
-        pub remaining: Option<Quantity>,
+        pub member: AccountNumber, // who is being levied
+        pub payee: AccountNumber,  // who receives the levy
+        pub rate_ppm: u32,
+        pub debt: Option<Quantity>, // optional cap; None = indefinite
     }
 
     impl Levy {
