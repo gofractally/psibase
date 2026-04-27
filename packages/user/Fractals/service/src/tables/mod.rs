@@ -42,24 +42,8 @@ pub mod tables {
         pub created_at: TimePointSec,
         pub name: String,
         pub mission: String,
-        #[graphql(skip)]
-        pub legislature: AccountNumber,
-        #[graphql(skip)]
-        pub judiciary: AccountNumber,
         pub token_id: TID,
         pub dist_strat: u8,
-    }
-
-    impl Fractal {
-        #[secondary_key(1)]
-        fn by_judiciary(&self) -> (AccountNumber, AccountNumber) {
-            (self.judiciary, self.account)
-        }
-
-        #[secondary_key(2)]
-        fn by_legislature(&self) -> (AccountNumber, AccountNumber) {
-            (self.legislature, self.account)
-        }
     }
 
     #[table(name = "FractalMemberTable", index = 2)]
@@ -131,7 +115,7 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_account(&self) -> AccountNumber {
+        fn by_role_account(&self) -> AccountNumber {
             self.account
         }
     }

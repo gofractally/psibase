@@ -6,6 +6,7 @@ use async_graphql::ComplexObject;
 use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
+use crate::constants::FractalRole;
 use crate::constants::{
     token_distributions::TOKEN_SUPPLY,
     FractalRole::{Executive, Judiciary, Legislature},
@@ -28,13 +29,7 @@ use psibase::services::transact::Wrapper as TransactSvc;
 use psibase::{check, get_sender, RawKey, TableQuery};
 
 impl Fractal {
-    fn new(
-        account: AccountNumber,
-        legislature: AccountNumber,
-        judiciary: AccountNumber,
-        name: String,
-        mission: String,
-    ) -> Self {
+    fn new(account: AccountNumber, name: String, mission: String) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
@@ -46,8 +41,6 @@ impl Fractal {
             created_at: now,
             mission,
             name,
-            judiciary,
-            legislature,
             dist_strat: DistributionStrategy::Constant as u8,
         }
     }
@@ -66,7 +59,7 @@ impl Fractal {
         mission: String,
     ) -> Self {
         check_none(Self::get(fractal), "fractal already exists");
-        let new_instance = Self::new(fractal, legislature, judiciary, name, mission);
+        let new_instance = Self::new(fractal, name, mission);
 
         // Save the fractal first prior to creating an account for it
         // as AuthDyn expects `has_policy` to return true when setting the fractals
@@ -88,32 +81,24 @@ impl Fractal {
         new_instance
     }
 
-    pub fn get_by_legislature(legislature: AccountNumber) -> Option<Self> {
-        FractalTable::read()
-            .get_index_by_legislature()
-            .range(
-                (legislature, AccountNumber::new(0))..=(legislature, AccountNumber::new(u64::MAX)),
-            )
-            .next()
+    pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
+        Role::get_by_role_account(role_account).map(|role| Fractal::get(role.fractal))?
     }
 
-    pub fn get_by_judiciary(judiciary: AccountNumber) -> Option<Self> {
-        FractalTable::read()
-            .get_index_by_judiciary()
-            .range((judiciary, AccountNumber::new(0))..=(judiciary, AccountNumber::new(u64::MAX)))
-            .next()
+    fn role_account(&self, role: FractalRole) -> AccountNumber {
+        Role::get_assert(self.account, role).account
     }
 
     pub fn check_sender_is_legislature(&self) {
         check(
-            self.legislature == get_sender(),
+            self.role_account(FractalRole::Legislature) == get_sender(),
             "Requires legislature authority",
         );
     }
 
     pub fn check_sender_is_judiciary(&self) {
         check(
-            self.judiciary == get_sender(),
+            self.role_account(FractalRole::Judiciary) == get_sender(),
             "Requires judiciary authority",
         );
     }
@@ -213,7 +198,7 @@ impl Fractal {
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
-        DynamicAuthPolicy::from_sole_authorizer(self.legislature)
+        DynamicAuthPolicy::from_sole_authorizer(self.role_account(FractalRole::Legislature))
     }
 }
 

@@ -5,7 +5,7 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{Fractal, FractalMember, FractalMemberTable, FractalTable};
     use psibase::{AccountNumber, *};
-    use serde::{Deserialize, Deserializer};
+    use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]

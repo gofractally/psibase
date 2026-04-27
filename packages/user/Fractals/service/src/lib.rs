@@ -133,7 +133,7 @@ pub mod service {
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
-            .or(Role::get_by_account(account).map(|role| {
+            .or(Role::get_by_role_account(account).map(|role| {
                 occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
             }))
     }

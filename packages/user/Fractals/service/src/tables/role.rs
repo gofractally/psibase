@@ -24,19 +24,21 @@ impl Role {
         RoleTable::read().get_index_pk().get(&(fractal, role_id))
     }
 
-    pub fn get_assert(fractal: AccountNumber, role_id: u8) -> Self {
+    pub fn get_assert(fractal: AccountNumber, role: FractalRole) -> Self {
         check_some(
-            Self::get(fractal, role_id),
+            Self::get(fractal, role as u8),
             &format!(
                 "role with id {} does not exist for fractal {}",
-                role_id,
+                role as u8,
                 fractal.to_string()
             ),
         )
     }
 
-    pub fn get_by_account(account: AccountNumber) -> Option<Self> {
-        RoleTable::read().get_index_by_account().get(&account)
+    pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
+        RoleTable::read()
+            .get_index_by_role_account()
+            .get(&role_account)
     }
 
     pub fn add(
