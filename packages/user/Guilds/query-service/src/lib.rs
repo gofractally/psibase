@@ -17,10 +17,7 @@ mod service {
         async fn ranked_guilds(&self, fractal: AccountNumber) -> Vec<AccountNumber> {
             let mut guilds: Vec<_> = RankingTable::read()
                 .get_index_pk()
-                .range(
-                    (fractal, u8::MIN, AccountNumber::new(0))
-                        ..=(fractal, u8::MAX, AccountNumber::new(u64::MAX)),
-                )
+                .range((fractal, u8::MIN)..=(fractal, u8::MAX))
                 .collect();
 
             guilds.sort_by_key(|x| x.index);

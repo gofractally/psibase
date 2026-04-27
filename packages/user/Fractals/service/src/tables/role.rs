@@ -29,7 +29,7 @@ impl Role {
             Self::get(fractal, role_id),
             &format!(
                 "role with id {} does not exist for fractal {}",
-                role_id as u8,
+                role_id,
                 fractal.to_string()
             ),
         )
@@ -58,7 +58,7 @@ impl Role {
             "occupation account does not exist",
         );
 
-        let new_instance = Self::new(fractal, account, role.into(), occupation);
+        let new_instance = Self::new(fractal, account, role, occupation);
         new_instance.save();
 
         create_managed_account(account, || {});

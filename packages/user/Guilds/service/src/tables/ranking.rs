@@ -1,5 +1,3 @@
-use std::u64;
-
 use psibase::{check, AccountNumber, Table};
 
 use crate::{
@@ -25,10 +23,7 @@ impl Ranking {
     pub fn get_ordered_rankings(fractal: AccountNumber) -> Vec<Self> {
         let mut rankings: Vec<_> = RankingTable::read()
             .get_index_pk()
-            .range(
-                &(fractal, 0, AccountNumber::new(0))
-                    ..&(fractal, u8::MAX, AccountNumber::new(u64::MAX)),
-            )
+            .range(&(fractal, 0)..&(fractal, u8::MAX))
             .collect();
 
         rankings.sort_by_key(|occ| occ.index);
