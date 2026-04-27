@@ -1,37 +1,6 @@
+pub mod constants;
 pub mod helpers;
 pub mod tables;
-
-pub mod constants {
-    pub const ONE_DAY: u32 = 86400;
-    pub const ONE_WEEK: u32 = ONE_DAY * 7;
-    const ONE_YEAR: u32 = ONE_WEEK * 52;
-
-    pub const PPM: u32 = 1_000_000;
-
-    pub mod roles {
-        pub const LEGISLATURE: u8 = 1;
-        pub const JUDICIARY: u8 = 2;
-        pub const EXECUTIVE: u8 = 3;
-    }
-    pub mod token_distributions {
-        pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
-
-        pub mod consensus_rewards {
-            pub const REWARD_DISTRIBUTION: u64 = super::TOKEN_SUPPLY / 4;
-            pub const INITIAL_REWARD_DISTRIBUTION: u64 = REWARD_DISTRIBUTION / 100;
-            pub const REMAINING_REWARD_DISTRIBUTION: u64 =
-                REWARD_DISTRIBUTION - INITIAL_REWARD_DISTRIBUTION;
-        }
-    }
-
-    pub const TOKEN_PRECISION: u8 = 4;
-    pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
-    pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
-    pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
-    pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
-
-    pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
-}
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
@@ -134,7 +103,7 @@ pub mod service {
     #[action]
     fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
         Fractal::get_assert(fractal).check_sender_is_legislature();
-        Role::get_assert(fractal, role_id).set_occupation(new_occupation);
+        Role::get_assert(fractal, role_id.into()).set_occupation(new_occupation);
     }
 
     /// Claim member rewards

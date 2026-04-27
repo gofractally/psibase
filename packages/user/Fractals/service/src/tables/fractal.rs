@@ -6,8 +6,11 @@ use async_graphql::ComplexObject;
 use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::roles::{EXECUTIVE, JUDICIARY, LEGISLATURE};
-use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
+use crate::constants::{
+    token_distributions::TOKEN_SUPPLY,
+    FractalRole::{Executive, Judiciary, Legislature},
+    TOKEN_PRECISION,
+};
 use crate::helpers::{create_managed_account, distribute_by_weight};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
@@ -72,9 +75,9 @@ impl Fractal {
 
         let defacto_service = "de-facto".into();
 
-        Role::add(fractal, legislature, LEGISLATURE, defacto_service);
-        Role::add(fractal, judiciary, JUDICIARY, defacto_service);
-        Role::add(fractal, executive, EXECUTIVE, defacto_service);
+        Role::add(fractal, legislature, Legislature, defacto_service);
+        Role::add(fractal, judiciary, Judiciary, defacto_service);
+        Role::add(fractal, executive, Executive, defacto_service);
 
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
@@ -255,15 +258,15 @@ impl Fractal {
     }
 
     async fn legislature(&self) -> Role {
-        Role::get_assert(self.account, LEGISLATURE)
+        Role::get_assert(self.account, Legislature.into())
     }
 
     async fn judiciary(&self) -> Role {
-        Role::get_assert(self.account, JUDICIARY)
+        Role::get_assert(self.account, Judiciary.into())
     }
 
     async fn executive(&self) -> Role {
-        Role::get_assert(self.account, EXECUTIVE)
+        Role::get_assert(self.account, Executive.into())
     }
 
     async fn stream(&self) -> Option<RewardStream> {

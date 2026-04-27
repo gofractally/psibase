@@ -1,4 +1,5 @@
 use crate::{
+    constants::FractalRole,
     helpers::create_managed_account,
     tables::tables::{Role, RoleTable},
 };
@@ -8,13 +9,13 @@ impl Role {
     fn new(
         fractal: AccountNumber,
         account: AccountNumber,
-        role_id: u8,
+        role: FractalRole,
         occupation: AccountNumber,
     ) -> Self {
         Self {
             fractal,
             account,
-            role_id,
+            role_id: role.into(),
             occupation,
         }
     }
@@ -28,7 +29,7 @@ impl Role {
             Self::get(fractal, role_id),
             &format!(
                 "role with id {} does not exist for fractal {}",
-                role_id,
+                role_id as u8,
                 fractal.to_string()
             ),
         )
@@ -41,14 +42,14 @@ impl Role {
     pub fn add(
         fractal: AccountNumber,
         account: AccountNumber,
-        role_id: u8,
+        role: FractalRole,
         occupation: AccountNumber,
     ) -> Self {
         check_none(
-            Self::get(fractal, role_id),
+            Self::get(fractal, role.into()),
             &format!(
                 "role with id {} already exists for fractal {}",
-                role_id,
+                role as u8,
                 fractal.to_string()
             ),
         );
@@ -57,7 +58,7 @@ impl Role {
             "occupation account does not exist",
         );
 
-        let new_instance = Self::new(fractal, account, role_id, occupation);
+        let new_instance = Self::new(fractal, account, role.into(), occupation);
         new_instance.save();
 
         create_managed_account(account, || {});
