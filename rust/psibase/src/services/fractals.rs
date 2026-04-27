@@ -274,14 +274,13 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Allows a user to join a fractal and immediately become a citizen.
-    ///
-    /// Cannot be called by a fractal.
+    /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal to join.
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
-    fn join(fractal: AccountNumber) {
+    fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
         unimplemented!()
     }
 

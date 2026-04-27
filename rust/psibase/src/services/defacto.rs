@@ -14,12 +14,12 @@ pub mod Service {
     }
 
     #[action]
-    fn is_supported(fractal: AccountNumber) -> bool {
+    fn is_role_ok(fractal: AccountNumber, _role_id: u8) -> bool {
         unimplemented!()
     }
 
     #[action]
-    fn role_policy(account: AccountNumber) -> DynamicAuthPolicy {
+    fn role_policy(fractal: AccountNumber, _role_id: u8) -> DynamicAuthPolicy {
         unimplemented!()
     }
 }

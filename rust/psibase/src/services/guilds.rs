@@ -10,6 +10,11 @@ pub mod Service {
     };
 
     #[action]
+    fn init() {
+        unimplemented!()
+    }
+
+    #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
         unimplemented!()
     }
