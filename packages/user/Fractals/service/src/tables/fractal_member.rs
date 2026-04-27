@@ -62,7 +62,9 @@ impl FractalMember {
                 remaining_amount - levy_paid
             });
 
-        self.credit_direct(to_credit, "Stream reward".into());
+        if to_credit.value > 0 {
+            self.credit_direct(to_credit, "Stream reward".into());
+        }
     }
 
     pub fn add(fractal: AccountNumber, account: AccountNumber) -> Self {
@@ -100,6 +102,9 @@ impl FractalMember {
 
     pub fn exile(&self) {
         FractalExile::add(self.fractal, self.account);
+        for levy in Levy::levies_of_member(self.fractal, self.account) {
+            levy.delete_by_exile()
+        }
         self.remove();
     }
 

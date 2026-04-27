@@ -67,11 +67,15 @@ impl Levy {
             .collect()
     }
 
+    pub fn delete_by_exile(&self) {
+        self.remove();
+    }
+
     fn remove(&self) {
         LevyTable::read_write().remove(&self);
     }
 
-    /// Applies the configured levy to the given income, pays the payee, and returns the amount paid.
+    /// Applies the configured levy to the given income, pays the payee, and returns the amount levied.
     pub fn apply_levy(&mut self, gross_income: Quantity) -> Quantity {
         if gross_income.value == 0 {
             return gross_income;
