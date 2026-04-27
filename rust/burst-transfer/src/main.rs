@@ -87,6 +87,23 @@ async fn lookup_token(
     )
 }
 
+fn build_transaction(
+    actions: Vec<psibase::Action>,
+    ref_block: &psibase::TaposRefBlock,
+) -> psibase::Transaction {
+    let expiration = psibase::TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
+    psibase::Transaction {
+        tapos: psibase::Tapos {
+            expiration,
+            refBlockSuffix: ref_block.ref_block_suffix,
+            flags: 0,
+            refBlockIndex: ref_block.ref_block_index,
+        },
+        actions,
+        claims: vec![],
+    }
+}
+
 // Randomly transfer
 async fn transfer_impl(
     args: &Args,
@@ -99,8 +116,6 @@ async fn transfer_impl(
     while to == from {
         to = args.accounts[rand::random::<usize>() % args.accounts.len()];
     }
-    let now_plus_10secs = chrono::Utc::now() + chrono::Duration::seconds(10);
-    let expiration = psibase::TimePointSec::from(now_plus_10secs);
     let mut actions = Vec::new();
     for _ in 0..args.actions {
         let memo = format!(
@@ -114,24 +129,14 @@ async fn transfer_impl(
             memo.try_into()?,
         ));
     }
-    let trx = psibase::Transaction {
-        tapos: psibase::Tapos {
-            expiration,
-            refBlockSuffix: ref_block.ref_block_suffix,
-            flags: 0,
-            refBlockIndex: ref_block.ref_block_index,
-        },
-        actions,
-        claims: vec![],
-    };
+    let trx = build_transaction(actions, ref_block);
     let client = reqwest::Client::new();
-
     let afmt = ActionFormatter::new(HttpSchemaFetcher {
         client: &client,
         base_url: &args.api,
     });
 
-    psibase::push_transaction(
+    psibase::push_transaction_optimistic(
         &args.api,
         client.clone(),
         psibase::sign_transaction(trx, &args.sign)?.packed(),
