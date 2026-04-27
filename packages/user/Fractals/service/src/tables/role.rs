@@ -20,13 +20,15 @@ impl Role {
         }
     }
 
-    pub fn get(fractal: AccountNumber, role_id: u8) -> Option<Self> {
-        RoleTable::read().get_index_pk().get(&(fractal, role_id))
+    pub fn get(fractal: AccountNumber, role: FractalRole) -> Option<Self> {
+        RoleTable::read()
+            .get_index_pk()
+            .get(&(fractal, role.into()))
     }
 
     pub fn get_assert(fractal: AccountNumber, role: FractalRole) -> Self {
         check_some(
-            Self::get(fractal, role as u8),
+            Self::get(fractal, role),
             &format!(
                 "role with id {} does not exist for fractal {}",
                 role as u8,

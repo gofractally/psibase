@@ -6,9 +6,9 @@ use async_graphql::ComplexObject;
 use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::FractalRole;
 use crate::constants::{
     token_distributions::TOKEN_SUPPLY,
+    FractalRole,
     FractalRole::{Executive, Judiciary, Legislature},
     TOKEN_PRECISION,
 };
@@ -82,7 +82,7 @@ impl Fractal {
     }
 
     pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
-        Role::get_by_role_account(role_account).map(|role| Fractal::get(role.fractal))?
+        Role::get_by_role_account(role_account).and_then(|role| Fractal::get(role.fractal))
     }
 
     fn role_account(&self, role: FractalRole) -> AccountNumber {
