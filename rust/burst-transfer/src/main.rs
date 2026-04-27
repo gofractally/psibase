@@ -2,6 +2,7 @@ use std::sync::atomic::AtomicI32;
 
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
+use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::{ActionFormatter, AnyPrivateKey, HttpSchemaFetcher, TraceFormat};
 
 fn parse_api_endpoint(api_str: &str) -> Result<url::Url, anyhow::Error> {
@@ -62,87 +63,28 @@ struct Args {
     console: bool,
 }
 
-// Get the url for a service's path
-fn get_url(
-    api: &url::Url,
-    service: psibase::AccountNumber,
-    path: &str,
-) -> Result<url::Url, anyhow::Error> {
-    let host = match api
-        .host()
-        .ok_or_else(|| anyhow!("missing host name in <API>"))?
-    {
-        url::Host::Domain(s) => s,
-        _ => return Err(anyhow!("missing host name in <API>")),
-    };
-    let mut api = api.clone();
-    api.set_host(Some(&(service.to_string() + "." + host)))?;
-    api.set_path(path);
-    Ok(api)
-}
-
-// Get response as text
-async fn as_text(mut response: reqwest::Response) -> Result<String, anyhow::Error> {
-    if response.status().is_client_error() {
-        response = response.error_for_status()?;
-    }
-    if response.status().is_server_error() {
-        return Err(anyhow!("{}", response.text().await?));
-    }
-    Ok(response.text().await?)
-}
-
-// Get response as JSON
-async fn as_json<T: serde::de::DeserializeOwned>(
-    response: reqwest::Response,
-) -> Result<T, anyhow::Error> {
-    Ok(serde_json::de::from_str(&as_text(response).await?)?)
-}
-
-// Just the fields we care about
-#[allow(non_snake_case)]
 #[derive(Debug, serde::Deserialize)]
 struct TokenRecord {
     id: u32,
-    symbolId: String,
 }
 
-// Look up token ID
+#[derive(Debug, serde::Deserialize)]
+struct TokenQuery {
+    token: Option<TokenRecord>,
+}
+
 async fn lookup_token(
     api: &url::Url,
     symbol_id: &str,
 ) -> Result<Option<TokenRecord>, anyhow::Error> {
-    let records = as_json::<Vec<TokenRecord>>(
-        reqwest::Client::new()
-            .get(get_url(
-                api,
-                psibase::account!("tokens"),
-                "/api/getTokenTypes",
-            )?)
-            .send()
-            .await?,
+    let token_id = serde_json::to_string(symbol_id)?;
+    let body = format!("query {{ token(tokenId: {}) {{ id }} }}", token_id);
+    let mut client = reqwest::Client::new();
+    Ok(
+        psibase::gql_query::<TokenQuery>(api, &mut client, psibase::account!("tokens"), body)
+            .await?
+            .token,
     )
-    .await?;
-
-    for record in records {
-        if record.symbolId == symbol_id {
-            return Ok(Some(record));
-        }
-    }
-
-    Ok(None)
-}
-
-// Interface to the action we need
-mod tokens {
-    #[psibase::service(name = "tokens", dispatch = false)]
-    #[allow(non_snake_case, unused_variables)]
-    mod service {
-        #[action]
-        fn credit(tokenId: u32, receiver: psibase::AccountNumber, amount: (u64,), memo: (String,)) {
-            unimplemented!()
-        }
-    }
 }
 
 // Randomly transfer
@@ -165,12 +107,11 @@ async fn transfer_impl(
             "memo {}",
             counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
         );
-        // println!("{} -> {} {}", from, to, memo);
-        actions.push(tokens::Wrapper::pack_from(from.into()).credit(
+        actions.push(Tokens::pack_from(from.into()).credit(
             token_id,
             to.into(),
-            (1u64,),
-            (memo,),
+            Quantity::from(1u64),
+            memo.try_into()?,
         ));
     }
     let trx = psibase::Transaction {
