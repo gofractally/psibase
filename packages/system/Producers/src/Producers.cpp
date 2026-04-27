@@ -59,14 +59,12 @@ namespace
    using IndirectCheckFunc =
        bool (Actor<SystemService::AuthInterface>::*)(AccountNumber,
                                                      std::vector<AccountNumber>,
-                                                     std::optional<ServiceMethod>,
-                                                     std::optional<std::vector<AccountNumber>>);
+                                                     std::optional<ServiceMethod>);
 
    bool checkOverlapping(std::vector<AccountNumber> producers,
                          std::vector<AccountNumber> authorizers,
                          std::size_t                threshold,
-                         IndirectCheckFunc          indirectCheck,
-                         std::vector<AccountNumber> authSet)
+                         IndirectCheckFunc          indirectCheck)
    {
       // We only check for indirect auth if there are insufficient direct auths.
       auto nonOverlapping = std::ranges::partition(
@@ -84,8 +82,7 @@ namespace
          auto toAuth = Actor<SystemService::AuthInterface>{
              SystemService::Producers::service, to<SystemService::Accounts>().getAuthOf(account)};
 
-         if ((toAuth.*indirectCheck)(account, authorizers, std::nullopt,
-                                     std::optional(std::move(authSet))) &&
+         if ((toAuth.*indirectCheck)(account, authorizers, std::nullopt) &&
              ++numOverlapping >= threshold)
          {
             return true;
@@ -277,19 +274,10 @@ namespace SystemService
             "Can only authorize predefined accounts");
    }
 
-   bool Producers::isAuthSys(AccountNumber                             sender,
-                             std::vector<AccountNumber>                authorizers,
-                             std::optional<ServiceMethod>              method,
-                             std::optional<std::vector<AccountNumber>> authSet_opt)
+   bool Producers::isAuthSys(AccountNumber                sender,
+                             std::vector<AccountNumber>   authorizers,
+                             std::optional<ServiceMethod> method)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
-
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
@@ -298,22 +286,13 @@ namespace SystemService
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(authorizers), threshold,
-                              &Actor<AuthInterface>::isAuthSys, std::move(authSet));
+                              &Actor<AuthInterface>::isAuthSys);
    }
 
-   bool Producers::isRejectSys(AccountNumber                             sender,
-                               std::vector<AccountNumber>                rejecters,
-                               std::optional<ServiceMethod>              method,
-                               std::optional<std::vector<AccountNumber>> authSet_opt)
+   bool Producers::isRejectSys(AccountNumber                sender,
+                               std::vector<AccountNumber>   rejecters,
+                               std::optional<ServiceMethod> method)
    {
-      auto authSet = authSet_opt ? std::move(*authSet_opt) : std::vector<AccountNumber>{};
-
-      // Base case to prevent infinite recursion
-      if (std::ranges::contains(authSet, sender))
-         return false;
-
-      authSet.push_back(sender);
-
       auto producers = ::getProducers()                          //
                        | std::views::transform(&Producer::name)  //
                        | std::ranges::to<std::vector>();
@@ -325,7 +304,7 @@ namespace SystemService
 
       auto _ = recurse();
       return checkOverlapping(std::move(producers), std::move(rejecters), threshold,
-                              &Actor<AuthInterface>::isRejectSys, std::move(authSet));
+                              &Actor<AuthInterface>::isRejectSys);
    }
 
 }  // namespace SystemService

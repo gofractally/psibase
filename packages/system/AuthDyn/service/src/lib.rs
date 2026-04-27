@@ -132,9 +132,8 @@ pub mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, authorizers, method, authSet, true)
+        is_auth(sender, authorizers, method, true)
     }
 
     #[action]
@@ -143,15 +142,13 @@ pub mod service {
         sender: AccountNumber,
         rejecters: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        authSet: Option<Vec<AccountNumber>>,
     ) -> bool {
-        is_auth(sender, rejecters, method, authSet, false)
+        is_auth(sender, rejecters, method, false)
     }
 
     fn is_auth_other(
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
-        auth_set: Vec<AccountNumber>,
         is_approval: bool,
     ) -> bool {
         use psibase::services::transact::auth_interface::AuthWrapper;
@@ -159,9 +156,9 @@ pub mod service {
         let auth_service = AuthWrapper::call_to(Accounts::call().getAuthOf(sender));
 
         if is_approval {
-            auth_service.isAuthSys(sender, authorizers, None, Some(auth_set))
+            auth_service.isAuthSys(sender, authorizers, None)
         } else {
-            auth_service.isRejectSys(sender, authorizers, None, Some(auth_set))
+            auth_service.isRejectSys(sender, authorizers, None)
         }
     }
 
@@ -169,16 +166,8 @@ pub mod service {
         sender: AccountNumber,
         authorizers: Vec<AccountNumber>,
         method: Option<ServiceMethod>,
-        auth_set: Option<Vec<AccountNumber>>,
         is_approval: bool,
     ) -> bool {
-        // Make sure we're not in a loop
-        let mut auth_set = auth_set.unwrap_or_default();
-        if auth_set.contains(&sender) {
-            return false;
-        }
-        auth_set.push(sender);
-
         let policy = Management::get_assert(sender).dynamic_policy(method);
         check(policy.threshold != 0, "multi auth threshold cannot be 0");
 
@@ -212,12 +201,8 @@ pub mod service {
         }
 
         for weight_authorizer in to_check {
-            let is_auth = is_auth_other(
-                weight_authorizer.account,
-                authorizers.clone(),
-                auth_set.clone(),
-                is_approval,
-            );
+            let is_auth =
+                is_auth_other(weight_authorizer.account, authorizers.clone(), is_approval);
             if is_auth {
                 total_weight_approved += weight_authorizer.weight;
                 if total_weight_approved >= required_weight {

@@ -32,7 +32,6 @@ impl StagedTxPolicy {
                 sender: self.user,
                 authorizers: accepters,
                 method: Some(method),
-                authSet: None,
             },
         )
     }
@@ -44,7 +43,6 @@ impl StagedTxPolicy {
                 sender: self.user,
                 rejecters,
                 method: Some(method),
-                authSet: None,
             },
         )
     }

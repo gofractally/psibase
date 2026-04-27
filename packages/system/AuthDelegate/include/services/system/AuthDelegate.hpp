@@ -67,10 +67,9 @@ namespace SystemService
       /// * `true`: If the sender's owner is among the authorizers, or if the sender's owner's auth
       /// service would authorize the transaction
       /// * `false`: If not returning true, or on recursive checks for the same sender
-      bool isAuthSys(psibase::AccountNumber                             sender,
-                     std::vector<psibase::AccountNumber>                authorizers,
-                     std::optional<ServiceMethod>                       method,
-                     std::optional<std::vector<psibase::AccountNumber>> authSet);
+      bool isAuthSys(psibase::AccountNumber              sender,
+                     std::vector<psibase::AccountNumber> authorizers,
+                     std::optional<ServiceMethod>        method);
 
       /// Check whether a specified set of rejecter accounts are sufficient to reject (cancel) a
       /// transaction from a specified sender.
@@ -82,10 +81,9 @@ namespace SystemService
       /// * `true`: If the sender's owner is among the rejecters, or if the sender's owner's auth
       /// service would reject the transaction
       /// * `false`: If not returning true, or on recursive checks for the same sender
-      bool isRejectSys(psibase::AccountNumber                             sender,
-                       std::vector<psibase::AccountNumber>                rejecters,
-                       std::optional<ServiceMethod>                       method,
-                       std::optional<std::vector<psibase::AccountNumber>> authSet);
+      bool isRejectSys(psibase::AccountNumber              sender,
+                       std::vector<psibase::AccountNumber> rejecters,
+                       std::optional<ServiceMethod>        method);
 
       /// Set the owner of the sender account
       ///
@@ -108,8 +106,8 @@ namespace SystemService
    PSIO_REFLECT(AuthDelegate,  //
                 method(checkAuthSys, flags, requester, sender, action, allowedActions, claims),
                 method(canAuthUserSys, user),
-                method(isAuthSys, sender, authorizers, method, authSet),
-                method(isRejectSys, sender, rejecters, method, authSet),
+                method(isAuthSys, sender, authorizers, method),
+                method(isRejectSys, sender, rejecters, method),
                 method(setOwner, owner),
                 method(newAccount, name, owner, requireMatch),
                 method(getOwner, owner)
