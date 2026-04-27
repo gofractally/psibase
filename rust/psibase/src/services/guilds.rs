@@ -9,16 +9,28 @@ pub mod Service {
         AccountNumber, Memo,
     };
 
+    /// Initialize the guilds service.
     #[action]
     fn init() {
         unimplemented!()
     }
 
+    /// Get scores for all guild members in a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
     #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
         unimplemented!()
     }
 
+    /// Is active
+    ///
+    /// Advises if the occupation considers a fractal member account an active member
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal.
+    /// * `member` - Fractal member.
     #[action]
     fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
         unimplemented!()
@@ -46,6 +58,10 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Has policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
     #[action]
     pub fn has_policy(account: AccountNumber) -> bool {
         unimplemented!()
@@ -54,7 +70,7 @@ pub mod Service {
     /// Creates a guild within a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to serve as juridiction of guild.
+    /// * `fractal` - Fractal to serve as jurisdiction of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
     /// * `council_role` - Council role account.
@@ -70,6 +86,11 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Check if a role ID is mapped for a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID to check.
     #[action]
     fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
         unimplemented!()
@@ -112,10 +133,11 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set guild description
+    /// Set guild application extra info
     ///
     /// # Arguments
-    /// * `description` - New description of the guild.
+    /// * `guild_account` - The guild being applied to.
+    /// * `extra_info` - Extra information to update on the application.
     #[action]
     fn set_g_app(guild_account: AccountNumber, extra_info: String) {
         unimplemented!()
@@ -132,7 +154,7 @@ pub mod Service {
 
     /// Register candidacy.
     ///
-    /// Register your candidacy to serve on a Guild council.  
+    /// Register your candidacy to serve on a Guild council.
     ///
     /// # Arguments
     /// * `guild` - Guild candidate is member of
@@ -142,10 +164,10 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set ranked guilds
+    /// Set rank ordering threshold
     ///
     /// # Arguments
-    /// * `ranked_guilds` - Ordered guilds to be ranked, affects scores.
+    /// * `rank_ordering_threshold` - Minimum number of scorers required to enable rank ordering.
     #[action]
     fn set_thres(rank_ordering_threshold: u8) {
         unimplemented!()
@@ -184,7 +206,7 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `guild_account` - The account number for the guild.
-    /// * `member` - Member to attest.
+    /// * `applicant` - Applicant to attest.
     /// * `comment` - Any comment relevant to the application.
     /// * `endorses` - True if in favour of the application.
     #[action]
@@ -287,7 +309,7 @@ pub mod Service {
 
     /// Invite a guild member.
     ///
-    /// Must be called by pre existing guild member.  
+    /// Must be called by pre existing guild member.
     ///
     /// # Arguments
     /// * `guild` - Guild invitee will join.

@@ -18,6 +18,7 @@ pub mod service {
         *,
     };
 
+    /// Initialize the guilds service.
     #[action]
     fn init() {
         let table = InitTable::new();
@@ -36,7 +37,7 @@ pub mod service {
     /// Creates a guild within a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to serve as owner of guild.
+    /// * `fractal` - Fractal to serve as jurisdiction of guild.
     /// * `guild_account` - The account number for the new guild.
     /// * `display_name` - The display name of the guild.
     /// * `council_role` - Council role account.
@@ -71,6 +72,10 @@ pub mod service {
         );
     }
 
+    /// Get scores for all guild members in a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
     #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
         FractalSettings::get_or_default(fractal).scores()
@@ -91,6 +96,11 @@ pub mod service {
             .any(|member| Guild::get_assert(member.guild).owner == fractal)
     }
 
+    /// Check if a role ID is mapped for a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID to check.
     #[action]
     fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
         RoleMap::get(fractal, role_id).is_some()
@@ -480,6 +490,10 @@ pub mod service {
         }
     }
 
+    /// Has policy action used by AuthDyn service.
+    ///
+    /// # Arguments
+    /// * `account` - Account being checked.
     #[action]
     pub fn has_policy(account: AccountNumber) -> bool {
         Guild::get(account).is_some()

@@ -172,6 +172,8 @@ pub mod Service {
 
     /// Exile a fractal member.
     ///
+    /// Must be called by judiciary.
+    ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
@@ -194,6 +196,7 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `account` - Account being checked.
+    /// * `method` - Optional method being checked.
     #[action]
     fn get_policy(account: AccountNumber, method: Option<ServiceMethod>) -> DynamicAuthPolicy {
         unimplemented!()
@@ -220,7 +223,7 @@ pub mod Service {
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
-    /// Must be called by legislature.  
+    /// Must be called by legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
