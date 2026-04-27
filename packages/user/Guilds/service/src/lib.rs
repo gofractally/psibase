@@ -154,8 +154,8 @@ pub mod service {
     /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `fractal` - Ordered guilds to be ranked, affects scores.
-    /// * `distribution_strategy` - Algoritm for weighted distribution.
+    /// * `fractal` - Fractal settings to update.
+    /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
     fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
         FractalSettings::get_or_default(fractal).set_dist_strategy(distribution_strategy.into());

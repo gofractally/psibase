@@ -75,8 +75,8 @@ pub mod service {
     /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `fractal` - Ordered guilds to be ranked, affects scores.
-    /// * `distribution_strategy` - Algoritm for weighted distribution.
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
     fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
         let mut fractal = Fractal::get_assert(fractal);
