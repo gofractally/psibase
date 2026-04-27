@@ -60,11 +60,17 @@ impl FractalSettings {
             }
         }
 
+        let max_score = member_scores.values().copied().max().unwrap_or(0);
+
+        if max_score == 0 {
+            return vec![];
+        }
+
         member_scores
             .into_iter()
             .map(|(member, total)| {
-                let clamped = total.min(u32::MAX as u128) as u32;
-                (member, clamped)
+                let normalized = ((total * u32::MAX as u128) / max_score) as u32;
+                (member, normalized)
             })
             .collect()
     }
