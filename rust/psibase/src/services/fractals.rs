@@ -1,3 +1,5 @@
+use crate::abort_message;
+
 #[crate::service(
     name = "eval-hooks",
     actions = "hooks_actions",
@@ -86,7 +88,8 @@ impl From<u8> for FractalRole {
             1 => FractalRole::Legislature,
             2 => FractalRole::Judiciary,
             3 => FractalRole::Executive,
-            _ => panic!("Invalid FractalRole value: {}", value),
+            4 => FractalRole::Recruitment,
+            _ => abort_message(&format!("Invalid FractalRole value: {}", value)),
         }
     }
 }
