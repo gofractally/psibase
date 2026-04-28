@@ -1,3 +1,4 @@
+// cargo build -r --bin burst-transfer --manifest-path rust/Cargo.toml --target-dir build/rust
 use std::sync::atomic::AtomicI32;
 
 use anyhow::{anyhow, Context};
@@ -273,6 +274,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut accounts: Vec<psibase::AccountNumber> = Vec::with_capacity(args.account_count);
 
     loop {
+        let batch_start = tokio::time::Instant::now();
         let ref_block = psibase::get_tapos_for_head(&args.api, reqwest::Client::new())
             .await
             .context("Failed to get tapos");
@@ -341,7 +343,10 @@ async fn main() -> Result<(), anyhow::Error> {
             }
         }
         if args.delay > 0 {
-            tokio::time::sleep(tokio::time::Duration::from_millis(args.delay.into())).await;
+            let delay = tokio::time::Duration::from_millis(args.delay.into());
+            if let Some(remaining) = delay.checked_sub(batch_start.elapsed()) {
+                tokio::time::sleep(remaining).await;
+            }
         }
     }
 }
