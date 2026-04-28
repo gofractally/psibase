@@ -3,7 +3,23 @@ use std::sync::atomic::AtomicI32;
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
-use psibase::{ActionFormatter, AnyPrivateKey, HttpSchemaFetcher, TraceFormat};
+use psibase::{
+    new_account_action, preapprove_action, ActionFormatter, AnyPrivateKey, HttpSchemaFetcher,
+    PackageList, TraceFormat,
+};
+
+const ACCOUNTS_PER_SETUP: usize = 10;
+
+mod faucet_tok {
+    #[psibase::service(name = "faucet-tok", dispatch = false)]
+    #[allow(non_snake_case, unused_variables)]
+    mod service {
+        #[action]
+        fn dispense(account: psibase::AccountNumber) {
+            unimplemented!()
+        }
+    }
+}
 
 fn parse_api_endpoint(api_str: &str) -> Result<url::Url, anyhow::Error> {
     if let Ok(api_url) = url::Url::parse(api_str) {
@@ -36,9 +52,9 @@ struct Args {
     #[clap(required = true)]
     symbol: psibase::ExactAccountNumber,
 
-    /// Accounts to transfer between; need at least 2
+    /// Number of random accounts to create and use as transfer participants
     #[clap(required = true)]
-    accounts: Vec<psibase::ExactAccountNumber>,
+    account_count: usize,
 
     /// Number of transactions in each burst
     #[clap(short = 'b', long, default_value_t = 1)]
@@ -87,6 +103,11 @@ async fn lookup_token(
     )
 }
 
+fn random_account_name() -> psibase::AccountNumber {
+    let bytes: Vec<u8> = (0..7).map(|_| b'a' + (rand::random::<u8>() % 26)).collect();
+    psibase::AccountNumber::from(std::str::from_utf8(&bytes).unwrap())
+}
+
 fn build_transaction(
     actions: Vec<psibase::Action>,
     ref_block: &psibase::TaposRefBlock,
@@ -104,17 +125,54 @@ fn build_transaction(
     }
 }
 
+async fn push_setup(
+    args: &Args,
+    new_accounts: &[psibase::AccountNumber],
+    ref_block: &psibase::TaposRefBlock,
+) -> Result<(), anyhow::Error> {
+    let sender = psibase::services::producers::ROOT;
+    let mut actions = Vec::new();
+    for account in new_accounts {
+        if let Some(preapprove) = preapprove_action(sender, *account) {
+            actions.push(preapprove);
+        }
+        actions.push(new_account_action(sender, *account));
+    }
+    for account in new_accounts {
+        actions.push(faucet_tok::Wrapper::pack_from(sender).dispense(*account));
+    }
+
+    let trx = build_transaction(actions, ref_block);
+    let client = reqwest::Client::new();
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.api,
+    });
+
+    psibase::push_transaction(
+        &args.api,
+        client.clone(),
+        psibase::sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
+        args.console,
+        None,
+        &afmt,
+    )
+    .await
+}
+
 // Randomly transfer
 async fn transfer_impl(
     args: &Args,
+    accounts: &[psibase::AccountNumber],
     token_id: u32,
     counter: &AtomicI32,
     ref_block: &psibase::TaposRefBlock,
 ) -> Result<(), anyhow::Error> {
-    let from = args.accounts[rand::random::<usize>() % args.accounts.len()];
+    let from = accounts[rand::random::<usize>() % accounts.len()];
     let mut to = from;
     while to == from {
-        to = args.accounts[rand::random::<usize>() % args.accounts.len()];
+        to = accounts[rand::random::<usize>() % accounts.len()];
     }
     let mut actions = Vec::new();
     for _ in 0..args.actions {
@@ -122,9 +180,9 @@ async fn transfer_impl(
             "memo {}",
             counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
         );
-        actions.push(Tokens::pack_from(from.into()).credit(
+        actions.push(Tokens::pack_from(from).credit(
             token_id,
-            to.into(),
+            to,
             Quantity::from(1u64),
             memo.try_into()?,
         ));
@@ -152,13 +210,14 @@ async fn transfer_impl(
 // Print any errors, but continue execution
 async fn transfer(
     args: &Args,
+    accounts: &[psibase::AccountNumber],
     token_id: u32,
     counter: &AtomicI32,
     ref_block: &psibase::TaposRefBlock,
     repeat: bool,
 ) {
     loop {
-        if let Err(e) = transfer_impl(args, token_id, counter, ref_block)
+        if let Err(e) = transfer_impl(args, accounts, token_id, counter, ref_block)
             .await
             .context("Failed to push transaction")
         {
@@ -173,8 +232,18 @@ async fn transfer(
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = <Args as clap::Parser>::parse();
-    if args.accounts.len() < 2 {
-        return Err(anyhow!("Need at least 2 accounts"));
+    if args.account_count < 2 {
+        return Err(anyhow!("account_count must be at least 2"));
+    }
+
+    let mut client = reqwest::Client::new();
+    let installed = PackageList::installed(&args.api, &mut client)
+        .await
+        .context("Failed to list installed packages")?;
+    if !installed.contains_package("FaucetTok") {
+        return Err(anyhow!(
+            "burst-transfer depends on the FaucetTok package; install it before running"
+        ));
     }
 
     let tok = match lookup_token(&args.api, &args.symbol.to_string())
@@ -186,6 +255,8 @@ async fn main() -> Result<(), anyhow::Error> {
     };
 
     let counter = AtomicI32::new(0);
+    let mut accounts: Vec<psibase::AccountNumber> = Vec::with_capacity(args.account_count);
+
     loop {
         println!("get tapos");
         let ref_block = psibase::get_tapos_for_head(&args.api, reqwest::Client::new())
@@ -195,17 +266,33 @@ async fn main() -> Result<(), anyhow::Error> {
         match ref_block {
             Err(e) => println!("\n{:?}", e),
             Ok(ref_block) => {
-                let mut transfers = Vec::new();
-                for _ in 0..args.burst_size {
-                    transfers.push(transfer(
-                        &args,
-                        tok.id,
-                        &counter,
-                        &ref_block,
-                        args.delay == 0,
-                    ));
+                if accounts.len() < args.account_count {
+                    let n = std::cmp::min(ACCOUNTS_PER_SETUP, args.account_count - accounts.len());
+                    let new_accounts: Vec<_> = (0..n).map(|_| random_account_name()).collect();
+                    match push_setup(&args, &new_accounts, &ref_block)
+                        .await
+                        .context("Failed to push setup transaction")
+                    {
+                        Err(e) => println!("\n{:?}", e),
+                        Ok(()) => accounts.extend(new_accounts),
+                    }
                 }
-                futures::future::join_all(transfers).await;
+
+                if accounts.len() >= 2 {
+                    let repeat = args.delay == 0 && accounts.len() >= args.account_count;
+                    let mut transfers = Vec::new();
+                    for _ in 0..args.burst_size {
+                        transfers.push(transfer(
+                            &args,
+                            &accounts,
+                            tok.id,
+                            &counter,
+                            &ref_block,
+                            repeat,
+                        ));
+                    }
+                    futures::future::join_all(transfers).await;
+                }
             }
         }
         if args.delay > 0 {
