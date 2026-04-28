@@ -50,11 +50,11 @@ export const zGuildsRes = z.object({
 
 export type GuildsRes = z.infer<typeof zGuildsRes>;
 
-export const getGuilds = async (owner: Account): Promise<GuildsRes> => {
+export const getGuilds = async (fractal: Account): Promise<GuildsRes> => {
     const guilds = await graphql(
         `
     {
-        guilds(fractal: "${owner}") {
+        guilds(fractal: "${fractal}") {
             nodes {
                 account
                 rep {
