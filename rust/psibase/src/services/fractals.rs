@@ -52,21 +52,48 @@ pub mod Hooks {
 pub mod Occupation {
     use crate::{services::auth_dyn, AccountNumber};
 
+    /// Get scores for a fractal
+    ///
+    /// Returns a vector of accounts and their corresponding scores for a fractal.
+    /// These scores are used by the Fractals service to determine distribution amounts for each member.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account of the fractal.
+    /// * `member` - The member account to check.
     #[action]
-    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
+    fn get_scores(fractal: AccountNumber, member: AccountNumber) -> Vec<(AccountNumber, u32)> {
         unimplemented!()
     }
 
+    /// Check if a an account is considered active in an occupation
+    ///
+    /// # Arguments
+    /// * `fractal` - The account of the fractal.
+    /// * `member` - The member account to check.
     #[action]
     fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
         unimplemented!()
     }
 
+    /// Check if a role ID is supported for a fractal.
+    ///
+    /// Returning false will cause the Fractals service to reject changing a role to this occupation.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID to check.
     #[action]
     fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
         unimplemented!()
     }
 
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// Returns authorisers for a given role in a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account of the fractal.
+    /// * `role_id` - The role ID to check.
     #[action]
     fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         unimplemented!()
