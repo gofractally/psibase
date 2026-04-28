@@ -100,17 +100,16 @@ pub mod service {
         DiffAdjust::call().set_ppm(nft_id, increase_ppm, decrease_ppm);
     }
 
-    fn require_caller_is_self() -> bool {
-        return get_sender() == get_service();
+    fn require_caller_is_self() {
+        check(
+            get_sender() == get_service(),
+            "caller must be PremAccounts service",
+        );
     }
 
     #[action]
     fn init() {
         let table = InitTable::new();
-
-        if table.get_index_pk().get(&()).is_some() {
-            return;
-        }
 
         table.put(&InitRow {}).unwrap();
         Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
@@ -225,7 +224,7 @@ pub mod service {
         let nft_id = DiffAdjust::call().create(
             initial_price.value,
             MARKET_WINDOW_SECONDS,
-            1,
+            target,
             target,
             floor_price.value,
             increase_ppm,

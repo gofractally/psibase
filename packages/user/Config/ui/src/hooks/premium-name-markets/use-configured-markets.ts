@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import {
-    DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET,
-    DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET,
-} from "@/lib/premium-name-market-defaults";
-
 import { graphql } from "@shared/lib/graphql";
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "@shared/lib/schemas/account";
 
 import QueryKey from "../../lib/query-keys";
 
@@ -14,8 +13,8 @@ const zRow = z.object({
     length: z
         .number()
         .int()
-        .min(DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET)
-        .max(DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET),
+        .min(MIN_ACCOUNT_NAME_LENGTH)
+        .max(MAX_ACCOUNT_NAME_LENGTH),
     enabled: z.boolean(),
     target: z.number().int().min(1),
     floorPrice: z.string(),

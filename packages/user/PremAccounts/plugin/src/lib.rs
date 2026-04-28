@@ -113,7 +113,7 @@ impl Api for PremAccountsPlugin {
             return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
         }
 
-        let length = account.len() as u8;
+        let length = account.to_string().len() as u8;
         let ask_u64 = require_active_premium_market_ask(length, sys_token_id)?;
         if max_cost_u64 < ask_u64 {
             return Err(ErrorType::MaxCostBelowCurrentAsk.into());

@@ -314,7 +314,6 @@ export function expandToCanonicalTokenDecimal(
     }
 
     // Normalize integer part to canonical form (no leading zeros; "0" when empty/zero).
-    // Matches Rust `to_fixed`'s `trim_start_matches('0')` + "0" floor.
     const intPart = rawInt === "" ? "0" : rawInt.replace(/^0+/, "") || "0";
 
     if (precision <= 0) {
