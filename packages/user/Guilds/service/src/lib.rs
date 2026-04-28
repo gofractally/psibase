@@ -72,7 +72,7 @@ pub mod service {
         );
     }
 
-    /// Get scores for all guild members in a fractal.
+    /// Add a member to a fractal.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
@@ -80,11 +80,11 @@ pub mod service {
     fn add_member(fractal: AccountNumber) {
         let guilds = Guild::guilds_of_fractal(fractal);
 
-        let is_member_of_guilds = guilds
+        let is_member_of_fractal_guilds = guilds
             .iter()
             .any(|guild| GuildMember::get(guild.account, get_sender()).is_some());
 
-        if is_member_of_guilds {
+        if is_member_of_fractal_guilds {
             psibase::services::fractals::Wrapper::call().add_mem(fractal, get_sender())
         }
     }

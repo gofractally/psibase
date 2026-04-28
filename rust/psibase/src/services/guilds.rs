@@ -202,6 +202,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Add a member to a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
+    fn add_member(fractal: AccountNumber) {
+        unimplemented!()
+    }
+
     /// Attest Guild Membership application
     ///
     /// # Arguments
