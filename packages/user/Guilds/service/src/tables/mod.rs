@@ -28,7 +28,7 @@ pub mod tables {
     pub struct Guild {
         #[primary_key]
         pub account: AccountNumber,
-        pub owner: AccountNumber,
+        pub fractal: AccountNumber,
         pub display_name: Memo,
         #[graphql(skip)]
         pub rep: Option<AccountNumber>,
@@ -62,8 +62,8 @@ pub mod tables {
 
     impl Guild {
         #[secondary_key(1)]
-        pub fn by_owner(&self) -> (AccountNumber, AccountNumber) {
-            (self.owner, self.account)
+        pub fn by_fractal(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.account)
         }
 
         #[secondary_key(2)]

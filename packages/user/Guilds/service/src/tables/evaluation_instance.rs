@@ -124,7 +124,7 @@ impl EvaluationInstance {
         let guild_instance = Guild::get_assert(guild);
 
         crate::Wrapper::emit().history().scheduled_evaluation(
-            guild_instance.owner,
+            guild_instance.fractal,
             guild,
             evaluation_id,
             registration,

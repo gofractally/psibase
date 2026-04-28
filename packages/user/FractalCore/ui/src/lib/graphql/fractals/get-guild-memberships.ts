@@ -7,7 +7,7 @@ import { Account } from "@shared/lib/schemas/account";
 const GuildSchema = z.object({
     account: z.string(),
     displayName: z.string(),
-    owner: z.string(),
+    fractal: z.string(),
 });
 
 const NodeSchema = z.object({
@@ -31,7 +31,7 @@ export const getGuildMemberships = async (member: Account) => {
                     guild {
                         account
                         displayName
-                        owner
+                        fractal
                     }
                 }
             }

@@ -115,7 +115,7 @@ pub mod service {
         GuildMember::memberships_of_member(member)
             .into_iter()
             .filter(|member| RollingBits16::from(member.attendance).count_recent_ones(4) >= 2)
-            .any(|member| Guild::get_assert(member.guild).owner == fractal)
+            .any(|member| Guild::get_assert(member.guild).fractal == fractal)
     }
 
     /// Check if a role ID is mapped for a fractal.

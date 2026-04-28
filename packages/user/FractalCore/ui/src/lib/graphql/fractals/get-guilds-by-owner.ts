@@ -19,14 +19,14 @@ const GuildMembershipsSchema = z.object({
 });
 
 const DataSchema = z.object({
-    guildsByOwner: GuildMembershipsSchema,
+    guildsByFractal: GuildMembershipsSchema,
 });
 
-export const getGuildsByOwner = async (member: Account) => {
+export const getGuildsByFractal = async (member: Account) => {
     const res = await graphql(
         `
             {
-            guildsByOwner(owner:"${member}") {
+            guildsByFractal(fractal:"${member}") {
                 nodes {
                 account
                 description
@@ -42,5 +42,5 @@ export const getGuildsByOwner = async (member: Account) => {
         { service: GUILDS_SERVICE },
     );
 
-    return DataSchema.parse(res).guildsByOwner.nodes;
+    return DataSchema.parse(res).guildsByFractal.nodes;
 };

@@ -59,9 +59,8 @@ pub mod Occupation {
     ///
     /// # Arguments
     /// * `fractal` - The account of the fractal.
-    /// * `member` - The member account to check.
     #[action]
-    fn get_scores(fractal: AccountNumber, member: AccountNumber) -> Vec<(AccountNumber, u32)> {
+    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
         unimplemented!()
     }
 

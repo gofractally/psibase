@@ -14,7 +14,7 @@ pub mod guild {
                         evaluationId
                     }}
                     account
-                    owner
+                    fractal
                     councilRole
                         repRole
                     }}
@@ -40,7 +40,7 @@ pub mod guild {
     #[serde(rename_all = "camelCase")]
     struct GuildQuery {
         pub eval_instance: Option<EvalInstance>,
-        pub owner: AccountNumber,
+        pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub council_role: AccountNumber,
         pub rep_role: AccountNumber,
@@ -79,7 +79,7 @@ pub mod guild {
                 council_role: value.council_role,
                 rep_role: value.rep_role,
                 guild: value.account,
-                fractal: value.owner,
+                fractal: value.fractal,
                 evaluation_id: value.eval_instance.map(|instance| instance.evaluation_id),
             }
         }

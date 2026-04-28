@@ -27,20 +27,20 @@ mod service {
 
         async fn role_map(
             &self,
-            owner: AccountNumber,
+            fractal: AccountNumber,
             role_id: Option<u8>,
         ) -> async_graphql::Result<Connection<RawKey, RoleMap>> {
             if let Some(role_id) = role_id {
                 TableQuery::subindex::<AccountNumber>(
                     RoleMapTable::with_service(guilds::SERVICE).get_index_pk(),
-                    &(owner, role_id),
+                    &(fractal, role_id),
                 )
                 .query()
                 .await
             } else {
                 TableQuery::subindex::<AccountNumber>(
                     RoleMapTable::with_service(guilds::SERVICE).get_index_pk(),
-                    &(owner),
+                    &(fractal),
                 )
                 .query()
                 .await
@@ -63,17 +63,17 @@ mod service {
                 .get(&id)
         }
 
-        async fn guilds_by_owner(
+        async fn guilds_by_fractal(
             &self,
-            owner: AccountNumber,
+            fractal: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<Connection<RawKey, Guild>> {
             TableQuery::subindex::<AccountNumber>(
-                GuildTable::with_service(guilds::SERVICE).get_index_by_owner(),
-                &(owner),
+                GuildTable::with_service(guilds::SERVICE).get_index_by_fractal(),
+                &(fractal),
             )
             .first(first)
             .last(last)

@@ -23,7 +23,7 @@ impl Guild {
     ) -> Self {
         Self {
             account: guild,
-            owner: fractal,
+            fractal,
             bio: "".to_string().try_into().unwrap(),
             display_name,
             rep: Some(rep),
@@ -57,7 +57,7 @@ impl Guild {
     }
 
     pub fn add(
-        owner: AccountNumber,
+        fractal: AccountNumber,
         guild: AccountNumber,
         rep: AccountNumber,
         display_name: Memo,
@@ -66,7 +66,8 @@ impl Guild {
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
 
-        let new_guild_instance = Self::new(owner, guild, rep, display_name, council_role, rep_role);
+        let new_guild_instance =
+            Self::new(fractal, guild, rep, display_name, council_role, rep_role);
         new_guild_instance.save();
 
         GuildMember::add(new_guild_instance.account, rep);
@@ -110,7 +111,7 @@ impl Guild {
 
     pub fn guilds_of_fractal(fractal: AccountNumber) -> Vec<Self> {
         GuildTable::read()
-            .get_index_by_owner()
+            .get_index_by_fractal()
             .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
             .collect()
     }

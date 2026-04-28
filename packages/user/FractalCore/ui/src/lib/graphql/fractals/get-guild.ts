@@ -6,7 +6,7 @@ import { Account, zAccount } from "@shared/lib/schemas/account";
 
 export const zGuild = z.object({
     account: zAccount,
-    owner: zAccount,
+    fractal: zAccount,
     displayName: z.string(),
     council: zAccount.array().nullable(),
     rep: z.object({ member: zAccount }).nullable(),
@@ -28,7 +28,7 @@ export const getGuild = async (guildAccount: Account) => {
         {
             guild(account:"${guildAccount}") {
                 account
-                owner
+                fractal
                 displayName
                 rep {
                     member

@@ -15,7 +15,7 @@ export const getRoleMap = async (fractalAccount: Account, roleId: number): Promi
     const res = await graphql(
         `
         {
-            roleMap(owner: "${fractalAccount}", roleId: ${roleId}) {
+            roleMap(fractal: "${fractalAccount}", roleId: ${roleId}) {
                 edges {
                     node {
                         fractal
