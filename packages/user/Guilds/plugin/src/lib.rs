@@ -416,6 +416,19 @@ impl UserGuild for GuildsPlugin {
         add_action_to_transaction(guilds::action_structs::del_g_inv::ACTION_NAME, &packed_args)
     }
 
+    fn join_fractal() -> Result<(), Error> {
+        // assert_authorized(FunctionName::join_fractal)?;
+
+        let packed_args = guilds::action_structs::add_member {
+            fractal: get_sender_app()?,
+        }
+        .packed();
+        add_action_to_transaction(
+            guilds::action_structs::add_member::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn invite_member(
         guild_account: String,
         num_accounts: u16,

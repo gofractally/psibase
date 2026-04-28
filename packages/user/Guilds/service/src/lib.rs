@@ -77,6 +77,23 @@ pub mod service {
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     #[action]
+    fn add_member(fractal: AccountNumber) {
+        let guilds = Guild::guilds_of_fractal(fractal);
+
+        let is_member_of_guilds = guilds
+            .iter()
+            .any(|guild| GuildMember::get(guild.account, get_sender()).is_some());
+
+        if is_member_of_guilds {
+            psibase::services::fractals::Wrapper::call().add_mem(fractal, get_sender())
+        }
+    }
+
+    /// Get scores for all guild members in a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    #[action]
     fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
         FractalSettings::get_or_default(fractal).scores()
     }
@@ -430,7 +447,13 @@ pub mod service {
             RoleMap::get(fractal, role_id),
             "no role map set by fractal for role_id",
         );
-        Guild::get_assert(role.guild).auth_policy()
+        use psibase::services::fractals::FractalRole;
+        let fractal_role = FractalRole::from(role_id);
+        if fractal_role == FractalRole::Recruitment {
+            auth_dyn::policy::DynamicAuthPolicy::from_sole_authorizer(get_service())
+        } else {
+            Guild::get_assert(role.guild).auth_policy()
+        }
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {

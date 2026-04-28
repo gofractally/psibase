@@ -21,6 +21,7 @@ interface user-fractal {
     dist-token: func() -> result<_, error>;
     claim-rewards: func() -> result<_, error>;
 
+    join: func() -> result<_, error>;
 
 }
 

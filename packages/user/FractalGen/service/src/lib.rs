@@ -53,12 +53,14 @@ mod service {
         let legislature = "legislature".into();
         let judiciary = "judiciary-a".into();
         let executive = "executive-a".into();
+        let recruitment = "recruitment-a".into();
 
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
             legislature,
             judiciary,
             executive,
+            recruitment,
             "Network Governance".into(),
             "To establish, maintain, and grow the network.".into(),
         );

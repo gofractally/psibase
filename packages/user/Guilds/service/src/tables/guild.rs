@@ -108,10 +108,10 @@ impl Guild {
         Self::get_assert(get_sender())
     }
 
-    pub fn guilds_of_owner(owner: AccountNumber) -> Vec<Self> {
+    pub fn guilds_of_fractal(fractal: AccountNumber) -> Vec<Self> {
         GuildTable::read()
             .get_index_by_owner()
-            .range((owner, AccountNumber::new(0))..=(owner, AccountNumber::new(u64::MAX)))
+            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
             .collect()
     }
 

@@ -8,6 +8,7 @@ pub mod service {
     use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
 
     use psibase::services::fractals::occu_wrapper;
+    use psibase::services::fractals::FractalRole;
     use psibase::*;
     use psibase::{
         services::{
@@ -131,6 +132,35 @@ pub mod service {
         FractalMember::get_assert(fractal, get_sender()).claim_member_rewards();
     }
 
+    /// Add fractal member
+    ///
+    /// Adds an account to a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `member` - Account to be added as a member
+    #[action]
+    fn add_mem(fractal: AccountNumber, member: AccountNumber) {
+        // check who the sender is, who should be "guilds"
+        // we determine that guilds is the correct acocunt by checking which occupation sits in it
+        let auth = psibase::services::auth_dyn::Wrapper::call();
+
+        check(
+            auth.isAuthSys(
+                fractal,
+                vec![get_sender()],
+                Some(ServiceMethod::new(
+                    get_service(),
+                    psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into(),
+                )),
+                None,
+            ),
+            "bad authhh",
+        );
+
+        FractalMember::add(fractal, member);
+    }
+
     /// Set ordered occupations
     ///
     /// Payment for each ordered occupation will be according to the fractals payment strategy.
@@ -197,6 +227,12 @@ pub mod service {
                 .any(|sm| sm.method == method.method && sm.service == method.service)
         }) {
             DynamicAuthPolicy::impossible()
+        } else if method.is_some_and(|method| {
+            method.method
+                == psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into()
+                && method.service == get_service()
+        }) {
+            Role::get_assert(account, FractalRole::Recruitment).auth_policy()
         } else {
             policy
         }

@@ -2,6 +2,7 @@ use crate::{
     helpers::create_managed_account,
     tables::tables::{Role, RoleTable},
 };
+use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::fractals::FractalRole;
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
@@ -41,6 +42,11 @@ impl Role {
         RoleTable::read()
             .get_index_by_role_account()
             .get(&role_account)
+    }
+
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
+        psibase::services::fractals::occu_wrapper::call_to(self.occupation)
+            .role_policy(self.fractal, self.role_id)
     }
 
     pub fn add(
