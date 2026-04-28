@@ -28,9 +28,9 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        auth_delegate::Wrapper as AuthDelegate, fractals::Wrapper as Fractals,
-        guilds::Wrapper as Guilds, guilds::SERVICE as GUILDS_SERVICE,
-        producers::Wrapper as Producers,
+        auth_delegate::Wrapper as AuthDelegate, fractals::FractalRole,
+        fractals::Wrapper as Fractals, guilds::Wrapper as Guilds,
+        guilds::SERVICE as GUILDS_SERVICE, producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -72,13 +72,15 @@ mod service {
             "r-role-001".into(),
         );
 
-        Guilds::call_from(SYS_FRACTAL).set_role_map(1, SYS_GUILD);
-        Guilds::call_from(SYS_FRACTAL).set_role_map(2, SYS_GUILD);
-        Guilds::call_from(SYS_FRACTAL).set_role_map(3, SYS_GUILD);
+        let map_sys_guild_to_role_occ = |role: FractalRole| {
+            Guilds::call_from(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
+            Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, role.into(), GUILDS_SERVICE);
+        };
 
-        Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, 1, GUILDS_SERVICE);
-        Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, 2, GUILDS_SERVICE);
-        Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, 3, GUILDS_SERVICE);
+        map_sys_guild_to_role_occ(FractalRole::Legislature);
+        map_sys_guild_to_role_occ(FractalRole::Judiciary);
+        map_sys_guild_to_role_occ(FractalRole::Executive);
+        map_sys_guild_to_role_occ(FractalRole::Recruitment);
 
         // Give the core fractal ownership of the network
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);

@@ -68,9 +68,10 @@ impl AdminFractal for FractallyPlugin {
             fractal_account: fractal_account.parse().unwrap(),
             name,
             mission,
-            judiciary: gen_rand_account(None)?.as_str().into(),
-            legislature: gen_rand_account(None)?.as_str().into(),
-            executive: gen_rand_account(None)?.as_str().into(),
+            judiciary: gen_rand_account(Some("jud"))?.as_str().into(),
+            legislature: gen_rand_account(Some("leg"))?.as_str().into(),
+            executive: gen_rand_account(Some("exec"))?.as_str().into(),
+            recruitment: gen_rand_account(Some("rec"))?.as_str().into(),
         }
         .packed();
         add_action_to_transaction(

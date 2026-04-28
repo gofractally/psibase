@@ -1,8 +1,8 @@
 use crate::{
-    constants::FractalRole,
     helpers::create_managed_account,
     tables::tables::{Role, RoleTable},
 };
+use psibase::services::fractals::FractalRole;
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 impl Role {

@@ -6,12 +6,11 @@ use async_graphql::ComplexObject;
 use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::{
-    token_distributions::TOKEN_SUPPLY,
-    FractalRole,
-    FractalRole::{Executive, Judiciary, Legislature},
-    TOKEN_PRECISION,
+use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
+use psibase::services::fractals::FractalRole::{
+    self, Executive, Judiciary, Legislature, Recruitment,
 };
+
 use crate::helpers::{create_managed_account, distribute_by_weight};
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
@@ -54,6 +53,7 @@ impl Fractal {
         legislature: AccountNumber,
         judiciary: AccountNumber,
         executive: AccountNumber,
+        recruitment: AccountNumber,
         name: String,
         mission: String,
     ) -> Self {
@@ -70,6 +70,7 @@ impl Fractal {
         Role::add(fractal, legislature, Legislature, defacto_service);
         Role::add(fractal, judiciary, Judiciary, defacto_service);
         Role::add(fractal, executive, Executive, defacto_service);
+        Role::add(fractal, recruitment, Recruitment, defacto_service);
 
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
@@ -82,6 +83,10 @@ impl Fractal {
 
     pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
         Role::get_by_role_account(role_account).and_then(|role| Fractal::get(role.fractal))
+    }
+
+    pub fn by_sender() -> Self {
+        Self::get_assert(get_sender())
     }
 
     fn role_account(&self, role: FractalRole) -> AccountNumber {

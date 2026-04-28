@@ -32,6 +32,7 @@ pub mod service {
         legislature: AccountNumber,
         judiciary: AccountNumber,
         executive: AccountNumber,
+        recruitment: AccountNumber,
         name: String,
         mission: String,
     ) {
@@ -40,6 +41,7 @@ pub mod service {
             legislature,
             judiciary,
             executive,
+            recruitment,
             name,
             mission,
         );

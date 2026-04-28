@@ -71,6 +71,32 @@ pub mod Occupation {
     }
 }
 
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FractalRole {
+    Legislature = 1,
+    Judiciary = 2,
+    Executive = 3,
+    Recruitment = 4,
+}
+
+impl From<u8> for FractalRole {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => FractalRole::Legislature,
+            2 => FractalRole::Judiciary,
+            3 => FractalRole::Executive,
+            _ => panic!("Invalid FractalRole value: {}", value),
+        }
+    }
+}
+
+impl From<FractalRole> for u8 {
+    fn from(value: FractalRole) -> Self {
+        value as u8
+    }
+}
+
 #[crate::service(
     name = "payment",
     actions = "pay_actions",

@@ -22,28 +22,3 @@ pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
 pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
 
 pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
-
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FractalRole {
-    Legislature = 1,
-    Judiciary = 2,
-    Executive = 3,
-}
-
-impl From<u8> for FractalRole {
-    fn from(value: u8) -> Self {
-        match value {
-            1 => FractalRole::Legislature,
-            2 => FractalRole::Judiciary,
-            3 => FractalRole::Executive,
-            _ => panic!("Invalid FractalRole value: {}", value),
-        }
-    }
-}
-
-impl From<FractalRole> for u8 {
-    fn from(value: FractalRole) -> Self {
-        value as u8
-    }
-}
