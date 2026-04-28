@@ -1,29 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 
-import { useBillingConfig } from "@shared/hooks/use-billing-config";
 import {
     useFillGasTank,
     useResizeAndFillGasTank,
 } from "../hooks/use-fill-gas-tank";
-import { useSystemToken } from "@shared/hooks/use-system-token";
 import { useUserResources } from "../hooks/use-user-resources";
 import { GasTank } from "./gas-tank";
 
 export const UserSettingsSection = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: billingConfig, isLoading: isLoadingBillingConfig } =
-        useBillingConfig({baseUrlIncludesSibling: false});
+        useBillingConfig();
     const billingInited =
         !isLoadingBillingConfig && !!billingConfig?.feeReceiver;
-    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken({
-        baseUrlIncludesSibling: false,
-    });
+    const { data: systemToken, isLoading: isLoadingToken } = useSystemToken();
     const {
         data: userResources,
         isLoading: isLoadingResources,
@@ -61,7 +58,8 @@ export const UserSettingsSection = () => {
         return String(userResources.bufferCapacity);
     }, [userResources]);
 
-    const [tankCapacityInput, setTankCapacityInput] = useState(originalCapacity);
+    const [tankCapacityInput, setTankCapacityInput] =
+        useState(originalCapacity);
 
     useEffect(() => {
         setTankCapacityInput(originalCapacity);
@@ -84,17 +82,16 @@ export const UserSettingsSection = () => {
         }
     };
 
-    const isDisabled =
-        !billingInited || isPending || isLoadingResources;
+    const isDisabled = !billingInited || isPending || isLoadingResources;
 
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold mb-2">Resources</h2>
+                <h2 className="mb-2 text-2xl font-bold">Resources</h2>
             </div>
 
             <div className="flex items-stretch gap-6">
-                <div className="flex-shrink-0 flex">
+                <div className="flex flex-shrink-0">
                     <GasTank fillPercentage={fillPercentage} />
                 </div>
                 <div className="flex flex-col justify-between">

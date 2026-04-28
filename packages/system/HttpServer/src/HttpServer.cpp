@@ -1,5 +1,7 @@
+#include <psibase/HttpHeaders.hpp>
+#include <psibase/Rpc.hpp>
+#include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
-#include <psibase/nativeTables.hpp>
 #include <psibase/psibase.hpp>
 #include <psibase/webServices.hpp>
 #include <psio/fracpack.hpp>
@@ -30,23 +32,37 @@ namespace SystemService
              .get(server);
       }
 
-      AccountNumber getTargetService(const HttpRequest& req, std::string_view rootHost)
+      std::optional<AccountNumber> getRedirect(const AccountNumber& account)
       {
-         std::string serviceName;
+         auto row = HttpServer::Tables(HttpServer::service, KvMode::read)
+                        .open<RedirectTable>()
+                        .get(account);
+         if (row)
+            return row->destination;
+         return std::nullopt;
+      }
 
-         // Path reserved across all subdomains
-         if (req.target.starts_with(HttpServer::commonApiPrefix))
-            serviceName = HttpServer::commonApiService.str();
+      std::optional<AccountNumber> getTargetService(const HttpRequest& req,
+                                                    std::string_view   rootHost)
+      {
+         if (!isSubdomain(req, rootHost))
+            return std::nullopt;
 
-         // subdomain
-         else if (isSubdomain(req, rootHost))
-            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
+         return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
+      }
 
-         // root domain
-         else
-            serviceName = HttpServer::homepageService.str();
-
-         return AccountNumber(serviceName);
+      std::string_view hostHeaderPortSuffix(const HttpRequest& req)
+      {
+         if (auto host = HttpHeader::get(req.headers, "host"))
+         {
+            std::string_view h = *host;
+            if (auto pos = h.rfind(':'); pos != std::string_view::npos)
+            {
+               if (h.find(']', pos) == std::string_view::npos)
+                  return h.substr(pos);
+            }
+         }
+         return {};
       }
    }  // namespace
 
@@ -101,6 +117,7 @@ namespace SystemService
                                                      "Content-Encoding",
                                                      "Content-Security-Policy",
                                                      "ETag",
+                                                     "Location",
                                                      "Set-Cookie"};
 
       void sendReplyImpl(AccountNumber service, std::int32_t socket, HttpReply&& result)
@@ -271,8 +288,41 @@ namespace SystemService
       req.removeCookie("SESSION");
       std::erase_if(req.headers, [](auto& header) { return header.matches("authorization"); });
 
-      // First we check the registered server
-      auto                     service    = getTargetService(req, to<XHttp>().rootHost(req.host));
+      // Extract subdomain
+      auto root        = to<XHttp>().rootHost(req.host);
+      auto service_opt = getTargetService(req, root);
+
+      auto redirect = [&](const psibase::AccountNumber& subdomain)
+      {
+         auto loc  = getSiblingUrl(req, std::optional{sock}, subdomain, true);
+         auto hdrs = allowCors();
+         hdrs.push_back({"Location", loc});
+         HttpReply reply{.status      = HttpStatus::permanentRedirect,
+                         .contentType = "text/html",
+                         .headers     = std::move(hdrs)};
+         sendReplyImpl(HttpServer::service, sock, std::move(reply));
+      };
+
+      // If the root host is requested directly, redirect to the homepage
+      if (!service_opt)
+      {
+         redirect(homepageService);
+         return;
+      }
+
+      // If the subdomain has a redirect set, that takes precedence
+      if (auto dest = getRedirect(*service_opt))
+      {
+         redirect(*dest);
+         return;
+      }
+
+      // If the path is to the common api, force proxy to the common api service
+      auto service =
+          (req.target.starts_with(HttpServer::commonApiPrefix) ? HttpServer::commonApiService
+                                                               : service_opt.value());
+
+      // First check the registered server
       auto                     registered = getServer(service);
       std::optional<HttpReply> result;
       psibase::AccountNumber   server;
@@ -291,6 +341,7 @@ namespace SystemService
          result = checkServer(registered->server);
       }
 
+      // Otherwise, check the sites service
       if (!registered || (!result && owned.get(sock)))
       {
          result = checkServer("sites"_a);
@@ -321,6 +372,53 @@ namespace SystemService
    std::string HttpServer::rootHost(psio::view<const std::string> host)
    {
       return to<XHttp>().rootHost(host);
+   }
+
+   std::string HttpServer::getSiblingUrl(const psibase::HttpRequest& req,
+                                         std::optional<std::int32_t> socket,
+                                         AccountNumber               destination,
+                                         bool                        keepTarget)
+   {
+      auto rootHost = to<XHttp>().rootHost(req.host);
+
+      check(iequal(req.host, rootHost) || isSubdomain(req, rootHost),
+            "request host invalid: \"" + req.host + "\"");
+
+      std::string siblingUrlHost = destination.str();
+      siblingUrlHost.push_back('.');
+      siblingUrlHost.append(rootHost);
+
+      std::string scheme;
+      if (auto proto = forwardedProto(req))
+         scheme = *proto + "://";
+      else if (socket)
+         scheme = to<XHttp>().isSecure(*socket) ? "https://" : "http://";
+      else
+         scheme = isLocalhost(req) ? "http://" : "https://";
+
+      std::string url = scheme + siblingUrlHost;
+
+      url.append(hostHeaderPortSuffix(req));
+
+      url += (keepTarget ? req.target : "/");
+
+      return url;
+   }
+
+   void HttpServer::setRedirect(AccountNumber destination)
+   {
+      auto sender = getSender();
+      check(destination != sender, "redirect destination must not be the sender");
+      Tables{getReceiver()}.open<RedirectTable>().put(RedirectRow{
+          .account     = sender,
+          .destination = destination,
+      });
+   }
+
+   void HttpServer::clearRedirect()
+   {
+      auto table = Tables{getReceiver()}.open<RedirectTable>();
+      table.erase(getSender());
    }
 }  // namespace SystemService
 

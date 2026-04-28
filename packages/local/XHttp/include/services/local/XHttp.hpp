@@ -142,11 +142,15 @@ namespace LocalService
       std::string rootHost(psio::view<const std::string> host);
 
       /// handles requests to the x-http subdomain
-      auto serveSys(psibase::HttpRequest req, std::optional<std::int32_t> socket)
-          -> std::optional<psibase::HttpReply>;
+      auto serveSys(psibase::HttpRequest        req,
+                    std::optional<std::int32_t> socket) -> std::optional<psibase::HttpReply>;
 
       /// Called by the host at the beginning of a session
       void startSession();
+
+      /// Returns true if the socket is over a secure connection (e.g. https).
+      /// The sender must be the current owner of the socket.
+      bool isSecure(int32_t socket);
    };
    PSIO_REFLECT(XHttp,
                 method(send, socket, data, flags),
@@ -162,7 +166,8 @@ namespace LocalService
                 method(log, severity, msg),
                 method(rootHost, host),
                 method(serveSys, request, socket),
-                method(startSession))
+                method(startSession),
+                method(isSecure, socket))
 
    PSIBASE_REFLECT_TABLES(XHttp, XHttp::Subjective, XHttp::Session)
 
