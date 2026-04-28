@@ -25,31 +25,18 @@ use trust::FunctionName;
 define_trust! {
     descriptions {
         Low => "
-            - Unregistering from guild evaluation
-            - Closing an evaluation cycle
+            - Triggering a fractal-wide token distribution
         ",
         Medium => "
-            - Joining the fractal
-            - Create and delete guild member invites
-            - Registering for a guild evaluation
-            - Unregistering from guild evaluation
-            - Applying to join a guild
-            - Attesting guild membership for a fractal member
-            - Retrieving a proposal in evaluation
             - Creating a new fractal
+            - Joining the fractal
+            - Claiming accrued fractal token rewards
+            - Inviting a new member to a guild
         ",
         High => "
-            - Proposing a vote in evaluation cycle
-            - Exiling a fractal member
-            - Setting the guild evaluation schedule
-            - Setting the guild display name, bio and description
-            - Attesting in an evaluation
-            - Creating a new guild
-            - Resign, remove or set a new Guild representative
-            - Set ranked guilds
-            - Set minimum scorers required to enable consensus rewards
-            - Set token init and guild ranking threshold
-            ",
+            - Attesting a finalized ranking proposal
+            - Setting the occupation service for a fractal role
+        ",
     }
     functions {
         None => [exile_member, init_token, set_dist_interval],

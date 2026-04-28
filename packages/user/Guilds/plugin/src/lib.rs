@@ -37,26 +37,30 @@ define_trust! {
             - Closing an evaluation cycle
         ",
         Medium => "
+            - Joining a fractal as a member
             - Creating a new guild
-            - Joining / applying to a guild
-            - Registering for guild evaluation
-            - Unregistering from guild evaluation
-            - Managing guild invites
+            - Applying to join a guild
+            - Registering for or unregistering from a guild evaluation
+            - Managing guild member invites
             - Attesting guild membership applications
-            - Registering candidacy
-            - Setting guild display name, bio, description
-            - Setting guild representative
+            - Registering or retiring council candidacy
+            - Updating guild application information
+            - Setting guild display name, bio, and description
+            - Setting, resigning, or removing a guild representative
+            - Proposing and attesting rankings in an evaluation
         ",
         High => "
-            - Setting ranked guilds and thresholds
-            - Setting guild evaluation schedule
             - Starting an evaluation cycle
-            - Exiling members (if moved here later)
+            - Setting the guild evaluation schedule
+            - Setting ranked guilds for scoring
+            - Setting the rank ordering threshold
+            - Mapping a governance role to a guild
         ",
     }
     functions {
         Low => [close_eval],
         Medium => [
+            join_fractal,
             create_guild,
             apply_guild,
             delete_guild_invite,
@@ -69,7 +73,6 @@ define_trust! {
             invite_member,
             attest_membership_app,
             register_candidacy,
-            join_fractal,
             set_guild_app_info,
             register,
             unregister,

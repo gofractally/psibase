@@ -28,30 +28,33 @@ define_trust! {
         Low => "
             - Starting an evaluation cycle
             - Closing an evaluation cycle
-            - Trigger a fractal wide token distribution
-            - Initialise fractal token
+            - Triggering a fractal-wide token distribution
         ",
         Medium => "
-            - Registering for a guild evaluation
-            - Create and delete guild member invites
-            - Unregistering from guild evaluation
-            - Applying to join a guild
-            - Attesting guild membership for a fractal member
-            - Retrieving a proposal in evaluation
+            - Joining the fractal
+            - Claiming accrued fractal token rewards
+            - Applying to join a guild (including drafting and submitting the application)
+            - Registering for or unregistering from a guild evaluation
+            - Managing guild member invites
+            - Attesting guild membership applications
+            - Registering or retiring council candidacy
+            - Retrieving a proposal in an evaluation
         ",
         High => "
-            - Proposing a vote in evaluation cycle
-            - Exiling a member from a fractal
-            - Set the fractal token distribution schedule
-            - Setting the guild evaluation schedule
-            - Setting the guild display name, bio and description
-            - Attesting in an evaluation
+            - Proposing a ranking in an evaluation
+            - Attesting a finalized ranking proposal
+            - Exiling a member from the fractal
+            - Initialising the fractal token
+            - Setting the fractal token distribution interval
             - Creating a new guild
-            - Resign, remove or set a new Guild representative
-            - Set ranked guilds
-            - Set minimum scorers required to enable consensus rewards
-            - Set token init and guild ranking threshold
-            ",
+            - Mapping a governance role to a guild
+            - Setting a role's occupation service
+            - Setting the guild evaluation schedule
+            - Setting guild display name, bio, and description
+            - Setting ranked guilds and rank ordering threshold
+            - Setting minimum scorers required for consensus rewards
+            - Assigning, resigning, or removing a guild representative
+        ",
     }
     functions {
         None => [get_group_users],
