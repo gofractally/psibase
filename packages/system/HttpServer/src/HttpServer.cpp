@@ -374,7 +374,7 @@ namespace SystemService
       return to<XHttp>().rootHost(host);
    }
 
-   std::string HttpServer::getSiblingUrl(HttpRequest                 req,
+   std::string HttpServer::getSiblingUrl(const psibase::HttpRequest& req,
                                          std::optional<std::int32_t> socket,
                                          AccountNumber               destination,
                                          bool                        keepTarget)

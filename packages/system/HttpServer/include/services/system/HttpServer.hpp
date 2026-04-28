@@ -108,7 +108,7 @@ namespace SystemService
       /// Constructs a URL for a sibling subdomain under the same root host.
       /// If `keepTarget` is true, the original path and query are preserved;
       /// otherwise the URL points to the subdomain root.
-      std::string getSiblingUrl(psibase::HttpRequest        req,
+      std::string getSiblingUrl(const psibase::HttpRequest& req,
                                 std::optional<std::int32_t> socket,
                                 psibase::AccountNumber      destination,
                                 bool                        keepTarget);
