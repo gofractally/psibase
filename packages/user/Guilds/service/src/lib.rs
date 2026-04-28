@@ -7,7 +7,7 @@ pub mod service {
         helpers::RollingBits16,
         tables::tables::{
             EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildInvite, GuildMember,
-            InitRow, InitTable, Ranking, RoleMap,
+            GuildMemberTable, InitRow, InitTable, Ranking, RoleMap,
         },
     };
     use psibase::{
@@ -78,14 +78,19 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn add_member(fractal: AccountNumber) {
-        let guilds = Guild::guilds_of_fractal(fractal);
+        let new_member = get_sender();
 
-        let is_member_of_fractal_guilds = guilds
-            .iter()
-            .any(|guild| GuildMember::get(guild.account, get_sender()).is_some());
+        let guild_member_table = GuildMemberTable::read();
+
+        let is_member_of_fractal_guilds = Guild::guilds_of_fractal(fractal).iter().any(|guild| {
+            guild_member_table
+                .get_index_pk()
+                .get(&(guild.account, new_member))
+                .is_some()
+        });
 
         if is_member_of_fractal_guilds {
-            psibase::services::fractals::Wrapper::call().add_mem(fractal, get_sender())
+            psibase::services::fractals::Wrapper::call().add_mem(fractal, new_member)
         }
     }
 
