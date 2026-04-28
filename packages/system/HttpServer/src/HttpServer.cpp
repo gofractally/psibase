@@ -418,8 +418,7 @@ namespace SystemService
    void HttpServer::clearRedirect()
    {
       auto table = Tables{getReceiver()}.open<RedirectTable>();
-      if (auto row = table.get(getSender()))
-         table.remove(*row);
+      table.erase(getSender());
    }
 }  // namespace SystemService
 
