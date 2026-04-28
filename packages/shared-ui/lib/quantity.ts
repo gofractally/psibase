@@ -238,6 +238,31 @@ export class Quantity {
 }
 
 // --- Canonical decimal strings (fixed fraction digits) for Tokens / plugin Quantity rules ---
+//
+// Canonical form mirrors the Rust on-chain `Decimal` representation:
+//   - integer part is always present and has no leading zeros (literal "0" when zero);
+//   - if `precision > 0`, a "." is always present followed by exactly `precision` digits;
+//   - if `precision == 0`, no "." is present.
+// e.g. precision 4: "0.0000", "0.0001", "1.2345", "12345.0000". NOT "007.5000", ".1000",
+// "1.5", or "1.50000".
+//
+// Related helpers elsewhere in the codebase (kept in mind for a future refactor that
+// consolidates these into a shared decimal module):
+//   - Strict parse (reject excess fractional digits): Rust `Quantity::from_str`
+//     in `rust/psibase/src/services/tokens/quantity.rs` — the on-chain analog of
+//     `expandToCanonicalTokenDecimal` below; returns `TokensError::PrecisionOverflow`
+//     where this function returns `null`.
+//   - Truncating normalizer: Rust `to_fixed` in
+//     `packages/user/Tokens/service/src/helpers.rs` (used for query-range bounds in
+//     `Tokens/query-service`); silently drops digits past `precision`. NOT suitable
+//     for values destined for the chain.
+//   - Rounding display formatter: TS `formatThousands` in
+//     `packages/shared-ui/lib/format-number.ts` (wraps `Intl.NumberFormat` with
+//     `maximumFractionDigits`); used by `Quantity.format(...)` for human display only.
+
+const DIGITS_ONLY = /^\d+$/;
+const CANONICAL_DECIMAL_SHAPE = /^(0|[1-9]\d*)\.(\d+)$/;
+const CANONICAL_INTEGER = /^(0|[1-9]\d*)$/;
 
 /** One whole token unit as canonical decimal, e.g. precision 4 → `"1.0000"`. */
 export function unitTokenAmountCanonical(precision: number): string {
@@ -247,7 +272,19 @@ export function unitTokenAmountCanonical(precision: number): string {
     return `1.${"0".repeat(precision)}`;
 }
 
-/** Pad/validate user input to canonical form; rejects excess fraction digits. */
+/**
+ * Pad/validate user input to canonical form.
+ * Equvalent of the Rust `Quantity::from_str` — both return null / `PrecisionOverflow`
+ * when the user provides more fractional digits than `precision` allows.
+ * TODO: Truncation or rounding should be separate fns (mirroring Rust).
+ *
+ * Accepts (input lenience): "9", "9.", "9.125", ".125" (treated as "0.125"),
+ * "007.5" (leading zeros stripped on output).
+ * Rejects: "", ".", multiple dots, non-digit characters, and fraction longer than
+ * `precision`.
+ *
+ * Output is always canonical (see header above)
+ */
 export function expandToCanonicalTokenDecimal(
     amount: string,
     precision: number,
@@ -256,41 +293,52 @@ export function expandToCanonicalTokenDecimal(
     if (t.length === 0) {
         return null;
     }
+
+    const parts = t.split(".");
+    if (parts.length > 2) {
+        return null;
+    }
+    const rawInt = parts[0];
+    const rawFrac = parts[1] ?? "";
+
+    // Reject "." (dot present with no digits on either side).
+    if (rawInt === "" && rawFrac === "") {
+        return null;
+    }
+    // Each present side must be all digits.
+    if (rawInt !== "" && !DIGITS_ONLY.test(rawInt)) {
+        return null;
+    }
+    if (rawFrac !== "" && !DIGITS_ONLY.test(rawFrac)) {
+        return null;
+    }
+
+    // Normalize integer part to canonical form (no leading zeros; "0" when empty/zero).
+    // Matches Rust `to_fixed`'s `trim_start_matches('0')` + "0" floor.
+    const intPart = rawInt === "" ? "0" : rawInt.replace(/^0+/, "") || "0";
+
     if (precision <= 0) {
-        return /^\d+$/.test(t) ? t : null;
+        return rawFrac === "" ? intPart : null;
     }
-    const m = /^(\d+)(?:\.(\d*))?$/.exec(t);
-    if (!m) {
+    if (rawFrac.length > precision) {
         return null;
     }
-    const intPart = m[1];
-    let frac = m[2] ?? "";
-    if (frac.length > precision) {
-        return null;
-    }
-    frac = frac.padEnd(precision, "0");
-    return `${intPart}.${frac}`;
+    return `${intPart}.${rawFrac.padEnd(precision, "0")}`;
 }
 
-export function isCanonicalTokenDecimal(amount: string, precision: number): boolean {
+export function isCanonicalTokenDecimal(
+    amount: string,
+    precision: number,
+): boolean {
     const t = amount.trim();
     if (t.length === 0) {
         return false;
     }
     if (precision <= 0) {
-        return /^\d+$/.test(t) && !t.includes(".");
+        return CANONICAL_INTEGER.test(t);
     }
-    const m = /^(\d+)\.(\d+)$/.exec(t);
-    if (!m) {
-        return false;
-    }
-    const [, intPart, frac] = m;
-    return (
-        intPart.length > 0 &&
-        /^\d+$/.test(intPart) &&
-        /^\d+$/.test(frac) &&
-        frac.length === precision
-    );
+    const m = CANONICAL_DECIMAL_SHAPE.exec(t);
+    return m !== null && m[2].length === precision;
 }
 
 export function formatCanonicalTokenAmount(
