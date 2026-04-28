@@ -31,10 +31,6 @@ pub mod service {
             .is_some()
     }
 
-    /// Get policy action used by AuthDyn service.
-    ///
-    /// # Arguments
-    /// * `role_account` - Account being checked.
     #[action]
     fn role_policy(fractal: AccountNumber, _role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         let accounts: Vec<(AccountNumber, u8)> =
