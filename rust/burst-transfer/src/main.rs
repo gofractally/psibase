@@ -69,8 +69,8 @@ struct Args {
     #[clap(short = 'd', long, default_value_t = 1000)]
     delay: u32,
 
-    /// Controls how transaction traces are reported. Possible values are
-    /// error, stack, full, or json
+    /// Controls how transaction traces are reported. `error` and `stack`
+    /// only print failed traces; use `full` or `json` to print successful traces.
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
     trace: TraceFormat,
 
@@ -106,6 +106,14 @@ async fn lookup_token(
 fn random_account_name() -> psibase::AccountNumber {
     let bytes: Vec<u8> = (0..7).map(|_| b'a' + (rand::random::<u8>() % 26)).collect();
     psibase::AccountNumber::from(std::str::from_utf8(&bytes).unwrap())
+}
+
+fn account_names(accounts: &[psibase::AccountNumber]) -> String {
+    accounts
+        .iter()
+        .map(|account| account.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn build_transaction(
@@ -161,7 +169,6 @@ async fn push_setup(
     .await
 }
 
-// Randomly transfer
 async fn transfer_impl(
     args: &Args,
     accounts: &[psibase::AccountNumber],
@@ -207,7 +214,6 @@ async fn transfer_impl(
     Ok(())
 }
 
-// Print any errors, but continue execution
 async fn transfer(
     args: &Args,
     accounts: &[psibase::AccountNumber],
@@ -215,16 +221,20 @@ async fn transfer(
     counter: &AtomicI32,
     ref_block: &psibase::TaposRefBlock,
     repeat: bool,
-) {
+) -> usize {
     loop {
-        if let Err(e) = transfer_impl(args, accounts, token_id, counter, ref_block)
+        let transferred = match transfer_impl(args, accounts, token_id, counter, ref_block)
             .await
             .context("Failed to push transaction")
         {
-            println!("\n{:?}", e);
+            Ok(()) => true,
+            Err(e) => {
+                println!("Transfer error | {:?}", e);
+                false
+            }
         };
         if !repeat {
-            return;
+            return usize::from(transferred);
         }
     }
 }
@@ -254,51 +264,84 @@ async fn main() -> Result<(), anyhow::Error> {
         None => return Err(anyhow!("Can not find tokens with symbol {}", args.symbol)),
     };
 
+    println!(
+        "burst-transfer | api: {} | token: {} #{} | accounts: {} | burst: {} tx x {} actions | delay: {}ms",
+        args.api, args.symbol, tok.id, args.account_count, args.burst_size, args.actions, args.delay
+    );
+
     let counter = AtomicI32::new(0);
     let mut accounts: Vec<psibase::AccountNumber> = Vec::with_capacity(args.account_count);
 
     loop {
-        println!("get tapos");
         let ref_block = psibase::get_tapos_for_head(&args.api, reqwest::Client::new())
             .await
-            .context("Failed to push transaction");
-        println!("got tapos");
+            .context("Failed to get tapos");
         match ref_block {
-            Err(e) => println!("\n{:?}", e),
+            Err(e) => println!("TAPOS error | {:?}", e),
             Ok(ref_block) => {
-                if accounts.len() < args.account_count {
+                let mut created = 0;
+                let mut created_names = String::new();
+                let new_accounts = if accounts.len() < args.account_count {
                     let n = std::cmp::min(ACCOUNTS_PER_SETUP, args.account_count - accounts.len());
-                    let new_accounts: Vec<_> = (0..n).map(|_| random_account_name()).collect();
+                    (0..n).map(|_| random_account_name()).collect()
+                } else {
+                    Vec::new()
+                };
+
+                if !new_accounts.is_empty() {
                     match push_setup(&args, &new_accounts, &ref_block)
                         .await
                         .context("Failed to push setup transaction")
                     {
-                        Err(e) => println!("\n{:?}", e),
-                        Ok(()) => accounts.extend(new_accounts),
+                        Err(e) => println!("Setup error | {:?}", e),
+                        Ok(()) => {
+                            created = new_accounts.len();
+                            created_names = account_names(&new_accounts);
+                            accounts.extend(new_accounts);
+                        }
                     }
                 }
 
+                let mut transferred = 0;
                 if accounts.len() >= 2 {
-                    let repeat = args.delay == 0 && accounts.len() >= args.account_count;
+                    let setup_done = accounts.len() >= args.account_count;
+                    let repeat = args.delay == 0 && setup_done;
+                    let transfer_accounts = accounts.clone();
                     let mut transfers = Vec::new();
                     for _ in 0..args.burst_size {
                         transfers.push(transfer(
                             &args,
-                            &accounts,
+                            &transfer_accounts,
                             tok.id,
                             &counter,
                             &ref_block,
                             repeat,
                         ));
                     }
-                    futures::future::join_all(transfers).await;
+                    if repeat {
+                        println!(
+                            "Batch | transferred continuously | maintaining {} in-flight transactions",
+                            args.burst_size
+                        );
+                    }
+                    transferred = futures::future::join_all(transfers).await.into_iter().sum();
+                }
+
+                println!(
+                    "Batch | created {} ({}/{}) | transferred {}/{} tx",
+                    created,
+                    accounts.len(),
+                    args.account_count,
+                    transferred,
+                    args.burst_size
+                );
+                if !created_names.is_empty() {
+                    println!("  {}", created_names);
                 }
             }
         }
         if args.delay > 0 {
-            println!("sleep...");
             tokio::time::sleep(tokio::time::Duration::from_millis(args.delay.into())).await;
         }
-        println!("ready");
     }
 }
