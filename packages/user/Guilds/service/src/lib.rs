@@ -453,8 +453,7 @@ pub mod service {
             "no role map set by fractal for role_id",
         );
         use psibase::services::fractals::FractalRole;
-        let fractal_role = FractalRole::from(role_id);
-        if fractal_role == FractalRole::Recruitment {
+        if FractalRole::Recruitment == role_id.into() {
             auth_dyn::policy::DynamicAuthPolicy::from_sole_authorizer(get_service())
         } else {
             Guild::get_assert(role.guild).auth_policy()
