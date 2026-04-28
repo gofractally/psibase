@@ -155,7 +155,7 @@ pub mod service {
                 )),
                 None,
             ),
-            "bad authhh",
+            "not authorized to add member",
         );
 
         FractalMember::add(fractal, member);

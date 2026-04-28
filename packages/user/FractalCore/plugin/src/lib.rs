@@ -56,8 +56,8 @@ define_trust! {
     functions {
         None => [get_group_users],
         Low => [close_eval, dist_token, start_eval],
-        Medium => [apply_guild, claim_rewards, join_fractal, push_application, draft_application, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
-        High => [attest, set_role_mapping, create_guild, set_role_occupation, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guild_slots, set_ranked_guilds, set_schedule, set_token_threshold],
+        Medium => [apply_guild, claim_rewards, join_fractal, delete_guild_invite, invite_member, attest_membership_app, get_proposal, register, register_candidacy, unregister],
+        High => [attest, set_role_mapping, create_guild, set_role_occupation, exile_member, init_token, propose, remove_guild_rep, resign_guild_rep, set_bio, set_description, set_display_name, set_dist_interval, set_guild_rep, set_min_scorers, set_rank_ordering_threshold, set_ranked_guilds, set_schedule],
     }
 }
 
@@ -241,7 +241,7 @@ impl UserFractal for FractalCorePlugin {
     }
 
     fn join() -> Result<(), Error> {
-        assert_authorized(FunctionName::claim_rewards)?;
+        assert_authorized(FunctionName::join_fractal)?;
         GuildsPlugin::user_guild::join_fractal()
     }
 }
@@ -272,7 +272,7 @@ impl UserGuild for FractalCorePlugin {
     }
 
     fn draft_application(guild_account: String, description: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::draft_application)?;
+        assert_authorized(FunctionName::apply_guild)?;
         Self::draft_bucket().set(&guild_account, &description.packed());
         Ok(())
     }

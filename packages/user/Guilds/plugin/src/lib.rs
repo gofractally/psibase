@@ -69,6 +69,7 @@ define_trust! {
             invite_member,
             attest_membership_app,
             register_candidacy,
+            join_fractal,
             set_guild_app_info,
             register,
             unregister,
@@ -417,7 +418,7 @@ impl UserGuild for GuildsPlugin {
     }
 
     fn join_fractal() -> Result<(), Error> {
-        // assert_authorized(FunctionName::join_fractal)?;
+        assert_authorized(FunctionName::join_fractal)?;
 
         let packed_args = guilds::action_structs::add_member {
             fractal: get_sender_app()?,

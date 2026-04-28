@@ -58,7 +58,7 @@ pub mod Occupation {
     }
 
     #[action]
-    fn is_active(fractal: AccountNumber, member: AccountNumber) -> Option<bool> {
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
         unimplemented!()
     }
 
