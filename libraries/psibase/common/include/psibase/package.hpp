@@ -28,10 +28,20 @@ namespace psibase
       std::string                description;
       std::vector<PackageRef>    depends;
       std::vector<AccountNumber> accounts;
+      std::vector<AccountNumber> services;
       Checksum256                sha256;
       std::string                file;
    };
-   PSIO_REFLECT(PackageInfo, name, version, scope, description, depends, accounts, sha256, file)
+   PSIO_REFLECT(PackageInfo,
+                name,
+                version,
+                scope,
+                description,
+                depends,
+                accounts,
+                services,
+                sha256,
+                file)
 
    std::weak_ordering operator<=>(const PackageInfo&, const PackageInfo&);
 
@@ -68,10 +78,15 @@ namespace psibase
       std::vector<char>                                                    buf;
       zip::ZipReader                                                       archive;
       PackageMeta                                                          meta;
+      Checksum256                                                          sha256;
       std::vector<std::tuple<AccountNumber, zip::FileHeader, ServiceInfo>> services;
       std::vector<std::pair<AccountNumber, zip::FileHeader>>               data;
       std::optional<zip::FileHeader>                                       postinstallScript;
    };
+
+   // Sorts packages in the correct order for installation
+   void sortPackages(std::span<PackagedService>     packages,
+                     std::span<const AccountNumber> priorityServices);
 
    class DirectoryRegistry
    {
@@ -81,11 +96,11 @@ namespace psibase
 
       PackagedService get(std::string_view name) const;
       PackagedService get(const PackageInfo& info) const;
-      // Packages will be returned in the order that they should be
-      // installed. Packages containing services in priorityServices
-      // will be as close to the front as possible.
-      std::vector<PackageInfo> resolve(std::span<const std::string>   packages,
-                                       std::span<const AccountNumber> priorityServices = {});
+      // The order of the result is unspecified
+      std::vector<PackageInfo> resolveInfo(std::span<const std::string> packages);
+      // Returns packages in the correct order for installation
+      std::vector<PackagedService> resolve(std::span<const std::string>   packages,
+                                           std::span<const AccountNumber> priorityServices);
 
      private:
       std::string path;

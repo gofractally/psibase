@@ -1025,8 +1025,7 @@ namespace psibase
              "   WHERE ROWID <= r.rowId"
              "   ORDER BY ROWID DESC"
              "   LIMIT 1"
-             " )"
-             " ORDER BY r.rowIndex ASC",
+             " )",
              values);
          auto json = sql_query(sql, {}, debug);
          return psio::convert_from_json<std::vector<RowBlockStart>>(json);

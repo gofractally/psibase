@@ -7,10 +7,13 @@ use crate::plugin::AccountsPlugin;
 use crate::bindings::exports::accounts::plugin::admin::Guest as Admin;
 use crate::bindings::exports::accounts::plugin::api::*;
 use crate::bindings::host::common::client as Client;
+use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::apps_table::*;
 use crate::db::user_table::*;
 use crate::helpers::assert_valid_account;
 use crate::trust::*;
+use psibase::fracpack::Pack;
+use psibase::services::accounts as Accounts;
 use std::collections::HashSet;
 
 fn prune_invalid_accounts(accounts: Vec<String>) {
@@ -121,5 +124,19 @@ impl Admin for AccountsPlugin {
             .filter_map(|opt_accnt| opt_accnt.map(|accnt| accnt.authService))
             .collect();
         Ok(auth_services)
+    }
+
+    fn preapprove_account(account: String) {
+        assert_authorized_with_whitelist(FunctionName::preapprove_account, vec!["config".into()])
+            .unwrap();
+
+        Transact::add_action_to_transaction(
+            Accounts::action_structs::preapproveAcc::ACTION_NAME,
+            &Accounts::action_structs::preapproveAcc {
+                name: account.as_str().into(),
+            }
+            .packed(),
+        )
+        .unwrap();
     }
 }

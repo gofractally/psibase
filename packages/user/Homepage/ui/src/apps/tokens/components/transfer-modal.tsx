@@ -49,9 +49,7 @@ export const TransferModal = withForm({
         onSubmit,
     }) {
         const { data: currentUser } = useCurrentUser();
-        const { data: profile } = useProfile(currentUser, true, {
-            baseUrlIncludesSibling: false,
-        });
+        const { data: profile } = useProfile(currentUser, true);
         const { data: contacts } = useContacts(currentUser);
 
         const [to, amount, isSubmitting] = useStore(form.store, (state) => [

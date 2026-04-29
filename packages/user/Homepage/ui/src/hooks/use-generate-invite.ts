@@ -18,12 +18,9 @@ export const useGenerateInvite = () =>
                 }),
             );
 
-            const res = modifyUrlParams(
-                siblingUrl(undefined, null, "invite", false),
-                {
-                    token,
-                },
-            );
+            const res = modifyUrlParams(siblingUrl(undefined, null, "invite"), {
+                token,
+            });
 
             return z.string().parse(res);
         },

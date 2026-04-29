@@ -80,6 +80,16 @@ pub enum PackageOp {
     Remove(Meta),
 }
 
+impl PackageOp {
+    fn by_name(&self) -> (u8, &str) {
+        match self {
+            PackageOp::Install(info) => (0, &info.name),
+            PackageOp::Replace(_, info) => (1, &info.name),
+            PackageOp::Remove(meta) => (2, &meta.name),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PackagePreference {
     // Prefer the latest version
@@ -107,14 +117,12 @@ pub fn solve_dependencies(
     packages: Vec<PackageInfo>,
     input: Vec<PackageRef>,
     existing: Vec<(Meta, PackageDisposition)>,
-    preferred_order: Vec<String>,
     reinstall: bool,
     request_pref: PackagePreference,
     non_request_pref: PackagePreference,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
     let mut graph = DepGraph::new();
     graph.reinstall = reinstall;
-    graph.preferred_order = preferred_order;
     graph.request_pref = request_pref;
     graph.non_request_pref = non_request_pref;
     for package in packages {
@@ -133,65 +141,10 @@ pub struct DepGraph<'a> {
     packages: HashMap<String, HashMap<String, (PackageInfo, Lit)>>,
     request: HashMap<String, String>,
     existing: HashMap<String, (Meta, PackageDisposition, bool)>,
-    preferred_order: Vec<String>,
     solver: Solver<'a>,
     reinstall: bool,
     request_pref: PackagePreference,
     non_request_pref: PackagePreference,
-}
-
-fn get_removed_impl(
-    reg: &HashMap<String, PackageInfo>,
-    names: &[PackageRef],
-    existing: &HashMap<String, (Meta, PackageDisposition, bool)>,
-    found: &mut HashMap<String, bool>,
-    result: &mut Vec<PackageOp>,
-) {
-    for name in names {
-        if !found.contains_key(&name.name) {
-            let (package, disp, broken) = existing.get(&name.name).unwrap();
-            found.insert(name.name.clone(), true);
-            let should_remove = !reg.contains_key(&name.name) && disp.can_remove;
-            if !broken {
-                get_removed_impl(reg, &package.depends, existing, found, result);
-                if should_remove {
-                    result.push(PackageOp::Remove(
-                        existing.get(&name.name).unwrap().0.clone(),
-                    ));
-                }
-            }
-        }
-    }
-}
-
-fn get_installed_impl(
-    reg: &mut HashMap<String, PackageInfo>,
-    reinstall: &HashMap<String, String>,
-    names: &[PackageRef],
-    existing: &mut HashMap<String, (Meta, PackageDisposition, bool)>,
-    found: &mut HashMap<String, bool>,
-    result: &mut Vec<PackageOp>,
-) -> Result<(), anyhow::Error> {
-    for name in names {
-        if let Some(completed) = found.get(&name.name) {
-            if !completed {
-                Err(Error::DependencyCycle)?
-            }
-        } else {
-            let (nm, package) = reg.remove_entry(&name.name).unwrap();
-            found.insert(nm, false);
-            get_installed_impl(reg, reinstall, &package.depends, existing, found, result)?;
-            if let Some((meta, _, _)) = existing.remove(&name.name) {
-                if meta.version != package.version || reinstall.contains_key(&name.name) {
-                    result.push(PackageOp::Replace(meta, package));
-                }
-            } else {
-                result.push(PackageOp::Install(package));
-            }
-            *found.get_mut(&name.name).unwrap() = true;
-        }
-    }
-    Ok(())
 }
 
 // Takes the new and previous sets of packages and returns a list
@@ -200,46 +153,29 @@ fn get_installed_impl(
 // A package is installed after and removed before all the packages
 // that it depends on.
 fn evaluate_changes(
-    mut packages: HashMap<String, PackageInfo>,
+    packages: HashMap<String, PackageInfo>,
     mut existing: HashMap<String, (Meta, PackageDisposition, bool)>,
     request: HashMap<String, String>,
-    preferred_order: Vec<String>,
     reinstall: bool,
 ) -> Result<Vec<PackageOp>, anyhow::Error> {
-    let existing_refs: Vec<_> = existing
-        .keys()
-        .map(|name| PackageRef {
-            name: name.clone(),
-            version: String::new(),
-        })
-        .collect();
     let mut result = vec![];
-    get_removed_impl(
-        &packages,
-        &existing_refs,
-        &existing,
-        &mut HashMap::new(),
-        &mut result,
-    );
-    result.reverse();
-
-    let installed_refs: Vec<_> = preferred_order
-        .iter()
-        .filter(|name| packages.contains_key(*name))
-        .chain(packages.keys())
-        .map(|name| PackageRef {
-            name: name.clone(),
-            version: String::new(),
-        })
-        .collect();
-    get_installed_impl(
-        &mut packages,
-        &if reinstall { request } else { HashMap::new() },
-        &installed_refs,
-        &mut existing,
-        &mut HashMap::new(),
-        &mut result,
-    )?;
+    let reinstall = if reinstall { request } else { HashMap::new() };
+    for package in packages.into_values() {
+        if let Some((meta, _, _)) = existing.remove(&package.name) {
+            if meta.version != package.version || reinstall.contains_key(&package.name) {
+                result.push(PackageOp::Replace(meta, package));
+            }
+        } else {
+            result.push(PackageOp::Install(package));
+        }
+    }
+    // Packages that are unchanged or updated have already been removed from existing
+    for (meta, disp, broken) in existing.into_values() {
+        if !broken && disp.can_remove {
+            result.push(PackageOp::Remove(meta));
+        }
+    }
+    result.sort_by(|a, b| a.by_name().cmp(&b.by_name()));
     Ok(result)
 }
 
@@ -324,7 +260,6 @@ impl<'a> DepGraph<'a> {
             request: HashMap::new(),
             existing: HashMap::new(),
             solver: Solver::new(),
-            preferred_order: Vec::new(),
             reinstall: false,
             request_pref: PackagePreference::Latest,
             non_request_pref: PackagePreference::Current,
@@ -349,16 +284,7 @@ impl<'a> DepGraph<'a> {
             .get(&meta.name)
             .map_or(false, |packages| packages.contains_key(&meta.version));
         if !is_known_package {
-            self.add(PackageInfo {
-                name: meta.name.clone(),
-                version: meta.version.clone(),
-                scope: meta.scope.clone(),
-                description: meta.description.clone(),
-                depends: meta.depends.clone(),
-                accounts: meta.accounts.clone(),
-                sha256: Default::default(),
-                file: String::new(),
-            });
+            self.add(meta.info(Default::default(), String::new()));
         }
         let name = meta.name.clone();
         self.existing.insert(name, (meta, disposition, false));
@@ -390,13 +316,7 @@ impl<'a> DepGraph<'a> {
                             }
                         }
                     }
-                    return evaluate_changes(
-                        result,
-                        self.existing,
-                        self.request,
-                        self.preferred_order,
-                        self.reinstall,
-                    );
+                    return evaluate_changes(result, self.existing, self.request, self.reinstall);
                 }
             }
         }
