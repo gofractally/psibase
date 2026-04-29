@@ -1,12 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey from "@/lib/query-keys";
 import { TokenId } from "@/lib/zod/token-id";
 
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 import { updateUserTokenBalancesCache } from "./use-user-token-balances";
 

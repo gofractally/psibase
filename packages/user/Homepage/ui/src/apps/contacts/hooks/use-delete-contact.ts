@@ -1,11 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey from "@/lib/query-keys";
 
 import { removeUserFromCache } from "@shared/hooks/use-contacts";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useDeleteContact = () =>

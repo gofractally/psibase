@@ -1,11 +1,8 @@
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-
-import { zAccount } from "@shared/lib/schemas/account";
-
 import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 const qs = {
     userTokenBalances: (username: string) => `

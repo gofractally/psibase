@@ -2,8 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@shared/lib/schemas/account";
-
-import { supervisor } from "@/supervisor";
+import { supervisor } from "@shared/lib/supervisor";
 
 /**
  * Homepage-specific current user hook that uses this app's supervisor

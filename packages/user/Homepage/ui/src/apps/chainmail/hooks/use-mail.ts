@@ -11,10 +11,10 @@ import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import { useCurrentUser } from "@/hooks/use-current-user";
 import QueryKey from "@/lib/query-keys";
+
+import { supervisor } from "@shared/lib/supervisor";
 
 import { zSendMessageSchema } from "../components/compose-dialog";
 import { zMailbox, zRawMessage } from "../types";
@@ -48,12 +48,12 @@ const transformRawMessagesToMessages = (
 };
 
 const getIncomingMessages = async (account: string) => {
-    let rawMessages = zRawMessage.array().parse(
+    const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
             service: "chainmail",
             intf: "queries",
             method: "getMsgs",
-            params: [, account],
+            params: [undefined, account],
         }),
     );
     return transformRawMessagesToMessages(rawMessages, account);
@@ -81,12 +81,12 @@ export function useIncomingMessages() {
 }
 
 const getArchivedMessages = async (account: string) => {
-    let rawMessages = zRawMessage.array().parse(
+    const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
             service: "chainmail",
             intf: "queries",
             method: "getArchivedMsgs",
-            params: [, account],
+            params: [undefined, account],
         }),
     );
     return transformRawMessagesToMessages(rawMessages, account);
@@ -114,7 +114,7 @@ export function useArchivedMessages() {
 }
 
 const getSavedMessages = async (account: string) => {
-    let rawMessages = zRawMessage.array().parse(
+    const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
             service: "chainmail",
             intf: "queries",
@@ -148,7 +148,7 @@ export function useSavedMessages() {
 }
 
 const getSentMessages = async (account: string) => {
-    let rawMessages = zRawMessage.array().parse(
+    const rawMessages = zRawMessage.array().parse(
         await supervisor.functionCall({
             service: "chainmail",
             intf: "queries",
