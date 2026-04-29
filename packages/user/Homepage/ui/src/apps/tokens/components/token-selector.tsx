@@ -101,7 +101,12 @@ const AvailableBalance = ({
             </span>
             <span className="text-foreground/90 font-mono text-xl font-medium">
                 <AnimateNumber
-                    n={selectedToken?.balance?.amount ?? 0}
+                    n={
+                        selectedToken?.balance
+                            ? Number(selectedToken.balance.raw) /
+                              10 ** selectedToken.balance.precision
+                            : 0
+                    }
                     precision={selectedToken?.balance?.precision ?? 0}
                     className="hover:cursor-pointer hover:underline"
                     onClick={onClick}

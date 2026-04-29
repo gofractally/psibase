@@ -25,8 +25,12 @@ export const useAmount = () => {
     const { data: tokenConfig } = useToken(tokenId);
     const precision = tokenConfig?.precision || 4;
 
+    // `amount` is a free-typing string (e.g. "" or "1." mid-edit), so use
+    // the nullable factory rather than throwing during a render.
     const amountQuantity =
-        tokenId !== undefined && new Quantity(amount, precision || 4, tokenId);
+        tokenId !== undefined
+            ? Quantity.tryFromDecimal(amount, precision || 4, tokenId)
+            : null;
 
     const obj = tokenId
         ? {

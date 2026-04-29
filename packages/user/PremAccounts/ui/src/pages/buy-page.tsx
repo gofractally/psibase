@@ -11,10 +11,9 @@ import { PREM_ACCOUNTS_SERVICE, doesAccountExist } from "@/lib/prem-service";
 
 import { graphql } from "@shared/lib/graphql";
 import {
-    canonicalTokenAmountToRaw,
-    expandToCanonicalTokenDecimal,
-    formatCanonicalTokenAmount,
-    unitTokenAmountCanonical,
+    decimalToRaw,
+    oneAsDecimal,
+    parseDecimal,
 } from "@shared/lib/quantity";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
@@ -92,7 +91,7 @@ export function BuyPage() {
                     id: sysTid,
                 });
                 if (!maxCostDefaultSynced.current) {
-                    setMaxCost(unitTokenAmountCanonical(token.precision));
+                    setMaxCost(oneAsDecimal(token.precision));
                     maxCostDefaultSynced.current = true;
                 }
             }
@@ -192,13 +191,10 @@ export function BuyPage() {
         const purchasedName = trimmed;
 
         const maxCostForTx =
-            expandToCanonicalTokenDecimal(maxCost, token.precision) ??
-            maxCost.trim();
-        const maxRaw = canonicalTokenAmountToRaw(maxCostForTx, token.precision);
+            parseDecimal(maxCost, token.precision) ?? maxCost.trim();
+        const maxRaw = decimalToRaw(maxCostForTx, token.precision);
         const priceRaw =
-            price != null
-                ? canonicalTokenAmountToRaw(price, token.precision)
-                : null;
+            price != null ? decimalToRaw(price, token.precision) : null;
         if (maxRaw != null && priceRaw != null && maxRaw < priceRaw) {
             setError(
                 "Max cost is below the current price. Raise max cost to at least the displayed price.",
@@ -223,7 +219,7 @@ export function BuyPage() {
             setPrice(null);
             setMaxCost(
                 systemToken != null
-                    ? unitTokenAmountCanonical(systemToken.precision)
+                    ? oneAsDecimal(systemToken.precision)
                     : "1.0000",
             );
             await loadPrices();
@@ -245,7 +241,7 @@ export function BuyPage() {
         (systemToken?.id != null ? `token ${systemToken.id}` : "SysToken");
     const maxCostCanonical =
         systemToken != null
-            ? expandToCanonicalTokenDecimal(maxCost, systemToken.precision)
+            ? parseDecimal(maxCost, systemToken.precision)
             : null;
     const isBuyEnabled =
         systemToken != null &&
@@ -299,9 +295,7 @@ export function BuyPage() {
                         }}
                         placeholder={
                             systemToken != null
-                                ? unitTokenAmountCanonical(
-                                      systemToken.precision,
-                                  )
+                                ? oneAsDecimal(systemToken.precision)
                                 : "1.0000"
                         }
                     />
@@ -339,11 +333,10 @@ export function BuyPage() {
                                 )}
                                 {accountExists === false && price !== null && (
                                     <p className="text-green-600">
-                                        Buy for{" "}
-                                        {formatCanonicalTokenAmount(
-                                            price,
-                                            systemToken?.symbol,
-                                        )}
+                                        Buy for {price}
+                                        {systemToken?.symbol
+                                            ? ` ${systemToken.symbol}`
+                                            : ""}
                                     </p>
                                 )}
                                 {accountExists === false &&

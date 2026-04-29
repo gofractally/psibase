@@ -50,7 +50,7 @@ export const RejectButton = ({
     const handleReject = async (pt: PendingBalance) => {
         try {
             await mutateAsync({
-                tokenId: pt.balance.tokenNumber.toString(),
+                tokenId: pt.balance.tokenId.toString(),
                 creditor: pt.creditor,
                 memo: memo,
             });

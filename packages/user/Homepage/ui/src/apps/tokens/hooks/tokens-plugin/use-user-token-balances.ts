@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import QueryKey from "@/lib/query-keys";
 import { updateArray } from "@/lib/update-array";
 
-import { Quantity } from "@shared/lib/quantity";
+import { Quantity, decimalToRaw } from "@shared/lib/quantity";
 import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -42,7 +42,7 @@ export const useUserTokenBalances = (
             // END TODO
 
             const userTokenBalances: Token[] = res.map((balance): Token => {
-                const quan = new Quantity(
+                const quan = Quantity.fromDecimal(
                     balance.balance,
                     balance.precision,
                     balance.tokenId,
@@ -88,13 +88,20 @@ export const updateUserTokenBalancesCache = (
                     balances,
                     (token) =>
                         token.id.toString() === tokenId && !!token.balance,
-                    (token) => ({
-                        ...token,
-                        balance:
-                            operation == "Add"
-                                ? token.balance!.add(amount)
-                                : token.balance!.subtract(amount),
-                    }),
+                    (token) => {
+                        const raw = decimalToRaw(
+                            amount,
+                            token.balance!.precision,
+                        );
+                        if (raw === null) return token;
+                        return {
+                            ...token,
+                            balance:
+                                operation == "Add"
+                                    ? token.balance!.add(raw)
+                                    : token.balance!.subtract(raw),
+                        };
+                    },
                 );
             }
         },

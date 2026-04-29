@@ -128,7 +128,7 @@ const TransferPageContents = () => {
         (e: React.MouseEvent<HTMLButtonElement>) => {
             e.preventDefault();
             form.setFieldValue("amount", {
-                amount: selectedToken?.balance?.amount.toString() ?? "",
+                amount: selectedToken?.balance?.toDecimal() ?? "",
             });
             form.validateField("amount.amount", "change");
         },
@@ -202,7 +202,7 @@ const TransferPageContents = () => {
                                             selectedToken?.precision ?? 0
                                         }
                                         balance={
-                                            selectedToken?.balance?.amount ?? 0
+                                            selectedToken?.balance ?? null
                                         }
                                         disabled={disableForm}
                                         description={null}

@@ -31,7 +31,7 @@ export const useUserPendingBalance = (
                 tokenId,
             );
             const xformSharedBalNode = (sbn: SharedBalNode): PendingBalance => {
-                const quan = new Quantity(
+                const quan = Quantity.fromDecimal(
                     sbn.balance,
                     sbn.token.precision,
                     sbn.token.id,

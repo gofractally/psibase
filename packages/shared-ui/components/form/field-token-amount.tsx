@@ -1,6 +1,8 @@
 import { useRef } from "react";
 import { z } from "zod";
 
+import { Quantity } from "../../lib/quantity";
+
 import { withFieldGroup } from "./app-form";
 
 /**
@@ -40,7 +42,8 @@ import { withFieldGroup } from "./app-form";
  * ```
  *
  * @param precision - The precision of the token; null skips validation
- * @param balance - The balance of the token; null skips validation
+ * @param balance - The user's balance as a `Quantity`; null skips the
+ *                  insufficient-balance check
  * @param disabled - Whether the field is disabled
  * @param description - Optional description text (specify null to ignore)
  * @param onMaxAmountClick - Optional function to call when the max amount button is clicked; set to `null` to omit Max button
@@ -52,7 +55,7 @@ export const FieldTokenAmount = withFieldGroup({
     },
     props: {
         precision: null as number | null,
-        balance: null as number | null,
+        balance: null as Quantity | null,
         disabled: false,
         description: null as string | null,
         onMaxAmountClick: null as
@@ -91,7 +94,9 @@ export const FieldTokenAmount = withFieldGroup({
                         type="button"
                         onClick={handleSetMaxAmount}
                         disabled={
-                            disabled || balance === 0 || precision === undefined
+                            disabled ||
+                            balance?.raw === 0n ||
+                            precision === undefined
                         }
                     >
                         Max
@@ -131,7 +136,7 @@ const zTokenAmount = ({
     balance,
 }: {
     precision: number | null;
-    balance: number | null;
+    balance: Quantity | null;
 }) => {
     return z
         .string()
@@ -156,7 +161,14 @@ const zTokenAmount = ({
         }, `Amount cannot have more than ${precision} decimal places`)
         .refine((val) => {
             if (balance === null) return true; // not checking balance if balance is not set
-            const num = Number(val);
-            return num <= balance; // Check if amount is less than balance
+            const input = Quantity.tryFromDecimal(
+                val,
+                balance.precision,
+                balance.tokenId,
+            );
+            // Skip when the input doesn't parse cleanly; the precision
+            // refinement above already produced a more specific error.
+            if (input === null) return true;
+            return !balance.isLessThan(input); // input <= balance
         }, `Insufficient balance`);
 };

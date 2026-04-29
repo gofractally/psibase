@@ -50,9 +50,9 @@ export const CancelButton = ({
     const handleRecall = async (pt: PendingBalance) => {
         try {
             await mutateAsync({
-                tokenId: pt.balance.tokenNumber.toString(),
+                tokenId: pt.balance.tokenId.toString(),
                 debitor: pt.debitor,
-                amount: pt.balance.amount.toString(),
+                amount: pt.balance.toDecimal(),
                 memo: memo,
             });
             toast.success("Pending balance successfully recalled");

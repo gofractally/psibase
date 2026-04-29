@@ -50,9 +50,9 @@ export const AcceptButton = ({
     const handleClaim = async (pt: PendingBalance) => {
         try {
             await mutateAsync({
-                tokenId: pt.balance.tokenNumber.toString(),
+                tokenId: pt.balance.tokenId.toString(),
                 sender: pt.creditor,
-                amount: pt.balance.amount.toString(),
+                amount: pt.balance.toDecimal(),
                 memo: memo,
             });
             toast.success("Pending balance successfully claimed");

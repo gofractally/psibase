@@ -97,7 +97,12 @@ export const TransferModal = withForm({
             if (!selectedToken) return null;
             const { precision, id, symbol } = selectedToken;
             try {
-                return new Quantity(amount.amount, precision, id, symbol);
+                return Quantity.fromDecimal(
+                    amount.amount,
+                    precision,
+                    id,
+                    symbol,
+                );
             } catch (error) {
                 console.log(error);
                 return null;

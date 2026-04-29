@@ -22,7 +22,11 @@ import { useQuoteSingleSidedRemove } from "./hooks/use-quote-single-sided-remove
 const pureDecimalToQuantity = (tokenAmount: TokenAmount): Quantity => {
     const [_, precPart] = tokenAmount.amount.split(".");
     const precision = precPart?.length ?? 0;
-    return new Quantity(tokenAmount.amount, precision, tokenAmount.tokenId);
+    return Quantity.fromDecimal(
+        tokenAmount.amount,
+        precision,
+        tokenAmount.tokenId,
+    );
 };
 
 export const Liquidity = () => {
@@ -84,9 +88,7 @@ export const Liquidity = () => {
     const poolTokenBalance = userBalances?.find(
         (balance) => balance.id == focusedPool?.id,
     );
-    const poolTokenBalanceDec = poolTokenBalance?.balance?.format({
-        includeLabel: false,
-    });
+    const poolTokenBalanceDec = poolTokenBalance?.balance?.toDecimal();
 
     const { data: maxWithdrawableLiquidity } = useQuoteRemoveLiquidity(
         !!poolTokenBalance && !isAddingLiquidity,
@@ -155,7 +157,7 @@ export const Liquidity = () => {
     const { data: quotedRemove } = useQuoteSingleSidedRemove(
         validQuote && !isAddingLiquidity,
         focusedPool,
-        poolTokenBalance?.balance?.format({ includeLabel: false }),
+        poolTokenBalance?.balance?.toDecimal(),
         lastTouched,
     );
 

@@ -48,7 +48,7 @@ export const useUserTokenBalanceChanges = (
                         throw new Error("Token ID mismatch");
                     }
 
-                    const quantity = new Quantity(
+                    const quantity = Quantity.fromDecimal(
                         balance.amount,
                         token.precision,
                         balance.tokenId,
