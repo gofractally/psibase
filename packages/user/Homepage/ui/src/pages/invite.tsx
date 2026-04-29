@@ -44,7 +44,7 @@ const fetchInvite = async (token: string) => {
     });
 
     const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "invite", "graphql", false),
+        siblingUrl(undefined, "invite", "graphql"),
         `
             query InviteById {
                 inviteById(inviteId: ${inviteId}) {

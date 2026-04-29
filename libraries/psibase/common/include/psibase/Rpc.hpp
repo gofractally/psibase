@@ -135,7 +135,7 @@ namespace psibase
       seeOther                    = 303,
       notModified                 = 304,
       temporaryRedirect           = 307,
-      permanentRedirecct          = 308,
+      permanentRedirect           = 308,
       badRequest                  = 400,
       unauthorized                = 401,
       forbidden                   = 403,

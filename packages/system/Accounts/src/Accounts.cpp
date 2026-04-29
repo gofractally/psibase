@@ -19,7 +19,9 @@ namespace SystemService
       auto   statusTable  = tables.open<AccountsStatusTable>();
       auto   statusIndex  = statusTable.getIndex<0>();
       auto   accountTable = tables.open<AccountTable>();
-      check(!statusIndex.get(std::tuple{}), "already started");
+
+      if (statusIndex.get(std::tuple{}))
+         return;
 
       uint32_t totalAccounts = 0;
       auto     codeTable     = Native::tables(KvMode::read).open<CodeTable>();

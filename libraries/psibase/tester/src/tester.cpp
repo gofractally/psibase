@@ -155,14 +155,13 @@ namespace
       auto                     packagesDir = std::string{serviceRoot} + "/packages";
       DirectoryRegistry        registry{packagesDir};
       std::vector<std::string> packageNames{"XDefault"};
-      auto                     packages = registry.resolve(packageNames);
+      auto                     packages = registry.resolve(packageNames, {});
       std::vector<HttpRequest> requests;
       std::vector<HttpRequest> early_requests;
       const std::string        rootHost("", 1);
       tester::raw::checkoutSubjective(self.nativeHandle());
-      for (const auto& info : packages)
+      for (auto& package : packages)
       {
-         auto package = registry.get(info);
          for (const auto& [account, header, serviceInfo] : package.services)
          {
             auto file = package.archive.getEntry(header);
@@ -215,7 +214,7 @@ namespace
          requests.push_back(HttpRequest{
              .host        = XPackages::service.str() + "." + rootHost,
              .method      = "PUT",
-             .target      = "/manifest/" + psio::hex(info.sha256.begin(), info.sha256.end()),
+             .target      = "/manifest/" + psio::hex(package.sha256.begin(), package.sha256.end()),
              .contentType = "application/json",
              .body        = package.manifest(),
          });
@@ -226,7 +225,17 @@ namespace
              .contentType = "application/json",
          };
          psio::vector_stream stream(postinstall.body);
-         to_json(info, stream);
+         to_json(
+             LocalPackage{
+                 .name        = package.meta.name,
+                 .version     = package.meta.version,
+                 .description = package.meta.description,
+                 .depends     = package.meta.depends,
+                 .accounts    = package.meta.accounts,
+                 .services    = package.meta.services,
+                 .sha256      = package.sha256,
+             },
+             stream);
          requests.push_back(std::move(postinstall));
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),

@@ -1,33 +1,27 @@
 import { GenerateOptions, generate } from "@bytecodealliance/jco/component";
+import * as cliNs from "@bytecodealliance/preview2-shim/cli";
+import * as clocksNs from "@bytecodealliance/preview2-shim/clocks";
+import * as filesystemNs from "@bytecodealliance/preview2-shim/filesystem";
+import * as ioNs from "@bytecodealliance/preview2-shim/io";
+import * as randomNs from "@bytecodealliance/preview2-shim/random";
 
+import { kebabToCamel, kebabToPascal } from "../case.js";
 import { HostInterface } from "../host-interface.js";
 import { assert } from "../utils.js";
 import { ComponentAPI, Functions, Interface } from "../wit-extraction.js";
 
 type PluginImports = Record<string, Record<string, unknown>>;
 
-// The preview2-shim type definitions use `export type *` which are type-only.
-// The runtime modules have the actual values, so we import as `any`.
-const shimModules: Record<string, any> = {};
-
-async function loadShims(): Promise<void> {
-    const [cli, clocks, filesystem, io, random] = await Promise.all([
-        import("@bytecodealliance/preview2-shim/cli"),
-        import("@bytecodealliance/preview2-shim/clocks"),
-        import("@bytecodealliance/preview2-shim/filesystem"),
-        import("@bytecodealliance/preview2-shim/io"),
-        import("@bytecodealliance/preview2-shim/random"),
-    ]);
-    Object.assign(shimModules, { cli, clocks, filesystem, io, random });
-}
-
-const shimsReady = loadShims();
+const cli = cliNs as any;
+const clocks = clocksNs as any;
+const filesystem = filesystemNs as any;
+const io = ioNs as any;
+const random = randomNs as any;
 
 // Whitelisted WASI imports. Each entry maps a WIT interface to its shim object.
 // As we discover that plugins need additional WASI imports, we can add them,
 // but each added shim should be validated.
 function getWasiImports(): PluginImports {
-    const { cli, clocks, filesystem, io, random } = shimModules;
     return {
         "wasi:cli/environment": cli.environment,
         "wasi:cli/exit": cli.exit,
@@ -41,38 +35,6 @@ function getWasiImports(): PluginImports {
         "wasi:io/error": io.error,
         "wasi:io/streams": io.streams,
         "wasi:random/random": random.random,
-    };
-}
-
-function buildPrivilegedImports(host: HostInterface): PluginImports {
-    return {
-        "supervisor:bridge/intf": {
-            sendRequest: (...args: unknown[]) =>
-                host.sendRequest(
-                    ...(args as Parameters<HostInterface["sendRequest"]>),
-                ),
-            serviceStack: () => host.getServiceStack(),
-            getRootDomain: () => host.getRootDomain(),
-            getChainId: () => host.getChainId(),
-            importKey: (privateKey: string) => host.importKey(privateKey),
-            signExplicit: (msg: Uint8Array, privateKey: string) =>
-                host.signExplicit(msg, privateKey),
-            sign: (msg: Uint8Array, publicKey: string) =>
-                host.sign(msg, publicKey),
-        },
-        "supervisor:bridge/database": {
-            get: (...args: unknown[]) =>
-                host.dbGet(...(args as Parameters<HostInterface["dbGet"]>)),
-            set: (...args: unknown[]) =>
-                host.dbSet(...(args as Parameters<HostInterface["dbSet"]>)),
-            remove: (...args: unknown[]) =>
-                host.dbRemove(
-                    ...(args as Parameters<HostInterface["dbRemove"]>),
-                ),
-        },
-        "supervisor:bridge/prompt": {
-            requestPrompt: () => host.requestPrompt(),
-        },
     };
 }
 
@@ -90,7 +52,7 @@ function buildProxiedImports(
         if (intf.namespace === "wasi" || intf.namespace === "supervisor")
             continue;
 
-        const key = `${intf.namespace}:${toKebabCase(intf.package)}/${toKebabCase(intf.name)}`;
+        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
 
         if (intf.funcs.length === 0) {
             imports[key] = {};
@@ -110,7 +72,7 @@ function buildInterfaceProxy(
         if (isResourceMethod(func.name)) {
             addResourceProxy(proxy, intf, func.name, func.dynamicLink, host);
         } else if (func.dynamicLink) {
-            proxy[func.name] = (
+            proxy[kebabToCamel(func.name)] = (
                 pluginRef: { handle: number },
                 ...args: unknown[]
             ) =>
@@ -120,7 +82,7 @@ function buildInterfaceProxy(
                     params: args,
                 });
         } else {
-            proxy[func.name] = (...args: unknown[]) =>
+            proxy[kebabToCamel(func.name)] = (...args: unknown[]) =>
                 host.syncCall({
                     service: intf.namespace,
                     plugin: intf.package,
@@ -141,13 +103,6 @@ function isResourceMethod(name: string): boolean {
     );
 }
 
-// The WIT parser returns camelCase names (e.g. "hookHandlers", "wallClock")
-// but jco uses the original WIT kebab-case (e.g. "hook-handlers", "wall-clock")
-// as import keys. Convert camelCase back to kebab-case.
-function toKebabCase(str: string): string {
-    return str.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`);
-}
-
 function addResourceProxy(
     proxy: Record<string, unknown>,
     intf: Interface,
@@ -166,11 +121,9 @@ function addResourceProxy(
             ? funcName.substring(bracketIndex + 1, dotIndex)
             : funcName.substring(bracketIndex + 1);
 
-    // jco expects the resource class name in PascalCase. The component parser
-    //   already converts kebab-case to camelCase before we see it, so all we
-    //   need to do here is capitalize the first letter.
-    const className =
-        rawResourceName.charAt(0).toUpperCase() + rawResourceName.slice(1);
+    // The component parser returns raw WIT kebab-case names; jco expects the
+    //   resource class in PascalCase and methods in camelCase as JS identifiers.
+    const className = kebabToPascal(rawResourceName);
 
     let resourceClass = proxy[className] as any;
     if (!resourceClass) {
@@ -180,27 +133,28 @@ function addResourceProxy(
         proxy[className] = resourceClass;
     }
 
-    let methodName: string;
+    let rawMethodName: string;
     if (funcName.includes("[constructor]")) {
-        methodName = "constructor";
+        rawMethodName = "constructor";
     } else if (funcName.includes("[method]") || funcName.includes("[static]")) {
-        methodName = funcName.split("]")[1].split(".")[1];
+        rawMethodName = funcName.split("]")[1].split(".")[1];
     } else {
         throw new Error(`Invalid resource method name: ${funcName}`);
     }
+    const jsMethodName = kebabToCamel(rawMethodName);
 
     const callResource = (handle: number | undefined, ...args: unknown[]) =>
         host.syncCallResource({
             service: intf.namespace,
             plugin: intf.package,
             intf: intf.name,
-            type: className,
+            type: rawResourceName,
             handle,
-            method: methodName,
+            method: rawMethodName,
             params: args,
         });
 
-    if (methodName === "constructor") {
+    if (rawMethodName === "constructor") {
         const origProto = resourceClass.prototype;
         const newClass = class {
             handle: number | undefined;
@@ -215,10 +169,10 @@ function addResourceProxy(
         Object.assign(newClass.prototype, origProto);
         proxy[className] = newClass;
     } else if (funcName.includes("[static]")) {
-        resourceClass[methodName] = (...args: unknown[]) =>
+        resourceClass[jsMethodName] = (...args: unknown[]) =>
             callResource(undefined, ...args);
     } else {
-        resourceClass.prototype[methodName] = function (
+        resourceClass.prototype[jsMethodName] = function (
             this: { handle: number | undefined },
             ...args: unknown[]
         ) {
@@ -313,6 +267,44 @@ async function compileWasmComponent(
     };
 }
 
+function assertSupervisorImportsSatisfied(
+    service: string,
+    privileged: boolean,
+    importedFuncs: Functions,
+    imports: PluginImports,
+): void {
+    for (const intf of importedFuncs.interfaces) {
+        if (intf.namespace !== "supervisor") continue;
+
+        if (intf.funcs.length === 0) continue;
+
+        const key = `${intf.namespace}:${intf.package}/${intf.name}`;
+
+        if (!privileged) {
+            throw new Error(
+                `Plugin ${service} imports ${key} but is not privileged`,
+            );
+        }
+
+        const provided = imports[key];
+        if (!provided) {
+            throw new Error(
+                `Plugin ${service} imports ${key}, but the host does not provide it`,
+            );
+        }
+
+        for (const func of intf.funcs) {
+            if (isResourceMethod(func.name)) continue;
+            const jsName = kebabToCamel(func.name);
+            if (typeof provided[jsName] !== "function") {
+                throw new Error(
+                    `Plugin ${service} imports ${key}.${func.name}, but the host does not provide it`,
+                );
+            }
+        }
+    }
+}
+
 export async function compilePlugin(
     service: string,
     privileged: boolean,
@@ -320,12 +312,17 @@ export async function compilePlugin(
     pluginHost: HostInterface,
     api: ComponentAPI,
 ): Promise<CompiledPlugin> {
-    await shimsReady;
     const imports: PluginImports = {
         ...getWasiImports(),
-        ...(privileged ? buildPrivilegedImports(pluginHost) : {}),
+        ...(privileged ? pluginHost.bridge : {}),
         ...buildProxiedImports(api.importedFuncs, pluginHost),
     };
+    assertSupervisorImportsSatisfied(
+        service,
+        privileged,
+        api.importedFuncs,
+        imports,
+    );
     return compileWasmComponent(wasmBytes, imports, `${service}.plugin.js`);
 }
 
@@ -336,7 +333,6 @@ export async function loadBasic(
     wasmBytes: Uint8Array,
     debugFileName: string,
 ): Promise<InstantiateResult> {
-    await shimsReady;
     const compiled = await compileWasmComponent(
         wasmBytes,
         getWasiImports(),
