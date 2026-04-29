@@ -1,19 +1,13 @@
 use std::u64;
 
-use psibase::{
-    check, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
-};
+use psibase::{check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
 
-use crate::{
-    constants::MEMBER_STREAM_HALF_LIFE,
-    helpers::Stream,
-    tables::tables::{
-        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy,
-    },
+use crate::tables::tables::{
+    Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy,
 };
 
 use async_graphql::ComplexObject;
-use psibase::services::{token_stream::Wrapper as TokenStream, transact::Wrapper as TransactSvc};
+use psibase::services::transact::Wrapper as TransactSvc;
 
 #[ComplexObject]
 impl FractalMember {
@@ -29,13 +23,10 @@ impl FractalMember {
     fn new(fractal: AccountNumber, account: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
-        let token_id = Fractal::get_assert(fractal).token_id;
-
         Self {
             account,
             fractal,
             created_at: now,
-            stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
         }
     }
 
@@ -49,22 +40,6 @@ impl FractalMember {
     pub fn credit_direct(&self, amount: Quantity, memo: Memo) {
         let token_id = Fractal::get_assert(self.fractal).token_id;
         psibase::services::tokens::Wrapper::call().credit(token_id, self.account, amount, memo)
-    }
-
-    pub fn claim_member_rewards(&self) {
-        let claimed = Stream::new(self.stream_id).withdraw();
-        check(claimed.value > 0, "nothing to withdraw");
-
-        let to_credit = Levy::levies_of_member(self.fractal, self.account)
-            .into_iter()
-            .fold(claimed, |remaining_amount, mut levy| {
-                let levy_paid = levy.apply_levy(claimed);
-                remaining_amount - levy_paid
-            });
-
-        if to_credit.value > 0 {
-            self.credit_direct(to_credit, "Stream reward".into());
-        }
     }
 
     pub fn add(fractal: AccountNumber, account: AccountNumber) -> Self {
@@ -88,16 +63,6 @@ impl FractalMember {
 
     pub fn get_assert(fractal: AccountNumber, account: AccountNumber) -> Self {
         check_some(Self::get(fractal, account), "member does not exist")
-    }
-
-    pub fn deposit_stream(&self, amount: Quantity, memo: Memo) {
-        psibase::services::tokens::Wrapper::call().credit(
-            Fractal::get_assert(self.fractal).token_id,
-            TokenStream::SERVICE,
-            amount,
-            memo,
-        );
-        TokenStream::call().deposit(self.stream_id, amount);
     }
 
     pub fn exile(&self) {

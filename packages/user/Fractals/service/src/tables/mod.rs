@@ -49,7 +49,6 @@ pub mod tables {
         pub fractal: AccountNumber,
         pub account: AccountNumber,
         pub created_at: psibase::TimePointSec,
-        pub stream_id: u32,
     }
 
     impl FractalMember {
@@ -88,11 +87,18 @@ pub mod tables {
     #[table(name = "RewardStreamTable", index = 4)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct RewardStream {
-        #[primary_key]
         pub fractal: AccountNumber,
+        pub owner: AccountNumber,
         pub stream_id: u32,
         pub last_distributed: psibase::TimePointSec,
         pub dist_interval_secs: u32,
+    }
+
+    impl RewardStream {
+        #[primary_key]
+        fn pk(&self) -> (AccountNumber, AccountNumber) {
+            (self.fractal, self.owner)
+        }
     }
 
     #[table(name = "RoleTable", index = 5)]

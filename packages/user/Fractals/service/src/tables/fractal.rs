@@ -129,10 +129,17 @@ impl Fractal {
             tokens.getToken(self.token_id).issued_supply.value == 0,
             "token already initialised",
         );
-        let stream = RewardStream::add(self.account, self.token_id);
+        let stream = RewardStream::add_fractal(self.account, self.token_id);
         let supply = TOKEN_SUPPLY.into();
         tokens.mint(self.token_id, supply, "initial mint".into());
         stream.deposit(supply, "initial stream deposit".into());
+    }
+
+    pub fn reward_stream(&self) -> RewardStream {
+        check_some(
+            RewardStream::get(self.account, self.account),
+            "fractal does not have reward stream",
+        )
     }
 
     fn get_weighted_occupations(
@@ -149,8 +156,8 @@ impl Fractal {
     }
 
     pub fn distribute_tokens(&self) {
-        let mut stream = RewardStream::get_assert(self.account);
-        let withdrawn = stream.withdraw();
+        let mut stream = self.reward_stream();
+        let (_, withdrawn) = stream.claim();
         if withdrawn.value == 0 {
             return;
         }
@@ -190,8 +197,7 @@ impl Fractal {
         }
 
         for (member, amount) in payable_members {
-            FractalMember::get_assert(self.account, member)
-                .deposit_stream(amount, "Fractal reward".into());
+            RewardStream::get_assert(self.account, member).deposit(amount, "Fractal reward".into());
         }
     }
 
@@ -259,6 +265,6 @@ impl Fractal {
     }
 
     async fn stream(&self) -> Option<RewardStream> {
-        RewardStream::get(self.account)
+        RewardStream::get(self.account, self.account)
     }
 }

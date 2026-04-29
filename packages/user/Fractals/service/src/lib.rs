@@ -5,7 +5,8 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
+    use crate::tables::tables::RewardStream;
+    use crate::tables::tables::{Fractal, FractalMember, Occupation, Role};
 
     use psibase::services::fractals::occu_wrapper;
     use psibase::services::fractals::FractalRole;
@@ -71,8 +72,11 @@ pub mod service {
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
     fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
-        RewardStream::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
+        let fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_legislature();
+        fractal
+            .reward_stream()
+            .set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set distribution strategy
@@ -127,9 +131,20 @@ pub mod service {
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
+    /// * `member` - The fractal member claiming rewards.
     #[action]
-    fn claim_rew(fractal: AccountNumber) {
-        FractalMember::get_assert(fractal, get_sender()).claim_member_rewards();
+    fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
+        let mut reward_stream = RewardStream::get_assert(fractal, member);
+        let (token_id, claimed) = reward_stream.claim();
+
+        if claimed.value > 0 {
+            psibase::services::tokens::Wrapper::call().credit(
+                token_id,
+                member,
+                claimed,
+                "Reward claim".into(),
+            );
+        }
     }
 
     /// Add fractal member
