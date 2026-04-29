@@ -1,7 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/query-keys";
-
 import SharedQueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -26,7 +24,7 @@ export const useUpdateContact = () => {
         },
         onSuccess: () => {
             const currentUser = queryClient.getQueryData(
-                QueryKey.currentUser(),
+                SharedQueryKey.currentUser(),
             );
             if (currentUser) {
                 queryClient.invalidateQueries({

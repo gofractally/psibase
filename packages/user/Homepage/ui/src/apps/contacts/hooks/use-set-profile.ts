@@ -1,9 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import QueryKey from "@/lib/query-keys";
-
 import { ProfileResponse } from "@shared/hooks/use-profile";
+import SharedQueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -26,12 +25,12 @@ export const useSetProfile = () =>
             toast.success("Profile updated");
 
             const currentUser = zAccount.parse(
-                await context.client.getQueryData(QueryKey.currentUser()),
+                await context.client.getQueryData(SharedQueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");
 
             context.client.setQueryData(
-                QueryKey.profile(currentUser),
+                SharedQueryKey.profile(currentUser),
                 (): z.infer<typeof ProfileResponse> => ({
                     profile: {
                         account: currentUser,
@@ -42,7 +41,7 @@ export const useSetProfile = () =>
             );
 
             context.client.invalidateQueries({
-                queryKey: QueryKey.profile(currentUser),
+                queryKey: SharedQueryKey.profile(currentUser),
             });
         },
         onError: () => {

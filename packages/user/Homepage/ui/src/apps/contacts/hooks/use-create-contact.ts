@@ -1,7 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
 
-import QueryKey from "@/lib/query-keys";
-
 import { upsertUserToCache } from "@shared/hooks/use-contacts";
 import SharedQueryKey from "@shared/lib/query-keys";
 import { zAccount } from "@shared/lib/schemas/account";
@@ -25,7 +23,7 @@ export const useCreateContact = () => {
         onSuccess: (_data, newContact, onMutateResult, context) => {
             toast.success("Contact created", { id: onMutateResult.toastId });
             const username = zAccount.parse(
-                context.client.getQueryData(QueryKey.currentUser()),
+                context.client.getQueryData(SharedQueryKey.currentUser()),
             );
             upsertUserToCache(username, newContact);
             context.client.invalidateQueries({
