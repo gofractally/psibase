@@ -11,9 +11,9 @@ import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { z } from "zod";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
 import QueryKey from "@/lib/query-keys";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { supervisor } from "@shared/lib/supervisor";
 
 import { zSendMessageSchema } from "../components/compose-dialog";

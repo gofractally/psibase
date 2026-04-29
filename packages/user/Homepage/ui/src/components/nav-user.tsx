@@ -14,12 +14,12 @@ import { useNavigate } from "react-router-dom";
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
-import { useLogout } from "@/hooks/use-logout";
 
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useLogout } from "@shared/hooks/use-logout";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Dialog } from "@shared/shadcn/ui/dialog";
 import {
