@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { graphql } from "@shared/lib/graphql";
-
 import { zNameEventsPageData } from "@/lib/graphql/prem-accounts.schemas";
 import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
+
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { graphql } from "@shared/lib/graphql";
 
 type Props = {
     /** Increment (e.g. after a purchase) to refetch history while logged in. */
@@ -37,21 +37,16 @@ export function HistorySection({ historyNonce = 0 }: Props) {
             try {
                 const allEvents: { account: string; action: string }[] = [];
                 let hasNextPage = true;
-                let afterCursor: string | null = null;
+                let cursorArg = "";
 
                 while (hasNextPage) {
                     const page = zNameEventsPageData.parse(
                         await graphql(
                             `
-                                query NameEvents(
-                                    $owner: String!,
-                                    $first: Int,
-                                    $after: String
-                                ) {
+                                {
                                     nameEvents(
-                                        owner: $owner,
-                                        first: $first,
-                                        after: $after
+                                        owner: "${loggedInUser}",
+                                        first: 50${cursorArg}
                                     ) {
                                         edges {
                                             node {
@@ -68,11 +63,6 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                             `,
                             {
                                 service: PREM_ACCOUNTS_SERVICE,
-                                variables: {
-                                    owner: loggedInUser,
-                                    first: 50,
-                                    after: afterCursor,
-                                },
                             },
                         ),
                     );
@@ -92,7 +82,8 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                     }
 
                     hasNextPage = connection.pageInfo?.hasNextPage ?? false;
-                    afterCursor = connection.pageInfo?.endCursor ?? null;
+                    const endCursor = connection.pageInfo?.endCursor;
+                    cursorArg = endCursor ? `, after: "${endCursor}"` : "";
                 }
 
                 setHistoryEvents(allEvents);
@@ -105,9 +96,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                 });
             } catch (e) {
                 console.error("Failed to load history events:", e);
-                setHistoryEvents((prev) =>
-                    prev.length > 0 ? prev : [],
-                );
+                setHistoryEvents((prev) => (prev.length > 0 ? prev : []));
                 setHistoryError(
                     e instanceof Error
                         ? e.message
@@ -165,7 +154,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                                             )
                                         }
                                         disabled={currentPage === 1}
-                                        className="rounded-md border px-3 py-1 disabled:opacity-40 enabled:hover:bg-muted"
+                                        className="enabled:hover:bg-muted rounded-md border px-3 py-1 disabled:opacity-40"
                                     >
                                         Previous
                                     </button>
@@ -179,7 +168,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                                             )
                                         }
                                         disabled={currentPage === totalPages}
-                                        className="rounded-md border px-3 py-1 disabled:opacity-40 enabled:hover:bg-muted"
+                                        className="enabled:hover:bg-muted rounded-md border px-3 py-1 disabled:opacity-40"
                                     >
                                         Next
                                     </button>

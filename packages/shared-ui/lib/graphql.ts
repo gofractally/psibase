@@ -52,9 +52,7 @@ export const graphql = async <T>(
     const res = await fetch(`${host}/graphql`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-            variables !== undefined ? { query, variables } : { query },
-        ),
+        body: JSON.stringify({ query }),
     });
 
     let body: unknown;
