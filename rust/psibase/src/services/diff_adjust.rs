@@ -40,7 +40,7 @@
 #[crate::service(name = "diff-adjust", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
-    use crate::{AccountNumber, Fracpack, TimePointSec, ToSchema};
+    use crate::{AccountNumber, Pack, TimePointSec, ToSchema, Unpack};
 
     use async_graphql::SimpleObject;
     use serde::{Deserialize, Serialize};
