@@ -2,18 +2,16 @@ use crate::weighted_normalization::fib::continuous_fibonacci;
 
 /// Assigns decreasing integer levels to items, starting from `from_level`.
 ///
-/// If `from_level` is `None`, defaults to `items.len()`
-///
 /// # Example
 ///
 /// ```
 /// let items = vec!["A", "B"];
 /// // Explicit start level
-/// let result = assign_decreasing_levels(items.clone(), Some(5));
+/// let result = assign_decreasing_levels(items.clone());
 /// assert_eq!(result, vec![(5, "A"), (4, "B")]);
 ///
 /// // Default: start from length
-/// let result = assign_decreasing_levels(items, None);
+/// let result = assign_decreasing_levels(items);
 /// assert_eq!(result, vec![(2, "A"), (1, "B")]);
 /// ```
 pub fn assign_decreasing_levels<T>(items: Vec<T>) -> Vec<(usize, T)> {

@@ -238,9 +238,9 @@ impl UserFractal for FractalCorePlugin {
         FractalsPlugin::user_fractal::dist_token()
     }
 
-    fn claim_rewards() -> Result<(), Error> {
+    fn claim_rewards(member: String) -> Result<(), Error> {
         assert_authorized(FunctionName::claim_rewards)?;
-        FractalsPlugin::user_fractal::claim_rewards()
+        FractalsPlugin::user_fractal::claim_rewards(&member)
     }
 
     fn join() -> Result<(), Error> {

@@ -103,19 +103,8 @@ impl Levy {
         };
 
         if payment.value > 0 {
-            let memo = "Levy payment".into();
-
-            if self.fractal == self.payee {
-                RewardStream::get_assert(self.fractal, self.fractal).deposit(payment, memo);
-            } else {
-                // If the payee is no longer a fractal member (he left or was exiled) then send amount to fractal instead.
-                match FractalMember::get(self.fractal, self.payee) {
-                    Some(member) => member.credit_direct(payment, memo),
-                    None => {
-                        RewardStream::get_assert(self.fractal, self.fractal).deposit(payment, memo)
-                    }
-                }
-            }
+            RewardStream::get_assert(self.fractal, self.payee)
+                .deposit(payment, "Levy payment".into());
         }
         payment
     }

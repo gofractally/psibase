@@ -122,10 +122,11 @@ impl AdminFractal for FractallyPlugin {
 }
 
 impl UserFractal for FractallyPlugin {
-    fn claim_rewards() -> Result<(), Error> {
+    fn claim_rewards(member: String) -> Result<(), Error> {
         assert_authorized(FunctionName::claim_rewards)?;
         let packed_args = fractals::action_structs::claim_rew {
             fractal: get_sender_app()?,
+            member: member.parse().unwrap(),
         }
         .packed();
         add_action_to_transaction(
