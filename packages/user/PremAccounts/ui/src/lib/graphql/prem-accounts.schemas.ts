@@ -65,5 +65,38 @@ export const zNameEventsPageData = z.object({
         .optional(),
 });
 
+const zUnclaimedNameNode = z
+    .object({
+        account: z.string(),
+    })
+    .passthrough();
+
+/**
+ * `unclaimedNames` connection page — bought-but-unclaimed account records for
+ * the authenticated user.
+ */
+export const zUnclaimedNamesPageData = z.object({
+    unclaimedNames: z
+        .object({
+            edges: z
+                .array(
+                    z.object({
+                        node: zUnclaimedNameNode.nullable().optional(),
+                    }),
+                )
+                .nullish()
+                .transform((e) => e ?? []),
+            pageInfo: z
+                .object({
+                    hasNextPage: z.boolean().optional(),
+                    endCursor: z.string().nullish().optional(),
+                })
+                .optional(),
+        })
+        .nullable()
+        .optional(),
+});
+
 export type NameEventsPageData = z.infer<typeof zNameEventsPageData>;
+export type UnclaimedNamesPageData = z.infer<typeof zUnclaimedNamesPageData>;
 export type CurrentPricesData = z.infer<typeof zCurrentPricesData>;

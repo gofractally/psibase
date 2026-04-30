@@ -134,9 +134,10 @@ if(DEFINED WASI_SDK_PREFIX)
     )
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/Catch2/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/psibase/licenses RENAME LICENSE.catch2 COMPONENT libpsibase)
 
+    # C++ packages
     set(SERVICES Accounts AuthDelegate AuthSig AuthAny CommonApi
         CpuLimit Db Events EventIndex Explorer Invite
-        Nop Packages PremAccounts Producers HttpServer Sites RAccounts
+        Nop Packages Producers HttpServer Sites RAccounts
         RAuthSig RAuthDelegate REvents RInvite RPackages RProducers
         RHttpServer RSetCode RTransact SetCode
         Transact VerifySig XAdmin XBasic XDb XHttp XRun XSites XTimer XTransact

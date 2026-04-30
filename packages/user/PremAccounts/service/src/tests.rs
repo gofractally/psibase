@@ -11,10 +11,10 @@ mod tests {
     use crate::Wrapper as PremAccounts;
     use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::nft::Wrapper as Nfts;
-    use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens};
+    use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 
-    fn initial_setup(chain: &psibase::Chain) -> Result<(), psibase::Error> {
+    fn initial_setup(chain: &psibase::Chain) -> Result<TID, psibase::Error> {
         let tokens_service = Tokens::SERVICE;
         let symbol = account!("symbol");
         let alice = account!("alice");
@@ -48,20 +48,23 @@ mod tests {
             .credit(sys, bob, 100_000_0000u64.into(), "".into())
             .get()?;
 
-        Ok(())
+        Ok(sys)
     }
 
-    fn setup_tokens(chain: &psibase::Chain) -> Result<(), psibase::Error> {
+    fn setup_tokens(chain: &psibase::Chain) -> Result<TID, psibase::Error> {
         chain.finish_block();
-        if let Err(e) = initial_setup(chain) {
-            if e.to_string().contains("not initialized") {
-                chain.finish_block();
-                initial_setup(chain)?;
-            } else {
-                return Err(e);
+        match initial_setup(chain) {
+            Ok(sys) => Ok(sys),
+            Err(e) => {
+                if e.to_string().contains("not initialized") {
+                    chain.finish_block();
+                    let sys = initial_setup(chain)?;
+                    Ok(sys)
+                } else {
+                    return Err(e);
+                }
             }
         }
-        Ok(())
     }
 
     /// One market per premium name length 1..=7 (matches Config default bootstrap range).

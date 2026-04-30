@@ -7,11 +7,11 @@ import {
     zCurrentPricesData,
     zTokenQueryData,
 } from "@/lib/graphql/prem-accounts.schemas";
-import { PREM_ACCOUNTS_SERVICE, doesAccountExist } from "@/lib/prem-service";
+import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
+import { isAccountAvailable } from "@shared/lib/get-account";
 import { graphql } from "@shared/lib/graphql";
 import {
-    canonicalTokenAmountToRaw,
     expandToCanonicalTokenDecimal,
     formatCanonicalTokenAmount,
     unitTokenAmountCanonical,
@@ -147,7 +147,7 @@ export function BuyPage() {
                 return;
             }
 
-            const exists = await doesAccountExist(trimmed);
+            const exists = (await isAccountAvailable(trimmed)) === "Taken";
             setAccountExists(exists);
 
             if (!exists && priceByLength.size > 0) {
@@ -194,18 +194,6 @@ export function BuyPage() {
         const maxCostForTx =
             expandToCanonicalTokenDecimal(maxCost, token.precision) ??
             maxCost.trim();
-        const maxRaw = canonicalTokenAmountToRaw(maxCostForTx, token.precision);
-        const priceRaw =
-            price != null
-                ? canonicalTokenAmountToRaw(price, token.precision)
-                : null;
-        if (maxRaw != null && priceRaw != null && maxRaw < priceRaw) {
-            setError(
-                "Max cost is below the current price. Raise max cost to at least the displayed price.",
-            );
-            setIsLoading(false);
-            return;
-        }
 
         try {
             await supervisor.functionCall({

@@ -46,7 +46,7 @@ pub mod Service {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "RateLimitTable", index = 0)]
-    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     #[fracpack(fracpack_mod = "fracpack")]
     pub struct RateLimit {
         #[primary_key]

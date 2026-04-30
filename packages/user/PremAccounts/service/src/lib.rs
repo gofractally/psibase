@@ -22,16 +22,6 @@ pub mod tables {
         pub enabled: bool,
     }
 
-    impl Default for Auction {
-        fn default() -> Self {
-            Self {
-                length: 0,
-                nft_id: 0,
-                enabled: true,
-            }
-        }
-    }
-
     #[table(name = "PurchasedAccountsTable", index = 2)]
     #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
     pub struct PurchasedAccount {
@@ -71,6 +61,23 @@ pub mod service {
     /// DiffAdjust window for target semantics (30-day period).
     const MARKET_WINDOW_SECONDS: u32 = 30 * 86400;
 
+    fn require_caller_is_self() {
+        check(
+            get_sender() == get_service(),
+            "caller must be PremAccounts service",
+        );
+    }
+
+    fn check_market_length(length: u8) {
+        check(
+            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
+            &format!(
+                "market name length must be {}-{}",
+                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
+            ),
+        );
+    }
+
     fn register_prem_acct_event_indices() {
         let add_index = |method: &str, column: u8| {
             events::Wrapper::call().addIndex(
@@ -98,13 +105,6 @@ pub mod service {
         DiffAdjust::call().set_targets(nft_id, target, target);
         DiffAdjust::call().set_floor(nft_id, floor_price.value);
         DiffAdjust::call().set_ppm(nft_id, increase_ppm, decrease_ppm);
-    }
-
-    fn require_caller_is_self() {
-        check(
-            get_sender() == get_service(),
-            "caller must be PremAccounts service",
-        );
     }
 
     #[action]
@@ -209,16 +209,11 @@ pub mod service {
     ) {
         require_caller_is_self();
 
-        check(
-            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
-            &format!(
-                "market name length must be {}-{}",
-                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
-            ),
-        );
+        check_market_length(length);
+
         let auctions_table = AuctionsTable::new();
-        check(
-            auctions_table.get_index_pk().get(&length).is_none(),
+        check_none(
+            auctions_table.get_index_pk().get(&length),
             "market already exists",
         );
         let nft_id = DiffAdjust::call().create(
@@ -260,13 +255,8 @@ pub mod service {
     ) {
         require_caller_is_self();
 
-        check(
-            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
-            &format!(
-                "market name length must be {}-{}",
-                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
-            ),
-        );
+        check_market_length(length);
+
         let auctions_table = AuctionsTable::new();
         let auction = check_some(
             auctions_table.get_index_pk().get(&length),
@@ -285,13 +275,7 @@ pub mod service {
     fn toggle_market(length: u8, enabled: bool) {
         require_caller_is_self();
 
-        check(
-            length >= MIN_ACCOUNT_NAME_LENGTH && length <= MAX_ACCOUNT_NAME_LENGTH,
-            &format!(
-                "market name length must be {}-{}",
-                MIN_ACCOUNT_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH,
-            ),
-        );
+        check_market_length(length);
         let auctions_table = AuctionsTable::new();
         let mut auction = check_some(
             auctions_table.get_index_pk().get(&length),

@@ -1,7 +1,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::*;
+    use async_graphql::{connection::Connection, *};
     use prem_accounts::tables::{AuctionsTable, PurchasedAccount, PurchasedAccountsTable};
     use prem_accounts::Wrapper as PremAccountsService;
     use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
@@ -84,7 +84,7 @@ mod service {
 
     #[Object]
     impl Query {
-        /// Current prices for each configured market (sparse list)
+        /// Current prices for each configured and enabled market (sparse list)
         /// If no system token configured, returns empty list
         async fn current_prices(&self) -> Vec<MarketPrice> {
             let Some(token) = TokensWrapper::call().getSysToken() else {
@@ -96,11 +96,12 @@ mod service {
             let mut rows: Vec<MarketPrice> = auctions_table
                 .get_index_pk()
                 .iter()
+                .filter(|auction| auction.enabled)
                 .map(|auction| {
                     // Delegate effective difficulty to DiffAdjust (same as `get_diff` action).
                     let mut price_raw = DiffAdjust::call().get_diff(auction.nft_id);
                     // Defensive: in edge cases active can read 0; fall back to stored floor.
-                    if auction.enabled && price_raw == 0 {
+                    if price_raw == 0 {
                         price_raw = rate_table
                             .get_index_pk()
                             .get(&auction.nft_id)
@@ -147,22 +148,26 @@ mod service {
             rows
         }
 
-        /// Bought-but-unclaimed account names for the user
-        async fn unclaimed_names(&self) -> async_graphql::Result<Vec<String>> {
+        /// Bought-but-unclaimed account records for the authenticated user
+        async fn unclaimed_names(
+            &self,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, PurchasedAccount>> {
             let user = self.require_authenticated()?;
 
-            let purchased_table = PurchasedAccountsTable::read();
-            let owner_idx = purchased_table.get_index_by_owner();
-            let mut prefix = owner_idx.prefix.clone();
-            user.append_key(&mut prefix);
-            let sub = TableIndex::<AccountNumber, PurchasedAccount>::new(
-                &owner_idx.db,
-                prefix,
-                owner_idx.is_secondary,
-            );
-            let mut names: Vec<String> = sub.iter().map(|r| r.account.to_string()).collect();
-            names.sort();
-            Ok(names)
+            TableQuery::subindex::<AccountNumber>(
+                PurchasedAccountsTable::read().get_index_by_owner(),
+                &user,
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         /// Events: premium **name** history for `owner`
