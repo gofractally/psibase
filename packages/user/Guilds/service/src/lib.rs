@@ -210,6 +210,7 @@ pub mod service {
     #[action]
     #[allow(non_snake_case)]
     fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
+        check_is_sender(psibase::services::invite::Wrapper::SERVICE);
         GuildInvite::get_assert(invite_id).accept(accepter);
     }
 
@@ -312,7 +313,7 @@ pub mod service {
     /// * `account` - The account number of the registering user.
     #[action]
     fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
-        check_is_eval();
+        check_is_sender(psibase::services::evaluations::SERVICE);
         let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
         check_some(
             GuildMember::get(evaluation.guild, account),
@@ -328,10 +329,10 @@ pub mod service {
     #[action]
     fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
 
-    fn check_is_eval() {
+    fn check_is_sender(account: AccountNumber) {
         check(
-            get_sender() == psibase::services::evaluations::SERVICE,
-            "sender must be evaluations",
+            get_sender() == account,
+            &format!("sender must be {}", account),
         );
     }
 
@@ -349,7 +350,7 @@ pub mod service {
         _user: AccountNumber,
         attestation: Vec<u8>,
     ) {
-        check_is_eval();
+        check_is_sender(psibase::services::evaluations::SERVICE);
         let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .users(Some(group_number))
             .len();
@@ -421,7 +422,7 @@ pub mod service {
     /// * `group_result` - The result data of the group.
     #[action]
     fn on_grp_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
-        check_is_eval();
+        check_is_sender(psibase::services::evaluations::SERVICE);
         EvaluationInstance::get_by_evaluation_id(evaluation_id)
             .award_group_scores(group_number, group_result);
     }
