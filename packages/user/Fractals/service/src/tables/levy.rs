@@ -21,7 +21,7 @@ impl Levy {
             member,
             payee,
             rate_ppm,
-            debt: amount,
+            debt: amount.unwrap_or_else(|| 0.into()),
             send_to_stream,
         }
     }
@@ -90,12 +90,12 @@ impl Levy {
             .into();
 
         // Determine how much they can actually pay based on remaining amount.
-        let payment = if let Some(remaining) = self.debt {
-            let amount = remaining.min(uncapped_amount);
-            let balance_after = remaining - amount;
+        let payment = if self.debt.value > 0 {
+            let amount = self.debt.min(uncapped_amount);
+            let balance_after = self.debt - amount;
 
             if balance_after.value > 0 {
-                self.debt = Some(balance_after);
+                self.debt = balance_after;
                 self.save();
             } else {
                 self.remove();
