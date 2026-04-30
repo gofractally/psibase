@@ -5,10 +5,10 @@ pub enum ErrorType {
     QueryResponseParseError(String),
     #[error("System token not defined")]
     SystemTokenNotDefined,
-    #[error("Max cost not canonical decimal")]
-    MaxCostNotCanonicalDecimal,
     #[error("Max cost below current ask")]
     MaxCostBelowCurrentAsk,
+    #[error("Invalid account name: {0}")]
+    InvalidAccountName(String),
     #[error("Premium name length not offered")]
     PremiumNameLengthNotOffered,
     #[error("Premium name market disabled")]

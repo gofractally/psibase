@@ -40,9 +40,8 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        let sys_token_id = TokensHelpers::fetch_network_token()?
-            // .map_err(|_| ErrorType::SystemTokenNotDefined)?
-            .ok_or(ErrorType::SystemTokenNotDefined)?;
+        let sys_token_id =
+            TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let initial_price = TokensHelpers::decimal_to_u64(sys_token_id, &initial_price)?;
         let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
         prem_accounts::Wrapper::add_to_tx().create(
@@ -65,10 +64,8 @@ impl MarketAdmin for PremAccountsPlugin {
         increase_ppm: u32,
         decrease_ppm: u32,
     ) -> Result<(), Error> {
-        let sys_token_id = match TokensHelpers::fetch_network_token()? {
-            Some(id) => id,
-            None => return Err(ErrorType::SystemTokenNotDefined.into()),
-        };
+        let sys_token_id =
+            TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
         let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &floor_price)?;
         prem_accounts::Wrapper::add_to_tx().configure(
             length,
@@ -97,23 +94,16 @@ impl MarketAdmin for PremAccountsPlugin {
 impl Api for PremAccountsPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["accounts"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
-        let acct_name = AccountNumber::from_exact(account.trim()).unwrap();
+        let acct_name = AccountNumber::from_exact(&account)
+            .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
 
         let service_account = prem_accounts::SERVICE.to_string();
 
-        let sys_token_id = match TokensHelpers::fetch_network_token()? {
-            Some(id) => id,
-            None => return Err(ErrorType::SystemTokenNotDefined.into()),
-        };
-
-        let max_cost = max_cost.trim().to_string();
-        let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
-        let canonical = TokensHelpers::u64_to_decimal(sys_token_id, max_cost_u64)?;
-        if canonical != max_cost {
-            return Err(ErrorType::MaxCostNotCanonicalDecimal.into());
-        }
+        let sys_token_id =
+            TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
 
         let length = account.to_string().len() as u8;
+        let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
         let ask_u64 = require_active_premium_market_ask(length, sys_token_id)?;
         if max_cost_u64 < ask_u64 {
             return Err(ErrorType::MaxCostBelowCurrentAsk.into());

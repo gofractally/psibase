@@ -72,11 +72,12 @@ mod service {
         }
 
         fn require_authenticated(&self) -> async_graphql::Result<AccountNumber> {
-            if self.user.is_none() {
-                return Err(async_graphql::Error::new(
+            self.user.ok_or_else(|| {
+                async_graphql::Error::new(
                     "permission denied: an authorized session is required for this query.",
-                ));
-            }
+                )
+            })?;
+
             Ok(self.user.unwrap().clone())
         }
     }
