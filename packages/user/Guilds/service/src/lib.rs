@@ -509,7 +509,7 @@ pub mod service {
     /// * `account` - Account being checked.
     #[action]
     pub fn has_policy(account: AccountNumber) -> bool {
-        Guild::get(account).is_some()
+        account_policy(account).is_some()
     }
 
     #[event(history)]
