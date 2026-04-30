@@ -7,7 +7,7 @@ pub mod service {
         helpers::RollingBits16,
         tables::tables::{
             EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildInvite, GuildMember,
-            GuildMemberTable, InitRow, InitTable, Ranking, RoleMap,
+            GuildMemberTable, Ranking, RoleMap,
         },
     };
     use psibase::{
@@ -17,22 +17,6 @@ pub mod service {
         },
         *,
     };
-
-    /// Initialize the guilds service.
-    #[action]
-    fn init() {
-        let table = InitTable::new();
-        table.put(&InitRow {}).unwrap();
-    }
-
-    #[pre_action(exclude(init))]
-    fn check_init() {
-        // let table = InitTable::read();
-        // check(
-        //     table.get_index_pk().get(&()).is_some(),
-        //     "service not inited",
-        // );
-    }
 
     /// Creates a guild within a fractal.
     ///

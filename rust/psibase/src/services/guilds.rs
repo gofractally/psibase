@@ -9,12 +9,6 @@ pub mod Service {
         AccountNumber, Memo,
     };
 
-    /// Initialize the guilds service.
-    #[action]
-    fn init() {
-        unimplemented!()
-    }
-
     /// Get scores for all guild members in a fractal.
     ///
     /// # Arguments
