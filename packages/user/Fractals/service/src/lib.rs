@@ -26,6 +26,7 @@ pub mod service {
     /// * `legislature` - Legislature role account.
     /// * `judiciary` - Judiciary role account.
     /// * `executive` - Executive role account
+    /// * `recruitment` - Recruitment role account.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
@@ -72,11 +73,9 @@ pub mod service {
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
     fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
-        let fractal = Fractal::get_assert(fractal);
+        let mut fractal = Fractal::get_assert(fractal);
         fractal.check_sender_is_legislature();
-        fractal
-            .reward_stream()
-            .set_distribution_interval(distribution_interval_secs);
+        fractal.set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set distribution strategy

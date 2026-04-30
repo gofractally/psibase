@@ -7,6 +7,10 @@ use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
+use crate::constants::{
+    DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+};
 use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
 use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
@@ -40,7 +44,22 @@ impl Fractal {
             mission,
             name,
             dist_strat: Algorithm::Constant as u8,
+            genesis_time: now,
+            dist_interval_secs: DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
         }
+    }
+
+    pub fn set_distribution_interval(&mut self, seconds: u32) {
+        check(
+            seconds >= MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+            "distribution interval too short",
+        );
+        check(
+            seconds <= MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+            "distribution interval too long",
+        );
+        self.dist_interval_secs = seconds;
+        self.save();
     }
 
     pub fn set_distribution_strategy(&mut self, strategy: Algorithm) {
@@ -266,6 +285,10 @@ impl Fractal {
 
     async fn executive(&self) -> Role {
         Role::get_assert(self.account, Executive)
+    }
+
+    async fn recruitment(&self) -> Role {
+        Role::get_assert(self.account, Recruitment)
     }
 
     async fn stream(&self) -> Option<RewardStream> {

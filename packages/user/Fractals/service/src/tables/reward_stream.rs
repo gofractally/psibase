@@ -1,11 +1,9 @@
 use psibase::{check, check_none, check_some, AccountNumber, Memo, Table};
 
 use crate::constants::{
-    DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, DEFAULT_MEMBER_DISTRIBUTION_INTERVAL,
-    FRACTAL_STREAM_HALF_LIFE, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS, MEMBER_STREAM_HALF_LIFE,
-    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+    DEFAULT_MEMBER_DISTRIBUTION_INTERVAL, FRACTAL_STREAM_HALF_LIFE, MEMBER_STREAM_HALF_LIFE,
 };
-use crate::tables::tables::{Levy, RewardStream, RewardStreamTable};
+use crate::tables::tables::{Fractal, Levy, RewardStream, RewardStreamTable};
 
 use psibase::services::tokens::{Quantity, TID};
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -14,42 +12,23 @@ use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::tokens::Wrapper as Tokens;
 
 impl RewardStream {
-    fn new(
-        fractal: AccountNumber,
-        owner: AccountNumber,
-        token_id: TID,
-        half_life: u32,
-        distribution_interval: u32,
-    ) -> Self {
+    fn new(fractal: AccountNumber, owner: AccountNumber, token_id: TID, half_life: u32) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
             owner,
             stream_id: TokenStream::call().create(half_life, token_id),
-            dist_interval_secs: distribution_interval,
             last_distributed: now,
             fractal,
         }
     }
 
     fn new_fractal(fractal: AccountNumber, token_id: TID) -> Self {
-        Self::new(
-            fractal,
-            fractal,
-            token_id,
-            FRACTAL_STREAM_HALF_LIFE,
-            DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
-        )
+        Self::new(fractal, fractal, token_id, FRACTAL_STREAM_HALF_LIFE)
     }
 
     fn new_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {
-        Self::new(
-            fractal,
-            owner,
-            token_id,
-            MEMBER_STREAM_HALF_LIFE,
-            DEFAULT_MEMBER_DISTRIBUTION_INTERVAL,
-        )
+        Self::new(fractal, owner, token_id, MEMBER_STREAM_HALF_LIFE)
     }
 
     pub fn add_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {
@@ -138,7 +117,11 @@ impl RewardStream {
     fn check_can_distribute(&mut self) {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
-        let distribution_interval = self.dist_interval_secs as i64;
+        let distribution_interval = if self.fractal == self.owner {
+            Fractal::get_assert(self.fractal).dist_interval_secs
+        } else {
+            DEFAULT_MEMBER_DISTRIBUTION_INTERVAL
+        } as i64;
         let seconds_elapsed = now.seconds - self.last_distributed.seconds;
         let whole_intervals_elapsed = seconds_elapsed / distribution_interval;
 
@@ -148,19 +131,6 @@ impl RewardStream {
         );
         let whole_interval_seconds = whole_intervals_elapsed * distribution_interval;
         self.last_distributed = (self.last_distributed.seconds + whole_interval_seconds).into();
-        self.save();
-    }
-
-    pub fn set_distribution_interval(&mut self, seconds: u32) {
-        check(
-            seconds >= MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
-            "distribution interval too short",
-        );
-        check(
-            seconds <= MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
-            "distribution interval too long",
-        );
-        self.dist_interval_secs = seconds;
         self.save();
     }
 }

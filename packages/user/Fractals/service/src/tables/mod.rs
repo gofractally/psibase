@@ -40,6 +40,8 @@ pub mod tables {
         pub mission: String,
         pub token_id: TID,
         pub dist_strat: u8,
+        pub dist_interval_secs: u32,
+        pub genesis_time: TimePointSec,
     }
 
     #[table(name = "FractalMemberTable", index = 2)]
@@ -91,7 +93,6 @@ pub mod tables {
         pub owner: AccountNumber,
         pub stream_id: u32,
         pub last_distributed: psibase::TimePointSec,
-        pub dist_interval_secs: u32,
     }
 
     impl RewardStream {
