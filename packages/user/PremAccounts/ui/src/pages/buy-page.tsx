@@ -10,11 +10,7 @@ import {
 import { PREM_ACCOUNTS_SERVICE, doesAccountExist } from "@/lib/prem-service";
 
 import { graphql } from "@shared/lib/graphql";
-import {
-    decimalToRaw,
-    oneAsDecimal,
-    parseDecimal,
-} from "@shared/lib/quantity";
+import { Quantity, decimalToRaw, parseDecimal } from "@shared/lib/quantity";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -37,6 +33,16 @@ export function BuyPage() {
         id?: number;
     } | null>(null);
     const [maxCost, setMaxCost] = useState("1.0000");
+
+    /** Canonical decimal string for one whole system token, or "1.0000" if not yet loaded. */
+    const oneAsDecimal = (): string =>
+        systemToken?.id != null
+            ? Quantity.fromDecimal(
+                  "1",
+                  systemToken.precision,
+                  systemToken.id,
+              ).toDecimal()
+            : "1.0000";
     const [priceByLength, setPriceByLength] = useState<Map<number, string>>(
         () => new Map(),
     );
@@ -91,7 +97,13 @@ export function BuyPage() {
                     id: sysTid,
                 });
                 if (!maxCostDefaultSynced.current) {
-                    setMaxCost(oneAsDecimal(token.precision));
+                    setMaxCost(
+                        Quantity.fromDecimal(
+                            "1",
+                            token.precision,
+                            sysTid,
+                        ).toDecimal(),
+                    );
                     maxCostDefaultSynced.current = true;
                 }
             }
@@ -217,11 +229,7 @@ export function BuyPage() {
             setAccountName("");
             setAccountExists(null);
             setPrice(null);
-            setMaxCost(
-                systemToken != null
-                    ? oneAsDecimal(systemToken.precision)
-                    : "1.0000",
-            );
+            setMaxCost(oneAsDecimal());
             await loadPrices();
             bumpHistory();
             setTimeout(() => setBuySuccessMessage(""), 5000);
@@ -293,11 +301,7 @@ export function BuyPage() {
                             setError("");
                             setBuySuccessMessage("");
                         }}
-                        placeholder={
-                            systemToken != null
-                                ? oneAsDecimal(systemToken.precision)
-                                : "1.0000"
-                        }
+                        placeholder={oneAsDecimal()}
                     />
                 </div>
                 <div className="col-span-6 mt-6 font-medium">

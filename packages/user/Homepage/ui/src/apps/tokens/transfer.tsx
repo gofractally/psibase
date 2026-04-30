@@ -9,6 +9,7 @@ import { supervisor } from "@/supervisor";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldTokenAmount } from "@shared/components/form/field-token-amount";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { Quantity } from "@shared/lib/quantity";
 import { CardContent } from "@shared/shadcn/ui/card";
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -202,7 +203,14 @@ const TransferPageContents = () => {
                                             selectedToken?.precision ?? 0
                                         }
                                         balance={
-                                            selectedToken?.balance ?? null
+                                            selectedToken?.balance ??
+                                            (selectedToken
+                                                ? new Quantity(
+                                                      0n,
+                                                      selectedToken.precision,
+                                                      selectedToken.id,
+                                                  )
+                                                : null)
                                         }
                                         disabled={disableForm}
                                         description={null}

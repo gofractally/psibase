@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 
 import { stringToNum } from "@/lib/string-to-num";
 
-import { Quantity, decimalToRaw } from "@shared/lib/quantity";
+import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
@@ -33,8 +33,12 @@ export const AmountField = ({
 }) => {
     const isOverMaxBalance = (() => {
         if (!balance || stringToNum(amount) === undefined) return false;
-        const raw = decimalToRaw(amount, balance.precision);
-        return raw === null ? false : balance.isLessThan(balance.withRaw(raw));
+        const input = Quantity.tryFromDecimal(
+            amount,
+            balance.precision,
+            balance.tokenId,
+        );
+        return input !== null && balance.isLessThan(input);
     })();
 
     return (

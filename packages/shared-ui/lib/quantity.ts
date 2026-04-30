@@ -1,61 +1,53 @@
 // ── Quantity helpers ────────────────────────────────────────────────────────
 //
+// Terms:
+// - Quantity: chain abstraction for storing/operating on token amounts.
+// - Decimal: canonical string representation of a token amount.
+//
 // `Quantity` is the FE counterpart to the on-chain Rust `Quantity` in
 // `rust/psibase/src/services/tokens/quantity.rs`. It stores the raw integer
 // (smallest-unit count) as a `bigint` plus the token's display metadata
 // (`precision`, `tokenId`, `symbol`).
+// API is modeled as closely as possible on the Rust API.
 //
-// The free functions `decimalToRaw` / `rawToDecimal` are sync local mirrors
-// of the WIT plugin helpers `tokens:plugin/helpers/decimal-to-u64` /
-// `u64-to-decimal` (see `packages/user/Tokens/plugin/wit/world.wit`).
-// We mirror rather than call them because:
-//   - render is sync; the WIT helpers are async (supervisor / wasm boundary).
+// `decimalToRaw` and `rawToDecimal` are independent client-side reimplementation
+// of the canonical chain logic. The source of truth lives in Rust:
+//   - `rust/psibase/src/services/tokens/quantity.rs` (`Quantity::from_str`)
+//   - `rust/psibase/src/services/tokens/decimal.rs`  (`Decimal::to_string`)
+// `tokens:plugin/helpers/decimal-to-u64` / `u64-to-decimal` are
+// async server-side wrappers that delegate to those Rust types after
+// resolving precision on chain.
+//
+// Motivation to reimplement in the frontend:
+//   - React render() is sync; the WIT helpers are async (supervisor / wasm boundary).
 //   - WIT helpers take `token-id` and re-resolve precision on chain; we
 //     usually already have `precision` in hand.
-//   - same algorithm, single source of truth: outputs MUST match the WIT helpers.
 //
-// ── Canonical decimal string format ────────────────────────────────────────
+// ── Canonical token decimal string format ──────────────────────────────────
 // Mirrors the on-chain `Decimal` representation:
-//   - integer part has no leading zeros (literal "0" when zero);
-//   - if `precision > 0`, exactly `precision` fractional digits after a "."
-//     (always present);
-//   - if `precision == 0`, no "." is present.
+//   - integer part has no leading zeros;
+//   - exactly `precision` digits after a "." (always present);
+//   - unless `precision == 0`, then no "." is present.
 // e.g. precision 4: "0.0000", "0.0001", "1.2345", "12345.0000".
-// NOT "007.5000", ".1000", "1.5", or "1.50000".
-//
-// Related on-chain analogs (kept in mind for cross-checking behavior):
-//   - Rust `Quantity::from_str` in `rust/psibase/src/services/tokens/quantity.rs`:
-//     strict parse; returns `TokensError::PrecisionOverflow` where
-//     `parseDecimal` returns `null`.
-//   - Rust `to_fixed` in `packages/user/Tokens/service/src/helpers.rs`:
-//     truncating normalizer used for query-range bounds; NOT chain-safe
-//     (silently drops digits past `precision`). Intentionally not provided here.
-//   - Display formatter `formatThousands` in
-//     `packages/shared-ui/lib/format-number.ts`: human display only; still
-//     operates on `number` (used by `AnimateNumber`).
+// NOT "007.5000", ".1000", "9.", "1.5", or "1.50000".
 
 const DIGITS_ONLY = /^\d+$/;
 
-/** One whole token unit as a canonical decimal string, e.g. precision 4 → `"1.0000"`. */
-export function oneAsDecimal(precision: number): string {
-    return precision <= 0 ? "1" : `1.${"0".repeat(precision)}`;
-}
+/** Upper bound for a chain `Quantity` (its raw value is a `u64`). */
+const U64_MAX = (1n << 64n) - 1n;
 
 /**
  * Pad/validate a (lenient) user-typed decimal to canonical form.
  *
- * Matches Rust `Quantity::from_str` validity: rejects when the fractional
- * part exceeds `precision` (returns `null` rather than truncating).
+ * Matches Rust `Quantity::from_str` validity: rejects (returns null)
+ * when the fractional part exceeds `precision`
  *
  * Accepts: "9", "9.", "9.125", ".125" (= "0.125"), "007.5" (leading zeros
  * stripped on output).
  * Rejects: "", ".", multiple dots, non-digit characters, fraction longer
  * than `precision`.
  */
-export function parseDecimal(
-    amount: string,
-    precision: number,
-): string | null {
+export function parseDecimal(amount: string, precision: number): string | null {
     const t = amount.trim();
     if (t.length === 0) return null;
 
@@ -81,10 +73,7 @@ export function parseDecimal(
  * Decimal string → smallest-unit count as `bigint`. Lenient input (anything
  * `parseDecimal` accepts). Sync mirror of WIT `tokens:plugin/helpers/decimal-to-u64`.
  */
-export function decimalToRaw(
-    amount: string,
-    precision: number,
-): bigint | null {
+export function decimalToRaw(amount: string, precision: number): bigint | null {
     const canonical = parseDecimal(amount, precision);
     if (canonical === null) return null;
     if (precision <= 0) return BigInt(canonical);
@@ -268,21 +257,21 @@ export class Quantity {
             : amountStr;
     }
 
-    /** Add `raw` smallest units (caller is responsible for matching precision). */
+    /**
+     * Add `raw` smallest units (caller is responsible for matching precision).
+     * Throws on overflow past `u64::MAX` to mirror the chain's checked arithmetic.
+     */
     public add(raw: bigint): Quantity {
-        return this.withRaw(this.raw + raw);
+        const result = this.raw + raw;
+        if (result > U64_MAX) throw new Error("Quantity overflow");
+        return new Quantity(result, this.precision, this.tokenId, this.symbol);
     }
 
     /** Subtract `raw` smallest units; throws if the result would be negative. */
     public subtract(raw: bigint): Quantity {
         const result = this.raw - raw;
         if (result < 0n) throw new Error("Result cannot be negative");
-        return this.withRaw(result);
-    }
-
-    /** Clone with the same token metadata and a different `raw`. */
-    public withRaw(raw: bigint): Quantity {
-        return new Quantity(raw, this.precision, this.tokenId, this.symbol);
+        return new Quantity(result, this.precision, this.tokenId, this.symbol);
     }
 
     private assertSameToken(other: Quantity, op: string): void {
