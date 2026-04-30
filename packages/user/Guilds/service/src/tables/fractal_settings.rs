@@ -1,7 +1,8 @@
+use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
+use psibase::{AccountNumber, Table};
 use std::collections::HashMap;
 
 use crate::tables::tables::{FractalSettings, FractalSettingsTable, GuildMember, Ranking};
-use psibase::{weighted_normalization, AccountNumber, Algorithm, Table};
 
 impl FractalSettings {
     fn new(fractal: AccountNumber, dist_strat: Algorithm) -> Self {

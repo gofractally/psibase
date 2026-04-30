@@ -7,6 +7,7 @@ use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
 use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
+use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
 use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
@@ -19,7 +20,6 @@ use crate::tables::tables::{
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
-use psibase::{weighted_normalization, Algorithm};
 
 use psibase::services::fractals::{self, occu_wrapper};
 use psibase::services::tokens::Wrapper as Tokens;

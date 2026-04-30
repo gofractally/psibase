@@ -40,7 +40,6 @@ mod trace;
 mod transaction_builder;
 mod trust;
 mod web_services;
-mod weighted_normalization;
 
 pub use account_number::*;
 pub use action_template::*;
@@ -79,7 +78,6 @@ pub use to_key::*;
 pub use trace::*;
 pub use transaction_builder::*;
 pub use web_services::*;
-pub use weighted_normalization::{weighted_normalization, Algorithm};
 
 use internal_macros::*;
 
