@@ -28,7 +28,7 @@ use psibase::{
 use psibase::services::fractals::{self, occu_wrapper};
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
-use psibase::{check, get_sender, RawKey, TableQuery};
+use psibase::{check, get_sender, RawKey, TableQuery, TimePointSec};
 
 impl Fractal {
     fn new(account: AccountNumber, name: String, mission: String) -> Self {
@@ -110,6 +110,15 @@ impl Fractal {
 
     pub fn by_sender() -> Self {
         Self::get_assert(get_sender())
+    }
+
+    pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
+        check(
+            new_time.seconds < self.genesis_time.seconds,
+            "genesis time can only be moved earlier, not later",
+        );
+        self.genesis_time = new_time;
+        self.save();
     }
 
     fn role_account(&self, role: FractalRole) -> AccountNumber {

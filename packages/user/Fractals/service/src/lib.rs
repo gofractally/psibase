@@ -78,6 +78,18 @@ pub mod service {
         fractal.set_distribution_interval(distribution_interval_secs);
     }
 
+    /// Set genesis time for a fractal
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `genesis_time` - New genesis time for the fractal.
+    #[action]
+    fn set_gen_time(fractal: AccountNumber, genesis_time: TimePointSec) {
+        let mut fractal = Fractal::get_assert(fractal);
+        fractal.check_sender_is_legislature();
+        fractal.set_genesis_time(genesis_time);
+    }
+
     /// Set distribution strategy
     ///
     /// # Arguments
@@ -146,6 +158,29 @@ pub mod service {
         }
     }
 
+    // Check sender is authorised to perform an action on behalf of a fractal.
+    //
+    // Asks the auth service of the fractal if whatever sender account is sufficient as the
+    // sole authoriser for the provided method number.
+    fn check_sender_is_authorised(fractal: AccountNumber, method: MethodNumber) {
+        let auth = psibase::services::auth_dyn::Wrapper::call();
+
+        check(
+            auth.isAuthSys(
+                fractal,
+                vec![get_sender()],
+                Some(ServiceMethod::new(get_service(), method)),
+                None,
+            ),
+            &format!(
+                "sender {} not authorised for fractal: {} method: {}",
+                get_sender(),
+                fractal,
+                method
+            ),
+        );
+    }
+
     /// Add fractal member
     ///
     /// Adds an account to a fractal.
@@ -158,21 +193,10 @@ pub mod service {
     fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
         // check who the sender is, who should be "guilds"
         // we determine that guilds is the correct acocunt by checking which occupation sits in it
-        let auth = psibase::services::auth_dyn::Wrapper::call();
-
-        check(
-            auth.isAuthSys(
-                fractal,
-                vec![get_sender()],
-                Some(ServiceMethod::new(
-                    get_service(),
-                    psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into(),
-                )),
-                None,
-            ),
-            "not authorized to add member",
+        self::check_sender_is_authorised(
+            fractal,
+            psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into(),
         );
-
         FractalMember::add(fractal, member, recruiter);
     }
 
