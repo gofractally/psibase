@@ -82,16 +82,17 @@ pub mod service {
 
         let guild_member_table = GuildMemberTable::read();
 
-        let is_member_of_fractal_guilds = Guild::guilds_of_fractal(fractal).iter().any(|guild| {
-            guild_member_table
-                .get_index_pk()
-                .get(&(guild.account, new_member))
-                .is_some()
-        });
+        check(
+            Guild::guilds_of_fractal(fractal).iter().any(|guild| {
+                guild_member_table
+                    .get_index_pk()
+                    .get(&(guild.account, new_member))
+                    .is_some()
+            }),
+            "new member must already be a member of a guild in the fractal",
+        );
 
-        if is_member_of_fractal_guilds {
-            psibase::services::fractals::Wrapper::call().add_mem(fractal, new_member, None);
-        }
+        psibase::services::fractals::Wrapper::call().add_mem(fractal, new_member, None);
     }
 
     /// Get scores for all guild members in a fractal.
