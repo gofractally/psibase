@@ -67,10 +67,14 @@ impl Fractal {
 
         let defacto_service = "de-facto".into();
 
-        Role::add(fractal, legislature, Legislature, defacto_service);
-        Role::add(fractal, judiciary, Judiciary, defacto_service);
-        Role::add(fractal, executive, Executive, defacto_service);
-        Role::add(fractal, recruitment, Recruitment, defacto_service);
+        let create_role = |role_account: AccountNumber, role: FractalRole| {
+            Role::add(fractal, role_account, role, defacto_service)
+        };
+
+        create_role(legislature, Legislature);
+        create_role(judiciary, Judiciary);
+        create_role(executive, Executive);
+        create_role(recruitment, Recruitment);
 
         create_managed_account(fractal, || {
             sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
