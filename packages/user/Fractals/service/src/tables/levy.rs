@@ -12,7 +12,7 @@ impl Levy {
         member: AccountNumber,
         payee: AccountNumber,
         rate_ppm: u32,
-        amount: Option<Quantity>,
+        amount: Quantity,
         send_to_stream: bool,
     ) -> Self {
         Self {
@@ -21,7 +21,7 @@ impl Levy {
             member,
             payee,
             rate_ppm,
-            debt: amount.unwrap_or_else(|| 0.into()),
+            debt: amount,
             send_to_stream,
         }
     }
@@ -31,7 +31,7 @@ impl Levy {
         member: AccountNumber,
         payee: AccountNumber,
         ppm: u32,
-        amount: Option<Quantity>,
+        amount: Quantity,
         send_to_stream: bool,
     ) -> Self {
         check(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");

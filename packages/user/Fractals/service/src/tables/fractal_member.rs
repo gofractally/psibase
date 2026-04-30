@@ -67,7 +67,8 @@ impl FractalMember {
             account,
             recruiter,
             DEFAULT_RECRUITMENT_PPM,
-            None,
+            // 0 for unlimited
+            0.into(),
             true,
         );
 
