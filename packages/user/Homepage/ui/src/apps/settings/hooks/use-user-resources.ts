@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { supervisor } from "@/supervisor";
-
 import QueryKey from "@/lib/query-keys";
+
+import { supervisor } from "@shared/lib/supervisor";
 
 interface UserResourcesResponse {
     userResources: {

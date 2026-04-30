@@ -1,10 +1,10 @@
-import {
-    MailList,
-    MailboxHeader,
-    MessageDetail,
-} from "@/apps/chainmail/components";
-import { useIsDesktop, useSavedMessages } from "@/apps/chainmail/hooks";
 import { useEffect } from "react";
+
+import { MailList } from "@/apps/chainmail/components/mail-list";
+import { MailboxHeader } from "@/apps/chainmail/components/mailbox-header";
+import { MessageDetail } from "@/apps/chainmail/components/message-detail";
+import { useIsDesktop } from "@/apps/chainmail/hooks/use-is-desktop";
+import { useSavedMessages } from "@/apps/chainmail/hooks/use-mail";
 
 import { TwoColumnSelect } from "@/components/two-column-select";
 

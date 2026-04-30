@@ -1,14 +1,14 @@
+import { useEffect, useMemo, useState } from "react";
+import { Outlet } from "react-router-dom";
+
 import { NoTokensWarning } from "@/apps/tokens/components/no-tokens-warning";
 import {
     type Token,
     useUserTokenBalances,
 } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
-import { useEffect, useMemo, useState } from "react";
-import { Outlet } from "react-router-dom";
-
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { CardContent } from "@shared/shadcn/ui/card";
 
 import { Loading } from "../../components/loading";

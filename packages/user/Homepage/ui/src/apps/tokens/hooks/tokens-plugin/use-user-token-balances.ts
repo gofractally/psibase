@@ -6,13 +6,13 @@ import {
     fetchUserTokenBalances,
 } from "@/apps/tokens/lib/graphql/ui";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
 import QueryKey from "@/lib/query-keys";
-import { updateArray } from "@/lib/update-array";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Quantity } from "@shared/lib/quantity";
 import { queryClient } from "@shared/lib/query-client";
 import { type Account, zAccount } from "@shared/lib/schemas/account";
+import { updateArray } from "@shared/lib/update-array";
 
 export interface Token {
     id: number;

@@ -4,9 +4,8 @@ import { useMediaQuery } from "usehooks-ts";
 
 import { TwoColumnSelect } from "@/components/two-column-select";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
 import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { Button } from "@shared/shadcn/ui/button";
 import { DialogTrigger } from "@shared/shadcn/ui/dialog";
 import { Input } from "@shared/shadcn/ui/input";
