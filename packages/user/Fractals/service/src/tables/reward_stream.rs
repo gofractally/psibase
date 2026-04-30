@@ -14,28 +14,42 @@ use psibase::services::token_stream::Wrapper as TokenStream;
 use psibase::services::tokens::Wrapper as Tokens;
 
 impl RewardStream {
-    fn new_fractal(fractal: AccountNumber, token_id: TID) -> Self {
+    fn new(
+        fractal: AccountNumber,
+        owner: AccountNumber,
+        token_id: TID,
+        half_life: u32,
+        distribution_interval: u32,
+    ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
-            owner: fractal,
-            stream_id: TokenStream::call().create(FRACTAL_STREAM_HALF_LIFE, token_id),
-            dist_interval_secs: DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
+            owner,
+            stream_id: TokenStream::call().create(half_life, token_id),
+            dist_interval_secs: distribution_interval,
             last_distributed: now,
             fractal,
         }
     }
 
-    fn new_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {
-        let now = TransactSvc::call().currentBlock().time.seconds();
-
-        Self {
-            owner,
-            stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
-            dist_interval_secs: DEFAULT_MEMBER_DISTRIBUTION_INTERVAL,
-            last_distributed: now,
+    fn new_fractal(fractal: AccountNumber, token_id: TID) -> Self {
+        Self::new(
             fractal,
-        }
+            fractal,
+            token_id,
+            FRACTAL_STREAM_HALF_LIFE,
+            DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
+        )
+    }
+
+    fn new_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {
+        Self::new(
+            fractal,
+            owner,
+            token_id,
+            MEMBER_STREAM_HALF_LIFE,
+            DEFAULT_MEMBER_DISTRIBUTION_INTERVAL,
+        )
     }
 
     pub fn add_member(fractal: AccountNumber, owner: AccountNumber, token_id: TID) -> Self {

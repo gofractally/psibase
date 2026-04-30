@@ -90,7 +90,7 @@ pub mod service {
         });
 
         if is_member_of_fractal_guilds {
-            psibase::services::fractals::Wrapper::call().add_mem(fractal, new_member)
+            psibase::services::fractals::Wrapper::call().add_mem(fractal, new_member, None);
         }
     }
 

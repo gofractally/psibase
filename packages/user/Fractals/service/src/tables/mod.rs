@@ -146,6 +146,7 @@ pub mod tables {
         pub payee: AccountNumber,  // who receives the levy
         pub rate_ppm: u32,
         pub debt: Option<Quantity>, // optional cap; None = indefinite
+        pub send_to_stream: bool,   // whether to send levy payments to the reward stream
     }
 
     impl Levy {

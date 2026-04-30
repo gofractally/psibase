@@ -13,6 +13,7 @@ impl Levy {
         payee: AccountNumber,
         rate_ppm: u32,
         amount: Option<Quantity>,
+        send_to_stream: bool,
     ) -> Self {
         Self {
             id: Config::next_levy_id(),
@@ -21,6 +22,7 @@ impl Levy {
             payee,
             rate_ppm,
             debt: amount,
+            send_to_stream,
         }
     }
 
@@ -30,6 +32,7 @@ impl Levy {
         payee: AccountNumber,
         ppm: u32,
         amount: Option<Quantity>,
+        send_to_stream: bool,
     ) -> Self {
         check(ppm > 0 && ppm <= PPM, "ppm must be between 1 - 1,000,000");
         check_some(
@@ -46,7 +49,7 @@ impl Levy {
             "accumulated levy ppms breach 100%",
         );
 
-        let new_instance = Self::new(fractal, member, payee, ppm, amount);
+        let new_instance = Self::new(fractal, member, payee, ppm, amount, send_to_stream);
 
         new_instance.save();
         new_instance
@@ -103,8 +106,17 @@ impl Levy {
         };
 
         if payment.value > 0 {
-            RewardStream::get_assert(self.fractal, self.payee)
-                .deposit(payment, "Levy payment".into());
+            let memo = "Levy payment".into();
+            if self.send_to_stream {
+                RewardStream::get_assert(self.fractal, self.payee).deposit(payment, memo);
+            } else {
+                psibase::services::tokens::Wrapper::call().credit(
+                    Fractal::get_assert(self.fractal).token_id,
+                    self.payee,
+                    payment,
+                    memo,
+                );
+            }
         }
         payment
     }

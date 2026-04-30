@@ -76,7 +76,7 @@ impl Fractal {
             sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
         });
 
-        FractalMember::add(fractal, get_sender());
+        FractalMember::add(fractal, get_sender(), None);
 
         new_instance
     }

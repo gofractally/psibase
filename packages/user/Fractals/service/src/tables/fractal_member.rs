@@ -2,8 +2,11 @@ use std::u64;
 
 use psibase::{check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
 
-use crate::tables::tables::{
-    Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy,
+use crate::{
+    constants::DEFAULT_RECRUITMENT_PPM,
+    tables::tables::{
+        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy, RewardStream,
+    },
 };
 
 use async_graphql::ComplexObject;
@@ -42,7 +45,11 @@ impl FractalMember {
         psibase::services::tokens::Wrapper::call().credit(token_id, self.account, amount, memo)
     }
 
-    pub fn add(fractal: AccountNumber, account: AccountNumber) -> Self {
+    pub fn add(
+        fractal: AccountNumber,
+        account: AccountNumber,
+        recruiter: Option<AccountNumber>,
+    ) -> Self {
         check_none(
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
@@ -51,6 +58,18 @@ impl FractalMember {
 
         let new_instance = Self::new(fractal, account);
         new_instance.save();
+
+        RewardStream::add_member(fractal, account, Fractal::get_assert(fractal).token_id);
+        // If a recruiter is specified, levy them; otherwise, levy the fractal itself so there's no advantage or disadvantage to being recruited by an existing member vs. joining independently
+        let recruiter = recruiter.unwrap_or(fractal);
+        Levy::add(
+            fractal,
+            account,
+            recruiter,
+            DEFAULT_RECRUITMENT_PPM,
+            None,
+            true,
+        );
 
         new_instance
     }

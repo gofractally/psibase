@@ -154,8 +154,9 @@ pub mod service {
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     /// * `member` - Account to be added as a member
+    /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
-    fn add_mem(fractal: AccountNumber, member: AccountNumber) {
+    fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
         // check who the sender is, who should be "guilds"
         // we determine that guilds is the correct acocunt by checking which occupation sits in it
         let auth = psibase::services::auth_dyn::Wrapper::call();
@@ -173,7 +174,7 @@ pub mod service {
             "not authorized to add member",
         );
 
-        FractalMember::add(fractal, member);
+        FractalMember::add(fractal, member, recruiter);
     }
 
     /// Set ordered occupations

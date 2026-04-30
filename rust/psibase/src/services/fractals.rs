@@ -224,8 +224,9 @@ pub mod Service {
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     /// * `member` - Account to be added as a member
+    /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
-    fn add_mem(fractal: AccountNumber, member: AccountNumber) {
+    fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
         unimplemented!()
     }
 
