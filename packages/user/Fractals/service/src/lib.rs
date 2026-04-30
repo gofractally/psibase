@@ -198,6 +198,8 @@ pub mod service {
             psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into(),
         );
         FractalMember::add(fractal, member, recruiter);
+
+        Wrapper::emit().history().joined_fractal(fractal, member);
     }
 
     /// Set ordered occupations
