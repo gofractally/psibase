@@ -1,11 +1,12 @@
 // ── Quantity helpers ────────────────────────────────────────────────────────
 //
-// Terms:
-// - Quantity: chain abstraction for storing/operating on token amounts.
-// - Decimal: canonical string representation of a token amount.
+// On-chain Terms:
+// - Decimal: struct that holds a Quantity (and precision) and
+// can produce a canonical string representation of a token amount.
+// - Quantity: chain abstraction for the integer representation of a token amount.
 //
-// `Quantity` is the FE counterpart to the on-chain Rust `Quantity` in
-// `rust/psibase/src/services/tokens/quantity.rs`. It stores the raw integer
+// `Quantity` is the FE counterpart to the on-chain Rust `Decimal` (and some of the Quantity struct) in
+// `rust/psibase/src/services/tokens/decimal.rs`. It stores the raw integer
 // (smallest-unit count) as a `bigint` plus the token's display metadata
 // (`precision`, `tokenId`, `symbol`).
 // API is modeled as closely as possible on the Rust API.
