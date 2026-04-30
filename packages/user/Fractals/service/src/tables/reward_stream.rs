@@ -54,7 +54,7 @@ impl RewardStream {
             "nothing to withdraw",
         );
 
-        let claimed_after_levy_payments = Levy::levies_of_member(self.fractal, self.owner)
+        let remaining_after_levy_payments = Levy::levies_of_member(self.fractal, self.owner)
             .into_iter()
             .fold(
                 claimed_before_levy_payments,
@@ -64,7 +64,7 @@ impl RewardStream {
                 },
             );
 
-        (token_id, claimed_after_levy_payments)
+        (token_id, remaining_after_levy_payments)
     }
 
     fn withdraw(&mut self) -> (TID, Quantity) {
