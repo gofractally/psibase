@@ -25,7 +25,6 @@ members = [
     "FractalTester/service",
     "Fractals",
     "Fractals/service",
-    "Fractals/stream-pay",
     "Fractals/plugin",
     "Fractals/query-service",
     "Identity",

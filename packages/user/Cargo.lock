@@ -1329,7 +1329,6 @@ dependencies = [
  "fractals-plugin",
  "psibase-user-workspace-hack",
  "r-fractals",
- "stream-pay",
 ]
 
 [[package]]
@@ -3678,20 +3677,6 @@ name = "static_assertions_next"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7beae5182595e9a8b683fa98c4317f956c9a2dec3b9716990d20023cc60c766"
-
-[[package]]
-name = "stream-pay"
-version = "0.23.0"
-dependencies = [
- "async-graphql",
- "fractals",
- "psibase",
- "psibase-user-workspace-hack",
- "psibase_macros",
- "psibase_service",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "strsim"
