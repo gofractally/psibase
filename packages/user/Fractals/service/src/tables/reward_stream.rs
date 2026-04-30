@@ -116,21 +116,27 @@ impl RewardStream {
 
     fn check_can_distribute(&mut self) {
         let now = TransactSvc::call().currentBlock().time.seconds();
+        let fractal = Fractal::get_assert(self.fractal);
 
         let distribution_interval = if self.fractal == self.owner {
-            Fractal::get_assert(self.fractal).dist_interval_secs
+            fractal.dist_interval_secs
         } else {
             DEFAULT_MEMBER_DISTRIBUTION_INTERVAL
         } as i64;
-        let seconds_elapsed = now.seconds - self.last_distributed.seconds;
-        let whole_intervals_elapsed = seconds_elapsed / distribution_interval;
+
+        let genesis = fractal.genesis_time.seconds;
+
+        let intervals_since_genesis = (now.seconds - genesis) / distribution_interval;
+        let intervals_at_last_dist =
+            (self.last_distributed.seconds - genesis) / distribution_interval;
+        let whole_intervals_elapsed = intervals_since_genesis - intervals_at_last_dist;
 
         check(
             whole_intervals_elapsed > 0,
             "must wait for interval period before token distribution",
         );
-        let whole_interval_seconds = whole_intervals_elapsed * distribution_interval;
-        self.last_distributed = (self.last_distributed.seconds + whole_interval_seconds).into();
+
+        self.last_distributed = (genesis + intervals_since_genesis * distribution_interval).into();
         self.save();
     }
 }
