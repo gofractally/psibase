@@ -38,7 +38,7 @@ export const AmountField = ({
             balance.precision,
             balance.tokenId,
         );
-        return input !== null && balance.isLessThan(input);
+        return input !== null && balance.lt(input);
     })();
 
     return (

@@ -168,6 +168,6 @@ const zTokenAmount = ({
             // Skip when the input doesn't parse cleanly; the precision
             // refinement above already produced a more specific error.
             if (input === null) return true;
-            return !balance.isLessThan(input); // input <= balance
+            return !balance.lt(input); // input <= balance
         }, `Insufficient balance`);
 };

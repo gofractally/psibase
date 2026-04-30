@@ -61,7 +61,7 @@ export const useAmount = () => {
         amountNumber,
         isOverBalance:
             amountQuantity && balance
-                ? amountQuantity.isGreaterThan(balance)
+                ? amountQuantity.gt(balance)
                 : false,
     };
 };

@@ -198,7 +198,7 @@ export class Quantity {
      * True iff `raw`, `precision`, and `tokenId` all match. `symbol` is ignored
      * (it's display metadata, not identity).
      */
-    public equals(other: Quantity): boolean {
+    public eq(other: Quantity): boolean {
         return (
             this.raw === other.raw &&
             this.precision === other.precision &&
@@ -206,12 +206,12 @@ export class Quantity {
         );
     }
 
-    public isGreaterThan(other: Quantity): boolean {
+    public gt(other: Quantity): boolean {
         this.assertSameToken(other, "compare");
         return this.raw > other.raw;
     }
 
-    public isLessThan(other: Quantity): boolean {
+    public lt(other: Quantity): boolean {
         this.assertSameToken(other, "compare");
         return this.raw < other.raw;
     }
