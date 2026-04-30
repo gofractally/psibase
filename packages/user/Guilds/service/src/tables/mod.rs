@@ -167,11 +167,6 @@ pub mod tables {
         fn by_guild(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
             (self.guild, self.attester, self.applicant)
         }
-
-        #[secondary_key(2)]
-        fn by_attester(&self) -> (AccountNumber, AccountNumber, AccountNumber) {
-            (self.attester, self.guild, self.applicant)
-        }
     }
 
     #[table(name = "EvaluationInstanceTable", index = 6)]
