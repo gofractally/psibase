@@ -65,8 +65,8 @@ struct Args {
     #[clap(short = 'A', long, default_value_t = 1)]
     actions: u32,
 
-    /// Delay in milliseconds between each burst. If this is 0, then
-    /// maintain <BURST_SIZE> transactions in flight.
+    /// Target interval in milliseconds between the start of each burst.
+    /// If this is 0, then maintain <BURST_SIZE> transactions in flight.
     #[clap(short = 'd', long, default_value_t = 1000)]
     delay: u32,
 
