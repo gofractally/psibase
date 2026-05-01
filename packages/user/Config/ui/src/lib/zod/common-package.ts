@@ -12,6 +12,7 @@ export const PackageSchema = z.object({
     description: z.string(),
     depends: z.array(DependencySchema),
     accounts: z.array(z.string()),
+    services: z.array(z.string()),
 });
 
 export const UpToDate = PackageSchema.extend({

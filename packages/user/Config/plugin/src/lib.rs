@@ -74,9 +74,12 @@ impl Branding for ConfigPlugin {
     }
 
     fn set_network_name(name: String) -> Result<(), Error> {
-        set_propose_latch(Some("branding"))?;
+        set_propose_latch(Some("accounts"))?;
+        accounts::plugin::admin::preapprove_account(&name);
 
+        set_propose_latch(Some("branding"))?;
         branding::plugin::api::set_network_name(&name);
+
         Ok(())
     }
 }

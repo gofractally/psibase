@@ -4,9 +4,9 @@ import { UserProfileSection } from "./components/user-profile-section";
 import { UserSettingsSection } from "./components/user-settings-section";
 
 export const SettingsPage = () => {
-    const { data: systemToken, isLoading: isSystemTokenLoading } = useSystemToken({ baseUrlIncludesSibling: false });
-    const systemTokenEnabled =
-        !isSystemTokenLoading && systemToken?.id !== "";
+    const { data: systemToken, isLoading: isSystemTokenLoading } =
+        useSystemToken({});
+    const systemTokenEnabled = !isSystemTokenLoading && systemToken?.id !== "";
 
     return (
         <div className="p-4">

@@ -2,6 +2,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <psibase/HttpHeaders.hpp>
+#include <psibase/Rpc.hpp>
 #include <psibase/api.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/serveActionTemplates.hpp>
@@ -44,21 +45,10 @@ namespace SystemService
 
       AccountNumber getTargetService(const HttpRequest& req, std::string_view rootHost)
       {
-         std::string serviceName;
+         if (!isSubdomain(req, rootHost))
+            abortMessage("Sites app only handles subdomains");
 
-         // Path reserved across all subdomains
-         if (req.target.starts_with(HttpServer::commonApiPrefix))
-            serviceName = HttpServer::commonApiService.str();
-
-         // subdomain
-         else if (isSubdomain(req, rootHost))
-            serviceName.assign(req.host.begin(), req.host.end() - rootHost.size() - 1);
-
-         // root domain
-         else
-            serviceName = HttpServer::homepageService.str();
-
-         return AccountNumber(serviceName);
+         return AccountNumber(req.host.substr(0, req.host.size() - rootHost.size() - 1));
       }
 
       // Checks for an extension to determine if it is a static asset
@@ -222,6 +212,8 @@ namespace SystemService
          return it->second;
       }
 
+      /// Gets the value of a request header.
+      /// The specified header is not case-sensitive.
       std::optional<std::string> get_header_value(const HttpRequest& request,
                                                   const std::string& name)
       {
@@ -405,7 +397,7 @@ namespace SystemService
 
    }  // namespace
 
-   std::optional<HttpReply> Sites::serveSys(HttpRequest request)
+   std::optional<HttpReply> Sites::serveSys(HttpRequest request, std::optional<std::int32_t> socket)
    {
       auto rootHost = to<HttpServer>().rootHost(request.host);
       if (request.host.size() < rootHost.size())
@@ -414,6 +406,12 @@ namespace SystemService
       }
 
       auto account = getTargetService(request, rootHost);
+
+      // Override target service for common api requests
+      if (request.target.starts_with(HttpServer::commonApiPrefix))
+      {
+         account = HttpServer::commonApiService;
+      }
 
       if (request.method == "GET" || request.method == "HEAD")
       {

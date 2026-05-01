@@ -10,11 +10,12 @@ world impl {
     include virtual-server:plugin/imports;
     include tokens:plugin/imports;
     include accounts:plugin/imports;
+    include sites:plugin/imports;
 
+    import accounts:plugin/admin;
     import tokens:plugin/admin;
     import packages:plugin/private-api;
     import symbol:plugin/admin;
-
 
     export branding;
     export producers;

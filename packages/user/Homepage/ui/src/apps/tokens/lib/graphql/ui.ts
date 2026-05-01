@@ -1,9 +1,8 @@
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
 import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 
 const qs = {
     userTokenBalances: (username: string) => `
@@ -93,7 +92,6 @@ export const fetchUserSettings = async (username: string) => {
     const query = `{${qs.userSettings(username)}}`;
     const res = await graphql<z.infer<typeof zUserSettingsSchema>>(query, {
         service: "tokens",
-        baseUrlIncludesSibling: false,
     });
     const parsed = zUserSettingsSchema.parse(res);
     return parsed.userSettings.settings;
@@ -142,7 +140,6 @@ export const fetchTokenMeta = async (tokenId: string) => {
     const query = `{${qs.tokenMeta(tokenId)}}`;
     const res = await graphql<z.infer<typeof zTokenMetaSchema>>(query, {
         service: "tokens",
-        baseUrlIncludesSibling: false,
     });
     const parsed = zTokenMetaSchema.parse(res);
     return parsed.token;

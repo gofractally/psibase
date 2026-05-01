@@ -61,4 +61,8 @@ namespace psibase
    /// items and items that have a missing, opaque or
    /// unknown "for" field are represented as nullopt.
    std::vector<std::optional<IPAddress>> forwardedFor(const HttpRequest& request);
+
+   /// Parses the X-Forwarded-Proto and Forwarded headers
+   /// and returns the first valid protocol ("http" or "https").
+   std::optional<std::string> forwardedProto(const HttpRequest& request);
 }  // namespace psibase
