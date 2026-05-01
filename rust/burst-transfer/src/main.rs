@@ -275,6 +275,37 @@ async fn main() -> Result<(), anyhow::Error> {
     let counter = AtomicI32::new(0);
     let mut accounts: Vec<psibase::AccountNumber> = Vec::with_capacity(args.account_count);
 
+    while accounts.len() < args.account_count {
+        let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
+            .await
+            .context("Failed to get tapos");
+        match ref_block {
+            Err(e) => println!("TAPOS error | {:?}", e),
+            Ok(ref_block) => {
+                let n = std::cmp::min(ACCOUNTS_PER_SETUP, args.account_count - accounts.len());
+                let new_accounts: Vec<_> = (0..n).map(|_| random_account_name()).collect();
+                match push_setup(&args, &new_accounts, &ref_block, &client, &afmt)
+                    .await
+                    .context("Failed to push setup transaction")
+                {
+                    Err(e) => println!("Setup error | {:?}", e),
+                    Ok(()) => {
+                        let created_names = account_names(&new_accounts);
+                        let added = new_accounts.len();
+                        accounts.extend(new_accounts);
+                        println!(
+                            "Setup | +{} accounts ({}/{})",
+                            added,
+                            accounts.len(),
+                            args.account_count
+                        );
+                        println!("  {}", created_names);
+                    }
+                }
+            }
+        }
+    }
+
     loop {
         let batch_start = tokio::time::Instant::now();
         let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
@@ -283,67 +314,22 @@ async fn main() -> Result<(), anyhow::Error> {
         match ref_block {
             Err(e) => println!("TAPOS error | {:?}", e),
             Ok(ref_block) => {
-                let mut created = 0;
-                let mut created_names = String::new();
-                let new_accounts = if accounts.len() < args.account_count {
-                    let n = std::cmp::min(ACCOUNTS_PER_SETUP, args.account_count - accounts.len());
-                    (0..n).map(|_| random_account_name()).collect()
-                } else {
-                    Vec::new()
-                };
-
-                if !new_accounts.is_empty() {
-                    match push_setup(&args, &new_accounts, &ref_block, &client, &afmt)
-                        .await
-                        .context("Failed to push setup transaction")
-                    {
-                        Err(e) => println!("Setup error | {:?}", e),
-                        Ok(()) => {
-                            created = new_accounts.len();
-                            created_names = account_names(&new_accounts);
-                            accounts.extend(new_accounts);
-                        }
-                    }
+                let repeat = args.delay == 0;
+                let mut transfers = Vec::new();
+                for _ in 0..args.burst_size {
+                    transfers.push(transfer(
+                        &args, &accounts, tok.id, &counter, &ref_block, repeat, &client, &afmt,
+                    ));
                 }
-
-                let mut transferred = 0;
-                if accounts.len() >= 2 {
-                    let setup_done = accounts.len() >= args.account_count;
-                    let repeat = args.delay == 0 && setup_done;
-                    let transfer_accounts = accounts.clone();
-                    let mut transfers = Vec::new();
-                    for _ in 0..args.burst_size {
-                        transfers.push(transfer(
-                            &args,
-                            &transfer_accounts,
-                            tok.id,
-                            &counter,
-                            &ref_block,
-                            repeat,
-                            &client,
-                            &afmt,
-                        ));
-                    }
-                    if repeat {
-                        println!(
-                            "Batch | transferred continuously | maintaining {} in-flight transactions",
-                            args.burst_size
-                        );
-                    }
-                    transferred = futures::future::join_all(transfers).await.into_iter().sum();
+                if repeat {
+                    println!(
+                        "Batch | transferred continuously | maintaining {} in-flight transactions",
+                        args.burst_size
+                    );
                 }
-
-                println!(
-                    "Batch | created {} ({}/{}) | transferred {}/{} tx",
-                    created,
-                    accounts.len(),
-                    args.account_count,
-                    transferred,
-                    args.burst_size
-                );
-                if !created_names.is_empty() {
-                    println!("  {}", created_names);
-                }
+                let transferred: usize =
+                    futures::future::join_all(transfers).await.into_iter().sum();
+                println!("Batch | transferred {}/{} tx", transferred, args.burst_size);
             }
         }
         if args.delay > 0 {
