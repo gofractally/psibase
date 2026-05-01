@@ -20,12 +20,12 @@ use crate::packages::plugin::types;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
 use exports::packages::plugin::queries::Guest as Queries;
 
-use psibase::fracpack::{Pack, Unpack};
+use psibase::fracpack::{CompiledSchema, Pack, Unpack};
 use psibase::services::packages::PackageSource;
 use psibase::{
-    make_refs, method, solve_dependencies, AccountNumber, Action, InstalledPackageInfo,
-    PackageDisposition, PackageList, PackageManifest, PackagedService, SchemaMap, StagedUpload,
-    TransactionBuilder,
+    make_refs, method, schema_types, solve_dependencies, AccountNumber, Action, Hex,
+    InstalledPackageInfo, MethodString, PackageDisposition, PackageList, PackageManifest,
+    PackagedService, Schema, SchemaMap, StagedUpload, TransactionBuilder,
 };
 
 use psibase::services::{
@@ -177,6 +177,48 @@ impl TryFrom<types::PackageOpFull> for psibase::PackageOpFull<Cursor<Vec<u8>>> {
 }
 
 struct PackagesPlugin;
+
+fn unpack_action_params_impl(
+    service: String,
+    method: String,
+    raw_data_hex: String,
+) -> Result<String, HostTypes::Error> {
+    let service_account = service.parse::<AccountNumber>().map_err(|_| {
+        ErrorType::UnpackActionError(format!("invalid service account: {}", service))
+    })?;
+    if raw_data_hex.is_empty() {
+        return Ok("null".to_string());
+    }
+
+    let raw = raw_data_hex
+        .parse::<Hex<Vec<u8>>>()
+        .map_err(|_| ErrorType::UnpackActionError("invalid hex for raw data".to_string()))?
+        .0;
+
+    let schema_json =
+        Server::get_json(&format!("/schema?service={}", service_account)).map_err(|e| {
+            ErrorType::UnpackActionError(format!(
+                "could not load schema for {}: {}",
+                service_account, e.message
+            ))
+        })?;
+    let schema: Schema =
+        serde_json::from_str(&schema_json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
+    let action_name = MethodString(method.clone());
+    let action_type = schema.actions.get(&action_name).ok_or_else(|| {
+        ErrorType::UnpackActionError(format!(
+            "unknown action `{}` on service `{}`",
+            method, service_account
+        ))
+    })?;
+    let custom = schema_types();
+    let mut cschema = CompiledSchema::new(&schema.types, &custom);
+    cschema.extend(&action_type.params);
+    let value = cschema
+        .to_value(&action_type.params, &raw)
+        .map_err(|e| ErrorType::UnpackActionError(e.to_string()))?;
+    Ok(serde_json::to_string(&value).map_err(|e| ErrorType::JsonError(e.to_string()))?)
+}
 
 fn assert_caller_config_or_self(context: &str) {
     assert!(
@@ -407,6 +449,13 @@ impl Queries for PackagesPlugin {
         let result: QueryRoot<SourcesQuery> =
             serde_json::from_str(&json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
         Ok(result.data.sources)
+    }
+    fn unpack_action_params(
+        service: String,
+        method: String,
+        raw_data_hex: String,
+    ) -> Result<String, HostTypes::Error> {
+        unpack_action_params_impl(service, method, raw_data_hex)
     }
 }
 

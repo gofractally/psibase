@@ -97,6 +97,7 @@ interface queries {
     use types.{meta, package-source};
     get-installed-packages: func() -> result<list<meta>, error>;
     get-sources: func(owner: string) -> result<list<package-source>, error>;
+    unpack-action-params: func(service: string, method: string, raw-data-hex: string) -> result<string, error>;
 }
 
 world imports {
