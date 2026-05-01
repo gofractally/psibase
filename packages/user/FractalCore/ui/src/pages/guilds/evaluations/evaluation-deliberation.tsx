@@ -1,6 +1,6 @@
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
 import dayjs from "dayjs";
-import { AlignJustify, Info, Plus, X } from "lucide-react";
+import { AlignJustify, Check, Info, Plus, X } from "lucide-react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
 
@@ -20,6 +20,7 @@ import { Account } from "@shared/lib/schemas/account";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Spinner } from "@shared/shadcn/ui/spinner";
 
 const usePageParams = () => {
     const { guildAccount, groupNumber } = useParams<{
@@ -58,7 +59,7 @@ const useRanking = () => {
     );
     const { mutateAsync: propose } = usePropose();
 
-    const { maybeExecute: debounceAccounts } = useAsyncDebouncer(
+    const { maybeExecute: debounceAccounts, state } = useAsyncDebouncer(
         async (rankedNumbers: Account[]) => {
             cancel();
             await propose({
@@ -70,6 +71,10 @@ const useRanking = () => {
         {
             wait: 4000,
         },
+        (state) => ({
+            isPending: state.isPending,
+            status: state.status,
+        }),
     );
 
     const updateRankedNumbers = (accounts: Account[]) => {
@@ -103,10 +108,18 @@ const useRanking = () => {
         add,
         remove,
         isLoading: isProposalPending,
+        isSaving: state.isPending,
+        isSaved: state.status === "settled",
     };
 };
 
-const GroupStatus = () => {
+const GroupStatus = ({
+    isSaving,
+    isSaved,
+}: {
+    isSaving: boolean;
+    isSaved: boolean;
+}) => {
     const { groupNumber } = usePageParams();
 
     const now = useNowUnix();
@@ -149,9 +162,21 @@ const GroupStatus = () => {
     return (
         <div className="flex h-9 items-center justify-between">
             <h1 className="text-lg font-semibold">Group #{groupNumber}</h1>
-            <Badge variant={variant} className="min-w-[52px]">
-                {description}
-            </Badge>
+            <div className="flex gap-2">
+                {isSaving && (
+                    <Badge className="min-w-[52px] bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
+                        <Spinner data-icon="inline-start" /> Saving
+                    </Badge>
+                )}
+                {isSaved && (
+                    <Badge className="min-w-[52px] bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
+                        <Check data-icon="inline-start" /> Saved
+                    </Badge>
+                )}
+                <Badge variant={variant} className="min-w-[52px]">
+                    {description}
+                </Badge>
+            </div>
         </div>
     );
 };
@@ -164,11 +189,13 @@ export const EvaluationDeliberation = () => {
         rankedAccounts,
         unrankedAccounts,
         isLoading,
+        isSaving,
+        isSaved,
     } = useRanking();
 
     return (
         <PageContainer className="space-y-6">
-            <GroupStatus />
+            <GroupStatus isSaving={isSaving} isSaved={isSaved} />
             <div className="flex flex-col gap-2">
                 <div>
                     <h2 className="text-base font-semibold">Unranked</h2>
