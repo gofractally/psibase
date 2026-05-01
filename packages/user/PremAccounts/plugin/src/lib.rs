@@ -6,11 +6,9 @@ use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
 use bindings::host::common::server as CommonServer;
-use bindings::host::crypto::keyvault as HostCryptoKeyVault;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
 
-use psibase::services::invite::SubjectPublicKeyInfo;
 use psibase::services::tokens::Quantity;
 use psibase::AccountNumber;
 mod errors;
@@ -129,10 +127,7 @@ impl Api for PremAccountsPlugin {
 
         AuthSigKeyVault::import_key(&keypair.private_key).unwrap();
 
-        prem_accounts::Wrapper::add_to_tx().claim(
-            account,
-            SubjectPublicKeyInfo::from(HostCryptoKeyVault::to_der(&keypair.public_key).unwrap()),
-        );
+        prem_accounts::Wrapper::add_to_tx().claim(account);
 
         Ok(keypair.private_key)
     }

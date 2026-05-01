@@ -48,8 +48,6 @@ pub mod service {
     };
     use psibase::services::accounts as Accounts;
     use psibase::services::auth_delegate as AuthDelegate;
-    use psibase::services::auth_sig as AuthSig;
-    use psibase::services::auth_sig::SubjectPublicKeyInfo;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::events;
     use psibase::services::nft::{self as Nfts, NftHolderFlags};
@@ -174,7 +172,7 @@ pub mod service {
     }
 
     #[action]
-    fn claim(account: AccountNumber, pub_key: SubjectPublicKeyInfo) {
+    fn claim(account: AccountNumber) {
         let purchased_accounts_table = PurchasedAccountsTable::new();
 
         let purchased_account = check_some(
@@ -187,9 +185,7 @@ pub mod service {
             "account not purchased by sender",
         );
 
-        AuthSig::Wrapper::call_as(account).setKey(pub_key);
-
-        Accounts::Wrapper::call_as(account).setAuthServ(AuthSig::Wrapper::SERVICE);
+        AuthDelegate::Wrapper::call().setOwner(get_sender());
 
         purchased_accounts_table.remove(&purchased_account);
 
