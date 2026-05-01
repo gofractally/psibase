@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
 import QueryKey, { OptionalNumber } from "@/lib/query-keys";
 
@@ -24,7 +23,8 @@ export const useProposal = (groupNumber: OptionalNumber) => {
                     intf: "userEval",
                 });
 
-                return z.optional(zAccount.array()).parse(res);
+                if (!res) return null;
+                return zAccount.array().parse(res);
             } catch (error) {
                 const message = "Error getting proposal";
                 console.error(message, error);
