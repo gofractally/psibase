@@ -145,11 +145,11 @@ pub fn authorized_with_whitelist<T: TrustConfig>(
 ) -> Result<bool, Error> {
     let whitelist: Vec<String> = whitelist.iter().map(|s| s.to_string()).collect();
     let descriptions = T::get_descriptions();
-    Ok(permissions::api::is_authorized(
+    permissions::api::is_authorized(
         &host::client::get_sender(),
         level,
         &descriptions,
         fn_name,
         &whitelist,
-    )?)
+    )
 }
