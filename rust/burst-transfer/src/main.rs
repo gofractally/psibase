@@ -1,6 +1,5 @@
 // cargo build -r --bin burst-transfer --manifest-path rust/Cargo.toml --target-dir build/rust
-use std::cell::Cell;
-use std::sync::atomic::AtomicI32;
+use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
@@ -11,7 +10,21 @@ use psibase::{
 };
 
 const ACCOUNTS_PER_SETUP: usize = 10;
-const MAX_CONSECUTIVE_ERRORS: u32 = 10;
+const MAX_ERRORS: u32 = 10;
+
+static ERROR_COUNT: AtomicU32 = AtomicU32::new(0);
+
+fn record_error() -> Result<(), anyhow::Error> {
+    let n = ERROR_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+    if n >= MAX_ERRORS {
+        return Err(anyhow!("stopped after {} errors", MAX_ERRORS));
+    }
+    Ok(())
+}
+
+fn quota_exhausted() -> bool {
+    ERROR_COUNT.load(Ordering::Relaxed) >= MAX_ERRORS
+}
 
 mod faucet_tok {
     #[psibase::service(name = "faucet-tok", dispatch = false)]
@@ -220,8 +233,11 @@ async fn transfer(
     repeat: bool,
     client: &reqwest::Client,
     afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
-) -> usize {
+) -> Result<usize, anyhow::Error> {
     loop {
+        if quota_exhausted() {
+            return Err(anyhow!("stopped after {} errors", MAX_ERRORS));
+        }
         let transferred =
             match transfer_impl(args, accounts, token_id, counter, ref_block, client, afmt)
                 .await
@@ -230,11 +246,12 @@ async fn transfer(
                 Ok(()) => true,
                 Err(e) => {
                     println!("Transfer error | {:?}", e);
+                    record_error()?;
                     false
                 }
             };
         if !repeat {
-            return usize::from(transferred);
+            return Ok(usize::from(transferred));
         }
     }
 }
@@ -277,19 +294,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let counter = AtomicI32::new(0);
     let mut accounts: Vec<psibase::AccountNumber> = Vec::with_capacity(args.account_count);
 
-    let consecutive_errors = Cell::new(0u32);
-    let check_consec_errors = || -> Result<(), anyhow::Error> {
-        let n = consecutive_errors.get() + 1;
-        consecutive_errors.set(n);
-        if n >= MAX_CONSECUTIVE_ERRORS {
-            return Err(anyhow!(
-                "stopped after {} consecutive errors",
-                MAX_CONSECUTIVE_ERRORS
-            ));
-        }
-        Ok(())
-    };
-
     while accounts.len() < args.account_count {
         let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
             .await
@@ -297,7 +301,7 @@ async fn main() -> Result<(), anyhow::Error> {
         match ref_block {
             Err(e) => {
                 println!("TAPOS error | {:?}", e);
-                check_consec_errors()?;
+                record_error()?;
             }
             Ok(ref_block) => {
                 let n = std::cmp::min(ACCOUNTS_PER_SETUP, args.account_count - accounts.len());
@@ -308,10 +312,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 {
                     Err(e) => {
                         println!("Setup error | {:?}", e);
-                        check_consec_errors()?;
+                        record_error()?;
                     }
                     Ok(()) => {
-                        consecutive_errors.set(0);
                         let created_names = account_names(&new_accounts);
                         let added = new_accounts.len();
                         accounts.extend(new_accounts);
@@ -328,7 +331,6 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    consecutive_errors.set(0);
     loop {
         let batch_start = tokio::time::Instant::now();
         let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
@@ -337,10 +339,9 @@ async fn main() -> Result<(), anyhow::Error> {
         match ref_block {
             Err(e) => {
                 println!("TAPOS error | {:?}", e);
-                check_consec_errors()?;
+                record_error()?;
             }
             Ok(ref_block) => {
-                consecutive_errors.set(0);
                 let repeat = args.delay == 0;
                 let mut transfers = Vec::new();
                 for _ in 0..args.burst_size {
@@ -354,8 +355,10 @@ async fn main() -> Result<(), anyhow::Error> {
                         args.burst_size
                     );
                 }
-                let transferred: usize =
-                    futures::future::join_all(transfers).await.into_iter().sum();
+                let transferred: usize = futures::future::try_join_all(transfers)
+                    .await?
+                    .into_iter()
+                    .sum();
                 println!("Batch | transferred {}/{} tx", transferred, args.burst_size);
             }
         }
