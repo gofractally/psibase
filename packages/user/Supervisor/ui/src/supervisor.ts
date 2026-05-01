@@ -29,12 +29,14 @@ import {
     assert,
     chainIdPromise,
     isEmbedded,
+    networkName,
+    networkNamePromise,
     parser,
     serviceFromOrigin,
     setQueryToken,
 } from "./utils";
 
-const rootDomain = siblingUrl(null, null, null, true);
+const rootDomain = siblingUrl();
 
 // System plugins are always loaded, even if they are not used
 //   in a given call context.
@@ -81,14 +83,16 @@ export class Supervisor implements AppInterface {
             "Redundant setting parent origination",
         );
 
-        if (callerOrigin === rootDomain) {
+        const service = serviceFromOrigin(callerOrigin);
+
+        if (service === networkName) {
             this.parentOrigination = {
                 app: "homepage",
                 origin: callerOrigin,
             };
         } else {
             this.parentOrigination = {
-                app: serviceFromOrigin(callerOrigin),
+                app: service,
                 origin: callerOrigin,
             };
         }
@@ -378,6 +382,7 @@ export class Supervisor implements AppInterface {
     // This is an entrypoint that returns the JSON interface for a plugin.
     async getJson(callerOrigin: string, id: string, plugin: QualifiedPluginId) {
         try {
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload([plugin]);
             const json = this.plugins.getPlugin(plugin).plugin.getJson();
@@ -394,6 +399,7 @@ export class Supervisor implements AppInterface {
     //   which accelerates the responsiveness of the plugins for subsequent calls.
     async preloadPlugins(callerOrigin: string, plugins: QualifiedPluginId[]) {
         try {
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
             await this.preload(plugins);
         } catch (e) {
@@ -411,6 +417,7 @@ export class Supervisor implements AppInterface {
         args: QualifiedFunctionCallArgs,
     ): Promise<any> {
         try {
+            await networkNamePromise;
             this.setParentOrigination(callerOrigin);
 
             // This is the time-intensive step. It includes: downloading, parsing, and transpiling the

@@ -47,20 +47,17 @@ export type MessageMetadata = {
  * @param baseUrl - The base URL to use. If null or undefined, uses the current window location.
  * @param subDomain - The subdomain (service name) to target. If null or undefined, no subdomain is added.
  * @param path - The path to append to the URL. If null or undefined, no path is added.
- * @param baseUrlIncludesSibling - Whether the baseUrl already includes a sibling subdomain that should be replaced. Default is `true`.
  * @returns A complete URL string pointing to the specified sibling service.
  */
 export function siblingUrl(
     baseUrl?: string | null,
     subDomain?: string | null,
     path?: string | null,
-    baseUrlIncludesSibling = true,
 ): string {
     const currentUrl = new URL(baseUrl || window.location.href);
     const hostnameParts = currentUrl.hostname.split(".");
-    if (baseUrlIncludesSibling) {
-        hostnameParts.shift();
-    }
+    hostnameParts.shift();
+
     if (subDomain) {
         hostnameParts.unshift(subDomain);
     }

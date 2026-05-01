@@ -9,8 +9,7 @@ import { z } from "zod";
 
 import { zDraftMessage } from "@/apps/chainmail/types";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { zAccount } from "@shared/lib/schemas/account";
 import {
     AlertDialog,

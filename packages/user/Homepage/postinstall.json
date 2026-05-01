@@ -1,1 +1,34 @@
-[{"sender": "homepage","service": "sites","method": "enablespa","data": {"enable": true}}]
+[
+    {
+        "sender": "homepage",
+        "service": "sites",
+        "method": "enablespa",
+        "data": {
+            "enable": true
+        }
+    },
+    {
+        "sender": "homepage",
+        "service": "http-server",
+        "method": "setRedirect",
+        "data": {
+            "destination": "network"
+        }
+    },
+    {
+        "sender": "accounts",
+        "service": "accounts",
+        "method": "preapproveAcc",
+        "data": {
+            "name": "network"
+        }
+    },
+    {
+        "sender": "branding",
+        "service": "branding",
+        "method": "setNetworkName",
+        "data": {
+            "name": "network"
+        }
+    }
+]

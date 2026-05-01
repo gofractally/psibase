@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { type Producer, getProducers } from "@/lib/graphql/get-producers";
 import { queryKeys } from "@/lib/query-keys";
+
+import { type Producer, getProducers } from "@shared/lib/get-producers";
 
 import { useConfig } from "./use-config";
 import { useStatuses } from "./use-statuses";

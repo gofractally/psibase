@@ -54,7 +54,7 @@ export const App = () => {
                 setActiveApp(promptDetails.activeApp);
 
                 const iframeUrl = new URL(
-                    siblingUrl(null, promptDetails.promptApp, null, true),
+                    siblingUrl(null, promptDetails.promptApp, null),
                 );
 
                 // The well-known path for the web platform is currently
@@ -81,8 +81,8 @@ export const App = () => {
             if (event.data === "finished") {
                 const rootDomain =
                     activeApp !== "homepage"
-                        ? new URL(siblingUrl(null, activeApp, returnPath, true))
-                        : new URL(siblingUrl(null, null, returnPath, true));
+                        ? new URL(siblingUrl(null, activeApp, returnPath))
+                        : new URL(siblingUrl(null, null, returnPath));
                 window.location.href = rootDomain.toString();
             }
         },

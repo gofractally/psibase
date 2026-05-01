@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { graphql, GraphQLUrlOptions } from "@shared/lib/graphql";
+import { GraphQLUrlOptions, graphql } from "@shared/lib/graphql";
 import QueryKey from "@shared/lib/query-keys";
 
 interface BillingConfigResponse {
@@ -10,7 +10,7 @@ interface BillingConfigResponse {
     } | null;
 }
 
-export const useBillingConfig = (options: GraphQLUrlOptions = {baseUrlIncludesSibling: true}) => {
+export const useBillingConfig = (options: GraphQLUrlOptions = {}) => {
     return useQuery({
         queryKey: QueryKey.billingConfig(),
         queryFn: async () => {
@@ -22,10 +22,10 @@ export const useBillingConfig = (options: GraphQLUrlOptions = {baseUrlIncludesSi
                     }
                 }
             `;
-            const res = await graphql<BillingConfigResponse>(
-                query,
-                {service: "virtual-server", ...options},
-            );
+            const res = await graphql<BillingConfigResponse>(query, {
+                service: "virtual-server",
+                ...options,
+            });
 
             if (!res.getBillingConfig) {
                 return { feeReceiver: null, enabled: false };
