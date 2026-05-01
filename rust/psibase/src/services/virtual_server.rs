@@ -462,7 +462,7 @@ mod service {
         unimplemented!()
     }
 
-    /// This actions specifies which account is primarily responsible for
+    /// This action specifies which account is primarily responsible for
     /// paying the bill for any consumed resources.
     ///
     /// A time limit for the execution of the current tx/query will be set based
