@@ -12,7 +12,7 @@ use futures::{
 use indicatif::{ProgressBar, ProgressStyle};
 use psibase::services::{auth_delegate, packages, sites, staged_tx, transact, x_packages};
 use psibase::{
-    account, apply_proxy, as_json, compress_content, create_boot_transactions,
+    account, apply_proxy, as_json, compress_content, create_boot_transactions, fetch_packages,
     get_installed_manifest, get_local_manifest, get_manifest, get_package_sources,
     get_tapos_for_head, login_action, new_account_action, new_account_key_action,
     new_account_owned_action, preapprove_action, push_transaction, push_transaction_optimistic,
@@ -20,10 +20,10 @@ use psibase::{
     set_owner_action, sign_transaction, AccountNumber, Action, ActionFormatter, AnyPrivateKey,
     AnyPublicKey, ChainUrl, Checksum256, DirectoryRegistry, ExactAccountNumber, FileSetRegistry,
     FilteredRegistry, HTTPRegistry, HttpSchemaFetcher, JointRegistry, Meta, NullSchemaFetcher,
-    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOrigin, PackagePreference,
-    PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher, SchemaMap, Seconds,
-    ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock, TimePointSec, TraceFormat,
-    Transaction, TransactionBuilder, TransactionTrace, Version,
+    PackageDataFile, PackageInfo, PackageList, PackageOp, PackageOpFull, PackageOrigin,
+    PackagePreference, PackageRef, PackageRegistry, PackagedService, PrettyAction, SchemaFetcher,
+    SchemaMap, Seconds, ServiceInfo, SignedTransaction, StagedUpload, Tapos, TaposRefBlock,
+    TimePointSec, TraceFormat, Transaction, TransactionBuilder, TransactionTrace, Version,
 };
 use regex::Regex;
 use reqwest::Url;
@@ -1239,7 +1239,7 @@ async fn boot(args: &BootArgs) -> Result<(), anyhow::Error> {
         &mut package_registry,
     )
     .await?;
-    let mut packages = package_registry.resolve(&package_names).await?;
+    let mut packages = package_registry.resolve(&package_names, false).await?;
     let (boot_transactions, groups) = create_boot_transactions(
         &args.block_key,
         &args.account_key,
@@ -1623,18 +1623,23 @@ async fn apply_packages<
     sender: AccountNumber,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
+    existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
+    let ops = fetch_packages(reg, ops, &existing).await?;
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
-            PackageOp::Install(info) => {
-                // TODO: verify ownership of existing accounts
-                let mut package = reg.get_by_info(&info).await?;
+            PackageOpFull::Install(mut package) => {
                 package.load_schemas(base_url, client, &mut schemas).await?;
-                out.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                out.set_label(format!(
+                    "Installing {}-{}",
+                    package.name(),
+                    package.version()
+                ));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
-                    &info.name, &info.version
+                    package.name(),
+                    package.version()
                 ));
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
@@ -1651,17 +1656,20 @@ async fn apply_packages<
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
-            PackageOp::Replace(meta, info) => {
-                let mut package = reg.get_by_info(&info).await?;
+            PackageOpFull::Replace(meta, mut package) => {
                 package.load_schemas(base_url, client, &mut schemas).await?;
                 // TODO: skip unmodified files (?)
                 out.set_label(format!(
                     "Updating {}-{} -> {}-{}",
-                    &meta.name, &meta.version, &info.name, &info.version
+                    &meta.name,
+                    &meta.version,
+                    package.name(),
+                    package.version()
                 ));
                 files.set_label(format!(
                     "Uploading files for {}-{}",
-                    &info.name, &info.version
+                    package.name(),
+                    package.version()
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
@@ -1682,7 +1690,7 @@ async fn apply_packages<
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
             }
-            PackageOp::Remove(meta) => {
+            PackageOpFull::Remove(meta) => {
                 out.set_label(format!("Removing {}", &meta.name));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
@@ -1703,6 +1711,7 @@ async fn do_install<T: Read + Seek>(
     tx_args: &TxArgs,
     key: &Option<AnyPublicKey>,
     compression_level: u32,
+    existing: PackageList,
 ) -> Result<(), anyhow::Error> {
     let tapos = get_tapos_for_head(&node_args.api, client.clone()).await?;
 
@@ -1754,6 +1763,7 @@ async fn do_install<T: Read + Seek>(
         sender,
         key,
         compression_level,
+        existing,
     )
     .await?;
 
@@ -1919,6 +1929,7 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.tx_args,
             &args.key,
             args.compression_level,
+            installed,
         )
         .await?;
     }
@@ -1932,6 +1943,7 @@ pub struct LocalPackage<'a> {
     pub description: &'a String,
     pub depends: &'a Vec<PackageRef>,
     pub accounts: &'a Vec<AccountNumber>,
+    pub services: &'a Vec<AccountNumber>,
     pub sha256: &'a Checksum256,
 }
 
@@ -1943,7 +1955,23 @@ impl<'a> From<&'a PackageInfo> for LocalPackage<'a> {
             description: &other.description,
             depends: &other.depends,
             accounts: &other.accounts,
+            services: &other.services,
             sha256: &other.sha256,
+        }
+    }
+}
+
+impl<'a, R: Read + Seek> From<&'a PackagedService<R>> for LocalPackage<'a> {
+    fn from(other: &'a PackagedService<R>) -> Self {
+        let meta = other.meta();
+        LocalPackage {
+            name: &meta.name,
+            version: &meta.version,
+            description: &meta.description,
+            depends: &meta.depends,
+            accounts: &meta.accounts,
+            services: &meta.services,
+            sha256: other.hash(),
         }
     }
 }
@@ -1959,6 +1987,7 @@ impl<'a> From<&'a (Meta, PackageOrigin)> for LocalPackage<'a> {
             description: &other.0.description,
             depends: &other.0.depends,
             accounts: &other.0.accounts,
+            services: &other.0.services,
             sha256: sha256,
         }
     }
@@ -1983,7 +2012,7 @@ async fn put_local_manifest<'a, R: Read + Seek>(
     base_url: &reqwest::Url,
     client: &mut reqwest::Client,
     info: &LocalPackage<'a>,
-    package: &mut PackagedService<R>,
+    package: &PackagedService<R>,
 ) -> Result<(), anyhow::Error> {
     let manifest = package.manifest();
     let mut manifest_encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
@@ -2032,43 +2061,75 @@ async fn do_install_local<T: Read + Seek>(
     let progress = ProgressBar::new(to_install.len() as u64).with_style(
         ProgressStyle::with_template("{wide_bar} {pos}/{len}\n{msg}")?,
     );
+    let to_install = fetch_packages(&package_registry, to_install, &installed).await?;
     progress.set_message("Installing packages");
     let res: Result<(), anyhow::Error> = async {
         for op in to_install {
             match op {
-                PackageOp::Install(info) => {
-                    let mut package = package_registry.get_by_info(&info).await?;
-                    let info: LocalPackage = (&info).into();
-                    post_local_info(&node_args.api, &mut client, &info, "/preinstall").await?;
-                    put_local_manifest(&node_args.api, &mut client, &info, &mut package).await?;
+                PackageOpFull::Install(mut package) => {
+                    post_local_info(
+                        &node_args.api,
+                        &mut client,
+                        &(&package).into(),
+                        "/preinstall",
+                    )
+                    .await?;
+                    put_local_manifest(&node_args.api, &mut client, &(&package).into(), &package)
+                        .await?;
                     package
                         .install_local(&node_args.api, &mut client, compression_level)
                         .await?;
-                    post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+                    post_local_info(
+                        &node_args.api,
+                        &mut client,
+                        &(&package).into(),
+                        "/postinstall",
+                    )
+                    .await?;
                 }
-                PackageOp::Replace(old, new) => {
-                    let mut package = package_registry.get_by_info(&new).await?;
+                PackageOpFull::Replace(old, mut package) => {
                     let old_info: LocalPackage = installed.get_by_name(&old.name)?.unwrap().into();
-                    if old_info.sha256 == &new.sha256 {
+                    if old_info.sha256 == package.hash() {
                         // The only reason to install a package that is identical
                         // to the currently installed package is to fix corrupted
                         // files. Nothing needs to be removed (in particular, the
                         // manifest must not be removed), and we don't need
                         // to keep track of partial success.
-                        let info: LocalPackage = (&new).into();
-                        put_local_manifest(&node_args.api, &mut client, &info, &mut package)
-                            .await?;
+                        put_local_manifest(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            &package,
+                        )
+                        .await?;
                         package
                             .install_local(&node_args.api, &mut client, compression_level)
                             .await?;
-                        post_local_info(&node_args.api, &mut client, &info, "/postinstall").await?;
+                        post_local_info(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            "/postinstall",
+                        )
+                        .await?;
                     } else {
                         let old_manifest =
                             get_local_manifest(&node_args.api, &mut client, &old_info.sha256)
                                 .await?;
-                        let new: LocalPackage = (&new).into();
-                        post_local_info(&node_args.api, &mut client, &new, "/preinstall").await?;
-                        put_local_manifest(&node_args.api, &mut client, &new, &mut package).await?;
+                        post_local_info(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            "/preinstall",
+                        )
+                        .await?;
+                        put_local_manifest(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            &package,
+                        )
+                        .await?;
                         post_local_info(&node_args.api, &mut client, &old_info, "/prerm").await?;
                         package
                             .install_local(&node_args.api, &mut client, compression_level)
@@ -2078,10 +2139,16 @@ async fn do_install_local<T: Read + Seek>(
                             .await?;
                         delete_local_manifest(&node_args.api, &mut client, &old_info).await?;
                         post_local_info(&node_args.api, &mut client, &old_info, "/postrm").await?;
-                        post_local_info(&node_args.api, &mut client, &new, "/postinstall").await?;
+                        post_local_info(
+                            &node_args.api,
+                            &mut client,
+                            &(&package).into(),
+                            "/postinstall",
+                        )
+                        .await?;
                     }
                 }
-                PackageOp::Remove(meta) => {
+                PackageOpFull::Remove(meta) => {
                     let info: LocalPackage = installed.get_by_name(&meta.name)?.unwrap().into();
                     let old_manifest =
                         get_local_manifest(&node_args.api, &mut client, info.sha256).await?;
@@ -2164,6 +2231,7 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             &args.tx_args,
             &args.key,
             args.compression_level,
+            installed,
         )
         .await
     }

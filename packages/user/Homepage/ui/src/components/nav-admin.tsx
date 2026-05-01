@@ -14,7 +14,7 @@ import {
 } from "@shared/shadcn/ui/sidebar";
 
 export function NavAdmin() {
-    const isCurrentUserProducer = useIsCurrentUserProducer({ baseUrlIncludesSibling: false});
+    const isCurrentUserProducer = useIsCurrentUserProducer({});
     if (!isCurrentUserProducer) return null;
     return (
         <SidebarGroup>
@@ -22,7 +22,7 @@ export function NavAdmin() {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <Link
-                        to={siblingUrl(undefined, "x-admin", undefined, false)}
+                        to={siblingUrl(undefined, "x-admin", undefined)}
                         target="_blank"
                     >
                         <SidebarMenuButton>
@@ -34,7 +34,7 @@ export function NavAdmin() {
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                     <Link
-                        to={siblingUrl(undefined, "config", undefined, false)}
+                        to={siblingUrl(undefined, "config", undefined)}
                         target="_blank"
                     >
                         <SidebarMenuButton>

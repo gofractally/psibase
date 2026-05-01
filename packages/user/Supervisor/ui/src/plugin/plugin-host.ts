@@ -14,7 +14,7 @@ import {
     HttpResponse,
 } from "../host-interface";
 import { Supervisor } from "../supervisor";
-import { chainId, isEmbedded } from "../utils";
+import { chainId, isEmbedded, networkName } from "../utils";
 import { RecoverableErrorPayload } from "./errors";
 
 function convert(
@@ -94,6 +94,20 @@ export class PluginHost implements HostInterface {
             : localStorage;
     }
 
+    // The supervisor maps network name subdomains to "homepage",
+    // this reverses that mapping on the way out so are sending
+    // requests meant for the homepage to the correct subdomain.
+    private rewriteUriHook(uri: string): string {
+        if (!networkName) return uri;
+        const url = new URL(uri);
+        const root = new URL(this.supervisor.getRootDomain());
+        if (url.host === `homepage.${root.host}`) {
+            url.host = `${networkName}.${root.host}`;
+            return url.toString();
+        }
+        return uri;
+    }
+
     // A synchronous web request.
     // This allows the plugin to make http queries.
     // It is a typescript-ified version of the wasip2 browser http shim
@@ -104,7 +118,11 @@ export class PluginHost implements HostInterface {
     ): HttpResponse {
         try {
             const xhr = new XMLHttpRequest();
-            xhr.open(req.method.toString(), req.uri, false);
+            xhr.open(
+                req.method.toString(),
+                this.rewriteUriHook(req.uri),
+                false,
+            );
             xhr.withCredentials = withCredentials;
 
             const requestHeaders = new Headers(convert(req.headers));

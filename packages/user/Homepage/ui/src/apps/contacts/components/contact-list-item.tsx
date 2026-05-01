@@ -14,9 +14,7 @@ export const ContactItem = ({
     isSelected: boolean;
     onSelect: () => void;
 }) => {
-    const { data: profile } = useProfile(contact.account, true, {
-        baseUrlIncludesSibling: false,
-    });
+    const { data: profile } = useProfile(contact.account, true, {});
 
     const [primaryName, secondaryName] = formatNames(
         contact.nickname,

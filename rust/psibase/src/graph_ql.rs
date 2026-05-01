@@ -498,8 +498,7 @@ fn fetch_block_start_rows(
             WHERE ROWID <= r.rowId \
             ORDER BY ROWID DESC \
             LIMIT 1 \
-        ) \
-        ORDER BY r.rowIndex ASC",
+        )",
         values
     );
 

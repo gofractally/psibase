@@ -19,7 +19,7 @@ async function readPackageIndexGQL(url: string, account: string) {
     let done = false;
     const result = [];
     while (!done) {
-        const query = `query { packages(owner: "${account}", first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } edges { node { name version scope description depends { name version } accounts sha256 file } } } }`;
+        const query = `query { packages(owner: "${account}", first: 100${cursorArg}) { pageInfo { hasNextPage endCursor } edges { node { name version scope description depends { name version } accounts services sha256 file } } } }`;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const page = await postGraphQLGetJson<any>(
             url.replace(/\/?$/, "/graphql"),

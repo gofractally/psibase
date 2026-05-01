@@ -13,6 +13,7 @@ interface types {
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
         sha256: string,
         file: string,
     }
@@ -24,6 +25,7 @@ interface types {
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
     }
     /// The location of a package repository.
     ///

@@ -2,12 +2,11 @@ import { Trash, Upload } from "lucide-react";
 
 import { FormProfile } from "@/components/form-profile";
 
+import { Avatar } from "@shared/components/avatar";
+import { useAvatar } from "@shared/hooks/use-avatar";
 import { useCacheBust } from "@shared/hooks/use-cache-bust";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
-
-import { Avatar } from "@shared/components/avatar";
-import { useAvatar } from "@shared/hooks/use-avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -15,7 +14,6 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { useRemoveAvatar } from "../../contacts/hooks/use-remove-avatar";
 import { useSetProfile } from "../../contacts/hooks/use-set-profile";
 import { useUploadAvatar } from "../../contacts/hooks/use-upload-avatar";
-
 import { UserProfileSkeleton } from "./user-profile-skeleton";
 
 export const UserProfileSection = () => {
@@ -30,12 +28,11 @@ export const UserProfileSection = () => {
     const { data: currentUser } = useCurrentUser();
     const {
         data: profile,
-        isSuccess,
         isError,
         isLoading,
         isFetching,
         error,
-    } = useProfile(currentUser, true, {baseUrlIncludesSibling: false});
+    } = useProfile(currentUser, true, {});
     const { mutateAsync: uploadAvatar, isPending: isUploadingAvatar } =
         useUploadAvatar();
 
@@ -69,7 +66,7 @@ export const UserProfileSection = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h2 className="text-2xl font-bold mb-2">User Profile</h2>
+                <h2 className="mb-2 text-2xl font-bold">User Profile</h2>
                 <p className="text-muted-foreground text-sm">
                     All information is public.
                 </p>

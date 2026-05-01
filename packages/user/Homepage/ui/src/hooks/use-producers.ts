@@ -2,24 +2,25 @@ import type { QueryOptions } from "@shared/hooks/types";
 
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
-import { type Producer, getProducers } from "@/lib/get-producers";
-import { GraphQLUrlOptions } from "@shared/lib/graphql";
 import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { type Producer, getProducers } from "@shared/lib/get-producers";
+import { GraphQLUrlOptions } from "@shared/lib/graphql";
 
-export const queryProducers = (opts: GraphQLUrlOptions) => queryOptions({
-    queryKey: QueryKey.producers(),
-    queryFn: async () => {
-        try {
-            return await getProducers(opts);
-        } catch (error) {
-            const message = "Error getting producers";
-            console.error(message, error);
-            throw new Error(message);
-        }
-    },
-});
+export const queryProducers = (opts: GraphQLUrlOptions) =>
+    queryOptions({
+        queryKey: QueryKey.producers(),
+        queryFn: async () => {
+            try {
+                return await getProducers(opts);
+            } catch (error) {
+                const message = "Error getting producers";
+                console.error(message, error);
+                throw new Error(message);
+            }
+        },
+    });
 
 export const useProducers = (
     options?: QueryOptions<

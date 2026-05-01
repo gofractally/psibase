@@ -27,8 +27,21 @@ mod tables {
 mod service {
     use crate::tables::*;
     use async_graphql::Object;
+    use psibase::services::auth_delegate::Wrapper as AuthDelegate;
+    use psibase::services::http_server::Wrapper as HttpServer;
+    use psibase::services::sites::Wrapper as Sites;
     use psibase::*;
 
+    /// Sets the network name for the current network.
+    ///
+    /// The specified name must be a valid account name. It must either not
+    /// yet exist as an account, or exist but be owned by the "branding"
+    /// account (using auth-delegate).
+    ///
+    /// The new name's subdomain reverse-proxies the homepage service, and
+    /// the homepage's subdomain is redirected to it. If a previous network
+    /// name was set, that name's subdomain is also redirected to the new
+    /// one.
     #[action]
     #[allow(non_snake_case)]
     fn setNetworkName(name: String) {
@@ -36,9 +49,24 @@ mod service {
             get_sender() == SERVICE,
             "Only the 'branding' account is authorized to set network branding",
         );
-        NetworkNameTable::new()
-            .put(&NetworkName { name: name.clone() })
-            .unwrap();
+
+        let account = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
+
+        let created = AuthDelegate::call().newAccount(account, SERVICE, true);
+        if !created {
+            HttpServer::call_as(account).clearRedirect();
+        }
+        Sites::call_as(account).setProxy(account!("homepage"));
+
+        let table = NetworkNameTable::new();
+        if let Some(prev) = table.get_index_pk().get(&()) {
+            let prev_account = AccountNumber::from_exact(prev.name.as_str()).unwrap();
+            if prev_account != account {
+                HttpServer::call_as(prev_account).setRedirect(account);
+            }
+        }
+
+        table.put(&NetworkName { name: name.clone() }).unwrap();
 
         Wrapper::emit().history().networkNameChanged(name);
     }

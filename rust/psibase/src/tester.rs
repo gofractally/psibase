@@ -9,16 +9,17 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
-    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, ActionFormatter,
-    BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error,
-    HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, JointRegistry,
-    KvHandle, KvMode, PackageRegistry, PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap,
-    Seconds, SignedTransaction, StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec,
-    ToKey, Transaction, TransactionBuilder, TransactionTrace,
+    actions::login_action, check, create_boot_transactions, fetch_packages,
+    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
+    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
+    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
+    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
-use crate::{MicroSeconds, PackageList, PackageOp};
+use crate::{MicroSeconds, PackageList};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -149,7 +150,7 @@ impl Chain {
     }
 
     pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
-        let mut services = block_on(reg.resolve(services))?;
+        let mut services = block_on(reg.resolve(services, false))?;
 
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
@@ -157,7 +158,7 @@ impl Chain {
             &None,
             PRODUCER_ACCOUNT,
             false,
-            TimePointSec { seconds: 10 },
+            TimePointSec { seconds: 120 },
             &mut services[..],
             COMPRESSION_LEVEL,
         )
@@ -172,6 +173,7 @@ impl Chain {
         for (_, group, _) in subsequent_tx {
             for trx in group {
                 self.push(&trx).ok()?;
+                self.start_block();
             }
         }
 
@@ -245,20 +247,14 @@ impl Chain {
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
-        let packages =
-            block_on(PackageList::new().resolve_changes(&registry, &package_names, false, true))
-                .unwrap();
+        let packages = block_on(registry.resolve(&package_names, true)).unwrap();
         let mut requests = Vec::new();
         let mut early_requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
         let root_host = "\0";
-        for op in packages {
-            let PackageOp::Install(info) = op else {
-                panic!("Only install is expected when there are no existing packages")
-            };
-            let mut package = block_on(registry.get_by_info(&info)).unwrap();
+        for mut package in packages {
             for (account, info, code) in package.services() {
                 let hash: [u8; 32] = Sha256::digest(&code).into();
                 let code_hash: Checksum256 = hash.into();
@@ -321,7 +317,7 @@ impl Chain {
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "PUT".to_string(),
-                target: format!("/manifest/{}", info.sha256),
+                target: format!("/manifest/{}", package.hash()),
                 contentType: "application/json".to_string(),
                 headers: vec![],
                 body: serde_json::to_string(&package.manifest())
@@ -335,7 +331,12 @@ impl Chain {
                 target: "/postinstall".to_string(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(&info).unwrap().into_bytes().into(),
+                body: serde_json::to_string(
+                    &package.meta().info(package.hash().clone(), String::new()),
+                )
+                .unwrap()
+                .into_bytes()
+                .into(),
             });
         }
         check(
@@ -641,6 +642,7 @@ impl Chain {
                     proofs: Default::default(),
                     subjectiveData: None,
                 });
+                self.start_block();
                 ChainEmptyResult { trace }.get()?
             }
         }
@@ -682,6 +684,7 @@ impl Chain {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
+        let packages = block_on(fetch_packages(reg, packages, &installed))?;
 
         let mut schemas = SchemaMap::new();
         let sender = services::producers::ROOT;
@@ -689,11 +692,14 @@ impl Chain {
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {
             match op {
-                PackageOp::Install(info) => {
+                PackageOpFull::Install(mut package) => {
                     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
-                    let mut package = block_on(reg.get_by_info(&info))?;
                     self.load_schemas(&mut package, &mut schemas)?;
-                    builder.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                    builder.set_label(format!(
+                        "Installing {}-{}",
+                        package.name(),
+                        package.version()
+                    ));
                     let mut account_actions = vec![];
                     package.install_accounts(&mut account_actions, None, sender, &None)?;
                     builder.push_all(account_actions)?;

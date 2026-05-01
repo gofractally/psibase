@@ -26,7 +26,7 @@ url.workspace = true
 walrus = "0.20.3"
 wasmparser = { version = "0.201.0" }
 tempfile = { version = "3.10" }
-zip = { version = "0.6", default-features = false, features = ["deflate"] }
+zip = { version = "7.2", default-features = false, features = ["deflate"] }
 
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
