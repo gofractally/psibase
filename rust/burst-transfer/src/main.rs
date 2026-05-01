@@ -138,6 +138,8 @@ async fn push_setup(
     args: &Args,
     new_accounts: &[psibase::AccountNumber],
     ref_block: &psibase::TaposRefBlock,
+    client: &reqwest::Client,
+    afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
 ) -> Result<(), anyhow::Error> {
     let sender = psibase::services::producers::ROOT;
     let mut actions = Vec::new();
@@ -152,11 +154,6 @@ async fn push_setup(
     }
 
     let trx = build_transaction(actions, ref_block);
-    let client = reqwest::Client::new();
-    let afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url: &args.api,
-    });
 
     psibase::push_transaction(
         &args.api,
@@ -176,6 +173,8 @@ async fn transfer_impl(
     token_id: u32,
     counter: &AtomicI32,
     ref_block: &psibase::TaposRefBlock,
+    client: &reqwest::Client,
+    afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
 ) -> Result<(), anyhow::Error> {
     let from = accounts[rand::random::<usize>() % accounts.len()];
     let mut to = from;
@@ -196,11 +195,6 @@ async fn transfer_impl(
         ));
     }
     let trx = build_transaction(actions, ref_block);
-    let client = reqwest::Client::new();
-    let afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url: &args.api,
-    });
 
     psibase::push_transaction_optimistic(
         &args.api,
@@ -222,18 +216,21 @@ async fn transfer(
     counter: &AtomicI32,
     ref_block: &psibase::TaposRefBlock,
     repeat: bool,
+    client: &reqwest::Client,
+    afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
 ) -> usize {
     loop {
-        let transferred = match transfer_impl(args, accounts, token_id, counter, ref_block)
-            .await
-            .context("Failed to push transaction")
-        {
-            Ok(()) => true,
-            Err(e) => {
-                println!("Transfer error | {:?}", e);
-                false
-            }
-        };
+        let transferred =
+            match transfer_impl(args, accounts, token_id, counter, ref_block, client, afmt)
+                .await
+                .context("Failed to push transaction")
+            {
+                Ok(()) => true,
+                Err(e) => {
+                    println!("Transfer error | {:?}", e);
+                    false
+                }
+            };
         if !repeat {
             return usize::from(transferred);
         }
@@ -265,6 +262,11 @@ async fn main() -> Result<(), anyhow::Error> {
         None => return Err(anyhow!("Can not find tokens with symbol {}", args.symbol)),
     };
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.api,
+    });
+
     println!(
         "burst-transfer | api: {} | token: {} #{} | accounts: {} | burst: {} tx x {} actions | delay: {}ms",
         args.api, args.symbol, tok.id, args.account_count, args.burst_size, args.actions, args.delay
@@ -275,7 +277,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     loop {
         let batch_start = tokio::time::Instant::now();
-        let ref_block = psibase::get_tapos_for_head(&args.api, reqwest::Client::new())
+        let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
             .await
             .context("Failed to get tapos");
         match ref_block {
@@ -291,7 +293,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 };
 
                 if !new_accounts.is_empty() {
-                    match push_setup(&args, &new_accounts, &ref_block)
+                    match push_setup(&args, &new_accounts, &ref_block, &client, &afmt)
                         .await
                         .context("Failed to push setup transaction")
                     {
@@ -318,6 +320,8 @@ async fn main() -> Result<(), anyhow::Error> {
                             &counter,
                             &ref_block,
                             repeat,
+                            &client,
+                            &afmt,
                         ));
                     }
                     if repeat {
