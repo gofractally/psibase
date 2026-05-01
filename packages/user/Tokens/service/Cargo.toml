@@ -8,7 +8,6 @@ publish.workspace = true
 [package.metadata.psibase]
 server = "r-tokens"
 plugin = "tokens-plugin"
-data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "tokens", service = "tokens", method = "init", data = {} },
 ]

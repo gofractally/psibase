@@ -108,6 +108,39 @@ pub fn get_package_dir(args: &Args, metadata: &MetadataIndex) -> PathBuf {
     target_dir.join("wasm32-wasip1/release/packages")
 }
 
+fn hash_bytes(bytes: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hasher.finalize().into()
+}
+
+fn hash_file(path: &Path) -> Result<[u8; 32], anyhow::Error> {
+    let mut file = File::open(path)
+        .map_err(|e| anyhow!("Failed to open {} for hashing: {}", path.display(), e))?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher)
+        .map_err(|e| anyhow!("Failed to hash {}: {}", path.display(), e))?;
+    Ok(hasher.finalize().into())
+}
+
+// Decides whether `filename` (an existing .psi) is up to date with respect
+// to the current build inputs. Returns `Ok(true)` if a rebuild is needed.
+//
+// Historically this used file mtimes to decide. That was unreliable for two
+// reasons:
+//
+//   1. `cargo component build` rewrites the plugin .wasm on every
+//      invocation, so the plugin path was always "newer" than the .psi and
+//      every `cargo-psibase package` invocation forced a full re-zip.
+//   2. The `>` mtime comparison silently missed UI changes whose mtime
+//      ended up equal to or older than the .psi mtime (same-second builds,
+//      `cp -p`, `git checkout`, filesystems with second-level mtime
+//      resolution, etc.), so the .psi could ship stale UI without warning.
+//
+// We now compare content hashes (SHA-256) of every contained file against
+// the corresponding source file. This is O(total package bytes) per call,
+// which in practice is well under 100 ms for the largest psibase packages
+// and is dwarfed by the cost of an actual rebuild.
 fn should_build_package(
     filename: &Path,
     meta: &Meta,
@@ -115,57 +148,82 @@ fn should_build_package(
     data: &[(AccountNumber, String, PathBuf)],
     postinstall: &[PrettyAction],
 ) -> Result<bool, anyhow::Error> {
-    let timestamp = if let Ok(metadata) = filename.metadata() {
-        metadata.modified()?
-    } else {
+    let Ok(file) = File::open(filename) else {
         return Ok(true);
     };
-    let mut existing = PackagedService::new(BufReader::new(File::open(filename)?))?;
+    let mut existing = match PackagedService::new(BufReader::new(file)) {
+        Ok(p) => p,
+        // Treat an unreadable / corrupt existing .psi as needing a rebuild
+        // rather than aborting the whole build.
+        Err(_) => return Ok(true),
+    };
     if existing.meta() != meta {
         return Ok(true);
     }
     let manifest = existing.manifest();
-    // Check services
+
+    // Cheap structural checks first: if the set of services or data files
+    // differs, or if any per-service info (flags / server / schema) has
+    // changed, we can short-circuit without hashing anything.
     if manifest.services.len() != services.len() {
         return Ok(true);
     }
-    for (account, info, path) in services {
-        if path.metadata()?.modified()? > timestamp {
-            return Ok(true);
-        }
-        if let Some(existing_info) = manifest.services.get(&account) {
-            if info != existing_info {
-                return Ok(true);
-            }
-        } else {
-            return Ok(true);
+    for (account, info, _) in services {
+        match manifest.services.get(account) {
+            Some(existing_info) if info == existing_info => {}
+            _ => return Ok(true),
         }
     }
-    // check data
     if manifest.data.len() != data.len() {
         return Ok(true);
     }
-    let mut existing_data = Vec::new();
-    for data in &manifest.data {
-        existing_data.push((data.account.value, data.filename.as_str()));
-    }
-    let mut new_data = Vec::new();
-    for (account, dest, src) in data {
-        if src.metadata()?.modified()? > timestamp {
-            return Ok(true);
-        }
-        new_data.push((account.value, dest.as_str()));
-    }
+    let mut existing_data: Vec<_> = manifest
+        .data
+        .iter()
+        .map(|d| (d.account.value, d.filename.as_str()))
+        .collect();
+    let mut new_data: Vec<_> = data
+        .iter()
+        .map(|(account, dest, _)| (account.value, dest.as_str()))
+        .collect();
     existing_data.sort();
     new_data.sort();
     if existing_data != new_data {
         return Ok(true);
     }
-    // check postinstall
+
     let existing_postinstall = existing.read_postinstall()?;
     if &existing_postinstall[..] != postinstall {
         return Ok(true);
     }
+
+    // Structure matches; now compare bytes. We hash the existing payload
+    // once into HashMaps so we can do O(1) lookups, then hash each current
+    // source file and compare. Any difference forces a rebuild.
+    let existing_service_hashes: HashMap<AccountNumber, [u8; 32]> = existing
+        .services()
+        .map(|(account, _info, contents)| (*account, hash_bytes(&contents)))
+        .collect();
+    for (account, _info, path) in services {
+        let new_hash = hash_file(path)?;
+        match existing_service_hashes.get(account) {
+            Some(h) if h == &new_hash => {}
+            _ => return Ok(true),
+        }
+    }
+
+    let existing_data_hashes: HashMap<(AccountNumber, String), [u8; 32]> = existing
+        .data()
+        .map(|(account, path, contents)| ((*account, path), hash_bytes(&contents)))
+        .collect();
+    for (account, dest, src) in data {
+        let new_hash = hash_file(src)?;
+        match existing_data_hashes.get(&(*account, dest.clone())) {
+            Some(h) if h == &new_hash => {}
+            _ => return Ok(true),
+        }
+    }
+
     Ok(false)
 }
 
@@ -381,6 +439,21 @@ impl<'a> PackageBuilder<'a> {
 
         let mut data_files = Vec::new();
         for (service, src, dest) in data_sources {
+            // A configured data source that does not exist on disk used to
+            // be silently dropped, producing a .psi with no UI / no plugin
+            // and no warning. Surface this as a hard error so misconfigured
+            // paths and forgotten UI builds are caught at packaging time.
+            if !src.exists() {
+                let dest_display = if dest.is_empty() { "/" } else { dest.as_str() };
+                return Err(anyhow!(
+                    "Data source for service `{}` does not exist: {} \
+                     (would be packaged at `{}`). If this is a UI directory, \
+                     make sure it is built before running `cargo-psibase package`.",
+                    service,
+                    src.display(),
+                    dest_display,
+                ));
+            }
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
         }
 
