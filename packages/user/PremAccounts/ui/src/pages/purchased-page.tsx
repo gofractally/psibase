@@ -1,4 +1,5 @@
 import type { PremAccountsOutletContext } from "@/components/prem-accounts-main";
+
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
@@ -6,7 +7,6 @@ import { zUnclaimedNamesPageData } from "@/lib/graphql/prem-accounts.schemas";
 import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
@@ -23,10 +23,6 @@ export function PurchasedPage() {
     const [claimingNames, setClaimingNames] = useState<Set<string>>(new Set());
     const [error, setError] = useState("");
     const [claimSuccessMessage, setClaimSuccessMessage] = useState("");
-    const [claimSuccessNotification, setClaimSuccessNotification] = useState<{
-        accountName: string;
-        privateKey: string;
-    } | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
 
     const loadBoughtNames = async () => {
@@ -114,7 +110,6 @@ export function PurchasedPage() {
         setClaimingNames((prev) => new Set(prev).add(name));
         setError("");
         setClaimSuccessMessage("");
-        setClaimSuccessNotification(null);
 
         const zod = zAccount.safeParse(name.trim());
         if (!zod.success) {
@@ -128,16 +123,15 @@ export function PurchasedPage() {
         }
 
         try {
-            const privateKey = (await supervisor.functionCall({
+            await supervisor.functionCall({
                 service: PREM_ACCOUNTS_SERVICE,
                 plugin: "plugin",
                 intf: "api",
                 method: "claim",
                 params: [name.trim()],
-            })) as string;
+            });
 
-            setClaimSuccessMessage(`Account '${name}' claimed successfully`);
-            setClaimSuccessNotification({ accountName: name, privateKey });
+            setClaimSuccessMessage(`Successfully claimed account "${name}".`);
 
             await loadBoughtNames();
             bumpHistory();
@@ -201,10 +195,7 @@ export function PurchasedPage() {
                                         <button
                                             onClick={() =>
                                                 setCurrentPage((p: number) =>
-                                                    Math.min(
-                                                        totalPages,
-                                                        p + 1,
-                                                    ),
+                                                    Math.min(totalPages, p + 1),
                                                 )
                                             }
                                             disabled={
@@ -254,27 +245,6 @@ export function PurchasedPage() {
                     )}
                     {error && <p className="text-red-500">{error}</p>}
                 </div>
-                {claimSuccessNotification && (
-                    <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/50">
-                        <p className="mb-2 font-medium text-green-700 dark:text-green-300">
-                            Account &apos;{claimSuccessNotification.accountName}
-                            &apos; claimed successfully
-                        </p>
-                        <p className="text-muted-foreground mb-1 text-sm">
-                            Private key (save this securely):
-                        </p>
-                        <p className="bg-muted/80 mb-4 break-all rounded p-2 font-mono text-sm">
-                            {pemToB64(claimSuccessNotification.privateKey)}
-                        </p>
-                        <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => setClaimSuccessNotification(null)}
-                        >
-                            Ok
-                        </Button>
-                    </div>
-                )}
             </div>
         </div>
     );

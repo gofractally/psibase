@@ -41,7 +41,7 @@ interface api {
 
     /// Claim a premium name
     /// * `account`: the account to claim the name for
-    claim: func(account: string) -> result<string, error>;
+    claim: func(account: string) -> result<_, error>;
 }
 
 /// Interface that makes authorized queries to this app's http server.

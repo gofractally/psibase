@@ -1,7 +1,6 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::auth_sig::plugin::keyvault as AuthSigKeyVault;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
@@ -120,16 +119,13 @@ impl Api for PremAccountsPlugin {
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
-    fn claim(account: String) -> Result<String, Error> {
-        let account = AccountNumber::from_exact(account.trim()).unwrap();
-
-        let keypair = AuthSigKeyVault::generate_unmanaged_keypair().unwrap();
-
-        AuthSigKeyVault::import_key(&keypair.private_key).unwrap();
+    fn claim(account: String) -> Result<(), Error> {
+        let account = AccountNumber::from_exact(&account)
+            .map_err(|_| ErrorType::InvalidAccountName(account))?;
 
         prem_accounts::Wrapper::add_to_tx().claim(account);
 
-        Ok(keypair.private_key)
+        Ok(())
     }
 }
 
