@@ -2,20 +2,24 @@
 mod bindings;
 use bindings::*;
 
+use exports::config::plugin::virtual_server::{
+    CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
+};
 use exports::config::plugin::{
     branding::Guest as Branding, packaging::Guest as Packaging, producers::Guest as Producers,
     settings::Guest as Settings, symbol::Guest as Symbol, virtual_server::Guest as VirtualServer,
 };
 use host::types::types::Error;
 
-use exports::config::plugin::virtual_server::{
-    CpuPricingParams, NetPricingParams, NetworkVariables, ServerSpecs,
-};
-
 use virtual_server::plugin::types::{
     CpuPricingParams as DestCpuPricingParams, NetPricingParams as DestNetPricingParams,
     NetworkVariables as DestNetworkVariables, ServerSpecs as DestServerSpecs,
 };
+
+use accounts::plugin::api::get_current_user;
+
+use psibase::services::tokens::{Decimal, Quantity};
+use std::str::FromStr;
 
 use transact::plugin::intf::set_propose_latch;
 
@@ -139,6 +143,7 @@ impl VirtualServer for ConfigPlugin {
             block_replay_factor: variables.block_replay_factor,
             per_block_sys_cpu_ns: variables.per_block_sys_cpu_ns,
             obj_storage_bytes: variables.obj_storage_bytes,
+            subj_storage_bytes: variables.subj_storage_bytes,
         };
         virtual_server::plugin::admin::set_network_variables(variables)
     }
@@ -146,10 +151,37 @@ impl VirtualServer for ConfigPlugin {
     fn enable_billing(enabled: bool) -> Result<(), Error> {
         if enabled {
             virtual_server::plugin::billing::fill_gas_tank()?;
+
+            let cost_json =
+                virtual_server::plugin::authorized::graphql("query { enableBillingCost }")?;
+            let parsed: serde_json::Value =
+                serde_json::from_str(&cost_json).expect("Failed to parse billing cost");
+            let cost_str = parsed["data"]["enableBillingCost"]
+                .as_str()
+                .expect("enableBillingCost missing or not a string");
+
+            let cost = Decimal::from_str(cost_str)
+                .unwrap_or_else(|_| panic!("Invalid enableBillingCost '{cost_str}'"));
+
+            if cost.quantity != Quantity::new(0) {
+                let sys_id = tokens::plugin::helpers::fetch_network_token()?
+                    .expect("Network token not found");
+                tokens::plugin::user::credit(
+                    sys_id,
+                    "virtual-server",
+                    &cost_str.to_string(),
+                    "Settle disk consumption that occurred while billing was disabled",
+                )?;
+            }
         }
 
         set_propose_latch(Some("virtual-server"))?;
-        virtual_server::plugin::admin::enable_billing(enabled)
+        let payer = if enabled {
+            Some(get_current_user().unwrap())
+        } else {
+            None
+        };
+        virtual_server::plugin::admin::enable_billing(enabled, payer.as_deref())
     }
 
     fn set_cpu_pricing_params(params: CpuPricingParams) -> Result<(), Error> {

@@ -6,6 +6,8 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+psibase.workspace = true
+serde_json.workspace = true
 wit-bindgen-rt.workspace = true
 psibase-plugin-workspace-hack.workspace = true
 
@@ -28,6 +30,6 @@ world = "impl"
 "branding:plugin" = { path = "../../Branding/plugin/wit/world.wit" }
 "packages:plugin" = { path = "../../Packages/plugin/wit/world.wit" }
 "symbol:plugin" = { path = "../../Symbol/plugin/wit/world.wit" }
-"tokens:plugin" = { path = "../../Tokens/plugin/wit/admin.wit" }
+"tokens:plugin" = { path = "../../Tokens/plugin/wit/world.wit" }
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "virtual-server:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }
-"accounts:plugin" = { path = "wit/deps/accounts-admin.wit" }

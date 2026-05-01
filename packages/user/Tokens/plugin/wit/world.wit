@@ -58,7 +58,7 @@ interface user {
     /// Arguments
     /// * `token_id` - Unique token identifier
     /// * `debitor` - Debitor / recipient account
-    /// * `amount`   - Amount to credit
+    /// * `amount`   - Amount to credit. Must be greater than zero.
     /// * `memo`     - Memo describing the credit
     ///
     /// Places funds in shared balance when the debitor has manual debit enabled
@@ -166,6 +166,10 @@ interface authorized {
     ///
     /// Returns the result of the query as a string.
     graphql: func(query: string) -> result<string, error>;
+}
+
+interface admin {
+    set-sys-token: func(token-id: u32);
 }
 
 world imports {

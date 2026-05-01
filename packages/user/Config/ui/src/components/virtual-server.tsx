@@ -64,6 +64,8 @@ interface VirtualServerFormData {
     perBlockSysCpuUnit: TimeUnit; // Time unit (ns, us, ms)
     objStorageAmount: string; // Objective storage in objStorageUnit
     objStorageUnit: StorageUnit; // Obj storage unit (GB, TB, PB)
+    subjStorageAmount: string; // Subjective storage in subjStorageUnit
+    subjStorageUnit: StorageUnit; // Subj storage unit (GB, TB, PB)
 }
 
 export const VirtualServer = () => {
@@ -106,6 +108,11 @@ export const VirtualServer = () => {
                 networkVariables.objStorageBytes,
             );
 
+            // Auto-select best storage unit for subjStorageBytes
+            const subjStorageUnitData = getBestStorageUnit(
+                networkVariables.subjStorageBytes,
+            );
+
             return {
                 netGbps: netBpsGbps,
                 storageAmount: storageUnitData.value.toString(),
@@ -116,6 +123,8 @@ export const VirtualServer = () => {
                 perBlockSysCpuUnit: timeUnitData.unit,
                 objStorageAmount: objStorageUnitData.value.toString(),
                 objStorageUnit: objStorageUnitData.unit,
+                subjStorageAmount: subjStorageUnitData.value.toString(),
+                subjStorageUnit: subjStorageUnitData.unit,
             };
         }
         // Return empty values while loading
@@ -128,6 +137,8 @@ export const VirtualServer = () => {
             perBlockSysCpuUnit: "ns",
             objStorageAmount: "",
             objStorageUnit: "GB",
+            subjStorageAmount: "",
+            subjStorageUnit: "GB",
         };
     }, [serverSpecs, networkVariables]);
 
@@ -153,6 +164,9 @@ export const VirtualServer = () => {
         objStorageAmount: z.coerce
             .number()
             .nonnegative("Objective storage must be a positive number"),
+        subjStorageAmount: z.coerce
+            .number()
+            .nonnegative("Subjective storage must be a positive number"),
     });
 
     const form = useAppForm({
@@ -169,6 +183,7 @@ export const VirtualServer = () => {
                 blockReplayFactor: data.value.blockReplayFactor,
                 perBlockSysCpu: data.value.perBlockSysCpu,
                 objStorageAmount: data.value.objStorageAmount,
+                subjStorageAmount: data.value.subjStorageAmount,
             });
 
             // Convert Gbps to bits/sec: 1 Gbps = 1e9 bits/sec
@@ -200,12 +215,19 @@ export const VirtualServer = () => {
                     STORAGE_FACTORS[data.value.objStorageUnit],
             );
 
+            // Convert subj storage value from selected unit to bytes
+            const subjStorageBytesValue = Math.floor(
+                parsedVars.subjStorageAmount *
+                    STORAGE_FACTORS[data.value.subjStorageUnit],
+            );
+
             // Submit network variables
             await setNetworkVariables([
                 {
                     blockReplayFactor: parsedVars.blockReplayFactor,
                     perBlockSysCpuNs: perBlockSysCpuNsValue,
                     objStorageBytes: objStorageBytesValue,
+                    subjStorageBytes: subjStorageBytesValue,
                 },
             ]);
 
@@ -494,6 +516,7 @@ export const VirtualServer = () => {
                                                             className="w-36"
                                                         />
                                                         <form.Field name="objStorageUnit">
+                                                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                             {(
                                                                 unitField: any,
                                                             ) => (

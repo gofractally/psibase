@@ -9,6 +9,7 @@ interface NetworkVariables {
     blockReplayFactor: number;
     perBlockSysCpuNs: number;
     objStorageBytes: number;
+    subjStorageBytes: number;
 }
 
 const zNetworkVariablesResponse = z.object({
@@ -16,6 +17,7 @@ const zNetworkVariablesResponse = z.object({
         blockReplayFactor: z.number(),
         perBlockSysCpuNs: z.string(),
         objStorageBytes: z.string(),
+        subjStorageBytes: z.string(),
     }),
 });
 
@@ -28,6 +30,7 @@ export const useNetworkVariables = () => {
                     blockReplayFactor
                     perBlockSysCpuNs
                     objStorageBytes
+                    subjStorageBytes
                 }
             }`;
             const res = await graphql(query, { service: "virtual-server" });
@@ -42,6 +45,9 @@ export const useNetworkVariables = () => {
                 ),
                 objStorageBytes: Number(
                     response.getNetworkVariables.objStorageBytes,
+                ),
+                subjStorageBytes: Number(
+                    response.getNetworkVariables.subjStorageBytes,
                 ),
             };
         },

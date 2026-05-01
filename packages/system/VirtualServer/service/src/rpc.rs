@@ -1,17 +1,16 @@
-use std::str::FromStr;
-
 use crate::{
     math_utils::ppm_to_pct,
-    service::{get_measurement_unit, get_resource_name, resources},
+    resource_type::ResourceType,
     tables::tables::{
-        BandwidthPricing, BillingConfig, BillingConfigTable, NetworkSpecs, NetworkSpecsTable,
-        NetworkVariables, ServerSpecs as InternalServerSpecs, ServerSpecsTable, UserSettings,
+        BillingConfig, BillingConfigTable, CapacityPricing, NetworkSpecs, NetworkSpecsTable,
+        NetworkVariables, RateLimitPricing, ServerSpecs as InternalServerSpecs, ServerSpecsTable,
+        UserSettings,
     },
 };
 
 use async_graphql::*;
 use psibase::{
-    is_auth,
+    check, is_auth,
     services::{
         tokens::{Decimal, Quantity, Wrapper as Tokens},
         transact::ServiceMethod,
@@ -30,28 +29,41 @@ pub struct ConsumptionEvent {
     resource: u8,
     #[graphql(skip)]
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    amount: u64,
+    amount: i64,
     #[graphql(skip)]
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    cost: u64,
+    cost: i64,
 }
 
 #[ComplexObject]
 impl ConsumptionEvent {
     pub async fn resource(&self) -> &'static str {
-        get_resource_name(self.resource)
+        ResourceType::from_id(self.resource).name()
     }
 
-    pub async fn amount(&self) -> String {
-        format!("{} {}", self.amount, get_measurement_unit(self.resource))
+    pub async fn amount(&self) -> i64 {
+        match ResourceType::from_id(self.resource) {
+            // Convert ns to ms
+            ResourceType::Cpu => (self.amount as u64).div_ceil(1_000_000) as i64,
+            ResourceType::Net | ResourceType::Disk => self.amount,
+        }
     }
 
-    pub async fn cost(&self) -> Decimal {
+    pub async fn unit(&self) -> &'static str {
+        ResourceType::from_id(self.resource).measurement_unit()
+    }
+
+    pub async fn cost(&self) -> String {
         if BillingConfig::get().is_none() {
-            return Decimal::from_str("0").unwrap();
+            return "0".to_string();
         }
         let token = BillingConfig::get_sys_token();
-        Decimal::new(Quantity::from(self.cost), token.precision)
+        let abs = Decimal::new(Quantity::new(self.cost.unsigned_abs()), token.precision);
+        if self.cost < 0 {
+            format!("-{abs}")
+        } else {
+            abs.to_string()
+        }
     }
 }
 
@@ -82,6 +94,9 @@ pub struct BlockUsageEvent {
     // The amount of CPU usage in the block in ppm (parts per million) of total capacity
     #[serde(deserialize_with = "deserialize_number_from_string")]
     cpu_usage_ppm: u32,
+    // Disk utilization in ppm (cumulative, not per-block)
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    disk_usage_ppm: u32,
 }
 
 #[Object]
@@ -94,6 +109,11 @@ impl BlockUsageEvent {
     /// The amount of CPU usage in the block as a percentage of total capacity
     pub async fn cpu_usage_pct(&self) -> Decimal {
         ppm_to_pct(self.cpu_usage_ppm as u64)
+    }
+
+    /// Disk utilization as a percentage of total capacity
+    pub async fn disk_usage_pct(&self) -> Decimal {
+        ppm_to_pct(self.disk_usage_ppm as u64)
     }
 }
 
@@ -192,8 +212,8 @@ impl Query {
         let server_specs: InternalServerSpecs =
             ServerSpecsTable::read().get_index_pk().get(&()).unwrap();
 
-        let network_specs = NetworkSpecsTable::read().get_index_pk().get(&()).unwrap();
-        let recommended_min_memory_bytes = network_specs.obj_storage_bytes / MEMORY_RATIO as u64;
+        let vars = NetworkVariables::get();
+        let recommended_min_memory_bytes = vars.obj_storage_bytes / MEMORY_RATIO as u64;
 
         ServerSpecs {
             net_bps: server_specs.net_bps,
@@ -217,19 +237,63 @@ impl Query {
     }
 
     /// Returns the data related to pricing of network bandwidth
-    async fn network_pricing(&self) -> Option<BandwidthPricing> {
-        BandwidthPricing::get(resources::NET)
+    async fn network_pricing(&self) -> Option<RateLimitPricing> {
+        RateLimitPricing::get(ResourceType::Net)
     }
 
     /// Returns the data related to pricing of CPU time
-    async fn cpu_pricing(&self) -> Option<BandwidthPricing> {
-        BandwidthPricing::get(resources::CPU)
+    async fn cpu_pricing(&self) -> Option<RateLimitPricing> {
+        RateLimitPricing::get(ResourceType::Cpu)
     }
 
-    /// Returns information related to the user's resource buffer.
-    /// The specified user must have authorized the query.
-    async fn user_resources(&self, user: AccountNumber) -> async_graphql::Result<UserResources> {
-        self.check_user_auth(user)?;
+    /// Returns the data related to pricing of disk storage
+    async fn disk_pricing(&self) -> Option<CapacityPricing> {
+        CapacityPricing::get(ResourceType::Disk)
+    }
+
+    /// Returns the current cost of consuming the specified number of bytes of disk
+    async fn disk_cost(&self, bytes: u64) -> Decimal {
+        let cost = CapacityPricing::get(ResourceType::Disk)
+            .map(|p| p.get_cost(bytes))
+            .unwrap_or(Quantity::new(0));
+        let token = BillingConfig::get_sys_token();
+        Decimal::new(cost, token.precision)
+    }
+
+    /// Returns the net refund (after fee) for freeing the specified number of bytes
+    async fn disk_refund(&self, bytes: u64) -> Decimal {
+        let refund = CapacityPricing::get(ResourceType::Disk)
+            .map(|p| p.refund_quote(bytes))
+            .unwrap_or(Quantity::new(0));
+        let token = BillingConfig::get_sys_token();
+        Decimal::new(refund, token.precision)
+    }
+
+    /// Returns the token cost that must be paid to enable billing.
+    ///
+    /// This is the amount of system tokens that the payer must credit to VirtualServer
+    /// before `enable_billing(true, payer)` can succeed.
+    ///
+    /// A 5% buffer is added to the cost to account for any minor variations in the cost
+    /// between query time and the time billing is enabled.
+    async fn enable_billing_cost(&self) -> Decimal {
+        let balance = CapacityPricing::get(ResourceType::Disk)
+            .map(|p| p.virtual_balance.net())
+            .unwrap_or(0);
+        let cost: u128 = balance.max(0) as u128;
+        let cost = cost
+            .checked_mul(105)
+            .expect("enable_billing_cost: overflow")
+            / 100;
+        check(cost <= u64::MAX as u128, "settlement cost exceeds u64");
+        let token = BillingConfig::get_sys_token();
+        Decimal::new(Quantity::new(cost as u64), token.precision)
+    }
+
+    /// Returns information related to the account's resource buffer.
+    /// The specified account must have authorized the query.
+    async fn user_resources(&self, account: AccountNumber) -> async_graphql::Result<UserResources> {
+        self.check_user_auth(account)?;
 
         let config = BillingConfig::get();
         if config.is_none() {
@@ -237,10 +301,10 @@ impl Query {
         }
         let p = Tokens::call().getToken(config.unwrap().sys).precision;
 
-        let settings = UserSettings::get(user);
+        let settings = UserSettings::get(account);
 
         Ok(UserResources {
-            balance: Decimal::new(UserSettings::get_resource_balance(user, None), p),
+            balance: Decimal::new(UserSettings::get_resource_balance(account, None), p),
             buffer_capacity: Decimal::new(Quantity::from(settings.buffer_capacity), p),
             auto_fill_threshold_percent: settings.auto_fill_threshold_percent,
         })
@@ -251,6 +315,7 @@ impl Query {
     async fn consumed_history(
         &self,
         account: AccountNumber,
+        resource: Option<ResourceType>,
         first: Option<i32>,
         last: Option<i32>,
         before: Option<String>,
@@ -258,11 +323,15 @@ impl Query {
     ) -> async_graphql::Result<EventConnection<ConsumptionEvent>> {
         self.check_user_auth(account)?;
 
-        let condition = "account = ?".to_string();
-        let param = account.to_string();
+        let mut conditions = vec!["account = ?".to_string()];
+        let params = vec![account.to_string()];
+
+        if let Some(r) = resource {
+            conditions.push(format!("resource = {}", r.as_id()));
+        }
 
         EventQuery::new("history.virtual-server.consumed")
-            .condition_with_params(condition, vec![param])
+            .condition_with_params(conditions.join(" AND "), params)
             .first(first)
             .last(last)
             .before(before)
@@ -310,7 +379,7 @@ impl Query {
             params.push(recipient.to_string());
         }
 
-        EventQuery::new("history.virtual-server.bought")
+        EventQuery::new("history.virtual-server.subsidized")
             .condition_with_params(conditions.join(" AND "), params)
             .first(first)
             .last(last)

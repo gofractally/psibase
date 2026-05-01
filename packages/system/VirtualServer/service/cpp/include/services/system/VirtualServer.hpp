@@ -19,7 +19,12 @@ namespace SystemService
       uint8_t  block_replay_factor;
       uint64_t per_block_sys_cpu_ns;
       uint64_t obj_storage_bytes;
-      PSIO_REFLECT(NetworkVariables, block_replay_factor, per_block_sys_cpu_ns, obj_storage_bytes);
+      uint64_t subj_storage_bytes;
+      PSIO_REFLECT(NetworkVariables,
+                   block_replay_factor,
+                   per_block_sys_cpu_ns,
+                   obj_storage_bytes,
+                   subj_storage_bytes);
    };
 
    struct BufferConfig
@@ -61,9 +66,11 @@ namespace SystemService
    /// 2 - Call `init_billing`: Initializes the billing system. To call this, the system token
    ///     must have already been set in the `Tokens` service. The specified `fee_receiver` will
    ///     receive all of the system token fees paid for resources by users.
-   /// 3 - Call `enable_billing`: When ready (when existing users have accumulated system tokens),
-   ///     calling this action will enable the billing system. To call this, the caller must have
-   ///     already filled their resource buffer because the action to enable billing is itself billed.
+   /// 3 - Call `enable_billing(true, Some(payer))`: When ready, calling this action enables the
+   ///     billing system. Two requirements: (a) the caller must have already filled their resource
+   ///     buffer because this action is itself billed, and (b) `payer` must have credited sufficient
+   ///     system tokens to this service to settle any net disk consumption that accumulated while
+   ///     billing was disabled (see the `enableBillingCost` GraphQL query for the required amount).
    ///
    /// > Note: typically, step 1 should be called at system boot, and therefore the network should
    /// >       always at least have some server specs and derived network specs.
@@ -79,8 +86,7 @@ namespace SystemService
 
       /// Initializes the billing system
       ///
-      /// If no specs are provided, some default specs are used that define a server
-      ///   with minimal specs.
+      /// The `fee_receiver` account will receive all resource billing fees.
       ///
       /// After calling this action, the billing system is NOT yet enabled. The
       /// `enable_billing` action must be called explicitly to enable user billing.
@@ -110,7 +116,11 @@ namespace SystemService
       /// If billing is disabled, resource consumption will still be tracked, but the resources will
       /// not be automatically metered by the network. This is insecure and allows users to abuse
       /// the network by consuming all of the network's resources.
-      void enable_billing(bool enabled);
+      ///
+      /// `payer` is required only when `enabled = true`: that account must have previously credited
+      /// sufficient system tokens to this service to cover the settlement cost of any net disk
+      /// consumption that occurred while billing was disabled.
+      void enable_billing(bool enabled, std::optional<psibase::AccountNumber> payer);
 
       /// Returns whether the billing system has been enabled
       bool is_billing_enabled();
@@ -172,7 +182,7 @@ namespace SystemService
       /// If `config` is None, the account will use a default configuration
       void conf_buffer(std::optional<BufferConfig> config);
 
-      /// Returns the current cost (in system tokens) of a typically sized resource buffer
+      /// Returns the current cost of a typically sized resource buffer
       UserService::Quantity std_buffer_cost();
 
       /// Set the network bandwidth pricing thresholds
@@ -251,6 +261,18 @@ namespace SystemService
       /// CPU time
       UserService::Quantity get_cpu_cost(uint64_t ns);
 
+      /// Reduce the disk-pricing reserve budget by `delta_supply`.
+      ///
+      /// The reserve budget caps the system tokens that may be sold into the disk-pricing
+      /// relay. Reducing it lowers the spot price of disk.
+      void reduce_disk_budget(UserService::Quantity delta_supply);
+
+      /// Returns the current cost of consuming the specified number of bytes
+      UserService::Quantity get_disk_cost(uint64_t bytes);
+
+      /// Gets the estimated refund amount for freeing the specified number of bytes
+      UserService::Quantity disk_ref_quote(uint64_t bytes);
+
       /// Called by the system to indicate that the specified user has consumed a
       /// given amount of network bandwidth.
       ///
@@ -264,6 +286,29 @@ namespace SystemService
       /// If billing is enabled, the user will be billed for the consumption of
       /// this resource.
       void useCpuSys(psibase::AccountNumber user, uint64_t amount_ns);
+
+      /// Suppress billing/tracking for the next `num_writes` `useDiskSys` calls.
+      ///
+      /// Intended for wrapping privileged-service writes that should not
+      /// be billed. The caller is expected to perform exactly `num_writes`
+      /// writes/frees and then call `end_skip_billing`.
+      ///
+      /// Only callable by privileged services.
+      void skip_billing(uint32_t num_writes);
+
+      /// Asserts that all writes promised by `skip_billing` were consumed.
+      ///
+      /// Only callable by privileged services.
+      void end_skip_billing();
+
+      /// Called by the system when `user` causes a write to any database.
+      ///
+      /// `amount_bytes` is positive for consumption and negative for a free
+      ///
+      /// If billing is enabled, the user may be billed from (or refunded to)
+      ///   their resource buffer, depending on the specified database and the
+      ///  amount of bytes consumed/freed.
+      void useDiskSys(psibase::AccountNumber user, psibase::DbId db_id, int64_t amount_bytes);
 
       UserService::Quantity get_resources(psibase::AccountNumber user);
 
@@ -292,7 +337,9 @@ namespace SystemService
                             psibase::AccountNumber recipient,
                             uint64_t               amount,
                             psibase::Memo          memo);
-            void block_summary(uint32_t net_usage_ppm, uint32_t cpu_usage_ppm);
+            void block_summary(uint32_t net_usage_ppm,
+                               uint32_t cpu_usage_ppm,
+                               uint32_t disk_usage_ppm);
          };
       };
    };
@@ -304,7 +351,7 @@ namespace SystemService
                 method(get_fee_receiver),
                 method(set_specs, specs),
                 method(set_network_variables, variables),
-                method(enable_billing, enabled),
+                method(enable_billing, enabled, payer),
                 method(is_billing_enabled),
                 method(buy_res_for, amount, for_user, memo),
                 method(buy_res_sub, amount, sub_account),
@@ -325,18 +372,25 @@ namespace SystemService
                 method(cpu_blocks_avg, num_blocks),
                 method(cpu_min_unit, ns),
                 method(get_cpu_cost, ns),
+                method(reduce_disk_budget, delta_supply),
+                method(get_disk_cost, bytes),
+                method(disk_ref_quote, bytes),
                 method(useNetSys, user, amount_bytes),
                 method(useCpuSys, user, amount_ns),
+                method(skip_billing, num_writes),
+                method(end_skip_billing),
+                method(useDiskSys, user, db_id, amount_bytes),
                 method(get_resources, user),
                 method(notifyBlock, block_num),
                 method(setBillableAcc, account),
                 method(serveSys, request, socket, user))
 
    PSIBASE_REFLECT_EVENTS(VirtualServer);
-   PSIBASE_REFLECT_HISTORY_EVENTS(VirtualServer,
-                                  allowHashedMethods(),
-                                  method(consumed, account, resource, amount, cost),
-                                  method(subsidized, purchaser, recipient, amount, memo),
-                                  method(block_summary, block_num, net_usage_ppm, cpu_usage_ppm));
+   PSIBASE_REFLECT_HISTORY_EVENTS(
+       VirtualServer,
+       allowHashedMethods(),
+       method(consumed, account, resource, amount, cost),
+       method(subsidized, purchaser, recipient, amount, memo),
+       method(block_summary, net_usage_ppm, cpu_usage_ppm, disk_usage_ppm));
 
 }  // namespace SystemService
