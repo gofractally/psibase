@@ -16,6 +16,15 @@ interface packaging {
     set-account-sources: func(accounts: list<string>) -> result<_, error>;
 }
 
+interface prem-accounts {
+    use host:types/types.{error};
+
+    create: func(length: u8, initial-price: string, target: u32, floor-price: string, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
+    configure: func(length: u8, window-seconds: u32, target: u32, floor-price: string, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
+    enable: func(length: u8) -> result<_, error>;
+    disable: func(length: u8) -> result<_, error>;
+}
+
 interface settings {
     use host:types/types.{error};
 
@@ -70,22 +79,22 @@ interface symbol {
 interface virtual-server {
     use host:types/types.{error};
     use virtual-server:plugin/types.{
-        server-specs, 
+        server-specs,
         network-variables,
-        cpu-pricing-params, 
+        cpu-pricing-params,
         net-pricing-params
     };
 
     /// Initialize the billing system
     /// A system token must have already been set to enable billing.
-    /// 
+    ///
     /// Parameters:
     /// * `fee-receiver` - The account that will receive the billing fees
     init-billing: func(fee-receiver: string) -> result<_, error>;
 
     /// Set network variables
     /// These variables change how the network specs are derived from the server specs.
-    /// 
+    ///
     /// Parameters:
     /// * `variables` - The network variables
     set-network-variables: func(variables: network-variables) -> result<_, error>;
@@ -93,32 +102,33 @@ interface virtual-server {
     /// Enable the billing system
     /// This must be called after the billing system has been initialized and the
     /// system token has been set.
-    /// 
+    ///
     /// Parameters:
     /// * `enabled` - Whether to enable the billing system
     enable-billing: func(enabled: bool) -> result<_, error>;
 
     /// Set the virtual server specs
     /// It is from these specs that the pricing for network resources is derived.
-    /// 
+    ///
     /// Parameters:
     /// * `specs` - The virtual server specs
     set-specs: func(specs: server-specs) -> result<_, error>;
 
     /// Set the CPU pricing parameters
-    /// 
+    ///
     /// Parameters:
     /// * `params` - The CPU pricing parameters
     set-cpu-pricing-params: func(params: cpu-pricing-params) -> result<_, error>;
 
     /// Set the network pricing parameters
-    /// 
+    ///
     /// Parameters:
     /// * `params` - The network pricing parameters
     set-net-pricing-params: func(params: net-pricing-params) -> result<_, error>;
 }
 
 world imports {
+    import prem-accounts;
     import producers;
     import branding;
     import packaging;

@@ -36,9 +36,32 @@
 //!   difficulty. The consumer is automatically set to the account that calls `create()` and cannot
 //!   be changed after creation. Initially, the creator is both admin and consumer, but the admin
 //!   role can be transferred via NFT ownership while the consumer remains fixed.
+
 #[crate::service(name = "diff-adjust", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
+    use crate::{AccountNumber, Pack, TimePointSec, ToSchema, Unpack};
+
+    use async_graphql::SimpleObject;
+    use serde::{Deserialize, Serialize};
+
+    #[table(name = "RateLimitTable", index = 0)]
+    #[derive(Default, Pack, Unpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug)]
+    #[fracpack(fracpack_mod = "fracpack")]
+    pub struct RateLimit {
+        #[primary_key]
+        pub nft_id: u32,
+        pub window_seconds: u32,
+        pub counter: u32,
+        pub target_min: u32,
+        pub target_max: u32,
+        pub floor_difficulty: u64,
+        pub active_difficulty: u64,
+        pub last_update: TimePointSec,
+        pub increase_ppm: u32,
+        pub decrease_ppm: u32,
+        pub consumer: AccountNumber,
+    }
 
     /// Creates a new Rate limit
     ///
@@ -163,6 +186,8 @@ pub mod Service {
         unimplemented!()
     }
 }
+
+pub use Service::{RateLimit, RateLimitTable};
 
 #[test]
 fn verify_schema() {
