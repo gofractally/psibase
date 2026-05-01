@@ -2,6 +2,9 @@
 mod bindings;
 use bindings::*;
 
+mod errors;
+use errors::ErrorType::*;
+
 mod helpers;
 use helpers::*;
 
@@ -13,7 +16,7 @@ use crate::bindings::{
     host::{
         common::admin as HostAdmin,
         db::store::{Bucket, Database, DbMode, StorageDuration},
-        types::types::{BodyTypes, Error, PostRequest},
+        types::types::{BodyTypes, Claim, Error, PostRequest},
     },
     transact::plugin::auth as Transact,
 };
@@ -29,14 +32,22 @@ fn bucket_id(user: &str) -> String {
     format!("query_tokens-{}", user)
 }
 
-fn set_active_query_token(query_token: &str, app: &str, user: &str) {
+fn install_cookie(query_token: &str, app: &str) {
     let req: PostRequest = PostRequest {
         endpoint: String::from("/common/set-auth-cookie"),
         body: BodyTypes::Json(format!("{{\"accessToken\": \"{}\"}}", query_token)),
     };
     HostAdmin::post_with_credentials(app, &req).unwrap();
+}
 
+fn cache_token(query_token: &str, app: &str, user: &str) {
     Bucket::new(DB, &bucket_id(user)).set(&app, &query_token.to_string().packed());
+}
+
+fn cached_token(app: &str, user: &str) -> Option<String> {
+    Bucket::new(DB, &bucket_id(user))
+        .get(&app)
+        .map(|t| String::unpacked(&t).unwrap())
 }
 
 fn remove_active_query_token(app: &str, user: &str) {
@@ -50,21 +61,26 @@ fn remove_active_query_token(app: &str, user: &str) {
 }
 
 impl Api for HostAuth {
-    fn set_logged_in_user(user: String, app: String) -> Result<(), Error> {
-        check_caller(&["accounts"], "set-logged-in-user@host:auth/api");
+    fn use_session(user: String, app: String) -> Result<(), Error> {
+        check_caller(&["accounts"], "use-session@host:auth/api");
 
-        let query_token = Bucket::new(DB, &bucket_id(&user))
-            .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
-            .unwrap_or_else(|| Transact::get_query_token(&app, &user).unwrap());
-
-        set_active_query_token(&query_token, &app, &user);
-
+        let token =
+            cached_token(&app, &user).ok_or_else(|| Error::from(ReauthorizationRequired(user)))?;
+        install_cookie(&token, &app);
         Ok(())
     }
 
-    fn log_out_user(user: String, app: String) {
-        check_caller(&["accounts"], "log_out_user@host:auth/api");
+    fn new_session(user: String, app: String, claim: Option<Claim>) -> Result<(), Error> {
+        check_caller(&["accounts"], "new-session@host:auth/api");
+
+        let token = Transact::get_query_token(&app, &user, claim.as_ref())?;
+        cache_token(&token, &app, &user);
+        install_cookie(&token, &app);
+        Ok(())
+    }
+
+    fn end_session(user: String, app: String) {
+        check_caller(&["accounts"], "end-session@host:auth/api");
         remove_active_query_token(&app, &user);
     }
 
@@ -74,9 +90,7 @@ impl Api for HostAuth {
             "get-active-query-token@host:auth/api",
         );
 
-        Bucket::new(DB, &bucket_id(&user))
-            .get(&app)
-            .map(|t| String::unpacked(&t).unwrap())
+        cached_token(&app, &user)
     }
 }
 

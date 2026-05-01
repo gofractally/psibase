@@ -1,20 +1,7 @@
 package transact:plugin;
 
 interface types {
-    /// A list of `claim` objects is added to every submitted transaction.
-    /// A claim is something the submitter of a transaction claims to know (e.g. a public key)
-    record claim {
-        /// The name of the service used to verify the claim is valid
-        verify-service: string,
-        /// The raw claim data
-        raw-data: list<u8>,
-    }
-
-    /// The verify-service specified in the claim is the service that knows how to verify that
-    /// a proof actually proves the claim.
-    record proof {
-        signature: list<u8>,
-    }
+    use host:types/types.{claim};
 
     /// Action data from a transaction
     record action {
@@ -29,13 +16,7 @@ interface types {
     }
 }
 
-/// Hooks allow plugins to hook into the transact plugin and customize its behavior
-/// during transaction construction and authorization.
 interface hooks {
-    /// Allows the the caller plugin to add transaction authorization claims and proofs
-    /// based on the next action added to this transaction.
-    hook-action-auth: func();
-
     /// Allows the caller plugin to manage the sender of any subsequent actions added to this
     /// transaction.
     hook-actions-sender: func();
@@ -68,6 +49,7 @@ interface admin {
 
 interface intf {
     use host:types/types.{error};
+    use types.{claim};
 
     /// Adds the specified service action to the current transaction.
     ///
@@ -79,6 +61,9 @@ interface intf {
     /// * `method-name`: The method name of the action being called
     /// * `packed-args`: The arguments for the action, packed into fracpack format
     add-action-to-transaction: func(method-name: string, packed-args: list<u8>) -> result<_, error>;
+
+    /// Appends a `claim` and its corresponding proof/signature to the current transaction.
+    add-signature: func(claim: claim) -> result<_, error>;
 
     /// Set or clear the propose-latch.
     ///
@@ -102,41 +87,25 @@ interface intf {
 
 interface auth {
     use host:types/types.{error};
+    use types.{claim};
 
-    /// Gets a bearer token for user to make authenticated queries
-    get-query-token: func(app: string, user: string) -> result<string, error>;
-}
-
-// Include this world to import the most common transact:plugin imports
-world imports {
-    import intf;
-    import auth;
-    import network;
-    import admin;
-}
-
-//      HOOK WORLDS
-//
-// Include the worlds below in plugins that you are implementing,
-//   if you want to use the corresponding hook.
-//
-// NOTE: Currently, the following limitation applies:
-//   - The transact plugin will always call the hook handler at:
-//     `<service>:plugin/transact-hook-<hook_name>`
-//     Therefore, If you use any of these hooks, your plugin must be called "plugin".
-
-// All user auth service plugins must include this world.
-world hook-user-auth {
-    export transact-hook-user-auth: interface {
-        use host:types/types.{error};
-        use types.{claim, proof, action};
-
-        /// Gets the claim needed to satisfy the authorization of the logged-in user
-        on-user-auth-claim: func(account-name: string) -> result<option<claim>, error>;
-
-        /// Provides proof of the user claim.
-        on-user-auth-proof: func(account-name: string, transaction-hash: list<u8>) -> result<option<proof>, error>;
-    }
+    /// Builds, signs, and POSTs a `loginSys` transaction to `/login` for
+    /// `user` against `app`, returning the bearer token used for
+    /// authenticated queries.
+    ///
+    /// `claim` is appended to the login transaction's claim list and
+    /// the matching proof is produced via `host:crypto/keyvault.sign`
+    /// (the keystore must contain the matching private key). `claim`
+    /// is `none` for accounts whose auth-service does not require a
+    /// signed login (e.g. `auth-any`); in that case the login
+    /// transaction has zero claims and zero proofs.
+    ///
+    /// Only callable by `host`.
+    get-query-token: func(
+        app: string,
+        user: string,
+        claim: option<claim>,
+    ) -> result<string, error>;
 }
 
 interface network {
@@ -146,27 +115,12 @@ interface network {
     set-snapshot-time: func(seconds: u32) -> result<_, error>;
 }
 
-world hook-action-auth {
-    import hooks;
-    export transact-hook-action-auth: interface {
-        use host:types/types.{error};
-        use types.{claim, proof, action};
-
-        /// Gets the claim(s) needed to satisfy the authorization of the sender of this transaction
-        ///
-        /// Parameters
-        /// * `action`: The action being added to the current transaction context
-        on-action-auth-claims: func(action: action) -> result<list<claim>, error>;
-
-        /// Provides proof(s) of the claim(s).
-        /// If there are multiple claims, the returned list of proofs must be in the same order as the
-        /// claims were specified.
-        ///
-        /// Parameters
-        /// * `claims`: The claims this transaction is attempting to satisfy
-        /// * `transaction-hash`: A hash of the current transaction. Often signed to generate a proof.
-        on-action-auth-proofs: func(claims: list<claim>, transaction-hash: list<u8>) -> result<list<proof>, error>;
-    }
+// Include this world to import the most common transact:plugin imports
+world imports {
+    import intf;
+    import auth;
+    import network;
+    import admin;
 }
 
 world hook-actions-sender {

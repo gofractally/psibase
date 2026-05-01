@@ -1,14 +1,26 @@
 package auth-sig:plugin;
 
+interface session {
+    use host:types/types.{error};
+
+    /// Called by the supervisor at the start of every transaction for
+    /// the currently logged-in user.
+    authorize: func(account-name: string) -> result<_, error>;
+
+    /// Log `account-name` into the currently active app.
+    ///
+    /// Can only be called by the `accounts` app.
+    login: func(account-name: string) -> result<_, error>;
+}
+
 world impl {
-    include accounts:plugin/imports;
+    import accounts:plugin/auth-svc;
     include transact:plugin/imports;
     include host:common/imports;
     include host:crypto/imports;
     include permissions:plugin/imports;
 
-    include transact:plugin/hook-user-auth;
-
+    export session;
     export keyvault;
     export actions;
     export api;
