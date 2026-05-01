@@ -11,11 +11,7 @@ import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { isAccountAvailable } from "@shared/lib/get-account";
 import { graphql } from "@shared/lib/graphql";
-import {
-    expandToCanonicalTokenDecimal,
-    formatCanonicalTokenAmount,
-    unitTokenAmountCanonical,
-} from "@shared/lib/quantity";
+import { Quantity } from "@shared/lib/quantity";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -25,6 +21,31 @@ import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
+
+const VALIDATION_DEBOUNCE_MS = 300;
+
+/** Canonical "one whole token" string for the given precision (e.g. 4 → "1.0000"). */
+function unitTokenDecimal(precision: number): string {
+    return new Quantity(1, precision, 0).format({
+        fullPrecision: true,
+        includeLabel: false,
+        showThousandsSeparator: false,
+    });
+}
+
+/** Display "<canonical> <symbol>" without thousands separators (matches on-chain decimal form). */
+function formatCanonicalPrice(
+    canonical: string,
+    precision: number,
+    tokenId: number,
+    symbol?: string | null,
+): string {
+    return new Quantity(canonical, precision, tokenId, symbol).format({
+        fullPrecision: true,
+        includeLabel: true,
+        showThousandsSeparator: false,
+    });
+}
 
 export function BuyPage() {
     const { bumpHistory } = useOutletContext<PremAccountsOutletContext>();
@@ -38,6 +59,13 @@ export function BuyPage() {
         id?: number;
     } | null>(null);
     const [maxCost, setMaxCost] = useState("1.0000");
+    /**
+     * Authoritative validation comes from `tokens` plugin's `decimal-to-u64` (debounced).
+     * `null` while pending or whenever the trimmed input fails to convert.
+     */
+    const [validatedMaxCostU64, setValidatedMaxCostU64] = useState<
+        bigint | null
+    >(null);
     const [priceByLength, setPriceByLength] = useState<Map<number, string>>(
         () => new Map(),
     );
@@ -92,7 +120,7 @@ export function BuyPage() {
                     id: sysTid,
                 });
                 if (!maxCostDefaultSynced.current) {
-                    setMaxCost(unitTokenAmountCanonical(token.precision));
+                    setMaxCost(unitTokenDecimal(token.precision));
                     maxCostDefaultSynced.current = true;
                 }
             }
@@ -165,6 +193,55 @@ export function BuyPage() {
         return () => clearTimeout(timeoutId);
     }, [accountName, priceByLength]);
 
+    /**
+     * Authoritative maxCost validation via tokens plugin's `decimal-to-u64`.
+     * Eager-invalidate on any change so the Buy button can't be clicked with stale "valid" state.
+     */
+    useEffect(() => {
+        setValidatedMaxCostU64(null);
+        const tid = systemToken?.id;
+        if (tid === undefined) {
+            return;
+        }
+        const trimmed = maxCost.trim();
+        if (trimmed === "") {
+            return;
+        }
+
+        let cancelled = false;
+        const handle = setTimeout(() => {
+            void (async () => {
+                try {
+                    const raw = await supervisor.functionCall({
+                        service: "tokens",
+                        plugin: "plugin",
+                        intf: "helpers",
+                        method: "decimalToU64",
+                        params: [tid, trimmed],
+                    });
+                    if (cancelled) {
+                        return;
+                    }
+                    const u64 =
+                        typeof raw === "bigint"
+                            ? raw
+                            : BigInt(raw as number | string);
+                    setValidatedMaxCostU64(u64);
+                } catch {
+                    if (cancelled) {
+                        return;
+                    }
+                    setValidatedMaxCostU64(null);
+                }
+            })();
+        }, VALIDATION_DEBOUNCE_MS);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(handle);
+        };
+    }, [maxCost, systemToken?.id]);
+
     const handleBuy = async () => {
         const trimmed = accountName.trim();
         const zod = zAccount.safeParse(trimmed);
@@ -191,9 +268,9 @@ export function BuyPage() {
 
         const purchasedName = trimmed;
 
-        const maxCostForTx =
-            expandToCanonicalTokenDecimal(maxCost, token.precision) ??
-            maxCost.trim();
+        // Plugin's `buy` server-side calls Tokens' `decimal_to_u64` on this string,
+        // so we hand it the trimmed user input directly (no FE padding/normalization).
+        const maxCostForTx = maxCost.trim();
 
         try {
             await supervisor.functionCall({
@@ -211,7 +288,7 @@ export function BuyPage() {
             setPrice(null);
             setMaxCost(
                 systemToken != null
-                    ? unitTokenAmountCanonical(systemToken.precision)
+                    ? unitTokenDecimal(systemToken.precision)
                     : "1.0000",
             );
             await loadPrices();
@@ -231,13 +308,9 @@ export function BuyPage() {
     const maxCostLabel =
         systemToken?.symbol ??
         (systemToken?.id != null ? `token ${systemToken.id}` : "SysToken");
-    const maxCostCanonical =
-        systemToken != null
-            ? expandToCanonicalTokenDecimal(maxCost, systemToken.precision)
-            : null;
     const isBuyEnabled =
         systemToken != null &&
-        maxCostCanonical != null &&
+        validatedMaxCostU64 !== null &&
         accountNameValid &&
         accountExists === false &&
         price !== null &&
@@ -287,9 +360,7 @@ export function BuyPage() {
                         }}
                         placeholder={
                             systemToken != null
-                                ? unitTokenAmountCanonical(
-                                      systemToken.precision,
-                                  )
+                                ? unitTokenDecimal(systemToken.precision)
                                 : "1.0000"
                         }
                     />
@@ -325,15 +396,19 @@ export function BuyPage() {
                                         Account name already exists
                                     </p>
                                 )}
-                                {accountExists === false && price !== null && (
-                                    <p className="text-green-600">
-                                        Buy for{" "}
-                                        {formatCanonicalTokenAmount(
-                                            price,
-                                            systemToken?.symbol,
-                                        )}
-                                    </p>
-                                )}
+                                {accountExists === false &&
+                                    price !== null &&
+                                    systemToken !== null && (
+                                        <p className="text-green-600">
+                                            Buy for{" "}
+                                            {formatCanonicalPrice(
+                                                price,
+                                                systemToken.precision,
+                                                systemToken.id ?? 0,
+                                                systemToken.symbol,
+                                            )}
+                                        </p>
+                                    )}
                                 {accountExists === false &&
                                     price === null &&
                                     !hasLoadedPrices && (
