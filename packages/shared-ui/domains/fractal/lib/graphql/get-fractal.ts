@@ -13,8 +13,9 @@ export const zFractal = z
         name: z.string(),
         stream: z.object({
             lastDistributed: zDateTime,
-            distIntervalSecs: z.number().int(),
         }).nullable(),
+        distIntervalSecs: z.number().int(),
+        genesisTime: zDateTime,
         mission: z.string(),
         judiciary: z.object({
             account: zAccount,
@@ -51,8 +52,9 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
             name
             stream {
                 lastDistributed
-                distIntervalSecs
             }
+            distIntervalSecs
+            genesisTime
             judiciary { 
                 account
                 occupation

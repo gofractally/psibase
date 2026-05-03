@@ -4,26 +4,6 @@ import { GUILDS_SERVICE } from "../constants";
 
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
-import { zDateTime } from "@shared/lib/schemas/date-time";
-
-export const zGuild = z
-    .object({
-        account: zAccount,
-        createdAt: zDateTime,
-        name: z.string(),
-        stream: z.object({
-            lastDistributed: zDateTime,
-            distIntervalSecs: z.number().int(),
-        }).nullable(),
-        mission: z.string(),
-        judiciary: z.object({
-            account: zAccount,
-        }),
-        legislature: z.object({
-            account: zAccount,
-        }),
-    })
-    .or(z.null());
 
 export const zGuildsRes = z.object({
     guilds: z.object({

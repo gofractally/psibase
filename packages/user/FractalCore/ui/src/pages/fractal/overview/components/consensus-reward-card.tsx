@@ -27,12 +27,13 @@ export const ConsensusRewardCard = () => {
     if (!fractal?.fractal?.stream) return null;
 
     const intervalPeriod = humanize(
-        fractal.fractal.stream.distIntervalSecs * 1000,
+        fractal.fractal.distIntervalSecs * 1000,
     );
+
     const nextPeriod = fractal.fractal.stream.lastDistributed;
 
     const nextClaimTime = dayjs(nextPeriod).add(
-        fractal.fractal.stream.distIntervalSecs,
+        fractal.fractal.distIntervalSecs,
         "seconds",
     );
     const isClaimTime = nextClaimTime.unix() < now;
