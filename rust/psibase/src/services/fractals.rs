@@ -205,6 +205,16 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set genesis time for a fractal
+    ///
+    /// # Arguments
+    /// * `fractal` - Fractal to update.
+    /// * `genesis_time` - New genesis time for the fractal.
+    #[action]
+    fn set_gen_time(fractal: AccountNumber, genesis_time: u64) {
+        unimplemented!()
+    }
+
     /// Set ordered occupations
     ///
     /// Payment for each ordered occupation will be according to the fractals payment strategy.

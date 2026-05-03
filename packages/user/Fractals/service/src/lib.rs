@@ -84,10 +84,10 @@ pub mod service {
     /// * `fractal` - Fractal to update.
     /// * `genesis_time` - New genesis time for the fractal.
     #[action]
-    fn set_gen_time(fractal: AccountNumber, genesis_time: TimePointSec) {
+    fn set_gen_time(fractal: AccountNumber, genesis_time: u64) {
         let mut fractal = Fractal::get_assert(fractal);
         fractal.check_sender_is_legislature();
-        fractal.set_genesis_time(genesis_time);
+        fractal.set_genesis_time(TimePointSec::from(genesis_time as i64));
     }
 
     /// Set distribution strategy
