@@ -27,10 +27,19 @@ pub fn assign_decreasing_levels<T>(items: Vec<T>) -> Vec<(usize, T)> {
 }
 
 pub fn fibonnaci<T>(items: Vec<T>) -> Vec<(T, u64)> {
-    const FIB_SCALE: u32 = EXTERNAL_S as u32;
+    use crate::helpers::weighted_normalization::fib::EXTERNAL_S;
+
+    const MAX_FIB: u32 = 32;
+    const MAX_ITEMS: u32 = 25;
+    const OFFSET: u32 = MAX_FIB - MAX_ITEMS;
 
     assign_decreasing_levels(items)
         .into_iter()
-        .map(|(level, item)| (item, continuous_fibonacci((level as u32) * FIB_SCALE)))
+        .map(|(level, item)| {
+            (
+                item,
+                continuous_fibonacci((level as u32 + OFFSET) * EXTERNAL_S as u32),
+            )
+        })
         .collect()
 }

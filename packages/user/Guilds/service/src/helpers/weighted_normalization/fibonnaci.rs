@@ -27,10 +27,20 @@ pub fn assign_decreasing_levels<T>(items: Vec<T>) -> Vec<(usize, T)> {
 }
 
 pub fn fibonnaci<T>(items: Vec<T>) -> Vec<(T, u64)> {
+    use crate::constants::MAX_RANKED_GUILDS;
+
     const FIB_SCALE: u32 = EXTERNAL_S as u32;
+    const MAX_FIB: u32 = 32;
+
+    const OFFSET: u32 = MAX_FIB - MAX_RANKED_GUILDS as u32;
 
     assign_decreasing_levels(items)
         .into_iter()
-        .map(|(level, item)| (item, continuous_fibonacci((level as u32) * FIB_SCALE)))
+        .map(|(level, item)| {
+            (
+                item,
+                continuous_fibonacci((level as u32 + OFFSET) * FIB_SCALE),
+            )
+        })
         .collect()
 }
