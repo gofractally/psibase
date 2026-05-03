@@ -434,11 +434,11 @@ pub mod service {
     /// * `role_id` - Role ID
     #[action]
     fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
+        use psibase::services::fractals::FractalRole;
         let role = check_some(
             RoleMap::get(fractal, role_id),
             "no role map set by fractal for role_id",
         );
-        use psibase::services::fractals::FractalRole;
         if FractalRole::Recruitment == role_id.into() {
             auth_dyn::policy::DynamicAuthPolicy::from_sole_authorizer(get_service())
         } else {

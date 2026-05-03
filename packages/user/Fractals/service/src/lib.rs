@@ -191,8 +191,6 @@ pub mod service {
     /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
     fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
-        // check who the sender is, who should be "guilds"
-        // we determine that guilds is the correct acocunt by checking which occupation sits in it
         self::check_sender_is_authorised(
             fractal,
             psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into(),

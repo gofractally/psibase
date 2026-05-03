@@ -46,8 +46,6 @@ export const Legislative = () => {
 
     const { data: currentUser } = useCurrentUser();
 
-    console.log({ guild })
-
     const isAdministrativeUser =
         currentUser == guild?.rep?.member ||
         (typeof currentUser == "string" &&
