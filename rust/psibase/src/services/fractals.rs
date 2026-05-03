@@ -200,8 +200,9 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
+    /// * `member` - The fractal member claiming rewards.
     #[action]
-    fn claim_rew(fractal: AccountNumber) {
+    fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
         unimplemented!()
     }
 
