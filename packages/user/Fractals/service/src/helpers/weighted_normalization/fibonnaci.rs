@@ -1,4 +1,4 @@
-use crate::helpers::weighted_normalization::fib::continuous_fibonacci;
+use crate::helpers::weighted_normalization::fib::{continuous_fibonacci, EXTERNAL_S};
 
 /// Assigns decreasing integer levels to items, starting from `from_level`.
 ///
@@ -27,7 +27,7 @@ pub fn assign_decreasing_levels<T>(items: Vec<T>) -> Vec<(usize, T)> {
 }
 
 pub fn fibonnaci<T>(items: Vec<T>) -> Vec<(T, u64)> {
-    const FIB_SCALE: u32 = 222 as u32;
+    const FIB_SCALE: u32 = EXTERNAL_S as u32;
 
     assign_decreasing_levels(items)
         .into_iter()
