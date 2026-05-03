@@ -126,33 +126,6 @@ impl From<FractalRole> for u8 {
     }
 }
 
-#[crate::service(
-    name = "payment",
-    actions = "pay_actions",
-    wrapper = "pay_wrapper",
-    structs = "pay_structs",
-    dispatch = false,
-    pub_constant = false,
-    psibase_mod = "crate"
-)]
-#[allow(non_snake_case, unused_variables)]
-pub mod Payment {
-    use crate::{
-        services::tokens::{Quantity, TID},
-        AccountNumber,
-    };
-
-    #[action]
-    fn on_payment(fractal: AccountNumber, member: AccountNumber, token_id: TID, amount: Quantity) {
-        unimplemented!()
-    }
-
-    #[action]
-    fn is_supported(fractal: AccountNumber) -> bool {
-        unimplemented!()
-    }
-}
-
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
