@@ -247,16 +247,16 @@ export const EvaluationDeliberation = () => {
                         </div>
                         <SortableList
                             className="mt-4 flex w-full flex-col gap-2"
-                            draggedItemClassName="dragged-item"
+                            draggedItemClassName="cursor-grabbing"
                             onSortEnd={onSortEnd}
                             lockAxis="y"
                         >
                             {rankedAccounts.length > 0 ? (
                                 rankedAccounts.map((account: string) => (
                                     <SortableItem key={account}>
-                                        <div className="bg-background">
+                                        <div className="bg-background cursor-grab">
                                             <SortableKnob>
-                                                <div className="border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full cursor-grab select-none items-center gap-3 rounded-sm border p-2">
+                                                <div className="border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full select-none items-center gap-3 rounded-sm border p-2">
                                                     <GripHorizontal className="h-5 w-5" />
                                                     <div className="flex-1 text-lg">
                                                         {account}
