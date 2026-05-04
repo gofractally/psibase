@@ -10,9 +10,9 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
 import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
