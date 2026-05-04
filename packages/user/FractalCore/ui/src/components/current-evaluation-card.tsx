@@ -3,7 +3,9 @@ import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useWatchStart } from "@/hooks/fractals/use-watch-start";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 
+import { GlowingCard } from "@shared/components/glowing-card";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
+import { CardContent } from "@shared/shadcn/ui/card";
 
 import { Deliberation } from "./evaluations/deliberation";
 import { Failed } from "./evaluations/failed";
@@ -22,21 +24,25 @@ export const CurrentEvaluationCard = () => {
     const isClosing = useWatchClose(status);
 
     return (
-        <div className="w-full rounded-md border p-4">
-            {status?.type == "waitingRegistration" && (
-                <WaitingRegistration status={status} />
-            )}
-            {status?.type == "failed" && <Failed />}
-            {status?.type == "registration" && <Register status={status} />}
-            {status?.type == "waitingStart" && <Start />}
-            {status?.type == "deliberation" && <Deliberation status={status} />}
-            {status?.type == "submission" && <Submission status={status} />}
-            {status?.type == "finished" && (
-                <div>
-                    ✅ Evaluation finished!{" "}
-                    {isClosing ? "Now closing" : "Awaiting to close"}
-                </div>
-            )}
-        </div>
+        <GlowingCard>
+            <CardContent>
+                {status?.type == "waitingRegistration" && (
+                    <WaitingRegistration status={status} />
+                )}
+                {status?.type == "failed" && <Failed />}
+                {status?.type == "registration" && <Register status={status} />}
+                {status?.type == "waitingStart" && <Start />}
+                {status?.type == "deliberation" && (
+                    <Deliberation status={status} />
+                )}
+                {status?.type == "submission" && <Submission status={status} />}
+                {status?.type == "finished" && (
+                    <div>
+                        ✅ Evaluation finished!{" "}
+                        {isClosing ? "Now closing" : "Awaiting to close"}
+                    </div>
+                )}
+            </CardContent>
+        </GlowingCard>
     );
 };
