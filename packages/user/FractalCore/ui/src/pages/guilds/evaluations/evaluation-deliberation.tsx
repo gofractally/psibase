@@ -23,6 +23,7 @@ import { Button } from "@shared/shadcn/ui/button";
 import {
     CardAction,
     CardContent,
+    CardDescription,
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
@@ -201,45 +202,50 @@ export const EvaluationDeliberation = () => {
             <GlowingCard>
                 <CardHeader>
                     <CardTitle>Group {groupNumber} evaluation</CardTitle>
+                    <CardDescription>
+                        Evaluate participants in your group
+                    </CardDescription>
                     <CardAction>
                         <GroupStatus isSaving={isSaving} isSaved={isSaved} />
                     </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="flex flex-col gap-2">
-                        <div>
-                            <h2 className="text-base font-semibold">
-                                Unranked
-                            </h2>
+                    <div>
+                        <h2 className="text-base font-semibold">Unranked</h2>
+                        <div className="text-muted-foreground text-sm">
+                            Select unranked participants to rank them
                         </div>
-                        {isLoading ? (
-                            <Skeleton className="h-10 w-full" />
-                        ) : (
-                            <div className="flex w-full gap-2">
-                                {unrankedAccounts.length > 0 ? (
-                                    unrankedAccounts.map((account) => (
-                                        <Button
-                                            key={account}
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => add(account)}
-                                        >
-                                            <div>{account}</div>
-                                            <Plus className="h-4 w-4" />
-                                        </Button>
-                                    ))
-                                ) : (
-                                    <div className="text-muted-foreground text-sm italic">
-                                        All participants are ranked
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        <div className="mt-2">
+                            {isLoading ? (
+                                <Skeleton className="h-10 w-full" />
+                            ) : (
+                                <div className="flex w-full gap-2">
+                                    {unrankedAccounts.length > 0 ? (
+                                        unrankedAccounts.map((account) => (
+                                            <Button
+                                                key={account}
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => add(account)}
+                                            >
+                                                <div>{account}</div>
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        ))
+                                    ) : (
+                                        <div className="text-muted-foreground text-sm italic">
+                                            All participants are ranked
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <h2 className="text-base font-semibold">Ranked</h2>
                         <div className="text-muted-foreground text-sm">
-                            With those more highly ranked towards the top:
+                            Drag and drop ranked participants to reorder them,
+                            with those more highly ranked towards the top.
                         </div>
                         <SortableList
                             className="jss30 mb-4 mt-2 flex w-full flex-col gap-2 border p-2"
