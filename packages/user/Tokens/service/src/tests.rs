@@ -9,8 +9,6 @@ mod tests {
     use psibase::*;
     use std::str::FromStr;
 
-    const MANUAL_DEBIT: u8 = 0;
-
     fn assert_error(result: ChainEmptyResult, message: &str) {
         let err = result.trace.error.unwrap();
         let contains_error = err.contains(message);
@@ -55,7 +53,6 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
         let b = Wrapper::push_from(&chain, bob);
-        b.setUserConf(MANUAL_DEBIT, true);
 
         let malicious_mike = account!("mike");
         chain.new_account(malicious_mike).unwrap();
@@ -111,8 +108,6 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
         let b = Wrapper::push_from(&chain, bob);
-
-        b.setUserConf(MANUAL_DEBIT, true);
 
         let tid = a
             .create(Precision::new(4).unwrap(), 100_0000.into())

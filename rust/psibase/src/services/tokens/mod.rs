@@ -72,7 +72,7 @@ pub struct Balance {
 }
 
 crate::define_flags!(BalanceFlags, u8, {
-    manual_debit,
+    auto_debit,
     keep_zero_balance,
 });
 

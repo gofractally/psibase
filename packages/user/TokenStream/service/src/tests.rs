@@ -79,6 +79,13 @@ mod tests {
             chain.set_auto_block_start(false);
             reset_clock(&chain);
             let token_id = setup_env(&chain);
+            Tokens::push_from(&chain, ALICE)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()
+                .unwrap();
             Self { chain, token_id }
         }
 

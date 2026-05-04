@@ -66,7 +66,7 @@ namespace UserService
       /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
       ///
       /// Configurations:
-      /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
       ///                           the receiver.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
@@ -82,7 +82,7 @@ namespace UserService
       /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
       ///
       /// Configurations:
-      /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
       ///                           the receiver.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
@@ -110,9 +110,8 @@ namespace UserService
 
       /// Credit tokens to a debitor (recipient).
       ///
-      /// On credit, tokens are typically automatically debited by the debitor. However,
-      /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-      /// "shared balance".
+      /// On credit, tokens are typically placed in an intermediate "shared balance" and manually debited by the debitor. However,
+      /// if the debitor has enabled `auto_debit`, then the tokens will be automatically debited.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -129,9 +128,8 @@ namespace UserService
 
       /// Uncredit tokens that were credited into a shared balance
       ///
-      /// On credit, tokens are typically automatically debited by the debitor. However,
-      /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-      /// "shared balance".
+      /// On credit, tokens are typically placed in an intermediate "shared balance" and manually debited by the debitor. However,
+      /// if the debitor has enabled `auto_debit`, then the tokens will be automatically debited.
       ///
       /// # Shared balance mechanics
       /// When in the shared balance, the tokens can be:
@@ -149,7 +147,7 @@ namespace UserService
       /// Rejects the shared balance between a creditor and a debitor
       ///
       /// On credit, tokens are typically automatically debited by the debitor. However,
-      /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
+      /// if the debitor has enabled `auto_debit`, then the tokens will be placed in an intermediate
       /// "shared balance".
       ///
       /// # Shared balance mechanics
@@ -167,7 +165,7 @@ namespace UserService
       /// Debit tokens that were credited into a shared balance
       ///
       /// On credit, tokens are typically automatically debited by the debitor. However,
-      /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
+      /// if the debitor has enabled `auto_debit`, then the tokens will be placed in an intermediate
       /// "shared balance".
       ///
       /// # Shared balance mechanics
@@ -283,7 +281,7 @@ namespace UserService
       ///                See `Configurations` for details
       ///
       /// Configurations:
-      /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
       ///                           the receiver.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
@@ -302,7 +300,7 @@ namespace UserService
       ///                See `Configurations` for details
       ///
       /// Configurations:
-      /// * 0: manual_debit       - If enabled, any credits of this token must be manually debited by
+      /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
       ///                           the receiver.
       /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
       ///                           balance table, and will not need to be recreated on the next deposit.
