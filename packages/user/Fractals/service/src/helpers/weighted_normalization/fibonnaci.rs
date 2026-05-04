@@ -1,4 +1,4 @@
-use crate::helpers::weighted_normalization::fib::{continuous_fibonacci, EXTERNAL_S};
+use crate::helpers::weighted_normalization::fib::continuous_fibonacci;
 
 /// Assigns decreasing integer levels to items, starting from `from_level`.
 ///
