@@ -211,14 +211,14 @@ pub mod impls {
             let responses = ResponseTable::new();
             responses
                 .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .range((id, AccountNumber::ZERO)..=(id, AccountNumber::MAX))
                 .for_each(|r| responses.erase(&(r.id, r.account)));
 
             // Delete all stored parties for this staged tx
             let parties = StagedTxPartyTable::new();
             parties
                 .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .range((id, AccountNumber::ZERO)..=(id, AccountNumber::MAX))
                 .for_each(|p| parties.erase(&(p.id, p.party)));
 
             // Delete the staged tx itself
@@ -228,7 +228,7 @@ pub mod impls {
         pub fn accepters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
+                .range((self.id, AccountNumber::ZERO)..=(self.id, AccountNumber::MAX))
                 .filter(|response| response.accepted)
                 .map(|response| response.account)
                 .collect()
@@ -237,7 +237,7 @@ pub mod impls {
         pub fn rejecters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
+                .range((self.id, AccountNumber::ZERO)..=(self.id, AccountNumber::MAX))
                 .filter(|response| !response.accepted)
                 .map(|response| response.account)
                 .collect()

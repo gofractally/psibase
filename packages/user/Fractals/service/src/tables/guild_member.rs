@@ -58,7 +58,7 @@ impl GuildMember {
     pub fn memberships_of_member(member: AccountNumber) -> Vec<Self> {
         GuildMemberTable::read()
             .get_index_by_member()
-            .range((member, AccountNumber::new(0))..=(member, AccountNumber::new(u64::MAX)))
+            .range((member, AccountNumber::ZERO)..=(member, AccountNumber::MAX))
             .collect()
     }
 

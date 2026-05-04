@@ -5,10 +5,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 #[cfg(target_family = "wasm")]
-static mut SERVICE: AccountNumber = AccountNumber::new(0);
+static mut SERVICE: AccountNumber = AccountNumber::ZERO;
 
 #[cfg(target_family = "wasm")]
-static mut SENDER: AccountNumber = AccountNumber::new(0);
+static mut SENDER: AccountNumber = AccountNumber::ZERO;
 
 /// Get currently-executing service
 ///
@@ -27,7 +27,7 @@ pub fn get_service() -> AccountNumber {
 /// code is not WASM, or is not a service, then this returns 0.
 #[cfg(not(target_family = "wasm"))]
 pub fn get_service() -> AccountNumber {
-    AccountNumber::new(0)
+    AccountNumber::ZERO
 }
 
 /// Get sender of currently-executing action
@@ -49,7 +49,7 @@ pub fn get_sender() -> AccountNumber {
 /// then this returns 0.
 #[cfg(not(target_family = "wasm"))]
 pub fn get_sender() -> AccountNumber {
-    AccountNumber::new(0)
+    AccountNumber::ZERO
 }
 
 // The service's `start` entry point sets this. Nothing else

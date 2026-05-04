@@ -118,7 +118,7 @@ impl Guild {
     pub fn guilds_of_fractal(fractal: AccountNumber) -> Vec<Self> {
         GuildTable::read()
             .get_index_by_fractal()
-            .range((fractal, AccountNumber::new(0))..=(fractal, AccountNumber::new(u64::MAX)))
+            .range((fractal, AccountNumber::ZERO)..=(fractal, AccountNumber::MAX))
             .collect()
     }
 
@@ -167,8 +167,8 @@ impl Guild {
         let council: Vec<GuildMember> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
-                (self.account, true, 0, AccountNumber::new(0))
-                    ..=(self.account, true, u32::MAX, AccountNumber::new(u64::MAX)),
+                (self.account, true, 0, AccountNumber::ZERO)
+                    ..=(self.account, true, u32::MAX, AccountNumber::MAX),
             )
             .rev()
             .take(COUNCIL_SEATS as usize)
