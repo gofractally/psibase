@@ -1,12 +1,19 @@
+mod events;
+
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
     use nft::{
         service::NID,
-        tables::{CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable},
+        tables::{
+            CreditRecord, CreditTable, Nft, NftHolder, NftHolderTable, NftTable, UserPending,
+            UserPendingTable,
+        },
     };
     use psibase::{services::accounts::Account, *};
+
+    use crate::events::{OwnerChangeEvent, UserConfEvent};
 
     #[derive(Fracpack, ToSchema, Debug, Clone, SimpleObject)]
     struct UserDetail {
@@ -34,6 +41,40 @@ mod service {
 
     #[Object]
     impl Query {
+        async fn ownerChanges(
+            &self,
+            nft_id: NID,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, OwnerChangeEvent>> {
+            EventQuery::new("history.nft.ownerChange")
+                .condition(format!("nftId = {}", nft_id))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn userConfChanges(
+            &self,
+            account: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<u64, UserConfEvent>> {
+            EventQuery::new("history.nft.userConfSet")
+                .condition(format!("account = {}", account))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
         async fn allNfts(
             &self,
             first: Option<i32>,
@@ -81,6 +122,40 @@ mod service {
             .after(after)
             .query()
             .await
+        }
+
+        async fn user_pending(
+            &self,
+            user: AccountNumber,
+            nft_id: Option<NID>,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, UserPending>> {
+            if let Some(nft_id) = nft_id {
+                TableQuery::subindex::<NID>(
+                    UserPendingTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
+                    &(user, nft_id),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            } else {
+                TableQuery::subindex::<NID>(
+                    UserPendingTable::with_service(psibase::services::nft::SERVICE).get_index_pk(),
+                    &(user),
+                )
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+                .await
+            }
         }
 
         async fn userNfts(
