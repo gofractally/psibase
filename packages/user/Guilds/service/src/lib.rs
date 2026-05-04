@@ -240,9 +240,7 @@ pub mod service {
     /// * `extra_info` - Relevant information to the application.
     #[action]
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
-        let guild = Guild::get_assert(guild_account);
-        let sender = get_sender();
-        GuildApplication::add(guild.account, sender, extra_info);
+        GuildApplication::add(guild_account, get_sender(), extra_info);
     }
 
     /// Attest Guild Membership application

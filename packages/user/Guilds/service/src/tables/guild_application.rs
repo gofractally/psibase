@@ -30,6 +30,7 @@ impl GuildApplication {
     }
 
     pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
+        check_some(Guild::get(guild), "guild does not exist");
         check_none(Self::get(guild, applicant), "application already exists");
         check_none(
             GuildMember::get(guild, applicant),
