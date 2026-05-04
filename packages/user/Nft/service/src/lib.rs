@@ -13,7 +13,7 @@ pub mod tables {
     pub type NID = u32;
 
     define_flags!(NftHolderFlags, u8, {
-        manual_debit,
+        auto_debit,
     });
 
     #[table(name = "ConfigTable", index = 0)]
@@ -278,8 +278,7 @@ pub mod tables {
 pub mod service {
     use crate::tables::*;
     use psibase::{
-        check, check_some, get_sender, get_service, services::events, AccountNumber, DbId, Memo,
-        MethodNumber,
+        check, check_some, get_sender, services::events, AccountNumber, DbId, Memo, MethodNumber,
     };
 
     pub type NID = u32;
@@ -288,7 +287,6 @@ pub mod service {
     fn init() {
         if ConfigRow::get().is_none() {
             ConfigRow::add();
-            NftHolder::get_or_default(get_service()).set_flag(NftHolderFlags::MANUAL_DEBIT, true);
 
             let add_index = |method: &str, column: u8, db_id: DbId| {
                 events::Wrapper::call().addIndex(
@@ -342,8 +340,8 @@ pub mod service {
         let credit_record = CreditRecord::add(nft_id, creditor, debitor, memo.clone());
 
         let receiver_holder = NftHolder::get_or_default(debitor);
-        let manual_debit = receiver_holder.get_flag(NftHolderFlags::MANUAL_DEBIT);
-        if !manual_debit {
+        let auto_debit = receiver_holder.get_flag(NftHolderFlags::AUTO_DEBIT);
+        if auto_debit {
             credit_record.debit(memo);
         }
     }

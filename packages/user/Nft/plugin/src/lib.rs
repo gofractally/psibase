@@ -21,13 +21,13 @@ define_trust! {
         ",
         High => "
             - Credit, Debit and uncredit.
-            - Manual debit toggle
+            - Auto debit toggle
             - Burning
         ",
     }
     functions {
         Medium => [mint],
-        High => [uncredit, debit, enable_user_manual_debit, credit, burn],
+        High => [uncredit, debit, enable_user_auto_debit, credit, burn],
     }
 }
 
@@ -91,11 +91,11 @@ impl User for NftPlugin {
 }
 
 impl UserConfig for NftPlugin {
-    fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
-        trust::assert_authorized(trust::FunctionName::enable_user_manual_debit)?;
+    fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
+        trust::assert_authorized(trust::FunctionName::enable_user_auto_debit)?;
 
         let packed_args = Nft::action_structs::setUserConf {
-            index: NftHolderFlags::MANUAL_DEBIT.index(),
+            index: NftHolderFlags::AUTO_DEBIT.index(),
             enable,
         }
         .packed();

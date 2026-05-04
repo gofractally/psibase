@@ -486,13 +486,11 @@ pub mod tables {
                 check(token.nft_holder() == get_sender(), "Token untradeable");
             }
 
-            let is_manual_debit = BalanceConfig::get(self.debitor, self.token_id)
-                .map(|holder| holder.get_flag(BalanceFlags::MANUAL_DEBIT))
-                .unwrap_or(
-                    UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::MANUAL_DEBIT),
-                );
+            let is_auto_debit = BalanceConfig::get(self.debitor, self.token_id)
+                .map(|holder| holder.get_flag(BalanceFlags::AUTO_DEBIT))
+                .unwrap_or(UserConfig::get_or_new(self.debitor).get_flag(BalanceFlags::AUTO_DEBIT));
 
-            if !is_manual_debit {
+            if is_auto_debit {
                 self.debit(quantity, memo);
             }
         }
@@ -600,7 +598,7 @@ pub mod tables {
     }
 
     define_flags!(BalanceFlags, u8, {
-        manual_debit,
+        auto_debit,
         keep_zero_balances,
     });
 

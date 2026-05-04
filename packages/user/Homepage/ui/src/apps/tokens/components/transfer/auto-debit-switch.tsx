@@ -16,9 +16,9 @@ import { toast } from "@shared/shadcn/ui/sonner";
 import { Switch } from "@shared/shadcn/ui/switch";
 
 import {
-    useToggleUserManualDebit,
-    useUserManualDebit,
-} from "../../hooks/tokens-plugin/use-user-manual-debit";
+    useToggleUserAutoDebit,
+    useUserAutoDebit,
+} from "../../hooks/tokens-plugin/use-user-auto-debit";
 
 export const AutoDebitSwitch = ({
     currentUser,
@@ -26,9 +26,8 @@ export const AutoDebitSwitch = ({
     currentUser: string | null;
 }) => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const { mutateAsync, isPending } = useToggleUserManualDebit(currentUser);
-    const { data: manualDebit } = useUserManualDebit(currentUser);
-    const autoDebit = !manualDebit;
+    const { mutateAsync, isPending } = useToggleUserAutoDebit(currentUser);
+    const { data: autoDebit } = useUserAutoDebit(currentUser);
 
     const handleSwitchClick = () => {
         setIsDialogOpen(true);
@@ -36,7 +35,7 @@ export const AutoDebitSwitch = ({
 
     const handleConfirm = async () => {
         try {
-            await mutateAsync({ enable: autoDebit });
+            await mutateAsync({ enable: !!autoDebit });
             toast.success(
                 autoDebit ? "Auto debit turned off" : "Auto debit turned on",
             );

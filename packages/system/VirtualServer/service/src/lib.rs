@@ -125,8 +125,6 @@ mod service {
 
         InitRow::init();
 
-        Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
-        Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Wrapper::call().set_specs(MIN_SERVER_SPECS);
         Transact::call().resMonitoring(true);
 

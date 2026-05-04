@@ -428,52 +428,52 @@ SCENARIO("Toggling manual-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      THEN("Alice and Bob both have manualDebit disabled")
+      THEN("Alice and Bob both have autoDebit disabled")
       {
-         auto isManualDebit1 = a.getUserConf(alice, Tokens::manualDebit);
-         REQUIRE(isManualDebit1.succeeded());
-         CHECK(isManualDebit1.returnVal() == false);
+         auto isAutoDebit1 = a.getUserConf(alice, Tokens::autoDebit);
+         REQUIRE(isAutoDebit1.succeeded());
+         CHECK(isAutoDebit1.returnVal() == false);
 
-         auto isManualDebit2 = a.getUserConf(bob, Tokens::manualDebit);
-         REQUIRE(isManualDebit2.succeeded());
-         CHECK(isManualDebit2.returnVal() == false);
+         auto isAutoDebit2 = a.getUserConf(bob, Tokens::autoDebit);
+         REQUIRE(isAutoDebit2.succeeded());
+         CHECK(isAutoDebit2.returnVal() == false);
       }
-      THEN("Alice may enable manual-debit")
+      THEN("Alice may enable auto-debit")
       {  //
-         CHECK(a.setUserConf(Tokens::manualDebit, true).succeeded());
+         CHECK(a.setUserConf(Tokens::autoDebit, true).succeeded());
       }
-      WHEN("Alice enabled manual-debit")
+      WHEN("Alice enabled auto-debit")
       {
-         a.setUserConf(Tokens::manualDebit, true);
+         a.setUserConf(Tokens::autoDebit, true);
 
-         THEN("Alice has manual-debit enabled")
+         THEN("Alice has auto-debit enabled")
          {  //
-            CHECK(a.getUserConf(alice, Tokens::manualDebit).returnVal() == true);
+            CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == true);
          }
-         THEN("Bob still has manual-debit disabled")
+         THEN("Bob still has auto-debit disabled")
          {  //
-            CHECK(a.getUserConf(bob, Tokens::manualDebit).returnVal() == false);
+            CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
          }
-         THEN("Alice may enable manual-debit again. Idempotent.")
+         THEN("Alice may enable auto   -debit again. Idempotent.")
          {
-            CHECK(a.setUserConf(Tokens::manualDebit, true).succeeded());
+            CHECK(a.setUserConf(Tokens::autoDebit, true).succeeded());
 
-            AND_THEN("But Bob may enable manual-debit")
+            AND_THEN("But Bob may enable auto-debit")
             {  //
-               CHECK(b.setUserConf(Tokens::manualDebit, true).succeeded());
+               CHECK(b.setUserConf(Tokens::autoDebit, true).succeeded());
             }
          }
-         THEN("Alice may disable manual-debit")
+         THEN("Alice may disable auto-debit")
          {  //
-            CHECK(a.setUserConf(Tokens::manualDebit, false).succeeded());
+            CHECK(a.setUserConf(Tokens::autoDebit, false).succeeded());
 
-            AND_THEN("Alice has manual-debit disabled")
+            AND_THEN("Alice has auto-debit disabled")
             {  //
-               CHECK(a.getUserConf(alice, Tokens::manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == false);
             }
-            AND_THEN("Bob still has manual-debit disabled")
+            AND_THEN("Bob still has auto-debit disabled")
             {
-               CHECK(a.getUserConf(bob, Tokens::manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
             }
          }
       }
@@ -568,7 +568,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
 
       AND_GIVEN("Alice turns on manual-debit")
       {
-         a.setUserConf(Tokens::manualDebit, true);
+         a.setUserConf(Tokens::autoDebit, true);
 
          THEN("Alice may credit Bob 50 tokens")
          {
@@ -853,8 +853,8 @@ TEST_CASE("GraphQL Queries")
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 500e4, memo).succeeded());
-   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
-   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
+   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
+   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
    REQUIRE(bob.to<Tokens>().credit(sysToken, alice, 200e4, memo).succeeded());
 

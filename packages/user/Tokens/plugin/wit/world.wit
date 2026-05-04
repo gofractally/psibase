@@ -61,7 +61,7 @@ interface user {
     /// * `amount`   - Amount to credit
     /// * `memo`     - Memo describing the credit
     ///
-    /// Places funds in shared balance when the debitor has manual debit enabled
+    /// Places funds in shared balance when the debitor has auto debit disabled
     credit: func(token-id: u32, debitor: string, amount: decimal, memo: string) -> result<_, error>;
 
     /// Cancel a pending shared-balance credit.
@@ -102,11 +102,11 @@ interface user {
 interface user-config {
     use host:types/types.{error};
 
-    /// Enable or disable manual debit globally for the caller.
+    /// Enable or disable auto debit globally for the caller.
     ///
     /// Arguments
-    /// * `enable` - `true` to require manual debit, `false` for automatic debit
-    enable-user-manual-debit: func(enable: bool) -> result<_, error>;
+    /// * `enable` - `true` to require auto debit, `false` for manual debit
+    enable-user-auto-debit: func(enable: bool) -> result<_, error>;
 
     /// Keep zero balances globally for the caller.
     ///
@@ -114,12 +114,12 @@ interface user-config {
     /// * `enable` - `true` to retain zero-balance rows, `false` to prune them
     enable-user-keep-zero-balances: func(enable: bool) -> result<_, error>;
 
-    /// Enable manual debit for a specific token balance.
+    /// Enable auto debit for a specific token balance.
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
-    /// * `enable`   - `true` to require manual debit, `false` for automatic debit
-    enable-balance-manual-debit: func(token-id: u32, enable: bool) -> result<_, error>;
+    /// * `enable`   - `true` to require auto debit, `false` for manual debit
+    enable-balance-auto-debit: func(token-id: u32, enable: bool) -> result<_, error>;
 
     /// Keep zero balances for a specific token balance.
     ///
