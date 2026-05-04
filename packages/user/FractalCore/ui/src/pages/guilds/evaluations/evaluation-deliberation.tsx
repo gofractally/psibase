@@ -1,6 +1,7 @@
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
 import dayjs from "dayjs";
 import { Check, GripHorizontal, Info, Plus, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
 
@@ -50,31 +51,25 @@ const useRanking = () => {
 
     const groupUsers = groupUsersData || [];
 
-    const {
-        data: currentProposal,
-        isPending: isProposalPending,
-        refetch: refetchProposal,
-    } = useProposal(Number(groupNumber));
-    const proposal = currentProposal ?? [];
-
-    const { cancel, maybeExecute: refreshProposal } = useAsyncDebouncer(
-        async () => {
-            await refetchProposal();
-        },
-        {
-            wait: 3000,
-        },
+    const { data: currentProposal, isPending: isProposalPending } = useProposal(
+        Number(groupNumber),
     );
+    const [rankedAccounts, setRankedAccounts] = useState<Account[]>(
+        () => currentProposal ?? [],
+    );
+
+    useEffect(() => {
+        setRankedAccounts(currentProposal ?? []);
+    }, [currentProposal]);
+
     const { mutateAsync: propose } = usePropose();
 
     const { maybeExecute: debounceAccounts, state } = useAsyncDebouncer(
         async (rankedNumbers: Account[]) => {
-            cancel();
             await propose({
                 groupNumber: Number(groupNumber),
                 proposal: rankedNumbers,
             });
-            refreshProposal();
         },
         {
             wait: 4000,
@@ -86,30 +81,33 @@ const useRanking = () => {
     );
 
     const updateRankedNumbers = (accounts: Account[]) => {
-        cancel();
+        setRankedAccounts(accounts);
         setCachedProposal(guildAccount!, Number(groupNumber), accounts);
         debounceAccounts(accounts);
     };
 
     const remove = (account: Account) => {
-        updateRankedNumbers(proposal.filter((a: Account) => a !== account));
+        updateRankedNumbers(
+            rankedAccounts.filter((a: Account) => a !== account),
+        );
     };
 
     const add = (account: Account) => {
-        updateRankedNumbers([...proposal, account]);
+        updateRankedNumbers([...rankedAccounts, account]);
     };
 
     const unrankedAccounts = groupUsers
-        .filter((user) => !proposal.some((p) => p === user))
+        .filter((user) => !rankedAccounts.some((p) => p === user))
         .sort();
 
     const onSortEnd = (oldIndex: number, newIndex: number) => {
-        updateRankedNumbers(arrayMove(proposal, oldIndex, newIndex));
+        const next = arrayMove(rankedAccounts, oldIndex, newIndex);
+        updateRankedNumbers(next);
     };
 
     return {
         allAccounts: groupUsers,
-        rankedAccounts: proposal,
+        rankedAccounts,
         unrankedAccounts,
         updateRankedNumbers,
         onSortEnd,
@@ -248,8 +246,8 @@ export const EvaluationDeliberation = () => {
                             with those more highly ranked towards the top.
                         </div>
                         <SortableList
-                            className="jss30 mt-4 flex w-full flex-col gap-2"
-                            draggedItemClassName="jss32"
+                            className="mt-4 flex w-full flex-col gap-2"
+                            draggedItemClassName="dragged-item"
                             onSortEnd={onSortEnd}
                             lockAxis="y"
                         >
@@ -258,7 +256,7 @@ export const EvaluationDeliberation = () => {
                                     <SortableItem key={account}>
                                         <div className="bg-background">
                                             <SortableKnob>
-                                                <div className="jss31 border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full cursor-grab select-none items-center gap-3 rounded-sm border p-2">
+                                                <div className="border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full cursor-grab select-none items-center gap-3 rounded-sm border p-2">
                                                     <GripHorizontal className="h-5 w-5" />
                                                     <div className="flex-1 text-lg">
                                                         {account}
