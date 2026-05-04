@@ -1,6 +1,6 @@
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
 import dayjs from "dayjs";
-import { AlignJustify, Check, Info, Plus, X } from "lucide-react";
+import { Check, GripHorizontal, Info, Plus, X } from "lucide-react";
 import SortableList, { SortableItem, SortableKnob } from "react-easy-sort";
 import { useParams } from "react-router-dom";
 
@@ -199,7 +199,7 @@ export const EvaluationDeliberation = () => {
 
     return (
         <PageContainer className="space-y-6">
-            <GlowingCard>
+            <GlowingCard cardClassName="z-0">
                 <CardHeader>
                     <CardTitle>Group {groupNumber} evaluation</CardTitle>
                     <CardDescription>
@@ -248,34 +248,39 @@ export const EvaluationDeliberation = () => {
                             with those more highly ranked towards the top.
                         </div>
                         <SortableList
-                            className="jss30 mb-4 mt-2 flex w-full flex-col gap-2 border p-2"
+                            className="jss30 mt-4 flex w-full flex-col gap-2"
                             draggedItemClassName="jss32"
                             onSortEnd={onSortEnd}
+                            lockAxis="y"
                         >
                             {rankedAccounts.length > 0 ? (
                                 rankedAccounts.map((account: string) => (
                                     <SortableItem key={account}>
-                                        <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
-                                            <div className="flex-1 text-lg">
-                                                {account}
-                                            </div>
+                                        <div className="bg-background">
                                             <SortableKnob>
-                                                <AlignJustify className="h-6 w-6" />
+                                                <div className="jss31 border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full cursor-grab select-none items-center gap-3 rounded-sm border p-2">
+                                                    <GripHorizontal className="h-5 w-5" />
+                                                    <div className="flex-1 text-lg">
+                                                        {account}
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() =>
+                                                            remove(account)
+                                                        }
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </SortableKnob>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => remove(account)}
-                                            >
-                                                <X className="h-4 w-4" />
-                                            </Button>
                                         </div>
                                     </SortableItem>
                                 ))
                             ) : (
                                 <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
                                     <Info className="h-4 w-4" />
-                                    Select participants below to rank them
+                                    Select participants above to rank them
                                 </div>
                             )}
                         </SortableList>
