@@ -12,6 +12,7 @@ import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { arrayMove } from "@shared/lib/array-move";
@@ -19,6 +20,12 @@ import { humanize } from "@shared/lib/humanize";
 import { Account } from "@shared/lib/schemas/account";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { Button } from "@shared/shadcn/ui/button";
+import {
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
@@ -120,8 +127,6 @@ const GroupStatus = ({
     isSaving: boolean;
     isSaved: boolean;
 }) => {
-    const { groupNumber } = usePageParams();
-
     const now = useNowUnix();
 
     const status = useEvaluationStatus(now);
@@ -160,28 +165,26 @@ const GroupStatus = ({
     }
 
     return (
-        <div className="flex h-9 items-center justify-between">
-            <h1 className="text-lg font-semibold">Group #{groupNumber}</h1>
-            <div className="flex gap-2">
-                {isSaving && (
-                    <Badge className="min-w-[52px] bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
-                        <Spinner data-icon="inline-start" /> Saving
-                    </Badge>
-                )}
-                {isSaved && (
-                    <Badge className="min-w-[52px] bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
-                        <Check data-icon="inline-start" /> Saved
-                    </Badge>
-                )}
-                <Badge variant={variant} className="min-w-[52px]">
-                    {description}
+        <div className="flex h-9 items-center justify-end gap-2">
+            {isSaving && (
+                <Badge className="min-w-[52px] bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
+                    <Spinner data-icon="inline-start" /> Saving
                 </Badge>
-            </div>
+            )}
+            {isSaved && (
+                <Badge className="min-w-[52px] bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
+                    <Check data-icon="inline-start" /> Saved
+                </Badge>
+            )}
+            <Badge variant={variant} className="min-w-[52px]">
+                {description}
+            </Badge>
         </div>
     );
 };
 
 export const EvaluationDeliberation = () => {
+    const { groupNumber } = usePageParams();
     const {
         add,
         remove,
@@ -195,73 +198,84 @@ export const EvaluationDeliberation = () => {
 
     return (
         <PageContainer className="space-y-6">
-            <GroupStatus isSaving={isSaving} isSaved={isSaved} />
-            <div className="flex flex-col gap-2">
-                <div>
-                    <h2 className="text-base font-semibold">Unranked</h2>
-                </div>
-                {isLoading ? (
-                    <Skeleton className="h-10 w-full" />
-                ) : (
-                    <div className="flex w-full gap-2">
-                        {unrankedAccounts.length > 0 ? (
-                            unrankedAccounts.map((account) => (
-                                <Button
-                                    key={account}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => add(account)}
-                                >
-                                    <div>{account}</div>
-                                    <Plus className="h-4 w-4" />
-                                </Button>
-                            ))
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Group {groupNumber} evaluation</CardTitle>
+                    <CardAction>
+                        <GroupStatus isSaving={isSaving} isSaved={isSaved} />
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col gap-2">
+                        <div>
+                            <h2 className="text-base font-semibold">
+                                Unranked
+                            </h2>
+                        </div>
+                        {isLoading ? (
+                            <Skeleton className="h-10 w-full" />
                         ) : (
-                            <div className="text-muted-foreground text-sm italic">
-                                All participants are ranked
+                            <div className="flex w-full gap-2">
+                                {unrankedAccounts.length > 0 ? (
+                                    unrankedAccounts.map((account) => (
+                                        <Button
+                                            key={account}
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => add(account)}
+                                        >
+                                            <div>{account}</div>
+                                            <Plus className="h-4 w-4" />
+                                        </Button>
+                                    ))
+                                ) : (
+                                    <div className="text-muted-foreground text-sm italic">
+                                        All participants are ranked
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
-            </div>
-            <div>
-                <h2 className="text-base font-semibold">Ranked</h2>
-                <div className="text-muted-foreground text-sm">
-                    With those more highly ranked towards the top:
-                </div>
-                <SortableList
-                    className="jss30 mb-4 mt-2 flex w-full flex-col gap-2 border p-2"
-                    draggedItemClassName="jss32"
-                    onSortEnd={onSortEnd}
-                >
-                    {rankedAccounts.length > 0 ? (
-                        rankedAccounts.map((account: string) => (
-                            <SortableItem key={account}>
-                                <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
-                                    <div className="flex-1 text-lg">
-                                        {account}
-                                    </div>
-                                    <SortableKnob>
-                                        <AlignJustify className="h-6 w-6" />
-                                    </SortableKnob>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => remove(account)}
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </SortableItem>
-                        ))
-                    ) : (
-                        <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
-                            <Info className="h-4 w-4" />
-                            Select participants below to rank them
+                    <div>
+                        <h2 className="text-base font-semibold">Ranked</h2>
+                        <div className="text-muted-foreground text-sm">
+                            With those more highly ranked towards the top:
                         </div>
-                    )}
-                </SortableList>
-            </div>
+                        <SortableList
+                            className="jss30 mb-4 mt-2 flex w-full flex-col gap-2 border p-2"
+                            draggedItemClassName="jss32"
+                            onSortEnd={onSortEnd}
+                        >
+                            {rankedAccounts.length > 0 ? (
+                                rankedAccounts.map((account: string) => (
+                                    <SortableItem key={account}>
+                                        <div className="jss31 flex w-full items-center gap-3 rounded-sm border p-2">
+                                            <div className="flex-1 text-lg">
+                                                {account}
+                                            </div>
+                                            <SortableKnob>
+                                                <AlignJustify className="h-6 w-6" />
+                                            </SortableKnob>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => remove(account)}
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </SortableItem>
+                                ))
+                            ) : (
+                                <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
+                                    <Info className="h-4 w-4" />
+                                    Select participants below to rank them
+                                </div>
+                            )}
+                        </SortableList>
+                    </div>
+                </CardContent>
+            </GlowingCard>
         </PageContainer>
     );
 };
