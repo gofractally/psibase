@@ -111,7 +111,7 @@ SCENARIO("Transferring NFTs")
       {
          CHECK(b.getUserConf(bob, autoDebit).returnVal() == false);
       }
-      THEN("Bob is able to opt in to manual-debit")
+      THEN("Bob is able to opt in to auto-debit")
       {
          CHECK(b.setUserConf(autoDebit, true).succeeded());
          CHECK(true == b.getUserConf(bob, autoDebit).returnVal());
@@ -162,9 +162,9 @@ SCENARIO("Transferring NFTs")
                CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
             }
          }
-         WHEN("Bob opts in to manual-debit")
+         WHEN("Bob opts out of auto-debit")
          {
-            b.setUserConf(autoDebit, true);
+            b.setUserConf(autoDebit, false);
 
             AND_WHEN("Alice credits the NFT to Bob")
             {

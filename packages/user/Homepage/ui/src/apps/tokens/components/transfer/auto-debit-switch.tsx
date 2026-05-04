@@ -37,7 +37,7 @@ export const AutoDebitSwitch = ({
         try {
             await mutateAsync({ enable: !!autoDebit });
             toast.success(
-                autoDebit ? "Auto debit turned off" : "Auto debit turned on",
+                autoDebit ? "Auto debit turned on" : "Auto debit turned off",
             );
             setIsDialogOpen(false);
         } catch (e) {

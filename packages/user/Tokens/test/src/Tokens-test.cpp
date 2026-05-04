@@ -454,7 +454,7 @@ SCENARIO("Toggling manual-debit")
          {  //
             CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
          }
-         THEN("Alice may enable auto   -debit again. Idempotent.")
+         THEN("Alice may enable auto-debit again. Idempotent.")
          {
             CHECK(a.setUserConf(Tokens::autoDebit, true).succeeded());
 
@@ -549,7 +549,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
    }
 }
 
-SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
+SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
@@ -566,9 +566,10 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       a.mint(tokenId, 200e4, memo);
       a.credit(tokenId, bob, 100e4, memo);
 
-      AND_GIVEN("Alice turns on manual-debit")
+      AND_GIVEN("Alice turns on auto-debit")
       {
          a.setUserConf(Tokens::autoDebit, true);
+         b.setUserConf(Tokens::autoDebit, true);
 
          THEN("Alice may credit Bob 50 tokens")
          {
@@ -853,8 +854,8 @@ TEST_CASE("GraphQL Queries")
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 500e4, memo).succeeded());
-   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
-   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::autoDebit, true).succeeded());
+   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, false).succeeded());
+   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::autoDebit, false).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
    REQUIRE(bob.to<Tokens>().credit(sysToken, alice, 200e4, memo).succeeded());
 

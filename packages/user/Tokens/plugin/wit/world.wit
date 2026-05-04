@@ -105,7 +105,7 @@ interface user-config {
     /// Enable or disable auto debit globally for the caller.
     ///
     /// Arguments
-    /// * `enable` - `true` to require auto debit, `false` for manual debit
+    /// * `enable` - `true` to enable auto debit, `false` for manual debit
     enable-user-auto-debit: func(enable: bool) -> result<_, error>;
 
     /// Keep zero balances globally for the caller.
@@ -118,7 +118,7 @@ interface user-config {
     ///
     /// Arguments
     /// * `token_id` - Unique token identifier
-    /// * `enable`   - `true` to require auto debit, `false` for manual debit
+    /// * `enable`   - `true` to enable auto debit, `false` for manual debit
     enable-balance-auto-debit: func(token-id: u32, enable: bool) -> result<_, error>;
 
     /// Keep zero balances for a specific token balance.
