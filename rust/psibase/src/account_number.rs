@@ -35,6 +35,9 @@ pub struct AccountNumber {
 serialize_as_str!(AccountNumber, "account number");
 
 impl AccountNumber {
+    pub const ZERO: Self = AccountNumber { value: 0 };
+    pub const MAX: Self = AccountNumber { value: u64::MAX };
+
     pub const fn new(value: u64) -> Self {
         AccountNumber { value }
     }
@@ -136,65 +139,65 @@ mod tests {
 
     #[test]
     fn empty_name_is_zero() {
-        assert_eq!(AccountNumber::from_str("").unwrap(), AccountNumber::new(0));
+        assert_eq!(AccountNumber::from_str("").unwrap(), AccountNumber::ZERO);
     }
 
     #[test]
     fn name_longer_than_limit_of_18_is_zero() {
         assert_eq!(
             AccountNumber::from_str("abcdefghijklmnopqrstuvwxyz").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
     }
 
     #[test]
     fn name_starting_with_a_char_less_than_9_returns_zero() {
-        assert_eq!(AccountNumber::from_str("9").unwrap(), AccountNumber::new(0));
-        assert_eq!(AccountNumber::from_str("3").unwrap(), AccountNumber::new(0));
+        assert_eq!(AccountNumber::from_str("9").unwrap(), AccountNumber::ZERO);
+        assert_eq!(AccountNumber::from_str("3").unwrap(), AccountNumber::ZERO);
         assert_eq!(
             AccountNumber::from_str("1abc").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_eq!(
             AccountNumber::from_str("1234").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_eq!(
             AccountNumber::from_str("9asdf").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_ne!(
             AccountNumber::from_str("abcd").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_ne!(
             AccountNumber::from_str("asdf9").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_ne!(
             AccountNumber::from_str("abc1").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
     }
 
     #[test]
     fn any_unknown_char_returns_zero() {
-        assert_eq!(AccountNumber::from_str("?").unwrap(), AccountNumber::new(0));
+        assert_eq!(AccountNumber::from_str("?").unwrap(), AccountNumber::ZERO);
         assert_eq!(
             AccountNumber::from_str("what?").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_eq!(
             AccountNumber::from_str("?what").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_eq!(
             AccountNumber::from_str("eaorintsl?").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
         assert_eq!(
             AccountNumber::from_str("????").unwrap(),
-            AccountNumber::new(0)
+            AccountNumber::ZERO
         );
     }
 

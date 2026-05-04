@@ -62,10 +62,7 @@ impl GuildAttest {
     pub fn attestations_by_guild_member(guild: AccountNumber, member: AccountNumber) -> Vec<Self> {
         GuildAttestTable::read()
             .get_index_by_guild()
-            .range(
-                (guild, member, AccountNumber::new(0))
-                    ..=(guild, member, AccountNumber::new(u64::MAX)),
-            )
+            .range((guild, member, AccountNumber::ZERO)..=(guild, member, AccountNumber::MAX))
             .collect()
     }
 
@@ -73,10 +70,7 @@ impl GuildAttest {
         let table = GuildAttestTable::read_write();
         table
             .get_index_by_guild()
-            .range(
-                (guild, member, AccountNumber::new(0))
-                    ..=(guild, member, AccountNumber::new(u64::MAX)),
-            )
+            .range((guild, member, AccountNumber::ZERO)..=(guild, member, AccountNumber::MAX))
             .for_each(|guild| {
                 table.remove(&guild);
             });
