@@ -88,6 +88,7 @@ mod service {
         Transact::call().runAs(admin_create_action, vec![]);
 
         let s = Symbol::call().getSymbol(SYSTEM_SYMBOL);
+        Nft::call().debit(s.ownerNft, "".into());
         Nft::call().credit(s.ownerNft, Symbol::SERVICE, "".into());
         Symbol::call().mapSymbol(tid, SYSTEM_SYMBOL);
     }

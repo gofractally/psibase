@@ -213,6 +213,8 @@ SCENARIO("Recalling tokens")
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e4, memo);
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 1'000e4, memo);
 
       THEN("The token is recallable by default")
@@ -265,6 +267,9 @@ SCENARIO("Interactions with the Issuer NFT")
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal();
+
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
 
       THEN("The Issuer NFT is owned by Alice")
       {
@@ -352,6 +357,9 @@ SCENARIO("Burning tokens")
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
+
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 100e4, memo);
 
       THEN("Alice may not burn 101 tokens")
@@ -494,6 +502,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 100e4, memo);
 
       THEN("Alice may not credit Bob 101 tokens")
@@ -562,6 +572,8 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
 
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
 
       a.mint(tokenId, 200e4, memo);
       a.credit(tokenId, bob, 100e4, memo);
@@ -696,7 +708,12 @@ SCENARIO("Mapping a symbol to a token")
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      auto sysToken    = sysIssuer.create(Precision{4}, userBalance).returnVal();
+      aliceTokens.setUserConf(Tokens::autoDebit, true);
+      bobTokens.setUserConf(Tokens::autoDebit, true);
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      bob.to<Nft>().setUserConf(Nft::autoDebit, true);
+
+      auto sysToken = sysIssuer.create(Precision{4}, userBalance).returnVal();
 
       REQUIRE(t.from(Symbol::service)
                   .to<Nft>()
@@ -759,7 +776,8 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         alice.to<Nft>().credit(nftId, Symbol::service, memo);
+         CHECK(alice.to<Nft>().credit(nftId, Symbol::service, memo).succeeded());
+         // missing required authority, lacks either the nft owner or the token owner.
          CHECK(aliceSymbol.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -769,8 +787,8 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice maps the symbol to the token")
       {
-         alice.to<Nft>().credit(nftId, Tokens::service, memo);
-         aliceSymbol.mapSymbol(newToken, symbolId);
+         CHECK(alice.to<Nft>().credit(nftId, Tokens::service, memo).succeeded());
+         CHECK(aliceSymbol.mapSymbol(newToken, symbolId).succeeded());
 
          THEN("The symbol record is identical")
          {
@@ -826,6 +844,10 @@ TEST_CASE("GraphQL Queries")
    auto alice = t.from(t.addAccount("alice"_a));
    auto a     = alice.to<Tokens>();
    auto bob   = t.from(t.addAccount("bob"_a));
+
+   a.setUserConf(Tokens::autoDebit, true);
+   bob.to<Tokens>().setUserConf(Tokens::autoDebit, true);
+   alice.to<Nft>().setUserConf(Nft::autoDebit, true);
 
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
    auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();

@@ -4,7 +4,7 @@
 mod tests {
     use crate::tables::Stream;
     use crate::Wrapper as TokenStream;
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Quantity, Wrapper as Tokens};
     use psibase::*;
 
@@ -79,13 +79,18 @@ mod tests {
             chain.set_auto_block_start(false);
             reset_clock(&chain);
             let token_id = setup_env(&chain);
-            Tokens::push_from(&chain, ALICE)
-                .setUserConf(
-                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
-                    true,
-                )
-                .get()
-                .unwrap();
+
+            let setup_auto_debit = |account| {
+                Nfts::push_from(&chain, account)
+                    .setUserConf(NftHolderFlags::AUTO_DEBIT.index(), true)
+                    .get()
+                    .unwrap();
+            };
+
+            setup_auto_debit(ALICE);
+            setup_auto_debit(BOB);
+            setup_auto_debit(CHARLIE);
+
             Self { chain, token_id }
         }
 
@@ -181,6 +186,17 @@ mod tests {
         chain.set_auto_block_start(false);
         reset_clock(&chain);
         let token_id = setup_env(&chain);
+
+        Nfts::push_from(&chain, ALICE).setUserConf(NftHolderFlags::AUTO_DEBIT.index(), true);
+        Nfts::push_from(&chain, BOB).setUserConf(NftHolderFlags::AUTO_DEBIT.index(), true);
+        Tokens::push_from(&chain, ALICE).setUserConf(
+            psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+            true,
+        );
+        Tokens::push_from(&chain, BOB).setUserConf(
+            psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+            true,
+        );
 
         let id = create_stream(&chain, ALICE, TestHelper::HALF_LIFE, token_id);
 

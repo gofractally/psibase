@@ -53,6 +53,10 @@ mod tests {
         let bob = account!("bob");
         chain.new_account(bob).unwrap();
         let b = Wrapper::push_from(&chain, bob);
+        b.setUserConf(
+            psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+            true,
+        );
 
         let malicious_mike = account!("mike");
         chain.new_account(malicious_mike).unwrap();
