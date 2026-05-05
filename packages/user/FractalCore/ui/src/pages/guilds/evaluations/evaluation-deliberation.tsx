@@ -70,7 +70,7 @@ export const EvaluationDeliberation = () => {
                             {isLoading ? (
                                 <Skeleton className="h-10 w-full" />
                             ) : (
-                                <div className="flex w-full gap-2">
+                                <div className="flex w-full flex-wrap gap-2">
                                     {unrankedAccounts.length > 0 ? (
                                         unrankedAccounts.map((account) => (
                                             <UnrankedAccountChip

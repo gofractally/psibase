@@ -18,8 +18,9 @@ export const UnrankedAccountChip = ({
     contacts,
     onAdd,
 }: UnrankedAccountChipProps) => {
-    const nickname = contacts?.find((contact) => contact.account === account)
-        ?.nickname;
+    const nickname = contacts?.find(
+        (contact) => contact.account === account,
+    )?.nickname;
     const isCurrentUser = currentUser === account;
     const primaryLabel = isCurrentUser ? "You" : nickname;
 
@@ -27,7 +28,7 @@ export const UnrankedAccountChip = ({
         <Button
             variant="outline"
             size="sm"
-            className="h-auto justify-between gap-2 px-2 py-1.5"
+            className="h-auto cursor-crosshair justify-between gap-2 px-2 py-1.5"
             onClick={() => onAdd(account)}
         >
             <div className="flex min-w-0 items-center gap-2">
