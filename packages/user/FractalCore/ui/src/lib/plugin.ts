@@ -116,7 +116,7 @@ class AdminGuild extends PluginInterface {
     protected override readonly _intf = "adminGuild" as const;
 
     get createGuild() {
-        return this._call<[displayName: string, fractal: Account, account: Account]>(
+        return this._call<[displayName: string, account: Account]>(
             "createGuild",
         );
     }

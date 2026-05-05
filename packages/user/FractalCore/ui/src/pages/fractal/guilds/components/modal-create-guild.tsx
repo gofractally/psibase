@@ -16,7 +16,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@shared/shadcn/ui/dialog";
-import { useFractal } from "@/hooks/fractals/use-fractal";
 
 export const ModalCreateGuild = ({
     show,
@@ -29,7 +28,6 @@ export const ModalCreateGuild = ({
 
     const { data: currentUser } = useCurrentUser();
     const { refetch } = useGuildMembershipsOfUser(currentUser);
-    const { data: fractalAccount } = useFractal();
 
     const navigate = useNavigate();
 
@@ -39,7 +37,7 @@ export const ModalCreateGuild = ({
             name: "",
         },
         onSubmit: async ({ formApi, value: { name, account } }) => {
-            await createGuild([name, fractalAccount, account]);
+            await createGuild([name, account]);
             openChange(false);
             navigate(`/guild/${account}`);
             formApi.reset();
