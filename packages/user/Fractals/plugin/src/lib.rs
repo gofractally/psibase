@@ -22,6 +22,10 @@ use crate::trust::assert_authorized;
 use psibase::define_trust;
 use trust::FunctionName;
 
+use crate::bindings::transact::plugin::intf::set_propose_latch;
+
+use crate::bindings::guilds::plugin as Guilds;
+
 define_trust! {
     descriptions {
         Low => "
@@ -49,22 +53,60 @@ define_trust! {
 struct FractallyPlugin;
 
 impl AdminFractal for FractallyPlugin {
-    fn create_fractal(fractal_account: String, name: String, mission: String) -> Result<(), Error> {
+    fn create_fractal(
+        fractal_account: String,
+        guild_account: String,
+        name: String,
+        mission: String,
+    ) -> Result<(), Error> {
         assert_authorized(FunctionName::create_fractal)?;
+
+        let fractal = fractal_account.parse().unwrap();
+        let legislature = gen_rand_account(Some("leg"))?.as_str().into();
+
         let packed_args = fractals::action_structs::create_frac {
-            fractal_account: fractal_account.parse().unwrap(),
+            fractal_account: fractal,
             name,
             mission,
+            legislature,
             judiciary: gen_rand_account(Some("jud"))?.as_str().into(),
-            legislature: gen_rand_account(Some("leg"))?.as_str().into(),
             executive: gen_rand_account(Some("exec"))?.as_str().into(),
             recruitment: gen_rand_account(Some("rec"))?.as_str().into(),
         }
         .packed();
+
         add_action_to_transaction(
             fractals::action_structs::create_frac::ACTION_NAME,
             &packed_args,
-        )
+        )?;
+
+        Guilds::admin_guild::create_guild("Genesis", &fractal_account, &guild_account)?;
+        set_propose_latch(Some(&fractal_account))?;
+
+        Guilds::admin_fractal::set_role_map(1, &guild_account)?;
+        Guilds::admin_fractal::set_role_map(2, &guild_account)?;
+        Guilds::admin_fractal::set_role_map(3, &guild_account)?;
+        Guilds::admin_fractal::set_role_map(4, &guild_account)?;
+
+        set_propose_latch(Some(&legislature.to_string()))?;
+
+        let set_role_occ = |role_id: u8| {
+            let packed_args = fractals::action_structs::set_r_occ {
+                fractal,
+                new_occupation: "guilds".into(),
+                role_id,
+            }
+            .packed();
+            add_action_to_transaction(
+                fractals::action_structs::set_r_occ::ACTION_NAME,
+                &packed_args,
+            )
+        };
+
+        set_role_occ(1)?; // Legislature
+        set_role_occ(2)?; // Judiciary
+        set_role_occ(3)?; // Executive
+        set_role_occ(4) // Recruitment
     }
 
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {

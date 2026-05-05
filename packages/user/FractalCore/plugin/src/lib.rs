@@ -19,8 +19,9 @@ use bindings::guilds::plugin as GuildsPlugin;
 
 use trust::{assert_authorized, FunctionName};
 
-use crate::bindings::host::db::store::{
-    Bucket, Database, DbMode::Transactional, StorageDuration::Persistent,
+use crate::bindings::host::{
+    common::client::get_receiver,
+    db::store::{Bucket, Database, DbMode::Transactional, StorageDuration::Persistent},
 };
 
 define_trust! {
@@ -190,7 +191,7 @@ impl AdminGuild for FractalCorePlugin {
 
     fn create_guild(display_name: String, account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::create_guild)?;
-        GuildsPlugin::admin_guild::create_guild(&display_name, &account)
+        GuildsPlugin::admin_guild::create_guild(&display_name, &get_receiver(), &account)
     }
 }
 

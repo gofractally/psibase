@@ -21,7 +21,7 @@ interface admin-fractal {
 interface admin-guild {
     use host:types/types.{error};
 
-    create-guild: func(display-name: string, account: string) -> result<_, error>;
+    create-guild: func(display-name: string, fractal: string, account: string) -> result<_, error>;
 
     set-display-name: func(guild-account: string, display-name: string) -> result<_, error>;
     set-bio: func(guild-account: string, bio: string) -> result<_, error>;

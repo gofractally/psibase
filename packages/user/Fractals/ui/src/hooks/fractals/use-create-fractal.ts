@@ -13,6 +13,7 @@ import { zAccountNameStatus } from "../use-account-status";
 
 export const zParams = z.object({
     fractalAccount: zAccount,
+    guildAccount: zAccount,
     name: z.string().min(1, { message: "Name is required." }),
     mission: z.string().min(1, { message: "Mission is required." }),
 });
@@ -21,11 +22,11 @@ export const useCreateFractal = () =>
     useMutation<undefined, Error, z.infer<typeof zParams>>({
         mutationKey: QueryKey.createFractal(),
         mutationFn: async (params) => {
-            const { fractalAccount, mission, name } =
+            const { fractalAccount, mission, name, guildAccount } =
                 zParams.parse(params);
             await supervisor.functionCall({
                 method: "createFractal",
-                params: [fractalAccount, name, mission],
+                params: [fractalAccount, guildAccount, name, mission],
                 service: FRACTALS_SERVICE,
                 intf: "adminFractal",
             });

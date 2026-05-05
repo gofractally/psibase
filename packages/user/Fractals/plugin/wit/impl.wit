@@ -7,6 +7,7 @@ world impl {
     include permissions:plugin/imports;
     include accounts:plugin/imports;
     include base64:plugin/imports;
+    include guilds:plugin/imports;
 
 
     export admin-fractal;

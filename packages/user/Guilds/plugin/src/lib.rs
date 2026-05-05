@@ -217,11 +217,15 @@ impl AdminGuild for GuildsPlugin {
         close(&"fractals".to_string(), guild.eval_id()?)
     }
 
-    fn create_guild(display_name: String, guild_account: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::create_guild)?;
+    fn create_guild(
+        display_name: String,
+        fractal: String,
+        guild_account: String,
+    ) -> Result<(), Error> {
+        assert_authorized_with_whitelist(FunctionName::create_guild, vec!["fractals".to_string()])?;
 
         let packed_args = guilds::action_structs::create_guild {
-            fractal: get_sender_app()?,
+            fractal: fractal.as_str().into(),
             display_name: Memo::try_from(display_name).unwrap(),
             guild_account: guild_account.as_str().into(),
             council_role: accounts::plugin::api::gen_rand_account(Some("c-"))?
