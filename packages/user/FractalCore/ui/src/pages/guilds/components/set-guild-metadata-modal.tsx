@@ -5,7 +5,6 @@ import { useSetGuildBio } from "@/hooks/fractals/use-set-guild-bio";
 import { useSetGuildDescription } from "@/hooks/fractals/use-set-guild-description";
 import { useSetGuildDisplayName } from "@/hooks/fractals/use-set-guild-display-name";
 import { useGuild } from "@/hooks/use-guild";
-import { useGuildAccount } from "@/hooks/use-guild-account";
 import QueryKey from "@/lib/query-keys";
 
 import { useAppForm } from "@shared/components/form/app-form";
@@ -18,17 +17,18 @@ import {
 } from "@shared/shadcn/ui/dialog";
 
 export const SetGuildMetadataModal = ({
+    guildAccount,
     show,
     openChange,
 }: {
+    guildAccount: string | undefined;
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
     const queryClient = useQueryClient();
-    const guildAccount = useGuildAccount();
     const { data: currentUser } = useCurrentUser();
 
-    const { data: guild, refetch } = useGuild();
+    const { data: guild, refetch } = useGuild(guildAccount);
 
     const { mutateAsync: setGuildBio } = useSetGuildBio();
     const { mutateAsync: setGuildDescription } = useSetGuildDescription();
