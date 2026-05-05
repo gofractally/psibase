@@ -7,12 +7,12 @@ import { GlowingCard } from "@shared/components/glowing-card";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { CardContent } from "@shared/shadcn/ui/card";
 
-import { Deliberation } from "./evaluations/deliberation";
-import { Failed } from "./evaluations/failed";
-import { Register } from "./evaluations/register";
-import { Start } from "./evaluations/start";
-import { Submission } from "./evaluations/submission";
-import { WaitingRegistration } from "./evaluations/waiting-registration";
+import { Deliberation } from "./evaluations/status/deliberation";
+import { Failed } from "./evaluations/status/failed";
+import { Register } from "./evaluations/status/register";
+import { Start } from "./evaluations/status/start";
+import { Submission } from "./evaluations/status/submission";
+import { WaitingRegistration } from "./evaluations/status/waiting-registration";
 
 export const CurrentEvaluationCard = () => {
     const now = useNowUnix();
