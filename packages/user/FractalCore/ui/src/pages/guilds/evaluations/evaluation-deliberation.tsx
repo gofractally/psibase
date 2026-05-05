@@ -44,8 +44,7 @@ export const EvaluationDeliberation = () => {
         rankedAccounts,
         unrankedAccounts,
         isLoading,
-        isSaving,
-        isSaved,
+        status,
     } = useRanking(groupNumber);
 
     return (
@@ -57,7 +56,7 @@ export const EvaluationDeliberation = () => {
                         Evaluate participants in your group
                     </CardDescription>
                     <CardAction>
-                        <StatusBadges isSaving={isSaving} isSaved={isSaved} />
+                        <StatusBadges rankingStatus={status} />
                     </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-6">

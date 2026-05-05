@@ -6,6 +6,7 @@ import { getSupervisor } from "@psibase/common-lib";
 import QueryKey from "@/lib/query-keys";
 
 import { zAccount } from "@shared/lib/schemas/account";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 import { useGuildAccount } from "../use-guild-account";
 import { useFractalAccount } from "./use-fractal-account";
@@ -40,8 +41,11 @@ export const usePropose = () => {
             });
         },
         onError: (error) => {
-            const message = "Error proposing:";
+            const message = "Error submitting proposal";
             console.error(message, error);
+            toast.error(message, {
+                description: error.message,
+            });
         },
     });
 };

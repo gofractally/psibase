@@ -9,6 +9,8 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 import { arrayMove } from "@shared/lib/array-move";
 import { Account } from "@shared/lib/schemas/account";
 
+export type RankingStatus = "idle" | "pending" | "success" | "error";
+
 export const useRanking = (groupNumber: number) => {
     const guildAccount = useGuildAccount();
 
@@ -34,11 +36,8 @@ export const useRanking = (groupNumber: number) => {
 
     const { mutateAsync: propose } = usePropose();
 
-    const {
-        maybeExecute: debounceAccounts,
-        cancel,
-        state,
-    } = useAsyncDebouncer(
+    const [status, setStatus] = useState<RankingStatus>("idle");
+    const { maybeExecute: debounceAccounts, cancel } = useAsyncDebouncer(
         async (rankedNumbers: Account[]) => {
             await propose({
                 groupNumber,
@@ -47,14 +46,19 @@ export const useRanking = (groupNumber: number) => {
         },
         {
             wait: 4000,
+            onError: (error) => {
+                console.error("Error submitting proposal:", error);
+                setRankedAccounts(currentProposal ?? []);
+                setStatus("error");
+            },
+            onSuccess: () => {
+                setStatus("success");
+            },
         },
-        (state) => ({
-            isPending: state.isPending,
-            status: state.status,
-        }),
     );
 
     const updateRankedNumbers = (accounts: Account[]) => {
+        setStatus("pending");
         setRankedAccounts(accounts);
         if (
             currentProposal &&
@@ -63,6 +67,7 @@ export const useRanking = (groupNumber: number) => {
         ) {
             // if the new proposal is the same as the already-submitted proposal, cancel the debounce
             cancel();
+            setStatus("success");
         } else {
             debounceAccounts(accounts);
         }
@@ -95,7 +100,6 @@ export const useRanking = (groupNumber: number) => {
         add,
         remove,
         isLoading: isProposalPending,
-        isSaving: state.isPending,
-        isSaved: state.status === "settled",
+        status,
     };
 };

@@ -1,5 +1,7 @@
+import type { RankingStatus } from "@/hooks/fractals/use-ranking";
+
 import dayjs from "dayjs";
-import { Check } from "lucide-react";
+import { Check, TriangleAlert } from "lucide-react";
 
 import { useWatchAttest } from "@/hooks/fractals/use-watch-attest";
 import { useWatchClose } from "@/hooks/fractals/use-watch-close";
@@ -11,25 +13,23 @@ import { Badge } from "@shared/shadcn/ui/badge";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 export const StatusBadges = ({
-    isSaving,
-    isSaved,
+    rankingStatus,
 }: {
-    isSaving: boolean;
-    isSaved: boolean;
+    rankingStatus: RankingStatus;
 }) => {
     const now = useNowUnix();
 
-    const status = useEvaluationStatus(now);
+    const evalStatus = useEvaluationStatus(now);
 
-    const isAttesting = useWatchAttest(status);
-    const isClosing = useWatchClose(status);
+    const isAttesting = useWatchAttest(evalStatus);
+    const isClosing = useWatchClose(evalStatus);
 
     let description = "";
     let variant: "default" | "destructive" | "secondary" | "outline" =
         "default";
 
-    if (status?.type == "deliberation") {
-        const secondsUntilDeliberation = status.deliberationDeadline - now;
+    if (evalStatus?.type == "deliberation") {
+        const secondsUntilDeliberation = evalStatus.deliberationDeadline - now;
         if (secondsUntilDeliberation <= 5400) {
             description = dayjs
                 .duration(secondsUntilDeliberation * 1000)
@@ -40,11 +40,11 @@ export const StatusBadges = ({
         if (secondsUntilDeliberation <= 90) {
             variant = "destructive";
         }
-    } else if (status?.type == "submission") {
-        if (status.mustSubmit) {
+    } else if (evalStatus?.type == "submission") {
+        if (evalStatus.mustSubmit) {
             description = isAttesting ? "Submitting..." : "Submit!";
             if (!isAttesting) variant = "destructive";
-        } else if (status.hasEnoughProposals === false) {
+        } else if (evalStatus.hasEnoughProposals === false) {
             description = "Failed: Not enough proposals";
             variant = "destructive";
         } else {
@@ -56,14 +56,19 @@ export const StatusBadges = ({
 
     return (
         <div className="flex h-9 items-center justify-end gap-2">
-            {isSaving && (
+            {rankingStatus === "pending" && (
                 <Badge className="min-w-[52px] bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
                     <Spinner data-icon="inline-start" /> Saving
                 </Badge>
             )}
-            {isSaved && (
+            {rankingStatus === "success" && (
                 <Badge className="min-w-[52px] bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
                     <Check data-icon="inline-start" /> Saved
+                </Badge>
+            )}
+            {rankingStatus === "error" && (
+                <Badge variant="destructive" className="min-w-[52px]">
+                    <TriangleAlert data-icon="inline-start" /> Error
                 </Badge>
             )}
             <Badge variant={variant} className="min-w-[52px]">
