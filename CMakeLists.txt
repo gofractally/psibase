@@ -534,7 +534,6 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Guilds.psi
     PATH packages/user/Guilds
     TARGET_DIR ${USER_WORKSPACE_TARGET}
-    DEPENDS ${Guilds_js_DEP}
 )
 
 cargo_psibase_package(
