@@ -110,7 +110,7 @@ impl Queries for GuildsPlugin {
 
 impl AdminFractal for GuildsPlugin {
     fn set_role_map(role_id: u8, guild: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_role_map)?;
+        assert_authorized_with_whitelist(FunctionName::set_role_map, vec!["fractals".to_string()])?;
 
         let packed_args = guilds::action_structs::set_role_map {
             role_id,
@@ -129,19 +129,29 @@ impl UserEval for GuildsPlugin {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::register)?;
 
-        EvaluationsUser::register(&"fractals".to_string(), guild.eval_id()?)
+        EvaluationsUser::register(
+            &psibase::services::guilds::SERVICE.to_string(),
+            guild.eval_id()?,
+        )
     }
 
     fn unregister(guild_account: String) -> Result<(), Error> {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::unregister)?;
 
-        EvaluationsUser::unregister(&"fractals".to_string(), guild.eval_id()?)
+        EvaluationsUser::unregister(
+            &psibase::services::guilds::SERVICE.to_string(),
+            guild.eval_id()?,
+        )
     }
 
     fn get_group_users(guild_account: String, group_number: u32) -> Result<Vec<String>, Error> {
         let guild = get_guild(guild_account)?;
-        EvaluationsUser::get_group_users(&"fractals".to_string(), guild.eval_id()?, group_number)
+        EvaluationsUser::get_group_users(
+            &psibase::services::guilds::SERVICE.to_string(),
+            guild.eval_id()?,
+            group_number,
+        )
     }
 
     fn get_proposal(
@@ -152,11 +162,15 @@ impl UserEval for GuildsPlugin {
         guild.assert_authorized(FunctionName::get_proposal)?;
         let evaluation_id = guild.eval_id()?;
 
-        match EvaluationsUser::get_proposal(&"fractals".to_string(), evaluation_id, group_number)? {
+        match EvaluationsUser::get_proposal(
+            &psibase::services::guilds::SERVICE.to_string(),
+            evaluation_id,
+            group_number,
+        )? {
             None => Ok(None),
             Some(rank_numbers) => {
                 let users: Vec<AccountNumber> = EvaluationsUser::get_group_users(
-                    &"fractals".to_string(),
+                    &psibase::services::guilds::SERVICE.to_string(),
                     evaluation_id,
                     group_number,
                 )?
@@ -183,11 +197,14 @@ impl UserEval for GuildsPlugin {
         guild.assert_authorized(FunctionName::propose)?;
         let evaluation_id = guild.eval_id()?;
 
-        let all_users: Vec<AccountNumber> =
-            EvaluationsUser::get_group_users(&"fractals".to_string(), evaluation_id, group_number)?
-                .iter()
-                .map(|account| AccountNumber::from_str(account).unwrap())
-                .collect();
+        let all_users: Vec<AccountNumber> = EvaluationsUser::get_group_users(
+            &psibase::services::guilds::SERVICE.to_string(),
+            evaluation_id,
+            group_number,
+        )?
+        .iter()
+        .map(|account| AccountNumber::from_str(account).unwrap())
+        .collect();
 
         let ranked_accounts: Vec<AccountNumber> = proposal
             .iter()
@@ -199,13 +216,22 @@ impl UserEval for GuildsPlugin {
             .map(|num| num.to_string())
             .collect();
 
-        EvaluationsUser::propose(&"fractals".to_string(), evaluation_id, group_number, &res)
+        EvaluationsUser::propose(
+            &psibase::services::guilds::SERVICE.to_string(),
+            evaluation_id,
+            group_number,
+            &res,
+        )
     }
 
     fn attest(guild_account: String, group_number: u32) -> Result<(), Error> {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::attest)?;
-        EvaluationsUser::attest(&"fractals".to_string(), guild.eval_id()?, group_number)
+        EvaluationsUser::attest(
+            &psibase::services::guilds::SERVICE.to_string(),
+            guild.eval_id()?,
+            group_number,
+        )
     }
 }
 
@@ -214,7 +240,10 @@ impl AdminGuild for GuildsPlugin {
         let guild = get_guild(guild_account)?;
         guild.assert_authorized(FunctionName::close_eval)?;
 
-        close(&"fractals".to_string(), guild.eval_id()?)
+        close(
+            &psibase::services::guilds::SERVICE.to_string(),
+            guild.eval_id()?,
+        )
     }
 
     fn create_guild(
