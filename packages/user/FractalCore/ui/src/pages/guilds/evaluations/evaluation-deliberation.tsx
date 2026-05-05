@@ -13,8 +13,11 @@ import { useWatchClose } from "@/hooks/fractals/use-watch-close";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { Avatar } from "@shared/components/avatar";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import { arrayMove } from "@shared/lib/array-move";
 import { humanize } from "@shared/lib/humanize";
@@ -184,6 +187,8 @@ const GroupStatus = ({
 
 export const EvaluationDeliberation = () => {
     const { groupNumber } = usePageParams();
+    const { data: currentUser } = useCurrentUser();
+    const { data: contacts } = useContacts(currentUser);
     const {
         add,
         remove,
@@ -252,29 +257,62 @@ export const EvaluationDeliberation = () => {
                             lockAxis="y"
                         >
                             {rankedAccounts.length > 0 ? (
-                                rankedAccounts.map((account: string) => (
-                                    <SortableItem key={account}>
-                                        <div className="bg-background cursor-grab">
-                                            <SortableKnob>
-                                                <div className="border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full select-none items-center gap-3 rounded-sm border p-2">
-                                                    <GripHorizontal className="h-5 w-5" />
-                                                    <div className="flex-1 text-lg">
-                                                        {account}
+                                rankedAccounts.map((account: string) => {
+                                    const nickname = contacts?.find(
+                                        (contact) =>
+                                            contact.account === account,
+                                    )?.nickname;
+                                    const isCurrentUser = currentUser === account;
+                                    const primaryLabel = isCurrentUser
+                                        ? "You"
+                                        : nickname;
+
+                                    return (
+                                        <SortableItem key={account}>
+                                            <div className="bg-background cursor-grab">
+                                                <SortableKnob>
+                                                    <div className="border-border bg-background hover:bg-muted hover:text-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 aria-expanded:bg-muted aria-expanded:text-foreground flex w-full select-none items-center gap-3 rounded-sm border p-2">
+                                                        <GripHorizontal className="h-5 w-5" />
+                                                        <Avatar
+                                                            account={account}
+                                                            className="h-8 w-8"
+                                                            alt="Contact avatar"
+                                                        />
+                                                        <div className="flex-1">
+                                                            {primaryLabel ? (
+                                                                <div className="flex flex-col">
+                                                                    <div className="text-base font-medium leading-tight">
+                                                                        {
+                                                                            primaryLabel
+                                                                        }
+                                                                    </div>
+                                                                    <div className="text-muted-foreground text-sm italic leading-tight">
+                                                                        {
+                                                                            account
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-base italic">
+                                                                    {account}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={() =>
+                                                                remove(account)
+                                                            }
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() =>
-                                                            remove(account)
-                                                        }
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </SortableKnob>
-                                        </div>
-                                    </SortableItem>
-                                ))
+                                                </SortableKnob>
+                                            </div>
+                                        </SortableItem>
+                                    );
+                                })
                             ) : (
                                 <div className="text-muted-foreground flex items-center gap-2 text-sm italic">
                                     <Info className="h-4 w-4" />
