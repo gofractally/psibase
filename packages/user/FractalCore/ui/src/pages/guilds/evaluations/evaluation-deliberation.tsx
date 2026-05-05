@@ -97,6 +97,7 @@ export const EvaluationDeliberation = () => {
                             with those more highly ranked towards the top.
                         </div>
                         <SortableList
+                            key={rankedAccounts.join("|")} // this forces a re-render, working around a bug in react-easy-sort where the index state gets out of sync
                             className="mt-4 flex w-full flex-col gap-2"
                             draggedItemClassName="cursor-grabbing"
                             onSortEnd={onSortEnd}

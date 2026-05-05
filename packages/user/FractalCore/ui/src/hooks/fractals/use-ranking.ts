@@ -1,8 +1,8 @@
 import { useAsyncDebouncer } from "@tanstack/react-pacer";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useGroupUsers } from "@/hooks/fractals/use-group-users";
-import { setCachedProposal, useProposal } from "@/hooks/fractals/use-proposal";
+import { useProposal } from "@/hooks/fractals/use-proposal";
 import { usePropose } from "@/hooks/fractals/use-propose";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
@@ -18,17 +18,27 @@ export const useRanking = (groupNumber: number) => {
 
     const { data: currentProposal, isPending: isProposalPending } =
         useProposal(groupNumber);
+
     const [rankedAccounts, setRankedAccounts] = useState<Account[]>(
         () => currentProposal ?? [],
     );
 
+    // initialize
+    const initialized = useRef(false);
     useEffect(() => {
+        if (!currentProposal || initialized.current) return;
+        initialized.current = true;
         setRankedAccounts(currentProposal ?? []);
     }, [currentProposal]);
+    // end initialize
 
     const { mutateAsync: propose } = usePropose();
 
-    const { maybeExecute: debounceAccounts, state } = useAsyncDebouncer(
+    const {
+        maybeExecute: debounceAccounts,
+        cancel,
+        state,
+    } = useAsyncDebouncer(
         async (rankedNumbers: Account[]) => {
             await propose({
                 groupNumber,
@@ -46,8 +56,16 @@ export const useRanking = (groupNumber: number) => {
 
     const updateRankedNumbers = (accounts: Account[]) => {
         setRankedAccounts(accounts);
-        setCachedProposal(guildAccount!, groupNumber, accounts);
-        debounceAccounts(accounts);
+        if (
+            currentProposal &&
+            accounts.length === currentProposal.length &&
+            accounts.every((acc, idx) => acc === currentProposal[idx])
+        ) {
+            // if the new proposal is the same as the already-submitted proposal, cancel the debounce
+            cancel();
+        } else {
+            debounceAccounts(accounts);
+        }
     };
 
     const remove = (account: Account) => {
@@ -73,7 +91,6 @@ export const useRanking = (groupNumber: number) => {
         allAccounts: groupUsers,
         rankedAccounts,
         unrankedAccounts,
-        updateRankedNumbers,
         onSortEnd,
         add,
         remove,

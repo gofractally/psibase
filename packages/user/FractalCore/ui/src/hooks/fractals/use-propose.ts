@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { getSupervisor } from "@psibase/common-lib";
 
+import QueryKey from "@/lib/query-keys";
+
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { useGuildAccount } from "../use-guild-account";
@@ -28,6 +30,14 @@ export const usePropose = () => {
             };
 
             void (await getSupervisor().functionCall(pars));
+        },
+        onSuccess: (_data, variables, _onMutateResult, context) => {
+            context.client.invalidateQueries({
+                queryKey: QueryKey.proposal(
+                    guildAccount,
+                    variables.groupNumber,
+                ),
+            });
         },
         onError: (error) => {
             const message = "Error proposing:";

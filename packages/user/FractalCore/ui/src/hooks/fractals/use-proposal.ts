@@ -2,8 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import QueryKey, { OptionalNumber } from "@/lib/query-keys";
 
-import { queryClient } from "@shared/lib/query-client";
-import { Account, zAccount } from "@shared/lib/schemas/account";
+import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
 import { useGuildAccount } from "../use-guild-account";
@@ -32,15 +31,4 @@ export const useProposal = (groupNumber: OptionalNumber) => {
             }
         },
     });
-};
-
-export const setCachedProposal = (
-    guildAccount: Account,
-    groupNumber: number,
-    accounts: Account[],
-) => {
-    queryClient.setQueryData(
-        QueryKey.proposal(guildAccount, groupNumber),
-        accounts,
-    );
 };
