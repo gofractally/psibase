@@ -1841,7 +1841,7 @@ __metadata:
     lucide-react: "npm:^0.475.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
+    react-easy-sort: "npm:^1.8.0"
     react-router-dom: "npm:^6.23.1"
     typescript: "npm:^5.7.3"
     usehooks-ts: "npm:^3.1.1"
@@ -1894,7 +1894,7 @@ __metadata:
   resolution: "@psibase/fractal-core-ui@workspace:user/FractalCore/ui"
   dependencies:
     "@tanstack/react-form": "npm:^1.11.1"
-    "@tanstack/react-pacer": "npm:^0.6.0"
+    "@tanstack/react-pacer": "npm:0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
@@ -1907,7 +1907,7 @@ __metadata:
     react: "npm:^19.1.0"
     react-confetti-explosion: "npm:^3.0.3"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
+    react-easy-sort: "npm:^1.8.0"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
     usehooks-ts: "npm:^3.1.1"
@@ -4514,6 +4514,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/devtools-event-client@npm:^0.2.2":
+  version: 0.2.5
+  resolution: "@tanstack/devtools-event-client@npm:0.2.5"
+  checksum: 10c0/3fb7a171d63bc27fb683bbdb274ac9bb00cee01b70fe74d2a8d62f49243468991182d622901dba8b4aa79a26783ba03e55c7498eba78bd52795e926125c1be59
+  languageName: node
+  linkType: hard
+
 "@tanstack/devtools-event-client@npm:^0.3.2":
   version: 0.3.5
   resolution: "@tanstack/devtools-event-client@npm:0.3.5"
@@ -4546,6 +4553,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/pacer@npm:0.15.1":
+  version: 0.15.1
+  resolution: "@tanstack/pacer@npm:0.15.1"
+  dependencies:
+    "@tanstack/devtools-event-client": "npm:^0.2.2"
+    "@tanstack/store": "npm:^0.7.2"
+  checksum: 10c0/1034c9bd8961f946db348258d7f115daaeb6bca762d754106b752bcfbfcbfda6c8bcbded32729d12d90260c8ade8abfeb8a31a600908308e7da1d3a18bcf8300
+  languageName: node
+  linkType: hard
+
 "@tanstack/pacer@npm:0.15.4":
   version: 0.15.4
   resolution: "@tanstack/pacer@npm:0.15.4"
@@ -4553,13 +4570,6 @@ __metadata:
     "@tanstack/devtools-event-client": "npm:^0.3.2"
     "@tanstack/store": "npm:^0.7.5"
   checksum: 10c0/0f926f508205a1892e86fb22f4818cb4afe1c28db08f94dda63d567db164c2cfe73b181ca936de4a7c848765181853b28d8d5cd9da6d2c0173215c5d4594b233
-  languageName: node
-  linkType: hard
-
-"@tanstack/pacer@npm:0.6.0":
-  version: 0.6.0
-  resolution: "@tanstack/pacer@npm:0.6.0"
-  checksum: 10c0/4deae6181d77cfab8099325cb1712fc583ff71870d1d5011461896b5c35cf20fa9d20ae7d0bd9f89ef1429cc355b798da82d392ff74c0678e68302eba48e72ee
   languageName: node
   linkType: hard
 
@@ -4585,6 +4595,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/react-pacer@npm:0.16.1":
+  version: 0.16.1
+  resolution: "@tanstack/react-pacer@npm:0.16.1"
+  dependencies:
+    "@tanstack/pacer": "npm:0.15.1"
+    "@tanstack/react-store": "npm:^0.7.3"
+  peerDependencies:
+    react: ">=16.8"
+    react-dom: ">=16.8"
+  checksum: 10c0/48c378d61dbb78aa2f3abf12e222da666ab66a567223d975304805059676b22e7e397e08461364a822cebe187dec8d83dbfb6cc1625d1614b952dcce2f9569ac
+  languageName: node
+  linkType: hard
+
 "@tanstack/react-pacer@npm:^0.16.1":
   version: 0.16.4
   resolution: "@tanstack/react-pacer@npm:0.16.4"
@@ -4595,18 +4618,6 @@ __metadata:
     react: ">=16.8"
     react-dom: ">=16.8"
   checksum: 10c0/0204f60505215cba9729de13de5ca2b11a46bcbf349162bbf543ce618125dfca0e16a89da550d86dd3b4a2f360a92edd6d28216afc6ce88a2c4e90d47e559e93
-  languageName: node
-  linkType: hard
-
-"@tanstack/react-pacer@npm:^0.6.0":
-  version: 0.6.0
-  resolution: "@tanstack/react-pacer@npm:0.6.0"
-  dependencies:
-    "@tanstack/pacer": "npm:0.6.0"
-  peerDependencies:
-    react: ">=16.8"
-    react-dom: ">=16.8"
-  checksum: 10c0/4854e329ada0c3c95b05e1fbdaa9a9b1636a4b5e89a0b9f346adac3d103f87b9c9a26569e95a49ded712f019439b30a8a57cc26217ade8f42d222fdb9c72bf79
   languageName: node
   linkType: hard
 
@@ -4621,7 +4632,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/react-store@npm:^0.7.5":
+"@tanstack/react-store@npm:^0.7.3, @tanstack/react-store@npm:^0.7.5":
   version: 0.7.7
   resolution: "@tanstack/react-store@npm:0.7.7"
   dependencies:
@@ -4659,7 +4670,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/store@npm:0.7.7, @tanstack/store@npm:^0.7.5, @tanstack/store@npm:^0.7.7":
+"@tanstack/store@npm:0.7.7, @tanstack/store@npm:^0.7.2, @tanstack/store@npm:^0.7.5, @tanstack/store@npm:^0.7.7":
   version: 0.7.7
   resolution: "@tanstack/store@npm:0.7.7"
   checksum: 10c0/bf90fa957bd97336d7dbc0d7b87379b5fe4baea030efef8a93fe4e49ac1c8bc929247d1a9f84b16a1642e386b67fe53be14df8d5415efdf85f83733ccdf8877a
@@ -11257,7 +11268,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-easy-sort@npm:^1.6.0":
+"react-easy-sort@npm:^1.8.0":
   version: 1.8.0
   resolution: "react-easy-sort@npm:1.8.0"
   dependencies:

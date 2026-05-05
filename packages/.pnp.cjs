@@ -2741,7 +2741,7 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["@psibase/fractal-core-ui", "workspace:user/FractalCore/ui"],\
           ["@tanstack/react-form", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:1.27.7"],\
-          ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0"],\
+          ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.16.1"],\
           ["@tanstack/react-query", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:5.90.16"],\
           ["@types/humanize-duration", "npm:3.27.4"],\
           ["@types/node", "npm:22.19.6"],\
@@ -6347,6 +6347,13 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@tanstack/devtools-event-client", [\
+      ["npm:0.2.5", {\
+        "packageLocation": "../.caches/yarn/@tanstack-devtools-event-client-npm-0.2.5-206ef0c6d0-3fb7a171d6.zip/node_modules/@tanstack/devtools-event-client/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.2.5"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["npm:0.3.5", {\
         "packageLocation": "../.caches/yarn/@tanstack-devtools-event-client-npm-0.3.5-64b1ca7ada-10e4feec2c.zip/node_modules/@tanstack/devtools-event-client/",\
         "packageDependencies": [\
@@ -6375,19 +6382,21 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@tanstack/pacer", [\
+      ["npm:0.15.1", {\
+        "packageLocation": "../.caches/yarn/@tanstack-pacer-npm-0.15.1-21befcd1ac-1034c9bd89.zip/node_modules/@tanstack/pacer/",\
+        "packageDependencies": [\
+          ["@tanstack/devtools-event-client", "npm:0.2.5"],\
+          ["@tanstack/pacer", "npm:0.15.1"],\
+          ["@tanstack/store", "npm:0.7.7"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
       ["npm:0.15.4", {\
         "packageLocation": "../.caches/yarn/@tanstack-pacer-npm-0.15.4-c480cbd6ef-0f926f5082.zip/node_modules/@tanstack/pacer/",\
         "packageDependencies": [\
           ["@tanstack/devtools-event-client", "npm:0.3.5"],\
           ["@tanstack/pacer", "npm:0.15.4"],\
           ["@tanstack/store", "npm:0.7.7"]\
-        ],\
-        "linkType": "HARD"\
-      }],\
-      ["npm:0.6.0", {\
-        "packageLocation": "../.caches/yarn/@tanstack-pacer-npm-0.6.0-5277b1d1dd-4deae6181d.zip/node_modules/@tanstack/pacer/",\
-        "packageDependencies": [\
-          ["@tanstack/pacer", "npm:0.6.0"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -6439,6 +6448,13 @@ const RAW_RUNTIME_STATE =
       }]\
     ]],\
     ["@tanstack/react-pacer", [\
+      ["npm:0.16.1", {\
+        "packageLocation": "../.caches/yarn/@tanstack-react-pacer-npm-0.16.1-d2ba103aa5-48c378d61d.zip/node_modules/@tanstack/react-pacer/",\
+        "packageDependencies": [\
+          ["@tanstack/react-pacer", "npm:0.16.1"]\
+        ],\
+        "linkType": "SOFT"\
+      }],\
       ["npm:0.16.4", {\
         "packageLocation": "../.caches/yarn/@tanstack-react-pacer-npm-0.16.4-f2669a5819-0204f60505.zip/node_modules/@tanstack/react-pacer/",\
         "packageDependencies": [\
@@ -6446,18 +6462,12 @@ const RAW_RUNTIME_STATE =
         ],\
         "linkType": "SOFT"\
       }],\
-      ["npm:0.6.0", {\
-        "packageLocation": "../.caches/yarn/@tanstack-react-pacer-npm-0.6.0-71514f509f-4854e329ad.zip/node_modules/@tanstack/react-pacer/",\
+      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.16.1", {\
+        "packageLocation": "./.yarn/__virtual__/@tanstack-react-pacer-virtual-f986daaa41/2/.caches/yarn/@tanstack-react-pacer-npm-0.16.1-d2ba103aa5-48c378d61d.zip/node_modules/@tanstack/react-pacer/",\
         "packageDependencies": [\
-          ["@tanstack/react-pacer", "npm:0.6.0"]\
-        ],\
-        "linkType": "SOFT"\
-      }],\
-      ["virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0", {\
-        "packageLocation": "./.yarn/__virtual__/@tanstack-react-pacer-virtual-a3ec775812/2/.caches/yarn/@tanstack-react-pacer-npm-0.6.0-71514f509f-4854e329ad.zip/node_modules/@tanstack/react-pacer/",\
-        "packageDependencies": [\
-          ["@tanstack/pacer", "npm:0.6.0"],\
-          ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.6.0"],\
+          ["@tanstack/pacer", "npm:0.15.1"],\
+          ["@tanstack/react-pacer", "virtual:2a785c4cbbec913f395d96cea4f42443efeafd8d49ecdcadcf6e1dbd543317b2958b5c7fc6e28254c66ec4fa5c6990489ee9da1006e8c766e4ddfbf15ffc4693#npm:0.16.1"],\
+          ["@tanstack/react-store", "virtual:44965dfb8967a7108c10693f702b511cb56a936167d97442ea4088d7c1643c23049c9046cade02b648cee326f76507b8bedc8f53f7508526bedcafb84f8c6947#npm:0.7.7"],\
           ["@types/react", "npm:19.2.8"],\
           ["@types/react-dom", "virtual:dc3fc578bfa5e06182a4d2be39ede0bc5b74940b1ffe0d70c26892ab140a4699787750fba175dc306292e80b4aa2c8c5f68c2a821e69b2c37e360c0dff36ff66#npm:19.2.3"],\
           ["react", "npm:19.2.3"],\
