@@ -58,10 +58,10 @@ pub mod service {
             .any(|(svc, name)| **svc == method.service && *name == &method.method.to_string())
     }
 
-    fn get_role_for_method(method_name: &str) -> Option<FractalRole> {
+    fn get_role_for_method(method: MethodNumber) -> Option<FractalRole> {
         ROLE_METHODS
             .iter()
-            .find(|(_, name)| *name == method_name)
+            .find(|(_, name)| method == MethodNumber::from(*name))
             .map(|(role, _)| *role)
     }
 
@@ -101,7 +101,7 @@ pub mod service {
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
-    /// Must be called by legislature.  
+    /// Must be called by legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
@@ -150,7 +150,7 @@ pub mod service {
 
     /// Exile a fractal member.
     ///
-    /// Must be called by judiciary.  
+    /// Must be called by judiciary.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
@@ -258,7 +258,7 @@ pub mod service {
         };
 
         if method.service == get_service() {
-            if let Some(role) = get_role_for_method(&method.method.to_string()) {
+            if let Some(role) = get_role_for_method(method.method) {
                 return Role::get_assert(account, role).auth_policy();
             }
         }
