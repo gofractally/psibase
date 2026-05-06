@@ -118,6 +118,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Called when an evaluation in a fractal is finalized.
+    ///
+    /// # Arguments
+    /// * `evaluation_id` - The ID of the evaluation.
+    #[action]
+    fn on_eval_fin(evaluation_id: u32) {
+        unimplemented!()
+    }
+
     /// Set guild description
     ///
     /// # Arguments
