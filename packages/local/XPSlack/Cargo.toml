@@ -1,0 +1,23 @@
+[package]
+name = "x-pslack-pkg"
+description = "Local WebRTC chat signaling service package"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "XPSlack"
+scope = "local"
+services = ["x-pslack"]
+
+[package.metadata.psibase.dependencies]
+XHttp = "0.23.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+x-pslack = { path = "service", version = "0.23.0" }

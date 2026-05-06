@@ -4,6 +4,7 @@ import { zAccount } from "@shared/lib/schemas/account";
 
 import { chainMailConfig } from "./apps/chainmail";
 import { contactsConfig } from "./apps/contacts";
+import { pslackConfig } from "./apps/pslack";
 import { tokenSwapConfig } from "./apps/token-swap";
 import { tokensConfig } from "./apps/tokens";
 
@@ -34,4 +35,5 @@ export const configuredApps: AppConfigType[] = [
     tokenSwapConfig,
     chainMailConfig,
     contactsConfig,
+    pslackConfig,
 ].map((config) => AppConfig.parse(config));
