@@ -125,17 +125,10 @@ impl Fractal {
         Role::get_assert(self.account, role).account
     }
 
-    pub fn check_sender_is_legislature(&self) {
+    pub fn check_sender_is_role(&self, role: FractalRole) {
         check(
-            self.role_account(FractalRole::Legislature) == get_sender(),
-            "Requires legislature authority",
-        );
-    }
-
-    pub fn check_sender_is_judiciary(&self) {
-        check(
-            self.role_account(FractalRole::Judiciary) == get_sender(),
-            "Requires judiciary authority",
+            self.role_account(role) == get_sender(),
+            &format!("Requires role {} authority", role as u8),
         );
     }
 

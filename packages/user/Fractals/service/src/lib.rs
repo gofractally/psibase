@@ -62,7 +62,7 @@ pub mod service {
     #[action]
     fn init_token(fractal: AccountNumber) {
         let fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
+        fractal.check_sender_is_role(FractalRole::Legislature);
         fractal.init_token();
     }
 
@@ -74,7 +74,7 @@ pub mod service {
     #[action]
     fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
         let mut fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
+        fractal.check_sender_is_role(FractalRole::Legislature);
         fractal.set_distribution_interval(distribution_interval_secs);
     }
 
@@ -86,7 +86,7 @@ pub mod service {
     #[action]
     fn set_gen_time(fractal: AccountNumber, genesis_time: u64) {
         let mut fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
+        fractal.check_sender_is_role(FractalRole::Legislature);
         fractal.set_genesis_time(TimePointSec::from(genesis_time as i64));
     }
 
@@ -98,7 +98,7 @@ pub mod service {
     #[action]
     fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
         let mut fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
+        fractal.check_sender_is_role(FractalRole::Legislature);
         fractal.set_distribution_strategy(distribution_strategy.into());
     }
 
@@ -111,7 +111,7 @@ pub mod service {
     /// * `member` - The fractal member to be exiled.
     #[action]
     fn exile_member(fractal: AccountNumber, member: AccountNumber) {
-        Fractal::get_assert(fractal).check_sender_is_judiciary();
+        Fractal::get_assert(fractal).check_sender_is_role(FractalRole::Judiciary);
         FractalMember::get_assert(fractal, member).exile();
     }
 
@@ -132,7 +132,7 @@ pub mod service {
     /// * `new_occupation` - New occupation to set for role
     #[action]
     fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
+        Fractal::get_assert(fractal).check_sender_is_role(FractalRole::Legislature);
         Role::get_assert(fractal, role_id.into()).set_occupation(new_occupation);
     }
 
@@ -209,7 +209,7 @@ pub mod service {
     /// * `paid_occupations` - Ordered occupations to set for the fractal
     #[action]
     fn set_paid_occ(fractal: AccountNumber, paid_occupations: Vec<AccountNumber>) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
+        Fractal::get_assert(fractal).check_sender_is_role(FractalRole::Legislature);
         Occupation::set_ordered_occupations(fractal, paid_occupations);
     }
 
