@@ -11,7 +11,7 @@ add_executable(triedent-tests
     temp_database.cpp
     temp_directory.cpp)
 target_link_libraries(triedent-tests PUBLIC Catch2::Catch2WithMain triedent)
-target_include_directories(triedent-tests PUBLIC ${Boost_INCLUDE_DIRS})
+target_include_directories(triedent-tests SYSTEM PUBLIC ${Boost_INCLUDE_DIRS})
 set_target_properties(triedent-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 native_test(triedent-tests)
 
