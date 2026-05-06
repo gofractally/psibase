@@ -2939,7 +2939,6 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
- "serde-aux",
  "serde_json",
 ]
 
@@ -2953,6 +2952,7 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
+ "serde-aux",
  "serde_json",
 ]
 

@@ -319,6 +319,24 @@ pub mod service {
         );
     }
 
+    /// Called when an evaluation in a fractal is finalized.
+    ///
+    /// # Arguments
+    /// * `evaluation_id` - The ID of the evaluation.
+    #[action]
+    fn on_eval_fin(evaluation_id: u32) {
+        check_is_sender(psibase::services::evaluations::SERVICE);
+
+        let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
+        evaluation.finish_evaluation();
+
+        Wrapper::emit()
+            .history()
+            .evaluation_finished(evaluation.guild, evaluation.evaluation_id);
+
+        evaluation.schedule_next_evaluation();
+    }
+
     /// Called when a user unregisters from an evaluation in a fractal.
     ///
     /// # Arguments

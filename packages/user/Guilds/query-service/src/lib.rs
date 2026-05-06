@@ -10,10 +10,100 @@ mod service {
     };
     use psibase::{AccountNumber, *};
 
+    use serde::Deserialize;
+    use serde_aux::field_attributes::deserialize_number_from_string;
+
+    #[derive(Deserialize, SimpleObject)]
+    struct EvaluationFinish {
+        guild: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    struct ScheduledEvaluation {
+        fractal: AccountNumber,
+        guild: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        registration: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        deliberation: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        submission: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        finish_by: u32,
+    }
+
+    #[derive(Deserialize, SimpleObject)]
+    struct NewGroup {
+        owner: AccountNumber,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        evaluation_id: u32,
+        #[serde(deserialize_with = "deserialize_number_from_string")]
+        group_number: u32,
+        users: Vec<AccountNumber>,
+    }
+
     struct Query;
 
     #[Object]
     impl Query {
+        async fn get_groups_created(
+            &self,
+            evaluation_id: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<EventConnection<NewGroup>> {
+            EventQuery::new("history.evaluations.new_group")
+                .condition(format!(
+                    "owner = 'guilds' AND evaluation_id = {}",
+                    evaluation_id
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn evaluation_finishes(
+            &self,
+            guild: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<EventConnection<EvaluationFinish>> {
+            EventQuery::new("history.guilds.evaluation_finished")
+                .condition(format!("guild = '{}'", guild))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn scheduled_evaluations(
+            &self,
+            guild: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<EventConnection<ScheduledEvaluation>> {
+            EventQuery::new("history.guilds.scheduled_evaluation")
+                .condition(format!("guild = '{}'", guild))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
         async fn ranked_guilds(&self, fractal: AccountNumber) -> Vec<AccountNumber> {
             let mut guilds: Vec<_> = RankingTable::read()
                 .get_index_pk()
