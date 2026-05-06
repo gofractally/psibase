@@ -1210,7 +1210,7 @@ write_package_index(package-index ${SERVICE_DIR}
     Accounts Aes AuthAny AuthDyn AuthDelegate AuthSig Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XPSlack XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XPSlack XPSlack XProxy XRun XSites XTimer XTransact)
 
 install(
     FILES ${SERVICE_DIR}/index.json
