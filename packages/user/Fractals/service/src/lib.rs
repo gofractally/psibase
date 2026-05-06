@@ -291,9 +291,7 @@ pub mod service {
 
         if method.service == get_service() {
             if let Some(role) = get_role_for_method(method.method) {
-                if let Some(role_record) = Role::get(account, role) {
-                    return role_record.auth_policy();
-                }
+                return Role::get_assert(account, role).auth_policy();
             }
         }
 
