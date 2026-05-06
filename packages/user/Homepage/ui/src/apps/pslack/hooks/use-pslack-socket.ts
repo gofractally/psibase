@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ConversationSnapshot } from "../lib/protocol";
+import type {
+    CallTimelineEventType,
+    ConversationSnapshot,
+} from "../lib/protocol";
 import { PslackWsClient, type PslackWsPublicState } from "../lib/ws-client";
 import { supervisor } from "@shared/lib/supervisor";
 
 export type PslackMessageStatus = "pending" | "sent" | "failed";
 
-/** One row in the message thread UI (outbound correlates via clientMsgId). */
+/** One plain chat bubble row (outbound correlates via clientMsgId). */
 export type PslackUiMessage = {
     /** Stable React key — clientMsgId for optimistic rows, else `srv-${serverMsgId}`. */
     key: string;
@@ -18,6 +21,25 @@ export type PslackUiMessage = {
     status: PslackMessageStatus;
     errorReason?: string;
 };
+
+export type PslackTimelineMessageRow = PslackUiMessage & { kind: "message" };
+
+export type PslackTimelineCallEventRow = {
+    kind: "callEvent";
+    key: string;
+    conversationId: string;
+    callId?: string;
+    event: CallTimelineEventType;
+    actor?: string;
+    reason?: string;
+    durationMs?: number;
+    serverMsgId: number;
+    serverTime: number;
+};
+
+export type PslackTimelineRow =
+    | PslackTimelineMessageRow
+    | PslackTimelineCallEventRow;
 
 export type PresenceUi = "online" | "offline" | "unknown";
 
@@ -89,8 +111,8 @@ export function usePslackSocket() {
     const [conversations, setConversations] = useState<ConversationSnapshot[]>(
         [],
     );
-    const [messagesByConversation, setMessagesByConversation] = useState<
-        Record<string, PslackUiMessage[]>
+    const [timelineByConversation, setTimelineByConversation] = useState<
+        Record<string, PslackTimelineRow[]>
     >({});
     const [selectedConversationId, setSelectedConversationId] = useState<
         string | undefined
@@ -141,11 +163,14 @@ export function usePslackSocket() {
     const markConversationSendFailed = useCallback(
         (conversationId: string | undefined, detail: string) => {
             if (!conversationId) return;
-            setMessagesByConversation((prev) => {
+            setTimelineByConversation((prev) => {
                 const arr = [...(prev[conversationId] ?? [])];
                 for (let i = arr.length - 1; i >= 0; i--) {
                     const row = arr[i];
-                    if (row?.status === "pending") {
+                    if (
+                        row?.kind === "message" &&
+                        row.status === "pending"
+                    ) {
                         arr[i] = {
                             ...row,
                             status: "failed",
@@ -252,17 +277,20 @@ export function usePslackSocket() {
                         clientMsgId,
                     } = frame;
 
-                    setMessagesByConversation((prev) => {
+                    setTimelineByConversation((prev) => {
                         const prevList = [...(prev[conversationId] ?? [])];
 
                         if (clientMsgId) {
                             const ix = prevList.findIndex(
-                                (m) => m.clientMsgId === clientMsgId,
+                                (m) =>
+                                    m.kind === "message" &&
+                                    m.clientMsgId === clientMsgId,
                             );
                             if (ix >= 0) {
-                                const cur = prevList[ix] as PslackUiMessage;
+                                const cur = prevList[ix] as PslackTimelineMessageRow;
                                 prevList[ix] = {
                                     ...cur,
+                                    kind: "message",
                                     key: clientMsgId,
                                     clientMsgId,
                                     serverMsgId,
@@ -276,12 +304,17 @@ export function usePslackSocket() {
                         }
 
                         if (
-                            prevList.some((m) => m.serverMsgId === serverMsgId)
+                            prevList.some(
+                                (m) =>
+                                    m.kind === "message" &&
+                                    m.serverMsgId === serverMsgId,
+                            )
                         ) {
                             return prev;
                         }
 
                         prevList.push({
+                            kind: "message",
                             key: `srv-${serverMsgId}`,
                             serverMsgId,
                             from,
@@ -292,6 +325,53 @@ export function usePslackSocket() {
                         prevList.sort((a, b) => a.serverTime - b.serverTime);
                         return { ...prev, [conversationId]: prevList };
                     });
+                },
+
+                callEvent: (frame) => {
+                    setLastInboundError(null);
+                    const {
+                        conversationId,
+                        callId,
+                        event,
+                        actor,
+                        reason,
+                        durationMs,
+                        serverMsgId,
+                        serverTime,
+                    } = frame;
+
+                    setTimelineByConversation((prev) => {
+                        const prevList = [...(prev[conversationId] ?? [])];
+                        if (
+                            prevList.some(
+                                (r) =>
+                                    r.kind === "callEvent" &&
+                                    r.serverMsgId === serverMsgId,
+                            )
+                        ) {
+                            return prev;
+                        }
+                        prevList.push({
+                            kind: "callEvent",
+                            key: `callev-${serverMsgId}`,
+                            conversationId,
+                            callId,
+                            event,
+                            actor,
+                            reason,
+                            durationMs,
+                            serverMsgId,
+                            serverTime,
+                        });
+                        prevList.sort((a, b) => a.serverTime - b.serverTime);
+                        return { ...prev, [conversationId]: prevList };
+                    });
+                },
+
+                callError: (frame) => {
+                    const detail = `${frame.code}: ${frame.reason}`.slice(0, 500);
+                    markConversationSendFailed(frame.conversationId, detail);
+                    setLastInboundError(detail);
                 },
 
                 error: (frame) => {
@@ -388,9 +468,10 @@ export function usePslackSocket() {
             const clientMsgId = crypto.randomUUID();
             c.send(convId, trimmed, clientMsgId);
 
-            setMessagesByConversation((prev) => {
+            setTimelineByConversation((prev) => {
                 const list = [...(prev[convId] ?? [])];
                 list.push({
+                    kind: "message",
                     key: clientMsgId,
                     clientMsgId,
                     from,
@@ -427,10 +508,10 @@ export function usePslackSocket() {
         return null;
     }, [authLost, chatTransportReady, selectedConversationId, wsState]);
 
-    const selectedMessages = useMemo(() => {
+    const selectedTimeline = useMemo(() => {
         if (!selectedConversationId) return [];
-        return messagesByConversation[selectedConversationId] ?? [];
-    }, [messagesByConversation, selectedConversationId]);
+        return timelineByConversation[selectedConversationId] ?? [];
+    }, [timelineByConversation, selectedConversationId]);
 
     const selectedConversation = useMemo(
         () =>
@@ -452,7 +533,7 @@ export function usePslackSocket() {
         selectedConversationId,
         setSelectedConversationId,
         selectedConversation,
-        selectedMessages,
+        selectedTimeline,
 
         openOrFocusDm,
         openGroupChat,

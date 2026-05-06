@@ -138,7 +138,7 @@ export const PslackPage = () => {
         selectedConversationId,
         setSelectedConversationId,
         selectedConversation,
-        selectedMessages,
+        selectedTimeline,
         openOrFocusDm,
         openGroupChat,
         sendChatMessage,
@@ -427,7 +427,7 @@ export const PslackPage = () => {
                         {selectedConversation ? (
                             <>
                                 <MessageThread
-                                    messages={selectedMessages}
+                                    timeline={selectedTimeline}
                                     selfAccount={selfAccount}
                                 />
                                 <ChatComposer

@@ -6,8 +6,11 @@ import {
     type ServerFrame,
 } from "./protocol";
 
-/** Application subprotocol negotiated on `/ws`; must match `XPSlack` service. */
-export const PSLACK_WS_SUBPROTOCOL = "psibase.pslack.v1";
+/** Negotiated websocket sub-protocols offered to `/ws`; v2 first (architecture §3.1). */
+export const PSLACK_WS_SUBPROTOCOLS = [
+    "psibase.pslack.v2",
+    "psibase.pslack.v1",
+] as const;
 export const PSLACK_AUTH_SUBPROTOCOL_PREFIX = "psibase.bearer.";
 
 export type PslackWsPublicState =
@@ -81,7 +84,7 @@ function nextReconnectDelayMs(
 }
 
 /**
- * Stateful x-pslack websocket client: `wss://…/ws` with {@link PSLACK_WS_SUBPROTOCOL}.
+ * Stateful x-pslack websocket client for `wss://…/ws`; negotiates {@link PSLACK_WS_SUBPROTOCOLS}.
  */
 export class PslackWsClient {
     private readonly baseUrl?: string | null;
@@ -253,8 +256,38 @@ export class PslackWsClient {
             case "error":
                 this.handlers.error?.(frame);
                 break;
-            case "pong":
-                this.handlers.pong?.(frame);
+            case "iceServers":
+                this.handlers.iceServers?.(frame);
+                break;
+            case "callEvent":
+                this.handlers.callEvent?.(frame);
+                break;
+            case "callError":
+                this.handlers.callError?.(frame);
+                break;
+            case "callTimeout":
+                this.handlers.callTimeout?.(frame);
+                break;
+            case "callInvite":
+                this.handlers.callInvite?.(frame);
+                break;
+            case "callAccept":
+                this.handlers.callAccept?.(frame);
+                break;
+            case "callDecline":
+                this.handlers.callDecline?.(frame);
+                break;
+            case "callOffer":
+                this.handlers.callOffer?.(frame);
+                break;
+            case "callAnswer":
+                this.handlers.callAnswer?.(frame);
+                break;
+            case "callCandidate":
+                this.handlers.callCandidate?.(frame);
+                break;
+            case "callHangup":
+                this.handlers.callHangup?.(frame);
                 break;
             default:
                 break;
@@ -326,10 +359,10 @@ export class PslackWsClient {
             const url = this.wsUrl();
             const protocols = token
                 ? [
-                      PSLACK_WS_SUBPROTOCOL,
+                      ...PSLACK_WS_SUBPROTOCOLS,
                       `${PSLACK_AUTH_SUBPROTOCOL_PREFIX}${token}`,
                   ]
-                : [PSLACK_WS_SUBPROTOCOL];
+                : [...PSLACK_WS_SUBPROTOCOLS];
             const ws = new WebSocket(url, protocols);
 
             ws.onopen = () => {

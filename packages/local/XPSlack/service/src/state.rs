@@ -51,6 +51,8 @@ pub mod tables {
         pub user: AccountNumber,
         pub connected_at: i64,
         pub last_seen_at: i64,
+        /// Negotiated websocket app protocol: `1` (`psibase.pslack.v1`) or `2` (`psibase.pslack.v2`).
+        pub protocol_major: u8,
     }
 
     impl SocketSessionRow {
@@ -281,7 +283,12 @@ pub fn members_of(conversation_id: &str) -> Vec<AccountNumber> {
         .collect()
 }
 
-pub fn upsert_socket_session(socket: i32, user: AccountNumber, now: i64) -> bool {
+pub fn upsert_socket_session(
+    socket: i32,
+    user: AccountNumber,
+    now: i64,
+    protocol_major: u8,
+) -> bool {
     let socket_table = SocketSessionTable::new();
     let user_table = UserSessionTable::new();
     let was_offline = sessions_for_user(user).is_empty();
@@ -296,6 +303,7 @@ pub fn upsert_socket_session(socket: i32, user: AccountNumber, now: i64) -> bool
             user,
             connected_at: now,
             last_seen_at: now,
+            protocol_major,
         })
         .unwrap();
     user_table.put(&UserSessionRow { user, socket }).unwrap();

@@ -60,9 +60,9 @@ mod r_transact {
 #[allow(non_snake_case)]
 mod service {
     use crate::protocol::{
-        encode_server_frame, parse_client_frame, validate_client_frame, ClientFrame,
-        ContactPresence, Conversation, ConversationKind, PresenceStatus, ProtocolError,
-        ServerFrame,
+        default_stun_ice_servers_frame, encode_server_frame, parse_client_frame,
+        validate_client_frame, ClientFrame, ContactPresence, Conversation, ConversationKind,
+        PresenceStatus, ProtocolError, PSLACK_SUBPROTOCOL_V1, PSLACK_SUBPROTOCOL_V2, ServerFrame,
     };
     use crate::r_transact::Wrapper as RTransact;
     use crate::state::tables::SocketSessionRow;
@@ -79,7 +79,6 @@ mod service {
     };
     use sha1::{Digest, Sha1};
 
-    const PSLACK_SUBPROTOCOL: &str = "psibase.pslack.v1";
     const PSLACK_AUTH_SUBPROTOCOL_PREFIX: &str = "psibase.bearer.";
     const WEBSOCKET_TEXT: u32 = 1;
 
@@ -173,30 +172,53 @@ mod service {
         STANDARD.encode(hasher.finalize())
     }
 
-    pub(super) fn websocket_handshake(request: &HttpRequest) -> Option<HttpReply> {
-        let key = websocket_key(request)?;
-        if !header_contains(request, "Sec-WebSocket-Protocol", PSLACK_SUBPROTOCOL) {
-            return None;
+    fn negotiate_pslack_subprotocol(request: &HttpRequest) -> Option<&'static str> {
+        let mut tokens: Vec<&str> = Vec::new();
+        for header in request.headers.iter().filter(|h| h.matches("Sec-WebSocket-Protocol")) {
+            for part in header.value.split(',') {
+                tokens.push(part.trim());
+            }
         }
 
-        Some(HttpReply {
-            status: 101,
-            contentType: String::new(),
-            body: Vec::new().into(),
-            headers: vec![
-                HttpHeader::new("Upgrade", "websocket"),
-                HttpHeader::new("Connection", "Upgrade"),
-                HttpHeader::new("Sec-WebSocket-Accept", &accept_key(key)),
-                HttpHeader::new("Sec-WebSocket-Protocol", PSLACK_SUBPROTOCOL),
-            ],
-        })
+        for t in tokens.iter().copied() {
+            if t.eq_ignore_ascii_case(PSLACK_SUBPROTOCOL_V2) {
+                return Some(PSLACK_SUBPROTOCOL_V2);
+            }
+        }
+        for t in tokens.iter().copied() {
+            if t.eq_ignore_ascii_case(PSLACK_SUBPROTOCOL_V1) {
+                return Some(PSLACK_SUBPROTOCOL_V1);
+            }
+        }
+        None
+    }
+
+    pub(super) fn websocket_handshake(request: &HttpRequest) -> Option<(HttpReply, u8)> {
+        let key = websocket_key(request)?;
+        let chosen = negotiate_pslack_subprotocol(request)?;
+        let protocol_major = if chosen == PSLACK_SUBPROTOCOL_V2 { 2u8 } else { 1u8 };
+
+        Some((
+            HttpReply {
+                status: 101,
+                contentType: String::new(),
+                body: Vec::new().into(),
+                headers: vec![
+                    HttpHeader::new("Upgrade", "websocket"),
+                    HttpHeader::new("Connection", "Upgrade"),
+                    HttpHeader::new("Sec-WebSocket-Accept", &accept_key(key)),
+                    HttpHeader::new("Sec-WebSocket-Protocol", chosen),
+                ],
+            },
+            protocol_major,
+        ))
     }
 
     pub(super) fn websocket_route(
         request: &HttpRequest,
         socket: Option<i32>,
         user: Option<psibase::AccountNumber>,
-    ) -> Result<(i32, psibase::AccountNumber, HttpReply), HttpReply> {
+    ) -> Result<(i32, psibase::AccountNumber, HttpReply, u8), HttpReply> {
         let Some(socket) = socket else {
             return Err(plain_reply(503, "x-pslack requires a websocket socket"));
         };
@@ -205,14 +227,14 @@ mod service {
             return Err(plain_reply(401, "x-pslack websocket requires authentication"));
         };
 
-        let Some(reply) = websocket_handshake(request) else {
+        let Some((reply, protocol_major)) = websocket_handshake(request) else {
             return Err(plain_reply(
                 426,
-                "x-pslack /ws requires websocket subprotocol psibase.pslack.v1",
+                "x-pslack /ws requires websocket subprotocol psibase.pslack.v1 or psibase.pslack.v2",
             ));
         };
 
-        Ok((socket, user, reply))
+        Ok((socket, user, reply, protocol_major))
     }
 
     fn send_frame(socket: i32, frame: &ServerFrame) {
@@ -226,6 +248,25 @@ mod service {
             &ServerFrame::Welcome {
                 user: user.into(),
                 server_time,
+            },
+        );
+    }
+
+    fn maybe_send_v2_ice_servers(socket: i32, protocol_major: u8) {
+        if protocol_major == 2 {
+            send_frame(socket, &default_stun_ice_servers_frame());
+        }
+    }
+
+    fn send_call_not_implemented(socket: i32, frame: ClientFrame) {
+        let (call_id, conversation_id) = frame.call_error_context();
+        send_frame(
+            socket,
+            &ServerFrame::CallError {
+                code: "not-implemented".into(),
+                reason: "call signaling is not implemented in this milestone".into(),
+                call_id,
+                conversation_id,
             },
         );
     }
@@ -351,9 +392,14 @@ mod service {
         }
     }
 
-    fn subjective_upsert_session(socket: i32, user: AccountNumber, now: i64) -> bool {
+    fn subjective_upsert_session(
+        socket: i32,
+        user: AccountNumber,
+        now: i64,
+        protocol_major: u8,
+    ) -> bool {
         ::psibase::subjective_tx! {
-            upsert_socket_session(socket, user, now)
+            upsert_socket_session(socket, user, now, protocol_major)
         }
     }
 
@@ -526,16 +572,18 @@ mod service {
         }
 
         let user = authenticated_user(&request);
-        let (socket, user, reply) = match websocket_route(&request, socket, user) {
-            Ok(accepted) => accepted,
-            Err(reply) => return Some(reply),
-        };
+        let (socket, user, reply, protocol_major) =
+            match websocket_route(&request, socket, user) {
+                Ok(accepted) => accepted,
+                Err(reply) => return Some(reply),
+            };
 
         XHttp::call().accept(socket, reply);
         XHttp::call().setCallback(socket, MethodNumber::from("recv"), MethodNumber::from("close"));
         let now = Transact::call().currentBlock().time.microseconds;
-        subjective_upsert_session(socket, user, now);
+        subjective_upsert_session(socket, user, now, protocol_major);
         send_welcome(socket, user, now);
+        maybe_send_v2_ice_servers(socket, protocol_major);
         fanout_presence(user, PresenceStatus::Online);
         None
     }
@@ -613,6 +661,13 @@ mod service {
             } => handle_ack(socket, session.user, conversation_id, server_msg_id),
             ClientFrame::Ping => send_frame(socket, &ServerFrame::Pong),
             ClientFrame::Signal { .. } => unreachable!("signal is rejected by validation"),
+            ClientFrame::CallInvite { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallAccept { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallDecline { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallOffer { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallAnswer { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallCandidate { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallHangup { .. } => send_call_not_implemented(socket, frame),
         }
     }
 
@@ -641,7 +696,8 @@ mod service {
 mod tests {
     use super::protocol::{
         canonical_group_members, encode_server_frame, parse_client_frame, validate_client_frame,
-        ClientFrame, PresenceStatus, ProtocolError, ServerFrame,
+        CallTimelineEventKind, ClientFrame, IceServerUrls, IceServerConfig, PresenceStatus,
+        ProtocolError, ServerFrame,
     };
     use super::service::{
         accept_key, bearer_subprotocol_token, header_contains, route_target, websocket_handshake,
@@ -789,9 +845,10 @@ mod tests {
     #[test]
     fn websocket_handshake_requires_pslack_subprotocol_and_returns_101() {
         let request = websocket_request(vec![]);
-        let reply = websocket_handshake(&request).expect("valid pslack websocket handshake");
+        let (reply, major) = websocket_handshake(&request).expect("valid pslack websocket handshake");
 
         assert_eq!(reply.status, 101);
+        assert_eq!(major, 1);
         assert_eq!(
             reply_header(&reply, "Sec-WebSocket-Accept"),
             Some("s3pPLMBiTxaQ9kYGzzhZRbK+xOo=")
@@ -807,6 +864,21 @@ mod tests {
             websocket_headers(vec![("Sec-WebSocket-Protocol", "chat")]),
         );
         assert!(websocket_handshake(&wrong_subprotocol).is_none());
+    }
+
+    #[test]
+    fn websocket_handshake_prefers_v2_when_offered() {
+        let request = websocket_request(vec![(
+            "Sec-WebSocket-Protocol",
+            "psibase.pslack.v2, psibase.pslack.v1",
+        )]);
+        let (reply, major) = websocket_handshake(&request).expect("v2 handshake");
+
+        assert_eq!(major, 2);
+        assert_eq!(
+            reply_header(&reply, "Sec-WebSocket-Protocol"),
+            Some("psibase.pslack.v2")
+        );
     }
 
     #[test]
@@ -849,13 +921,15 @@ mod tests {
         };
         assert_eq!(reply.status, 426);
 
-        let (socket, accepted_user, reply) = match websocket_route(&request, Some(7), Some(user)) {
-            Ok(accepted) => accepted,
-            Err(reply) => panic!("valid handshake failed with {}", reply.status),
-        };
+        let (socket, accepted_user, reply, protocol_major) =
+            match websocket_route(&request, Some(7), Some(user)) {
+                Ok(accepted) => accepted,
+                Err(reply) => panic!("valid handshake failed with {}", reply.status),
+            };
         assert_eq!(socket, 7);
         assert_eq!(accepted_user, user);
         assert_eq!(reply.status, 101);
+        assert_eq!(protocol_major, 1);
     }
 
     #[test]
@@ -894,7 +968,71 @@ mod tests {
                     server_msg_id: 7,
                 },
             ),
-            (r#"{"t":"ping"}"#, ClientFrame::Ping),
+            (
+                r#"{"t":"ping"}"#,
+                ClientFrame::Ping,
+            ),
+            (
+                r#"{"t":"callInvite","conversationId":"c1","wantVideo":true,"wantAudio":true,"clientCallId":"cc"}"#,
+                ClientFrame::CallInvite {
+                    conversation_id: "c1".into(),
+                    want_video: true,
+                    want_audio: true,
+                    client_call_id: "cc".into(),
+                },
+            ),
+            (
+                r#"{"t":"callAccept","callId":"x"}"#,
+                ClientFrame::CallAccept {
+                    call_id: "x".into(),
+                },
+            ),
+            (
+                r#"{"t":"callDecline","callId":"x","reason":"busy"}"#,
+                ClientFrame::CallDecline {
+                    call_id: "x".into(),
+                    reason: Some("busy".into()),
+                },
+            ),
+            (
+                r#"{"t":"callOffer","callId":"x","sdp":"v=0"}"#,
+                ClientFrame::CallOffer {
+                    call_id: "x".into(),
+                    sdp: "v=0".into(),
+                },
+            ),
+            (
+                r#"{"t":"callAnswer","callId":"x","sdp":"v=0"}"#,
+                ClientFrame::CallAnswer {
+                    call_id: "x".into(),
+                    sdp: "v=0".into(),
+                },
+            ),
+            (
+                r#"{"t":"callCandidate","callId":"x","candidate":"cand","sdpMid":"0","sdpMLineIndex":0}"#,
+                ClientFrame::CallCandidate {
+                    call_id: "x".into(),
+                    candidate: Some("cand".into()),
+                    sdp_mid: Some("0".into()),
+                    sdp_mline_index: Some(0),
+                },
+            ),
+            (
+                r#"{"t":"callCandidate","callId":"x","candidate":null}"#,
+                ClientFrame::CallCandidate {
+                    call_id: "x".into(),
+                    candidate: None,
+                    sdp_mid: None,
+                    sdp_mline_index: None,
+                },
+            ),
+            (
+                r#"{"t":"callHangup","callId":"x","reason":"user"}"#,
+                ClientFrame::CallHangup {
+                    call_id: "x".into(),
+                    reason: Some("user".into()),
+                },
+            ),
         ] {
             assert_eq!(parse_client_frame(json.as_bytes()).unwrap(), expected);
         }
@@ -918,6 +1056,38 @@ mod tests {
                     conversation_id: Some("c1".into()),
                 },
                 r#"{"t":"error","code":"bad-frame","reason":"bad request","conversationId":"c1"}"#,
+            ),
+            (
+                ServerFrame::CallEvent {
+                    conversation_id: "c1".into(),
+                    call_id: Some("cid".into()),
+                    event: CallTimelineEventKind::Started,
+                    actor: Some(account("alice")),
+                    reason: None,
+                    duration_ms: None,
+                    server_msg_id: 3,
+                    server_time: 99,
+                },
+                r#"{"t":"callEvent","conversationId":"c1","callId":"cid","event":"started","actor":"alice","serverMsgId":3,"serverTime":99}"#,
+            ),
+            (
+                ServerFrame::CallError {
+                    code: "busy".into(),
+                    reason: "in call".into(),
+                    call_id: Some("x".into()),
+                    conversation_id: Some("c1".into()),
+                },
+                r#"{"t":"callError","code":"busy","reason":"in call","callId":"x","conversationId":"c1"}"#,
+            ),
+            (
+                ServerFrame::IceServers {
+                    servers: vec![IceServerConfig {
+                        urls: IceServerUrls::One("stun:stun.example:19302".into()),
+                        username: None,
+                        credential: None,
+                    }],
+                },
+                r#"{"t":"iceServers","servers":[{"urls":"stun:stun.example:19302"}]}"#,
             ),
         ];
 

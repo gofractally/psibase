@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+/** Offer v2 first, then fall back to v1 (architecture §3.1). */
+export const PSLACK_SUBPROTOCOL_V1 = "psibase.pslack.v1";
+export const PSLACK_SUBPROTOCOL_V2 = "psibase.pslack.v2";
+
 /** Psibase account string (syntax validated server-side). */
 const zAccountStr = z.string();
 
@@ -26,7 +30,31 @@ export const conversationSnapshotSchema = z
 export type ContactPresence = z.infer<typeof contactPresenceSchema>;
 export type ConversationSnapshot = z.infer<typeof conversationSnapshotSchema>;
 
-// --- Client → server frames (v1)
+/** DM call-history row discriminator (architecture §3.4 / §2.3). */
+export const callTimelineEventSchema = z.enum([
+    "started",
+    "ended",
+    "missed",
+    "declined",
+    "cancelled",
+    "failed",
+]);
+
+export type CallTimelineEventType = z.infer<typeof callTimelineEventSchema>;
+
+const iceUrlsSchema = z.union([z.string(), z.array(z.string())]);
+
+export const iceServerConfigSchema = z
+    .object({
+        urls: iceUrlsSchema,
+        username: z.string().optional(),
+        credential: z.string().optional(),
+    })
+    .strict();
+
+export type IceServerConfig = z.infer<typeof iceServerConfigSchema>;
+
+// --- Client → server frames (chat + v2 call control)
 
 export const clientFrameSyncSchema = z
     .object({
@@ -81,6 +109,65 @@ export const clientFrameSignalSchema = z
     })
     .strict();
 
+export const clientFrameCallInviteSchema = z
+    .object({
+        t: z.literal("callInvite"),
+        conversationId: z.string(),
+        wantVideo: z.boolean(),
+        wantAudio: z.boolean(),
+        clientCallId: z.string(),
+    })
+    .strict();
+
+export const clientFrameCallAcceptSchema = z
+    .object({
+        t: z.literal("callAccept"),
+        callId: z.string(),
+    })
+    .strict();
+
+export const clientFrameCallDeclineSchema = z
+    .object({
+        t: z.literal("callDecline"),
+        callId: z.string(),
+        reason: z.string().optional(),
+    })
+    .strict();
+
+export const clientFrameCallOfferSchema = z
+    .object({
+        t: z.literal("callOffer"),
+        callId: z.string(),
+        sdp: z.string(),
+    })
+    .strict();
+
+export const clientFrameCallAnswerSchema = z
+    .object({
+        t: z.literal("callAnswer"),
+        callId: z.string(),
+        sdp: z.string(),
+    })
+    .strict();
+
+export const clientFrameCallCandidateSchema = z
+    .object({
+        t: z.literal("callCandidate"),
+        callId: z.string(),
+        candidate: z.string().nullable(),
+        sdpMid: z.string().optional(),
+        sdpMLineIndex: z.number().optional(),
+    })
+    .strict();
+
+export const clientFrameCallHangupSchema = z
+    .object({
+        t: z.literal("callHangup"),
+        callId: z.string(),
+        reason: z.string().optional(),
+    })
+    .strict();
+
 export const clientFrameSchema = z.discriminatedUnion("t", [
     clientFrameSyncSchema,
     clientFrameOpenDmSchema,
@@ -89,17 +176,31 @@ export const clientFrameSchema = z.discriminatedUnion("t", [
     clientFrameAckSchema,
     clientFramePingSchema,
     clientFrameSignalSchema,
+    clientFrameCallInviteSchema,
+    clientFrameCallAcceptSchema,
+    clientFrameCallDeclineSchema,
+    clientFrameCallOfferSchema,
+    clientFrameCallAnswerSchema,
+    clientFrameCallCandidateSchema,
+    clientFrameCallHangupSchema,
 ]);
 
 export type ClientFrame = z.infer<typeof clientFrameSchema>;
 
-// --- Server → client frames (v1)
+// --- Server → client frames
 
 export const serverFrameWelcomeSchema = z
     .object({
         t: z.literal("welcome"),
         user: zAccountStr,
         serverTime: z.number(),
+    })
+    .strict();
+
+export const serverFrameIceServersSchema = z
+    .object({
+        t: z.literal("iceServers"),
+        servers: z.array(iceServerConfigSchema),
     })
     .strict();
 
@@ -159,6 +260,109 @@ export const serverFrameErrorSchema = z
     })
     .strict();
 
+/** Routed call framing from service (architecture §3.4). */
+export const serverFrameInboundCallInviteSchema = z
+    .object({
+        t: z.literal("callInvite"),
+        callId: z.string(),
+        conversationId: z.string(),
+        from: zAccountStr,
+        to: zAccountStr,
+        wantVideo: z.boolean(),
+        wantAudio: z.boolean(),
+        serverTime: z.number(),
+    })
+    .strict();
+
+export const serverFrameInboundCallAcceptSchema = z
+    .object({
+        t: z.literal("callAccept"),
+        callId: z.string(),
+        by: zAccountStr,
+    })
+    .strict();
+
+export const serverFrameInboundCallDeclineSchema = z
+    .object({
+        t: z.literal("callDecline"),
+        callId: z.string(),
+        by: zAccountStr,
+        reason: z.string().optional(),
+    })
+    .strict();
+
+export const serverFrameInboundCallOfferSchema = z
+    .object({
+        t: z.literal("callOffer"),
+        callId: z.string(),
+        from: zAccountStr,
+        sdp: z.string(),
+    })
+    .strict();
+
+export const serverFrameInboundCallAnswerSchema = z
+    .object({
+        t: z.literal("callAnswer"),
+        callId: z.string(),
+        from: zAccountStr,
+        sdp: z.string(),
+    })
+    .strict();
+
+export const serverFrameInboundCallCandidateSchema = z
+    .object({
+        t: z.literal("callCandidate"),
+        callId: z.string(),
+        from: zAccountStr,
+        candidate: z.string().nullable(),
+        sdpMid: z.string().optional(),
+        sdpMLineIndex: z.number().optional(),
+    })
+    .strict();
+
+export const serverFrameInboundCallHangupSchema = z
+    .object({
+        t: z.literal("callHangup"),
+        callId: z.string(),
+        by: zAccountStr,
+        reason: z.string().optional(),
+    })
+    .strict();
+
+export const serverFrameCallTimeoutSchema = z
+    .object({
+        t: z.literal("callTimeout"),
+        callId: z.string(),
+        conversationId: z.string(),
+        caller: zAccountStr,
+        callee: zAccountStr,
+    })
+    .strict();
+
+export const serverFrameCallEventSchema = z
+    .object({
+        t: z.literal("callEvent"),
+        conversationId: z.string(),
+        callId: z.string().optional(),
+        event: callTimelineEventSchema,
+        actor: zAccountStr.optional(),
+        reason: z.string().optional(),
+        durationMs: z.number().optional(),
+        serverMsgId: z.number(),
+        serverTime: z.number(),
+    })
+    .strict();
+
+export const serverFrameCallErrorSchema = z
+    .object({
+        t: z.literal("callError"),
+        code: z.string(),
+        reason: z.string(),
+        callId: z.string().optional(),
+        conversationId: z.string().optional(),
+    })
+    .strict();
+
 export const serverFramePongSchema = z
     .object({
         t: z.literal("pong"),
@@ -167,12 +371,23 @@ export const serverFramePongSchema = z
 
 export const serverFrameSchema = z.discriminatedUnion("t", [
     serverFrameWelcomeSchema,
+    serverFrameIceServersSchema,
     serverFrameSyncSchema,
     serverFrameConversationSchema,
     serverFramePresenceSchema,
     serverFrameMessageSchema,
     serverFrameDeliveredSchema,
     serverFrameErrorSchema,
+    serverFrameCallEventSchema,
+    serverFrameCallErrorSchema,
+    serverFrameCallTimeoutSchema,
+    serverFrameInboundCallInviteSchema,
+    serverFrameInboundCallAcceptSchema,
+    serverFrameInboundCallDeclineSchema,
+    serverFrameInboundCallOfferSchema,
+    serverFrameInboundCallAnswerSchema,
+    serverFrameInboundCallCandidateSchema,
+    serverFrameInboundCallHangupSchema,
     serverFramePongSchema,
 ]);
 
@@ -222,7 +437,7 @@ export function parseServerFrame(json: unknown): ParseResult<ServerFrame> {
     return { ok: false, error: r.error };
 }
 
-/** Parse a websocket text payload as a server frame. */
+/** Parse a websocket text payload as a validated server frame. */
 export function parseServerFrameText(text: string): ParseResult<ServerFrame> {
     let data: unknown;
     try {
