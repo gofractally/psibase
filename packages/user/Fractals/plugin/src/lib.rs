@@ -61,6 +61,10 @@ impl AdminFractal for FractallyPlugin {
     ) -> Result<(), Error> {
         assert_authorized(FunctionName::create_fractal)?;
 
+        use psibase::services::fractals::FractalRole::{
+            Executive, Judiciary, Legislature, Recruitment,
+        };
+
         let fractal = fractal_account.parse().unwrap();
         let legislature = gen_rand_account(Some("leg"))?.as_str().into();
 
@@ -83,10 +87,10 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_guild::create_guild("Genesis", &fractal_account, &guild_account)?;
         set_propose_latch(Some(&fractal_account))?;
 
-        Guilds::admin_fractal::set_role_map(1, &guild_account)?;
-        Guilds::admin_fractal::set_role_map(2, &guild_account)?;
-        Guilds::admin_fractal::set_role_map(3, &guild_account)?;
-        Guilds::admin_fractal::set_role_map(4, &guild_account)?;
+        Guilds::admin_fractal::set_role_map(Legislature.into(), &guild_account)?;
+        Guilds::admin_fractal::set_role_map(Judiciary.into(), &guild_account)?;
+        Guilds::admin_fractal::set_role_map(Executive.into(), &guild_account)?;
+        Guilds::admin_fractal::set_role_map(Recruitment.into(), &guild_account)?;
 
         set_propose_latch(Some(&legislature.to_string()))?;
 
@@ -103,10 +107,10 @@ impl AdminFractal for FractallyPlugin {
             )
         };
 
-        set_role_occ(1)?; // Legislature
-        set_role_occ(2)?; // Judiciary
-        set_role_occ(3)?; // Executive
-        set_role_occ(4) // Recruitment
+        set_role_occ(Legislature.into())?;
+        set_role_occ(Judiciary.into())?;
+        set_role_occ(Executive.into())?;
+        set_role_occ(Recruitment.into())
     }
 
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
