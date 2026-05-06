@@ -20,6 +20,51 @@ pub mod service {
         AccountNumber,
     };
 
+    const ROLE_METHODS: &[(FractalRole, &str)] = &[(
+        FractalRole::Recruitment,
+        psibase::services::fractals::action_structs::add_mem::ACTION_NAME,
+    )];
+
+    fn is_banned_method(method: &ServiceMethod) -> bool {
+        use psibase::services::accounts as Accounts;
+        use psibase::services::setcode as SetCode;
+        use psibase::services::staged_tx as StagedTx;
+
+        const BANNED: &[(&AccountNumber, &str)] = &[
+            (
+                &Accounts::SERVICE,
+                Accounts::action_structs::setAuthServ::ACTION_NAME,
+            ),
+            (
+                &SetCode::SERVICE,
+                SetCode::action_structs::setCode::ACTION_NAME,
+            ),
+            (
+                &SetCode::SERVICE,
+                SetCode::action_structs::setCodeStaged::ACTION_NAME,
+            ),
+            (
+                &StagedTx::SERVICE,
+                StagedTx::action_structs::propose::ACTION_NAME,
+            ),
+            (
+                &StagedTx::SERVICE,
+                StagedTx::action_structs::accept::ACTION_NAME,
+            ),
+        ];
+
+        BANNED
+            .iter()
+            .any(|(svc, name)| **svc == method.service && *name == &method.method.to_string())
+    }
+
+    fn get_role_for_method(method_name: &str) -> Option<FractalRole> {
+        ROLE_METHODS
+            .iter()
+            .find(|(_, name)| *name == method_name)
+            .map(|(role, _)| *role)
+    }
+
     /// Creates a new account and fractal.
     ///
     /// # Arguments
@@ -206,50 +251,19 @@ pub mod service {
         account: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> auth_dyn::policy::DynamicAuthPolicy {
-        use psibase::services::accounts as Accounts;
-        use psibase::services::setcode as SetCode;
-        use psibase::services::staged_tx as StagedTx;
+        let method = match method {
+            None => return check_some(account_policy(account), "account not supported"),
+            Some(m) if is_banned_method(&m) => return DynamicAuthPolicy::impossible(),
+            Some(m) => m,
+        };
 
-        let policy = check_some(account_policy(account), "account not supported");
-
-        if method.is_some_and(|method| {
-            let banned_service_methods: Vec<ServiceMethod> = vec![
-                ServiceMethod::new(
-                    Accounts::SERVICE,
-                    Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    SetCode::SERVICE,
-                    SetCode::action_structs::setCode::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    SetCode::SERVICE,
-                    SetCode::action_structs::setCodeStaged::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    StagedTx::SERVICE,
-                    StagedTx::action_structs::propose::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    StagedTx::SERVICE,
-                    StagedTx::action_structs::accept::ACTION_NAME.into(),
-                ),
-            ];
-
-            banned_service_methods
-                .iter()
-                .any(|sm| sm.method == method.method && sm.service == method.service)
-        }) {
-            DynamicAuthPolicy::impossible()
-        } else if method.is_some_and(|method| {
-            method.method
-                == psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into()
-                && method.service == get_service()
-        }) {
-            Role::get_assert(account, FractalRole::Recruitment).auth_policy()
-        } else {
-            policy
+        if method.service == get_service() {
+            if let Some(role) = get_role_for_method(&method.method.to_string()) {
+                return Role::get_assert(account, role).auth_policy();
+            }
         }
+
+        check_some(account_policy(account), "account not supported")
     }
 
     /// Has policy action used by AuthDyn service.
