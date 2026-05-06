@@ -7,7 +7,7 @@ import { PslackPage } from "./page";
 
 export const pslackConfig: AppConfigType = {
     service: zAccount.parse("pslack"),
-    name: "x-pslack",
+    name: "Pslack",
     description: "Direct and group chat over websocket.",
     icon: <MessagesSquare className="h-6 w-6" />,
     isMore: false,

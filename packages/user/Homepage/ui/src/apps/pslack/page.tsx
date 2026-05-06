@@ -1,39 +1,39 @@
+import type { LocalContact } from "../contacts/types";
+import type { PresenceUi } from "./hooks/use-pslack-socket";
+
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useMediaQuery } from "usehooks-ts";
 
 import { TwoColumnSelect } from "@/components/two-column-select";
 
+import { Avatar } from "@shared/components/avatar";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { Avatar } from "@shared/components/avatar";
+import { useProfile } from "@shared/hooks/use-profile";
+import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
-import type { PresenceUi } from "./hooks/use-pslack-socket";
-import { usePslackSocket } from "./hooks/use-pslack-socket";
-import { ChatComposer } from "./components/chat-composer";
-import { ConnectionStatusBanner } from "./components/connection-status-banner";
-import { ConversationList, formatConversationSubtitle } from "./components/conversation-list";
-import { MessageThread } from "./components/message-thread";
-import { cn } from "@shared/lib/utils";
 import { ContactListSection } from "../contacts/components/contact-list-section";
 import { formatNames } from "../contacts/utils/format-names";
-import { useProfile } from "@shared/hooks/use-profile";
-import type { LocalContact } from "../contacts/types";
+import { ChatComposer } from "./components/chat-composer";
+import { ConnectionStatusBanner } from "./components/connection-status-banner";
+import {
+    ConversationList,
+    formatConversationSubtitle,
+} from "./components/conversation-list";
+import { MessageThread } from "./components/message-thread";
+import { usePslackSocket } from "./hooks/use-pslack-socket";
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-    <div className="text-muted-foreground px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide">
+    <div className="text-muted-foreground px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide">
         {children}
     </div>
 );
 
-const PresenceDot = ({
-    status,
-}: {
-    status: PresenceUi;
-}) => {
+const PresenceDot = ({ status }: { status: PresenceUi }) => {
     const color =
         status === "online"
             ? "bg-emerald-500"
@@ -122,10 +122,8 @@ const ContactWithPresenceRow = ({
 
 export const PslackPage = () => {
     const { data: currentUser } = useCurrentUser();
-    const {
-        data: contactsData,
-        isLoading: isLoadingContacts,
-    } = useContacts(currentUser);
+    const { data: contactsData, isLoading: isLoadingContacts } =
+        useContacts(currentUser);
 
     const {
         wsState,
@@ -232,7 +230,7 @@ export const PslackPage = () => {
                 displayMode={desktopDisplay}
                 header={
                     <header className="flex items-center border-b px-4 py-2.5">
-                        <h1 className="text-xl font-bold">x-pslack</h1>
+                        <h1 className="text-xl font-bold">Pslack</h1>
                     </header>
                 }
                 left={
@@ -242,7 +240,9 @@ export const PslackPage = () => {
                             <div className="flex flex-wrap gap-2">
                                 <Button
                                     type="button"
-                                    variant={groupPickMode ? "secondary" : "outline"}
+                                    variant={
+                                        groupPickMode ? "secondary" : "outline"
+                                    }
                                     size="sm"
                                     onClick={() => {
                                         setGroupPickMode((v) => !v);
@@ -261,7 +261,8 @@ export const PslackPage = () => {
                                         disabled={groupCandidates.size < 2}
                                         onClick={onStartGroup}
                                     >
-                                        Open group ({groupCandidates.size} picked)
+                                        Open group ({groupCandidates.size}{" "}
+                                        picked)
                                     </Button>
                                 ) : null}
                             </div>
@@ -329,9 +330,7 @@ export const PslackPage = () => {
                                 conversations={conversations}
                                 selfAccount={selfAccount}
                                 selectedConversationId={selectedConversationId}
-                                onSelectConversation={
-                                    setSelectedConversationId
-                                }
+                                onSelectConversation={setSelectedConversationId}
                             />
                         </div>
 
