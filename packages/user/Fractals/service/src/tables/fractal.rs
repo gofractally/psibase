@@ -113,6 +113,7 @@ impl Fractal {
     }
 
     pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
+        // Genesis time can only be moved earlier, not later, to prevent abuse / delay of token distribution
         check(
             new_time.seconds < self.genesis_time.seconds,
             "genesis time can only be moved earlier, not later",
