@@ -1,0 +1,27 @@
+[package]
+name = "guilds"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+server = "r-guilds"
+plugin = "guilds-plugin"
+data = [{ src = "../ui/dist", dst = "/" }]
+postinstall = []
+
+[dependencies]
+psibase.workspace = true
+psibase_macros.workspace = true
+psibase_service.workspace = true
+async-graphql.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+psibase-user-workspace-hack.workspace = true
+evaluations = { path = "../../Evaluations/service", version = "0.23.0" }
+fractals = { path = "../../Fractals/service", version = "0.23.0" }
+
+
+[dev-dependencies]
+guilds-pkg = { path = "..", version = "0.23.0" }

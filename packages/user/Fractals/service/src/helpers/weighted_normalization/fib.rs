@@ -141,7 +141,7 @@
 //! All runtime math uses only integer operations with explicit rounding, ensuring
 //! deterministic behavior across platforms while still closely approximating the
 //! continuous Binet formula.
-//! 
+//!
 //! ---
 //!
 //! #### 6. Error analysis
@@ -185,7 +185,7 @@
 //!    an overall contribution of roughly \\(0.5K/S\\), with \\(K/S\\) as a
 //!    simple worst-case bound. In this implementation with \\(K = 11\\), this
 //!    corresponds to total error ≈ \\(5.5/S\\).
-//! 
+//!
 //! 3. **Truncation of the Taylor series (≈ \\(0.33/S\\))**
 //!
 //!    Stopping the series after \\(K\\) terms leaves a remainder bounded by
@@ -201,13 +201,12 @@
 //!    \bigl|R_K(t)\bigr| \le \varphi \frac{(\ln\varphi)^{K+1}}{(K+1)!}
 //!    \\]
 //!
-//!    As \\(K\\) increases this quantity shrinks very rapidly. In the 
+//!    As \\(K\\) increases this quantity shrinks very rapidly. In the
 //!    implementation we choose \\(K = 11\\), for which the worst-case
 //!    truncation remainder is approximately \\(0.33/S\\).
 //!
 //! Therefore, the rounding error accumulated inside the \\(K\\)-step Taylor
 //! recurrence provides the dominant contribution to the total error.
-
 
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
@@ -225,13 +224,13 @@ const INV_SQRT5_S: u128 = 447_213_595_500;
 
 // PHI_POW2_TABLE[k] ≈ φ^(2^k) * S, with S = 1e12
 const PHI_POW2_TABLE: [u128; 7] = [
-    1_618_033_988_750,                                    // k=0, 2^0  = 1
-    2_618_033_988_750,                                    // k=1, 2^1  = 2
-    6_854_101_966_250,                                    // k=2, 2^2  = 4
-    46_978_713_763_748,                                   // k=3, 2^3  = 8
-    2_206_999_546_896_146,                                // k=4, 2^4  = 16
-    4_870_846_999_999_794_697,                            // k=5, 2^5  = 32
-    23_725_150_497_407_000_000_000_000,                   // k=6, 2^6  = 64
+    1_618_033_988_750,                  // k=0, 2^0  = 1
+    2_618_033_988_750,                  // k=1, 2^1  = 2
+    6_854_101_966_250,                  // k=2, 2^2  = 4
+    46_978_713_763_748,                 // k=3, 2^3  = 8
+    2_206_999_546_896_146,              // k=4, 2^4  = 16
+    4_870_846_999_999_794_697,          // k=5, 2^5  = 32
+    23_725_150_497_407_000_000_000_000, // k=6, 2^6  = 64
 ];
 
 /// Calculate the Fibonacci value for a given x in a continuous function
@@ -241,7 +240,7 @@ const PHI_POW2_TABLE: [u128; 7] = [
 ///
 /// * `x` - The input value scaled by 10_000, eg. (fib(1.4142) -> fib(14142))
 pub fn continuous_fibonacci(x: u32) -> u64 {
-    psibase::check(x <= MAX_INPUT_SCALED, "x out of bounds");
+    assert!(x <= MAX_INPUT_SCALED, "x out of bounds");
 
     // Split x into integer and fractional parts:
     let int_x: u32 = x / (EXTERNAL_S as u32);
@@ -337,7 +336,6 @@ fn exp_taylor_scaled(t: u128) -> u128 {
 
     sum
 }
-
 
 #[cfg(test)]
 mod tests {

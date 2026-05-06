@@ -9,8 +9,7 @@ use crate::constants::{
 };
 use crate::helpers::{two_thirds_plus_one, RollingBits16};
 use crate::tables::tables::{
-    EvaluationInstance, Fractal, FractalMember, Guild, GuildFlags, GuildMember, GuildMemberTable,
-    GuildTable,
+    EvaluationInstance, Guild, GuildFlags, GuildMember, GuildMemberTable, GuildTable,
 };
 
 impl Guild {
@@ -66,11 +65,6 @@ impl Guild {
         rep_role: AccountNumber,
     ) -> Self {
         check_none(Self::get(guild), "guild already exists");
-
-        check_some(
-            FractalMember::get(fractal, rep),
-            "rep must be a member of the fractal",
-        );
 
         let new_guild_instance =
             Self::new(fractal, guild, rep, display_name, council_role, rep_role);
@@ -164,7 +158,7 @@ impl Guild {
     }
 
     pub fn council_members(&self) -> Option<Vec<GuildMember>> {
-        let council: Vec<GuildMember> = GuildMemberTable::read()
+        let members: Vec<_> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
                 (self.account, true, 0, AccountNumber::new(0))
@@ -175,11 +169,7 @@ impl Guild {
             .filter(|member| member.score != 0)
             .collect();
 
-        if council.len() > 0 {
-            return Some(council);
-        } else {
-            return None;
-        }
+        (members.len() > 0).then_some(members)
     }
 
     pub fn representative(&self) -> Option<GuildMember> {
@@ -187,7 +177,7 @@ impl Guild {
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
 
-    pub fn guild_auth(&self) -> DynamicAuthPolicy {
+    pub fn auth_policy(&self) -> DynamicAuthPolicy {
         DynamicAuthPolicy::from_sole_authorizer(
             self.rep.map_or(self.council_role, |_| self.rep_role),
         )
@@ -213,8 +203,10 @@ impl Guild {
     }
 
     pub fn set_representative(&mut self, new_representative: AccountNumber) {
-        FractalMember::get_assert(self.fractal, new_representative);
-
+        check_some(
+            GuildMember::get(self.account, new_representative),
+            "representative must be a guild member",
+        ); // Or must it?
         self.rep = Some(new_representative);
         self.save();
     }
@@ -248,10 +240,6 @@ impl Guild {
 impl Guild {
     pub async fn eval_instance(&self) -> Option<EvaluationInstance> {
         EvaluationInstance::get(self.account)
-    }
-
-    pub async fn fractal(&self) -> Fractal {
-        Fractal::get_assert(self.fractal)
     }
 
     pub async fn council(&self) -> Option<Vec<AccountNumber>> {

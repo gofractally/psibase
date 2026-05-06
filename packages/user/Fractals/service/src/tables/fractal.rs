@@ -1,35 +1,37 @@
+use std::collections::HashMap;
+use std::u64;
+
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
+use psibase::services::sites;
 use psibase::services::tokens::{Precision, Quantity};
 
-use crate::constants::token_distributions::consensus_rewards::{
-    INITIAL_REWARD_DISTRIBUTION, REMAINING_REWARD_DISTRIBUTION, REWARD_DISTRIBUTION,
-};
+use crate::constants::{token_distributions::TOKEN_SUPPLY, TOKEN_PRECISION};
 use crate::constants::{
-    token_distributions::TOKEN_SUPPLY, DEFAULT_TOKEN_INIT_THRESHOLD, TOKEN_PRECISION,
+    DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+    MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
 };
+use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
+use psibase::services::fractals::FractalRole::{
+    self, Executive, Judiciary, Legislature, Recruitment,
+};
+
+use crate::helpers::{create_managed_account, distribute_by_weight};
 use crate::tables::tables::{
-    Fractal, FractalMember, FractalMemberTable, FractalTable, RewardConsensus,
+    Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
+    RoleTable,
 };
 use psibase::{
     check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
 };
 
-use crate::tables::tables::Guild;
-
+use psibase::services::fractals::{self, occu_wrapper};
 use psibase::services::tokens::Wrapper as Tokens;
 use psibase::services::transact::Wrapper as TransactSvc;
-use psibase::services::{accounts, fractals, sites, transact};
-use psibase::{check, get_sender, Action, RawKey, TableQuery};
-use psibase::{fracpack::Pack, services::auth_dyn};
+use psibase::{check, get_sender, RawKey, TableQuery, TimePointSec};
 
 impl Fractal {
-    fn new(
-        account: AccountNumber,
-        name: String,
-        mission: String,
-        genesis_guild: AccountNumber,
-    ) -> Self {
+    fn new(account: AccountNumber, name: String, mission: String) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         let max_supply: Quantity = TOKEN_SUPPLY.into();
@@ -41,87 +43,87 @@ impl Fractal {
             created_at: now,
             mission,
             name,
-            judiciary: genesis_guild,
-            legislature: genesis_guild,
-            token_init_threshold: DEFAULT_TOKEN_INIT_THRESHOLD,
+            dist_strat: Algorithm::Constant as u8,
+            genesis_time: now,
+            dist_interval_secs: DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
         }
     }
 
-    fn create_account(&self) {
-        let fractal_account = self.account;
-        accounts::Wrapper::call().newAccount(fractal_account, "auth-any".into(), true);
+    pub fn set_distribution_interval(&mut self, seconds: u32) {
+        check(
+            seconds >= MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+            "distribution interval too short",
+        );
+        check(
+            seconds <= MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
+            "distribution interval too long",
+        );
+        self.dist_interval_secs = seconds;
+        self.save();
+    }
 
-        let set_proxy = Action {
-            sender: fractal_account,
-            service: sites::SERVICE,
-            method: sites::action_structs::setProxy::ACTION_NAME.into(),
-            rawData: sites::action_structs::setProxy {
-                proxy: "fractal-core".into(),
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_policy = Action {
-            sender: fractal_account,
-            service: auth_dyn::SERVICE,
-            method: auth_dyn::action_structs::set_mgmt::ACTION_NAME.into(),
-            rawData: auth_dyn::action_structs::set_mgmt {
-                account: fractal_account,
-                manager: crate::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        let set_auth_serv = Action {
-            sender: fractal_account,
-            service: accounts::SERVICE,
-            method: accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-            rawData: accounts::action_structs::setAuthServ {
-                authService: auth_dyn::Wrapper::SERVICE,
-            }
-            .packed()
-            .into(),
-        };
-
-        transact::Wrapper::call().runAs(set_proxy, vec![]);
-        transact::Wrapper::call().runAs(set_policy, vec![]);
-        transact::Wrapper::call().runAs(set_auth_serv, vec![]);
+    pub fn set_distribution_strategy(&mut self, strategy: Algorithm) {
+        self.dist_strat = strategy as u8;
+        self.save();
     }
 
     pub fn add(
-        account: AccountNumber,
+        fractal: AccountNumber,
+        legislature: AccountNumber,
+        judiciary: AccountNumber,
+        executive: AccountNumber,
+        recruitment: AccountNumber,
         name: String,
         mission: String,
-        genesis_guild: AccountNumber,
     ) -> Self {
-        check_none(Self::get(account), "fractal already exists");
-        let new_instance = Self::new(account, name, mission, genesis_guild);
+        check_none(Self::get(fractal), "fractal already exists");
+        let new_instance = Self::new(fractal, name, mission);
+
         // Save the fractal first prior to creating an account for it
         // as AuthDyn expects `has_policy` to return true when setting the fractals
         // auth service to AuthDyn.
         new_instance.save();
-        new_instance.create_account();
+
+        let defacto_service = "de-facto".into();
+
+        let create_role = |role_account: AccountNumber, role: FractalRole| {
+            Role::add(fractal, role_account, role, defacto_service)
+        };
+
+        create_role(legislature, Legislature);
+        create_role(judiciary, Judiciary);
+        create_role(executive, Executive);
+        create_role(recruitment, Recruitment);
+
+        create_managed_account(fractal, || {
+            sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
+        });
+
+        FractalMember::add(fractal, get_sender(), None);
+
         new_instance
     }
 
-    pub fn check_sender_is_legislature(&self) {
-        check(
-            self.legislature == get_sender(),
-            "Requires legislature authority",
-        );
+    pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
+        Role::get_by_role_account(role_account).and_then(|role| Fractal::get(role.fractal))
     }
 
-    pub fn check_sender_is_judiciary(&self) {
-        check(
-            self.judiciary == get_sender(),
-            "Requires judiciary authority",
-        );
+    pub fn by_sender() -> Self {
+        Self::get_assert(get_sender())
     }
 
-    pub fn check_sender_is_fractal(&self) {
-        check(self.account == get_sender(), "Requires fractal authority");
+    pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
+        // Genesis time can only be moved earlier, not later, to prevent abuse / delay of token distribution
+        check(
+            new_time.seconds < self.genesis_time.seconds,
+            "genesis time can only be moved earlier, not later",
+        );
+        self.genesis_time = new_time;
+        self.save();
+    }
+
+    fn role_account(&self, role: FractalRole) -> AccountNumber {
+        Role::get_assert(self.account, role).account
     }
 
     pub fn get(fractal: AccountNumber) -> Option<Self> {
@@ -136,49 +138,82 @@ impl Fractal {
     }
 
     pub fn init_token(&self) {
-        let legislature_guild = Guild::get_assert(self.legislature);
+        let tokens = psibase::services::tokens::Wrapper::call();
 
-        let reward_consensus = RewardConsensus::get(self.account);
-
-        let is_first_distribution = reward_consensus.is_none();
-
-        if is_first_distribution {
-            check(
-                legislature_guild.active_member_count() >= self.token_init_threshold.into(),
-                "active member count does not meet token init threshold",
-            );
-            RewardConsensus::add(self.account, INITIAL_REWARD_DISTRIBUTION.into());
-        } else {
-            check(
-                legislature_guild.is_rank_ordering(),
-                "cannot distribute remaining tokens until rank ordering is enabled",
-            );
-
-            let reward_consensus = reward_consensus.unwrap();
-
-            let supply = psibase::services::token_stream::Wrapper::call()
-                .get_stream(reward_consensus.reward_stream_id)
-                .unwrap();
-            let is_second_distrbution = supply.total_deposited < REWARD_DISTRIBUTION.into();
-
-            check(
-                is_second_distrbution,
-                "remaining consensus rewards already distributed",
-            );
-            reward_consensus.deposit(
-                REMAINING_REWARD_DISTRIBUTION.into(),
-                "Consensus rewards for ranked evaluations".into(),
-            );
-        }
+        check(
+            tokens.getToken(self.token_id).issued_supply.value == 0,
+            "token already initialised",
+        );
+        let stream = RewardStream::add_fractal(self.account, self.token_id);
+        let supply = TOKEN_SUPPLY.into();
+        tokens.mint(self.token_id, supply, "initial mint".into());
+        stream.deposit(supply, "initial stream deposit".into());
     }
 
-    pub fn set_token_threshold(&mut self, threshold: u8) {
-        check_none(
-            RewardConsensus::get(self.account),
-            "token has already been initialised",
-        );
-        self.token_init_threshold = threshold;
-        self.save();
+    pub fn reward_stream(&self) -> RewardStream {
+        check_some(
+            RewardStream::get(self.account, self.account),
+            "fractal does not have reward stream",
+        )
+    }
+
+    fn get_weighted_occupations(
+        &self,
+        total_distribution: Quantity,
+    ) -> (Vec<(Occupation, u64)>, u64) {
+        distribute_by_weight(
+            weighted_normalization(
+                self.dist_strat.into(),
+                Occupation::get_ordered(self.account),
+            ),
+            total_distribution.value,
+        )
+    }
+
+    pub fn distribute_tokens(&self) {
+        let mut stream = self.reward_stream();
+        let (_, withdrawn) = stream.claim();
+        if withdrawn.value == 0 {
+            return;
+        }
+        let members = FractalMember::get_all(self.account);
+
+        let mut total_dust = 0u64;
+        let mut payable_members = HashMap::new();
+
+        let (occupation_distributions, dust) = self.get_weighted_occupations(withdrawn);
+
+        total_dust += dust;
+
+        for (occupation_distribution, distribution_dust) in occupation_distributions {
+            let scores: Vec<(AccountNumber, u64)> =
+                occu_wrapper::call_to(occupation_distribution.occupation)
+                    .get_scores(self.account)
+                    .into_iter()
+                    .filter(|(mem, _)| members.iter().any(|member| member.account == *mem))
+                    .map(|(item, score)| (item, score as u64))
+                    .collect();
+
+            let (member_distributions, member_dust) =
+                distribute_by_weight(scores, distribution_dust);
+            total_dust += member_dust;
+
+            for (member, amount) in member_distributions {
+                if amount > 0 {
+                    let new_balance =
+                        *payable_members.entry(member).or_insert(0.into()) + amount.into();
+                    payable_members.insert(member, new_balance);
+                }
+            }
+        }
+
+        if total_dust > 0 {
+            stream.deposit(total_dust.into(), "Dust recycle".into());
+        }
+
+        for (member, amount) in payable_members {
+            RewardStream::get_assert(self.account, member).deposit(amount, "Fractal reward".into());
+        }
     }
 
     fn save(&self) {
@@ -188,7 +223,7 @@ impl Fractal {
     }
 
     pub fn auth_policy(&self) -> DynamicAuthPolicy {
-        DynamicAuthPolicy::from_sole_authorizer(self.legislature)
+        DynamicAuthPolicy::from_sole_authorizer(self.role_account(FractalRole::Legislature))
     }
 }
 
@@ -213,15 +248,42 @@ impl Fractal {
         .await
     }
 
-    async fn legislature(&self) -> Guild {
-        Guild::get_assert(self.legislature)
+    async fn roles(
+        &self,
+        first: Option<i32>,
+        last: Option<i32>,
+        before: Option<String>,
+        after: Option<String>,
+    ) -> async_graphql::Result<Connection<RawKey, Role>> {
+        TableQuery::subindex::<AccountNumber>(
+            RoleTable::with_service(fractals::SERVICE).get_index_pk(),
+            &(self.account),
+        )
+        .first(first)
+        .last(last)
+        .before(before)
+        .after(after)
+        .query()
+        .await
     }
 
-    async fn judiciary(&self) -> Guild {
-        Guild::get_assert(self.judiciary)
+    async fn legislature(&self) -> Role {
+        Role::get_assert(self.account, Legislature)
     }
 
-    async fn consensus_reward(&self) -> Option<RewardConsensus> {
-        RewardConsensus::get(self.account)
+    async fn judiciary(&self) -> Role {
+        Role::get_assert(self.account, Judiciary)
+    }
+
+    async fn executive(&self) -> Role {
+        Role::get_assert(self.account, Executive)
+    }
+
+    async fn recruitment(&self) -> Role {
+        Role::get_assert(self.account, Recruitment)
+    }
+
+    async fn stream(&self) -> Option<RewardStream> {
+        RewardStream::get(self.account, self.account)
     }
 }

@@ -32,18 +32,34 @@ abstract class PluginInterface {
 class AdminFractal extends PluginInterface {
     protected override readonly _intf = "adminFractal" as const;
 
+    get setRoleOccupation() {
+        return this._call<[roleId: number, occupation: string]>("setRoleOccupation")
+    }
+
+
+
+    get migrateGuilds() {
+        return this._call<[guild: string]>("migrateGuilds")
+    }
+
+
+    get setRoleMapping() {
+        return this._call<[roleId: number, guild: string]>("setRoleMapping")
+    }
+
     get exileMember() {
         return this._call<[member: Account]>("exileMember");
     }
+
+
+    get initToken() {
+        return this._call<[]>("initToken");
+    }
+
     get setDistInterval() {
         return this._call<[interval: number]>("setDistInterval");
     }
-    get setRankedGuildSlots() {
-        return this._call<[slots: number]>("setRankedGuildSlots");
-    }
-    get setTokenThreshold() {
-        return this._call<[threshold: number]>("setTokenThreshold");
-    }
+
     get setRankedGuilds() {
         return this._call<[guilds: Account[]]>("setRankedGuilds");
     }
@@ -58,6 +74,10 @@ class UserFractal extends PluginInterface {
 
     get distToken() {
         return this._call<[]>("distToken");
+    }
+
+    get claimRewards() {
+        return this._call<[]>("claimRewards");
     }
 }
 

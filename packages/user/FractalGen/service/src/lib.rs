@@ -28,8 +28,9 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        auth_delegate::Wrapper as AuthDelegate, fractals::Wrapper as Fractals,
-        producers::Wrapper as Producers,
+        auth_delegate::Wrapper as AuthDelegate, fractals::FractalRole,
+        fractals::Wrapper as Fractals, guilds::Wrapper as Guilds,
+        guilds::SERVICE as GUILDS_SERVICE, producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -49,14 +50,39 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        Fractals::call_from(*producer).create_fractal(
+        let legislature = "legislature".into();
+        let judiciary = "judiciary-a".into();
+        let executive = "executive-a".into();
+        let recruitment = "recruitment-a".into();
+
+        Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
-            SYS_GUILD,
+            legislature,
+            judiciary,
+            executive,
+            recruitment,
             "Network Governance".into(),
             "To establish, maintain, and grow the network.".into(),
-            account!("c-role-001"),
-            account!("r-role-001"),
         );
+
+        let guilds = Guilds::call_from(*producer);
+        guilds.create_guild(
+            SYS_FRACTAL,
+            SYS_GUILD,
+            "Genesis".into(),
+            "c-role-001".into(),
+            "r-role-001".into(),
+        );
+
+        let map_sys_guild_to_role_occ = |role: FractalRole| {
+            Guilds::call_as(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
+            Fractals::call_as(*producer).set_r_occ(SYS_FRACTAL, role.into(), GUILDS_SERVICE);
+        };
+
+        map_sys_guild_to_role_occ(FractalRole::Legislature);
+        map_sys_guild_to_role_occ(FractalRole::Judiciary);
+        map_sys_guild_to_role_occ(FractalRole::Executive);
+        map_sys_guild_to_role_occ(FractalRole::Recruitment);
 
         // Give the core fractal ownership of the network
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);

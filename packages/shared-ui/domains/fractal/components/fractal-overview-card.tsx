@@ -12,7 +12,6 @@ import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardFooter, CardHeader } from "@shared/shadcn/ui/card";
 
-import { getMemberLabel } from "../lib/get-member-label";
 import { FractalGuildIdentifier } from "./fractal-guild-header-identifier";
 
 export const OverviewCard = ({
@@ -30,7 +29,7 @@ export const OverviewCard = ({
     const status = !isMember
         ? "Not a member"
         : membership
-          ? getMemberLabel(membership.memberStatus)
+          ? 'Member'
           : "Loading...";
 
     const content = (

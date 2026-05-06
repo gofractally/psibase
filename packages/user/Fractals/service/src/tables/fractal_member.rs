@@ -1,34 +1,16 @@
-use psibase::{
-    abort_message, check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table,
-};
+use std::u64;
+
+use psibase::{check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
 
 use crate::{
-    constants::MEMBER_STREAM_HALF_LIFE,
+    constants::DEFAULT_RECRUITMENT_PPM,
     tables::tables::{
-        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, GuildMember,
+        Fractal, FractalExile, FractalMember, FractalMemberTable, FractalTable, Levy, RewardStream,
     },
 };
 
 use async_graphql::ComplexObject;
-use psibase::services::{token_stream::Wrapper as TokenStream, transact::Wrapper as TransactSvc};
-
-#[derive(PartialEq)]
-pub enum MemberStatus {
-    Visa = 1,
-    Citizen = 2,
-}
-
-pub type StatusU8 = u8;
-
-impl From<StatusU8> for MemberStatus {
-    fn from(status: StatusU8) -> Self {
-        match status {
-            1 => MemberStatus::Visa,
-            2 => MemberStatus::Citizen,
-            _ => abort_message("invalid member status"),
-        }
-    }
-}
+use psibase::services::transact::Wrapper as TransactSvc;
 
 #[ComplexObject]
 impl FractalMember {
@@ -41,29 +23,54 @@ impl FractalMember {
 }
 
 impl FractalMember {
-    fn new(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
+    fn new(fractal: AccountNumber, account: AccountNumber) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
-
-        let token_id = Fractal::get_assert(fractal).token_id;
 
         Self {
             account,
             fractal,
             created_at: now,
-            member_status: status as StatusU8,
-            stream_id: TokenStream::call().create(MEMBER_STREAM_HALF_LIFE, token_id),
         }
     }
 
-    pub fn add(fractal: AccountNumber, account: AccountNumber, status: MemberStatus) -> Self {
+    pub fn get_all(fractal: AccountNumber) -> Vec<Self> {
+        FractalMemberTable::read()
+            .get_index_pk()
+            .range(&(fractal, AccountNumber::from(0))..&(fractal, AccountNumber::from(u64::MAX)))
+            .collect()
+    }
+
+    pub fn credit_direct(&self, amount: Quantity, memo: Memo) {
+        let token_id = Fractal::get_assert(self.fractal).token_id;
+        psibase::services::tokens::Wrapper::call().credit(token_id, self.account, amount, memo)
+    }
+
+    pub fn add(
+        fractal: AccountNumber,
+        account: AccountNumber,
+        recruiter: Option<AccountNumber>,
+    ) -> Self {
         check_none(
             FractalExile::get(fractal, account),
             "member has been exiled from this fractal",
         );
         check_none(Self::get(fractal, account), "account is already a member");
 
-        let new_instance = Self::new(fractal, account, status);
+        let new_instance = Self::new(fractal, account);
         new_instance.save();
+
+        RewardStream::add_member(fractal, account, Fractal::get_assert(fractal).token_id);
+        // If a recruiter is specified, levy them; otherwise, levy the fractal itself so there's no advantage or disadvantage to being recruited by an existing member vs. joining independently
+        let recruiter = recruiter.unwrap_or(fractal);
+        Levy::add(
+            fractal,
+            account,
+            recruiter,
+            DEFAULT_RECRUITMENT_PPM,
+            // 0 for unlimited
+            0.into(),
+            true,
+        );
 
         new_instance
     }
@@ -78,34 +85,15 @@ impl FractalMember {
         check_some(Self::get(fractal, account), "member does not exist")
     }
 
-    pub fn deposit_stream(&self, amount: Quantity, memo: Memo) {
-        psibase::services::tokens::Wrapper::call().credit(
-            Fractal::get_assert(self.fractal).token_id,
-            TokenStream::SERVICE,
-            amount,
-            memo,
-        );
-        TokenStream::call().deposit(self.stream_id, amount);
-    }
-
-    pub fn is_citizen(&self) -> bool {
-        MemberStatus::Citizen == self.member_status.into()
-    }
-
-    pub fn has_visa(&self) -> bool {
-        MemberStatus::Visa == self.member_status.into()
-    }
-
     pub fn exile(&self) {
         FractalExile::add(self.fractal, self.account);
+        for levy in Levy::levies_of_member(self.fractal, self.account) {
+            levy.delete_by_exile()
+        }
         self.remove();
     }
 
     fn remove(&self) {
-        for guild_membership in GuildMember::memberships_of_member(self.account) {
-            guild_membership.kick()
-        }
-
         FractalMemberTable::read_write().remove(&self);
     }
 

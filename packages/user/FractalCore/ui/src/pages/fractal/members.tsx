@@ -8,7 +8,6 @@ import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
-import { getMemberLabel } from "@shared/domains/fractal/lib/get-member-label";
 import { Badge } from "@shared/shadcn/ui/badge";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -74,9 +73,7 @@ export const Members = () => {
                                             </Tooltip>
                                         )}
                                         <Badge variant="default">
-                                            {getMemberLabel(
-                                                member.memberStatus,
-                                            )}
+                                            Member
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-end">

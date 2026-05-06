@@ -18,7 +18,7 @@ const mutationFn = async (fractal: string) => {
     try {
         await supervisor.functionCall({
             method: "join",
-            params: [fractal],
+            params: [],
             service: fractal,
             intf: "userFractal",
         });

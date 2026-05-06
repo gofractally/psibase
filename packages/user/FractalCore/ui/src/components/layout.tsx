@@ -8,7 +8,11 @@ import {
     SidebarTrigger,
 } from "@shared/shadcn/ui/sidebar";
 
+
+
+
 export const Layout = () => {
+
     return (
         <SidebarProvider>
             <AppSidebar variant="inset" />

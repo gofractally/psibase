@@ -1,82 +1,216 @@
+use crate::abort_message;
+
+#[crate::service(
+    name = "eval-hooks",
+    actions = "hooks_actions",
+    wrapper = "hooks_wrapper",
+    structs = "hooks_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod Hooks {
+    use crate::AccountNumber;
+
+    #[action]
+    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_grp_fin(evaluation_id: u32, group_number: u32, result: Vec<u8>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn on_eval_fin(evaluation_id: u32) {
+        unimplemented!()
+    }
+}
+
+#[crate::service(
+    name = "occupation",
+    actions = "occu_actions",
+    wrapper = "occu_wrapper",
+    structs = "occu_structs",
+    dispatch = false,
+    pub_constant = false,
+    psibase_mod = "crate"
+)]
+#[allow(non_snake_case, unused_variables)]
+pub mod Occupation {
+    use crate::{services::auth_dyn, AccountNumber};
+
+    /// Get scores for a fractal
+    ///
+    /// Returns a vector of accounts and their corresponding scores for a fractal.
+    /// These scores are used by the Fractals service to determine distribution amounts for each member.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account of the fractal.
+    #[action]
+    fn get_scores(fractal: AccountNumber) -> Vec<(AccountNumber, u32)> {
+        unimplemented!()
+    }
+
+    /// Check if a an account is considered active in an occupation
+    ///
+    /// # Arguments
+    /// * `fractal` - The account of the fractal.
+    /// * `member` - The member account to check.
+    #[action]
+    fn is_active(fractal: AccountNumber, member: AccountNumber) -> bool {
+        unimplemented!()
+    }
+
+    /// Check if a role ID is supported for a fractal.
+    ///
+    /// Returning false will cause the Fractals service to reject changing a role to this occupation.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID to check.
+    #[action]
+    fn is_role_ok(fractal: AccountNumber, role_id: u8) -> bool {
+        unimplemented!()
+    }
+
+    /// Get policy action used by AuthDyn service.
+    ///
+    /// Returns authorisers for a given role in a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account of the fractal.
+    /// * `role_id` - The role ID to check.
+    #[action]
+    fn role_policy(fractal: AccountNumber, role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
+        unimplemented!()
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FractalRole {
+    Legislature = 1,
+    Judiciary = 2,
+    Executive = 3,
+    Recruitment = 4,
+}
+
+impl From<u8> for FractalRole {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => FractalRole::Legislature,
+            2 => FractalRole::Judiciary,
+            3 => FractalRole::Executive,
+            4 => FractalRole::Recruitment,
+            _ => abort_message(&format!("Invalid FractalRole value: {}", value)),
+        }
+    }
+}
+
+impl From<FractalRole> for u8 {
+    fn from(value: FractalRole) -> Self {
+        value as u8
+    }
+}
+
 #[crate::service(name = "fractals", dispatch = false, psibase_mod = "crate")]
 #[allow(non_snake_case, unused_variables)]
 pub mod Service {
     use crate::services::auth_dyn::policy::DynamicAuthPolicy;
     use crate::services::transact::ServiceMethod;
     use crate::AccountNumber;
-    use crate::Memo;
 
     /// Creates a new account and fractal.
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
-    /// * `guild_account` - The account number for the associated guild.
+    /// * `legislature` - Legislature role account.
+    /// * `judiciary` - Judiciary role account.
+    /// * `executive` - Executive role account
+    /// * `recruitment` - Recruitment role account
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_fractal(
+    fn create_frac(
         fractal_account: AccountNumber,
-        guild_account: AccountNumber,
+        legislature: AccountNumber,
+        judiciary: AccountNumber,
+        executive: AccountNumber,
+        recruitment: AccountNumber,
         name: String,
         mission: String,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
     ) {
         unimplemented!()
     }
 
-    /// On Invite Accept.
-    ///
-    /// Used by invite hook
+    /// Sets occupation on a fractal role.
     ///
     /// # Arguments
-    /// * `invite_id` - Unique ID of invite.
-    /// * `accepter` - Account name which accepted the invite
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID for fractal
+    /// * `new_occupation` - New occupation to set for role
     #[action]
-    fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
+    fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
         unimplemented!()
     }
 
-    /// Invite a guild member.
+    /// Claim member rewards
     ///
-    /// Must be called by pre existing guild member.  
+    /// Sends any vested token rewards to the fractal member after applying any pending levies.
     ///
     /// # Arguments
-    /// * `guild` - Guild invitee will join.
-    /// * `invite_id` - Unique ID generated by invite.
-    /// * `invite_payload` - An opaque payload to pass through to the invite service.
-    /// * `num_accounts` - Number of invites to create
-    /// * `pre_attest` - Inviter attests to the application prior to its creation
+    /// * `fractal` - The account number of the fractal.
+    /// * `member` - The fractal member claiming rewards.
     #[action]
-    fn inv_g_member(
-        guild: AccountNumber,
-        invite_id: u32,
-        invite_payload: Vec<u8>,
-        num_accounts: u16,
-        pre_attest: bool,
-    ) {
+    fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
         unimplemented!()
     }
 
-    /// Set guild application.
+    /// Set genesis time for a fractal
     ///
     /// # Arguments
-    /// * `guild_account` - Guild being applied for.
-    /// * `extra_info` - Application description
+    /// * `fractal` - Fractal to update.
+    /// * `genesis_time` - New genesis time for the fractal.
     #[action]
-    fn set_g_app(guild_account: AccountNumber, extra_info: String) {
+    fn set_gen_time(fractal: AccountNumber, genesis_time: u64) {
         unimplemented!()
     }
 
-    /// Delete guild invite.
+    /// Set ordered occupations
     ///
+    /// Payment for each ordered occupation will be according to the fractals payment strategy.
     ///
     /// # Arguments
-    /// * `invite_id` - Unique ID generated by invite.
+    /// * `fractal` - The account number of the fractal.
+    /// * `paid_occupations` - Ordered occupations to set for the fractal
     #[action]
-    fn del_g_inv(invite_id: u32) {
+    fn set_paid_occ(fractal: AccountNumber, paid_occupations: Vec<AccountNumber>) {
+        unimplemented!()
+    }
+
+    /// Add fractal member
+    ///
+    /// Adds an account to a fractal.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `member` - Account to be added as a member
+    /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
+    #[action]
+    fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
         unimplemented!()
     }
 
@@ -90,35 +224,9 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Apply to join a guild
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    /// * `extra_info` - Relevant information to the application.
-    #[action]
-    fn apply_guild(guild_account: AccountNumber, extra_info: String) {
-        unimplemented!()
-    }
-
-    /// Set guild display name
-    ///
-    /// # Arguments
-    /// * `display_name` - New display name of the guild.
-    #[action]
-    fn set_g_disp(display_name: Memo) {
-        unimplemented!()
-    }
-
-    /// Set guild bio
-    ///
-    /// # Arguments
-    /// * `bio` - New bio of the guild.
-    #[action]
-    fn set_g_bio(bio: Memo) {
-        unimplemented!()
-    }
-
     /// Exile a fractal member.
+    ///
+    /// Must be called by judiciary.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
@@ -128,185 +236,13 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set guild description
+    /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `description` - New description of the guild.
+    /// * `fractal` - Fractal to update.
+    /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
-    fn set_g_desc(description: String) {
-        unimplemented!()
-    }
-
-    /// Kick member from guild
-    ///
-    /// # Arguments
-    /// * `member` - Guild member to be kicked.
-    #[action]
-    fn guild_kick(member: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Attest Guild Membership application
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    /// * `member` - Member to attest.
-    /// * `comment` - Any comment relevant to the application.
-    /// * `endorses` - True if in favour of the application.
-    #[action]
-    fn at_mem_app(
-        guild_account: AccountNumber,
-        member: AccountNumber,
-        comment: String,
-        endorses: bool,
-    ) {
-        unimplemented!()
-    }
-
-    /// Starts an evaluation for the specified guild.
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    #[action]
-    fn start_eval(guild_account: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Allows a user to join a fractal and immediately become a citizen.
-    ///
-    /// Cannot be called by a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal to join.
-    #[action]
-    fn join(fractal: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Sets the schedule for an evaluation type within a fractal.
-    ///
-    /// # Arguments
-    /// * `registration` - Unix seconds timestamp for the start of the registration phase.
-    /// * `deliberation` - Unix seconds timestamp for the start of the deliberation phase.
-    /// * `submission` - Unix seconds timestamp for the start of the submission phase.
-    /// * `finish_by` - Unix seconds timestamp for the start of the evaluation completion phase.
-    /// * `interval_seconds` - Interval in seconds for recurring evaluations.
-    #[action]
-    fn set_schedule(
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-        interval_seconds: u32,
-    ) {
-        unimplemented!()
-    }
-
-    /// Called when an evaluation in a fractal is finalized.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    #[action]
-    fn on_eval_fin(evaluation_id: u32) {
-        unimplemented!()
-    }
-
-    /// Called when a user registers for an evaluation in a fractal.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `account` - The account number of the registering user.
-    #[action]
-    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Called when a user unregisters from an evaluation in a fractal.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `account` - The account number of the unregistering user.
-    #[action]
-    fn on_ev_unreg(evaluation_id: u32, account: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Called when a user submits an attestation for decrypted proposals in a fractal evaluation.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `group_number` - The group number within the evaluation.
-    /// * `user` - The account number of the user submitting the attestation.
-    /// * `attestation` - The attestation data.
-    #[action]
-    fn on_attest(evaluation_id: u32, group_number: u32, user: AccountNumber, attestation: Vec<u8>) {
-        unimplemented!()
-    }
-
-    /// Called when a group finalizes its result in a fractal evaluation.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `group_number` - The group number within the evaluation.
-    /// * `group_result` - The result data of the group.
-    #[action]
-    fn on_grp_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
-        unimplemented!()
-    }
-
-    /// Creates a guild within a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `guild_account` - The account number for the new guild.
-    /// * `display_name` - The display name of the guild.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
-    #[action]
-    fn create_guild(
-        fractal: AccountNumber,
-        guild_account: AccountNumber,
-        display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
-    ) {
-        unimplemented!()
-    }
-
-    /// Set a new representative of the Guild.
-    ///
-    /// # Arguments
-    /// * `new_representative` - The account number of the new representative.
-    #[action]
-    fn set_g_rep(new_representative: AccountNumber) {
-        unimplemented!()
-    }
-
-    /// Resign as representative of a guild.
-    ///
-    /// Called by current representative of guild.
-    #[action]
-    fn resign_g_rep() {
-        unimplemented!()
-    }
-
-    /// Forcibly remove the current representative of the guild.
-    ///
-    /// Called by council role account of the guild.
-    #[action]
-    fn remove_g_rep() {
-        unimplemented!()
-    }
-
-    /// Set ranked guild slots.
-    ///
-    /// Must be called by legislature.  
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `slots_count` - The number of ranked guild slots.
-    #[action]
-    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
+    fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
         unimplemented!()
     }
 
@@ -314,6 +250,7 @@ pub mod Service {
     ///
     /// # Arguments
     /// * `account` - Account being checked.
+    /// * `method` - Optional method being checked.
     #[action]
     fn get_policy(account: AccountNumber, method: Option<ServiceMethod>) -> DynamicAuthPolicy {
         unimplemented!()
@@ -337,21 +274,10 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set rank ordering threshold.
-    ///
-    /// Amount of active participants a guild must have prior to auto-enabling rank ordering.  
-    ///
-    /// # Arguments
-    /// * `threshold` - The minimum amount of active members required.
-    #[action]
-    fn set_rnk_thrs(threshold: u8) {
-        unimplemented!()
-    }
-
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
-    /// Must be called by legislature.  
+    /// Must be called by legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
@@ -360,78 +286,11 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Register candidacy.
-    ///
-    /// Register your candidacy to serve on a Guild council.  
-    ///
-    /// # Arguments
-    /// * `guild` - Guild candidate is member of
-    /// * `active`- True to become a candidate, False to retire
-    #[action]
-    fn reg_can(guild: AccountNumber, active: bool) {
-        unimplemented!()
-    }
-
-    /// Set the candidacy cooldown period.
-    ///
-    /// This defines how many seconds a guild member must wait after retiring their candidacy
-    /// before they are allowed to become a candidate again.
-    ///
-    /// # Arguments
-    /// * `cooldown_seconds` - The cooldown duration in seconds (0 disables the cooldown).
-    #[action]
-    fn set_can_cool(cooldown_seconds: u32) {
-        unimplemented!()
-    }
-
-    /// Set token threshold.
-    ///
-    /// Sets the required amount of active members in the legislature guild before the token can be initialised.  
-    ///
-    /// # Arguments
-    /// * `fractal` - Fractal to update.
-    /// * `threshold` - The minimum amount of active members required.
-    #[action]
-    fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
-        unimplemented!()
-    }
-
-    /// Rank guilds for a fractal
-    ///
-    /// This action assigns the fractal's consensus reward distribution to the provided
-    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
-    /// guilds in the vector receive progressively larger shares.
-    ///
-    /// Must be called by the legislature.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `guilds` - Ranked guilds, from highest rewarded to lowest.
-    #[action]
-    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
-        unimplemented!()
-    }
-
     #[event(history)]
     pub fn created_fractal(fractal_account: AccountNumber) {}
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
-
-    #[event(history)]
-    pub fn evaluation_finished(guild_account: AccountNumber, evaluation_id: u32) {}
-
-    #[event(history)]
-    pub fn scheduled_evaluation(
-        fractal_account: AccountNumber,
-        guild_account: AccountNumber,
-        evaluation_id: u32,
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-    ) {
-    }
 }
 
 #[test]

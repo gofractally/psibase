@@ -916,6 +916,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "de-facto"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "fractals",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1310,6 +1324,7 @@ dependencies = [
 name = "fractals-pkg"
 version = "0.23.0"
 dependencies = [
+ "de-facto",
  "fractals",
  "fractals-plugin",
  "psibase-user-workspace-hack",
@@ -1550,6 +1565,43 @@ dependencies = [
  "ff",
  "rand_core 0.6.4",
  "subtle",
+]
+
+[[package]]
+name = "guilds"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "evaluations",
+ "fractals",
+ "guilds-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "guilds-pkg"
+version = "0.23.0"
+dependencies = [
+ "guilds",
+ "guilds-plugin",
+ "r-guilds",
+]
+
+[[package]]
+name = "guilds-plugin"
+version = "0.23.0"
+dependencies = [
+ "guilds",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -2883,6 +2935,19 @@ version = "0.23.0"
 dependencies = [
  "async-graphql",
  "fractals",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-guilds"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "guilds",
  "psibase",
  "psibase-user-workspace-hack",
  "psibase_service",

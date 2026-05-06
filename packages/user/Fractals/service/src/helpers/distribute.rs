@@ -1,19 +1,14 @@
-pub fn distribute_by_weight<T, F>(
-    items: Vec<T>,
-    weight_fn: F,
+pub fn distribute_by_weight<T>(
+    items: Vec<(T, u64)>,
     total_distribution: u64,
-) -> (Vec<(T, u64)>, u64)
-where
-    F: Fn(usize, &T) -> u64,
-{
+) -> (Vec<(T, u64)>, u64) {
     if items.is_empty() || total_distribution == 0 {
         return (vec![], total_distribution);
     }
 
     let (weighted, total_weight): (Vec<_>, u128) = items.into_iter().enumerate().fold(
         (Vec::new(), 0u128),
-        |(mut weighted_items, acc_weight), (i, item)| {
-            let weight = weight_fn(i, &item);
+        |(mut weighted_items, acc_weight), (_, (item, weight))| {
             weighted_items.push((item, weight));
             (weighted_items, acc_weight.saturating_add(weight as u128))
         },

@@ -5,56 +5,38 @@ import { FRACTALS_SERVICE } from "../constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 import { zDateTime } from "@shared/lib/schemas/date-time";
-import { zU8 } from "@shared/lib/schemas/u8";
 
 export const zFractal = z
     .object({
         account: zAccount,
-        tokenInitThreshold: zU8,
         createdAt: zDateTime,
         name: z.string(),
-        consensusReward: z
-            .object({
-                rankedGuilds: zAccount.array(),
-                rankedGuildSlotCount: zU8,
-                stream: z.object({
-                    lastDistributed: zDateTime,
-                    distIntervalSecs: z.number().int(),
-                }),
-            })
-            .nullable(),
+        stream: z.object({
+            lastDistributed: zDateTime,
+        }).nullable(),
+        distIntervalSecs: z.number().int(),
+        genesisTime: zDateTime,
         mission: z.string(),
         judiciary: z.object({
             account: zAccount,
+            occupation: zAccount,
+            roleId: z.number().int()
         }),
         legislature: z.object({
             account: zAccount,
+            occupation: zAccount,
+            roleId: z.number().int()
         }),
+        executive: z.object({
+            account: zAccount,
+            occupation: zAccount,
+            roleId: z.number().int()
+        })
     })
     .or(z.null());
 
 export const zFractalRes = z.object({
     fractal: zFractal,
-    guilds: z.object({
-        nodes: z
-            .object({
-                account: zAccount,
-                rep: z
-                    .object({
-                        member: zAccount,
-                    })
-                    .optional(),
-                displayName: z.string(),
-                council: z.array(zAccount).nullable(),
-                bio: z.string(),
-                evalInstance: z
-                    .object({
-                        evaluationId: z.number().int(),
-                    })
-                    .nullable(),
-            })
-            .array(),
-    }),
 });
 
 export type FractalRes = z.infer<typeof zFractalRes>;
@@ -65,37 +47,28 @@ export const getFractal = async (owner: Account): Promise<FractalRes> => {
     {
         fractal(fractal: "${owner}") {     
             account
-            tokenInitThreshold
             createdAt
             mission
             name
-            consensusReward {
-                rankedGuilds
-                rankedGuildSlotCount
-                stream {
-                    lastDistributed
-                    distIntervalSecs
-                }
+            stream {
+                lastDistributed
             }
+            distIntervalSecs
+            genesisTime
             judiciary { 
                 account
+                occupation
+                roleId
             }
             legislature { 
                 account
+                occupation
+                roleId
             }
-        }
-        guilds(fractal: "${owner}") {
-            nodes {
+            executive { 
                 account
-                rep {
-                    member
-                }
-                displayName
-                council
-                bio
-                evalInstance {
-                  evaluationId
-                }
+                occupation
+                roleId
             }
         }
     }`,

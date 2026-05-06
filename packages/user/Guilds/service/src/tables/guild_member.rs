@@ -2,8 +2,7 @@ use async_graphql::ComplexObject;
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
-use crate::helpers::RollingBits16;
-use crate::scoring::{calculate_ema_u32, Fraction};
+use crate::helpers::{calculate_ema_u32, Fraction, RollingBits16};
 use crate::tables::tables::{
     Guild, GuildAttest, GuildAttestTable, GuildInvite, GuildInviteTable, GuildMember,
     GuildMemberTable,
@@ -52,6 +51,7 @@ impl GuildMember {
     }
 
     pub fn kick(&self) {
+        GuildAttest::remove_attestations_by_guild_member(self.guild, self.member);
         self.remove();
     }
 
@@ -67,13 +67,6 @@ impl GuildMember {
             .get_index_pk()
             .range((guild, AccountNumber::from(0))..=(guild, AccountNumber::from(u64::MAX)))
             .collect()
-    }
-
-    pub fn remove_all_by_member(member: AccountNumber) {
-        let table = GuildMemberTable::read_write();
-        for membership in Self::memberships_of_member(member) {
-            table.remove(&membership);
-        }
     }
 
     fn set_pending_level(&mut self, pending_level: Option<u8>) {

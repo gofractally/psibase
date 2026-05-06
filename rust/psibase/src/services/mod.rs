@@ -15,6 +15,7 @@ pub mod diff_adjust;
 pub mod evaluations;
 pub mod events;
 pub mod fractals;
+pub mod guilds;
 pub mod http_server;
 #[allow(non_snake_case)]
 pub mod invite;

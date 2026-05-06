@@ -13,5 +13,4 @@ serde.workspace = true
 serde_json.workspace = true
 fractals = { path = "../service", version = "0.23.0" }
 async-graphql.workspace = true
-serde-aux.workspace = true
 psibase-user-workspace-hack.workspace = true
