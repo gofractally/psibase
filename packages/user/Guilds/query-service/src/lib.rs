@@ -4,13 +4,17 @@ mod service {
     use std::u64;
 
     use async_graphql::{connection::Connection, *};
-    use guilds::tables::tables::{
-        Guild, GuildApplication, GuildApplicationTable, GuildInvite, GuildInviteTable, GuildMember,
-        GuildMemberTable, GuildTable, RankingTable, RoleMap, RoleMapTable,
+    use guilds::{
+        helpers::parse_rank_to_accounts,
+        tables::tables::{
+            Guild, GuildApplication, GuildApplicationTable, GuildInvite, GuildInviteTable,
+            GuildMember, GuildMemberTable, GuildTable, RankingTable, RoleMap, RoleMapTable,
+        },
     };
+    use serde::{Deserialize, Deserializer};
+
     use psibase::{AccountNumber, *};
 
-    use serde::Deserialize;
     use serde_aux::field_attributes::deserialize_number_from_string;
 
     #[derive(Deserialize, SimpleObject)]
@@ -34,6 +38,39 @@ mod service {
         submission: u32,
         #[serde(deserialize_with = "deserialize_number_from_string")]
         finish_by: u32,
+    }
+
+    #[derive(SimpleObject)]
+    struct GroupFinish {
+        evaluation_id: u32,
+        group_number: u32,
+        users: Vec<AccountNumber>,
+        result: Vec<AccountNumber>,
+    }
+
+    impl<'de> Deserialize<'de> for GroupFinish {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            #[derive(Deserialize)]
+            struct GroupFinishRaw {
+                #[serde(deserialize_with = "deserialize_number_from_string")]
+                evaluation_id: u32,
+                #[serde(deserialize_with = "deserialize_number_from_string")]
+                group_number: u32,
+                users: Vec<AccountNumber>,
+                result: Vec<u8>,
+            }
+
+            let raw = GroupFinishRaw::deserialize(deserializer)?;
+            Ok(GroupFinish {
+                evaluation_id: raw.evaluation_id,
+                group_number: raw.group_number,
+                users: raw.users.clone(),
+                result: parse_rank_to_accounts(raw.result, raw.users),
+            })
+        }
     }
 
     #[derive(Deserialize, SimpleObject)]
@@ -61,6 +98,26 @@ mod service {
             EventQuery::new("history.evaluations.new_group")
                 .condition(format!(
                     "owner = 'guilds' AND evaluation_id = {}",
+                    evaluation_id
+                ))
+                .first(first)
+                .last(last)
+                .before(before)
+                .after(after)
+                .query()
+        }
+
+        async fn group_finishes(
+            &self,
+            evaluation_id: u32,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<EventConnection<GroupFinish>> {
+            EventQuery::new("history.evaluations.group_fin")
+                .condition(format!(
+                    "owner = 'fractals' AND evaluation_id = {}",
                     evaluation_id
                 ))
                 .first(first)
