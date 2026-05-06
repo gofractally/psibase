@@ -70,21 +70,21 @@ struct FractalCorePlugin;
 impl AdminFractal for FractalCorePlugin {
     fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
         assert_authorized(FunctionName::set_ranked_guilds)?;
-        propose::legislature()?;
+        propose::fractal()?;
 
         GuildsPlugin::admin_guild::set_ranked_guilds(ranked_guilds.as_slice())
     }
 
     fn set_dist_interval(interval_seconds: u32) -> Result<(), Error> {
         assert_authorized(FunctionName::set_dist_interval)?;
-        propose::legislature()?;
+        propose::fractal()?;
 
         FractalsPlugin::admin_fractal::set_dist_interval(interval_seconds)
     }
 
     fn exile_member(member_account: String) -> Result<(), Error> {
         assert_authorized(FunctionName::exile_member)?;
-        propose::judiciary()?;
+        propose::fractal()?;
 
         FractalsPlugin::admin_fractal::exile_member(&member_account)
     }
@@ -98,14 +98,14 @@ impl AdminFractal for FractalCorePlugin {
 
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
         assert_authorized(FunctionName::set_role_occupation)?;
-        propose::legislature()?;
+        propose::fractal()?;
 
         FractalsPlugin::admin_fractal::set_role_occupation(role_id, &occupation)
     }
 
     fn init_token() -> Result<(), Error> {
         assert_authorized(FunctionName::init_token)?;
-        propose::legislature()?;
+        propose::fractal()?;
 
         FractalsPlugin::admin_fractal::init_token()
     }

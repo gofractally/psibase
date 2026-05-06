@@ -126,17 +126,6 @@ impl Fractal {
         Role::get_assert(self.account, role).account
     }
 
-    pub fn check_sender_is_role(&self, role: FractalRole) {
-        check(
-            self.role_account(role) == get_sender(),
-            &format!("Requires role {} authority", role as u8),
-        );
-    }
-
-    pub fn check_sender_is_fractal(&self) {
-        check(self.account == get_sender(), "Requires fractal authority");
-    }
-
     pub fn get(fractal: AccountNumber) -> Option<Self> {
         FractalTable::read().get_index_pk().get(&(fractal))
     }

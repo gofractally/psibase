@@ -1,5 +1,3 @@
-use crate::bindings::fractals::plugin as FractalsPlugin;
-use crate::bindings::fractals::plugin::queries::Fractal;
 use crate::bindings::guilds::plugin as GuildsPlugin;
 use crate::bindings::guilds::plugin::queries::Guild;
 
@@ -12,20 +10,8 @@ fn latch(account: &str) -> Result<(), Error> {
     set_propose_latch(Some(account))
 }
 
-fn get_fractal() -> Result<Fractal, Error> {
-    FractalsPlugin::queries::get_fractal(&get_receiver())
-}
-
 fn get_guild(guild_account: &str) -> Result<Guild, Error> {
     GuildsPlugin::queries::get_guild(guild_account)
-}
-
-pub fn legislature() -> Result<(), Error> {
-    get_fractal().and_then(|fractal| latch(&fractal.legislature))
-}
-
-pub fn judiciary() -> Result<(), Error> {
-    get_fractal().and_then(|fractal| latch(&fractal.judiciary))
 }
 
 pub fn fractal() -> Result<(), Error> {
