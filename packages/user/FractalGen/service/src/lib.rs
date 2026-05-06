@@ -75,8 +75,8 @@ mod service {
         );
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {
-            Guilds::call_from(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
-            Fractals::call_from(legislature).set_r_occ(SYS_FRACTAL, role.into(), GUILDS_SERVICE);
+            Guilds::call_as(SYS_FRACTAL).set_role_map(role.into(), SYS_GUILD);
+            Fractals::call_as(*producer).set_r_occ(SYS_FRACTAL, role.into(), GUILDS_SERVICE);
         };
 
         map_sys_guild_to_role_occ(FractalRole::Legislature);
