@@ -236,8 +236,28 @@ mod service {
             applicant: AccountNumber,
         ) -> Option<GuildApplication> {
             GuildApplicationTable::with_service(guilds::SERVICE)
-                .get_index_by_applicant()
+                .get_index_pk()
                 .get(&(guild, applicant))
+        }
+
+        async fn guild_applications(
+            &self,
+            guild: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, GuildApplication>> {
+            TableQuery::subindex::<AccountNumber>(
+                GuildApplicationTable::with_service(guilds::SERVICE).get_index_pk(),
+                &(guild),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
         }
 
         async fn guild(&self, account: AccountNumber) -> Option<Guild> {
