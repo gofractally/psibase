@@ -5,6 +5,7 @@ pub mod tables;
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
+    use crate::helpers::check_fractal_auth;
     use crate::tables::tables::RewardStream;
     use crate::tables::tables::{Fractal, FractalMember, Occupation, Role};
 
@@ -158,29 +159,6 @@ pub mod service {
         }
     }
 
-    // Check sender is authorised to perform an action on behalf of a fractal.
-    //
-    // Asks the auth service of the fractal if whatever sender account is sufficient as the
-    // sole authoriser for the provided method number.
-    fn check_sender_is_authorised(fractal: AccountNumber, method: MethodNumber) {
-        let auth = psibase::services::auth_dyn::Wrapper::call();
-
-        check(
-            auth.isAuthSys(
-                fractal,
-                vec![get_sender()],
-                Some(ServiceMethod::new(get_service(), method)),
-                None,
-            ),
-            &format!(
-                "sender {} not authorised for fractal: {} method: {}",
-                get_sender(),
-                fractal,
-                method
-            ),
-        );
-    }
-
     /// Add fractal member
     ///
     /// Adds an account to a fractal.
@@ -191,10 +169,7 @@ pub mod service {
     /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
     fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
-        self::check_sender_is_authorised(
-            fractal,
-            psibase::services::fractals::action_structs::add_mem::ACTION_NAME.into(),
-        );
+        check_fractal_auth!(fractal, add_mem);
         FractalMember::add(fractal, member, recruiter);
 
         Wrapper::emit().history().joined_fractal(fractal, member);
