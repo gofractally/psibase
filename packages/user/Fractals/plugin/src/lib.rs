@@ -92,7 +92,7 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_fractal::set_role_map(Executive.into(), &guild_account)?;
         Guilds::admin_fractal::set_role_map(Recruitment.into(), &guild_account)?;
 
-        set_propose_latch(Some(&legislature.to_string()))?;
+        set_propose_latch(None)?;
 
         let set_role_occ = |role_id: u8| {
             let packed_args = fractals::action_structs::set_r_occ {
