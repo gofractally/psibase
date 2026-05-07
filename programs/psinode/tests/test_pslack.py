@@ -119,6 +119,10 @@ class TestPslack(unittest.TestCase):
                 conv_a = await _read_json(ws_a)
                 self.assertEqual(conv_a['t'], 'conversation')
                 cid = conv_a['conversationId']
+                conv_b = await _read_json(ws_b)
+                self.assertEqual(conv_b['t'], 'conversation')
+                self.assertEqual(conv_b['kind'], 'dm')
+                self.assertEqual(conv_b['conversationId'], cid)
                 # Bob receives presence for alice (opened conversation + fanout)
                 nb = await _read_json(ws_b)
                 self.assertEqual(nb['t'], 'presence')
@@ -173,9 +177,17 @@ class TestPslack(unittest.TestCase):
                 self.assertEqual(ca['kind'], 'group')
                 cid = ca['conversationId']
 
+                cb = await _read_json(ws_b)
                 pb = await _read_json(ws_b)
+                cc = await _read_json(ws_c)
                 pc = await _read_json(ws_c)
+                self.assertEqual(cb['t'], 'conversation')
+                self.assertEqual(cb['kind'], 'group')
+                self.assertEqual(cb['conversationId'], cid)
                 self.assertEqual(pb['t'], 'presence')
+                self.assertEqual(cc['t'], 'conversation')
+                self.assertEqual(cc['kind'], 'group')
+                self.assertEqual(cc['conversationId'], cid)
                 self.assertEqual(pc['t'], 'presence')
 
                 await ws_a.send(
@@ -196,6 +208,85 @@ class TestPslack(unittest.TestCase):
                     self.assertEqual(f['conversationId'], cid)
                 bodies_from = {f['from'] for f in frames}
                 self.assertEqual(bodies_from, {'alice'})
+
+        import asyncio
+        asyncio.run(body())
+
+    @testutil.psinode_test
+    def test_targeted_message_retries_without_duplicate_recipient_delivery(self, cluster):
+        a = self._boot_with_pslack(cluster)
+        ta = Transact(a).login('alice')
+        tb = Transact(a).login('bob')
+        url = websocket_url(a, '/ws', service='x-pslack')
+
+        async def body():
+            async with _unix_connect(a, url, [('Authorization', 'Bearer ' + ta)]) as ws_a:
+                await self._welcome(ws_a)
+
+                await ws_a.send(json.dumps({'t': 'openDm', 'member': 'bob'}))
+                conv = await _read_json(ws_a)
+                self.assertEqual(conv['t'], 'conversation')
+                cid = conv['conversationId']
+
+                await ws_a.send(
+                    json.dumps(
+                        {
+                            't': 'say',
+                            'conversationId': cid,
+                            'body': 'queued for bob',
+                            'clientMsgId': 'retry-1',
+                            'clientTime': 1234,
+                            'to': 'bob',
+                        }
+                    )
+                )
+                with self.assertRaises(TimeoutError):
+                    await asyncio.wait_for(_read_json(ws_a), timeout=0.2)
+
+                async with _unix_connect(a, url, [('Authorization', 'Bearer ' + tb)]) as ws_b:
+                    await self._welcome(ws_b)
+                    presence = await _read_json(ws_a)
+                    self.assertEqual(presence['t'], 'presence')
+                    self.assertEqual(presence['account'], 'bob')
+                    self.assertEqual(presence['status'], 'online')
+
+                    await ws_a.send(
+                        json.dumps(
+                            {
+                                't': 'say',
+                                'conversationId': cid,
+                                'body': 'queued for bob',
+                                'clientMsgId': 'retry-1',
+                                'clientTime': 1234,
+                                'to': 'bob',
+                            }
+                        )
+                    )
+                    ack_a = await _read_json(ws_a)
+                    msg_b = await _read_json(ws_b)
+                    self.assertEqual(ack_a['t'], 'message')
+                    self.assertEqual(ack_a['to'], 'bob')
+                    self.assertEqual(ack_a['clientTime'], 1234)
+                    self.assertEqual(msg_b['t'], 'message')
+                    self.assertEqual(msg_b['body'], 'queued for bob')
+                    self.assertEqual(msg_b['to'], 'bob')
+
+                    await ws_a.send(
+                        json.dumps(
+                            {
+                                't': 'say',
+                                'conversationId': cid,
+                                'body': 'queued for bob',
+                                'clientMsgId': 'retry-1',
+                                'clientTime': 1234,
+                                'to': 'bob',
+                            }
+                        )
+                    )
+                    dup_ack = await _read_json(ws_a)
+                    self.assertEqual(dup_ack['t'], 'message')
+                    with self.assertRaises(TimeoutError):
+                        await asyncio.wait_for(_read_json(ws_b), timeout=0.2)
 
         import asyncio
         asyncio.run(body())

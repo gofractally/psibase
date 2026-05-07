@@ -193,8 +193,21 @@ export class PslackWsClient {
     }
 
     /** Send a chat line (`say` frame). */
-    send(conversationId: string, body: string, clientMsgId: string): void {
-        this.sendJson({ t: "say", conversationId, body, clientMsgId });
+    send(
+        conversationId: string,
+        body: string,
+        clientMsgId: string,
+        clientTime?: number,
+        to?: string,
+    ): void {
+        this.sendJson({
+            t: "say",
+            conversationId,
+            body,
+            clientMsgId,
+            ...(clientTime === undefined ? {} : { clientTime }),
+            ...(to === undefined ? {} : { to }),
+        });
     }
 
     ping(): void {
