@@ -1,7 +1,7 @@
 import type { LocalContact } from "../contacts/types";
 import type { PresenceUi } from "./hooks/use-pslack-socket";
 
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, PhoneCall } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useMediaQuery } from "usehooks-ts";
 
@@ -19,11 +19,13 @@ import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 import { ContactListSection } from "../contacts/components/contact-list-section";
 import { formatNames } from "../contacts/utils/format-names";
 import { ChatComposer } from "./components/chat-composer";
+import { CallView } from "./components/call-view";
 import { ConnectionStatusBanner } from "./components/connection-status-banner";
 import {
     ConversationList,
     formatConversationSubtitle,
 } from "./components/conversation-list";
+import { IncomingCallDialog } from "./components/incoming-call-dialog";
 import { MessageThread } from "./components/message-thread";
 import { usePslackSocket } from "./hooks/use-pslack-socket";
 
@@ -142,6 +144,21 @@ export const PslackPage = () => {
         openOrFocusDm,
         openGroupChat,
         sendChatMessage,
+        incomingCall,
+        activeCall,
+        startMeetCall,
+        acceptIncomingCall,
+        declineIncomingCall,
+        endPlaceholderCall,
+        callLocalStream,
+        callRemoteStream,
+        callAudioMuted,
+        callVideoMuted,
+        callRemoteAudioMuted,
+        callRemoteVideoMuted,
+        callAudioOnlyFallback,
+        toggleCallAudioMuted,
+        toggleCallVideoMuted,
         composerDisabledReason,
     } = usePslackSocket();
 
@@ -208,6 +225,18 @@ export const PslackPage = () => {
               )
             : null;
 
+    const selectedIsTwoPersonDm =
+        !!selectedConversation &&
+        selectedConversation.kind === "dm" &&
+        selectedConversation.members.length === 2 &&
+        !!selfAccount &&
+        selectedConversation.members.includes(selfAccount);
+
+    const activeCallForSelected =
+        activeCall && activeCall.conversationId === selectedConversationId
+            ? activeCall
+            : null;
+
     const onStartGroup = () => {
         if (groupCandidates.size < 2) return;
         openGroupChat([...groupCandidates]);
@@ -224,6 +253,12 @@ export const PslackPage = () => {
                 authLost={authLost}
                 syncedOnce={syncedOnce}
                 onReconnect={reconnectNow}
+            />
+
+            <IncomingCallDialog
+                call={incomingCall}
+                onAccept={acceptIncomingCall}
+                onDecline={declineIncomingCall}
             />
 
             <TwoColumnSelect
@@ -426,6 +461,45 @@ export const PslackPage = () => {
 
                         {selectedConversation ? (
                             <>
+                                {selectedIsTwoPersonDm ? (
+                                    <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
+                                        <div>
+                                            <p className="text-sm font-medium">
+                                                Meet
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">
+                                                Start a DM Meet call. Connected
+                                                sessions use live WebRTC (STUN
+                                                only) with in-call controls
+                                                below video.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={startMeetCall}
+                                        >
+                                            <PhoneCall className="size-4" />
+                                            Meet
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                {activeCallForSelected ? (
+                                    <CallView
+                                        call={activeCallForSelected}
+                                        onEnd={endPlaceholderCall}
+                                        localStream={callLocalStream}
+                                        remoteStream={callRemoteStream}
+                                        audioMuted={callAudioMuted}
+                                        videoMuted={callVideoMuted}
+                                        remoteAudioMuted={callRemoteAudioMuted}
+                                        remoteVideoMuted={callRemoteVideoMuted}
+                                        audioOnlyFallback={callAudioOnlyFallback}
+                                        onToggleAudio={toggleCallAudioMuted}
+                                        onToggleVideo={toggleCallVideoMuted}
+                                    />
+                                ) : null}
                                 <MessageThread
                                     timeline={selectedTimeline}
                                     selfAccount={selfAccount}

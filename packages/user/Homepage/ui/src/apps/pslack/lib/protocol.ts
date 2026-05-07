@@ -160,6 +160,15 @@ export const clientFrameCallCandidateSchema = z
     })
     .strict();
 
+export const clientFrameCallMediaStateSchema = z
+    .object({
+        t: z.literal("callMediaState"),
+        callId: z.string(),
+        audioMuted: z.boolean(),
+        videoMuted: z.boolean(),
+    })
+    .strict();
+
 export const clientFrameCallHangupSchema = z
     .object({
         t: z.literal("callHangup"),
@@ -182,6 +191,7 @@ export const clientFrameSchema = z.discriminatedUnion("t", [
     clientFrameCallOfferSchema,
     clientFrameCallAnswerSchema,
     clientFrameCallCandidateSchema,
+    clientFrameCallMediaStateSchema,
     clientFrameCallHangupSchema,
 ]);
 
@@ -320,6 +330,16 @@ export const serverFrameInboundCallCandidateSchema = z
     })
     .strict();
 
+export const serverFrameInboundCallMediaStateSchema = z
+    .object({
+        t: z.literal("callMediaState"),
+        callId: z.string(),
+        from: zAccountStr,
+        audioMuted: z.boolean(),
+        videoMuted: z.boolean(),
+    })
+    .strict();
+
 export const serverFrameInboundCallHangupSchema = z
     .object({
         t: z.literal("callHangup"),
@@ -387,6 +407,7 @@ export const serverFrameSchema = z.discriminatedUnion("t", [
     serverFrameInboundCallOfferSchema,
     serverFrameInboundCallAnswerSchema,
     serverFrameInboundCallCandidateSchema,
+    serverFrameInboundCallMediaStateSchema,
     serverFrameInboundCallHangupSchema,
     serverFramePongSchema,
 ]);

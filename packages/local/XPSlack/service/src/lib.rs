@@ -1,6 +1,8 @@
 pub mod protocol;
 pub mod state;
 
+mod call_signaling;
+
 #[cfg(not(test))]
 mod r_transact {
     #[psibase::service(name = "r-transact", dispatch = false)]
@@ -373,6 +375,11 @@ mod service {
     }
 
     fn handle_socket_cleanup(socket: i32) {
+        let now = Transact::call().currentBlock().time.microseconds;
+        for (s, frame) in crate::call_signaling::tear_down_call_for_dead_socket(socket, now) {
+            send_frame(s, &frame);
+        }
+
         let removed = crate::state::tx_remove_socket_session(socket);
         let Some(removed) = removed else {
             return;
@@ -630,6 +637,10 @@ mod service {
         }
 
         let now = Transact::call().currentBlock().time.microseconds;
+        for (s, frame_out) in crate::call_signaling::sweep_stale_ringing_calls(now) {
+            send_frame(s, &frame_out);
+        }
+
         match frame {
             ClientFrame::Sync { .. } => {
                 let sync_payload = subjective_sync_frame(session.user);
@@ -661,13 +672,27 @@ mod service {
             } => handle_ack(socket, session.user, conversation_id, server_msg_id),
             ClientFrame::Ping => send_frame(socket, &ServerFrame::Pong),
             ClientFrame::Signal { .. } => unreachable!("signal is rejected by validation"),
-            ClientFrame::CallInvite { .. } => send_call_not_implemented(socket, frame),
-            ClientFrame::CallAccept { .. } => send_call_not_implemented(socket, frame),
-            ClientFrame::CallDecline { .. } => send_call_not_implemented(socket, frame),
-            ClientFrame::CallOffer { .. } => send_call_not_implemented(socket, frame),
-            ClientFrame::CallAnswer { .. } => send_call_not_implemented(socket, frame),
-            ClientFrame::CallCandidate { .. } => send_call_not_implemented(socket, frame),
-            ClientFrame::CallHangup { .. } => send_call_not_implemented(socket, frame),
+            ClientFrame::CallInvite { .. }
+            | ClientFrame::CallAccept { .. }
+            | ClientFrame::CallDecline { .. }
+            | ClientFrame::CallHangup { .. }
+            | ClientFrame::CallOffer { .. }
+            | ClientFrame::CallAnswer { .. }
+            | ClientFrame::CallCandidate { .. }
+            | ClientFrame::CallMediaState { .. } => {
+                if session.protocol_major != 2 {
+                    send_call_not_implemented(socket, frame);
+                } else {
+                    for (s, frame_out) in crate::call_signaling::dispatch_call_client_frame(
+                        socket,
+                        session.user,
+                        now,
+                        frame,
+                    ) {
+                        send_frame(s, &frame_out);
+                    }
+                }
+            }
         }
     }
 
@@ -1027,6 +1052,14 @@ mod tests {
                 },
             ),
             (
+                r#"{"t":"callMediaState","callId":"x","audioMuted":true,"videoMuted":false}"#,
+                ClientFrame::CallMediaState {
+                    call_id: "x".into(),
+                    audio_muted: true,
+                    video_muted: false,
+                },
+            ),
+            (
                 r#"{"t":"callHangup","callId":"x","reason":"user"}"#,
                 ClientFrame::CallHangup {
                     call_id: "x".into(),
@@ -1283,6 +1316,101 @@ mod tests {
 
     fn state_account(name: &str) -> AccountNumber {
         name.parse().unwrap()
+    }
+
+    #[test]
+    fn collision_tie_breaker_lex_order() {
+        use crate::state::cmp_call_invite_tuples;
+        let alice = state_account("alice");
+        let bob = state_account("bob");
+        assert_eq!(
+            cmp_call_invite_tuples(alice, bob, 1, bob, alice, 2),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            cmp_call_invite_tuples(bob, alice, 1, alice, bob, 2),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            cmp_call_invite_tuples(alice, bob, 5, alice, bob, 5),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn single_tab_socket_selection_is_stable() {
+        use crate::state::stable_pick_callee_socket;
+        assert_eq!(stable_pick_callee_socket(vec![99, 3, 50]), Some(3));
+        assert_eq!(stable_pick_callee_socket(vec![]), None);
+    }
+
+    #[test]
+    fn lazy_call_state_sweep_drops_stale_rows() {
+        use crate::state::tables::ActiveCallRow;
+        use crate::state::{
+            stale_ringing_calls_for_sweep, CALL_PHASE_CONNECTED, CALL_PHASE_RINGING,
+            STALE_RINGING_TTL_US,
+        };
+        let now = 10_000_000_000_i64;
+        let rows = vec![
+            ActiveCallRow {
+                call_id: "old".into(),
+                conversation_id: "c1".into(),
+                caller: state_account("alice"),
+                callee: state_account("bob"),
+                caller_socket: 1,
+                callee_socket: 2,
+                created_at: 0,
+                last_activity_at: now - STALE_RINGING_TTL_US - 1,
+                phase: CALL_PHASE_RINGING,
+                connected_at: 0,
+            },
+            ActiveCallRow {
+                call_id: "fresh".into(),
+                conversation_id: "c1".into(),
+                caller: state_account("alice"),
+                callee: state_account("bob"),
+                caller_socket: 3,
+                callee_socket: 4,
+                created_at: 0,
+                last_activity_at: now,
+                phase: CALL_PHASE_RINGING,
+                connected_at: 0,
+            },
+            ActiveCallRow {
+                call_id: "connected".into(),
+                conversation_id: "c1".into(),
+                caller: state_account("alice"),
+                callee: state_account("bob"),
+                caller_socket: 5,
+                callee_socket: 6,
+                created_at: 0,
+                last_activity_at: now - STALE_RINGING_TTL_US - 1,
+                phase: CALL_PHASE_CONNECTED,
+                connected_at: 1,
+            },
+        ];
+        let out = stale_ringing_calls_for_sweep(now, &rows);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].call_id, "old");
+    }
+
+    #[test]
+    fn call_event_schema_is_stable() {
+        let frame = ServerFrame::CallEvent {
+            conversation_id: "c:dm".into(),
+            call_id: Some("call:x".into()),
+            event: CallTimelineEventKind::Missed,
+            actor: None,
+            reason: Some("timeout".into()),
+            duration_ms: None,
+            server_msg_id: 7,
+            server_time: 12345,
+        };
+        assert_eq!(
+            encode_server_frame(&frame).unwrap(),
+            r#"{"t":"callEvent","conversationId":"c:dm","callId":"call:x","event":"missed","reason":"timeout","serverMsgId":7,"serverTime":12345}"#
+        );
     }
 
     fn http_request(method: &str, target: &str, headers: Vec<HttpHeader>) -> HttpRequest {

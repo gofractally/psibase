@@ -205,6 +205,84 @@ export class PslackWsClient {
         this.sendJson({ t: "ack", conversationId, serverMsgId });
     }
 
+    callInvite(
+        conversationId: string,
+        wantVideo: boolean,
+        wantAudio: boolean,
+        clientCallId: string,
+    ): void {
+        this.sendJson({
+            t: "callInvite",
+            conversationId,
+            wantVideo,
+            wantAudio,
+            clientCallId,
+        });
+    }
+
+    callAccept(callId: string): void {
+        this.sendJson({ t: "callAccept", callId });
+    }
+
+    callDecline(callId: string, reason?: string): void {
+        if (reason === undefined) {
+            this.sendJson({ t: "callDecline", callId });
+        } else {
+            this.sendJson({ t: "callDecline", callId, reason });
+        }
+    }
+
+    callHangup(callId: string, reason?: string): void {
+        if (reason === undefined) {
+            this.sendJson({ t: "callHangup", callId });
+        } else {
+            this.sendJson({ t: "callHangup", callId, reason });
+        }
+    }
+
+    callOffer(callId: string, sdp: string): void {
+        this.sendJson({ t: "callOffer", callId, sdp });
+    }
+
+    callAnswer(callId: string, sdp: string): void {
+        this.sendJson({ t: "callAnswer", callId, sdp });
+    }
+
+    callCandidate(
+        callId: string,
+        candidate: RTCIceCandidate | null,
+    ): void {
+        if (!candidate) {
+            this.sendJson({
+                t: "callCandidate",
+                callId,
+                candidate: null,
+            });
+            return;
+        }
+        const init = candidate.toJSON();
+        this.sendJson({
+            t: "callCandidate",
+            callId,
+            candidate: init.candidate ?? null,
+            sdpMid: init.sdpMid,
+            sdpMLineIndex: init.sdpMLineIndex,
+        });
+    }
+
+    callMediaState(
+        callId: string,
+        audioMuted: boolean,
+        videoMuted: boolean,
+    ): void {
+        this.sendJson({
+            t: "callMediaState",
+            callId,
+            audioMuted,
+            videoMuted,
+        });
+    }
+
     signal(
         conversationId: string,
         toAccount: string,
@@ -285,6 +363,9 @@ export class PslackWsClient {
                 break;
             case "callCandidate":
                 this.handlers.callCandidate?.(frame);
+                break;
+            case "callMediaState":
+                this.handlers.callMediaState?.(frame);
                 break;
             case "callHangup":
                 this.handlers.callHangup?.(frame);

@@ -3,9 +3,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
     CallTimelineEventType,
     ConversationSnapshot,
+    IceServerConfig,
 } from "../lib/protocol";
-import { PslackWsClient, type PslackWsPublicState } from "../lib/ws-client";
 import { supervisor } from "@shared/lib/supervisor";
+
+import type {
+    InboundCallAnswer,
+    InboundCallCandidate,
+    InboundCallMediaState,
+    InboundCallOffer,
+} from "../lib/call-webrtc-session";
+import { PslackWsClient, type PslackWsPublicState } from "../lib/ws-client";
+
+import { useCallSession } from "./use-call-session";
+
+const TERMINAL_CALL_TIMELINE_EVENTS = new Set<CallTimelineEventType>([
+    "declined",
+    "missed",
+    "cancelled",
+    "failed",
+    "ended",
+]);
+
+/** Cleared-call IDs — suppress spurious `bad-call` from late signaling after teardown (decline, hangup, etc.). */
+const SIGNALING_TEARDOWN_SUPPRESS_MS = 12_000;
 
 export type PslackMessageStatus = "pending" | "sent" | "failed";
 
@@ -42,6 +63,30 @@ export type PslackTimelineRow =
     | PslackTimelineCallEventRow;
 
 export type PresenceUi = "online" | "offline" | "unknown";
+
+export type PslackIncomingCall = {
+    callId: string;
+    conversationId: string;
+    from: string;
+    to: string;
+    wantVideo: boolean;
+    wantAudio: boolean;
+    serverTime: number;
+    source: "service-frame";
+};
+
+export type PslackActiveCall = {
+    callId: string;
+    conversationId: string;
+    peerAccount: string;
+    direction: "incoming" | "outgoing";
+    wantVideo: boolean;
+    wantAudio: boolean;
+    startedAt: number;
+    status: "ringing" | "connected" | "ended";
+    source: "mock" | "service-frame";
+    lastFrame?: string;
+};
 
 function memberCanonicalKey(members: readonly string[]): string {
     return [...members].sort().join("|");
@@ -117,6 +162,18 @@ export function usePslackSocket() {
     const [selectedConversationId, setSelectedConversationId] = useState<
         string | undefined
     >();
+    const [incomingCall, setIncomingCall] = useState<PslackIncomingCall | null>(
+        null,
+    );
+    const [activeCall, setActiveCall] = useState<PslackActiveCall | null>(null);
+
+    const iceServersRef = useRef<IceServerConfig[] | null>(null);
+    const webrtcBridgeRef = useRef<{
+        onOffer?: (frame: InboundCallOffer) => void;
+        onAnswer?: (frame: InboundCallAnswer) => void;
+        onCandidate?: (frame: InboundCallCandidate) => void;
+        onMediaState?: (frame: InboundCallMediaState) => void;
+    }>({});
 
     const [lastInboundError, setLastInboundError] = useState<string | null>(null);
 
@@ -128,7 +185,29 @@ export function usePslackSocket() {
     const pendingDmMemberRef = useRef<string | null>(null);
     const pendingGroupKeyRef = useRef<string | null>(null);
 
+    const ringOutTimerRef = useRef<ReturnType<
+        typeof globalThis.setTimeout
+    > | null>(null);
+
+    const activeCallRef = useRef<PslackActiveCall | null>(null);
+    const hangupInitiatedCallIdRef = useRef<string | null>(null);
+    const recentSignalingTeardownIdsRef = useRef<Set<string>>(new Set());
+
+    const markSignalingTeardown = useCallback(
+        (callId: string | undefined) => {
+            if (!callId) return;
+            recentSignalingTeardownIdsRef.current.add(callId);
+            globalThis.setTimeout(() => {
+                recentSignalingTeardownIdsRef.current.delete(callId);
+            }, SIGNALING_TEARDOWN_SUPPRESS_MS);
+        },
+        [],
+    );
+
     conversationsRef.current = conversations;
+
+    activeCallRef.current = activeCall;
+    if (!activeCall) hangupInitiatedCallIdRef.current = null;
 
     const trySelectPendingConversation = useCallback(
         (conv: ConversationSnapshot) => {
@@ -366,12 +445,184 @@ export function usePslackSocket() {
                         prevList.sort((a, b) => a.serverTime - b.serverTime);
                         return { ...prev, [conversationId]: prevList };
                     });
+
+                    if (
+                        callId &&
+                        TERMINAL_CALL_TIMELINE_EVENTS.has(event)
+                    ) {
+                        markSignalingTeardown(callId);
+                        if (ringOutTimerRef.current != null) {
+                            globalThis.clearTimeout(ringOutTimerRef.current);
+                            ringOutTimerRef.current = null;
+                        }
+                        setIncomingCall((prev) =>
+                            prev?.callId === callId ? null : prev,
+                        );
+                        setActiveCall((prev) =>
+                            prev?.callId === callId ? null : prev,
+                        );
+                    }
                 },
 
                 callError: (frame) => {
+                    const callId = frame.callId;
+                    if (
+                        callId &&
+                        frame.code === "bad-call" &&
+                        recentSignalingTeardownIdsRef.current.has(callId)
+                    ) {
+                        return;
+                    }
                     const detail = `${frame.code}: ${frame.reason}`.slice(0, 500);
-                    markConversationSendFailed(frame.conversationId, detail);
                     setLastInboundError(detail);
+                    if (ringOutTimerRef.current != null) {
+                        globalThis.clearTimeout(ringOutTimerRef.current);
+                        ringOutTimerRef.current = null;
+                    }
+                    if (frame.callId) {
+                        setIncomingCall((p) =>
+                            p?.callId === frame.callId ? null : p,
+                        );
+                        setActiveCall((p) =>
+                            p?.callId === frame.callId ? null : p,
+                        );
+                    } else if (frame.conversationId) {
+                        setActiveCall((p) =>
+                            p?.conversationId === frame.conversationId
+                                ? null
+                                : p,
+                        );
+                    }
+                },
+
+                callInvite: (frame) => {
+                    setLastInboundError(null);
+                    const self = selfRef.current;
+                    if (!self) return;
+                    if (frame.to === self) {
+                        setIncomingCall({
+                            ...frame,
+                            source: "service-frame",
+                        });
+                        return;
+                    }
+                    if (frame.from === self) {
+                        if (ringOutTimerRef.current != null) {
+                            globalThis.clearTimeout(ringOutTimerRef.current);
+                            ringOutTimerRef.current = null;
+                        }
+                        ringOutTimerRef.current = globalThis.setTimeout(() => {
+                            ringOutTimerRef.current = null;
+                            clientRef.current?.callHangup(
+                                frame.callId,
+                                "timeout",
+                            );
+                        }, 20_000);
+                        setActiveCall({
+                            callId: frame.callId,
+                            conversationId: frame.conversationId,
+                            peerAccount: frame.to,
+                            direction: "outgoing",
+                            wantVideo: frame.wantVideo,
+                            wantAudio: frame.wantAudio,
+                            startedAt: Date.now(),
+                            status: "ringing",
+                            source: "service-frame",
+                            lastFrame: "Ringing…",
+                        });
+                        setSelectedConversationId(frame.conversationId);
+                    }
+                },
+
+                callAccept: (frame) => {
+                    setLastInboundError(null);
+                    if (ringOutTimerRef.current != null) {
+                        globalThis.clearTimeout(ringOutTimerRef.current);
+                        ringOutTimerRef.current = null;
+                    }
+                    setActiveCall((prev) =>
+                        prev?.callId === frame.callId
+                            ? {
+                                  ...prev,
+                                  status: "connected",
+                                  lastFrame: `Accepted by ${frame.by}`,
+                              }
+                            : prev,
+                    );
+                },
+
+                callDecline: (frame) => {
+                    setLastInboundError(null);
+                    markSignalingTeardown(frame.callId);
+                    if (ringOutTimerRef.current != null) {
+                        globalThis.clearTimeout(ringOutTimerRef.current);
+                        ringOutTimerRef.current = null;
+                    }
+                    setIncomingCall((prev) =>
+                        prev?.callId === frame.callId ? null : prev,
+                    );
+                    setActiveCall((prev) =>
+                        prev?.callId === frame.callId ? null : prev,
+                    );
+                },
+
+                callHangup: (frame) => {
+                    setLastInboundError(null);
+                    markSignalingTeardown(frame.callId);
+                    if (ringOutTimerRef.current != null) {
+                        globalThis.clearTimeout(ringOutTimerRef.current);
+                        ringOutTimerRef.current = null;
+                    }
+                    setIncomingCall((prev) =>
+                        prev?.callId === frame.callId ? null : prev,
+                    );
+                    setActiveCall((prev) =>
+                        prev?.callId === frame.callId ? null : prev,
+                    );
+                },
+
+                callTimeout: (frame) => {
+                    setLastInboundError(null);
+                    markSignalingTeardown(frame.callId);
+                    if (ringOutTimerRef.current != null) {
+                        globalThis.clearTimeout(ringOutTimerRef.current);
+                        ringOutTimerRef.current = null;
+                    }
+                    setIncomingCall((prev) =>
+                        prev?.callId === frame.callId ? null : prev,
+                    );
+                    setActiveCall((prev) =>
+                        prev?.callId === frame.callId ? null : prev,
+                    );
+                },
+
+                iceServers: (frame) => {
+                    setLastInboundError(null);
+                    iceServersRef.current = frame.servers;
+                },
+
+                callOffer: (frame) => {
+                    setLastInboundError(null);
+                    const f = frame as unknown as InboundCallOffer;
+                    webrtcBridgeRef.current.onOffer?.(f);
+                },
+
+                callAnswer: (frame) => {
+                    setLastInboundError(null);
+                    const f = frame as unknown as InboundCallAnswer;
+                    webrtcBridgeRef.current.onAnswer?.(f);
+                },
+
+                callCandidate: (frame) => {
+                    setLastInboundError(null);
+                    const f = frame as unknown as InboundCallCandidate;
+                    webrtcBridgeRef.current.onCandidate?.(f);
+                },
+
+                callMediaState: (frame) => {
+                    setLastInboundError(null);
+                    const f = frame as unknown as InboundCallMediaState;
+                    webrtcBridgeRef.current.onMediaState?.(f);
                 },
 
                 error: (frame) => {
@@ -392,11 +643,15 @@ export function usePslackSocket() {
         client.connect();
 
         return () => {
+            if (ringOutTimerRef.current != null) {
+                globalThis.clearTimeout(ringOutTimerRef.current);
+                ringOutTimerRef.current = null;
+            }
             client.close();
             clientRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- single mount client; refs hold latest matchers
-    }, []);
+    }, [markSignalingTeardown]);
 
     const reconnectNow = useCallback(() => {
         clientRef.current?.reconnectNow();
@@ -486,6 +741,183 @@ export function usePslackSocket() {
         [selectedConversationId],
     );
 
+    const startMeetCall = useCallback(() => {
+        const convId = selectedConversationId;
+        const self = selfRef.current;
+        const c = clientRef.current;
+        if (!convId || !self || !c) return;
+
+        const conversation = conversationsRef.current.find(
+            (row) => row.conversationId === convId,
+        );
+        if (
+            !conversation ||
+            conversation.kind !== "dm" ||
+            conversation.members.length !== 2 ||
+            !conversation.members.includes(self)
+        ) {
+            return;
+        }
+
+        const peerAccount = conversation.members.find((m) => m !== self);
+        if (!peerAccount) return;
+
+        c.callInvite(convId, true, true, crypto.randomUUID());
+    }, [selectedConversationId]);
+
+    const startMockCall = useCallback(() => {
+        const convId = selectedConversationId;
+        const self = selfRef.current;
+        if (!convId || !self) return;
+
+        const conversation = conversationsRef.current.find(
+            (c) => c.conversationId === convId,
+        );
+        if (
+            !conversation ||
+            conversation.kind !== "dm" ||
+            conversation.members.length !== 2 ||
+            !conversation.members.includes(self)
+        ) {
+            return;
+        }
+
+        const peerAccount = conversation.members.find((m) => m !== self);
+        if (!peerAccount) return;
+
+        setActiveCall({
+            callId: `mock-${crypto.randomUUID()}`,
+            conversationId: convId,
+            peerAccount,
+            direction: "outgoing",
+            wantVideo: true,
+            wantAudio: true,
+            startedAt: Date.now(),
+            status: "ringing",
+            source: "mock",
+            lastFrame: "Mock outgoing call preview",
+        });
+    }, [selectedConversationId]);
+
+    const acceptIncomingCall = useCallback(() => {
+        setIncomingCall((call) => {
+            if (!call) return null;
+            clientRef.current?.callAccept(call.callId);
+            setActiveCall({
+                callId: call.callId,
+                conversationId: call.conversationId,
+                peerAccount: call.from,
+                direction: "incoming",
+                wantVideo: call.wantVideo,
+                wantAudio: call.wantAudio,
+                startedAt: Date.now(),
+                status: "connected",
+                source: "service-frame",
+                lastFrame: "Connected",
+            });
+            setSelectedConversationId(call.conversationId);
+            return null;
+        });
+    }, []);
+
+    const declineIncomingCall = useCallback(
+        (reason: "user" | "timeout") => {
+            setLastInboundError(null);
+            setIncomingCall((call) => {
+                if (!call) return null;
+                markSignalingTeardown(call.callId);
+                if (reason === "timeout") {
+                    clientRef.current?.callDecline(call.callId, "timeout");
+                } else {
+                    clientRef.current?.callDecline(call.callId);
+                }
+                return null;
+            });
+        },
+        [markSignalingTeardown],
+    );
+
+    const endPlaceholderCall = useCallback(() => {
+        if (ringOutTimerRef.current != null) {
+            globalThis.clearTimeout(ringOutTimerRef.current);
+            ringOutTimerRef.current = null;
+        }
+        const ac = activeCallRef.current;
+        if (!ac) return;
+        if (hangupInitiatedCallIdRef.current === ac.callId) return;
+        hangupInitiatedCallIdRef.current = ac.callId;
+
+        if (ac.source === "service-frame") {
+            const c = clientRef.current;
+            markSignalingTeardown(ac.callId);
+            if (ac.status === "ringing" && ac.direction === "outgoing") {
+                c?.callHangup(ac.callId, "cancelled");
+            } else {
+                c?.callHangup(ac.callId, "ended");
+            }
+        } else {
+            setLastInboundError(null);
+        }
+        setActiveCall(null);
+    }, [markSignalingTeardown]);
+
+    const callRtcSnapshot = useMemo(() => {
+        const ac = activeCall;
+        if (
+            ac &&
+            ac.source === "service-frame" &&
+            ac.status === "connected"
+        ) {
+            return {
+                callId: ac.callId,
+                direction: ac.direction,
+                wantVideo: ac.wantVideo,
+                wantAudio: ac.wantAudio,
+            };
+        }
+        return null;
+    }, [activeCall]);
+
+    const onMediaAcquisitionFailed = useCallback((callId: string) => {
+        if (activeCallRef.current?.callId !== callId) return;
+        setLastInboundError(
+            "Could not access camera or microphone for this call.",
+        );
+        clientRef.current?.callHangup(callId, "ended");
+    }, []);
+
+    const onIceFailedHangup = useCallback((callId: string) => {
+        clientRef.current?.callHangup(callId, "ice-failed");
+    }, []);
+
+    const activeCallMediaKey =
+        activeCall?.source === "service-frame" &&
+        activeCall.status === "connected"
+            ? activeCall.callId
+            : null;
+
+    const {
+        localStream: callLocalStream,
+        remoteStream: callRemoteStream,
+        audioMuted: callAudioMuted,
+        videoMuted: callVideoMuted,
+        remoteAudioMuted: callRemoteAudioMuted,
+        remoteVideoMuted: callRemoteVideoMuted,
+        audioOnlyFallback: callAudioOnlyFallback,
+        toggleAudio: toggleCallAudioMuted,
+        toggleVideo: toggleCallVideoMuted,
+    } = useCallSession({
+        mediaCallKey: activeCallMediaKey,
+        callSnapshot: callRtcSnapshot,
+        wsState,
+        iceServersRef,
+        clientRef,
+        activeCallRef,
+        webrtcBridgeRef,
+        onMediaAcquisitionFailed,
+        onIceFailedHangup,
+    });
+
     const authLost = useMemo(() => {
         const e = lastWsError ?? "";
         return (
@@ -538,6 +970,23 @@ export function usePslackSocket() {
         openOrFocusDm,
         openGroupChat,
         sendChatMessage,
+        incomingCall,
+        activeCall,
+        startMeetCall,
+        startMockCall,
+        acceptIncomingCall,
+        declineIncomingCall,
+        endPlaceholderCall,
+
+        callLocalStream,
+        callRemoteStream,
+        callAudioMuted,
+        callVideoMuted,
+        callRemoteAudioMuted,
+        callRemoteVideoMuted,
+        callAudioOnlyFallback,
+        toggleCallAudioMuted,
+        toggleCallVideoMuted,
 
         chatTransportReady,
         composerDisabledReason,

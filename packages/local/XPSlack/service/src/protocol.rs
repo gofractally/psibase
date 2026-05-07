@@ -141,6 +141,15 @@ pub enum ClientFrame {
         #[serde(rename = "sdpMLineIndex")]
         sdp_mline_index: Option<u32>,
     },
+    #[serde(rename = "callMediaState")]
+    CallMediaState {
+        #[serde(rename = "callId")]
+        call_id: String,
+        #[serde(rename = "audioMuted")]
+        audio_muted: bool,
+        #[serde(rename = "videoMuted")]
+        video_muted: bool,
+    },
     #[serde(rename = "callHangup")]
     CallHangup {
         #[serde(rename = "callId")]
@@ -161,6 +170,7 @@ impl ClientFrame {
             | ClientFrame::CallOffer { call_id, .. }
             | ClientFrame::CallAnswer { call_id, .. }
             | ClientFrame::CallCandidate { call_id, .. }
+            | ClientFrame::CallMediaState { call_id, .. }
             | ClientFrame::CallHangup { call_id, .. } => (Some(call_id.clone()), None),
             _ => (None, None),
         }
@@ -306,6 +316,16 @@ pub enum ServerFrame {
         #[serde(rename = "sdpMLineIndex")]
         sdp_mline_index: Option<u32>,
     },
+    #[serde(rename = "callMediaState")]
+    SrvCallMediaState {
+        #[serde(rename = "callId")]
+        call_id: String,
+        from: ExactAccountNumber,
+        #[serde(rename = "audioMuted")]
+        audio_muted: bool,
+        #[serde(rename = "videoMuted")]
+        video_muted: bool,
+    },
     #[serde(rename = "callHangup")]
     SrvCallHangup {
         #[serde(rename = "callId")]
@@ -395,6 +415,7 @@ pub fn parse_client_frame(input: &[u8]) -> Result<ClientFrame, ProtocolError> {
         "callOffer",
         "callAnswer",
         "callCandidate",
+        "callMediaState",
         "callHangup",
     ];
     if !KNOWN.iter().any(|k| *k == frame_type) {
@@ -449,7 +470,8 @@ pub fn validate_client_frame(
             validate_required_id("callId", call_id)?;
             validate_required_id("sdp", sdp)
         }
-        ClientFrame::CallCandidate { call_id, .. } => validate_required_id("callId", call_id),
+        ClientFrame::CallCandidate { call_id, .. }
+        | ClientFrame::CallMediaState { call_id, .. } => validate_required_id("callId", call_id),
     }
 }
 

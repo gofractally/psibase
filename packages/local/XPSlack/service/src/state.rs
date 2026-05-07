@@ -1,10 +1,17 @@
 use psibase::{sha256, AccountNumber, Table};
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use crate::protocol::{PresenceStatus, ServerFrame};
 
 pub const CONVERSATION_KIND_DM: u8 = 1;
 pub const CONVERSATION_KIND_GROUP: u8 = 2;
+
+pub const CALL_PHASE_RINGING: u8 = 0;
+pub const CALL_PHASE_CONNECTED: u8 = 1;
+
+/// Client + server safety net (architecture §6.2, §9.2): drop stale ringing rows after this many µs.
+pub const STALE_RINGING_TTL_US: i64 = 25_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StateError {
@@ -114,11 +121,56 @@ pub mod tables {
         #[primary_key]
         fn pk(&self) {}
     }
+
+    /// Transient DM call row (Milestone 2+). Primary key is an opaque service-issued `call_id`.
+    #[table(name = "ActiveCallTable", index = 5, db = "Subjective")]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
+    pub struct ActiveCallRow {
+        #[primary_key]
+        pub call_id: String,
+        pub conversation_id: String,
+        pub caller: AccountNumber,
+        pub callee: AccountNumber,
+        pub caller_socket: i32,
+        pub callee_socket: i32,
+        pub created_at: i64,
+        pub last_activity_at: i64,
+        /// [`CALL_PHASE_RINGING`] or [`CALL_PHASE_CONNECTED`].
+        pub phase: u8,
+        /// Microseconds since epoch when callee accepted; `0` while ringing.
+        pub connected_at: i64,
+    }
+
+    /// At most one active (ringing or connected) call per account (architecture §9.1).
+    #[table(name = "UserActiveCallTable", index = 6, db = "Subjective")]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
+    pub struct UserActiveCallRow {
+        pub user: AccountNumber,
+        pub call_id: String,
+    }
+
+    impl UserActiveCallRow {
+        #[primary_key]
+        fn pk(&self) -> AccountNumber {
+            self.user
+        }
+    }
+
+    /// Maps a websocket `socket` id to an active `call_id` for fast teardown on close (architecture §9.3).
+    #[table(name = "CallSocketBindingTable", index = 7, db = "Subjective")]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
+    pub struct CallSocketBindingRow {
+        #[primary_key]
+        pub socket: i32,
+        pub call_id: String,
+    }
 }
 
 use tables::{
-    ConversationMemberRow, ConversationMemberTable, ConversationRow, ConversationTable,
-    MessageCounterTable, SocketSessionRow, SocketSessionTable, UserSessionRow, UserSessionTable,
+    ActiveCallRow, ActiveCallTable, CallSocketBindingTable, ConversationMemberRow,
+    ConversationMemberTable, ConversationRow, ConversationTable, MessageCounterTable,
+    SocketSessionRow, SocketSessionTable, UserActiveCallTable, UserSessionRow,
+    UserSessionTable,
 };
 
 pub fn canonical_conversation_members(
@@ -444,6 +496,83 @@ pub fn tx_presence_subscriber_sockets(subject: AccountNumber) -> Vec<i32> {
         }
         socks
     }
+}
+
+/// Deterministic socket choice for multi-tab edge cases (tests + architecture §11).
+pub fn stable_pick_callee_socket(mut sockets: Vec<i32>) -> Option<i32> {
+    if sockets.is_empty() {
+        return None;
+    }
+    sockets.sort_unstable();
+    Some(sockets[0])
+}
+
+/// Lexicographic ordering on `(caller, callee, created_at)` (architecture §9.1).
+pub fn cmp_call_invite_tuples(
+    a_caller: AccountNumber,
+    a_callee: AccountNumber,
+    a_created: i64,
+    b_caller: AccountNumber,
+    b_callee: AccountNumber,
+    b_created: i64,
+) -> Ordering {
+    let ac = a_caller.to_string();
+    let bc = b_caller.to_string();
+    ac.cmp(&bc)
+        .then_with(|| a_callee.to_string().cmp(&b_callee.to_string()))
+        .then_with(|| a_created.cmp(&b_created))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaleCallSweepItem {
+    pub call_id: String,
+    pub conversation_id: String,
+    pub caller: AccountNumber,
+    pub callee: AccountNumber,
+}
+
+/// Pure helper for unit tests: ringing calls idle longer than [`STALE_RINGING_TTL_US`].
+pub fn stale_ringing_calls_for_sweep(now: i64, rows: &[ActiveCallRow]) -> Vec<StaleCallSweepItem> {
+    let cutoff = now - STALE_RINGING_TTL_US;
+    rows.iter()
+        .filter(|r| r.phase == CALL_PHASE_RINGING && r.last_activity_at < cutoff)
+        .map(|r| StaleCallSweepItem {
+            call_id: r.call_id.clone(),
+            conversation_id: r.conversation_id.clone(),
+            caller: r.caller,
+            callee: r.callee,
+        })
+        .collect()
+}
+
+pub fn allocate_call_id(
+    now: i64,
+    client_call_id: &str,
+    caller: AccountNumber,
+    callee: AccountNumber,
+) -> String {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&now.to_le_bytes());
+    bytes.extend_from_slice(client_call_id.as_bytes());
+    bytes.extend_from_slice(&caller.value.to_le_bytes());
+    bytes.extend_from_slice(&callee.value.to_le_bytes());
+    format!("call:{}", sha256(&bytes))
+}
+
+pub fn active_call_for_user(user: AccountNumber) -> Option<ActiveCallRow> {
+    let binding = UserActiveCallTable::read()
+        .get_index_pk()
+        .get(&user)?;
+    ActiveCallTable::read()
+        .get_index_pk()
+        .get(&binding.call_id)
+}
+
+pub fn call_id_for_socket(socket: i32) -> Option<String> {
+    CallSocketBindingTable::read()
+        .get_index_pk()
+        .get(&socket)
+        .map(|r| r.call_id.clone())
 }
 
 #[cfg(test)]
