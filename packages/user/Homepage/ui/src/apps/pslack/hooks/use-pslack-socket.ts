@@ -887,6 +887,9 @@ export function usePslackSocket() {
     }, []);
 
     const onIceFailedHangup = useCallback((callId: string) => {
+        setLastInboundError(
+            "Could not establish a media connection. The node may have no TURN relay quota left, or this network blocks direct and relay paths. Try another network or ask a node admin to check Pslack / OpenRelay settings in x-admin.",
+        );
         clientRef.current?.callHangup(callId, "ice-failed");
     }, []);
 

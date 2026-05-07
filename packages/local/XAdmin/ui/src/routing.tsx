@@ -5,6 +5,7 @@ import {
     Network,
     Package,
     Settings,
+    Video,
 } from "lucide-react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -18,6 +19,7 @@ import { DashboardPage } from "./pages/dashboard-page";
 import { JoinPage } from "./pages/join-page";
 import { KeysPage } from "./pages/keys-page";
 import { NodeLocalPage } from "./pages/node-local-page";
+import { PslackOpenRelayPage } from "./pages/pslack-openrelay-page";
 import { SetupPage } from "./pages/setup-page";
 import { PeersPage } from "./peers/peers-page";
 
@@ -39,6 +41,12 @@ export const routes = [
         icon: Network,
         path: "peers",
         element: <PeersPage />,
+    },
+    {
+        name: "Pslack",
+        icon: Video,
+        path: "pslack",
+        element: <PslackOpenRelayPage />,
     },
     {
         name: "Logs",
