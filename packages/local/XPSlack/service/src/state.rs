@@ -164,13 +164,33 @@ pub mod tables {
         pub socket: i32,
         pub call_id: String,
     }
+
+    /// Per-recipient targeted chat delivery dedupe for client-generated message IDs.
+    #[table(name = "MessageDeliveryTable", index = 8, db = "Subjective")]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
+    pub struct MessageDeliveryRow {
+        pub conversation_id: String,
+        pub client_msg_id: String,
+        pub recipient: AccountNumber,
+    }
+
+    impl MessageDeliveryRow {
+        #[primary_key]
+        fn pk(&self) -> (String, String, AccountNumber) {
+            (
+                self.conversation_id.clone(),
+                self.client_msg_id.clone(),
+                self.recipient,
+            )
+        }
+    }
 }
 
 use tables::{
     ActiveCallRow, ActiveCallTable, CallSocketBindingTable, ConversationMemberRow,
     ConversationMemberTable, ConversationRow, ConversationTable, MessageCounterTable,
-    SocketSessionRow, SocketSessionTable, UserActiveCallTable, UserSessionRow,
-    UserSessionTable,
+    MessageDeliveryRow, MessageDeliveryTable, SocketSessionRow, SocketSessionTable,
+    UserActiveCallTable, UserSessionRow, UserSessionTable,
 };
 
 pub fn canonical_conversation_members(
@@ -309,6 +329,31 @@ pub fn is_conversation_member(conversation_id: &str, member: AccountNumber) -> b
         .get_index_pk()
         .get(&(conversation_id.to_owned(), member))
         .is_some()
+}
+
+pub fn targeted_message_was_delivered(
+    conversation_id: &str,
+    client_msg_id: &str,
+    recipient: AccountNumber,
+) -> bool {
+    MessageDeliveryTable::read()
+        .get_index_pk()
+        .get(&(conversation_id.to_owned(), client_msg_id.to_owned(), recipient))
+        .is_some()
+}
+
+pub fn mark_targeted_message_delivered(
+    conversation_id: &str,
+    client_msg_id: &str,
+    recipient: AccountNumber,
+) {
+    MessageDeliveryTable::new()
+        .put(&MessageDeliveryRow {
+            conversation_id: conversation_id.to_owned(),
+            client_msg_id: client_msg_id.to_owned(),
+            recipient,
+        })
+        .unwrap();
 }
 
 pub fn conversations_for_user(user: AccountNumber) -> Vec<ConversationRow> {

@@ -27,6 +27,7 @@ const TERMINAL_CALL_TIMELINE_EVENTS = new Set<CallTimelineEventType>([
 
 /** Cleared-call IDs — suppress spurious `bad-call` from late signaling after teardown (decline, hangup, etc.). */
 const SIGNALING_TEARDOWN_SUPPRESS_MS = 12_000;
+const PENDING_STORAGE_PREFIX = "pslack.pendingMessages.v1";
 
 export type PslackMessageStatus = "pending" | "sent" | "failed";
 
@@ -41,6 +42,7 @@ export type PslackUiMessage = {
     serverTime: number;
     status: PslackMessageStatus;
     errorReason?: string;
+    pendingRecipientCount?: number;
 };
 
 export type PslackTimelineMessageRow = PslackUiMessage & { kind: "message" };
@@ -63,6 +65,76 @@ export type PslackTimelineRow =
     | PslackTimelineCallEventRow;
 
 export type PresenceUi = "online" | "offline" | "unknown";
+
+type PendingChatMessage = {
+    clientMsgId: string;
+    conversationId: string;
+    from: string;
+    body: string;
+    createdAt: number;
+    recipients: string[];
+    deliveredTo: string[];
+    status: PslackMessageStatus;
+    errorReason?: string;
+};
+
+function pendingStorageKey(account: string): string {
+    return `${PENDING_STORAGE_PREFIX}.${account}`;
+}
+
+function sortTimelineRows(rows: PslackTimelineRow[]): PslackTimelineRow[] {
+    return rows.sort((a, b) => a.serverTime - b.serverTime);
+}
+
+function pendingRecipientCount(pending: PendingChatMessage): number {
+    const delivered = new Set(pending.deliveredTo);
+    return pending.recipients.filter((recipient) => !delivered.has(recipient))
+        .length;
+}
+
+function pendingToTimelineRow(pending: PendingChatMessage): PslackTimelineMessageRow {
+    return {
+        kind: "message",
+        key: pending.clientMsgId,
+        clientMsgId: pending.clientMsgId,
+        from: pending.from,
+        body: pending.body,
+        serverTime: pending.createdAt,
+        status: pending.status,
+        errorReason: pending.errorReason,
+        pendingRecipientCount: pendingRecipientCount(pending),
+    };
+}
+
+function parsePendingMessages(raw: string | null): PendingChatMessage[] {
+    if (!raw) return [];
+    const data = JSON.parse(raw) as unknown;
+    if (!Array.isArray(data)) return [];
+    return data
+        .filter((row): row is PendingChatMessage => {
+            if (typeof row !== "object" || row === null) return false;
+            const r = row as Record<string, unknown>;
+            return (
+                typeof r.clientMsgId === "string" &&
+                typeof r.conversationId === "string" &&
+                typeof r.from === "string" &&
+                typeof r.body === "string" &&
+                typeof r.createdAt === "number" &&
+                Array.isArray(r.recipients) &&
+                r.recipients.every((v) => typeof v === "string") &&
+                Array.isArray(r.deliveredTo) &&
+                r.deliveredTo.every((v) => typeof v === "string") &&
+                (r.status === "pending" ||
+                    r.status === "sent" ||
+                    r.status === "failed")
+            );
+        })
+        .map((row) => ({
+            ...row,
+            recipients: [...new Set(row.recipients)],
+            deliveredTo: [...new Set(row.deliveredTo)],
+        }));
+}
 
 export type PslackIncomingCall = {
     callId: string;
@@ -159,6 +231,12 @@ export function usePslackSocket() {
     const [timelineByConversation, setTimelineByConversation] = useState<
         Record<string, PslackTimelineRow[]>
     >({});
+    const [pendingMessages, setPendingMessages] = useState<
+        Record<string, PendingChatMessage>
+    >({});
+    const [unreadByConversation, setUnreadByConversation] = useState<
+        Record<string, number>
+    >({});
     const [selectedConversationId, setSelectedConversationId] = useState<
         string | undefined
     >();
@@ -181,6 +259,10 @@ export function usePslackSocket() {
     const selfRef = useRef<string | null>(null);
     const conversationIdsRef = useRef<string[]>([]);
     const conversationsRef = useRef<ConversationSnapshot[]>([]);
+    const selectedConversationIdRef = useRef<string | undefined>(undefined);
+    const pendingMessagesRef = useRef<Record<string, PendingChatMessage>>({});
+    const storageFailureRef = useRef<string | null>(null);
+    const inFlightDeliveriesRef = useRef<Set<string>>(new Set());
 
     const pendingDmMemberRef = useRef<string | null>(null);
     const pendingGroupKeyRef = useRef<string | null>(null);
@@ -205,6 +287,8 @@ export function usePslackSocket() {
     );
 
     conversationsRef.current = conversations;
+    selectedConversationIdRef.current = selectedConversationId;
+    pendingMessagesRef.current = pendingMessages;
 
     activeCallRef.current = activeCall;
     if (!activeCall) hangupInitiatedCallIdRef.current = null;
@@ -264,6 +348,99 @@ export function usePslackSocket() {
         [],
     );
 
+    const persistPendingMessages = useCallback(
+        (next: Record<string, PendingChatMessage>) => {
+            const self = selfRef.current;
+            if (!self) return true;
+            try {
+                const rows = Object.values(next).filter(
+                    (row) => row.status !== "sent",
+                );
+                globalThis.localStorage.setItem(
+                    pendingStorageKey(self),
+                    JSON.stringify(rows),
+                );
+                storageFailureRef.current = null;
+                return true;
+            } catch (e) {
+                const detail =
+                    e instanceof Error
+                        ? e.message
+                        : "Could not write pending message storage.";
+                storageFailureRef.current = detail;
+                setLastInboundError(
+                    `Pending message storage failed: ${detail}. This browser cannot safely queue offline messages.`,
+                );
+                return false;
+            }
+        },
+        [],
+    );
+
+    const replacePendingMessages = useCallback(
+        (
+            updater: (
+                prev: Record<string, PendingChatMessage>,
+            ) => Record<string, PendingChatMessage>,
+        ) => {
+            setPendingMessages((prev) => {
+                const next = updater(prev);
+                pendingMessagesRef.current = next;
+                persistPendingMessages(next);
+                return next;
+            });
+        },
+        [persistPendingMessages],
+    );
+
+    const upsertPendingTimelineRow = useCallback(
+        (pending: PendingChatMessage) => {
+            const row = pendingToTimelineRow(pending);
+            setTimelineByConversation((prev) => {
+                const list = [...(prev[pending.conversationId] ?? [])];
+                const ix = list.findIndex(
+                    (item) =>
+                        item.kind === "message" &&
+                        item.clientMsgId === pending.clientMsgId,
+                );
+                if (ix >= 0) list[ix] = { ...list[ix], ...row };
+                else list.push(row);
+                return {
+                    ...prev,
+                    [pending.conversationId]: sortTimelineRows(list),
+                };
+            });
+        },
+        [],
+    );
+
+    const flushPendingMessages = useCallback(() => {
+        const c = clientRef.current;
+        if (!c || c.state !== "synced") return;
+        const presence = presenceByAccount;
+        for (const pending of Object.values(pendingMessagesRef.current)) {
+            if (pending.status !== "pending") continue;
+            const delivered = new Set(pending.deliveredTo);
+            for (const recipient of pending.recipients) {
+                if (delivered.has(recipient)) continue;
+                if (presence[recipient] !== "online") continue;
+                const flightKey = `${pending.clientMsgId}:${recipient}`;
+                if (inFlightDeliveriesRef.current.has(flightKey)) continue;
+                inFlightDeliveriesRef.current.add(flightKey);
+                globalThis.setTimeout(() => {
+                    inFlightDeliveriesRef.current.delete(flightKey);
+                }, 5_000);
+                c.send(
+                    pending.conversationId,
+                    pending.body,
+                    pending.clientMsgId,
+                    pending.createdAt,
+                    recipient,
+                );
+            }
+        }
+    }, [presenceByAccount]);
+
     useEffect(() => {
         const client = new PslackWsClient({
             authTokenProvider: getActiveQueryToken,
@@ -288,6 +465,31 @@ export function usePslackSocket() {
                     setLastInboundError(null);
                     selfRef.current = frame.user;
                     setSelfAccount(frame.user);
+                    try {
+                        const loaded = parsePendingMessages(
+                            globalThis.localStorage.getItem(
+                                pendingStorageKey(frame.user),
+                            ),
+                        ).filter((row) => row.status !== "sent");
+                        const byId = Object.fromEntries(
+                            loaded.map((row) => [row.clientMsgId, row]),
+                        );
+                        pendingMessagesRef.current = byId;
+                        setPendingMessages(byId);
+                        for (const row of loaded) {
+                            upsertPendingTimelineRow(row);
+                        }
+                        storageFailureRef.current = null;
+                    } catch (e) {
+                        const detail =
+                            e instanceof Error
+                                ? e.message
+                                : "Could not read pending message storage.";
+                        storageFailureRef.current = detail;
+                        setLastInboundError(
+                            `Pending message storage is unavailable or corrupted: ${detail}. Offline messages cannot be restored in this browser.`,
+                        );
+                    }
                     const c = clientRef.current;
                     c?.sync([...conversationIdsRef.current]);
                 },
@@ -354,7 +556,43 @@ export function usePslackSocket() {
                         serverMsgId,
                         serverTime,
                         clientMsgId,
+                        clientTime,
+                        to,
                     } = frame;
+
+                    if (from !== selfRef.current) {
+                        const selectedId = selectedConversationIdRef.current;
+                        if (conversationId !== selectedId) {
+                            setUnreadByConversation((prev) => ({
+                                ...prev,
+                                [conversationId]: (prev[conversationId] ?? 0) + 1,
+                            }));
+                        }
+                    }
+
+                    if (clientMsgId && from === selfRef.current && to) {
+                        inFlightDeliveriesRef.current.delete(`${clientMsgId}:${to}`);
+                        let nextPending: PendingChatMessage | undefined;
+                        replacePendingMessages((prev) => {
+                            const cur = prev[clientMsgId];
+                            if (!cur) return prev;
+                            const deliveredTo = [...new Set([...cur.deliveredTo, to])];
+                            const complete = cur.recipients.every((recipient) =>
+                                deliveredTo.includes(recipient),
+                            );
+                            if (complete) {
+                                const { [clientMsgId]: _sent, ...rest } = prev;
+                                return rest;
+                            }
+                            nextPending = {
+                                ...cur,
+                                deliveredTo,
+                                status: "pending",
+                            };
+                            return { ...prev, [clientMsgId]: nextPending };
+                        });
+                        if (nextPending) upsertPendingTimelineRow(nextPending);
+                    }
 
                     setTimelineByConversation((prev) => {
                         const prevList = [...(prev[conversationId] ?? [])];
@@ -373,10 +611,25 @@ export function usePslackSocket() {
                                     key: clientMsgId,
                                     clientMsgId,
                                     serverMsgId,
-                                    serverTime,
+                                    serverTime: clientTime ?? serverTime,
                                     from,
                                     body,
-                                    status: "sent",
+                                    status:
+                                        to &&
+                                        from === selfRef.current &&
+                                        pendingMessagesRef.current[clientMsgId]
+                                            ? "pending"
+                                            : "sent",
+                                    pendingRecipientCount:
+                                        to &&
+                                        from === selfRef.current &&
+                                        pendingMessagesRef.current[clientMsgId]
+                                            ? pendingRecipientCount(
+                                                  pendingMessagesRef.current[
+                                                      clientMsgId
+                                                  ],
+                                              )
+                                            : undefined,
                                 };
                                 return { ...prev, [conversationId]: prevList };
                             }
@@ -398,10 +651,10 @@ export function usePslackSocket() {
                             serverMsgId,
                             from,
                             body,
-                            serverTime,
+                            serverTime: clientTime ?? serverTime,
                             status: "sent",
                         });
-                        prevList.sort((a, b) => a.serverTime - b.serverTime);
+                        sortTimelineRows(prevList);
                         return { ...prev, [conversationId]: prevList };
                     });
                 },
@@ -631,7 +884,24 @@ export function usePslackSocket() {
                         frame.reason,
                     ).slice(0, 500);
 
-                    markConversationSendFailed(frame.conversationId, detail);
+                    if (frame.clientMsgId) {
+                        inFlightDeliveriesRef.current.delete(
+                            `${frame.clientMsgId}:${frame.to ?? ""}`,
+                        );
+                        replacePendingMessages((prev) => {
+                            const cur = prev[frame.clientMsgId!];
+                            if (!cur) return prev;
+                            const failed = {
+                                ...cur,
+                                status: "failed" as const,
+                                errorReason: detail,
+                            };
+                            upsertPendingTimelineRow(failed);
+                            return { ...prev, [frame.clientMsgId!]: failed };
+                        });
+                    } else {
+                        markConversationSendFailed(frame.conversationId, detail);
+                    }
                     setLastInboundError(detail);
                 },
 
@@ -651,7 +921,11 @@ export function usePslackSocket() {
             clientRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- single mount client; refs hold latest matchers
-    }, [markSignalingTeardown]);
+    }, [markSignalingTeardown, upsertPendingTimelineRow]);
+
+    useEffect(() => {
+        flushPendingMessages();
+    }, [flushPendingMessages, pendingMessages, wsState]);
 
     const reconnectNow = useCallback(() => {
         clientRef.current?.reconnectNow();
@@ -712,34 +986,62 @@ export function usePslackSocket() {
 
     const sendChatMessage = useCallback(
         (body: string) => {
-            const c = clientRef.current;
             const convId = selectedConversationId;
             const from = selfRef.current;
-            if (!c || !convId || !from) return;
+            if (!convId || !from) return;
 
             const trimmed = body.trim();
             if (!trimmed) return;
 
-            const clientMsgId = crypto.randomUUID();
-            c.send(convId, trimmed, clientMsgId);
+            const conversation = conversationsRef.current.find(
+                (row) => row.conversationId === convId,
+            );
+            if (!conversation) return;
 
-            setTimelineByConversation((prev) => {
-                const list = [...(prev[convId] ?? [])];
-                list.push({
-                    kind: "message",
-                    key: clientMsgId,
-                    clientMsgId,
-                    from,
-                    body: trimmed,
-                    serverTime: Date.now(),
-                    status: "pending",
-                });
-                list.sort((a, b) => a.serverTime - b.serverTime);
-                return { ...prev, [convId]: list };
-            });
+            const clientMsgId = crypto.randomUUID();
+            const recipients = conversation.members.filter(
+                (member) => member !== from,
+            );
+            const pending: PendingChatMessage = {
+                clientMsgId,
+                conversationId: convId,
+                from,
+                body: trimmed,
+                createdAt: Date.now(),
+                recipients,
+                deliveredTo: [],
+                status: "pending",
+            };
+
+            const nextPending = {
+                ...pendingMessagesRef.current,
+                [clientMsgId]: pending,
+            };
+            if (!persistPendingMessages(nextPending)) {
+                const failed = {
+                    ...pending,
+                    status: "failed" as const,
+                    errorReason:
+                        storageFailureRef.current ??
+                        "Pending message storage is unavailable.",
+                };
+                upsertPendingTimelineRow(failed);
+                return;
+            }
+
+            pendingMessagesRef.current = nextPending;
+            setPendingMessages(nextPending);
+            upsertPendingTimelineRow(pending);
+            globalThis.setTimeout(() => flushPendingMessages(), 0);
         },
-        [selectedConversationId],
+        [
+            flushPendingMessages,
+            persistPendingMessages,
+            selectedConversationId,
+            upsertPendingTimelineRow,
+        ],
     );
+
 
     const startMeetCall = useCallback(() => {
         const convId = selectedConversationId;
@@ -948,11 +1250,36 @@ export function usePslackSocket() {
         return timelineByConversation[selectedConversationId] ?? [];
     }, [timelineByConversation, selectedConversationId]);
 
+    useEffect(() => {
+        if (!selectedConversationId) return;
+        setUnreadByConversation((prev) => {
+            if (!prev[selectedConversationId]) return prev;
+            const next = { ...prev };
+            delete next[selectedConversationId];
+            return next;
+        });
+    }, [selectedConversationId, selectedTimeline.length]);
+
     const selectedConversation = useMemo(
         () =>
             conversations.find((c) => c.conversationId === selectedConversationId),
         [conversations, selectedConversationId],
     );
+
+    const undeliveredByConversation = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const pending of Object.values(pendingMessages)) {
+            const count = pendingRecipientCount(pending);
+            if (count <= 0) continue;
+            counts[pending.conversationId] =
+                (counts[pending.conversationId] ?? 0) + count;
+        }
+        return counts;
+    }, [pendingMessages]);
+
+    const selectedHasPendingMessages =
+        !!selectedConversationId &&
+        (undeliveredByConversation[selectedConversationId] ?? 0) > 0;
 
     return {
         wsState,
@@ -969,6 +1296,9 @@ export function usePslackSocket() {
         setSelectedConversationId,
         selectedConversation,
         selectedTimeline,
+        unreadByConversation,
+        undeliveredByConversation,
+        selectedHasPendingMessages,
 
         openOrFocusDm,
         openGroupChat,

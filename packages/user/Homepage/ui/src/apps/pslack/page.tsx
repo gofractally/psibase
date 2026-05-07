@@ -23,6 +23,7 @@ import { CallView } from "./components/call-view";
 import { ConnectionStatusBanner } from "./components/connection-status-banner";
 import {
     ConversationList,
+    formatGroupConversationLabel,
     formatConversationSubtitle,
 } from "./components/conversation-list";
 import { IncomingCallDialog } from "./components/incoming-call-dialog";
@@ -84,7 +85,7 @@ const ContactWithPresenceRow = ({
     return (
         <div
             className={cn(
-                "flex w-full items-center justify-between gap-2 rounded-sm border px-3 py-2",
+                "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-1.5",
                 isSelected && !groupPickMode ? "bg-muted" : "hover:bg-muted/60",
             )}
         >
@@ -102,7 +103,9 @@ const ContactWithPresenceRow = ({
                         account={contact.account}
                         className="size-8 shrink-0"
                     />
-                    <span className="truncate font-medium">{primaryName}</span>
+                    <span className="truncate text-sm font-medium">
+                        {primaryName}
+                    </span>
                 </label>
             ) : (
                 <button
@@ -114,7 +117,9 @@ const ContactWithPresenceRow = ({
                         account={contact.account}
                         className="size-8 shrink-0"
                     />
-                    <span className="truncate font-medium">{primaryName}</span>
+                    <span className="truncate text-sm font-medium">
+                        {primaryName}
+                    </span>
                 </button>
             )}
             <PresenceDot status={presence} />
@@ -141,6 +146,9 @@ export const PslackPage = () => {
         setSelectedConversationId,
         selectedConversation,
         selectedTimeline,
+        unreadByConversation,
+        undeliveredByConversation,
+        selectedHasPendingMessages,
         openOrFocusDm,
         openGroupChat,
         sendChatMessage,
@@ -214,7 +222,11 @@ export const PslackPage = () => {
                   selectedConversation,
                   selfAccount ?? undefined,
               )
-            : `Group (${selectedConversation.members.length})`
+            : formatGroupConversationLabel(
+                  selectedConversation,
+                  selfAccount ?? undefined,
+                  42,
+              )
         : null;
 
     const threadSubtitle =
@@ -270,38 +282,34 @@ export const PslackPage = () => {
                 }
                 left={
                     <ScrollArea className="bg-sidebar/60 min-h-0 w-full lg:h-full">
-                        <SectionTitle>Contacts</SectionTitle>
-                        <div className="flex flex-col gap-2 px-4 pb-2">
-                            <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 px-4 pb-2 pt-3">
+                            <Button
+                                type="button"
+                                variant={groupPickMode ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => {
+                                    setGroupPickMode((v) => !v);
+                                    if (groupPickMode)
+                                        setGroupCandidates(new Set());
+                                }}
+                            >
+                                {groupPickMode
+                                    ? "Cancel group pick"
+                                    : "New group chat"}
+                            </Button>
+                            {groupPickMode ? (
                                 <Button
                                     type="button"
-                                    variant={
-                                        groupPickMode ? "secondary" : "outline"
-                                    }
                                     size="sm"
-                                    onClick={() => {
-                                        setGroupPickMode((v) => !v);
-                                        if (groupPickMode)
-                                            setGroupCandidates(new Set());
-                                    }}
+                                    disabled={groupCandidates.size < 2}
+                                    onClick={onStartGroup}
                                 >
-                                    {groupPickMode
-                                        ? "Cancel group pick"
-                                        : "New group chat"}
+                                    Open group ({groupCandidates.size} picked)
                                 </Button>
-                                {groupPickMode ? (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        disabled={groupCandidates.size < 2}
-                                        onClick={onStartGroup}
-                                    >
-                                        Open group ({groupCandidates.size}{" "}
-                                        picked)
-                                    </Button>
-                                ) : null}
-                            </div>
-
+                            ) : null}
+                        </div>
+                        <SectionTitle>Contacts</SectionTitle>
+                        <div className="flex flex-col gap-2 px-4 pb-2">
                             {others.length === 0 ? (
                                 <p className="text-muted-foreground px-1 py-2 text-sm">
                                     No contacts yet. Add some in Contacts.
@@ -359,13 +367,16 @@ export const PslackPage = () => {
                             )}
                         </div>
 
-                        <SectionTitle>Conversations</SectionTitle>
                         <div className="min-h-[180px]">
                             <ConversationList
                                 conversations={conversations}
                                 selfAccount={selfAccount}
                                 selectedConversationId={selectedConversationId}
                                 onSelectConversation={setSelectedConversationId}
+                                unreadByConversation={unreadByConversation}
+                                undeliveredByConversation={
+                                    undeliveredByConversation
+                                }
                             />
                         </div>
 
@@ -506,6 +517,13 @@ export const PslackPage = () => {
                                     timeline={selectedTimeline}
                                     selfAccount={selfAccount}
                                 />
+                                {selectedHasPendingMessages ? (
+                                    <div className="text-muted-foreground border-t px-4 py-2 text-xs">
+                                        Pending messages are stored only in this
+                                        browser profile until each recipient is
+                                        online and acknowledged.
+                                    </div>
+                                ) : null}
                                 <ChatComposer
                                     disabledReason={composerDisabledReason}
                                     onSend={sendChatMessage}

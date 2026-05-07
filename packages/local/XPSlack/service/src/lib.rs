@@ -70,8 +70,9 @@ mod service {
     use crate::state::tables::SocketSessionRow;
     use crate::state::{
         conversations_for_user, dm_members, ensure_sender_is_member, group_members, members_of,
-        next_server_msg_id, open_conversation, sessions_for_user, socket_session,
-        upsert_socket_session, StateError, CONVERSATION_KIND_DM, CONVERSATION_KIND_GROUP,
+        mark_targeted_message_delivered, next_server_msg_id, open_conversation,
+        sessions_for_user, socket_session, targeted_message_was_delivered, upsert_socket_session,
+        StateError, CONVERSATION_KIND_DM, CONVERSATION_KIND_GROUP,
     };
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     #[cfg(not(test))]
@@ -290,6 +291,8 @@ mod service {
                 code: err.code().into(),
                 reason: err.reason(),
                 conversation_id,
+                client_msg_id: None,
+                to: None,
             },
         );
     }
@@ -306,6 +309,8 @@ mod service {
                 code: err.wire_code().into(),
                 reason,
                 conversation_id,
+                client_msg_id: None,
+                to: None,
             },
         );
     }
@@ -453,6 +458,8 @@ mod service {
         sender: AccountNumber,
         body: String,
         client_msg_id: String,
+        client_time: Option<i64>,
+        to: Option<AccountNumber>,
         now: i64,
     ) -> Result<(Vec<i32>, ServerFrame), StateError> {
         ::psibase::subjective_tx! {
@@ -460,8 +467,30 @@ mod service {
                 match ensure_sender_is_member(&conversation_id, sender) {
                     Err(err) => Err(err),
                     Ok(()) => {
-                        let members = members_of(&conversation_id);
-                        let recipient_sockets = snapshot_member_sockets(&members);
+                        let recipient_sockets: Result<Vec<i32>, StateError> = if let Some(target) = to {
+                            if !crate::state::is_conversation_member(&conversation_id, target) {
+                                Err(StateError::NotMember(format!(
+                                    "target account is not a member of conversation {conversation_id}"
+                                )))
+                            } else {
+                                let mut sockets = Vec::new();
+                                if targeted_message_was_delivered(&conversation_id, &client_msg_id, target) {
+                                    sockets.extend(sessions_for_user(sender));
+                                } else {
+                                    let target_sockets = sessions_for_user(target);
+                                    if !target_sockets.is_empty() {
+                                        mark_targeted_message_delivered(&conversation_id, &client_msg_id, target);
+                                        sockets.extend(sessions_for_user(sender));
+                                        sockets.extend(target_sockets);
+                                    }
+                                }
+                                Ok(sockets)
+                            }
+                        } else {
+                            let members = members_of(&conversation_id);
+                            Ok(snapshot_member_sockets(&members))
+                        };
+                        let recipient_sockets = recipient_sockets?;
                         let server_msg_id = next_server_msg_id();
                         Ok((
                             recipient_sockets,
@@ -472,6 +501,8 @@ mod service {
                                 server_msg_id,
                                 server_time: now,
                                 client_msg_id: Some(client_msg_id.clone()),
+                                client_time,
+                                to: to.map(ExactAccountNumber::from),
                             },
                         ))
                     }
@@ -515,12 +546,22 @@ mod service {
         match subjective_open_conversation_frame(members.clone(), now) {
             Ok(frame) => {
                 send_frame(socket, &frame);
+                let is_group = matches!(
+                    &frame,
+                    ServerFrame::Conversation {
+                        kind: ConversationKind::Group,
+                        ..
+                    }
+                );
                 let presence = crate::state::tx_presence_frame_after_open(sender);
                 let other_members: Vec<AccountNumber> =
                     members.into_iter().filter(|m| *m != sender).collect();
                 let target_sockets =
                     crate::state::tx_snapshot_sockets_for_accounts(other_members);
                 for s in target_sockets {
+                    if is_group {
+                        send_frame(s, &frame);
+                    }
                     send_frame(s, &presence);
                 }
             }
@@ -534,10 +575,12 @@ mod service {
         conversation_id: String,
         body: String,
         client_msg_id: String,
+        client_time: Option<i64>,
+        to: Option<AccountNumber>,
         now: i64,
     ) {
         let conv_for_err = conversation_id.clone();
-        match subjective_prepare_say(conversation_id, sender, body, client_msg_id, now) {
+        match subjective_prepare_say(conversation_id, sender, body, client_msg_id, client_time, to, now) {
             Err(err) => send_state_error(socket, err, Some(conv_for_err)),
             Ok((recipient_sockets, frame)) => {
                 for recipient_socket in recipient_sockets {
@@ -675,7 +718,18 @@ mod service {
                 conversation_id,
                 body,
                 client_msg_id,
-            } => handle_say(socket, session.user, conversation_id, body, client_msg_id, now),
+                client_time,
+                to,
+            } => handle_say(
+                socket,
+                session.user,
+                conversation_id,
+                body,
+                client_msg_id,
+                client_time,
+                to.map(|account| AccountNumber::from(account.value)),
+                now,
+            ),
             ClientFrame::Ack {
                 conversation_id,
                 server_msg_id,
@@ -994,6 +1048,8 @@ mod tests {
                     conversation_id: "c1".into(),
                     body: "hello".into(),
                     client_msg_id: "m1".into(),
+                    client_time: None,
+                    to: None,
                 },
             ),
             (
@@ -1097,6 +1153,8 @@ mod tests {
                     code: "bad-frame".into(),
                     reason: "bad request".into(),
                     conversation_id: Some("c1".into()),
+                    client_msg_id: None,
+                    to: None,
                 },
                 r#"{"t":"error","code":"bad-frame","reason":"bad request","conversationId":"c1"}"#,
             ),
