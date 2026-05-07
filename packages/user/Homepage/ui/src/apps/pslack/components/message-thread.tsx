@@ -17,6 +17,14 @@ type Props = {
     selfAccount: string | null;
 };
 
+function formatCallEventReason(reason: string | undefined): string | undefined {
+    if (!reason) return undefined;
+    if (reason === "ice-failed") {
+        return "media connection failed (try another network or TURN quota may be exhausted)";
+    }
+    return reason;
+}
+
 function callEventLabel(row: PslackTimelineCallEventRow) {
     const verb =
         row.event === "started"
@@ -32,7 +40,10 @@ function callEventLabel(row: PslackTimelineCallEventRow) {
                     : "Call failed";
 
     let suffix = "";
-    if (row.reason) suffix += ` · ${row.reason}`;
+    if (row.reason) {
+        const r = formatCallEventReason(row.reason) ?? row.reason;
+        suffix += ` · ${r}`;
+    }
     if (typeof row.durationMs === "number")
         suffix += ` · ${Math.round(row.durationMs / 1000)}s`;
 

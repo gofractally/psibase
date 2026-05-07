@@ -28,6 +28,18 @@ namespace LocalService
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
 
+   /// Node-local OpenRelay/Metered credentials and cached ICE servers for Pslack Meet TURN.
+   struct PslackOpenRelayRow
+   {
+      std::string app_name;
+      std::string api_key;
+      /// JSON array of WebRTC iceServers entries (Metered credential response shape).
+      std::string ice_servers_json = "[]";
+      PSIO_REFLECT(PslackOpenRelayRow, app_name, api_key, ice_servers_json)
+   };
+   using PslackOpenRelayTable = psibase::Table<PslackOpenRelayRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(PslackOpenRelayTable)
+
    namespace Auth
    {
       struct Account
@@ -76,8 +88,9 @@ namespace LocalService
    struct XAdmin : psibase::Service
    {
       static constexpr auto service = psibase::AccountNumber{"x-admin"};
-      using Subjective = psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable>;
-      using Session    = psibase::SessionTables<AdminOptionsTable>;
+      using Subjective =
+          psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable, PslackOpenRelayTable>;
+      using Session = psibase::SessionTables<AdminOptionsTable>;
       /// Returns true if the account or the remote end of socket is a node admin
       bool isAdmin(std::optional<psibase::AccountNumber>          account,
                    std::optional<std::int32_t>                    socket,
@@ -91,12 +104,16 @@ namespace LocalService
       void startSession();
       /// This action can be called inside a subjective tx
       AdminOptionsRow options();
+
+      /// JSON array string (possibly empty) of TURN/STUN entries for Pslack; only x-pslack may call.
+      std::string pslackTurnIceServersJson();
    };
    PSIO_REFLECT(XAdmin,
                 method(isAdmin, account, socket),
                 method(checkAuth, req, socket),
                 method(serveSys, req, socket),
                 method(startSession),
-                method(options))
+                method(options),
+                method(pslackTurnIceServersJson))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective, XAdmin::Session)
 }  // namespace LocalService

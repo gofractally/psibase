@@ -469,8 +469,10 @@ export const PslackPage = () => {
                                             </p>
                                             <p className="text-muted-foreground text-xs">
                                                 Start a DM Meet call. Connected
-                                                sessions use live WebRTC (STUN
-                                                only) with in-call controls
+                                                sessions use WebRTC (STUN plus
+                                                optional OpenRelay TURN when the
+                                                node admin configures it in
+                                                x-admin) with in-call controls
                                                 below video.
                                             </p>
                                         </div>

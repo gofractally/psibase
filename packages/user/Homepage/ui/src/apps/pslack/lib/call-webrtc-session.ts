@@ -38,43 +38,52 @@ const FALLBACK_STUN: RTCIceServer[] = [
     { urls: "stun:stun.cloudflare.com:3478" },
 ];
 
-function urlLooksStunScheme(u: string): boolean {
-    const t = u.trim().toLowerCase();
-    return t.startsWith("stun:") || t.startsWith("stuns:");
+function urlScheme(u: string): string {
+    const t = u.trim();
+    const i = t.indexOf(":");
+    if (i <= 0) return "";
+    return t.slice(0, i).toLowerCase();
 }
 
-/**
- * Architecture: STUN-only ICE. Drop TURN transports and credential-based entries from
- * whatever the service sent.
- */
-function sanitizeStunOnlyIceConfig(
-    servers: IceServerConfig[],
-): IceServerConfig[] {
-    const out: IceServerConfig[] = [];
-    for (const s of servers) {
-        if (s.username || s.credential) {
-            continue;
-        }
-        const urls = s.urls;
-        if (typeof urls === "string") {
-            if (urlLooksStunScheme(urls)) out.push({ urls });
-        } else {
-            const filtered = urls.filter(urlLooksStunScheme);
-            if (filtered.length > 0) {
-                out.push({ urls: filtered });
-            }
-        }
+function listUrls(s: IceServerConfig): string[] {
+    return typeof s.urls === "string" ? [s.urls] : s.urls;
+}
+
+/** Match x-pslack service validation: STUN without secrets; TURN requires username + credential. */
+export function iceServerConfigIsValidForClients(s: IceServerConfig): boolean {
+    const urls = listUrls(s).map((u) => u.trim()).filter(Boolean);
+    if (!urls.length) return false;
+    const schemes = urls.map(urlScheme);
+    const hasTurn = schemes.some((x) => x === "turn" || x === "turns");
+    const hasStun = schemes.some((x) => x === "stun" || x === "stuns");
+    if (hasTurn) {
+        const u = s.username?.trim() ?? "";
+        const c = s.credential?.trim() ?? "";
+        return u.length > 0 && c.length > 0;
     }
-    return out;
+    return hasStun && !s.username && !s.credential;
+}
+
+function sanitizeIceConfig(servers: IceServerConfig[]): IceServerConfig[] {
+    return servers.filter((s) => iceServerConfigIsValidForClients(s));
 }
 
 function toRtcIceServers(servers: IceServerConfig[] | null): RTCIceServer[] {
     if (!servers?.length) return FALLBACK_STUN;
-    const stunOnly = sanitizeStunOnlyIceConfig(servers);
-    if (!stunOnly.length) return FALLBACK_STUN;
-    return stunOnly.map((s) => ({
-        urls: s.urls as string | string[],
-    }));
+    const cleaned = sanitizeIceConfig(servers);
+    if (!cleaned.length) return FALLBACK_STUN;
+    return cleaned.map((s) => {
+        const base: RTCIceServer = {
+            urls: s.urls as string | string[],
+        };
+        if (s.username != null && s.username !== "") {
+            base.username = s.username;
+        }
+        if (s.credential != null && s.credential !== "") {
+            base.credential = s.credential;
+        }
+        return base;
+    });
 }
 export type StartPslackCallWebRtcParams = {
     callId: string;

@@ -583,6 +583,14 @@ namespace LocalService
          }
       }
 
+      struct PslackOpenRelayStatusDto
+      {
+         bool        configured    = false;
+         bool        hasIceServers = false;
+         std::string appName;
+      };
+      PSIO_REFLECT(PslackOpenRelayStatusDto, configured, hasIceServers, appName)
+
       AuthResult checkAuthChain(const HttpRequest& req, std::optional<std::int32_t> socket)
       {
          if (chainIsBooted())
@@ -759,6 +767,18 @@ namespace LocalService
       return result.value_or(AdminOptionsRow{});
    }
 
+   std::string XAdmin::pslackTurnIceServersJson()
+   {
+      check(getSender() == psibase::AccountNumber{"x-pslack"}, "Wrong sender");
+      std::optional<std::string> json;
+      PSIBASE_SUBJECTIVE_TX
+      {
+         if (auto row = XAdmin{}.open<PslackOpenRelayTable>().get({}))
+            json = row->ice_servers_json;
+      }
+      return json.value_or("[]");
+   }
+
    // Returns nullopt on success, an appropriate error on failure
    std::optional<HttpReply> XAdmin::checkAuth(const HttpRequest&          req,
                                               std::optional<std::int32_t> socket)
@@ -839,6 +859,77 @@ namespace LocalService
             return HttpReply{
                 .status = HttpStatus::ok,
             };
+         }
+         else
+         {
+            return HttpReply::methodNotAllowed(req);
+         }
+      }
+      else if (target == "/pslack/openrelay")
+      {
+         if (auto reply = checkAuth(req, socket))
+            return reply;
+
+         if (req.method == "GET")
+         {
+            PslackOpenRelayStatusDto status{};
+            PSIBASE_SUBJECTIVE_TX
+            {
+               if (auto row = XAdmin{}.open<PslackOpenRelayTable>().get({}))
+               {
+                  status.appName = row->app_name;
+                  const bool hasIce =
+                      !row->ice_servers_json.empty() && row->ice_servers_json != "[]";
+                  status.hasIceServers = hasIce;
+                  status.configured    = hasIce || !row->api_key.empty() || !row->app_name.empty();
+               }
+            }
+            auto json = psio::convert_to_json(status);
+            return HttpReply{
+                .status      = HttpStatus::ok,
+                .contentType = "application/json",
+                .body        = std::vector(json.begin(), json.end()),
+            };
+         }
+         else if (req.method == "PUT")
+         {
+            if (req.contentType != "application/json")
+            {
+               return HttpReply{
+                   .status      = HttpStatus::unsupportedMediaType,
+                   .contentType = "text/plain",
+                   .body        = toVec("Content-Type must be application/json\n"),
+               };
+            }
+            auto               obj = psio::convert_from_json<psio::json::any_object>(
+                std::string(req.body.begin(), req.body.end()));
+            PslackOpenRelayRow row{};
+            PSIBASE_SUBJECTIVE_TX
+            {
+               row = XAdmin{}.open<PslackOpenRelayTable>().get({}).value_or(PslackOpenRelayRow{});
+            }
+            for (auto& entry : obj)
+            {
+               if (entry.key == "appName")
+               {
+                  if (auto* s = entry.value.get_if<std::string>())
+                     row.app_name = *s;
+               }
+               else if (entry.key == "apiKey")
+               {
+                  if (auto* s = entry.value.get_if<std::string>())
+                     row.api_key = *s;
+               }
+               else if (entry.key == "iceServers")
+               {
+                  row.ice_servers_json = psio::convert_to_json(entry.value);
+               }
+            }
+            PSIBASE_SUBJECTIVE_TX
+            {
+               XAdmin{}.open<PslackOpenRelayTable>().put(row);
+            }
+            return HttpReply{.status = HttpStatus::ok};
          }
          else
          {
