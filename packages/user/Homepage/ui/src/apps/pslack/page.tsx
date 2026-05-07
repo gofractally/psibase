@@ -16,6 +16,7 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
+import { NewContactDialog } from "../contacts/components/new-contact-dialog";
 import { formatNames } from "../contacts/utils/format-names";
 import { ChatComposer } from "./components/chat-composer";
 import { CallView } from "./components/call-view";
@@ -196,10 +197,15 @@ export const PslackPage = () => {
     );
     const [groupPickMode, setGroupPickMode] = useState(false);
     const [contactsExpanded, setContactsExpanded] = useState(true);
+    const [addContactAccount, setAddContactAccount] = useState<string>();
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
 
-    const contacts = contactsData ?? [];
+    const contacts = useMemo(() => contactsData ?? [], [contactsData]);
+    const contactAccounts = useMemo(
+        () => new Set(contacts.map((c) => c.account)),
+        [contacts],
+    );
     const resolveGroupMemberLabel = useMemo(() => {
         const nickByAccount = new Map(
             contacts.map((c) => [
@@ -305,6 +311,18 @@ export const PslackPage = () => {
                 onDecline={declineIncomingCall}
             />
 
+            <NewContactDialog
+                open={!!addContactAccount}
+                onOpenChange={(open) => {
+                    if (!open) setAddContactAccount(undefined);
+                }}
+                initialValues={
+                    addContactAccount
+                        ? { account: addContactAccount }
+                        : undefined
+                }
+            />
+
             <TwoColumnSelect
                 displayMode={desktopDisplay}
                 header={
@@ -327,6 +345,10 @@ export const PslackPage = () => {
                                 resolveGroupMemberLabel={resolveGroupMemberLabel}
                                 presenceByAccount={presenceByAccount}
                                 groupPickMode={groupPickMode}
+                                isDmPeerInContacts={(account) =>
+                                    contactAccounts.has(account)
+                                }
+                                onAddDmPeerToContacts={setAddContactAccount}
                                 groupActions={
                                     groupPickMode ? (
                                         <>

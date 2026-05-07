@@ -136,6 +136,8 @@ type Props = {
     presenceByAccount?: Record<string, PresenceUi>;
     /** When true, shows hint under Group Chats header (above action buttons). */
     groupPickMode?: boolean;
+    isDmPeerInContacts?: (account: string) => boolean;
+    onAddDmPeerToContacts?: (account: string) => void;
 };
 
 export function ConversationList({
@@ -149,6 +151,8 @@ export function ConversationList({
     resolveGroupMemberLabel,
     presenceByAccount,
     groupPickMode = false,
+    isDmPeerInContacts,
+    onAddDmPeerToContacts,
 }: Props) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [rowWidth, setRowWidth] = useState(260);
@@ -189,58 +193,85 @@ export function ConversationList({
             dmPeerAccount && presenceByAccount
                 ? (presenceByAccount[dmPeerAccount] ?? "unknown")
                 : null;
+        const showAddContact =
+            !!dmPeerAccount &&
+            !!isDmPeerInContacts &&
+            !!onAddDmPeerToContacts &&
+            !isDmPeerInContacts(dmPeerAccount);
 
         return (
-            <button
-                type="button"
-                onClick={() => onSelectConversation(conv.conversationId)}
-                title={fullTitle ?? title}
-                aria-label={`${fullTitle ?? title}${
-                    unreadByConversation[conv.conversationId]
-                        ? `, ${unreadByConversation[conv.conversationId]} new messages`
-                        : ""
-                }${
-                    undeliveredByConversation[conv.conversationId]
-                        ? `, ${undeliveredByConversation[conv.conversationId]} undelivered`
-                        : ""
-                }`}
+            <div
                 className={cn(
-                    "hover:bg-muted/60 flex w-full items-center gap-2 rounded-sm px-3 py-1.5 text-left",
+                    "hover:bg-muted/60 flex w-full items-center gap-2 rounded-sm pr-2",
                     selectedConversationId === conv.conversationId &&
                         "bg-muted",
                 )}
             >
-                <Avatar account={avatarAccount} className="size-7 shrink-0" />
-                <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-medium leading-snug">
-                        {title}
-                    </p>
-                    {subtitle ? (
-                        <p className="text-muted-foreground truncate text-[14px] leading-snug">
-                            {subtitle}
+                <button
+                    type="button"
+                    onClick={() => onSelectConversation(conv.conversationId)}
+                    title={fullTitle ?? title}
+                    aria-label={`${fullTitle ?? title}${
+                        unreadByConversation[conv.conversationId]
+                            ? `, ${unreadByConversation[conv.conversationId]} new messages`
+                            : ""
+                    }${
+                        undeliveredByConversation[conv.conversationId]
+                            ? `, ${undeliveredByConversation[conv.conversationId]} undelivered`
+                            : ""
+                    }`}
+                    className="flex min-w-0 items-center gap-2 py-1.5 pl-3 text-left"
+                >
+                    <Avatar
+                        account={avatarAccount}
+                        className="size-7 shrink-0"
+                    />
+                    <div className="min-w-0">
+                        <p className="truncate text-[14px] font-medium leading-snug">
+                            {title}
                         </p>
+                        {subtitle ? (
+                            <p className="text-muted-foreground truncate text-[14px] leading-snug">
+                                {subtitle}
+                            </p>
+                        ) : null}
+                    </div>
+                </button>
+                {showAddContact ? (
+                    <button
+                        type="button"
+                        className="text-muted-foreground/80 hover:text-foreground -ml-1 shrink-0 text-[12px] underline"
+                        aria-label={`Add ${title} to Contacts`}
+                        onClick={() => {
+                            if (dmPeerAccount)
+                                onAddDmPeerToContacts?.(dmPeerAccount);
+                        }}
+                    >
+                        Add
+                    </button>
+                ) : null}
+                <div className="ml-auto flex shrink-0 items-center gap-2">
+                    {undeliveredByConversation[conv.conversationId] ? (
+                        <span
+                            className="inline-flex min-w-5 shrink-0 justify-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+                            title={`${undeliveredByConversation[conv.conversationId]} undelivered recipients`}
+                        >
+                            !
+                        </span>
+                    ) : null}
+                    {unreadByConversation[conv.conversationId] ? (
+                        <span
+                            className="bg-primary text-primary-foreground inline-flex min-w-5 shrink-0 justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                            title={`${unreadByConversation[conv.conversationId]} new messages`}
+                        >
+                            {unreadByConversation[conv.conversationId]}
+                        </span>
+                    ) : null}
+                    {dmPresence !== null ? (
+                        <PresenceDot status={dmPresence} />
                     ) : null}
                 </div>
-                {undeliveredByConversation[conv.conversationId] ? (
-                    <span
-                        className="inline-flex min-w-5 shrink-0 justify-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
-                        title={`${undeliveredByConversation[conv.conversationId]} undelivered recipients`}
-                    >
-                        !
-                    </span>
-                ) : null}
-                {unreadByConversation[conv.conversationId] ? (
-                    <span
-                        className="bg-primary text-primary-foreground inline-flex min-w-5 shrink-0 justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                        title={`${unreadByConversation[conv.conversationId]} new messages`}
-                    >
-                        {unreadByConversation[conv.conversationId]}
-                    </span>
-                ) : null}
-                {dmPresence !== null ? (
-                    <PresenceDot status={dmPresence} />
-                ) : null}
-            </button>
+            </div>
         );
     };
 

@@ -1,4 +1,5 @@
 import type { Account } from "@shared/lib/schemas/account";
+import type { LocalContact } from "../types";
 
 import {
     Dialog,
@@ -14,8 +15,9 @@ import { ContactForm } from "./contact-form";
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onNewAccount: (account: Account) => void;
-    trigger: React.ReactNode;
+    onNewAccount?: (account: Account) => void;
+    trigger?: React.ReactNode;
+    initialValues?: LocalContact;
 }
 
 export const NewContactDialog = ({
@@ -23,6 +25,7 @@ export const NewContactDialog = ({
     onOpenChange,
     onNewAccount,
     trigger,
+    initialValues,
 }: Props) => {
     const { mutateAsync: createContact } = useCreateContact();
 
@@ -36,10 +39,12 @@ export const NewContactDialog = ({
                         These details are stored locally and not sent to the
                         network.
                         <ContactForm
+                            key={initialValues?.account ?? "new-contact"}
+                            initialValues={initialValues}
                             onSubmit={async (data) => {
                                 await createContact(data);
                                 onOpenChange(false);
-                                onNewAccount(data.account);
+                                onNewAccount?.(data.account);
                             }}
                         />
                     </DialogDescription>
