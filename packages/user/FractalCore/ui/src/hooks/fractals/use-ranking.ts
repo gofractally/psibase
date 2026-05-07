@@ -6,6 +6,7 @@ import { useProposal } from "@/hooks/fractals/use-proposal";
 import { usePropose } from "@/hooks/fractals/use-propose";
 import { useGuildAccount } from "@/hooks/use-guild-account";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { arrayMove } from "@shared/lib/array-move";
 import { Account } from "@shared/lib/schemas/account";
 
@@ -13,6 +14,7 @@ export type RankingStatus = "idle" | "pending" | "success" | "error";
 
 export const useRanking = (groupNumber: number) => {
     const guildAccount = useGuildAccount();
+    const { data: currentUser } = useCurrentUser();
 
     const { data: groupUsersData } = useGroupUsers(guildAccount, groupNumber);
 
@@ -84,7 +86,8 @@ export const useRanking = (groupNumber: number) => {
     };
 
     const unrankedAccounts = groupUsers
-        .filter((user) => !rankedAccounts.some((p) => p === user))
+        .filter((user) => user !== currentUser) // exclude current user
+        .filter((user) => !rankedAccounts.some((p) => p === user)) // exclude ranked accounts
         .sort();
 
     const onSortEnd = (oldIndex: number, newIndex: number) => {
