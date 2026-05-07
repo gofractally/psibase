@@ -35,6 +35,12 @@ mod service {
         unimplemented!()
     }
 
+    /// JSON array of additional ICE server entries from node OpenRelay config; only x-pslack may rely on this.
+    #[action]
+    fn pslackTurnIceServersJson() -> String {
+        unimplemented!()
+    }
+
     #[derive(Debug, Pack, Unpack, ToSchema, Serialize, Deserialize)]
     #[fracpack(fracpack_mod = "fracpack")]
     struct AdminOptionsRow {

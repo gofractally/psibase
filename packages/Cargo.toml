@@ -7,6 +7,8 @@ members = [
     "system/Transact/plugin/",
     "system/SetCode/plugin/",
     "system/Producers/plugin/",
+    "local/XPSlack",
+    "local/XPSlack/service",
     "user/Aes/plugin",
     "user/Base64/plugin",
     "user/BrotliCodec/plugin",
@@ -57,6 +59,7 @@ publish = false
 async-graphql = "=7.0.17"
 psibase = { path = "../rust/psibase", version = "0.23.0" }
 psibase_plugin = { path = "../rust/psibase_plugin", version = "0.23.0" }
+psibase_service = { path = "../rust/psibase_service", version = "0.23.0" }
 graphql_client = "0.16"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"

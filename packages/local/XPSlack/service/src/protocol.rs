@@ -346,21 +346,120 @@ pub enum ServerFrame {
     Pong,
 }
 
-/// STUN-only defaults (architecture §7.1): Google + Cloudflare.
+fn url_schemes_lower(urls: &[String]) -> Vec<String> {
+    urls
+        .iter()
+        .map(|u| {
+            u.trim()
+                .split_once(':')
+                .map(|(scheme, _)| scheme.to_ascii_lowercase())
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+/// Returns true if the entry is safe to expose to browsers: STUN without secrets, or TURN with credentials.
+pub fn ice_server_config_is_valid_for_clients(entry: &IceServerConfig) -> bool {
+    let urls: Vec<String> = match &entry.urls {
+        IceServerUrls::One(u) => vec![u.clone()],
+        IceServerUrls::Many(v) => v.clone(),
+    };
+    if urls.is_empty() || urls.iter().any(|u| u.trim().is_empty()) {
+        return false;
+    }
+    let schemes = url_schemes_lower(&urls);
+    let has_turn = schemes.iter().any(|s| s == "turn" || s == "turns");
+    let has_stun = schemes.iter().any(|s| s == "stun" || s == "stuns");
+    if has_turn {
+        let user_ok = entry
+            .username
+            .as_ref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        let cred_ok = entry
+            .credential
+            .as_ref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        user_ok && cred_ok
+    } else {
+        has_stun && entry.username.is_none() && entry.credential.is_none()
+    }
+}
+
+/// STUN defaults (architecture §7.1): Google + Cloudflare.
+pub fn default_stun_ice_server_configs() -> Vec<IceServerConfig> {
+    vec![
+        IceServerConfig {
+            urls: IceServerUrls::One("stun:stun.l.google.com:19302".into()),
+            username: None,
+            credential: None,
+        },
+        IceServerConfig {
+            urls: IceServerUrls::One("stun:stun.cloudflare.com:3478".into()),
+            username: None,
+            credential: None,
+        },
+    ]
+}
+
 pub fn default_stun_ice_servers_frame() -> ServerFrame {
     ServerFrame::IceServers {
-        servers: vec![
-            IceServerConfig {
-                urls: IceServerUrls::One("stun:stun.l.google.com:19302".into()),
-                username: None,
-                credential: None,
-            },
-            IceServerConfig {
-                urls: IceServerUrls::One("stun:stun.cloudflare.com:3478".into()),
-                username: None,
-                credential: None,
-            },
-        ],
+        servers: default_stun_ice_server_configs(),
+    }
+}
+
+/// Merges default STUN servers with OpenRelay/Metered entries from node admin JSON (`[]` if unset).
+/// Invalid or ambiguous entries are dropped.
+pub fn merged_v2_ice_servers_frame(turn_json: &str) -> ServerFrame {
+    let mut servers = default_stun_ice_server_configs();
+    let Ok(extra) = serde_json::from_str::<Vec<IceServerConfig>>(turn_json) else {
+        return ServerFrame::IceServers { servers };
+    };
+    for e in extra.into_iter() {
+        if ice_server_config_is_valid_for_clients(&e) {
+            servers.push(e);
+        }
+    }
+    ServerFrame::IceServers { servers }
+}
+
+#[cfg(test)]
+mod ice_tests {
+    use super::*;
+
+    #[test]
+    fn merge_keeps_stun_when_turn_json_invalid() {
+        let frame = merged_v2_ice_servers_frame("not json");
+        match frame {
+            ServerFrame::IceServers { servers } => {
+                assert_eq!(servers.len(), 2);
+                assert!(servers.iter().all(|s| ice_server_config_is_valid_for_clients(s)));
+            }
+            _ => panic!("expected IceServers"),
+        }
+    }
+
+    #[test]
+    fn merge_appends_valid_turn() {
+        let json = r#"[{"urls":["turn:relay.example:3478"],"username":"u","credential":"c"}]"#;
+        let frame = merged_v2_ice_servers_frame(json);
+        match frame {
+            ServerFrame::IceServers { servers } => {
+                assert_eq!(servers.len(), 3);
+            }
+            _ => panic!("expected IceServers"),
+        }
+    }
+
+    #[test]
+    fn rejects_turn_without_credential() {
+        let json = r#"[{"urls":["turn:relay.example:3478"],"username":"u"}]"#;
+        let frame = merged_v2_ice_servers_frame(json);
+        match frame {
+            ServerFrame::IceServers { servers } => assert_eq!(servers.len(), 2),
+            _ => panic!("expected IceServers"),
+        }
     }
 }
 

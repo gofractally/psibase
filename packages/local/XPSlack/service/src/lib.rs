@@ -62,7 +62,7 @@ mod r_transact {
 #[allow(non_snake_case)]
 mod service {
     use crate::protocol::{
-        default_stun_ice_servers_frame, encode_server_frame, parse_client_frame,
+        encode_server_frame, merged_v2_ice_servers_frame, parse_client_frame,
         validate_client_frame, ClientFrame, ContactPresence, Conversation, ConversationKind,
         PresenceStatus, ProtocolError, PSLACK_SUBPROTOCOL_V1, PSLACK_SUBPROTOCOL_V2, ServerFrame,
     };
@@ -74,6 +74,8 @@ mod service {
         upsert_socket_session, StateError, CONVERSATION_KIND_DM, CONVERSATION_KIND_GROUP,
     };
     use base64::{engine::general_purpose::STANDARD, Engine as _};
+    #[cfg(not(test))]
+    use psibase::services::x_admin::Wrapper as XAdminWrapper;
     use psibase::services::x_http::Wrapper as XHttp;
     use psibase::{
         account, check, get_sender, services::transact::Wrapper as Transact, AccountNumber,
@@ -255,9 +257,17 @@ mod service {
     }
 
     fn maybe_send_v2_ice_servers(socket: i32, protocol_major: u8) {
-        if protocol_major == 2 {
-            send_frame(socket, &default_stun_ice_servers_frame());
+        if protocol_major != 2 {
+            return;
         }
+        #[cfg(test)]
+        let frame = merged_v2_ice_servers_frame("[]");
+        #[cfg(not(test))]
+        let frame = {
+            let turn_json = XAdminWrapper::call_from(account!("x-pslack")).pslackTurnIceServersJson();
+            merged_v2_ice_servers_frame(&turn_json)
+        };
+        send_frame(socket, &frame);
     }
 
     fn send_call_not_implemented(socket: i32, frame: ClientFrame) {
@@ -1393,6 +1403,31 @@ mod tests {
         let out = stale_ringing_calls_for_sweep(now, &rows);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].call_id, "old");
+    }
+
+    #[test]
+    fn pslack_validate_call_invite_rejects_empty_required_ids() {
+        let alice = account("alice");
+        assert!(validate_client_frame(
+            &ClientFrame::CallInvite {
+                conversation_id: "".into(),
+                want_video: true,
+                want_audio: true,
+                client_call_id: "x".into(),
+            },
+            alice,
+        )
+        .is_err());
+        assert!(validate_client_frame(
+            &ClientFrame::CallInvite {
+                conversation_id: "c1".into(),
+                want_video: true,
+                want_audio: true,
+                client_call_id: "".into(),
+            },
+            alice,
+        )
+        .is_err());
     }
 
     #[test]
