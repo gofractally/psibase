@@ -164,13 +164,33 @@ pub mod tables {
         pub socket: i32,
         pub call_id: String,
     }
+
+    /// Per-recipient targeted chat delivery dedupe for client-generated message IDs.
+    #[table(name = "MessageDeliveryTable", index = 8, db = "Subjective")]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
+    pub struct MessageDeliveryRow {
+        pub conversation_id: String,
+        pub client_msg_id: String,
+        pub recipient: AccountNumber,
+    }
+
+    impl MessageDeliveryRow {
+        #[primary_key]
+        fn pk(&self) -> (String, String, AccountNumber) {
+            (
+                self.conversation_id.clone(),
+                self.client_msg_id.clone(),
+                self.recipient,
+            )
+        }
+    }
 }
 
 use tables::{
     ActiveCallRow, ActiveCallTable, CallSocketBindingTable, ConversationMemberRow,
     ConversationMemberTable, ConversationRow, ConversationTable, MessageCounterTable,
-    SocketSessionRow, SocketSessionTable, UserActiveCallTable, UserSessionRow,
-    UserSessionTable,
+    MessageDeliveryRow, MessageDeliveryTable, SocketSessionRow, SocketSessionTable,
+    UserActiveCallTable, UserSessionRow, UserSessionTable,
 };
 
 pub fn canonical_conversation_members(
@@ -311,6 +331,31 @@ pub fn is_conversation_member(conversation_id: &str, member: AccountNumber) -> b
         .is_some()
 }
 
+pub fn targeted_message_was_delivered(
+    conversation_id: &str,
+    client_msg_id: &str,
+    recipient: AccountNumber,
+) -> bool {
+    MessageDeliveryTable::read()
+        .get_index_pk()
+        .get(&(conversation_id.to_owned(), client_msg_id.to_owned(), recipient))
+        .is_some()
+}
+
+pub fn mark_targeted_message_delivered(
+    conversation_id: &str,
+    client_msg_id: &str,
+    recipient: AccountNumber,
+) {
+    MessageDeliveryTable::new()
+        .put(&MessageDeliveryRow {
+            conversation_id: conversation_id.to_owned(),
+            client_msg_id: client_msg_id.to_owned(),
+            recipient,
+        })
+        .unwrap();
+}
+
 pub fn conversations_for_user(user: AccountNumber) -> Vec<ConversationRow> {
     let member_table = ConversationMemberTable::read();
     let conversation_table = ConversationTable::read();
@@ -369,6 +414,18 @@ pub fn sessions_for_user(user: AccountNumber) -> Vec<i32> {
         .filter(|row| row.user == user)
         .map(|row| row.socket)
         .collect()
+}
+
+pub fn active_session_accounts_except(user: AccountNumber) -> Vec<AccountNumber> {
+    let mut accounts: Vec<AccountNumber> = UserSessionTable::read()
+        .get_index_pk()
+        .iter()
+        .filter(|row| row.user != user)
+        .map(|row| row.user)
+        .collect();
+    accounts.sort_by_key(|account| account.value);
+    accounts.dedup_by_key(|account| account.value);
+    accounts
 }
 
 pub fn socket_session(socket: i32) -> Option<SocketSessionRow> {
@@ -495,6 +552,17 @@ pub fn tx_presence_subscriber_sockets(subject: AccountNumber) -> Vec<i32> {
             socks.extend(sessions_for_user(peer));
         }
         socks
+    }
+}
+
+pub fn tx_all_presence_subscriber_sockets(subject: AccountNumber) -> Vec<i32> {
+    ::psibase::subjective_tx! {
+        UserSessionTable::read()
+            .get_index_pk()
+            .iter()
+            .filter(|row| row.user != subject)
+            .map(|row| row.socket)
+            .collect()
     }
 }
 

@@ -57,8 +57,12 @@ so the server can select v2; v1 remains available for chat-only clients.
 
 Immediately after `welcome`, v2 sessions receive a one-shot ICE config:
 
+- **First-slice product path (Meet v1):** clients use **STUN-only** ICE from the service
+  frame. There is **no TURN in the Meet feature requirements**; calls that cannot complete
+  on STUN-only paths fail with `callHangup` `reason: ice-failed` and a timeline `callEvent`
+  with `event: failed`, `reason: ice-failed`.
 - Default **STUN** entries (Google + Cloudflare) are always included.
-- Optional **TURN** entries come from **OpenRelay / Metered** credentials stored node-locally
+- Optional **TURN** entries (operator-only, not required for Meet v1) come from **OpenRelay / Metered** credentials stored node-locally
   via the x-admin **Pslack** tab (`GET`/`PUT` `/pslack/openrelay` on `x-admin`). The UI fetches
   `https://{app}.metered.live/api/v1/turn/credentials?apiKey=…` and saves the resulting
   `iceServers` JSON array; `x-pslack` reads it through the `x-admin` action

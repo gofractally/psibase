@@ -83,6 +83,8 @@ export const clientFrameSaySchema = z
         conversationId: z.string(),
         body: z.string(),
         clientMsgId: z.string(),
+        clientTime: z.number().optional(),
+        to: zAccountStr.optional(),
     })
     .strict();
 
@@ -249,6 +251,8 @@ export const serverFrameMessageSchema = z
         serverMsgId: z.number(),
         serverTime: z.number(),
         clientMsgId: z.string().optional(),
+        clientTime: z.number().optional(),
+        to: zAccountStr.optional(),
     })
     .strict();
 
@@ -267,6 +271,8 @@ export const serverFrameErrorSchema = z
         code: z.string(),
         reason: z.string(),
         conversationId: z.string().optional(),
+        clientMsgId: z.string().optional(),
+        to: zAccountStr.optional(),
     })
     .strict();
 

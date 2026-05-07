@@ -80,6 +80,10 @@ pub enum ClientFrame {
         body: String,
         #[serde(rename = "clientMsgId")]
         client_msg_id: String,
+        #[serde(skip_serializing_if = "Option::is_none", rename = "clientTime")]
+        client_time: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        to: Option<ExactAccountNumber>,
     },
     #[serde(rename = "ack")]
     Ack {
@@ -219,6 +223,10 @@ pub enum ServerFrame {
         server_time: i64,
         #[serde(skip_serializing_if = "Option::is_none", rename = "clientMsgId")]
         client_msg_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none", rename = "clientTime")]
+        client_time: Option<i64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        to: Option<ExactAccountNumber>,
     },
     #[serde(rename = "delivered")]
     Delivered {
@@ -234,6 +242,10 @@ pub enum ServerFrame {
         reason: String,
         #[serde(skip_serializing_if = "Option::is_none", rename = "conversationId")]
         conversation_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none", rename = "clientMsgId")]
+        client_msg_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        to: Option<ExactAccountNumber>,
     },
     #[serde(rename = "callError")]
     CallError {
@@ -544,6 +556,7 @@ pub fn validate_client_frame(
             conversation_id,
             body,
             client_msg_id,
+            ..
         } => {
             validate_required_id("conversationId", conversation_id)?;
             validate_required_id("body", body)?;

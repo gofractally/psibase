@@ -1,4 +1,4 @@
-import { Phone } from "lucide-react";
+import { AlertCircle, Clock3, Phone } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 import { Avatar } from "@shared/components/avatar";
@@ -120,9 +120,23 @@ function MessageBubbleRow({
                 </p>
 
                 <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0 text-[11px] opacity-70">
-                    <span>
-                        {pending ? "Sending…" : failed ? "Failed" : ""}
-                    </span>
+                    {pending ? (
+                        <span
+                            className="inline-flex items-center gap-1"
+                            title="Stored in this browser until every recipient is online and acknowledged."
+                        >
+                            <Clock3 className="size-3" aria-hidden />
+                            Pending
+                            {m.pendingRecipientCount
+                                ? ` (${m.pendingRecipientCount})`
+                                : ""}
+                        </span>
+                    ) : failed ? (
+                        <span className="inline-flex items-center gap-1">
+                            <AlertCircle className="size-3" aria-hidden />
+                            Failed
+                        </span>
+                    ) : null}
                     {failed && m.errorReason ? (
                         <span
                             className="text-destructive max-w-[220px] truncate font-medium"
