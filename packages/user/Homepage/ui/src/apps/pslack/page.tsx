@@ -1,7 +1,7 @@
 import type { LocalContact } from "../contacts/types";
 import type { PresenceUi } from "./hooks/use-pslack-socket";
 
-import { ChevronLeft, PhoneCall } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, PhoneCall } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useMediaQuery } from "usehooks-ts";
 
@@ -16,13 +16,13 @@ import { Button } from "@shared/shadcn/ui/button";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { ScrollArea } from "@shared/shadcn/ui/scroll-area";
 
-import { ContactListSection } from "../contacts/components/contact-list-section";
 import { formatNames } from "../contacts/utils/format-names";
 import { ChatComposer } from "./components/chat-composer";
 import { CallView } from "./components/call-view";
 import { ConnectionStatusBanner } from "./components/connection-status-banner";
 import {
     ConversationList,
+    formatGroupConversationFullTitle,
     formatGroupConversationLabel,
     formatConversationSubtitle,
 } from "./components/conversation-list";
@@ -30,10 +30,28 @@ import { IncomingCallDialog } from "./components/incoming-call-dialog";
 import { MessageThread } from "./components/message-thread";
 import { usePslackSocket } from "./hooks/use-pslack-socket";
 
-const SectionTitle = ({ children }: { children: React.ReactNode }) => (
-    <div className="text-muted-foreground px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide">
+const SectionToggle = ({
+    children,
+    expanded,
+    onToggle,
+}: {
+    children: React.ReactNode;
+    expanded: boolean;
+    onToggle: () => void;
+}) => (
+    <button
+        type="button"
+        onClick={onToggle}
+        className="text-muted-foreground flex w-full items-center gap-1 px-4 pb-1 pt-3 text-left text-xs font-semibold uppercase tracking-wide hover:text-foreground"
+        aria-expanded={expanded}
+    >
+        {expanded ? (
+            <ChevronDown className="size-3.5" aria-hidden />
+        ) : (
+            <ChevronRight className="size-3.5" aria-hidden />
+        )}
         {children}
-    </div>
+    </button>
 );
 
 const PresenceDot = ({ status }: { status: PresenceUi }) => {
@@ -103,7 +121,7 @@ const ContactWithPresenceRow = ({
                         account={contact.account}
                         className="size-8 shrink-0"
                     />
-                    <span className="truncate text-sm font-medium">
+                    <span className="truncate text-[14px] font-medium leading-snug">
                         {primaryName}
                     </span>
                 </label>
@@ -117,7 +135,7 @@ const ContactWithPresenceRow = ({
                         account={contact.account}
                         className="size-8 shrink-0"
                     />
-                    <span className="truncate text-sm font-medium">
+                    <span className="truncate text-[14px] font-medium leading-snug">
                         {primaryName}
                     </span>
                 </button>
@@ -177,10 +195,21 @@ export const PslackPage = () => {
         () => new Set(),
     );
     const [groupPickMode, setGroupPickMode] = useState(false);
+    const [contactsExpanded, setContactsExpanded] = useState(true);
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
 
     const contacts = contactsData ?? [];
+    const resolveGroupMemberLabel = useMemo(() => {
+        const nickByAccount = new Map(
+            contacts.map((c) => [
+                c.account,
+                c.nickname?.trim() ? c.nickname.trim() : c.account,
+            ]),
+        );
+        return (account: string) => nickByAccount.get(account) ?? account;
+    }, [contacts]);
+
     const others = useMemo(
         () => contacts.filter((c) => c.account !== currentUser),
         [contacts, currentUser],
@@ -221,11 +250,13 @@ export const PslackPage = () => {
             ? formatConversationSubtitle(
                   selectedConversation,
                   selfAccount ?? undefined,
+                  resolveGroupMemberLabel,
               )
             : formatGroupConversationLabel(
                   selectedConversation,
                   selfAccount ?? undefined,
                   42,
+                  resolveGroupMemberLabel,
               )
         : null;
 
@@ -234,6 +265,7 @@ export const PslackPage = () => {
             ? formatConversationSubtitle(
                   selectedConversation,
                   selfAccount ?? undefined,
+                  resolveGroupMemberLabel,
               )
             : null;
 
@@ -282,91 +314,6 @@ export const PslackPage = () => {
                 }
                 left={
                     <ScrollArea className="bg-sidebar/60 min-h-0 w-full lg:h-full">
-                        <div className="flex flex-wrap gap-2 px-4 pb-2 pt-3">
-                            <Button
-                                type="button"
-                                variant={groupPickMode ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => {
-                                    setGroupPickMode((v) => !v);
-                                    if (groupPickMode)
-                                        setGroupCandidates(new Set());
-                                }}
-                            >
-                                {groupPickMode
-                                    ? "Cancel group pick"
-                                    : "New group chat"}
-                            </Button>
-                            {groupPickMode ? (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    disabled={groupCandidates.size < 2}
-                                    onClick={onStartGroup}
-                                >
-                                    Open group ({groupCandidates.size} picked)
-                                </Button>
-                            ) : null}
-                        </div>
-                        <SectionTitle>Contacts</SectionTitle>
-                        <div className="flex flex-col gap-2 px-4 pb-2">
-                            {others.length === 0 ? (
-                                <p className="text-muted-foreground px-1 py-2 text-sm">
-                                    No contacts yet. Add some in Contacts.
-                                </p>
-                            ) : (
-                                <div className="flex flex-col gap-1">
-                                    {others.map((contact) => {
-                                        const pr: PresenceUi =
-                                            presenceByAccount[
-                                                contact.account
-                                            ] ?? "unknown";
-                                        return (
-                                            <ContactWithPresenceRow
-                                                key={contact.account}
-                                                contact={contact}
-                                                isSelected={
-                                                    sidebarKey ===
-                                                    contact.account
-                                                }
-                                                onSelect={() => {
-                                                    setSidebarKey(
-                                                        contact.account,
-                                                    );
-                                                    if (!groupPickMode)
-                                                        openOrFocusDm(
-                                                            contact.account,
-                                                        );
-                                                }}
-                                                presence={pr}
-                                                groupPickMode={groupPickMode}
-                                                groupSelected={groupCandidates.has(
-                                                    contact.account,
-                                                )}
-                                                setGroupIncluded={(included) =>
-                                                    setGroupCandidates(
-                                                        (prev) => {
-                                                            const next =
-                                                                new Set(prev);
-                                                            if (included)
-                                                                next.add(
-                                                                    contact.account,
-                                                                );
-                                                            else
-                                                                next.delete(
-                                                                    contact.account,
-                                                                );
-                                                            return next;
-                                                        },
-                                                    )
-                                                }
-                                            />
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-
                         <div className="min-h-[180px]">
                             <ConversationList
                                 conversations={conversations}
@@ -377,23 +324,126 @@ export const PslackPage = () => {
                                 undeliveredByConversation={
                                     undeliveredByConversation
                                 }
+                                resolveGroupMemberLabel={resolveGroupMemberLabel}
+                                presenceByAccount={presenceByAccount}
+                                groupPickMode={groupPickMode}
+                                groupActions={
+                                    groupPickMode ? (
+                                        <>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                className="text-[14px]"
+                                                disabled={
+                                                    groupCandidates.size < 2
+                                                }
+                                                onClick={onStartGroup}
+                                            >
+                                                Start group (
+                                                {groupCandidates.size} picked)
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                className="text-[14px]"
+                                                onClick={() => {
+                                                    setGroupCandidates(
+                                                        new Set(),
+                                                    );
+                                                    setGroupPickMode(false);
+                                                }}
+                                            >
+                                                Cancel group pick
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-[14px]"
+                                            onClick={() => {
+                                                setContactsExpanded(true);
+                                                setGroupPickMode(true);
+                                            }}
+                                        >
+                                            New group chat
+                                        </Button>
+                                    )
+                                }
                             />
                         </div>
 
-                        {currentUser ? (
-                            <>
-                                <SectionTitle>My account</SectionTitle>
-                                <div className="px-4 pb-4">
-                                    <ContactListSection
-                                        title=""
-                                        setSelectedContact={setSidebarKey}
-                                        selectedContactId={sidebarKey}
-                                        contacts={contacts.filter(
-                                            (c) => c.account === currentUser,
-                                        )}
-                                    />
-                                </div>
-                            </>
+                        <SectionToggle
+                            expanded={contactsExpanded}
+                            onToggle={() => setContactsExpanded((v) => !v)}
+                        >
+                            Contacts
+                        </SectionToggle>
+                        {contactsExpanded ? (
+                            <div className="flex flex-col gap-2 px-4 pb-4 pt-0">
+                                {others.length === 0 ? (
+                                    <p className="text-muted-foreground px-1 py-2 text-[14px] leading-snug">
+                                        No contacts yet. Add some in the
+                                        Contacts app.
+                                    </p>
+                                ) : (
+                                    <div className="flex flex-col gap-1">
+                                        {others.map((contact) => {
+                                            const pr: PresenceUi =
+                                                presenceByAccount[
+                                                    contact.account
+                                                ] ?? "unknown";
+                                            return (
+                                                <ContactWithPresenceRow
+                                                    key={contact.account}
+                                                    contact={contact}
+                                                    isSelected={
+                                                        sidebarKey ===
+                                                        contact.account
+                                                    }
+                                                    onSelect={() => {
+                                                        setSidebarKey(
+                                                            contact.account,
+                                                        );
+                                                        if (!groupPickMode)
+                                                            openOrFocusDm(
+                                                                contact.account,
+                                                            );
+                                                    }}
+                                                    presence={pr}
+                                                    groupPickMode={groupPickMode}
+                                                    groupSelected={groupCandidates.has(
+                                                        contact.account,
+                                                    )}
+                                                    setGroupIncluded={(
+                                                        included,
+                                                    ) =>
+                                                        setGroupCandidates(
+                                                            (prev) => {
+                                                                const next =
+                                                                    new Set(
+                                                                        prev,
+                                                                    );
+                                                                if (included)
+                                                                    next.add(
+                                                                        contact.account,
+                                                                    );
+                                                                else
+                                                                    next.delete(
+                                                                        contact.account,
+                                                                    );
+                                                                return next;
+                                                            },
+                                                        )
+                                                    }
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         ) : null}
                     </ScrollArea>
                 }
@@ -425,12 +475,25 @@ export const PslackPage = () => {
                                         }
                                         className="size-9"
                                     />
-                                    <div className="min-w-0">
-                                        <p className="truncate font-medium">
+                                    <div
+                                        className="min-w-0"
+                                        title={
+                                            selectedConversation.kind ===
+                                            "group"
+                                                ? formatGroupConversationFullTitle(
+                                                      selectedConversation,
+                                                      selfAccount ??
+                                                          undefined,
+                                                      resolveGroupMemberLabel,
+                                                  )
+                                                : undefined
+                                        }
+                                    >
+                                        <p className="truncate text-[14px] font-medium leading-snug">
                                             {threadTitle}
                                         </p>
                                         {threadSubtitle ? (
-                                            <p className="text-muted-foreground truncate text-sm">
+                                            <p className="text-muted-foreground truncate text-[14px] leading-snug">
                                                 {threadSubtitle}
                                             </p>
                                         ) : null}
@@ -445,11 +508,11 @@ export const PslackPage = () => {
                                         className="size-9"
                                     />
                                     <div>
-                                        <p className="font-medium">
+                                        <p className="text-[14px] font-medium leading-snug">
                                             {sidebarContact.nickname ??
                                                 sidebarContact.account}
                                         </p>
-                                        <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                                        <p className="text-muted-foreground flex items-center gap-2 text-[14px] leading-snug">
                                             {sidebarContact.account}
                                             <PresenceDot
                                                 status={presenceForSidebar()}
@@ -458,7 +521,7 @@ export const PslackPage = () => {
                                         <Button
                                             type="button"
                                             variant="link"
-                                            className="h-auto px-0"
+                                            className="h-auto px-0 text-[14px]"
                                             onClick={openDmFromSidebar}
                                         >
                                             {sidebarContactIsSelf
@@ -530,11 +593,11 @@ export const PslackPage = () => {
                                 />
                             </>
                         ) : (
-                            <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm">
+                            <div className="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-[14px] leading-snug">
                                 <p>
                                     {groupPickMode
-                                        ? "Choose at least two contacts, then Open group."
-                                        : "Pick a conversation on the left or open a DM from Contacts."}
+                                        ? "Choose at least two contacts below, then Start group."
+                                        : "Pick a conversation on the left or open a DM from Contacts below."}
                                 </p>
                             </div>
                         )}

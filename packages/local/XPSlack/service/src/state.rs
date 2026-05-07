@@ -416,6 +416,18 @@ pub fn sessions_for_user(user: AccountNumber) -> Vec<i32> {
         .collect()
 }
 
+pub fn active_session_accounts_except(user: AccountNumber) -> Vec<AccountNumber> {
+    let mut accounts: Vec<AccountNumber> = UserSessionTable::read()
+        .get_index_pk()
+        .iter()
+        .filter(|row| row.user != user)
+        .map(|row| row.user)
+        .collect();
+    accounts.sort_by_key(|account| account.value);
+    accounts.dedup_by_key(|account| account.value);
+    accounts
+}
+
 pub fn socket_session(socket: i32) -> Option<SocketSessionRow> {
     SocketSessionTable::read().get_index_pk().get(&socket)
 }
@@ -540,6 +552,17 @@ pub fn tx_presence_subscriber_sockets(subject: AccountNumber) -> Vec<i32> {
             socks.extend(sessions_for_user(peer));
         }
         socks
+    }
+}
+
+pub fn tx_all_presence_subscriber_sockets(subject: AccountNumber) -> Vec<i32> {
+    ::psibase::subjective_tx! {
+        UserSessionTable::read()
+            .get_index_pk()
+            .iter()
+            .filter(|row| row.user != subject)
+            .map(|row| row.socket)
+            .collect()
     }
 }
 

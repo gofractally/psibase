@@ -119,6 +119,10 @@ class TestPslack(unittest.TestCase):
                 conv_a = await _read_json(ws_a)
                 self.assertEqual(conv_a['t'], 'conversation')
                 cid = conv_a['conversationId']
+                conv_b = await _read_json(ws_b)
+                self.assertEqual(conv_b['t'], 'conversation')
+                self.assertEqual(conv_b['kind'], 'dm')
+                self.assertEqual(conv_b['conversationId'], cid)
                 # Bob receives presence for alice (opened conversation + fanout)
                 nb = await _read_json(ws_b)
                 self.assertEqual(nb['t'], 'presence')

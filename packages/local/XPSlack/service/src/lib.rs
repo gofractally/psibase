@@ -69,8 +69,9 @@ mod service {
     use crate::r_transact::Wrapper as RTransact;
     use crate::state::tables::SocketSessionRow;
     use crate::state::{
-        conversations_for_user, dm_members, ensure_sender_is_member, group_members, members_of,
-        mark_targeted_message_delivered, next_server_msg_id, open_conversation,
+        active_session_accounts_except, conversations_for_user, dm_members,
+        ensure_sender_is_member, group_members, members_of, mark_targeted_message_delivered,
+        next_server_msg_id, open_conversation,
         sessions_for_user, socket_session, targeted_message_was_delivered, upsert_socket_session,
         StateError, CONVERSATION_KIND_DM, CONVERSATION_KIND_GROUP,
     };
@@ -353,6 +354,11 @@ mod service {
             .flat_map(|conversation| conversation.members.iter().copied())
             .filter(|account| account.value != user.value)
             .map(|account| account.value)
+            .chain(
+                active_session_accounts_except(user)
+                    .into_iter()
+                    .map(|account| account.value),
+            )
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
             .map(|account_value| {
@@ -389,6 +395,14 @@ mod service {
         }
     }
 
+    fn fanout_presence_to_all(user: AccountNumber, status: PresenceStatus) {
+        let frame = crate::state::tx_presence_frame(user, status);
+        let sockets = crate::state::tx_all_presence_subscriber_sockets(user);
+        for s in sockets {
+            send_frame(s, &frame);
+        }
+    }
+
     fn handle_socket_cleanup(socket: i32) {
         let now = Transact::call().currentBlock().time.microseconds;
         for (s, frame) in crate::call_signaling::tear_down_call_for_dead_socket(socket, now) {
@@ -404,7 +418,7 @@ mod service {
         } else {
             PresenceStatus::Online
         };
-        fanout_presence(removed.user, status);
+        fanout_presence_to_all(removed.user, status);
     }
 
     fn subjective_socket_session(socket: i32) -> Option<SocketSessionRow> {
@@ -546,22 +560,13 @@ mod service {
         match subjective_open_conversation_frame(members.clone(), now) {
             Ok(frame) => {
                 send_frame(socket, &frame);
-                let is_group = matches!(
-                    &frame,
-                    ServerFrame::Conversation {
-                        kind: ConversationKind::Group,
-                        ..
-                    }
-                );
                 let presence = crate::state::tx_presence_frame_after_open(sender);
                 let other_members: Vec<AccountNumber> =
                     members.into_iter().filter(|m| *m != sender).collect();
                 let target_sockets =
                     crate::state::tx_snapshot_sockets_for_accounts(other_members);
                 for s in target_sockets {
-                    if is_group {
-                        send_frame(s, &frame);
-                    }
+                    send_frame(s, &frame);
                     send_frame(s, &presence);
                 }
             }
@@ -698,6 +703,7 @@ mod service {
             ClientFrame::Sync { .. } => {
                 let sync_payload = subjective_sync_frame(session.user);
                 send_frame(socket, &sync_payload);
+                fanout_presence_to_all(session.user, PresenceStatus::Online);
             }
             ClientFrame::OpenDm { member } => {
                 match dm_members(session.user, AccountNumber::from(member.value)) {
