@@ -218,7 +218,7 @@
             }
             export PS1="🔧 \[\033[01;32m\]psibase-nix\[\033[00m\]:\[\033[01;34m\]\w\[\033[32m\]\$(parse_git_branch)\[\033[00m\]\$ "
 
-            if [ -n "$BASH_VERSION" ]; then
+            if [ -n "$BASH_VERSION" ] && [[ $- == *i* ]]; then
               if [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]]; then
                 source ${pkgs.bash-completion}/share/bash-completion/bash_completion
               fi
