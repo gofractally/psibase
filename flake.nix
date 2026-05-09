@@ -137,7 +137,6 @@
           jq
           xxd
           unzip
-          zstd
           icu
           direnv
           mkcert
@@ -270,7 +269,7 @@
               _check_cargo_tools
               echo "To build psibase (clean build required on first run):"
               echo "  rm -rf build && mkdir build && cd build"
-              echo "  cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=psidk .."
+              echo "  cmake -DCMAKE_BUILD_TYPE=Release .."
               echo "  cmake --build . -j\$(nproc)"
               echo ""
             fi
