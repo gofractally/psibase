@@ -29,6 +29,9 @@
       "binary": {
         "path_lookup": true,
       },
+      "initialization_options": {
+        "linkedProjects": ["packages/user/Cargo.toml"],
+      },
     },
   },
 }
