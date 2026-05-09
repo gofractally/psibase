@@ -151,6 +151,7 @@
           bash-completion
           nil
           nixd
+          neocmakelsp
         ];
 
         linuxPackages = with pkgs; [
