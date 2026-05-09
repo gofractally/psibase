@@ -1,0 +1,24 @@
+{
+  "lsp": {
+    "clangd": {
+      "binary": {
+        "path_lookup": true
+      }
+    },
+    "neocmakelsp": {
+      "binary": {
+        "path_lookup": true
+      }
+    },
+    "nil": {
+      "binary": {
+        "path_lookup": true
+      }
+    },
+    "nixd": {
+      "binary": {
+        "path_lookup": true
+      }
+    }
+  }
+}
