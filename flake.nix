@@ -149,6 +149,7 @@
           vim
           bashInteractive
           bash-completion
+          nil
         ];
 
         linuxPackages = with pkgs; [
