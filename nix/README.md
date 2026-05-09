@@ -83,8 +83,8 @@ Inside the `nix develop` shell:
 #### 2.2 Run .vscode/setup_env.sh
 This will ensure your build and dev envs can find everything they need
 
-#### 2.3 Initializing/Configuring the Environment (using direnv,
-which activates the environment automatically when you `cd` into the repo)
+#### 2.3 Initializing/Configuring the Environment 
+Using direnv, which activates the environment automatically when you `cd` into the repo
 
 From the psibase repo root:
 
@@ -102,8 +102,8 @@ EOF
 direnv allow
 ```
 
-#### 2.4 extensions
-Copy nix/docs/extensions.json.example to .vscode/extensions.json to pick up the standard dev extensions.
+#### 2.4 Extensions
+Copy nix/docs/extensions.json.recommended to .vscode/extensions.json to pick up the standard dev extensions.
 
 ### 3. Verify environment (optional)
 
@@ -128,9 +128,9 @@ cmake --build . -j$(nproc)
 #### Launch
 You should, at this point, see the standard tasks.json buttons. Press Launch to launch a change (manual hacky command below).
 
-Within the nix shell, replace the PROJECT_ROOT below with your repo root path:
+Within the nix shell, run from the root path
 ```bash
-PROJECT_ROOT="/home/mike/repos/fractally/psibase" PSIBASE_ADMIN_IP=127.0.0.1 psinode "$PROJECT_ROOT/db" -p myprod -l 7777
+psinode "$PROJECT_ROOT/db" -p myprod -l 7777
 ```
 
 #### Boot
