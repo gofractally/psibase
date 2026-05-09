@@ -64,7 +64,7 @@ impl GuildApplication {
         let mut rejectors: Vec<AccountNumber> = Vec::new();
 
         for attestation in GuildAttestTable::read().get_index_pk().range(
-            (self.guild, self.applicant, AccountNumber::ZERO)
+            (self.guild, self.applicant, AccountNumber::MIN)
                 ..=(self.guild, self.applicant, AccountNumber::MAX),
         ) {
             if attestation.endorses {
@@ -108,7 +108,7 @@ impl GuildApplication {
         GuildAttestTable::read()
             .get_index_pk()
             .range(
-                (self.guild, self.applicant, AccountNumber::ZERO)
+                (self.guild, self.applicant, AccountNumber::MIN)
                     ..=(self.guild, self.applicant, AccountNumber::MAX),
             )
             .map(|e| if e.endorses { 1 } else { -1 })
@@ -130,7 +130,7 @@ impl GuildApplication {
         table
             .get_index_pk()
             .range(
-                (self.guild, self.applicant, AccountNumber::ZERO)
+                (self.guild, self.applicant, AccountNumber::MIN)
                     ..=(self.guild, self.applicant, AccountNumber::MAX),
             )
             .for_each(|attest| {

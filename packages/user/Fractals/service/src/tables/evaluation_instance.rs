@@ -72,7 +72,7 @@ impl EvaluationInstance {
                         fractals_service,
                         evaluation_id,
                         Some(group_number),
-                        AccountNumber::ZERO,
+                        AccountNumber::MIN,
                     )
                         ..=(
                             fractals_service,
@@ -85,7 +85,7 @@ impl EvaluationInstance {
             None => table
                 .get_index_pk()
                 .range(
-                    (fractals_service, evaluation_id, AccountNumber::ZERO)
+                    (fractals_service, evaluation_id, AccountNumber::MIN)
                         ..=(fractals_service, evaluation_id, AccountNumber::MAX),
                 )
                 .collect(),

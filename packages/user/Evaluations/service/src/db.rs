@@ -238,7 +238,7 @@ pub mod impls {
             table
                 .get_index_pk()
                 .range(
-                    (self.owner, self.id, AccountNumber::ZERO)
+                    (self.owner, self.id, AccountNumber::MIN)
                         ..=(self.owner, self.id, AccountNumber::MAX),
                 )
                 .collect()
@@ -316,7 +316,7 @@ pub mod impls {
             let users: Vec<User> = users_table
                 .get_index_pk()
                 .range(
-                    (self.owner, self.id, AccountNumber::ZERO)
+                    (self.owner, self.id, AccountNumber::MIN)
                         ..=(self.owner, self.id, AccountNumber::MAX),
                 )
                 .collect();
@@ -428,7 +428,7 @@ pub mod impls {
             let users: Vec<User> = users_table
                 .get_index_pk()
                 .range(
-                    (self.owner, self.evaluation_id, AccountNumber::ZERO)
+                    (self.owner, self.evaluation_id, AccountNumber::MIN)
                         ..=(self.owner, self.evaluation_id, AccountNumber::MAX),
                 )
                 .collect();
@@ -464,7 +464,7 @@ pub mod impls {
             UserTable::new()
                 .get_index_by_group()
                 .range(
-                    (owner, id, Some(group_num), AccountNumber::ZERO)
+                    (owner, id, Some(group_num), AccountNumber::MIN)
                         ..=(owner, id, Some(group_num), AccountNumber::MAX),
                 )
                 .collect()
