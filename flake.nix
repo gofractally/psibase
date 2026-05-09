@@ -150,6 +150,7 @@
           bashInteractive
           bash-completion
           nil
+          nixd
         ];
 
         linuxPackages = with pkgs; [
