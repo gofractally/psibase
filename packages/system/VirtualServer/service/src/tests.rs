@@ -176,20 +176,7 @@ mod tests {
         chain.new_account(alice).unwrap();
         chain.new_account(bob).unwrap();
 
-        let supply: u64 = 10_000_000_000_000_0000u64.into();
-        let sys = tokens::Wrapper::push_from(chain, symbol)
-            .create(Precision::new(4).unwrap(), Quantity::from(supply))
-            .get()?;
-
-        for acc in &[
-            alice,
-            bob,
-            PRODUCER_ACCOUNT,
-            psibase::services::virtual_server::SERVICE,
-            tokens_service,
-            psibase::services::invite::SERVICE,
-            symbol,
-        ] {
+        for acc in &[alice, bob, PRODUCER_ACCOUNT, symbol] {
             Tokens::push_from(chain, *acc)
                 .setUserConf(
                     psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
@@ -205,8 +192,10 @@ mod tests {
                 .get()?;
         }
 
-        let nid = Tokens::push(&chain).getToken(sys).get()?.nft_id;
-        Nft::push_from(chain, symbol).debit(nid, "".into()).get()?;
+        let supply: u64 = 10_000_000_000_000_0000u64.into();
+        let sys = tokens::Wrapper::push_from(chain, symbol)
+            .create(Precision::new(4).unwrap(), Quantity::from(supply))
+            .get()?;
 
         Tokens::push_from(chain, tokens_service)
             .setSysToken(sys)

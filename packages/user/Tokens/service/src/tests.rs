@@ -55,7 +55,7 @@ mod tests {
         let b = Wrapper::push_from(&chain, bob);
         b.setUserConf(
             psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
-            true,
+            false,
         );
 
         let malicious_mike = account!("mike");
