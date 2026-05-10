@@ -150,7 +150,8 @@ SCENARIO("Transferring NFTs")
          }
          WHEN("Alice credits the NFT to Bob")
          {
-            auto credit = a.credit(nft.id, bob, "memo");
+            bob.to<Nft>().setUserConf(autoDebit, true);
+            CHECK(a.credit(nft.id, bob, "memo").succeeded());
 
             THEN("Bob immediately owns the NFT")
             {
