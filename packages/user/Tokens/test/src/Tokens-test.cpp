@@ -34,7 +34,8 @@ SCENARIO("Using system token")
 
       auto alice = t.from(t.addAccount("alice"_a));
       auto a     = alice.to<Tokens>();
-      auto bob   = t.from(t.addAccount("bob"_a));
+      a.setUserConf(Tokens::autoDebit, true);
+      auto bob = t.from(t.addAccount("bob"_a));
 
       auto     sysIssuer = t.from(Symbol::service).to<Tokens>();
       Quantity userBalance{1'000'000'00e4};
@@ -153,6 +154,7 @@ SCENARIO("Minting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
 
       THEN("Bob may not mint them")
@@ -210,6 +212,7 @@ SCENARIO("Recalling tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e4, memo);
@@ -263,6 +266,9 @@ SCENARIO("Interactions with the Issuer NFT")
       auto a     = alice.to<Tokens>();
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
+
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      bob.to<Nft>().setUserConf(Nft::autoDebit, true);
 
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
@@ -354,6 +360,7 @@ SCENARIO("Burning tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
@@ -499,6 +506,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
@@ -570,19 +578,16 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
-      a.setUserConf(Tokens::autoDebit, true);
-      b.setUserConf(Tokens::autoDebit, true);
 
       a.mint(tokenId, 200e4, memo);
       a.credit(tokenId, bob, 100e4, memo);
 
       AND_GIVEN("Alice turns on auto-debit")
       {
-         a.setUserConf(Tokens::autoDebit, true);
-         b.setUserConf(Tokens::autoDebit, true);
-
          THEN("Alice may credit Bob 50 tokens")
          {
             CHECK(a.credit(tokenId, bob, 50e4, memo).succeeded());
@@ -613,7 +618,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
          }
          WHEN("Bob credits Alice 50 tokens")
          {
-            b.credit(tokenId, alice, 50e4, memo);
+            CHECK(b.credit(tokenId, alice, 50e4, memo).succeeded());
 
             THEN("Bob owns 50 tokens in his individual balance")
             {
@@ -708,6 +713,7 @@ SCENARIO("Mapping a symbol to a token")
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       aliceTokens.setUserConf(Tokens::autoDebit, true);
       bobTokens.setUserConf(Tokens::autoDebit, true);
       alice.to<Nft>().setUserConf(Nft::autoDebit, true);
