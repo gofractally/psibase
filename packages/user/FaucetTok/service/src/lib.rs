@@ -54,6 +54,7 @@ mod service {
         check(get_sender() == Tokens::SERVICE, "Unauthorized");
         let twenty_one_billion = 21_000_000_000_0000_u64;
         let id = Tokens::call().create(Precision::new(4).unwrap(), twenty_one_billion.into());
+        Nft::call().debit(Tokens::call().getToken(id).nft_id, Memo::default());
 
         let set_sys_token = Action {
             sender: Tokens::SERVICE,
