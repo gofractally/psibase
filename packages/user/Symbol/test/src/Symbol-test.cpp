@@ -73,6 +73,7 @@ SCENARIO("Buying a symbol")
 
       const Quantity quantity{q(SymbolPricing::initialPrice, precision)};
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       THEN("Alice cannot create a symbol with numbers")
       {
          alice.to<Tokens>().credit(sysToken, Symbol::service, quantity, memo);
