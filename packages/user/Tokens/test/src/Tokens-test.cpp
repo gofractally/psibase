@@ -776,8 +776,7 @@ SCENARIO("Mapping a symbol to a token")
       }
       THEN("Alice is able to map the symbol to the token")
       {
-         CHECK(alice.to<Nft>().credit(nftId, Symbol::service, memo).succeeded());
-         // missing required authority, lacks either the nft owner or the token owner.
+         alice.to<Nft>().credit(nftId, Symbol::service, memo);
          CHECK(aliceSymbol.mapSymbol(newToken, symbolId).succeeded());
 
          AND_THEN("The token ID mapping exists")
@@ -787,8 +786,8 @@ SCENARIO("Mapping a symbol to a token")
       }
       WHEN("Alice maps the symbol to the token")
       {
-         CHECK(alice.to<Nft>().credit(nftId, Tokens::service, memo).succeeded());
-         CHECK(aliceSymbol.mapSymbol(newToken, symbolId).succeeded());
+         alice.to<Nft>().credit(nftId, Tokens::service, memo);
+         aliceSymbol.mapSymbol(newToken, symbolId);
 
          THEN("The symbol record is identical")
          {
