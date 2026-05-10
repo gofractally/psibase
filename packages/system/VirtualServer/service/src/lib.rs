@@ -86,8 +86,7 @@ mod service {
     use psibase::services::{
         accounts::Wrapper as Accounts,
         cpu_limit::Wrapper as CpuLimit,
-        nft::{NftHolderFlags, Wrapper as Nft},
-        tokens::{BalanceFlags, Quantity, Wrapper as Tokens},
+        tokens::{Quantity, Wrapper as Tokens},
         transact::Wrapper as Transact,
     };
     use psibase::{abort_message, *};
