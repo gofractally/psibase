@@ -1601,8 +1601,10 @@ dependencies = [
  "guilds",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_plugin",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "wit-bindgen-rt",
 ]
 
