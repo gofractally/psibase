@@ -1,3 +1,5 @@
+use psibase::services::fractals::weighted_normalization::HasScore;
+use psibase::services::tokens::{Decimal, Precision};
 use psibase::{check, AccountNumber, Table};
 
 use crate::{
@@ -21,14 +23,17 @@ impl Ranking {
     }
 
     pub fn get_ordered_rankings(fractal: AccountNumber) -> Vec<Self> {
-        let mut rankings: Vec<_> = RankingTable::read()
+        RankingTable::read()
             .get_index_pk()
             .range(&(fractal, 0)..&(fractal, u8::MAX))
-            .collect();
+            .collect()
+    }
 
-        rankings.sort_by_key(|occ| occ.index);
-
-        rankings
+    fn total(fractal: AccountNumber) -> usize {
+        RankingTable::read()
+            .get_index_pk()
+            .range(&(fractal, 0)..&(fractal, u8::MAX))
+            .count()
     }
 
     pub fn set_ranked_guilds(fractal: AccountNumber, new_ranked_guilds: Vec<AccountNumber>) {
@@ -54,5 +59,13 @@ impl Ranking {
         for existing in existing_rankings.into_iter().skip(ranked_guilds_length) {
             RankingTable::read_write().remove(&existing);
         }
+    }
+}
+
+impl HasScore for Ranking {
+    /// Top-ranked guild (lowest index) gets the highest score.
+    fn get_score(&self) -> Decimal {
+        let score = (Self::total(self.fractal) - self.index as usize) as u64;
+        Decimal::new(score.into(), Precision::new(0).unwrap())
     }
 }

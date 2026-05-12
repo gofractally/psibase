@@ -43,12 +43,12 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set distribution strategy
+    /// This curve maps guild rank to the value used to weight guild member scores.
     ///
     /// # Arguments
-    /// * `distribution_strategy` - Algorithm for weighted distribution.
+    /// * `curve_id` - An identifier for a particular weighting curve
     #[action]
-    fn set_dstrat(distribution_strategy: u8) {
+    fn set_guild_weight_curve(curve_id: u8) {
         unimplemented!()
     }
 

@@ -206,6 +206,6 @@ pub mod tables {
     pub struct FractalSettings {
         #[primary_key]
         pub fractal: AccountNumber,
-        pub dist_strat: u8,
+        pub guild_weight_curve: u8,
     }
 }

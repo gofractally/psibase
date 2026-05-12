@@ -1,4 +1,6 @@
 use async_graphql::ComplexObject;
+use psibase::services::fractals::weighted_normalization::HasScore;
+use psibase::services::tokens::{Decimal, Precision, Quantity};
 use psibase::{check, check_none, check_some, AccountNumber, Table};
 
 use crate::constants::{EMA_ALPHA_DENOMINATOR, GUILD_EVALUATION_GROUP_SIZE, SCORE_SCALE};
@@ -8,6 +10,12 @@ use crate::tables::tables::{
     GuildMemberTable,
 };
 use psibase::services::transact::Wrapper as TransactSvc;
+
+impl HasScore for GuildMember {
+    fn get_score(&self) -> Decimal {
+        Decimal::new(Quantity::from(self.score as u64), Precision::new(4).unwrap())
+    }
+}
 
 impl GuildMember {
     fn new(guild: AccountNumber, member: AccountNumber) -> Self {
