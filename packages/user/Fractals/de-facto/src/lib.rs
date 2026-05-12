@@ -1,6 +1,5 @@
 #[psibase::service(name = "de-facto")]
 pub mod service {
-    use fractals::helpers::two_thirds_plus_one;
     use psibase::{
         services::auth_dyn::{self, policy::DynamicAuthPolicy},
         *,
@@ -29,6 +28,10 @@ pub mod service {
             .get_index_pk()
             .get(&fractal)
             .is_some()
+    }
+
+    fn two_thirds_plus_one(count: u8) -> u8 {
+        ((count as u16 * 2 + 3) / 3) as u8
     }
 
     #[action]

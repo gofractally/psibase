@@ -41,7 +41,7 @@ impl GuildApplication {
         new_instance
     }
 
-    pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
+    fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
         GuildApplicationTable::read()
             .get_index_pk()
             .get(&(guild, applicant))

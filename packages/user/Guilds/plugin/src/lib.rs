@@ -3,19 +3,19 @@ mod bindings;
 
 use std::str::FromStr;
 
-use bindings::exports::guilds::plugin::admin_fractal::Guest as AdminFractal;
-use bindings::exports::guilds::plugin::admin_guild::Guest as AdminGuild;
-use bindings::exports::guilds::plugin::queries::Guest as Queries;
-use bindings::exports::guilds::plugin::queries::Guild as GuildWit;
-use bindings::exports::guilds::plugin::user_eval::Guest as UserEval;
-use bindings::exports::guilds::plugin::user_guild::Guest as UserGuild;
-
+use bindings::accounts;
+use bindings::evaluations::plugin::{admin::close, user as EvaluationsUser};
+use bindings::exports::guilds::plugin::{
+    admin_fractal::Guest as AdminFractal,
+    admin_guild::Guest as AdminGuild,
+    queries::{Guest as Queries, Guild as GuildWit},
+    user_eval::Guest as UserEval,
+    user_guild::Guest as UserGuild,
+};
 use bindings::host::types::types::Error;
 use bindings::transact::plugin::intf::add_action_to_transaction;
 
-use psibase::define_trust;
-use psibase::fracpack::Pack;
-use psibase::{AccountNumber, Memo};
+use psibase::{define_trust, fracpack::Pack, AccountNumber, Memo};
 
 mod errors;
 mod graphql;
@@ -25,11 +25,6 @@ use crate::graphql::guild::get_guild;
 use crate::helpers::get_sender_app;
 use crate::trust::{assert_authorized, assert_authorized_with_whitelist, FunctionName};
 use errors::ErrorType;
-
-use bindings::evaluations::plugin::admin::close;
-use bindings::evaluations::plugin::user as EvaluationsUser;
-
-use crate::bindings::accounts;
 
 define_trust! {
     descriptions {
@@ -178,7 +173,7 @@ impl UserEval for GuildsPlugin {
                 .map(|account| AccountNumber::from_str(account).unwrap())
                 .collect();
 
-                let res: Vec<String> = helpers::parse_rank_to_accounts(rank_numbers, users)
+                let res: Vec<String> = guilds::helpers::parse_rank_to_accounts(rank_numbers, users)
                     .into_iter()
                     .map(|user| user.to_string())
                     .collect();

@@ -67,7 +67,7 @@ impl GuildInvite {
         Self::new(guild, invite_id, pre_attest).save();
     }
 
-    pub fn get(id: u32) -> Option<Self> {
+    fn get(id: u32) -> Option<Self> {
         GuildInviteTable::read().get_index_pk().get(&id)
     }
 

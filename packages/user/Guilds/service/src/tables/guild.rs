@@ -174,7 +174,7 @@ impl Guild {
             .collect()
     }
 
-    pub fn council_members(&self) -> Option<Vec<GuildMember>> {
+    fn council_members(&self) -> Option<Vec<GuildMember>> {
         let members: Vec<_> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
@@ -189,7 +189,7 @@ impl Guild {
         (members.len() > 0).then_some(members)
     }
 
-    pub fn representative(&self) -> Option<GuildMember> {
+    fn representative(&self) -> Option<GuildMember> {
         self.rep
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
