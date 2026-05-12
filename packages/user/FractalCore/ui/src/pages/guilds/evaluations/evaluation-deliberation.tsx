@@ -10,8 +10,10 @@ import { useRanking } from "@/hooks/fractals/use-ranking";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
 import {
     CardAction,
     CardContent,
@@ -35,8 +37,17 @@ const usePageParams = () => {
 
 export const EvaluationDeliberation = () => {
     const { groupNumber } = usePageParams();
+
     const { data: currentUser } = useCurrentUser();
-    const { data: contacts } = useContacts(currentUser);
+
+    const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
+        enabled: !!currentUser,
+    });
+
+    const { data: contacts } = useContacts(currentUser, {
+        enabled: !!hasProfilesReadPermission,
+    });
+
     const {
         add,
         remove,
@@ -56,7 +67,10 @@ export const EvaluationDeliberation = () => {
                         Evaluate participants in your group
                     </CardDescription>
                     <CardAction>
-                        <StatusBadges rankingStatus={status} />
+                        <div className="flex items-center gap-2">
+                            <StatusBadges rankingStatus={status} />
+                            <ShowContactsButton />
+                        </div>
                     </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-6">

@@ -7,9 +7,15 @@ import { useScores } from "@/hooks/fractals/use-scores";
 import { useGuild } from "@/hooks/use-guild";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { Badge } from "@shared/shadcn/ui/badge";
-import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
+import {
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
@@ -43,6 +49,9 @@ export const GuildMembers = () => {
         <GlowingCard>
             <CardHeader>
                 <CardTitle>Guild members</CardTitle>
+                <CardAction>
+                    <ShowContactsButton />
+                </CardAction>
             </CardHeader>
             <CardContent className="@container">
                 <Table>

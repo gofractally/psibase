@@ -10,9 +10,15 @@ import { useGuildAccount } from "@/hooks/use-guild-account";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
+import {
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
@@ -48,6 +54,9 @@ export const GuildApplicants = () => {
                 <GlowingCard>
                     <CardHeader>
                         <CardTitle>Guild applicants</CardTitle>
+                        <CardAction>
+                            <ShowContactsButton />
+                        </CardAction>
                     </CardHeader>
                     <CardContent className="@container">
                         <Table>
@@ -81,7 +90,8 @@ export const GuildApplicants = () => {
                                             ).format("llll")}
                                         </TableCell>
                                         <TableCell className="text-end">
-                                            {application.score.current} / {application.score.required}
+                                            {application.score.current} /{" "}
+                                            {application.score.required}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -102,8 +112,8 @@ export const GuildApplicants = () => {
                         isGuildMember || isPending
                             ? undefined
                             : () => {
-                                setShowGuildModal(true);
-                            }
+                                  setShowGuildModal(true);
+                              }
                     }
                 />
             )}
