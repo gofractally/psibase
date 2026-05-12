@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
+import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
@@ -48,7 +49,9 @@ export const Members = () => {
                 <CardHeader>
                     <CardTitle>All Members</CardTitle>
                     <CardAction>
-                        <ShowContactsButton />
+                        <ShowContactsButton
+                            returnPath={paths.fractal.members()}
+                        />
                     </CardAction>
                 </CardHeader>
                 <CardContent className="@container">

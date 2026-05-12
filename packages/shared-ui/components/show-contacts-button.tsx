@@ -20,7 +20,7 @@ import {
 } from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 
-export const ShowContactsButton = () => {
+export const ShowContactsButton = ({ returnPath }: { returnPath?: string }) => {
     const { data: networkName } = useBranding();
     const contactsUrl = useMemo(
         () => siblingUrl(null, networkName, "contacts"),
@@ -31,7 +31,11 @@ export const ShowContactsButton = () => {
     const { data: hasProfilesReadPermission } = useHasProfilesReadPermission({
         enabled: !!currentUser,
     });
-    const { refetch: prompt } = useContacts(currentUser, { enabled: false });
+    const { refetch: prompt } = useContacts(
+        currentUser,
+        { enabled: false },
+        returnPath ? { enabled: true, returnPath } : undefined,
+    );
 
     if (hasProfilesReadPermission === false) {
         return (

@@ -7,6 +7,7 @@ import { ApplyGuildModal } from "@/components/modals/apply-guild-modal";
 import { useGuildApplications } from "@/hooks/fractals/use-guild-applications";
 import { useGuildMembershipsOfUser } from "@/hooks/fractals/use-guild-memberships";
 import { useGuildAccount } from "@/hooks/use-guild-account";
+import { paths } from "@/lib/paths";
 
 import { EmptyBlock } from "@shared/components/empty-block";
 import { GlowingCard } from "@shared/components/glowing-card";
@@ -55,7 +56,11 @@ export const GuildApplicants = () => {
                     <CardHeader>
                         <CardTitle>Guild applicants</CardTitle>
                         <CardAction>
-                            <ShowContactsButton />
+                            <ShowContactsButton
+                                returnPath={paths.guild.membership.applicants(
+                                    guildAccount!,
+                                )}
+                            />
                         </CardAction>
                     </CardHeader>
                     <CardContent className="@container">

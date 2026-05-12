@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 
 import { useScores } from "@/hooks/fractals/use-scores";
 import { useGuild } from "@/hooks/use-guild";
+import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
@@ -50,7 +51,11 @@ export const GuildMembers = () => {
             <CardHeader>
                 <CardTitle>Guild members</CardTitle>
                 <CardAction>
-                    <ShowContactsButton />
+                    <ShowContactsButton
+                        returnPath={paths.guild.membership.members(
+                            guild?.account ?? "",
+                        )}
+                    />
                 </CardAction>
             </CardHeader>
             <CardContent className="@container">

@@ -7,6 +7,7 @@ import { StatusBadges } from "@/components/evaluations/deliberation/status-badge
 import { UnrankedAccountChip } from "@/components/evaluations/deliberation/unranked-account-chip";
 
 import { useRanking } from "@/hooks/fractals/use-ranking";
+import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
 import { PageContainer } from "@shared/components/page-container";
@@ -36,7 +37,7 @@ const usePageParams = () => {
 };
 
 export const EvaluationDeliberation = () => {
-    const { groupNumber } = usePageParams();
+    const { guildAccount, groupNumber } = usePageParams();
 
     const { data: currentUser } = useCurrentUser();
 
@@ -69,7 +70,12 @@ export const EvaluationDeliberation = () => {
                     <CardAction>
                         <div className="flex items-center gap-2">
                             <StatusBadges rankingStatus={status} />
-                            <ShowContactsButton />
+                            <ShowContactsButton
+                                returnPath={paths.guild.evaluationGroup(
+                                    guildAccount!,
+                                    groupNumber,
+                                )}
+                            />
                         </div>
                     </CardAction>
                 </CardHeader>
