@@ -1,54 +1,48 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use super::constants::PPM;
-use crate::{abort_message, AccountNumber};
+use crate::abort_message;
 
-pub fn aggregate_member_weights<O, S, P>(
-    groups: O,
-    is_member: P,
-) -> HashMap<AccountNumber, u32>
+/// Distributes each group's `total` across its members according to their
+/// PPM shares (via [`allocations`]) and sums each member's per-group
+/// amounts into a single map.
+pub fn combine_group_scores<Groups, Scores, Member: Eq + Hash>(
+    groups: Groups,
+) -> HashMap<Member, u32>
 where
-    O: IntoIterator<Item = (AccountNumber, u32, S)>,
-    S: IntoIterator<Item = (AccountNumber, u32)>,
-    P: Fn(AccountNumber) -> bool,
+    Groups: IntoIterator<Item = (u32, Scores)>,
+    Scores: IntoIterator<Item = (Member, u32)>,
 {
-    let mut weighted_members = HashMap::new();
-    for (group, group_weight, scores) in groups {
-        let mut score_total = 0u64;
-        for (member, score) in scores {
-            if !is_member(member) {
-                continue;
-            }
-            score_total += score as u64;
-            if score_total > PPM as u64 {
-                abort_message(&format!(
-                    "({}) provided member scores exceed 100%",
-                    group.to_string()
-                ));
-            }
-            let weight = ((score as u64 * group_weight as u64) / PPM as u64) as u32;
-            *weighted_members.entry(member).or_insert(0u32) += weight;
+    let mut member_allocations: HashMap<Member, u32> = HashMap::new();
+
+    for (total, member_shares) in groups {
+        for (member, allocation) in allocations(member_shares, total as u64) {
+            *member_allocations.entry(member).or_insert(0u32) += allocation as u32;
         }
     }
-    weighted_members
+    member_allocations
 }
 
-pub fn distribute_amount<I, F>(weighted_members: I, total: u64, mut emit: F) -> u64
+/// Yields `(element, amount)` pairs, where `amount = (share / PPM) * total`
+/// (integer-floored). Elements whose computed amount is zero are skipped.
+///
+/// Aborts if the cumulative shares exceed `PPM`.
+pub fn allocations<I, Element>(
+    element_shares: I,
+    total: u64,
+) -> impl Iterator<Item = (Element, u64)>
 where
-    I: IntoIterator<Item = (AccountNumber, u32)>,
-    F: FnMut(AccountNumber, u64),
+    I: IntoIterator<Item = (Element, u32)>,
 {
-    let mut remaining = total;
-    for (member, weight) in weighted_members {
-        if remaining == 0 {
-            break;
-        }
-        let amount = ((weight as u128 * total as u128) / PPM as u128) as u64;
-        let amount = amount.min(remaining);
-        if amount > 0 {
-            emit(member, amount);
-            remaining -= amount;
-        }
-    }
-    remaining
+    let mut total_shares = 0u64;
+    element_shares
+        .into_iter()
+        .filter_map(move |(element, share)| {
+            total_shares += share as u64;
+            if total_shares > PPM as u64 {
+                abort_message("provided shares exceed 100%");
+            }
+            let amount = ((share as u128 * total as u128) / PPM as u128) as u64;
+            (amount > 0).then_some((element, amount))
+        })
 }

@@ -1,5 +1,5 @@
 pub mod curves;
-mod fib;
+pub mod fib;
 
 use super::constants::PPM;
 use crate::services::tokens::{Decimal, Precision};

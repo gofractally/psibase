@@ -1,4 +1,4 @@
-use psibase::services::fractals::distribute::aggregate_member_weights;
+use psibase::services::fractals::distribute::combine_group_scores;
 use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
     weighted_normalization,
@@ -35,18 +35,16 @@ impl FractalSettings {
 
     pub fn scores(&self) -> Vec<(AccountNumber, u32)> {
         let ranked_guilds = Ranking::get_ordered_rankings(self.fractal);
-        let guild_weights = weighted_normalization(
+        let wights = weighted_normalization(
             ranked_guilds.iter(),
             get_curve(self.guild_weight_curve.into()),
         );
 
         let groups = ranked_guilds
             .iter()
-            .zip(guild_weights)
-            .map(|(r, gw)| (r.guild, gw, Guild::get_assert(r.guild).scores()));
+            .zip(wights)
+            .map(|(r, gw)| (gw, Guild::get_assert(r.guild).scores()));
 
-        aggregate_member_weights(groups, |_| true)
-            .into_iter()
-            .collect()
+        combine_group_scores(groups).into_iter().collect()
     }
 }

@@ -313,3 +313,6 @@ pub mod service {
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
 }
+
+#[cfg(test)]
+mod tests;

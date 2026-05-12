@@ -8,7 +8,7 @@ use crate::constants::{
     DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
     MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
 };
-use psibase::services::fractals::distribute::{aggregate_member_weights, distribute_amount};
+use psibase::services::fractals::distribute::{allocations, combine_group_scores};
 use psibase::services::fractals::weighted_normalization::{
     curves::{get_curve, Curve},
     weighted_normalization,
@@ -164,26 +164,10 @@ impl Fractal {
         if withdrawn.value == 0 {
             return;
         }
-        let members = FractalMember::get_all(self.account);
-        let is_fractal_member = |acc: AccountNumber| members.iter().any(|m| m.account == acc);
 
-        let occupations = Occupation::get_ordered(self.account);
-        let weighted =
-            weighted_normalization(occupations.iter(), get_curve(self.dist_strat.into()));
-
-        let occupations_with_scores =
-            occupations
-                .into_iter()
-                .zip(weighted)
-                .map(|(occ, occ_weight)| {
-                    let member_scores =
-                        occu_wrapper::call_to(occ.occupation).get_scores(self.account);
-                    (occ.occupation, occ_weight, member_scores)
-                });
-
-        let weighted_members = aggregate_member_weights(occupations_with_scores, is_fractal_member);
-
-        let dust = distribute_amount(weighted_members, withdrawn.value, |member, amount| {
+        let mut dust = withdrawn.value;
+        allocations(self.member_reward_shares(), withdrawn.value).for_each(|(member, amount)| {
+            dust -= amount;
             RewardStream::get_assert(self.account, member)
                 .deposit(amount.into(), "Fractal reward".into());
         });
@@ -191,6 +175,24 @@ impl Fractal {
         if dust > 0 {
             stream.deposit(dust.into(), "Dust recycle".into());
         }
+    }
+
+    fn member_reward_shares(&self) -> std::collections::HashMap<AccountNumber, u32> {
+        let members = FractalMember::get_all(self.account);
+        let is_member = |acc: &AccountNumber| members.iter().any(|m| m.account == *acc);
+
+        let ranked_occ = Occupation::get_ordered(self.account);
+        let weights = weighted_normalization(ranked_occ.iter(), get_curve(self.dist_strat.into()));
+
+        let groups = ranked_occ.into_iter().zip(weights).map(|(occ, w)| {
+            let member_scores = occu_wrapper::call_to(occ.occupation)
+                .get_scores(self.account)
+                .into_iter()
+                .filter(|(m, _)| is_member(m));
+            (w, member_scores)
+        });
+
+        combine_group_scores(groups)
     }
 
     fn save(&self) {
