@@ -40,9 +40,7 @@ pub mod service {
                 .map(|account| (account.account, 1))
                 .collect();
 
-        DynamicAuthPolicy::from_weighted_authorizers(
-            accounts.clone(),
-            two_thirds_plus_one(accounts.len() as u8),
-        )
+        let threshold = two_thirds_plus_one(accounts.len() as u8);
+        DynamicAuthPolicy::from_weighted_authorizers(accounts, threshold)
     }
 }
