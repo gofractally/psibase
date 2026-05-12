@@ -1,11 +1,11 @@
-import {
-    MailList,
-    MailboxHeader,
-    MessageDetail,
-    NoMessageSelected,
-} from "@/apps/chainmail/components";
-import { useIncomingMessages, useIsDesktop } from "@/apps/chainmail/hooks";
 import { useEffect } from "react";
+
+import { NoMessageSelected } from "@/apps/chainmail/components/empty-states";
+import { MailList } from "@/apps/chainmail/components/mail-list";
+import { MailboxHeader } from "@/apps/chainmail/components/mailbox-header";
+import { MessageDetail } from "@/apps/chainmail/components/message-detail";
+import { useIsDesktop } from "@/apps/chainmail/hooks/use-is-desktop";
+import { useIncomingMessages } from "@/apps/chainmail/hooks/use-mail";
 
 import { TwoColumnSelect } from "@/components/two-column-select";
 

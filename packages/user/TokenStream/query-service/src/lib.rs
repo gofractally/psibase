@@ -65,7 +65,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, CreatedEvent>> {
+        ) -> async_graphql::Result<EventConnection<CreatedEvent>> {
             EventQuery::new("history.token-stream.created")
                 .first(first)
                 .last(last)
@@ -81,7 +81,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, UpdatedEvent>> {
+        ) -> async_graphql::Result<EventConnection<UpdatedEvent>> {
             EventQuery::new("history.token-stream.updated")
                 .condition(format!("nft_id = {}", nft_id))
                 .first(first)

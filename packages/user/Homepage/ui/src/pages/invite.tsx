@@ -10,9 +10,9 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
 import { postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
+import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Card,
@@ -44,7 +44,7 @@ const fetchInvite = async (token: string) => {
     });
 
     const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "invite", "graphql", false),
+        siblingUrl(undefined, "invite", "graphql"),
         `
             query InviteById {
                 inviteById(inviteId: ${inviteId}) {

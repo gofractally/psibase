@@ -22,7 +22,6 @@ export const getToken = async (tokenId: number) => {
             }
         `,
         {
-            baseUrlIncludesSibling: false,
             service: "tokens",
         },
     );

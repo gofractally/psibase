@@ -597,16 +597,13 @@ impl<
                         .await
                         .with_context(|| format!("Failed to acquire job"))?,
                 );
-                println!("first slot acquired")
             } else {
                 match select(new_slot, self.running.next()).await {
                     Either::Left((slot, _)) => {
                         self.acquired
                             .push(slot.with_context(|| format!("Failed to acquire job"))?);
-                        println!("slot acquired");
                     }
                     Either::Right((res, slot)) => {
-                        println!("job finished");
                         res.unwrap()?;
                         self.pending = Some(slot)
                     }

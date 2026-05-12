@@ -143,6 +143,19 @@ namespace
       psibase::socketSend(sock, psio::to_frac(std::move(reply)));
    }
 
+   bool hasTls(const SocketInfo& info)
+   {
+      return std::visit(
+          [](const auto& i) -> bool
+          {
+             if constexpr (requires { i.tls; })
+                return i.tls.has_value();
+             else
+                return false;
+          },
+          info);
+   }
+
    bool chainIsBooted()
    {
       auto mode   = KvMode::read;
@@ -557,6 +570,35 @@ void XHttp::startSession()
 {
    check(getSender() == AccountNumber{}, "Wrong sender");
    recurse().to<XAdmin>().startSession();
+}
+
+bool XHttp::isSecure(int32_t socket)
+{
+   auto sender   = getSender();
+   auto receiver = getReceiver();
+
+   auto ownedBySender = [&](auto table, auto field)
+   {
+      if (auto row = table.get(socket))
+         return (*row).*field == sender;
+      return false;
+   };
+
+   std::optional<SocketRow> socketRow;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto session = Session{receiver, KvMode::read};
+      auto temp    = Temporary{receiver, KvMode::read};
+      if (!ownedBySender(session.open<PendingRequestTable>(), &PendingRequestRow::owner) &&
+          !ownedBySender(temp.open<TempPendingRequestTable>(), &TempPendingRequestRow::owner) &&
+          !ownedBySender(session.open<ResponseHandlerTable>(), &ResponseHandlerRow::service) &&
+          !ownedBySender(temp.open<TempResponseHandlerTable>(), &TempResponseHandlerRow::service))
+         abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
+
+      socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
+   }
+
+   return hasTls(socketRow.value().info);
 }
 
 auto XHttp::serveSys(HttpRequest                 req,

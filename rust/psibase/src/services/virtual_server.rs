@@ -406,7 +406,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 }
 
 #[test]

@@ -28,7 +28,7 @@ mod service {
     }
 
     #[action]
-    fn newAccount(name: AccountNumber, authService: AccountNumber, requireNew: bool) {
+    fn newAccount(name: AccountNumber, authService: AccountNumber, requireMatch: bool) -> bool {
         unimplemented!()
     }
 

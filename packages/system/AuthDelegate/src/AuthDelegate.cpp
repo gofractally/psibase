@@ -104,21 +104,31 @@ namespace SystemService
       return Actor<AuthInterface>{service, to<Accounts>().getAuthOf(account)};
    }
 
-   void AuthDelegate::newAccount(psibase::AccountNumber name, psibase::AccountNumber owner)
+   // cases to consider:
+   // - the account does not exist
+   // - the account exists and uses AuthDelegate with another owner
+   // - the account exists and uses a different auth service
+   // - the account exists and uses a different auth service but there is a record in auth delegate
+   bool AuthDelegate::newAccount(psibase::AccountNumber name,
+                                 psibase::AccountNumber owner,
+                                 bool                   requireMatch)
    {
-      auto table  = open<AuthDelegateTable>();
-      auto record = table.getIndex<0>().get(name);
-      if (record && record->owner == owner)
+      auto table = open<AuthDelegateTable>();
+      if (requireMatch)
       {
-         // idempotent if the new account already exists & is owned
-         //   by the same owner
-         return;
+         auto record = table.getIndex<0>().get(name);
+         if (record && record->owner != owner)
+         {
+            abortMessage(std::format("{} is owned by {}", name.str(), record->owner.str()));
+         }
       }
 
       check(to<Accounts>().exists(owner), "owner account does not exist");
 
-      table.put(AuthDelegateRecord{.account = name, .owner = owner});
-      to<Accounts>().newAccount(name, AuthDelegate::service, true);
+      bool created = to<Accounts>().newAccount(name, AuthDelegate::service, requireMatch);
+      if (created)
+         table.put(AuthDelegateRecord{.account = name, .owner = owner});
+      return created;
    }
 
 }  // namespace SystemService

@@ -64,12 +64,14 @@ namespace SystemService
 
       /// Used to create a new account with a specified auth service
       ///
-      /// The accounts permitted to call this action are restricted to either Accounts itself
-      /// or the service indicated by `inviteService`. If the `requireNew` flag is set, then
-      /// the action will fail if the `name` account already exists.
-      void newAccount(psibase::AccountNumber name,
+      /// Existing accounts will not be modified. If the `requireMatch`
+      /// flag is set, then the action will fail if the `name` account
+      /// already exists and uses a different auth service.
+      ///
+      /// Returns true if an account was created
+      bool newAccount(psibase::AccountNumber name,
                       psibase::AccountNumber authService,
-                      bool                   requireNew);
+                      bool                   requireMatch);
 
       /// Used to update the auth service used by an account
       void setAuthServ(psibase::AccountNumber authService);
@@ -89,7 +91,7 @@ namespace SystemService
    PSIO_REFLECT(Accounts,
                 method(init),
                 method(preapproveAcc, name),
-                method(newAccount, name, authService, requireNew),
+                method(newAccount, name, authService, requireMatch),
                 method(setAuthServ, authService),
                 method(getAccount, name),
                 method(getAuthOf, account),

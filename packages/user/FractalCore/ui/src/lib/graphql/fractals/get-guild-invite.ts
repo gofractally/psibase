@@ -26,7 +26,7 @@ const zGuildInviteDetailsResponse = z.object({
 
 export const getGuildInvite = async (inviteId: number) => {
     const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "fractals", "graphql", true),
+        siblingUrl(undefined, "fractals", "graphql"),
         `
         {
             guildInvite(id: ${inviteId}) {

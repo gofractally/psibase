@@ -1,4 +1,4 @@
-import { getJson, siblingUrl } from "@psibase/common-lib";
+import { getJson, postGraphQLGetJson, siblingUrl } from "@psibase/common-lib";
 
 import { loadBasic } from "./component-loading";
 import { DownloadFailed } from "./errors";
@@ -7,7 +7,7 @@ export const wasmFromUrl = async (url: string) => {
     let headers: [string, string][] = [];
     if (queryToken) {
         headers = [["Authorization", `Bearer ${queryToken}`]];
-    } 
+    }
     return fetch(url, {
         headers,
     })
@@ -43,9 +43,12 @@ export interface QualifiedOriginationData extends OriginationData {
     app: string;
 }
 
-export const assert = (condition: boolean, errorMessage: string): void => {
+export function assert(
+    condition: unknown,
+    errorMessage: string,
+): asserts condition {
     if (!condition) throw new Error(errorMessage);
-};
+}
 
 let modulePromise: Promise<any>;
 
@@ -56,15 +59,16 @@ export const parser = (): Promise<any> => {
             "supervisor",
             "/common/component_parser.wasm",
         );
-        modulePromise = wasmFromUrl(url).then((bytes) =>
-            loadBasic(bytes, "component-parser.js"),
-        );
+        modulePromise = wasmFromUrl(url)
+            .then((bytes) => loadBasic(bytes, "component-parser.js"))
+            .then(({ exports }) => exports);
     }
     return modulePromise;
 };
 
 let queryToken: string | undefined;
-export const setQueryToken = (token: string | undefined) => (queryToken = token);
+export const setQueryToken = (token: string | undefined) =>
+    (queryToken = token);
 
 export let chainId: string | undefined;
 const getChainId = (): Promise<string> => {
@@ -78,6 +82,22 @@ const getChainId = (): Promise<string> => {
 };
 export const chainIdPromise: Promise<string> = getChainId();
 
+export let networkName: string | undefined;
+const getNetworkName = (): Promise<string> => {
+    if (!networkName) {
+        const url = siblingUrl(null, "branding", "/graphql");
+        return postGraphQLGetJson<{ data: { networkName: string } }>(
+            url,
+            "query { networkName }",
+        ).then((res) => {
+            networkName = res.data.networkName;
+            return networkName;
+        });
+    }
+    return Promise.resolve(networkName);
+};
+export const networkNamePromise: Promise<string> = getNetworkName();
+
 export const isString = (value: any): value is string => {
     return typeof value === "string";
 };
@@ -85,8 +105,7 @@ export const isString = (value: any): value is string => {
 export const isEmbedded: boolean = (() => {
     try {
         return (
-            window.top?.location.origin ===
-            siblingUrl(null, "supervisor", null, true)
+            window.top?.location.origin === siblingUrl(null, "supervisor", null)
         );
     } catch {
         return false;

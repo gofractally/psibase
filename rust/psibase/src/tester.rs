@@ -158,7 +158,7 @@ impl Chain {
             &None,
             PRODUCER_ACCOUNT,
             false,
-            TimePointSec { seconds: 10 },
+            TimePointSec { seconds: 120 },
             &mut services[..],
             COMPRESSION_LEVEL,
         )
@@ -173,6 +173,7 @@ impl Chain {
         for (_, group, _) in subsequent_tx {
             for trx in group {
                 self.push(&trx).ok()?;
+                self.start_block();
             }
         }
 
@@ -609,7 +610,8 @@ impl Chain {
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
         services::accounts::Wrapper::push(self)
             .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
-            .get()
+            .get()?;
+        Ok(())
     }
 
     /// Deploy a service
@@ -640,6 +642,7 @@ impl Chain {
                     proofs: Default::default(),
                     subjectiveData: None,
                 });
+                self.start_block();
                 ChainEmptyResult { trace }.get()?
             }
         }

@@ -1,13 +1,14 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages,
-    producers, setcode, sites, transact, verify_sig, x_sites,
+    accounts, auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers, setcode, sites,
+    transact, verify_sig, x_sites,
 };
 use crate::{
-    reg_server, schema_types, set_code_action, solve_dependencies, version_match, AccountNumber,
-    Action, AnyPublicKey, Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString,
-    Pack, PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
+    new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
+    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256, CodeRow,
+    GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp,
+    PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -649,8 +650,8 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        if sender == producers::ROOT {
-            actions.push(accounts::Wrapper::pack_from(accounts::SERVICE).preapproveAcc(account));
+        if let Some(preapprove) = preapprove_action(sender, account) {
+            actions.push(preapprove)
         }
         if let Some(key) = key {
             if key.key.service != verify_sig::SERVICE {
@@ -661,7 +662,7 @@ impl<R: Read + Seek> PackagedService<R> {
                     .newAccount(account, key.key.rawData.0.clone().into()),
             );
         } else {
-            actions.push(auth_delegate::Wrapper::pack_from(sender).newAccount(account, sender));
+            actions.push(new_account_owned_action(sender, account, sender));
         }
         Ok(())
     }
@@ -1629,19 +1630,6 @@ impl EssentialServices {
         }
         return false;
     }
-}
-
-pub fn get_essential_packages(
-    packages: &Vec<PackageInfo>,
-    essential_services: &EssentialServices,
-) -> Vec<String> {
-    let mut result = Vec::new();
-    for info in packages {
-        if essential_services.intersects(&info.accounts) {
-            result.push(info.name.clone());
-        }
-    }
-    result
 }
 
 #[async_trait(?Send)]

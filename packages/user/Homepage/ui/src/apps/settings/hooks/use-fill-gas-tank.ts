@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { supervisor } from "@/supervisor";
-
-import { toast } from "@shared/shadcn/ui/sonner";
 import QueryKey from "@/lib/query-keys";
+
+import { supervisor } from "@shared/lib/supervisor";
+import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useFillGasTank = () => {
     return useMutation<void, Error, void>({
@@ -48,7 +48,9 @@ export const useResizeAndFillGasTank = () => {
             });
         },
         onError: (error) => {
-            toast.error(error.message || "Failed to resize and refill gas tank");
+            toast.error(
+                error.message || "Failed to resize and refill gas tank",
+            );
         },
     });
 };

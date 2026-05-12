@@ -11,9 +11,8 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-
 import { Avatar } from "@shared/components/avatar";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -63,9 +62,7 @@ export function ContactDetails({
     );
 
     const { data: currentUser } = useCurrentUser();
-    const { data: profile } = useProfile(contact?.account, true, {
-        baseUrlIncludesSibling: false,
-    });
+    const { data: profile } = useProfile(contact?.account, true, {});
 
     const { mutateAsync: updateContact } = useUpdateContact();
     const { mutateAsync: deleteContact } = useDeleteContact();

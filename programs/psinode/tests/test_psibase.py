@@ -142,7 +142,7 @@ class TestPsibase(unittest.TestCase):
                 [{"sender":"root",
                   "service":"accounts",
                   "method":"newAccount",
-                  "data":{"name":account,"authService":"auth-any","requireNew":False}}])
+                  "data":{"name":account,"authService":"auth-any","requireMatch":False}}])
         a.run_psibase(['push'] + a.node_args(), input=make_input('bbbbb12345'), text=True)
         a.run_psibase(['push', '-'] + a.node_args(), input=make_input('ccccc12345'), text=True)
         with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8') as f:

@@ -135,7 +135,6 @@ export const Branding = () => {
                                               null,
                                               "branding",
                                               "/network_logo.svg",
-                                              true,
                                           )
                                         : "");
                                 const hasDraft = !!field.state.value;

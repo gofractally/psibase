@@ -89,7 +89,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, NewGroup>> {
+        ) -> async_graphql::Result<EventConnection<NewGroup>> {
             EventQuery::new("history.evaluations.new_group")
                 .condition(format!(
                     "owner = 'fractals' AND evaluation_id = {}",
@@ -109,7 +109,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
+        ) -> async_graphql::Result<EventConnection<EvaluationFinish>> {
             EventQuery::new("history.fractals.evaluation_finished")
                 .condition(format!("guild = '{}'", guild))
                 .first(first)
@@ -126,7 +126,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, ScheduledEvaluation>> {
+        ) -> async_graphql::Result<EventConnection<ScheduledEvaluation>> {
             EventQuery::new("history.fractals.scheduled_evaluation")
                 .condition(format!("guild = '{}'", guild))
                 .first(first)
@@ -143,7 +143,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+        ) -> async_graphql::Result<EventConnection<GroupFinish>> {
             EventQuery::new("history.evaluations.group_fin")
                 .condition(format!(
                     "owner = 'fractals' AND evaluation_id = {}",

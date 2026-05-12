@@ -12,7 +12,7 @@ export const useGuild = (optionalGuildAccount?: OptionalAccount) => {
     return useQuery({
         queryKey: QueryKey.guild(guildAccount),
         queryFn: async () => {
-            return getGuild(guildAccount!);
+            return await getGuild(guildAccount!);
         },
         staleTime: 10000,
         enabled: !!guildAccount,

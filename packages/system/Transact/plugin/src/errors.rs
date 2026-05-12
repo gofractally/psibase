@@ -9,4 +9,5 @@ plugin_error! {
     ClaimProofMismatch => "Number of proofs does not match number of claims",
     WrongOrigin(origin: &'a str) => "Cannot be called by {origin}",
     BadResponse(msg: &'a str) => "Bad response: {msg}",
+    InvalidAccount(account: &'a str) => "Invalid account: {account}",
 }

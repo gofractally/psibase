@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
 import { siblingUrl } from "@psibase/common-lib";
 
 import { modifyUrlParams } from "@shared/lib/modify-url-params";
+import { supervisor } from "@shared/lib/supervisor";
 
 export const useGenerateInvite = () =>
     useMutation({
@@ -18,12 +18,9 @@ export const useGenerateInvite = () =>
                 }),
             );
 
-            const res = modifyUrlParams(
-                siblingUrl(undefined, null, "invite", false),
-                {
-                    token,
-                },
-            );
+            const res = modifyUrlParams(siblingUrl(undefined, null, "invite"), {
+                token,
+            });
 
             return z.string().parse(res);
         },
