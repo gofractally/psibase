@@ -1,7 +1,7 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers, setcode, sites,
+    auth_sig, brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers, setcode, sites,
     transact, verify_sig, x_sites,
 };
 use crate::{
@@ -1371,7 +1371,6 @@ fn build_package_order_graph<R: Read + Seek>(
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut result: HashMap<String, Vec<String>> = HashMap::new();
     let mut provides_service: HashMap<AccountNumber, &Meta> = HashMap::new();
-    let empty_deps = Vec::new();
     let mut service_deps = HashMap::new();
     // Build the graph of service dependencies. Service dependencies
     // can be cyclic as long as nothing calls any of the services in
@@ -1395,11 +1394,6 @@ fn build_package_order_graph<R: Read + Seek>(
                     // assume they are installed. This transitively requires all
                     // services that this package might use to be installed.
                     service_deps.insert(package.name().to_string(), &package.meta().depends);
-                } else if !package.postinstall.is_empty() {
-                    // If a package provides a postinstall script, direct dependents
-                    // can assume that it has been run. Dependencies only need to
-                    // be installed first if they are required to install this package
-                    service_deps.insert(package.name().to_string(), &empty_deps);
                 }
             }
             PackageOpFull::Remove(_) => {}
@@ -1442,9 +1436,6 @@ fn build_package_order_graph<R: Read + Seek>(
                 if !meta.services.is_empty() {
                     service_deps.insert(name.clone(), &meta.depends);
                 }
-                // We don't know whether this package has a postinstall
-                // script, and it doesn't matter, because it's already
-                // been executed and won't be executed again.
             }
         }
     }

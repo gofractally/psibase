@@ -90,7 +90,7 @@ function buildInterfaceProxy(
     const proxy: Record<string, unknown> = {};
     for (const func of intf.funcs) {
         if (isResourceMethod(func.name)) {
-            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host);
+            addResourceProxy(proxy, intf, func.name, func.dynamicLink, host, services);
         } else if (func.dynamicLink) {
             proxy[kebabToCamel(func.name)] = (
                 pluginRef: { handle: number },
@@ -130,6 +130,7 @@ function addResourceProxy(
     funcName: string,
     isDynamic: boolean,
     host: HostInterface,
+    services: ServiceMap | null,
 ): void {
     if (isDynamic) {
         throw new Error(`Dynamic resource methods are not supported`);
