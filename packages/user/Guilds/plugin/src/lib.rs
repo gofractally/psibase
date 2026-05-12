@@ -35,9 +35,11 @@ define_trust! {
             - Joining a fractal as a member
             - Creating a new guild
             - Applying to join a guild
+            - Cancelling a guild application
             - Registering for or unregistering from a guild evaluation
             - Managing guild member invites
             - Attesting guild membership applications
+            - Withdrawing a guild membership attestation
             - Registering or retiring council candidacy
             - Updating guild application information
             - Setting guild display name, bio, and description
@@ -49,6 +51,7 @@ define_trust! {
             - Setting the guild evaluation schedule
             - Setting ranked guilds for scoring
             - Setting the rank ordering threshold
+            - Setting the guild candidacy cooldown
             - Mapping a governance role to a guild
         ",
     }
@@ -58,6 +61,7 @@ define_trust! {
             join_fractal,
             create_guild,
             apply_guild,
+            cancel_guild_app,
             delete_guild_invite,
             set_display_name,
             set_bio,
@@ -67,6 +71,7 @@ define_trust! {
             remove_guild_rep,
             invite_member,
             attest_membership_app,
+            remove_attestation,
             register_candidacy,
             set_guild_app_info,
             register,
@@ -77,6 +82,7 @@ define_trust! {
         ],
         High => [
             set_rank_ordering_threshold,
+            set_candidacy_cooldown,
             set_ranked_guilds,
             set_schedule,
             start_eval,
@@ -344,6 +350,19 @@ impl AdminGuild for GuildsPlugin {
         add_action_to_transaction(guilds::action_structs::set_thres::ACTION_NAME, &packed_args)
     }
 
+    fn set_candidacy_cooldown(cooldown: u32) -> Result<(), Error> {
+        assert_authorized(FunctionName::set_candidacy_cooldown)?;
+
+        let packed_args = guilds::action_structs::set_can_cd {
+            candidacy_cooldown: cooldown,
+        }
+        .packed();
+        add_action_to_transaction(
+            guilds::action_structs::set_can_cd::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
         assert_authorized(FunctionName::set_ranked_guilds)?;
 
@@ -418,6 +437,20 @@ impl UserGuild for GuildsPlugin {
         )
     }
 
+    fn cancel_guild_app(guild_account: String) -> Result<(), Error> {
+        get_guild(guild_account.clone())?.assert_authorized(FunctionName::cancel_guild_app)?;
+
+        let packed_args = guilds::action_structs::cancel_g_app {
+            guild_account: guild_account.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            guilds::action_structs::cancel_g_app::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
     fn attest_membership_app(
         guild_account: String,
         applicant: String,
@@ -437,6 +470,22 @@ impl UserGuild for GuildsPlugin {
 
         add_action_to_transaction(
             guilds::action_structs::at_mem_app::ACTION_NAME,
+            &packed_args,
+        )
+    }
+
+    fn remove_attestation(guild_account: String, applicant: String) -> Result<(), Error> {
+        let guild = get_guild(guild_account.clone())?;
+        guild.assert_authorized(FunctionName::remove_attestation)?;
+
+        let packed_args = guilds::action_structs::rm_attest {
+            guild_account: guild_account.as_str().into(),
+            applicant: applicant.as_str().into(),
+        }
+        .packed();
+
+        add_action_to_transaction(
+            guilds::action_structs::rm_attest::ACTION_NAME,
             &packed_args,
         )
     }

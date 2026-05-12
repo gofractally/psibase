@@ -176,6 +176,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set candidacy cooldown
+    ///
+    /// # Arguments
+    /// * `candidacy_cooldown` - Seconds a guild member must wait between toggling candidacy.
+    #[action]
+    fn set_can_cd(candidacy_cooldown: u32) {
+        unimplemented!()
+    }
+
     /// Kick member from guild
     ///
     /// # Arguments
@@ -205,6 +214,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Cancel the sender's pending application to a guild.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    #[action]
+    fn cancel_g_app(guild_account: AccountNumber) {
+        unimplemented!()
+    }
+
     /// Add a member to a fractal.
     ///
     /// # Arguments
@@ -228,6 +246,16 @@ pub mod Service {
         comment: String,
         endorses: bool,
     ) {
+        unimplemented!()
+    }
+
+    /// Remove the sender's attestation on a guild membership application.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    /// * `applicant` - Applicant whose attestation is being withdrawn.
+    #[action]
+    fn rm_attest(guild_account: AccountNumber, applicant: AccountNumber) {
         unimplemented!()
     }
 

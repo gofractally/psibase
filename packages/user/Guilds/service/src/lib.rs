@@ -6,8 +6,8 @@ pub mod service {
     use crate::{
         helpers::RollingBits16,
         tables::tables::{
-            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildInvite, GuildMember,
-            GuildMemberTable, Ranking, RoleMap,
+            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildAttest, GuildInvite,
+            GuildMember, GuildMemberTable, Ranking, RoleMap,
         },
     };
     use psibase::{
@@ -199,6 +199,15 @@ pub mod service {
         Guild::by_sender().set_rank_ordering_threshold(rank_ordering_threshold);
     }
 
+    /// Set candidacy cooldown
+    ///
+    /// # Arguments
+    /// * `candidacy_cooldown` - Seconds a guild member must wait between toggling candidacy.
+    #[action]
+    fn set_can_cd(candidacy_cooldown: u32) {
+        Guild::by_sender().set_candidacy_cooldown(candidacy_cooldown);
+    }
+
     /// On Invite Accept.
     ///
     /// Used by invite hook
@@ -242,6 +251,15 @@ pub mod service {
         GuildApplication::add(guild_account, get_sender(), extra_info);
     }
 
+    /// Cancel the sender's pending application to a guild.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    #[action]
+    fn cancel_g_app(guild_account: AccountNumber) {
+        GuildApplication::get_assert(guild_account, get_sender()).cancel();
+    }
+
     /// Attest Guild Membership application
     ///
     /// # Arguments
@@ -261,6 +279,16 @@ pub mod service {
             get_sender(),
             endorses,
         );
+    }
+
+    /// Remove the sender's attestation on a guild membership application.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    /// * `applicant` - Applicant whose attestation is being withdrawn.
+    #[action]
+    fn rm_attest(guild_account: AccountNumber, applicant: AccountNumber) {
+        GuildAttest::get_assert(guild_account, applicant, get_sender()).remove();
     }
 
     /// Starts an evaluation for the specified guild.

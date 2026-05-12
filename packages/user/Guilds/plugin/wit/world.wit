@@ -38,6 +38,8 @@ interface admin-guild {
     set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
     set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
 
+    set-candidacy-cooldown: func(cooldown: u32) -> result<_, error>;
+
 }
 
 interface user-guild {
@@ -52,7 +54,9 @@ interface user-guild {
 
     invite-member: func(guild-account: string, num-accounts: u16, pre-attest: bool) -> result<string, error>;
     apply-guild: func(guild-account: string, app: string) -> result<_, error>;
+    cancel-guild-app: func(guild-account: string) -> result<_, error>;
     attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
+    remove-attestation: func(guild-account: string, applicant: string) -> result<_, error>;
 }
 
 interface user-eval {
