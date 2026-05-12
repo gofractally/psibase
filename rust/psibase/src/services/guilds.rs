@@ -20,7 +20,7 @@ pub mod Service {
 
     /// Is active
     ///
-    /// Advises if the occupation considers a fractal member account an active member
+    /// Check if an account is considered active in an occupation
     ///
     /// # Arguments
     /// * `fractal` - Fractal.
@@ -340,7 +340,7 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Called when a group finalizes its result in a fractal evaluation.
+    /// Called when a group finalizes its result in an evaluation.
     ///
     /// # Arguments
     /// * `evaluation_id` - The ID of the evaluation.

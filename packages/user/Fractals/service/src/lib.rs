@@ -202,7 +202,7 @@ pub mod service {
         Fractal::get_assert(fractal).distribute_tokens();
     }
 
-    /// Sets occupation on a fractal role.
+    /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
