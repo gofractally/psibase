@@ -2,99 +2,74 @@ pub mod constants;
 pub mod helpers;
 pub mod tables;
 
+macro_rules! ban {
+    ($svc:ident, $action:ident) => {
+        (&$svc::SERVICE, $svc::action_structs::$action::ACTION_NAME)
+    };
+}
+
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::helpers::check_fractal_auth;
-    use crate::tables::tables::RewardStream;
-    use crate::tables::tables::{Fractal, FractalMember, Occupation, Role};
-
-    use psibase::services::fractals::occu_wrapper;
-    use psibase::services::fractals::FractalRole;
-    use psibase::*;
-    use psibase::{
-        services::{
-            auth_dyn::{self, policy::DynamicAuthPolicy},
-            transact::ServiceMethod,
-        },
-        AccountNumber,
+    use crate::{
+        helpers::check_fractal_auth,
+        tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role},
     };
 
-    use psibase::services::fractals::action_structs as FractalActions;
+    use psibase::{
+        services::{
+            accounts as Accounts,
+            auth_dyn::{self, policy::DynamicAuthPolicy},
+            fractals::{action_structs as Actns, occu_wrapper, FractalRole},
+            setcode as SetCode, staged_tx as StagedTx,
+            transact::ServiceMethod,
+        },
+        *,
+    };
+    use FractalRole::*;
 
     const ROLE_METHODS: &[(FractalRole, &str)] = &[
-        (
-            FractalRole::Recruitment,
-            FractalActions::add_mem::ACTION_NAME,
-        ),
-        (
-            FractalRole::Judiciary,
-            FractalActions::exile_member::ACTION_NAME,
-        ),
-        (
-            FractalRole::Legislature,
-            FractalActions::set_r_occ::ACTION_NAME,
-        ),
-        (
-            FractalRole::Legislature,
-            FractalActions::set_dist_int::ACTION_NAME,
-        ),
-        (
-            FractalRole::Legislature,
-            FractalActions::set_gen_time::ACTION_NAME,
-        ),
-        (
-            FractalRole::Legislature,
-            FractalActions::set_dstrat::ACTION_NAME,
-        ),
-        (
-            FractalRole::Legislature,
-            FractalActions::set_paid_occ::ACTION_NAME,
-        ),
-        (
-            FractalRole::Legislature,
-            FractalActions::init_token::ACTION_NAME,
-        ),
+        (Recruitment, Actns::add_mem::ACTION_NAME),
+        (Judiciary, Actns::exile_member::ACTION_NAME),
+        (Legislature, Actns::set_r_occ::ACTION_NAME),
+        (Legislature, Actns::set_dist_int::ACTION_NAME),
+        (Legislature, Actns::set_gen_time::ACTION_NAME),
+        (Legislature, Actns::set_dstrat::ACTION_NAME),
+        (Legislature, Actns::set_paid_occ::ACTION_NAME),
+        (Legislature, Actns::init_token::ACTION_NAME),
     ];
 
-    fn is_banned_method(method: &ServiceMethod) -> bool {
-        use psibase::services::accounts as Accounts;
-        use psibase::services::setcode as SetCode;
-        use psibase::services::staged_tx as StagedTx;
+    const BANNED: &[(&AccountNumber, &str)] = &[
+        ban!(Accounts, setAuthServ),
+        ban!(SetCode, setCode),
+        ban!(SetCode, setCodeStaged),
+        ban!(StagedTx, propose),
+        ban!(StagedTx, accept),
+    ];
 
-        const BANNED: &[(&AccountNumber, &str)] = &[
-            (
-                &Accounts::SERVICE,
-                Accounts::action_structs::setAuthServ::ACTION_NAME,
-            ),
-            (
-                &SetCode::SERVICE,
-                SetCode::action_structs::setCode::ACTION_NAME,
-            ),
-            (
-                &SetCode::SERVICE,
-                SetCode::action_structs::setCodeStaged::ACTION_NAME,
-            ),
-            (
-                &StagedTx::SERVICE,
-                StagedTx::action_structs::propose::ACTION_NAME,
-            ),
-            (
-                &StagedTx::SERVICE,
-                StagedTx::action_structs::accept::ACTION_NAME,
-            ),
-        ];
+    fn method_policy(
+        account: AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> Option<DynamicAuthPolicy> {
+        let method = method?;
 
-        BANNED
-            .iter()
-            .any(|(svc, name)| **svc == method.service && *name == &method.method.to_string())
-    }
+        let is_banned = BANNED.iter().any(|&(svc, name)| {
+            *svc == method.service && method.method == MethodNumber::from(name)
+        });
 
-    fn get_role_for_method(method: MethodNumber) -> Option<FractalRole> {
-        ROLE_METHODS
-            .iter()
-            .find(|(_, name)| method == MethodNumber::from(*name))
-            .map(|(role, _)| *role)
+        if is_banned {
+            return Some(DynamicAuthPolicy::impossible());
+        }
+        if method.service == get_service() {
+            let role = ROLE_METHODS
+                .iter()
+                .find(|(_, name)| method.method == MethodNumber::from(*name))
+                .map(|(role, _)| *role);
+            if let Some(role) = role {
+                return Some(Role::get_assert(account, role).auth_policy());
+            }
+        }
+        None
     }
 
     /// Creates a new account and fractal.
@@ -283,19 +258,8 @@ pub mod service {
         account: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> auth_dyn::policy::DynamicAuthPolicy {
-        let method = match method {
-            None => return check_some(account_policy(account), "account not supported"),
-            Some(m) if is_banned_method(&m) => return DynamicAuthPolicy::impossible(),
-            Some(m) => m,
-        };
-
-        if method.service == get_service() {
-            if let Some(role) = get_role_for_method(method.method) {
-                return Role::get_assert(account, role).auth_policy();
-            }
-        }
-
-        check_some(account_policy(account), "account not supported")
+        let policy = method_policy(account, method).or_else(|| account_policy(account));
+        check_some(policy, "account not supported")
     }
 
     /// Has policy action used by AuthDyn service.
