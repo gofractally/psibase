@@ -1,3 +1,7 @@
+pub mod constants;
+pub mod distribute;
+pub mod weighted_normalization;
+
 use crate::abort_message;
 
 #[crate::service(
@@ -64,7 +68,7 @@ pub mod Occupation {
         unimplemented!()
     }
 
-    /// Check if a an account is considered active in an occupation
+    /// Check if an account is considered active in an occupation
     ///
     /// # Arguments
     /// * `fractal` - The account of the fractal.

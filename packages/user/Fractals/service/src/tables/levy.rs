@@ -1,10 +1,8 @@
 use async_graphql::ComplexObject;
+use psibase::services::fractals::constants::PPM;
 use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Table};
 
-use crate::{
-    constants::PPM,
-    tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream},
-};
+use crate::tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream};
 
 impl Levy {
     fn new(

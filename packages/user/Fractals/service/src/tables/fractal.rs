@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::u64;
-
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::sites;
@@ -11,12 +8,16 @@ use crate::constants::{
     DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
     MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
 };
-use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
+use psibase::services::fractals::distribute::{aggregate_member_weights, distribute_amount};
+use psibase::services::fractals::weighted_normalization::{
+    curves::{get_curve, Curve},
+    weighted_normalization,
+};
 use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
 
-use crate::helpers::{create_managed_account, distribute_by_weight};
+use crate::helpers::create_managed_account;
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -43,7 +44,7 @@ impl Fractal {
             created_at: now,
             mission,
             name,
-            dist_strat: Algorithm::Constant as u8,
+            dist_strat: Curve::Constant as u8,
             genesis_time: now,
             dist_interval_secs: DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
         }
@@ -62,7 +63,7 @@ impl Fractal {
         self.save();
     }
 
-    pub fn set_distribution_strategy(&mut self, strategy: Algorithm) {
+    pub fn set_distribution_strategy(&mut self, strategy: Curve) {
         self.dist_strat = strategy as u8;
         self.save();
     }
@@ -157,19 +158,6 @@ impl Fractal {
         )
     }
 
-    fn get_weighted_occupations(
-        &self,
-        total_distribution: Quantity,
-    ) -> (Vec<(Occupation, u64)>, u64) {
-        distribute_by_weight(
-            weighted_normalization(
-                self.dist_strat.into(),
-                Occupation::get_ordered(self.account),
-            ),
-            total_distribution.value,
-        )
-    }
-
     pub fn distribute_tokens(&self) {
         let mut stream = self.reward_stream();
         let (_, withdrawn) = stream.claim();
@@ -177,42 +165,31 @@ impl Fractal {
             return;
         }
         let members = FractalMember::get_all(self.account);
+        let is_fractal_member = |acc: AccountNumber| members.iter().any(|m| m.account == acc);
 
-        let mut total_dust = 0u64;
-        let mut payable_members = HashMap::new();
+        let occupations = Occupation::get_ordered(self.account);
+        let weighted =
+            weighted_normalization(occupations.iter(), get_curve(self.dist_strat.into()));
 
-        let (occupation_distributions, dust) = self.get_weighted_occupations(withdrawn);
+        let occupations_with_scores =
+            occupations
+                .into_iter()
+                .zip(weighted)
+                .map(|(occ, occ_weight)| {
+                    let member_scores =
+                        occu_wrapper::call_to(occ.occupation).get_scores(self.account);
+                    (occ.occupation, occ_weight, member_scores)
+                });
 
-        total_dust += dust;
+        let weighted_members = aggregate_member_weights(occupations_with_scores, is_fractal_member);
 
-        for (occupation_distribution, distribution_dust) in occupation_distributions {
-            let scores: Vec<(AccountNumber, u64)> =
-                occu_wrapper::call_to(occupation_distribution.occupation)
-                    .get_scores(self.account)
-                    .into_iter()
-                    .filter(|(mem, _)| members.iter().any(|member| member.account == *mem))
-                    .map(|(item, score)| (item, score as u64))
-                    .collect();
+        let dust = distribute_amount(weighted_members, withdrawn.value, |member, amount| {
+            RewardStream::get_assert(self.account, member)
+                .deposit(amount.into(), "Fractal reward".into());
+        });
 
-            let (member_distributions, member_dust) =
-                distribute_by_weight(scores, distribution_dust);
-            total_dust += member_dust;
-
-            for (member, amount) in member_distributions {
-                if amount > 0 {
-                    let new_balance =
-                        *payable_members.entry(member).or_insert(0.into()) + amount.into();
-                    payable_members.insert(member, new_balance);
-                }
-            }
-        }
-
-        if total_dust > 0 {
-            stream.deposit(total_dust.into(), "Dust recycle".into());
-        }
-
-        for (member, amount) in payable_members {
-            RewardStream::get_assert(self.account, member).deposit(amount, "Fractal reward".into());
+        if dust > 0 {
+            stream.deposit(dust.into(), "Dust recycle".into());
         }
     }
 

@@ -208,9 +208,12 @@
 //! Therefore, the rounding error accumulated inside the \\(K\\)-step Taylor
 //! recurrence provides the dominant contribution to the total error.
 
+use crate::services::tokens::{Decimal, Precision, Quantity};
+
 // Fixed-point scales
 const S: u128 = 1_000_000_000_000; // 12 decimal places internal scale
-pub const EXTERNAL_S: u128 = 10_000; // 4 decimal places
+/// Public API input/output use four decimal places (`10_000`-scaled fixed point).
+const EXTERNAL_S: u128 = 10_000; // 4 decimal places
 const MAX_INPUT_UNSCALED: u32 = 32;
 const MAX_INPUT_SCALED: u32 = MAX_INPUT_UNSCALED * (EXTERNAL_S as u32); // Power of 2 (scaled) nearest to the max input for which the output is accurate.
 
@@ -233,13 +236,36 @@ const PHI_POW2_TABLE: [u128; 7] = [
     23_725_150_497_407_000_000_000_000, // k=6, 2^6  = 64
 ];
 
+fn decimal_to_scaled_units(d: Decimal) -> u32 {
+    let p = d.precision.value() as u32;
+    let q = d.quantity.value as u128;
+    let denom = 10u128.pow(p);
+    let prod = q
+        .checked_mul(EXTERNAL_S)
+        .expect("continuous_fibonacci: quantity * EXTERNAL_S overflow");
+    let x_scaled = div_rounded(prod, denom);
+    crate::check(
+        x_scaled <= u128::from(MAX_INPUT_SCALED),
+        "continuous_fibonacci: x out of bounds",
+    );
+    x_scaled as u32 // MAX_INPUT_SCALED < u32::MAX
+}
+
 /// Calculate the Fibonacci value for a given x in a continuous function
 /// (rather than the typical discrete fib sequence).
 ///
 /// # Arguments
 ///
-/// * `x` - The input value scaled by 10_000, eg. (fib(1.4142) -> fib(14142))
-pub fn continuous_fibonacci(x: u32) -> u64 {
+/// * `x` - The input decimal value
+///
+/// Return value uses **precision 4**
+pub fn continuous_fibonacci(x: Decimal) -> Decimal {
+    let x_scaled = decimal_to_scaled_units(x);
+    let y = continuous_fibonacci_impl(x_scaled);
+    Decimal::new(Quantity::from(y), Precision::new(4).unwrap())
+}
+
+fn continuous_fibonacci_impl(x: u32) -> u64 {
     assert!(x <= MAX_INPUT_SCALED, "x out of bounds");
 
     // Split x into integer and fractional parts:
@@ -340,6 +366,7 @@ fn exp_taylor_scaled(t: u128) -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::tokens::Precision;
 
     fn from_fixed(y: u64) -> f64 {
         y as f64 / EXTERNAL_S as f64
@@ -351,6 +378,20 @@ mod tests {
     }
 
     #[test]
+    fn decimal_wrapper_matches_impl() {
+        let p4 = Precision::new(4).unwrap();
+        for x_scaled in 0..=MAX_INPUT_SCALED {
+            assert_eq!(
+                continuous_fibonacci_impl(x_scaled),
+                continuous_fibonacci(Decimal::new(Quantity::from(x_scaled as u64), p4))
+                    .quantity
+                    .value,
+                "x_scaled={x_scaled}",
+            );
+        }
+    }
+
+    #[test]
     fn check_accuracy() {
         let max_x_scaled: u32 = 32 * (EXTERNAL_S as u32);
         // 1e-4 accuracy experimentally determined to break at input 37.381
@@ -358,7 +399,7 @@ mod tests {
         for x_scaled in 0..=max_x_scaled {
             let x = x_scaled as f64 / EXTERNAL_S as f64;
 
-            let fx = from_fixed(continuous_fibonacci(x_scaled));
+            let fx = from_fixed(continuous_fibonacci_impl(x_scaled));
             let true_fx = fib_true(x);
             let err = (fx - true_fx).abs();
 
