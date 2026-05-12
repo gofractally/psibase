@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use crate::bindings::host::common::client::{self as Client};
 use crate::errors::ErrorType;
 use psibase::AccountNumber;
+use psibase_plugin::host::client as Client;
 
 pub fn get_sender_app() -> Result<AccountNumber, ErrorType> {
     let sender_string = Client::get_sender();

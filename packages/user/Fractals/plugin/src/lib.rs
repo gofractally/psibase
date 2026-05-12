@@ -5,10 +5,9 @@ use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::exports::fractals::plugin::user_fractal::Guest as UserFractal;
 
-use bindings::host::types::types::Error;
-use bindings::transact::plugin::intf::add_action_to_transaction;
+use psibase_plugin::{trust::*, *};
 
-use psibase::fracpack::Pack;
+use fractals::Wrapper as Fractals;
 
 mod errors;
 mod graphql;
@@ -16,51 +15,34 @@ mod helpers;
 
 use crate::bindings::accounts::plugin::api::gen_rand_account;
 use crate::bindings::exports::fractals::plugin::types;
+use crate::bindings::guilds::plugin as Guilds;
+use crate::bindings::transact::plugin::intf::set_propose_latch;
 use crate::graphql::fractal::get_fractal;
 use crate::helpers::get_sender_app;
-use crate::trust::assert_authorized;
-use psibase::define_trust;
-use trust::FunctionName;
-
-use crate::bindings::transact::plugin::intf::set_propose_latch;
-
-use crate::bindings::guilds::plugin as Guilds;
-
-define_trust! {
-    descriptions {
-        Low => "
-            - Triggering a fractal-wide token distribution
-        ",
-        Medium => "
-            - Creating a new fractal
-            - Joining the fractal
-            - Claiming accrued fractal token rewards
-            - Inviting a new member to a guild
-        ",
-        High => "
-            - Attesting a finalized ranking proposal
-            - Setting the occupation service for a fractal role
-        ",
-    }
-    functions {
-        None => [exile_member, init_token, set_dist_interval],
-        Low => [dist_token],
-        Medium => [claim_rewards, invite_member, create_fractal, join],
-        High => [attest, set_role_occupation],
-    }
-}
 
 struct FractallyPlugin;
 
+impl TrustConfig for FractallyPlugin {
+    fn capabilities() -> Capabilities {
+        Capabilities {
+            low: &["Triggering a fractal-wide token distribution"],
+            medium: &[
+                "Creating a new fractal",
+                "Claiming accrued fractal token rewards",
+            ],
+            high: &["Setting the occupation service for a fractal role"],
+        }
+    }
+}
+
 impl AdminFractal for FractallyPlugin {
+    #[psibase_plugin::authorized(Medium)]
     fn create_fractal(
         fractal_account: String,
         guild_account: String,
         name: String,
         mission: String,
     ) -> Result<(), Error> {
-        assert_authorized(FunctionName::create_fractal)?;
-
         use psibase::services::fractals::FractalRole::{
             Executive, Judiciary, Legislature, Recruitment,
         };
@@ -68,21 +50,15 @@ impl AdminFractal for FractallyPlugin {
         let fractal = fractal_account.parse().unwrap();
         let legislature = gen_rand_account(Some("leg"))?.as_str().into();
 
-        let packed_args = fractals::action_structs::create_frac {
-            fractal_account: fractal,
+        Fractals::add_to_tx().create_frac(
+            fractal,
+            legislature,
+            gen_rand_account(Some("jud"))?.as_str().into(),
+            gen_rand_account(Some("exec"))?.as_str().into(),
+            gen_rand_account(Some("rec"))?.as_str().into(),
             name,
             mission,
-            legislature,
-            judiciary: gen_rand_account(Some("jud"))?.as_str().into(),
-            executive: gen_rand_account(Some("exec"))?.as_str().into(),
-            recruitment: gen_rand_account(Some("rec"))?.as_str().into(),
-        }
-        .packed();
-
-        add_action_to_transaction(
-            fractals::action_structs::create_frac::ACTION_NAME,
-            &packed_args,
-        )?;
+        );
 
         Guilds::admin_guild::create_guild("Genesis", &fractal_account, &guild_account)?;
         set_propose_latch(Some(&fractal_account))?;
@@ -95,102 +71,52 @@ impl AdminFractal for FractallyPlugin {
         set_propose_latch(None)?;
 
         let set_role_occ = |role_id: u8| {
-            let packed_args = fractals::action_structs::set_r_occ {
-                fractal,
-                new_occupation: "guilds".into(),
-                role_id,
-            }
-            .packed();
-            add_action_to_transaction(
-                fractals::action_structs::set_r_occ::ACTION_NAME,
-                &packed_args,
-            )
+            Fractals::add_to_tx().set_r_occ(fractal, role_id, "guilds".into());
         };
 
-        set_role_occ(Legislature.into())?;
-        set_role_occ(Judiciary.into())?;
-        set_role_occ(Executive.into())?;
-        set_role_occ(Recruitment.into())
+        set_role_occ(Legislature.into());
+        set_role_occ(Judiciary.into());
+        set_role_occ(Executive.into());
+        set_role_occ(Recruitment.into());
+        Ok(())
     }
 
+    #[psibase_plugin::authorized(High)]
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_role_occupation)?;
-        let packed_args = fractals::action_structs::set_r_occ {
-            fractal: get_sender_app()?,
-            new_occupation: occupation.as_str().into(),
-            role_id,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::set_r_occ::ACTION_NAME,
-            &packed_args,
-        )
+        Fractals::add_to_tx().set_r_occ(get_sender_app()?, role_id, occupation.as_str().into());
+        Ok(())
     }
 
+    #[psibase_plugin::authorized(None)]
     fn init_token() -> Result<(), Error> {
-        assert_authorized(FunctionName::init_token)?;
-
-        let packed_args = fractals::action_structs::init_token {
-            fractal: get_sender_app()?,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::init_token::ACTION_NAME,
-            &packed_args,
-        )
+        Fractals::add_to_tx().init_token(get_sender_app()?);
+        Ok(())
     }
 
+    #[psibase_plugin::authorized(None)]
     fn exile_member(member: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::exile_member)?;
-        let packed_args = fractals::action_structs::exile_member {
-            fractal: get_sender_app()?,
-            member: member.parse().unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::exile_member::ACTION_NAME,
-            &packed_args,
-        )
+        Fractals::add_to_tx().exile_member(get_sender_app()?, member.parse().unwrap());
+        Ok(())
     }
 
+    #[psibase_plugin::authorized(None)]
     fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
-        assert_authorized(FunctionName::set_dist_interval)?;
-        let packed_args = fractals::action_structs::set_dist_int {
-            fractal: get_sender_app()?,
-            distribution_interval_secs,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::set_dist_int::ACTION_NAME,
-            &packed_args,
-        )
+        Fractals::add_to_tx().set_dist_int(get_sender_app()?, distribution_interval_secs);
+        Ok(())
     }
 }
 
 impl UserFractal for FractallyPlugin {
+    #[psibase_plugin::authorized(Medium)]
     fn claim_rewards(member: String) -> Result<(), Error> {
-        assert_authorized(FunctionName::claim_rewards)?;
-        let packed_args = fractals::action_structs::claim_rew {
-            fractal: get_sender_app()?,
-            member: member.parse().unwrap(),
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::claim_rew::ACTION_NAME,
-            &packed_args,
-        )
+        Fractals::add_to_tx().claim_rew(get_sender_app()?, member.parse().unwrap());
+        Ok(())
     }
 
+    #[psibase_plugin::authorized(Low)]
     fn dist_token() -> Result<(), Error> {
-        assert_authorized(FunctionName::dist_token)?;
-        let packed_args = fractals::action_structs::dist_token {
-            fractal: get_sender_app()?,
-        }
-        .packed();
-        add_action_to_transaction(
-            fractals::action_structs::dist_token::ACTION_NAME,
-            &packed_args,
-        )
+        Fractals::add_to_tx().dist_token(get_sender_app()?);
+        Ok(())
     }
 }
 
