@@ -1,10 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 
 import QueryKey, { OptionalNumber } from "@/lib/query-keys";
 
-import { queryClient } from "@shared/lib/query-client";
-import { Account, zAccount } from "@shared/lib/schemas/account";
+import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
 import { useGuildAccount } from "../use-guild-account";
@@ -24,7 +22,8 @@ export const useProposal = (groupNumber: OptionalNumber) => {
                     intf: "userEval",
                 });
 
-                return z.optional(zAccount.array()).parse(res);
+                if (!res) return null;
+                return zAccount.array().parse(res);
             } catch (error) {
                 const message = "Error getting proposal";
                 console.error(message, error);
@@ -32,15 +31,4 @@ export const useProposal = (groupNumber: OptionalNumber) => {
             }
         },
     });
-};
-
-export const setCachedProposal = (
-    guildAccount: Account,
-    groupNumber: number,
-    accounts: Account[],
-) => {
-    queryClient.setQueryData(
-        QueryKey.proposal(guildAccount, groupNumber),
-        accounts,
-    );
 };
