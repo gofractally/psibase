@@ -21,7 +21,7 @@ impl Role {
         }
     }
 
-    pub fn get(fractal: AccountNumber, role: FractalRole) -> Option<Self> {
+    fn get(fractal: AccountNumber, role: FractalRole) -> Option<Self> {
         RoleTable::read()
             .get_index_pk()
             .get(&(fractal, role.into()))

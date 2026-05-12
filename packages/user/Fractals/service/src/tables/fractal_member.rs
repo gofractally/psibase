@@ -1,6 +1,6 @@
 use std::u64;
 
-use psibase::{check_none, check_some, services::tokens::Quantity, AccountNumber, Memo, Table};
+use psibase::{check_none, check_some, AccountNumber, Table};
 
 use crate::{
     constants::DEFAULT_RECRUITMENT_PPM,
@@ -38,11 +38,6 @@ impl FractalMember {
             .get_index_pk()
             .range(&(fractal, AccountNumber::from(0))..&(fractal, AccountNumber::from(u64::MAX)))
             .collect()
-    }
-
-    pub fn credit_direct(&self, amount: Quantity, memo: Memo) {
-        let token_id = Fractal::get_assert(self.fractal).token_id;
-        psibase::services::tokens::Wrapper::call().credit(token_id, self.account, amount, memo)
     }
 
     pub fn add(

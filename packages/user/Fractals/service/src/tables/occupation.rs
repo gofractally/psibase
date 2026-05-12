@@ -1,5 +1,5 @@
 use psibase::{
-    check, check_none,
+    check,
     services::tokens::{Decimal, Precision},
     AccountNumber, Table,
 };
@@ -14,23 +14,6 @@ impl Occupation {
             index,
             occupation,
         }
-    }
-
-    pub fn add(fractal: AccountNumber, index: u8, occupation: AccountNumber) -> Self {
-        check_none(
-            Self::get(fractal, index),
-            "occupation already exists for this fractal and index",
-        );
-
-        let new_instance = Self::new(fractal, index, occupation);
-        new_instance.save();
-        new_instance
-    }
-
-    fn get(fractal: AccountNumber, index: u8) -> Option<Self> {
-        OccupationTable::read()
-            .get_index_pk()
-            .get(&(fractal, index))
     }
 
     fn save(&self) {

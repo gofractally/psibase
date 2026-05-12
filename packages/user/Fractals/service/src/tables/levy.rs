@@ -53,14 +53,6 @@ impl Levy {
         new_instance
     }
 
-    pub fn get(fractal: AccountNumber, member: AccountNumber, id: u32) -> Option<Self> {
-        LevyTable::read().get_index_pk().get(&(fractal, member, id))
-    }
-
-    pub fn get_assert(fractal: AccountNumber, member: AccountNumber, id: u32) -> Self {
-        check_some(Self::get(fractal, member, id), "levy does not exist")
-    }
-
     pub fn levies_of_member(fractal: AccountNumber, member: AccountNumber) -> Vec<Self> {
         LevyTable::read()
             .get_index_pk()

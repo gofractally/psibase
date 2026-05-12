@@ -105,14 +105,6 @@ impl Fractal {
         new_instance
     }
 
-    pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
-        Role::get_by_role_account(role_account).and_then(|role| Fractal::get(role.fractal))
-    }
-
-    pub fn by_sender() -> Self {
-        Self::get_assert(get_sender())
-    }
-
     pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
         // Genesis time can only be moved earlier, not later, to prevent abuse / delay of token distribution
         check(
@@ -151,7 +143,7 @@ impl Fractal {
         stream.deposit(supply, "initial stream deposit".into());
     }
 
-    pub fn reward_stream(&self) -> RewardStream {
+    fn reward_stream(&self) -> RewardStream {
         check_some(
             RewardStream::get(self.account, self.account),
             "fractal does not have reward stream",
