@@ -53,9 +53,3 @@ impl From<u16> for RollingBits16 {
         Self(value)
     }
 }
-
-impl From<RollingBits16> for u16 {
-    fn from(r: RollingBits16) -> u16 {
-        r.0
-    }
-}

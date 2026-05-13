@@ -1,14 +1,18 @@
-use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
+use psibase::services::fractals::distribute::combine_group_scores;
+use psibase::services::fractals::weighted_normalization::{
+    curves::{get_curve, Curve},
+    weighted_normalization,
+};
 use psibase::{AccountNumber, Table};
-use std::collections::HashMap;
 
-use crate::tables::tables::{FractalSettings, FractalSettingsTable, GuildMember, Ranking};
+use crate::tables::tables::{FractalSettings, FractalSettingsTable, Guild, Ranking};
 
 impl FractalSettings {
-    fn new(fractal: AccountNumber, dist_strat: Algorithm) -> Self {
+    fn new(fractal: AccountNumber, dist_strat: Curve) -> Self {
         Self {
             fractal,
-            dist_strat: dist_strat.into(),
+            guild_weight_curve: dist_strat.into(),
+            auto_join_fractal: false,
         }
     }
 
@@ -22,57 +26,31 @@ impl FractalSettings {
         FractalSettingsTable::read()
             .get_index_pk()
             .get(&fractal)
-            .unwrap_or_else(|| Self::new(fractal, Algorithm::Fibonacci))
+            .unwrap_or_else(|| Self::new(fractal, Curve::Fibonacci))
     }
 
-    pub fn set_dist_strategy(&mut self, dist_strat: Algorithm) {
-        self.dist_strat = dist_strat.into();
+    pub fn set_guild_weight_curve(&mut self, guild_weight_curve: Curve) {
+        self.guild_weight_curve = guild_weight_curve.into();
+        self.save();
+    }
+
+    pub fn set_auto_join_fractal(&mut self, enabled: bool) {
+        self.auto_join_fractal = enabled;
         self.save();
     }
 
     pub fn scores(&self) -> Vec<(AccountNumber, u32)> {
         let ranked_guilds = Ranking::get_ordered_rankings(self.fractal);
-
-        if ranked_guilds.is_empty() {
-            return vec![];
-        }
-
-        let guild_weights = weighted_normalization(
-            self.dist_strat.into(),
-            ranked_guilds.into_iter().map(|rank| rank.guild).collect(),
+        let weights = weighted_normalization(
+            ranked_guilds.iter(),
+            get_curve(self.guild_weight_curve.into()),
         );
 
-        let mut member_scores: HashMap<AccountNumber, u128> = HashMap::new();
+        let groups = ranked_guilds
+            .iter()
+            .zip(weights)
+            .map(|(r, gw)| (gw, Guild::get_assert(r.guild).scores()));
 
-        for (guild, guild_weight) in guild_weights {
-            if guild_weight == 0 {
-                continue;
-            }
-
-            let guild_weight = guild_weight as u128;
-            let guild_member_scores = GuildMember::memberships_of_guild(guild);
-
-            for guild_member in guild_member_scores {
-                if guild_member.score == 0 {
-                    continue;
-                }
-                let contribution = guild_member.score as u128 * guild_weight;
-                *member_scores.entry(guild_member.member).or_insert(0) += contribution;
-            }
-        }
-
-        let max_score = member_scores.values().copied().max().unwrap_or(0);
-
-        if max_score == 0 {
-            return vec![];
-        }
-
-        member_scores
-            .into_iter()
-            .map(|(member, total)| {
-                let normalized = ((total * u32::MAX as u128) / max_score) as u32;
-                (member, normalized)
-            })
-            .collect()
+        combine_group_scores(groups).into_iter().collect()
     }
 }

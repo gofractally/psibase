@@ -2,8 +2,6 @@ pub const ONE_DAY: u32 = 86400;
 pub const ONE_WEEK: u32 = ONE_DAY * 7;
 const ONE_YEAR: u32 = ONE_WEEK * 52;
 
-pub const PPM: u32 = 1_000_000;
-
 pub mod token_distributions {
     pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
 

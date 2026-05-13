@@ -1,8 +1,10 @@
-use psibase::plugin_error;
-
-plugin_error! {
-    pub ErrorType
-    QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
-    NoPendingEvaluation => "No pending evaluation for guild",
-    InvalidAccountNumber => "Invalid account number",
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorType {
+    #[error("Query response parsing error: {0}")]
+    QueryResponseParseError(String),
+    #[error("No pending evaluation for guild")]
+    NoPendingEvaluation,
+    #[error("Invalid account number")]
+    InvalidAccountNumber,
 }

@@ -6,7 +6,8 @@ use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 use crate::{
     constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
     tables::tables::{
-        Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
+        FractalSettings, Guild, GuildApplication, GuildApplicationTable, GuildAttest,
+        GuildAttestTable, GuildMember, Ranking,
     },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -18,7 +19,12 @@ enum ApplicationStatus {
 }
 
 impl GuildApplication {
-    fn new(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
+    fn new(
+        guild: AccountNumber,
+        applicant: AccountNumber,
+        extra_info: String,
+        inviter: Option<AccountNumber>,
+    ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
@@ -26,22 +32,28 @@ impl GuildApplication {
             applicant,
             extra_info,
             created_at: now,
+            inviter,
         }
     }
 
-    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
+    pub fn add(
+        guild: AccountNumber,
+        applicant: AccountNumber,
+        extra_info: String,
+        inviter: Option<AccountNumber>,
+    ) -> Self {
         check_some(Guild::get(guild), "guild does not exist");
         check_none(Self::get(guild, applicant), "application already exists");
         check_none(
             GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
-        let new_instance = Self::new(guild, applicant, extra_info);
+        let new_instance = Self::new(guild, applicant, extra_info, inviter);
         new_instance.save();
         new_instance
     }
 
-    pub fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
+    fn get(guild: AccountNumber, applicant: AccountNumber) -> Option<Self> {
         GuildApplicationTable::read()
             .get_index_pk()
             .get(&(guild, applicant))
@@ -96,6 +108,7 @@ impl GuildApplication {
         match self.application_status() {
             ApplicationStatus::Accepted => {
                 GuildMember::add(self.guild, self.applicant);
+                Self::maybe_auto_join_fractal(self.guild, self.applicant, self.inviter);
                 self.remove()
             }
             ApplicationStatus::Rejected => {
@@ -103,6 +116,19 @@ impl GuildApplication {
             }
             ApplicationStatus::Pending => {}
         }
+    }
+
+    fn maybe_auto_join_fractal(
+        guild: AccountNumber,
+        applicant: AccountNumber,
+        inviter: Option<AccountNumber>,
+    ) {
+        let parent = Guild::get_assert(guild);
+        let settings = FractalSettings::get_or_default(parent.fractal);
+        if !settings.auto_join_fractal || !Ranking::contains(parent.fractal, guild) {
+            return;
+        }
+        psibase::services::fractals::Wrapper::call().add_mem(parent.fractal, applicant, inviter);
     }
 
     fn attestations_score(&self) -> i16 {

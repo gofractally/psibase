@@ -1,10 +1,8 @@
 use async_graphql::ComplexObject;
+use psibase::services::fractals::constants::PPM;
 use psibase::{check, check_some, services::tokens::Quantity, AccountNumber, Table};
 
-use crate::{
-    constants::PPM,
-    tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream},
-};
+use crate::tables::tables::{Config, Fractal, FractalMember, Levy, LevyTable, RewardStream};
 
 impl Levy {
     fn new(
@@ -53,14 +51,6 @@ impl Levy {
 
         new_instance.save();
         new_instance
-    }
-
-    pub fn get(fractal: AccountNumber, member: AccountNumber, id: u32) -> Option<Self> {
-        LevyTable::read().get_index_pk().get(&(fractal, member, id))
-    }
-
-    pub fn get_assert(fractal: AccountNumber, member: AccountNumber, id: u32) -> Self {
-        check_some(Self::get(fractal, member, id), "levy does not exist")
     }
 
     pub fn levies_of_member(fractal: AccountNumber, member: AccountNumber) -> Vec<Self> {

@@ -18,7 +18,7 @@ impl Fraction {
     }
 
     /// Converts the fraction to Q0.16 fixed-point (0‥=65 535)
-    pub fn to_q16(self) -> u16 {
+    fn to_q16(self) -> u16 {
         const ONE_Q16: u64 = 65_536;
         let scaled: u64 = (self.numerator as u64) * ONE_Q16 / (self.denominator as u64);
         if scaled >= ONE_Q16 {

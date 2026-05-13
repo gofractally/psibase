@@ -7,7 +7,7 @@ impl Config {
         Self { last_levy_id: 0 }
     }
 
-    pub fn get_assert() -> Self {
+    fn get_assert() -> Self {
         ConfigTable::read()
             .get_index_pk()
             .get(&())

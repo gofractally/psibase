@@ -1,9 +1,10 @@
 pub mod guild {
     use crate::bindings::exports::guilds::plugin::queries::Guild as GuildWit;
-    use crate::bindings::host::types::types as HostTypes;
-    use crate::bindings::host::types::types::Error;
-    use crate::{bindings::host::common::server as CommonServer, errors::ErrorType};
+    use crate::errors::ErrorType;
     use psibase::AccountNumber;
+    use psibase_plugin::host::server as CommonServer;
+    use psibase_plugin::types as HostTypes;
+    use psibase_plugin::types::Error;
     use serde::{Deserialize, Serialize};
 
     fn fetch_guild(guild: AccountNumber) -> Result<GuildQuery, Error> {
@@ -85,8 +86,8 @@ pub mod guild {
         }
     }
 
-    pub fn get_guild(guild: String) -> Result<Guild, Error> {
-        fetch_guild(guild.as_str().into()).map(|guild| Guild::from(guild))
+    pub fn get_guild(guild: &str) -> Result<Guild, Error> {
+        fetch_guild(guild.into()).map(|guild| Guild::from(guild))
     }
 
     impl From<Guild> for GuildWit {

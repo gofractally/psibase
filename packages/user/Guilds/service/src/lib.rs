@@ -6,8 +6,8 @@ pub mod service {
     use crate::{
         helpers::RollingBits16,
         tables::tables::{
-            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildInvite, GuildMember,
-            GuildMemberTable, Ranking, RoleMap,
+            EvaluationInstance, FractalSettings, Guild, GuildApplication, GuildAttest, GuildInvite,
+            GuildMember, GuildMemberTable, Ranking, RoleMap,
         },
     };
     use psibase::{
@@ -90,7 +90,7 @@ pub mod service {
 
     /// Is active
     ///
-    /// Advises if the occupation considers a fractal member account an active member
+    /// Check if an account is considered active in an occupation
     ///
     /// # Arguments
     /// * `fractal` - Fractal.
@@ -169,14 +169,24 @@ pub mod service {
         Ranking::set_ranked_guilds(get_sender(), ranked_guilds);
     }
 
-    /// Set distribution strategy
+    /// This curve maps guild rank to the value used to weight guild member scores.
     ///
     /// # Arguments
-    /// * `distribution_strategy` - Algorithm for weighted distribution.
+    /// * `curve_id` - An identifier for a particular weighting curve
     #[action]
-    fn set_dstrat(distribution_strategy: u8) {
-        FractalSettings::get_or_default(get_sender())
-            .set_dist_strategy(distribution_strategy.into());
+    fn set_guild_weight_curve(curve_id: u8) {
+        FractalSettings::get_or_default(get_sender()).set_guild_weight_curve(curve_id.into());
+    }
+
+    /// Auto-join fractal
+    ///
+    /// When enabled, new guild members in ranked guilds are automatically added to the fractal.
+    ///
+    /// # Arguments
+    /// * `enabled` - True to enable auto-join, false to disable.
+    #[action]
+    fn set_auto_join(enabled: bool) {
+        FractalSettings::get_or_default(get_sender()).set_auto_join_fractal(enabled);
     }
 
     /// Register candidacy.
@@ -198,6 +208,15 @@ pub mod service {
     #[action]
     fn set_thres(rank_ordering_threshold: u8) {
         Guild::by_sender().set_rank_ordering_threshold(rank_ordering_threshold);
+    }
+
+    /// Set candidacy cooldown
+    ///
+    /// # Arguments
+    /// * `candidacy_cooldown` - Seconds a guild member must wait between toggling candidacy.
+    #[action]
+    fn set_can_cd(candidacy_cooldown: u32) {
+        Guild::by_sender().set_candidacy_cooldown(candidacy_cooldown);
     }
 
     /// On Invite Accept.
@@ -240,7 +259,16 @@ pub mod service {
     /// * `extra_info` - Relevant information to the application.
     #[action]
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
-        GuildApplication::add(guild_account, get_sender(), extra_info);
+        GuildApplication::add(guild_account, get_sender(), extra_info, None);
+    }
+
+    /// Cancel the sender's pending application to a guild.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    #[action]
+    fn cancel_g_app(guild_account: AccountNumber) {
+        GuildApplication::get_assert(guild_account, get_sender()).cancel();
     }
 
     /// Attest Guild Membership application
@@ -262,6 +290,16 @@ pub mod service {
             get_sender(),
             endorses,
         );
+    }
+
+    /// Remove the sender's attestation on a guild membership application.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    /// * `applicant` - Applicant whose attestation is being withdrawn.
+    #[action]
+    fn rm_attest(guild_account: AccountNumber, applicant: AccountNumber) {
+        GuildAttest::get_assert(guild_account, applicant, get_sender()).remove();
     }
 
     /// Starts an evaluation for the specified guild.
@@ -430,7 +468,7 @@ pub mod service {
         GuildInvite::add(guild, invite_id, invite_payload, num_accounts, pre_attest);
     }
 
-    /// Called when a group finalizes its result in a fractal evaluation.
+    /// Called when a group finalizes its result in an evaluation.
     ///
     /// # Arguments
     /// * `evaluation_id` - The ID of the evaluation.

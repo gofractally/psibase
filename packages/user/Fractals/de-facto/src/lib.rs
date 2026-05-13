@@ -1,6 +1,5 @@
 #[psibase::service(name = "de-facto")]
 pub mod service {
-    use fractals::helpers::two_thirds_plus_one;
     use psibase::{
         services::auth_dyn::{self, policy::DynamicAuthPolicy},
         *,
@@ -31,6 +30,10 @@ pub mod service {
             .is_some()
     }
 
+    fn two_thirds_plus_one(count: u8) -> u8 {
+        ((count as u16 * 2 + 3) / 3) as u8
+    }
+
     #[action]
     fn role_policy(fractal: AccountNumber, _role_id: u8) -> auth_dyn::policy::DynamicAuthPolicy {
         let accounts: Vec<(AccountNumber, u8)> =
@@ -40,9 +43,7 @@ pub mod service {
                 .map(|account| (account.account, 1))
                 .collect();
 
-        DynamicAuthPolicy::from_weighted_authorizers(
-            accounts.clone(),
-            two_thirds_plus_one(accounts.len() as u8),
-        )
+        let threshold = two_thirds_plus_one(accounts.len() as u8);
+        DynamicAuthPolicy::from_weighted_authorizers(accounts, threshold)
     }
 }

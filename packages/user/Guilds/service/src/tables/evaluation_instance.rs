@@ -18,10 +18,6 @@ impl EvaluationInstance {
         EvaluationInstanceTable::read().get_index_pk().get(&guild)
     }
 
-    pub fn get_assert(guild: AccountNumber) -> Self {
-        check_some(Self::get(guild), "failed to find guild")
-    }
-
     fn new(guild: AccountNumber, interval: u32, evaluation_id: u32) -> Self {
         Self {
             guild,
@@ -192,7 +188,7 @@ impl EvaluationInstance {
             });
     }
 
-    pub fn close_pending_levels(&self, forced_pending_level: Option<u8>) {
+    fn close_pending_levels(&self, forced_pending_level: Option<u8>) {
         let guild_member_table = GuildMemberTable::read_write();
 
         let evaluation_participants: HashSet<AccountNumber> = self

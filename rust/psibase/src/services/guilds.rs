@@ -20,7 +20,7 @@ pub mod Service {
 
     /// Is active
     ///
-    /// Advises if the occupation considers a fractal member account an active member
+    /// Check if an account is considered active in an occupation
     ///
     /// # Arguments
     /// * `fractal` - Fractal.
@@ -43,12 +43,23 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Set distribution strategy
+    /// This curve maps guild rank to the value used to weight guild member scores.
     ///
     /// # Arguments
-    /// * `distribution_strategy` - Algorithm for weighted distribution.
+    /// * `curve_id` - An identifier for a particular weighting curve
     #[action]
-    fn set_dstrat(distribution_strategy: u8) {
+    fn set_guild_weight_curve(curve_id: u8) {
+        unimplemented!()
+    }
+
+    /// Auto-join fractal
+    ///
+    /// When enabled, new guild members in ranked guilds are automatically added to the fractal.
+    ///
+    /// # Arguments
+    /// * `enabled` - True to enable auto-join, false to disable.
+    #[action]
+    fn set_auto_join(enabled: bool) {
         unimplemented!()
     }
 
@@ -176,6 +187,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Set candidacy cooldown
+    ///
+    /// # Arguments
+    /// * `candidacy_cooldown` - Seconds a guild member must wait between toggling candidacy.
+    #[action]
+    fn set_can_cd(candidacy_cooldown: u32) {
+        unimplemented!()
+    }
+
     /// Kick member from guild
     ///
     /// # Arguments
@@ -205,6 +225,15 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Cancel the sender's pending application to a guild.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    #[action]
+    fn cancel_g_app(guild_account: AccountNumber) {
+        unimplemented!()
+    }
+
     /// Add a member to a fractal.
     ///
     /// # Arguments
@@ -228,6 +257,16 @@ pub mod Service {
         comment: String,
         endorses: bool,
     ) {
+        unimplemented!()
+    }
+
+    /// Remove the sender's attestation on a guild membership application.
+    ///
+    /// # Arguments
+    /// * `guild_account` - The account number for the guild.
+    /// * `applicant` - Applicant whose attestation is being withdrawn.
+    #[action]
+    fn rm_attest(guild_account: AccountNumber, applicant: AccountNumber) {
         unimplemented!()
     }
 
@@ -340,7 +379,7 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Called when a group finalizes its result in a fractal evaluation.
+    /// Called when a group finalizes its result in an evaluation.
     ///
     /// # Arguments
     /// * `evaluation_id` - The ID of the evaluation.

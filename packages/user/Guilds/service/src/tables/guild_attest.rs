@@ -34,29 +34,29 @@ impl GuildAttest {
         Self::new(guild, applicant, attester, comment, endorses).save();
     }
 
-    pub fn get(
+    fn get(
         guild: AccountNumber,
-        member: AccountNumber,
-        attestee: AccountNumber,
+        applicant: AccountNumber,
+        attester: AccountNumber,
     ) -> Option<Self> {
         GuildAttestTable::read()
             .get_index_pk()
-            .get(&(guild, member, attestee))
+            .get(&(guild, applicant, attester))
     }
 
     pub fn get_assert(
         guild: AccountNumber,
-        member: AccountNumber,
-        attestee: AccountNumber,
+        applicant: AccountNumber,
+        attester: AccountNumber,
     ) -> Self {
         check_some(
-            Self::get(guild, member, attestee),
-            "guild attestation does not exist",
+            Self::get(guild, applicant, attester),
+            "attestation does not exist",
         )
     }
 
     pub fn remove(&self) {
-        GuildAttestTable::read_write().remove(&self);
+        GuildAttestTable::read_write().remove(self);
     }
 
     pub fn attestations_by_guild_member(guild: AccountNumber, member: AccountNumber) -> Vec<Self> {

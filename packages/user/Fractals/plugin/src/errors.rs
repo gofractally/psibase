@@ -1,9 +1,10 @@
-use psibase::plugin_error;
-
-plugin_error! {
-    pub ErrorType
-    QueryResponseParseError(msg: String) => "Query response parsing error: {msg}",
-    NoSender => "No sender app",
-    InvalidSender(sender: String) => "Sender origin app must be fractals or fractal, received: {sender}",
-    InvalidAccountNumber => "Invalid account number",
+#[derive(Debug, psibase_plugin::ErrorEnum, thiserror::Error)]
+#[repr(u32)]
+pub enum ErrorType {
+    #[error("Query response parsing error: {0}")]
+    QueryResponseParseError(String),
+    #[error("Invalid account number")]
+    InvalidAccountNumber,
+    #[error("Account name {0} invalid, must be at least 10 characters")]
+    AccountNameTooShort(String),
 }

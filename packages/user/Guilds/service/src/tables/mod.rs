@@ -54,17 +54,17 @@ pub mod tables {
 
     impl Guild {
         #[secondary_key(1)]
-        pub fn by_fractal(&self) -> (AccountNumber, AccountNumber) {
+        fn by_fractal(&self) -> (AccountNumber, AccountNumber) {
             (self.fractal, self.account)
         }
 
         #[secondary_key(2)]
-        pub fn by_council(&self) -> AccountNumber {
+        fn by_council(&self) -> AccountNumber {
             self.council_role
         }
 
         #[secondary_key(3)]
-        pub fn by_rep(&self) -> AccountNumber {
+        fn by_rep(&self) -> AccountNumber {
             self.rep_role
         }
     }
@@ -111,6 +111,7 @@ pub mod tables {
         pub applicant: AccountNumber,
         pub extra_info: String,
         pub created_at: psibase::TimePointSec,
+        pub inviter: Option<AccountNumber>,
     }
 
     impl GuildApplication {
@@ -181,7 +182,7 @@ pub mod tables {
 
     impl EvaluationInstance {
         #[secondary_key(1)]
-        pub fn by_evaluation(&self) -> u32 {
+        fn by_evaluation(&self) -> u32 {
             self.evaluation_id
         }
     }
@@ -206,6 +207,7 @@ pub mod tables {
     pub struct FractalSettings {
         #[primary_key]
         pub fractal: AccountNumber,
-        pub dist_strat: u8,
+        pub guild_weight_curve: u8,
+        pub auto_join_fractal: bool,
     }
 }

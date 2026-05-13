@@ -1,8 +1,9 @@
 pub mod fractal {
-    use crate::bindings::host::types::types as HostTypes;
-    use crate::bindings::host::types::types::Error;
-    use crate::{bindings::host::common::server as CommonServer, errors::ErrorType};
+    use crate::errors::ErrorType;
     use psibase::AccountNumber;
+    use psibase_plugin::host::server as CommonServer;
+    use psibase_plugin::types as HostTypes;
+    use psibase_plugin::types::Error;
     use serde::{Deserialize, Serialize};
 
     fn fetch_fractal(fractal: AccountNumber) -> Result<FractalData, Error> {

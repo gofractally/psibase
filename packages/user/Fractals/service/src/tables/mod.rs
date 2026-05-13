@@ -124,7 +124,7 @@ pub mod tables {
     }
 
     #[table(name = "OccupationTable", index = 6)]
-    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug)]
+    #[derive(Default, Fracpack, ToSchema, Serialize, Deserialize, Debug, Clone)]
     pub struct Occupation {
         pub fractal: AccountNumber,
         pub index: u8,

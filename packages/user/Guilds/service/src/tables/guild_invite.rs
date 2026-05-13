@@ -67,7 +67,7 @@ impl GuildInvite {
         Self::new(guild, invite_id, pre_attest).save();
     }
 
-    pub fn get(id: u32) -> Option<Self> {
+    fn get(id: u32) -> Option<Self> {
         GuildInviteTable::read().get_index_pk().get(&id)
     }
 
@@ -76,7 +76,8 @@ impl GuildInvite {
     }
 
     pub fn accept(&self, accepter: AccountNumber) {
-        let application = GuildApplication::add(self.guild, accepter, "".to_string());
+        let application =
+            GuildApplication::add(self.guild, accepter, "".to_string(), Some(self.inviter));
         if self.pre_attest {
             application.attest("".to_string(), self.inviter, true);
         }

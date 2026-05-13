@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::u64;
-
 use async_graphql::connection::Connection;
 use async_graphql::ComplexObject;
 use psibase::services::sites;
@@ -11,12 +8,16 @@ use crate::constants::{
     DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL, MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
     MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS,
 };
-use crate::helpers::weighted_normalization::{weighted_normalization, Algorithm};
+use psibase::services::fractals::distribute::{allocations, combine_group_scores};
+use psibase::services::fractals::weighted_normalization::{
+    curves::{get_curve, Curve},
+    weighted_normalization,
+};
 use psibase::services::fractals::FractalRole::{
     self, Executive, Judiciary, Legislature, Recruitment,
 };
 
-use crate::helpers::{create_managed_account, distribute_by_weight};
+use crate::helpers::create_managed_account;
 use crate::tables::tables::{
     Fractal, FractalMember, FractalMemberTable, FractalTable, Occupation, RewardStream, Role,
     RoleTable,
@@ -43,7 +44,7 @@ impl Fractal {
             created_at: now,
             mission,
             name,
-            dist_strat: Algorithm::Constant as u8,
+            dist_strat: Curve::Constant as u8,
             genesis_time: now,
             dist_interval_secs: DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL,
         }
@@ -62,7 +63,7 @@ impl Fractal {
         self.save();
     }
 
-    pub fn set_distribution_strategy(&mut self, strategy: Algorithm) {
+    pub fn set_distribution_strategy(&mut self, strategy: Curve) {
         self.dist_strat = strategy as u8;
         self.save();
     }
@@ -104,14 +105,6 @@ impl Fractal {
         new_instance
     }
 
-    pub fn get_by_role_account(role_account: AccountNumber) -> Option<Self> {
-        Role::get_by_role_account(role_account).and_then(|role| Fractal::get(role.fractal))
-    }
-
-    pub fn by_sender() -> Self {
-        Self::get_assert(get_sender())
-    }
-
     pub fn set_genesis_time(&mut self, new_time: TimePointSec) {
         // Genesis time can only be moved earlier, not later, to prevent abuse / delay of token distribution
         check(
@@ -150,23 +143,10 @@ impl Fractal {
         stream.deposit(supply, "initial stream deposit".into());
     }
 
-    pub fn reward_stream(&self) -> RewardStream {
+    fn reward_stream(&self) -> RewardStream {
         check_some(
             RewardStream::get(self.account, self.account),
             "fractal does not have reward stream",
-        )
-    }
-
-    fn get_weighted_occupations(
-        &self,
-        total_distribution: Quantity,
-    ) -> (Vec<(Occupation, u64)>, u64) {
-        distribute_by_weight(
-            weighted_normalization(
-                self.dist_strat.into(),
-                Occupation::get_ordered(self.account),
-            ),
-            total_distribution.value,
         )
     }
 
@@ -176,44 +156,35 @@ impl Fractal {
         if withdrawn.value == 0 {
             return;
         }
+
+        let mut dust = withdrawn.value;
+        allocations(self.member_reward_shares(), withdrawn.value).for_each(|(member, amount)| {
+            dust -= amount;
+            RewardStream::get_assert(self.account, member)
+                .deposit(amount.into(), "Fractal reward".into());
+        });
+
+        if dust > 0 {
+            stream.deposit(dust.into(), "Dust recycle".into());
+        }
+    }
+
+    fn member_reward_shares(&self) -> std::collections::HashMap<AccountNumber, u32> {
         let members = FractalMember::get_all(self.account);
+        let is_member = |acc: &AccountNumber| members.iter().any(|m| m.account == *acc);
 
-        let mut total_dust = 0u64;
-        let mut payable_members = HashMap::new();
+        let ranked_occ = Occupation::get_ordered(self.account);
+        let weights = weighted_normalization(ranked_occ.iter(), get_curve(self.dist_strat.into()));
 
-        let (occupation_distributions, dust) = self.get_weighted_occupations(withdrawn);
+        let groups = ranked_occ.into_iter().zip(weights).map(|(occ, w)| {
+            let member_scores = occu_wrapper::call_to(occ.occupation)
+                .get_scores(self.account)
+                .into_iter()
+                .filter(|(m, _)| is_member(m));
+            (w, member_scores)
+        });
 
-        total_dust += dust;
-
-        for (occupation_distribution, distribution_dust) in occupation_distributions {
-            let scores: Vec<(AccountNumber, u64)> =
-                occu_wrapper::call_to(occupation_distribution.occupation)
-                    .get_scores(self.account)
-                    .into_iter()
-                    .filter(|(mem, _)| members.iter().any(|member| member.account == *mem))
-                    .map(|(item, score)| (item, score as u64))
-                    .collect();
-
-            let (member_distributions, member_dust) =
-                distribute_by_weight(scores, distribution_dust);
-            total_dust += member_dust;
-
-            for (member, amount) in member_distributions {
-                if amount > 0 {
-                    let new_balance =
-                        *payable_members.entry(member).or_insert(0.into()) + amount.into();
-                    payable_members.insert(member, new_balance);
-                }
-            }
-        }
-
-        if total_dust > 0 {
-            stream.deposit(total_dust.into(), "Dust recycle".into());
-        }
-
-        for (member, amount) in payable_members {
-            RewardStream::get_assert(self.account, member).deposit(amount, "Fractal reward".into());
-        }
+        combine_group_scores(groups)
     }
 
     fn save(&self) {

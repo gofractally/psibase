@@ -1,6 +1,10 @@
 use async_graphql::ComplexObject;
 use psibase::services::auth_dyn::policy::DynamicAuthPolicy;
 use psibase::services::auth_dyn::Wrapper as AuthDyn;
+use psibase::services::fractals::weighted_normalization::{
+    curves::{get_curve, Curve},
+    weighted_normalization,
+};
 use psibase::{check, check_none, check_some, get_sender, AccountNumber, Flags, Memo, Table};
 
 use crate::constants::{
@@ -157,7 +161,20 @@ impl Guild {
             .count()
     }
 
-    pub fn council_members(&self) -> Option<Vec<GuildMember>> {
+    pub fn scores(&self) -> Vec<(AccountNumber, u32)> {
+        let members: Vec<GuildMember> = GuildMember::memberships_of_guild(self.account)
+            .into_iter()
+            .filter(|m| m.score > 0)
+            .collect();
+        let weights = weighted_normalization(members.iter(), get_curve(Curve::Fibonacci));
+        members
+            .into_iter()
+            .zip(weights)
+            .map(|(m, w)| (m.member, w))
+            .collect()
+    }
+
+    fn council_members(&self) -> Option<Vec<GuildMember>> {
         let members: Vec<_> = GuildMemberTable::read()
             .get_index_by_score()
             .range(
@@ -172,7 +189,7 @@ impl Guild {
         (members.len() > 0).then_some(members)
     }
 
-    pub fn representative(&self) -> Option<GuildMember> {
+    fn representative(&self) -> Option<GuildMember> {
         self.rep
             .map(|rep| GuildMember::get_assert(self.account, rep))
     }
