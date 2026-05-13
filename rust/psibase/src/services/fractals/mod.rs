@@ -144,7 +144,7 @@ pub mod Service {
     /// * `legislature` - Legislature role account.
     /// * `judiciary` - Judiciary role account.
     /// * `executive` - Executive role account
-    /// * `recruitment` - Recruitment role account
+    /// * `recruitment` - Recruitment role account.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
     #[action]
@@ -160,7 +160,7 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Sets occupation on a fractal role.
+    /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
