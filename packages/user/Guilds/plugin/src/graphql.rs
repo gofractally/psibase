@@ -22,8 +22,11 @@ pub mod guild {
                 }}"#,
             guild
         );
-        Response::try_from(CommonServer::post_graphql_get_json(&query)?)
-            .map(|res| res.data.guild.expect("expected a guild to be here"))
+        Response::try_from(CommonServer::post_graphql_get_json(&query)?).map(|res| {
+            res.data
+                .guild
+                .expect(format!("expected guild {} to exist", guild).as_str())
+        })
     }
 
     #[derive(Serialize, Deserialize)]
