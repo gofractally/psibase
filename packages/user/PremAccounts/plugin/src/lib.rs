@@ -99,7 +99,7 @@ impl Api for PremAccountsPlugin {
         let sys_token_id =
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
 
-        let length = account.to_string().len() as u8;
+        let length = account.len() as u8;
         let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
         let ask_u64 = require_active_premium_market_ask(length, sys_token_id)?;
         if max_cost_u64 < ask_u64 {

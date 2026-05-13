@@ -157,7 +157,7 @@ mod tests {
             .into_contents();
 
         PremAccounts::push_from(&chain, alice)
-            .claim(account!("test"), SubjectPublicKeyInfo::from(der))
+            .claim(account!("test"))
             .get()?;
 
         // --- marketParams + configure ---

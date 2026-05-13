@@ -11,6 +11,7 @@ plugin = "prem-accounts-plugin"
 data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "prem-accounts", service = "prem-accounts", method = "init", data = {} },
+    { sender = "prem-accounts", service = "sites", method = "enablespa", data = { enable = true } },
 ]
 
 [dependencies]

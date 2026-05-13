@@ -185,7 +185,7 @@ pub mod service {
             "account not purchased by sender",
         );
 
-        AuthDelegate::Wrapper::call().setOwner(get_sender());
+        AuthDelegate::Wrapper::call_as(account).setOwner(get_sender());
 
         purchased_accounts_table.remove(&purchased_account);
 
