@@ -341,7 +341,9 @@ fn div_rounded(numer: u128, denom: u128) -> u128 {
 ///
 /// The series used is:
 ///
-///     e^t ≈ Σ_{k=0}^{K} t^k / k!
+/// ```text
+/// e^t ≈ Σ_{k=0}^{K} t^k / k!
+/// ```
 fn exp_taylor_scaled(t: u128) -> u128 {
     const MAX_K: u32 = 11;
 
