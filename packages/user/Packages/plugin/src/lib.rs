@@ -15,6 +15,7 @@ use setcode::plugin::api as SetCode;
 use sites::plugin::api as Sites;
 use transact::plugin::admin as TransactAdmin;
 
+use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use crate::bindings::transact::plugin::intf::add_action_to_transaction;
 use crate::packages::plugin::types;
 use exports::packages::plugin::private_api::Guest as PrivateApi;
@@ -178,6 +179,32 @@ impl TryFrom<types::PackageOpFull> for psibase::PackageOpFull<Cursor<Vec<u8>>> {
 
 struct PackagesPlugin;
 
+fn get_schema(service: String) -> Result<Schema, HostTypes::Error> {
+    let schemas = Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Session,
+        },
+        "schemas",
+    );
+    if let Some(schema) = schemas.get(&service.as_str()) {
+        return Ok(<Schema>::unpacked(&schema).expect("failed to unpack stored schema"));
+    }
+
+    let schema_json = Server::get_json(&format!("/schema?service={}", service)).map_err(|e| {
+        ErrorType::UnpackActionError(format!(
+            "could not load schema for {}: {}",
+            service, e.message
+        ))
+    })?;
+    let schema: Schema =
+        serde_json::from_str(&schema_json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
+
+    schemas.set(&service.as_str(), &schema.packed());
+
+    Ok(schema)
+}
+
 fn unpack_action_params_impl(
     service: String,
     method: String,
@@ -195,15 +222,8 @@ fn unpack_action_params_impl(
         .map_err(|_| ErrorType::UnpackActionError("invalid hex for raw data".to_string()))?
         .0;
 
-    let schema_json =
-        Server::get_json(&format!("/schema?service={}", service_account)).map_err(|e| {
-            ErrorType::UnpackActionError(format!(
-                "could not load schema for {}: {}",
-                service_account, e.message
-            ))
-        })?;
-    let schema: Schema =
-        serde_json::from_str(&schema_json).map_err(|e| ErrorType::JsonError(e.to_string()))?;
+    let schema = get_schema(service)?;
+
     let action_name = MethodString(method.clone());
     let action_type = schema.actions.get(&action_name).ok_or_else(|| {
         ErrorType::UnpackActionError(format!(
