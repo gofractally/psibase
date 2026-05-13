@@ -129,6 +129,20 @@ pub trait TrustConfig {
         authorized_with_whitelist::<Self>(level, fn_name, whitelist)
     }
 
+    fn has_auth(level: TrustLevel) -> bool
+    where
+        Self: Sized,
+    {
+        has_auth_with_whitelist::<Self>(level, &[])
+    }
+
+    fn has_auth_with_whitelist(level: TrustLevel, whitelist: &[&str]) -> bool
+    where
+        Self: Sized,
+    {
+        has_auth_with_whitelist::<Self>(level, whitelist)
+    }
+
     fn get_descriptions() -> (String, String, String) {
         Self::capabilities().to_descriptions()
     }
@@ -136,6 +150,15 @@ pub trait TrustConfig {
 
 pub fn authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
     authorized_with_whitelist::<T>(level, fn_name, &[])
+}
+
+pub fn has_auth<T: TrustConfig>(level: TrustLevel) -> bool {
+    has_auth_with_whitelist::<T>(level, &[])
+}
+
+pub fn has_auth_with_whitelist<T: TrustConfig>(level: TrustLevel, whitelist: &[&str]) -> bool {
+    let whitelist: Vec<String> = whitelist.iter().map(|s| s.to_string()).collect();
+    permissions::api::has_auth(&host::client::get_sender(), level, &whitelist)
 }
 
 pub fn authorized_with_whitelist<T: TrustConfig>(
