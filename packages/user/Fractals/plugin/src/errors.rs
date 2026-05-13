@@ -5,4 +5,6 @@ pub enum ErrorType {
     QueryResponseParseError(String),
     #[error("Invalid account number")]
     InvalidAccountNumber,
+    #[error("Account name {0} invalid, must be at least 10 characters")]
+    AccountNameTooShort(String),
 }

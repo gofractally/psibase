@@ -18,7 +18,7 @@ use crate::bindings::exports::fractals::plugin::types;
 use crate::bindings::guilds::plugin as Guilds;
 use crate::bindings::transact::plugin::intf::set_propose_latch;
 use crate::graphql::fractal::get_fractal;
-use crate::helpers::get_sender_app;
+use crate::helpers::{get_sender_app, validate_account_name};
 
 struct FractallyPlugin;
 
@@ -47,12 +47,14 @@ impl AdminFractal for FractallyPlugin {
             Executive, Judiciary, Legislature, Recruitment,
         };
 
+        validate_account_name(&fractal_account)?;
+        validate_account_name(&guild_account)?;
+
         let fractal = fractal_account.parse().unwrap();
-        let legislature = gen_rand_account(Some("leg"))?.as_str().into();
 
         Fractals::add_to_tx().create_frac(
             fractal,
-            legislature,
+            gen_rand_account(Some("leg"))?.as_str().into(),
             gen_rand_account(Some("jud"))?.as_str().into(),
             gen_rand_account(Some("exec"))?.as_str().into(),
             gen_rand_account(Some("rec"))?.as_str().into(),
