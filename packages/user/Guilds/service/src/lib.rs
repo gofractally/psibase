@@ -248,7 +248,7 @@ pub mod service {
     /// * `extra_info` - Relevant information to the application.
     #[action]
     fn apply_guild(guild_account: AccountNumber, extra_info: String) {
-        GuildApplication::add(guild_account, get_sender(), extra_info);
+        GuildApplication::add(guild_account, get_sender(), extra_info, None);
     }
 
     /// Cancel the sender's pending application to a guild.

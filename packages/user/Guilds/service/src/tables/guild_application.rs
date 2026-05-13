@@ -18,7 +18,12 @@ enum ApplicationStatus {
 }
 
 impl GuildApplication {
-    fn new(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
+    fn new(
+        guild: AccountNumber,
+        applicant: AccountNumber,
+        extra_info: String,
+        inviter: Option<AccountNumber>,
+    ) -> Self {
         let now = TransactSvc::call().currentBlock().time.seconds();
 
         Self {
@@ -26,17 +31,23 @@ impl GuildApplication {
             applicant,
             extra_info,
             created_at: now,
+            inviter,
         }
     }
 
-    pub fn add(guild: AccountNumber, applicant: AccountNumber, extra_info: String) -> Self {
+    pub fn add(
+        guild: AccountNumber,
+        applicant: AccountNumber,
+        extra_info: String,
+        inviter: Option<AccountNumber>,
+    ) -> Self {
         check_some(Guild::get(guild), "guild does not exist");
         check_none(Self::get(guild, applicant), "application already exists");
         check_none(
             GuildMember::get(guild, applicant),
             "user is already a guild member",
         );
-        let new_instance = Self::new(guild, applicant, extra_info);
+        let new_instance = Self::new(guild, applicant, extra_info, inviter);
         new_instance.save();
         new_instance
     }

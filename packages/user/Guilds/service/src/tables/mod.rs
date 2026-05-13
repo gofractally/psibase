@@ -111,6 +111,7 @@ pub mod tables {
         pub applicant: AccountNumber,
         pub extra_info: String,
         pub created_at: psibase::TimePointSec,
+        pub inviter: Option<AccountNumber>,
     }
 
     impl GuildApplication {

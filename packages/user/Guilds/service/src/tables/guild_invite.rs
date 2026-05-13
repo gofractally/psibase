@@ -76,7 +76,8 @@ impl GuildInvite {
     }
 
     pub fn accept(&self, accepter: AccountNumber) {
-        let application = GuildApplication::add(self.guild, accepter, "".to_string());
+        let application =
+            GuildApplication::add(self.guild, accepter, "".to_string(), Some(self.inviter));
         if self.pre_attest {
             application.attest("".to_string(), self.inviter, true);
         }
