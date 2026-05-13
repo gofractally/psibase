@@ -12,6 +12,6 @@ export const paths = {
         },
     },
     fractal: {
-        members: () => `/fractal/members`,
+        members: () => `/members`,
     },
 };
