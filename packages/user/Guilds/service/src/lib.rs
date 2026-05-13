@@ -178,6 +178,17 @@ pub mod service {
         FractalSettings::get_or_default(get_sender()).set_guild_weight_curve(curve_id.into());
     }
 
+    /// Auto-join fractal
+    ///
+    /// When enabled, new guild members in ranked guilds are automatically added to the fractal.
+    ///
+    /// # Arguments
+    /// * `enabled` - True to enable auto-join, false to disable.
+    #[action]
+    fn set_auto_join(enabled: bool) {
+        FractalSettings::get_or_default(get_sender()).set_auto_join_fractal(enabled);
+    }
+
     /// Register candidacy.
     ///
     /// Register your candidacy to serve on a Guild council.

@@ -12,6 +12,7 @@ impl FractalSettings {
         Self {
             fractal,
             guild_weight_curve: dist_strat.into(),
+            auto_join_fractal: false,
         }
     }
 
@@ -33,16 +34,21 @@ impl FractalSettings {
         self.save();
     }
 
+    pub fn set_auto_join_fractal(&mut self, enabled: bool) {
+        self.auto_join_fractal = enabled;
+        self.save();
+    }
+
     pub fn scores(&self) -> Vec<(AccountNumber, u32)> {
         let ranked_guilds = Ranking::get_ordered_rankings(self.fractal);
-        let wights = weighted_normalization(
+        let weights = weighted_normalization(
             ranked_guilds.iter(),
             get_curve(self.guild_weight_curve.into()),
         );
 
         let groups = ranked_guilds
             .iter()
-            .zip(wights)
+            .zip(weights)
             .map(|(r, gw)| (gw, Guild::get_assert(r.guild).scores()));
 
         combine_group_scores(groups).into_iter().collect()

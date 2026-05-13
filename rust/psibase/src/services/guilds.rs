@@ -52,6 +52,17 @@ pub mod Service {
         unimplemented!()
     }
 
+    /// Auto-join fractal
+    ///
+    /// When enabled, new guild members in ranked guilds are automatically added to the fractal.
+    ///
+    /// # Arguments
+    /// * `enabled` - True to enable auto-join, false to disable.
+    #[action]
+    fn set_auto_join(enabled: bool) {
+        unimplemented!()
+    }
+
     /// Has policy action used by AuthDyn service.
     ///
     /// # Arguments

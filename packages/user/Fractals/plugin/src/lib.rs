@@ -70,6 +70,9 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_fractal::set_role_map(Executive.into(), &guild_account)?;
         Guilds::admin_fractal::set_role_map(Recruitment.into(), &guild_account)?;
 
+        Guilds::admin_guild::set_ranked_guilds(&[guild_account.clone()])?;
+        Guilds::admin_fractal::set_auto_join_fractal(true)?;
+
         set_propose_latch(None)?;
 
         let set_role_occ = |role_id: u8| {

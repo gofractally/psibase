@@ -29,6 +29,12 @@ impl Ranking {
             .collect()
     }
 
+    pub fn contains(fractal: AccountNumber, guild: AccountNumber) -> bool {
+        Self::get_ordered_rankings(fractal)
+            .iter()
+            .any(|r| r.guild == guild)
+    }
+
     fn total(fractal: AccountNumber) -> usize {
         RankingTable::read()
             .get_index_pk()

@@ -208,5 +208,6 @@ pub mod tables {
         #[primary_key]
         pub fractal: AccountNumber,
         pub guild_weight_curve: u8,
+        pub auto_join_fractal: bool,
     }
 }

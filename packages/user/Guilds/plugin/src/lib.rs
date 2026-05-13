@@ -54,6 +54,7 @@ impl TrustConfig for GuildsPlugin {
                 "Setting the rank ordering threshold",
                 "Setting the guild candidacy cooldown",
                 "Mapping a governance role to a guild",
+                "Enabling auto-join to fractal for ranked-guild members",
             ],
         }
     }
@@ -75,6 +76,12 @@ impl AdminFractal for GuildsPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["fractals"])]
     fn set_role_map(role_id: u8, guild: String) -> Result<(), Error> {
         Guilds::add_to_tx().set_role_map(role_id, guild.as_str().into());
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(High, whitelist = ["fractals"])]
+    fn set_auto_join_fractal(enabled: bool) -> Result<(), Error> {
+        Guilds::add_to_tx().set_auto_join(enabled);
         Ok(())
     }
 }
@@ -198,7 +205,7 @@ impl AdminGuild for GuildsPlugin {
         )
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist = ["fractals"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["fractals", parent_fractal(&guild_account)?.as_str()])]
     fn create_guild(
         display_name: String,
         fractal: String,
@@ -266,7 +273,7 @@ impl AdminGuild for GuildsPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(High)]
+    #[psibase_plugin::authorized(High, whitelist = ["fractals"])]
     fn set_ranked_guilds(ranked_guilds: Vec<String>) -> Result<(), Error> {
         Guilds::add_to_tx().set_rguilds(
             ranked_guilds

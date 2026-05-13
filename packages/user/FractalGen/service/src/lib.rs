@@ -84,6 +84,9 @@ mod service {
         map_sys_guild_to_role_occ(FractalRole::Executive);
         map_sys_guild_to_role_occ(FractalRole::Recruitment);
 
+        Guilds::call_as(SYS_FRACTAL).set_rguilds(vec![SYS_GUILD]);
+        Guilds::call_as(SYS_FRACTAL).set_auto_join(true);
+
         // Give the core fractal ownership of the network
         AuthDelegate::call_from(ROOT).setOwner(SYS_FRACTAL);
     }

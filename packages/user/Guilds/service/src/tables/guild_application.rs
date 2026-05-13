@@ -6,7 +6,8 @@ use psibase::{check_none, check_some, AccountNumber, RawKey, Table, TableQuery};
 use crate::{
     constants::{GUILD_APP_ENDORSEMENT_THRESHOLD, GUILD_APP_REJECT_THRESHOLD},
     tables::tables::{
-        Guild, GuildApplication, GuildApplicationTable, GuildAttest, GuildAttestTable, GuildMember,
+        FractalSettings, Guild, GuildApplication, GuildApplicationTable, GuildAttest,
+        GuildAttestTable, GuildMember, Ranking,
     },
 };
 use psibase::services::transact::Wrapper as TransactSvc;
@@ -107,6 +108,7 @@ impl GuildApplication {
         match self.application_status() {
             ApplicationStatus::Accepted => {
                 GuildMember::add(self.guild, self.applicant);
+                Self::maybe_auto_join_fractal(self.guild, self.applicant, self.inviter);
                 self.remove()
             }
             ApplicationStatus::Rejected => {
@@ -114,6 +116,19 @@ impl GuildApplication {
             }
             ApplicationStatus::Pending => {}
         }
+    }
+
+    fn maybe_auto_join_fractal(
+        guild: AccountNumber,
+        applicant: AccountNumber,
+        inviter: Option<AccountNumber>,
+    ) {
+        let parent = Guild::get_assert(guild);
+        let settings = FractalSettings::get_or_default(parent.fractal);
+        if !settings.auto_join_fractal || !Ranking::contains(parent.fractal, guild) {
+            return;
+        }
+        psibase::services::fractals::Wrapper::call().add_mem(parent.fractal, applicant, inviter);
     }
 
     fn attestations_score(&self) -> i16 {

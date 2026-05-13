@@ -16,6 +16,7 @@ interface admin-fractal {
 
     set-role-map: func(role-id: u8, guild: string) -> result<_, error>;
 
+    set-auto-join-fractal: func(enabled: bool) -> result<_, error>;
 }
 
 interface admin-guild {
