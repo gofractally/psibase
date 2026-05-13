@@ -111,10 +111,7 @@ pub fn unauthorized_error(fn_name: &str) -> Error {
 pub trait TrustConfig {
     fn capabilities() -> Capabilities;
 
-    fn authorized(level: TrustLevel, fn_name: &str) -> Result<bool, Error>
-    where
-        Self: Sized,
-    {
+    fn authorized(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
         Self::authorized_with_whitelist(level, fn_name, &[])
     }
 
@@ -122,24 +119,15 @@ pub trait TrustConfig {
         level: TrustLevel,
         fn_name: &str,
         whitelist: &[&str],
-    ) -> Result<bool, Error>
-    where
-        Self: Sized,
-    {
+    ) -> Result<bool, Error> {
         authorized_with_whitelist::<Self>(level, fn_name, whitelist)
     }
 
-    fn has_auth(level: TrustLevel) -> bool
-    where
-        Self: Sized,
-    {
+    fn has_auth(level: TrustLevel) -> bool {
         has_auth_with_whitelist(level, &[])
     }
 
-    fn has_auth_with_whitelist(level: TrustLevel, whitelist: &[&str]) -> bool
-    where
-        Self: Sized,
-    {
+    fn has_auth_with_whitelist(level: TrustLevel, whitelist: &[&str]) -> bool {
         has_auth_with_whitelist(level, whitelist)
     }
 
@@ -148,7 +136,7 @@ pub trait TrustConfig {
     }
 }
 
-pub fn authorized<T: TrustConfig>(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
+pub fn authorized<T: TrustConfig + ?Sized>(level: TrustLevel, fn_name: &str) -> Result<bool, Error> {
     authorized_with_whitelist::<T>(level, fn_name, &[])
 }
 
@@ -161,7 +149,7 @@ pub fn has_auth_with_whitelist(level: TrustLevel, whitelist: &[&str]) -> bool {
     permissions::api::has_auth(&host::client::get_sender(), level, &whitelist)
 }
 
-pub fn authorized_with_whitelist<T: TrustConfig>(
+pub fn authorized_with_whitelist<T: TrustConfig + ?Sized>(
     level: TrustLevel,
     fn_name: &str,
     whitelist: &[&str],
