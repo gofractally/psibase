@@ -685,7 +685,7 @@ psibase_package(
         DATA ${Plugins_OUTPUT_FILE_auth_any} /plugin.wasm
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -801,7 +801,7 @@ psibase_package(
     ACCOUNTS prods-weak prods-strong
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION})" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -837,7 +837,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RSetCode-schema.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "CommonApi(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -957,15 +957,23 @@ psibase_package(
     NAME Config
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A dashboard for developers to create and manage apps"
-    PACKAGE_DEPENDS 
+    PACKAGE_DEPENDS
+        "Branding(^${PSIBASE_VERSION})"
+        "Host(^${PSIBASE_VERSION})"
         "HttpServer(^${PSIBASE_VERSION})"
         "Sites(^${PSIBASE_VERSION})" 
         "Accounts(^${PSIBASE_VERSION})" 
         "CommonApi(^${PSIBASE_VERSION})" 
         "Registry(^${PSIBASE_VERSION})" 
         "StagedTx(^${PSIBASE_VERSION})" 
+        "Packages(^${PSIBASE_VERSION})"
+        "Producers(^${PSIBASE_VERSION})"
+        "StagedTx(^${PSIBASE_VERSION})"
         "Transact(^${PSIBASE_VERSION})"
         "SetCode(^${PSIBASE_VERSION})"
+        "Symbol(^${PSIBASE_VERSION})"
+        "Tokens(^${PSIBASE_VERSION})"
+        "VirtualServer(^${PSIBASE_VERSION})"
         "Chainmail(^${PSIBASE_VERSION})"
         "ClientData(^${PSIBASE_VERSION})"
     SERVICE config
@@ -1020,7 +1028,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
     DEPENDS wasm ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Nop(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Nop(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(

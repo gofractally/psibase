@@ -249,7 +249,7 @@ fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, HostTy
     let mut result = Vec::new();
     loop {
         let json = Server::post_graphql_get_json(
-            &format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts services owner }} }} }} }}", serde_json::to_string(&end_cursor).unwrap())).map_err(|e| ErrorType::QueryError(e.message))?;
+            &format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts services exports {{ name service }}  owner }} }} }} }}", serde_json::to_string(&end_cursor).unwrap())).map_err(|e| ErrorType::QueryError(e.message))?;
         let root: InstalledRoot =
             serde_json::from_str(&json).map_err(|e| ErrorType::QueryError(e.to_string()))?;
         for edge in root.data.installed.edges {
