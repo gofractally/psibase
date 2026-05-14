@@ -14,9 +14,9 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
-use fracpack::CompiledSchema;
+use fracpack::{CompiledSchema, UnpackOwned};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::ffi::OsString;
@@ -342,6 +342,15 @@ impl PrettyAction {
             method: self.method,
             rawData: raw_data,
         })
+    }
+    pub fn parse_data_as<T: UnpackOwned + DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
+        if let Some(raw_data) = &self.raw_data {
+            Ok(T::unpacked(&raw_data.0)?)
+        } else if let Some(data) = &self.data {
+            Ok(serde_json::from_value(data.clone())?)
+        } else {
+            Err(anyhow!("Missing action data"))
+        }
     }
 }
 
@@ -775,6 +784,13 @@ impl<R: Read + Seek> PackagedService<R> {
         for act in &self.postinstall {
             accounts.push(act.sender);
             services.push(act.service);
+            if act.service == transact::SERVICE
+                && act.method == MethodNumber::from(transact::action_structs::runAs::ACTION_NAME)
+            {
+                let nested = act.parse_data_as::<transact::action_structs::runAs>()?;
+                accounts.push(nested.action.sender);
+                services.push(nested.action.service);
+            }
         }
 
         accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
