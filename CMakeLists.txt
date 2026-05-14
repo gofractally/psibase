@@ -897,7 +897,7 @@ psibase_package(
     NAME Invite
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Create invite links to apps. An invite can facilitate the creation of one or more new accounts."
-    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Aes(^${PSIBASE_VERSION}.0)" "Base64(^${PSIBASE_VERSION}.0)" "Credentials(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Accounts(^${PSIBASE_VERSION}.0)" "Aes(^${PSIBASE_VERSION}.0)" "Base64(^${PSIBASE_VERSION}.0)" "Credentials(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "InviteService(^${PSIBASE_VERSION}.0)" "Nft(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
     SERVICE invite
         DATA ${Plugins_OUTPUT_FILE_invite} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -1250,7 +1250,7 @@ endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
-    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Explorer Host Identity Invite Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry 
+    Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
@@ -1293,6 +1293,7 @@ install(
           ${SERVICE_DIR}/Homepage.psi
           ${SERVICE_DIR}/Identity.psi
           ${SERVICE_DIR}/Invite.psi
+          ${SERVICE_DIR}/InviteService.psi
           ${SERVICE_DIR}/Kdf.psi
           ${SERVICE_DIR}/Kvtests.psi
           ${SERVICE_DIR}/Minimal.psi
