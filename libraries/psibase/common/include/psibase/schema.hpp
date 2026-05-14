@@ -173,7 +173,7 @@ namespace psibase
                return i;
             ++i;
          }
-         throw std::runtime_error("Member is not reflected");
+         abortMessage("Member is not reflected");
       }
 
       template <bool Last, auto K, typename T, typename M>
