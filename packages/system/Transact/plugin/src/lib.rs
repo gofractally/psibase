@@ -11,15 +11,12 @@ mod db;
 mod types;
 use db::*;
 
-use transact::plugin::hook_handlers::*;
-
-// Other plugins
 use host::common::{self as Host, server as Server};
 use host::db::store as Store;
-use host::types::types::{self as HostTypes, BodyTypes};
+use host::types::types::{self as HostTypes, BodyTypes, Claim};
+use transact::plugin::types::Action;
 use virtual_server::plugin::transact as VirtualServer;
 
-// Exported interfaces/types
 use exports::transact::plugin::{
     admin::Guest as Admin, auth::Guest as Auth, hooks::Guest as Hooks, intf::Guest as Intf,
     network::Guest as Network,
@@ -27,7 +24,6 @@ use exports::transact::plugin::{
 
 use psibase::services::transact::action_structs::setSnapTime;
 
-// Third-party crates
 use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::{Hex, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionTrace};
@@ -45,38 +41,16 @@ psibase::define_trust! {
         ",
     }
     functions {
-        None => [hook_action_auth, unhook_actions_sender, add_action_to_transaction],
+        None => [add_signature, unhook_actions_sender, add_action_to_transaction],
         Low => [],
         High => [hook_actions_sender],
         Max => [set_propose_latch, propose, set_snapshot_time, start_tx, finish_tx, get_query_token],
     }
 }
 
-// The transaction construction cycle, including hooks, is as follows:
-//
-// 1. start-tx
-//
-// 2. add-action-to-transaction
-// 3.   on-actions-sender           - the propose-latch account (if any) is used;
-//                                    otherwise the hooked plugin can set the sender of the action;
-//                                    otherwise the logged-in user is used by default.
-// 4.   on-action-auth-claims       - the hooked plugin can add claims for this action
-//
-// 5. finish-tx
-// 6.   on-user-claim               - the user auth plugin adds the user claim
-// 7.   construct transaction
-// 8.   hash-transaction
-// 9.   on-user-auth-proof          - the user auth plugin adds the user proof
-// 10.  on-action-auth-proofs       - the hooked plugin can add proofs for their action claims
-// 11.  publish transaction
-
 struct TransactPlugin {}
 
 impl Hooks for TransactPlugin {
-    fn hook_action_auth() {
-        ActionAuthPlugins::set(Host::client::get_sender());
-    }
-
     fn hook_actions_sender() {
         assert_authorized_with_whitelist(FunctionName::hook_actions_sender, vec!["invite".into()])
             .unwrap();
@@ -116,13 +90,6 @@ fn schedule_action(
         raw_data: packed_args,
     };
 
-    if let Some(plugin) = ActionAuthPlugins::get() {
-        ActionAuthPlugins::clear();
-        let plugin_ref = HostTypes::PluginRef::new(&plugin, "plugin", "transact-hook-action-auth");
-        let claims = on_action_auth_claims(plugin_ref, &action)?;
-        ActionClaims::push(plugin, claims);
-    }
-
     if ProposeLatch::is_active() {
         ProposeLatch::add(action);
     } else {
@@ -138,6 +105,11 @@ impl Intf for TransactPlugin {
         packed_args: Vec<u8>,
     ) -> Result<(), HostTypes::Error> {
         schedule_action(Host::client::get_sender(), method_name, packed_args)
+    }
+
+    fn add_signature(claim: Claim) -> Result<(), HostTypes::Error> {
+        TxSignatures::add(claim);
+        Ok(())
     }
 
     fn set_propose_latch(account: Option<String>) -> Result<(), HostTypes::Error> {
@@ -229,17 +201,13 @@ impl Admin for TransactPlugin {
             println!("[Warning] Propose latch should already have been cleared.");
             ProposeLatch::clear();
         }
-        if ActionAuthPlugins::has() {
-            println!("[Warning] Auth plugins should already have been cleared.");
-            ActionAuthPlugins::clear();
-        }
         if ActionSenderHook::has() {
             println!("[Warning] Action sender hook should already have been cleared.");
             ActionSenderHook::clear();
         }
-        if ActionClaims::get_all().len() > 0 {
-            println!("[Warning] Action claims should already have been cleared.");
-            ActionClaims::clear();
+        if !TxSignatures::is_empty() {
+            println!("[Warning] Tx signatures should already have been cleared.");
+            TxSignatures::reset();
         }
     }
 
@@ -260,6 +228,7 @@ impl Admin for TransactPlugin {
         let mut actions = TxActions::take();
 
         if actions.len() == 0 {
+            TxSignatures::reset();
             Store::flush_transactional_data();
             return Ok(());
         }
@@ -272,18 +241,18 @@ impl Admin for TransactPlugin {
 
         let tx = make_transaction(actions, 3);
 
+        let tx_hash = sha256(&tx.packed());
+        let proofs = build_proofs(&tx_hash)?;
+        TxSignatures::reset();
+
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs(&sha256(&tx.packed()), true)?,
+            proofs,
             subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
             return Err(ClaimProofMismatch.into());
         }
-
-        // TODO (idea): on_hook_pre_publish(signed_tx) -> bool
-        // Could allow a user to inspect a final transaction rather than publish
-        //   (Helpful for debugging, post-install scripts, offline msig, etc.)
 
         let body = signed_tx.publish()?;
         let trace = match body {
@@ -292,9 +261,6 @@ impl Admin for TransactPlugin {
                 return Err(TransactionError("Invalid response body".to_string()).into());
             }
         };
-
-        // TODO (idea): on_hook_post_publish(trace)
-        // Could be for logging, or for other post-transaction client-side processing
 
         match trace.error {
             Some(err) => Err(TransactionError(err).into()),
@@ -315,27 +281,27 @@ struct LoginReply {
 }
 
 impl Auth for TransactPlugin {
-    fn get_query_token(app: String, user: String) -> Result<String, HostTypes::Error> {
+    fn get_query_token(
+        app: String,
+        user: String,
+        claim: Option<Claim>,
+    ) -> Result<String, HostTypes::Error> {
         assert_authorized_with_whitelist(FunctionName::get_query_token, vec!["host".into()])?;
 
         let root_host: String = serde_json::from_str(&Server::get_json("/common/rootdomain")?)
             .expect("Failed to deserialize rootdomain");
-        let actions = vec![Action {
+        let action = Action {
             sender: user.clone(),
             service: app,
             method: "loginSys".to_string(),
             raw_data: (root_host,).packed(),
-        }];
+        };
 
-        let claims =
-            get_claims_for_user(&user).expect("Failed to retrieve claims from auth plugin");
-
-        let claims: Vec<psibase::Claim> = claims.into_iter().map(Into::into).collect();
-        let actions: Vec<psibase::Action> = actions.into_iter().map(Into::into).collect();
+        let tx_claim = claim.as_ref().map(|c| psibase::Claim::from(c.clone()));
 
         let expiration = TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
         let tapos = Tapos {
-            expiration: expiration,
+            expiration,
             refBlockSuffix: 0,
             flags: Tapos::DO_NOT_BROADCAST_FLAG,
             refBlockIndex: 0,
@@ -343,12 +309,22 @@ impl Auth for TransactPlugin {
 
         let tx = Transaction {
             tapos,
-            actions,
-            claims,
+            actions: vec![action.into()],
+            claims: match tx_claim {
+                Some(claim) => vec![claim],
+                None => vec![],
+            },
         };
+        let tx_hash = sha256(&tx.packed());
+
+        let proofs: Vec<Hex<Vec<u8>>> = match claim.as_ref() {
+            Some(c) => vec![Hex::from(sign_with_claim(c, &tx_hash)?)],
+            None => Vec::new(),
+        };
+
         let signed_tx = SignedTransaction {
             transaction: Hex::from(tx.packed()),
-            proofs: get_proofs_for_user(&sha256(&tx.packed()), &user)?,
+            proofs,
             subjectiveData: None,
         };
         if signed_tx.proofs.len() != tx.claims.len() {
