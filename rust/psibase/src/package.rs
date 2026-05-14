@@ -1818,7 +1818,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services exports {{ name service }} sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))
