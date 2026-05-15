@@ -51,6 +51,7 @@ namespace UserService
                                         &PublishedPackage::version>;
    };
    PSIO_REFLECT(PublishedPackage,
+                owner,
                 name,
                 version,
                 scope,

@@ -1,19 +1,62 @@
-use std::sync::atomic::AtomicI32;
+// cargo build -r --bin burst-transfer --manifest-path rust/Cargo.toml --target-dir build/rust
+use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
 use anyhow::{anyhow, Context};
 use psibase::fracpack::Pack;
-use psibase::{ActionFormatter, AnyPrivateKey, HttpSchemaFetcher, TraceFormat};
+use psibase::services::tokens::{Quantity, Wrapper as Tokens};
+use psibase::{
+    new_account_action, preapprove_action, ActionFormatter, AnyPrivateKey, HttpSchemaFetcher,
+    PackageList, TraceFormat,
+};
+
+const ACCOUNTS_PER_SETUP: usize = 10;
+const MAX_ERRORS: u32 = 10;
+
+static ERROR_COUNT: AtomicU32 = AtomicU32::new(0);
+
+fn record_error() -> Result<(), anyhow::Error> {
+    let n = ERROR_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+    if n >= MAX_ERRORS {
+        return Err(anyhow!("stopped after {} errors", MAX_ERRORS));
+    }
+    Ok(())
+}
+
+fn quota_exhausted() -> bool {
+    ERROR_COUNT.load(Ordering::Relaxed) >= MAX_ERRORS
+}
+
+mod faucet_tok {
+    #[psibase::service(name = "faucet-tok", dispatch = false)]
+    #[allow(non_snake_case, unused_variables)]
+    mod service {
+        #[action]
+        fn dispense(account: psibase::AccountNumber) {
+            unimplemented!()
+        }
+    }
+}
+
+fn parse_api_endpoint(api_str: &str) -> Result<url::Url, anyhow::Error> {
+    if let Ok(api_url) = url::Url::parse(api_str) {
+        Ok(api_url)
+    } else {
+        let host_url = psibase::cli::config::read_host_url(api_str)?;
+        Ok(url::Url::parse(&host_url)?)
+    }
+}
 
 /// Randomly push transfers to a blockchain in bursts
 #[derive(clap::Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// API Endpoint
+    /// API Endpoint URL or host alias from `psibase config`
     #[clap(
         short = 'a',
         long,
-        value_name = "URL",
-        default_value = "http://psibase.localhost:8080/"
+        value_name = "URL_OR_HOST_ALIAS",
+        default_value = "http://psibase.localhost:8080/",
+        value_parser = parse_api_endpoint
     )]
     api: url::Url,
 
@@ -25,9 +68,9 @@ struct Args {
     #[clap(required = true)]
     symbol: psibase::ExactAccountNumber,
 
-    /// Accounts to transfer between; need at least 2
+    /// Number of random accounts to create and use as transfer participants
     #[clap(required = true)]
-    accounts: Vec<psibase::ExactAccountNumber>,
+    account_count: usize,
 
     /// Number of transactions in each burst
     #[clap(short = 'b', long, default_value_t = 1)]
@@ -37,13 +80,13 @@ struct Args {
     #[clap(short = 'A', long, default_value_t = 1)]
     actions: u32,
 
-    /// Delay in milliseconds between each burst. If this is 0, then
-    /// maintain <BURST_SIZE> transactions in flight.
+    /// Target interval in milliseconds between the start of each burst.
+    /// If this is 0, then maintain <BURST_SIZE> transactions in flight.
     #[clap(short = 'd', long, default_value_t = 1000)]
     delay: u32,
 
-    /// Controls how transaction traces are reported. Possible values are
-    /// error, stack, full, or json
+    /// Controls how transaction traces are reported. `error` and `stack`
+    /// only print failed traces; use `full` or `json` to print successful traces.
     #[clap(long, value_name = "FORMAT", default_value = "stack")]
     trace: TraceFormat,
 
@@ -52,118 +95,49 @@ struct Args {
     console: bool,
 }
 
-// Get the url for a service's path
-fn get_url(
-    api: &url::Url,
-    service: psibase::AccountNumber,
-    path: &str,
-) -> Result<url::Url, anyhow::Error> {
-    let host = match api
-        .host()
-        .ok_or_else(|| anyhow!("missing host name in <API>"))?
-    {
-        url::Host::Domain(s) => s,
-        _ => return Err(anyhow!("missing host name in <API>")),
-    };
-    let mut api = api.clone();
-    api.set_host(Some(&(service.to_string() + "." + host)))?;
-    api.set_path(path);
-    Ok(api)
-}
-
-// Get response as text
-async fn as_text(mut response: reqwest::Response) -> Result<String, anyhow::Error> {
-    if response.status().is_client_error() {
-        response = response.error_for_status()?;
-    }
-    if response.status().is_server_error() {
-        return Err(anyhow!("{}", response.text().await?));
-    }
-    Ok(response.text().await?)
-}
-
-// Get response as JSON
-async fn as_json<T: serde::de::DeserializeOwned>(
-    response: reqwest::Response,
-) -> Result<T, anyhow::Error> {
-    Ok(serde_json::de::from_str(&as_text(response).await?)?)
-}
-
-// Just the fields we care about
-#[allow(non_snake_case)]
 #[derive(Debug, serde::Deserialize)]
 struct TokenRecord {
     id: u32,
-    symbolId: String,
 }
 
-// Look up token ID
+#[derive(Debug, serde::Deserialize)]
+struct TokenQuery {
+    token: Option<TokenRecord>,
+}
+
 async fn lookup_token(
     api: &url::Url,
     symbol_id: &str,
 ) -> Result<Option<TokenRecord>, anyhow::Error> {
-    let records = as_json::<Vec<TokenRecord>>(
-        reqwest::Client::new()
-            .get(get_url(
-                api,
-                psibase::account!("tokens"),
-                "/api/getTokenTypes",
-            )?)
-            .send()
-            .await?,
+    let token_id = serde_json::to_string(symbol_id)?;
+    let body = format!("query {{ token(tokenId: {}) {{ id }} }}", token_id);
+    let mut client = reqwest::Client::new();
+    Ok(
+        psibase::gql_query::<TokenQuery>(api, &mut client, psibase::account!("tokens"), body)
+            .await?
+            .token,
     )
-    .await?;
-
-    for record in records {
-        if record.symbolId == symbol_id {
-            return Ok(Some(record));
-        }
-    }
-
-    Ok(None)
 }
 
-// Interface to the action we need
-mod tokens {
-    #[psibase::service(name = "tokens", dispatch = false)]
-    #[allow(non_snake_case, unused_variables)]
-    mod service {
-        #[action]
-        fn credit(tokenId: u32, receiver: psibase::AccountNumber, amount: (u64,), memo: (String,)) {
-            unimplemented!()
-        }
-    }
+fn random_account_name() -> psibase::AccountNumber {
+    let bytes: Vec<u8> = (0..7).map(|_| b'a' + (rand::random::<u8>() % 26)).collect();
+    psibase::AccountNumber::from(std::str::from_utf8(&bytes).unwrap())
 }
 
-// Randomly transfer
-async fn transfer_impl(
-    args: &Args,
-    token_id: u32,
-    counter: &AtomicI32,
+fn account_names(accounts: &[psibase::AccountNumber]) -> String {
+    accounts
+        .iter()
+        .map(|account| account.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn build_transaction(
+    actions: Vec<psibase::Action>,
     ref_block: &psibase::TaposRefBlock,
-) -> Result<(), anyhow::Error> {
-    let from = args.accounts[rand::random::<usize>() % args.accounts.len()];
-    let mut to = from;
-    while to == from {
-        to = args.accounts[rand::random::<usize>() % args.accounts.len()];
-    }
-    let now_plus_10secs = chrono::Utc::now() + chrono::Duration::seconds(10);
-    let expiration = psibase::TimePointSec::from(now_plus_10secs);
-    let mut actions = Vec::new();
-    for _ in 0..args.actions {
-        let memo = format!(
-            "memo {}",
-            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
-        );
-        // println!("{} -> {} {}", from, to, memo);
-        actions.push(tokens::Wrapper::pack_from(from.into()).credit(
-            token_id,
-            to.into(),
-            (1u64,),
-            (memo,),
-        ));
-    }
-    let trx = psibase::Transaction {
+) -> psibase::Transaction {
+    let expiration = psibase::TimePointSec::from(chrono::Utc::now() + chrono::Duration::seconds(3));
+    psibase::Transaction {
         tapos: psibase::Tapos {
             expiration,
             refBlockSuffix: ref_block.ref_block_suffix,
@@ -172,15 +146,72 @@ async fn transfer_impl(
         },
         actions,
         claims: vec![],
-    };
-    let client = reqwest::Client::new();
+    }
+}
 
-    let afmt = ActionFormatter::new(HttpSchemaFetcher {
-        client: &client,
-        base_url: &args.api,
-    });
+async fn push_setup(
+    args: &Args,
+    new_accounts: &[psibase::AccountNumber],
+    ref_block: &psibase::TaposRefBlock,
+    client: &reqwest::Client,
+    afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
+) -> Result<(), anyhow::Error> {
+    let sender = psibase::services::producers::ROOT;
+    let mut actions = Vec::new();
+    for account in new_accounts {
+        if let Some(preapprove) = preapprove_action(sender, *account) {
+            actions.push(preapprove);
+        }
+        actions.push(new_account_action(sender, *account));
+    }
+    for account in new_accounts {
+        actions.push(faucet_tok::Wrapper::pack_from(sender).dispense(*account));
+    }
+
+    let trx = build_transaction(actions, ref_block);
 
     psibase::push_transaction(
+        &args.api,
+        client.clone(),
+        psibase::sign_transaction(trx, &args.sign)?.packed(),
+        args.trace,
+        args.console,
+        None,
+        &afmt,
+    )
+    .await
+}
+
+async fn transfer_impl(
+    args: &Args,
+    accounts: &[psibase::AccountNumber],
+    token_id: u32,
+    counter: &AtomicI32,
+    ref_block: &psibase::TaposRefBlock,
+    client: &reqwest::Client,
+    afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
+) -> Result<(), anyhow::Error> {
+    let from = accounts[rand::random::<usize>() % accounts.len()];
+    let mut to = from;
+    while to == from {
+        to = accounts[rand::random::<usize>() % accounts.len()];
+    }
+    let mut actions = Vec::new();
+    for _ in 0..args.actions {
+        let memo = format!(
+            "memo {}",
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
+        );
+        actions.push(Tokens::pack_from(from).credit(
+            token_id,
+            to,
+            Quantity::from(1u64),
+            memo.try_into()?,
+        ));
+    }
+    let trx = build_transaction(actions, ref_block);
+
+    psibase::push_transaction_optimistic(
         &args.api,
         client.clone(),
         psibase::sign_transaction(trx, &args.sign)?.packed(),
@@ -193,23 +224,34 @@ async fn transfer_impl(
     Ok(())
 }
 
-// Print any errors, but continue execution
 async fn transfer(
     args: &Args,
+    accounts: &[psibase::AccountNumber],
     token_id: u32,
     counter: &AtomicI32,
     ref_block: &psibase::TaposRefBlock,
     repeat: bool,
-) {
+    client: &reqwest::Client,
+    afmt: &ActionFormatter<'_, HttpSchemaFetcher<'_>>,
+) -> Result<usize, anyhow::Error> {
     loop {
-        if let Err(e) = transfer_impl(args, token_id, counter, ref_block)
-            .await
-            .context("Failed to push transaction")
-        {
-            println!("\n{:?}", e);
-        };
+        if quota_exhausted() {
+            return Err(anyhow!("stopped after {} errors", MAX_ERRORS));
+        }
+        let transferred =
+            match transfer_impl(args, accounts, token_id, counter, ref_block, client, afmt)
+                .await
+                .context("Failed to push transaction")
+            {
+                Ok(()) => true,
+                Err(e) => {
+                    println!("Transfer error | {:?}", e);
+                    record_error()?;
+                    false
+                }
+            };
         if !repeat {
-            return;
+            return Ok(usize::from(transferred));
         }
     }
 }
@@ -217,8 +259,18 @@ async fn transfer(
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args = <Args as clap::Parser>::parse();
-    if args.accounts.len() < 2 {
-        return Err(anyhow!("Need at least 2 accounts"));
+    if args.account_count < 2 {
+        return Err(anyhow!("account_count must be at least 2"));
+    }
+
+    let mut client = reqwest::Client::new();
+    let installed = PackageList::installed(&args.api, &mut client)
+        .await
+        .context("Failed to list installed packages")?;
+    if !installed.contains_package("FaucetTok") {
+        return Err(anyhow!(
+            "burst-transfer depends on the FaucetTok package; install it before running"
+        ));
     }
 
     let tok = match lookup_token(&args.api, &args.symbol.to_string())
@@ -229,33 +281,92 @@ async fn main() -> Result<(), anyhow::Error> {
         None => return Err(anyhow!("Can not find tokens with symbol {}", args.symbol)),
     };
 
+    let afmt = ActionFormatter::new(HttpSchemaFetcher {
+        client: &client,
+        base_url: &args.api,
+    });
+
+    println!(
+        "burst-transfer | api: {} | token: {} #{} | accounts: {} | burst: {} tx x {} actions | delay: {}ms",
+        args.api, args.symbol, tok.id, args.account_count, args.burst_size, args.actions, args.delay
+    );
+
     let counter = AtomicI32::new(0);
-    loop {
-        println!("get tapos");
-        let ref_block = psibase::get_tapos_for_head(&args.api, reqwest::Client::new())
+    let mut accounts: Vec<psibase::AccountNumber> = Vec::with_capacity(args.account_count);
+
+    while accounts.len() < args.account_count {
+        let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
             .await
-            .context("Failed to push transaction");
-        println!("got tapos");
+            .context("Failed to get tapos");
         match ref_block {
-            Err(e) => println!("\n{:?}", e),
+            Err(e) => {
+                println!("TAPOS error | {:?}", e);
+                record_error()?;
+            }
             Ok(ref_block) => {
+                let n = std::cmp::min(ACCOUNTS_PER_SETUP, args.account_count - accounts.len());
+                let new_accounts: Vec<_> = (0..n).map(|_| random_account_name()).collect();
+                match push_setup(&args, &new_accounts, &ref_block, &client, &afmt)
+                    .await
+                    .context("Failed to push setup transaction")
+                {
+                    Err(e) => {
+                        println!("Setup error | {:?}", e);
+                        record_error()?;
+                    }
+                    Ok(()) => {
+                        let created_names = account_names(&new_accounts);
+                        let added = new_accounts.len();
+                        accounts.extend(new_accounts);
+                        println!(
+                            "Setup | +{} accounts ({}/{})",
+                            added,
+                            accounts.len(),
+                            args.account_count
+                        );
+                        println!("  {}", created_names);
+                    }
+                }
+            }
+        }
+    }
+
+    loop {
+        let batch_start = tokio::time::Instant::now();
+        let ref_block = psibase::get_tapos_for_head(&args.api, client.clone())
+            .await
+            .context("Failed to get tapos");
+        match ref_block {
+            Err(e) => {
+                println!("TAPOS error | {:?}", e);
+                record_error()?;
+            }
+            Ok(ref_block) => {
+                let repeat = args.delay == 0;
                 let mut transfers = Vec::new();
                 for _ in 0..args.burst_size {
                     transfers.push(transfer(
-                        &args,
-                        tok.id,
-                        &counter,
-                        &ref_block,
-                        args.delay == 0,
+                        &args, &accounts, tok.id, &counter, &ref_block, repeat, &client, &afmt,
                     ));
                 }
-                futures::future::join_all(transfers).await;
+                if repeat {
+                    println!(
+                        "Batch | transferred continuously | maintaining {} in-flight transactions",
+                        args.burst_size
+                    );
+                }
+                let transferred: usize = futures::future::try_join_all(transfers)
+                    .await?
+                    .into_iter()
+                    .sum();
+                println!("Batch | transferred {}/{} tx", transferred, args.burst_size);
             }
         }
         if args.delay > 0 {
-            println!("sleep...");
-            tokio::time::sleep(tokio::time::Duration::from_millis(args.delay.into())).await;
+            let delay = tokio::time::Duration::from_millis(args.delay.into());
+            if let Some(remaining) = delay.checked_sub(batch_start.elapsed()) {
+                tokio::time::sleep(remaining).await;
+            }
         }
-        println!("ready");
     }
 }
