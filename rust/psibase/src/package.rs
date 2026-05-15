@@ -1,14 +1,14 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers, setcode, sites,
-    transact, verify_sig, x_sites,
+    accounts, brotli_svc::brotli_impl, http_server, packages, producers, setcode, sites, transact,
+    x_sites,
 };
 use crate::{
     new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
-    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256, CodeRow,
-    GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp,
-    PackagePreference, Schema, ToSchema, Unpack, Version,
+    solve_dependencies, version_match, AccountNumber, Action, Checksum256, CodeRow, GenesisService,
+    Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp, PackagePreference,
+    Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -626,24 +626,13 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn create_account(
         &self,
         account: AccountNumber,
-        key: &Option<AnyPublicKey>,
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
         if let Some(preapprove) = preapprove_action(sender, account) {
             actions.push(preapprove)
         }
-        if let Some(key) = key {
-            if key.key.service != verify_sig::SERVICE {
-                return Err(Error::InvalidVerifyService)?;
-            }
-            actions.push(
-                auth_sig::Wrapper::pack_from(sender)
-                    .newAccount(account, key.key.rawData.0.clone().into()),
-            );
-        } else {
-            actions.push(new_account_owned_action(sender, account, sender));
-        }
+        actions.push(new_account_owned_action(sender, account, sender));
         Ok(())
     }
 
@@ -652,12 +641,11 @@ impl<R: Read + Seek> PackagedService<R> {
         actions: &mut Vec<Vec<Action>>,
         mut uploader: Option<&mut StagedUpload>,
         sender: AccountNumber,
-        key: &Option<AnyPublicKey>,
     ) -> Result<(), anyhow::Error> {
         // service accounts
         for (account, index, info) in &self.services {
             let mut group = vec![];
-            self.create_account(*account, key, sender, &mut group)?;
+            self.create_account(*account, sender, &mut group)?;
             let code = read(&mut self.archive.by_index(*index)?)?;
             let code_hash: [u8; 32] = Sha256::digest(&code).into();
             if let Some(uploader) = &mut uploader {
@@ -693,7 +681,7 @@ impl<R: Read + Seek> PackagedService<R> {
         for account in self.get_accounts() {
             if !self.has_service(*account) {
                 let mut group = vec![];
-                self.create_account(*account, key, sender, &mut group)?;
+                self.create_account(*account, sender, &mut group)?;
                 actions.push(group);
             }
         }

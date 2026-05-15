@@ -701,7 +701,7 @@ impl Chain {
                         package.version()
                     ));
                     let mut account_actions = vec![];
-                    package.install_accounts(&mut account_actions, None, sender, &None)?;
+                    package.install_accounts(&mut account_actions, None, sender)?;
                     builder.push_all(account_actions)?;
                     let mut actions = vec![];
                     package.install(
