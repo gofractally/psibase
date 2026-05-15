@@ -27,7 +27,7 @@ pub fn get_service() -> AccountNumber {
 /// code is not WASM, or is not a service, then this returns 0.
 #[cfg(not(target_family = "wasm"))]
 pub fn get_service() -> AccountNumber {
-    AccountNumber::MIN
+    AccountNumber::new(0)
 }
 
 /// Get sender of currently-executing action
@@ -49,7 +49,7 @@ pub fn get_sender() -> AccountNumber {
 /// then this returns 0.
 #[cfg(not(target_family = "wasm"))]
 pub fn get_sender() -> AccountNumber {
-    AccountNumber::MIN
+    AccountNumber::new(0)
 }
 
 // The service's `start` entry point sets this. Nothing else
