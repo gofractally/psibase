@@ -205,7 +205,7 @@ impl AdminGuild for GuildsPlugin {
         )
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist = ["fractals"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["fractals", &fractal])]
     fn create_guild(
         display_name: String,
         fractal: String,
