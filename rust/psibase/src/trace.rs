@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::{
     method, schema_types,
-    services::{db, transact},
-    AccountNumber, Action, Hex, MethodString, Pack, Schema, SchemaMap,
+    services::{db, transact, virtual_server},
+    AccountNumber, Action, DbId, Hex, MethodString, Pack, Schema, SchemaMap,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -176,7 +176,8 @@ fn format_string(mut s: &str, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt:
 
 fn format_console(c: &ConsoleTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{:indent$}console:    ", "")?;
-    format_string(&c.console, indent + 12, f)
+    format_string(c.console.trim_end_matches('\n'), indent + 12, f)?;
+    writeln!(f)
 }
 
 fn format_event(_: &EventTrace, indent: usize, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -277,6 +278,187 @@ fn format_transaction_trace(
         format_string(e, indent + 11, f)?;
     }
     Ok(())
+}
+
+fn use_disk_sys_amount(action: &Action) -> Option<i64> {
+    use crate as psibase;
+    if action.service == virtual_server::SERVICE && action.method == method!("useDiskSys") {
+        let (_, _, amount) = <(AccountNumber, DbId, i64)>::unpacked(&action.rawData).ok()?;
+        Some(amount)
+    } else {
+        None
+    }
+}
+
+fn subtree_disk_net(atrace: &ActionTrace) -> i64 {
+    let mut net = use_disk_sys_amount(&atrace.action).unwrap_or(0);
+    for inner in &atrace.inner_traces {
+        if let InnerTraceEnum::ActionTrace(c) = &inner.inner {
+            net += subtree_disk_net(c);
+        }
+    }
+    net
+}
+
+fn has_disk_activity(atrace: &ActionTrace) -> bool {
+    if use_disk_sys_amount(&atrace.action).is_some() {
+        return true;
+    }
+    for inner in &atrace.inner_traces {
+        if let InnerTraceEnum::ActionTrace(c) = &inner.inner {
+            if has_disk_activity(c) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn collect_direct_disk<'a>(
+    atrace: &'a ActionTrace,
+    deltas: &mut Vec<i64>,
+    shown_children: &mut Vec<&'a ActionTrace>,
+) {
+    use crate as psibase;
+    for inner in &atrace.inner_traces {
+        if let InnerTraceEnum::ActionTrace(c) = &inner.inner {
+            let is_kv_notify =
+                c.action.service == transact::SERVICE && c.action.method == method!("kvNotify");
+            if let Some(amount) = use_disk_sys_amount(&c.action) {
+                deltas.push(amount);
+                collect_direct_disk(c, deltas, shown_children);
+            } else if is_kv_notify {
+                collect_direct_disk(c, deltas, shown_children);
+            } else if has_disk_activity(c) {
+                shown_children.push(c);
+            }
+        }
+    }
+}
+
+fn format_signed_bytes(amount: i64, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if amount >= 0 {
+        write!(f, "+{}", amount)
+    } else {
+        write!(f, "{}", amount)
+    }
+}
+
+fn format_signed_col(amount: Option<i64>, width: usize) -> String {
+    match amount {
+        None => " ".repeat(width),
+        Some(n) if n >= 0 => format!("{:>width$}", format!("+{}", n), width = width),
+        Some(n) => format!("{:>width$}", n, width = width),
+    }
+}
+
+const COL_WIDTH: usize = 8;
+const COLS_TOTAL: usize = COL_WIDTH * 2 + 4;
+
+fn format_disk_usage_action(
+    schemas: &SchemaMap,
+    atrace: &ActionTrace,
+    indent: usize,
+    show_all_ops: bool,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    let schema = schemas.get(&atrace.action.service);
+    let entry_placeholder = MethodString("<entry>".to_string());
+    let action_name = MethodString(atrace.action.method.to_string());
+    let action_name = if atrace.action.method.value == 0 {
+        &entry_placeholder
+    } else {
+        schema
+            .and_then(|schema| schema.actions.get_key_value(&action_name))
+            .map_or(&action_name, |(name, _)| name)
+    };
+
+    let mut deltas = Vec::new();
+    let mut shown_children = Vec::new();
+    collect_direct_disk(atrace, &mut deltas, &mut shown_children);
+
+    let direct_disk: i64 = deltas.iter().sum();
+    let child_disk: i64 = shown_children.iter().copied().map(subtree_disk_net).sum();
+    let self_col = if direct_disk == 0 {
+        None
+    } else {
+        Some(direct_disk)
+    };
+    let children_col = if shown_children.is_empty() {
+        None
+    } else {
+        Some(child_disk)
+    };
+
+    writeln!(
+        f,
+        "{}  {}  {:indent$}{}::{}",
+        format_signed_col(self_col, COL_WIDTH),
+        format_signed_col(children_col, COL_WIDTH),
+        "",
+        atrace.action.service,
+        action_name,
+    )?;
+
+    if show_all_ops && !deltas.is_empty() {
+        write!(f, "{:>COLS_TOTAL$}{:indent$}  ", "", "")?;
+        for (i, d) in deltas.iter().enumerate() {
+            if i != 0 {
+                write!(f, " ")?;
+            }
+            format_signed_bytes(*d, f)?;
+        }
+        writeln!(f)?;
+    }
+
+    for c in shown_children {
+        format_disk_usage_action(schemas, c, indent + 2, show_all_ops, f)?;
+    }
+
+    Ok(())
+}
+
+fn format_transaction_disk_usage_trace(
+    schemas: &SchemaMap,
+    ttrace: &TransactionTrace,
+    show_all_ops: bool,
+    f: &mut fmt::Formatter<'_>,
+) -> fmt::Result {
+    let total: i64 = ttrace.action_traces.iter().map(subtree_disk_net).sum();
+    write!(f, "Total disk usage: ")?;
+    format_signed_bytes(total, f)?;
+    writeln!(f, " bytes")?;
+    writeln!(
+        f,
+        "{:>w1$}  {:>w2$}  action",
+        "self",
+        "children",
+        w1 = COL_WIDTH,
+        w2 = COL_WIDTH,
+    )?;
+    for a in &ttrace.action_traces {
+        if has_disk_activity(a) {
+            format_disk_usage_action(schemas, a, 0, show_all_ops, f)?;
+        }
+    }
+    Ok(())
+}
+
+pub struct DisplayDiskUsageTrace<'a> {
+    schemas: &'a RefCell<HashMap<AccountNumber, Schema>>,
+    trace: &'a TransactionTrace,
+    show_all_ops: bool,
+}
+
+impl fmt::Display for DisplayDiskUsageTrace<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        format_transaction_disk_usage_trace(
+            &self.schemas.borrow(),
+            self.trace,
+            self.show_all_ops,
+            f,
+        )
+    }
 }
 
 fn format_error_stack<T: std::fmt::Write>(
@@ -456,6 +638,17 @@ impl<'a, F: SchemaFetcher + 'a> ActionFormatter<'a, F> {
         DisplayTransactionTrace {
             schemas: &self.storage.schemas,
             trace: ttrace,
+        }
+    }
+    pub fn display_disk_usage_trace<'b>(
+        &'b self,
+        ttrace: &'b TransactionTrace,
+        show_all_ops: bool,
+    ) -> DisplayDiskUsageTrace<'b> {
+        DisplayDiskUsageTrace {
+            schemas: &self.storage.schemas,
+            trace: ttrace,
+            show_all_ops,
         }
     }
 }
