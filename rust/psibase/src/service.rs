@@ -5,10 +5,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 #[cfg(target_family = "wasm")]
-static mut SERVICE: AccountNumber = AccountNumber::MIN;
+static mut SERVICE: AccountNumber = AccountNumber::new(0);
 
 #[cfg(target_family = "wasm")]
-static mut SENDER: AccountNumber = AccountNumber::MIN;
+static mut SENDER: AccountNumber = AccountNumber::new(0);
 
 /// Get currently-executing service
 ///

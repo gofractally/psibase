@@ -139,51 +139,66 @@ mod tests {
 
     #[test]
     fn empty_name_is_zero() {
-        assert_eq!(AccountNumber::from_str("").unwrap(), AccountNumber::MIN);
+        assert_eq!(AccountNumber::from_str("").unwrap(), AccountNumber::new(0));
     }
 
     #[test]
     fn name_longer_than_limit_of_18_is_zero() {
         assert_eq!(
             AccountNumber::from_str("abcdefghijklmnopqrstuvwxyz").unwrap(),
-            AccountNumber::MIN
+            AccountNumber::new(0)
         );
     }
 
     #[test]
     fn name_starting_with_a_char_less_than_9_returns_zero() {
-        assert_eq!(AccountNumber::from_str("9").unwrap(), AccountNumber::MIN);
-        assert_eq!(AccountNumber::from_str("3").unwrap(), AccountNumber::MIN);
-        assert_eq!(AccountNumber::from_str("1abc").unwrap(), AccountNumber::MIN);
-        assert_eq!(AccountNumber::from_str("1234").unwrap(), AccountNumber::MIN);
+        assert_eq!(AccountNumber::from_str("9").unwrap(), AccountNumber::new(0));
+        assert_eq!(AccountNumber::from_str("3").unwrap(), AccountNumber::new(0));
+        assert_eq!(
+            AccountNumber::from_str("1abc").unwrap(),
+            AccountNumber::new(0)
+        );
+        assert_eq!(
+            AccountNumber::from_str("1234").unwrap(),
+            AccountNumber::new(0)
+        );
         assert_eq!(
             AccountNumber::from_str("9asdf").unwrap(),
-            AccountNumber::MIN
+            AccountNumber::new(0)
         );
-        assert_ne!(AccountNumber::from_str("abcd").unwrap(), AccountNumber::MIN);
+        assert_ne!(
+            AccountNumber::from_str("abcd").unwrap(),
+            AccountNumber::new(0)
+        );
         assert_ne!(
             AccountNumber::from_str("asdf9").unwrap(),
-            AccountNumber::MIN
+            AccountNumber::new(0)
         );
-        assert_ne!(AccountNumber::from_str("abc1").unwrap(), AccountNumber::MIN);
+        assert_ne!(
+            AccountNumber::from_str("abc1").unwrap(),
+            AccountNumber::new(0)
+        );
     }
 
     #[test]
     fn any_unknown_char_returns_zero() {
-        assert_eq!(AccountNumber::from_str("?").unwrap(), AccountNumber::MIN);
+        assert_eq!(AccountNumber::from_str("?").unwrap(), AccountNumber::new(0));
         assert_eq!(
             AccountNumber::from_str("what?").unwrap(),
-            AccountNumber::MIN
+            AccountNumber::new(0)
         );
         assert_eq!(
             AccountNumber::from_str("?what").unwrap(),
-            AccountNumber::MIN
+            AccountNumber::new(0)
         );
         assert_eq!(
             AccountNumber::from_str("eaorintsl?").unwrap(),
-            AccountNumber::MIN
+            AccountNumber::new(0)
         );
-        assert_eq!(AccountNumber::from_str("????").unwrap(), AccountNumber::MIN);
+        assert_eq!(
+            AccountNumber::from_str("????").unwrap(),
+            AccountNumber::new(0)
+        );
     }
 
     #[test]
