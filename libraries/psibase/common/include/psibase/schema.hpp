@@ -408,6 +408,8 @@ namespace psibase
          }
          return result;
       }
+      // checks that all names and indexes are valid
+      void checkValid() const;
       PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle, database)
    };
 
