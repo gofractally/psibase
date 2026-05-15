@@ -76,7 +76,9 @@ pub mod service {
             "new member must already be a member of a guild in the fractal",
         );
 
-        psibase::services::fractals::Wrapper::call().add_mem(fractal, new_member, None);
+        let add_member_action =
+            psibase::services::fractals::Wrapper::pack_from(fractal).add_mem(new_member, None);
+        psibase::services::staged_tx::Wrapper::call().propose(vec![add_member_action], true);
     }
 
     /// Get scores for all guild members in a fractal.

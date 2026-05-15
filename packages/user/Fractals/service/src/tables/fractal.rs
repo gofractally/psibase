@@ -68,6 +68,11 @@ impl Fractal {
         self.save();
     }
 
+    pub fn by_sender() -> Self {
+        let sender = get_sender();
+        Self::get_assert(sender)
+    }
+
     pub fn add(
         fractal: AccountNumber,
         legislature: AccountNumber,

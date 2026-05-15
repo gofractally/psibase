@@ -11,10 +11,7 @@ macro_rules! ban {
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::{
-        helpers::check_fractal_auth,
-        tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role},
-    };
+    use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
 
     use psibase::{
         services::{
@@ -113,33 +110,28 @@ pub mod service {
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     #[action]
-    fn init_token(fractal: AccountNumber) {
-        check_fractal_auth!(fractal, init_token);
-        let fractal = Fractal::get_assert(fractal);
+    fn init_token() {
+        let fractal = Fractal::by_sender();
         fractal.init_token();
     }
 
     /// Set Fractal distribution interval
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
-    fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
-        check_fractal_auth!(fractal, set_dist_int);
-        let mut fractal = Fractal::get_assert(fractal);
+    fn set_dist_int(distribution_interval_secs: u32) {
+        let mut fractal = Fractal::by_sender();
         fractal.set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set genesis time for a fractal
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `genesis_time` - New genesis time for the fractal.
     #[action]
-    fn set_gen_time(fractal: AccountNumber, genesis_time: u64) {
-        check_fractal_auth!(fractal, set_gen_time);
-        let mut fractal = Fractal::get_assert(fractal);
+    fn set_gen_time(genesis_time: u64) {
+        let mut fractal = Fractal::by_sender();
         fractal.set_genesis_time(TimePointSec::from(genesis_time as i64));
     }
 
@@ -149,29 +141,21 @@ pub mod service {
     /// * `fractal` - Fractal to update.
     /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
-    fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
-        check_fractal_auth!(fractal, set_dstrat);
-        let mut fractal = Fractal::get_assert(fractal);
+    fn set_dstrat(distribution_strategy: u8) {
+        let mut fractal = Fractal::by_sender();
         fractal.set_distribution_strategy(distribution_strategy.into());
     }
 
     /// Exile a fractal member.
     ///
-    /// Must be called by judiciary.
-    ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
     #[action]
-    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
-        check_fractal_auth!(fractal, exile_member);
-        FractalMember::get_assert(fractal, member).exile();
+    fn exile_member(member: AccountNumber) {
+        FractalMember::get_assert(get_sender(), member).exile();
     }
 
     /// Distribute token for a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
         Fractal::get_assert(fractal).distribute_tokens();
@@ -184,8 +168,8 @@ pub mod service {
     /// * `role_id` - Role ID for fractal
     /// * `new_occupation` - New occupation to set for role
     #[action]
-    fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
-        check_fractal_auth!(fractal, set_r_occ);
+    fn set_r_occ(role_id: u8, new_occupation: AccountNumber) {
+        let fractal = get_sender();
         Role::get_assert(fractal, role_id.into()).set_occupation(new_occupation);
     }
 
@@ -216,12 +200,11 @@ pub mod service {
     /// Adds an account to a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `member` - Account to be added as a member
     /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
-    fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
-        check_fractal_auth!(fractal, add_mem);
+    fn add_mem(member: AccountNumber, recruiter: Option<AccountNumber>) {
+        let fractal = get_sender();
         FractalMember::add(fractal, member, recruiter);
 
         Wrapper::emit().history().joined_fractal(fractal, member);
@@ -232,12 +215,10 @@ pub mod service {
     /// Payment for each ordered occupation will be according to the fractals payment strategy.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `paid_occupations` - Ordered occupations to set for the fractal
     #[action]
-    fn set_paid_occ(fractal: AccountNumber, paid_occupations: Vec<AccountNumber>) {
-        check_fractal_auth!(fractal, set_paid_occ);
-        Occupation::set_ordered_occupations(fractal, paid_occupations);
+    fn set_paid_occ(paid_occupations: Vec<AccountNumber>) {
+        Occupation::set_ordered_occupations(get_sender(), paid_occupations);
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {

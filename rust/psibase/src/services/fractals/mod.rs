@@ -186,10 +186,9 @@ pub mod Service {
     /// Set genesis time for a fractal
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `genesis_time` - New genesis time for the fractal.
     #[action]
-    fn set_gen_time(fractal: AccountNumber, genesis_time: u64) {
+    fn set_gen_time(genesis_time: u64) {
         unimplemented!()
     }
 
@@ -198,10 +197,9 @@ pub mod Service {
     /// Payment for each ordered occupation will be according to the fractals payment strategy.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `paid_occupations` - Ordered occupations to set for the fractal
     #[action]
-    fn set_paid_occ(fractal: AccountNumber, paid_occupations: Vec<AccountNumber>) {
+    fn set_paid_occ(paid_occupations: Vec<AccountNumber>) {
         unimplemented!()
     }
 
@@ -210,43 +208,37 @@ pub mod Service {
     /// Adds an account to a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `member` - Account to be added as a member
     /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
-    fn add_mem(fractal: AccountNumber, member: AccountNumber, recruiter: Option<AccountNumber>) {
+    fn add_mem(member: AccountNumber, recruiter: Option<AccountNumber>) {
         unimplemented!()
     }
 
     /// Set Fractal distribution interval
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
-    fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
+    fn set_dist_int(distribution_interval_secs: u32) {
         unimplemented!()
     }
 
     /// Exile a fractal member.
     ///
-    /// Must be called by judiciary.
-    ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
     #[action]
-    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
+    fn exile_member(member: AccountNumber) {
         unimplemented!()
     }
 
     /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
-    fn set_dstrat(fractal: AccountNumber, distribution_strategy: u8) {
+    fn set_dstrat(distribution_strategy: u8) {
         unimplemented!()
     }
 
@@ -270,9 +262,6 @@ pub mod Service {
     }
 
     /// Distribute token for a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
         unimplemented!()
@@ -281,12 +270,9 @@ pub mod Service {
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
-    /// Must be called by legislature.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
+    /// Must be called by fractal.
     #[action]
-    fn init_token(fractal: AccountNumber) {
+    fn init_token() {
         unimplemented!()
     }
 

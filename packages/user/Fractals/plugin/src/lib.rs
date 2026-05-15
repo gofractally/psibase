@@ -73,10 +73,8 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_guild::set_ranked_guilds(&[guild_account.clone()])?;
         Guilds::admin_fractal::set_auto_join_fractal(true)?;
 
-        set_propose_latch(None)?;
-
         let set_role_occ = |role_id: u8| {
-            Fractals::add_to_tx().set_r_occ(fractal, role_id, "guilds".into());
+            Fractals::add_to_tx().set_r_occ(role_id, "guilds".into());
         };
 
         set_role_occ(Legislature.into());
@@ -88,25 +86,25 @@ impl AdminFractal for FractallyPlugin {
 
     #[psibase_plugin::authorized(High)]
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
-        Fractals::add_to_tx().set_r_occ(get_sender_app()?, role_id, occupation.as_str().into());
+        Fractals::add_to_tx().set_r_occ(role_id, occupation.as_str().into());
         Ok(())
     }
 
     #[psibase_plugin::authorized(None)]
     fn init_token() -> Result<(), Error> {
-        Fractals::add_to_tx().init_token(get_sender_app()?);
+        Fractals::add_to_tx().init_token();
         Ok(())
     }
 
     #[psibase_plugin::authorized(None)]
     fn exile_member(member: String) -> Result<(), Error> {
-        Fractals::add_to_tx().exile_member(get_sender_app()?, member.parse().unwrap());
+        Fractals::add_to_tx().exile_member(member.parse().unwrap());
         Ok(())
     }
 
     #[psibase_plugin::authorized(None)]
     fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
-        Fractals::add_to_tx().set_dist_int(get_sender_app()?, distribution_interval_secs);
+        Fractals::add_to_tx().set_dist_int(distribution_interval_secs);
         Ok(())
     }
 }

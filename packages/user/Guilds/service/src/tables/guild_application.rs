@@ -128,7 +128,10 @@ impl GuildApplication {
         if !settings.auto_join_fractal || !Ranking::contains(parent.fractal, guild) {
             return;
         }
-        psibase::services::fractals::Wrapper::call().add_mem(parent.fractal, applicant, inviter);
+
+        let add_member_action = psibase::services::fractals::Wrapper::pack_from(parent.fractal)
+            .add_mem(applicant, inviter);
+        psibase::services::staged_tx::Wrapper::call().propose(vec![add_member_action], true);
     }
 
     fn attestations_score(&self) -> i16 {
