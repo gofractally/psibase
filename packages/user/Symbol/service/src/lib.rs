@@ -283,12 +283,11 @@ pub mod tables {
 pub mod service {
     use crate::tables::{InitRow, InitTable, Mapping, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
-    use psibase::services::tokens::{BalanceFlags, Quantity, TID};
+    use psibase::services::tokens::{Quantity, TID};
     use psibase::*;
 
     use psibase::services::events;
 
-    use psibase::services::nft::{NftHolderFlags, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
@@ -297,9 +296,6 @@ pub mod service {
 
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table.put(&InitRow {}).unwrap();
-
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
@@ -341,7 +337,10 @@ pub mod service {
 
     #[action]
     fn admin_create(symbol: AccountNumber, recipient: AccountNumber) {
-        check(get_sender() == get_service(), "only symbol service can call this action");
+        check(
+            get_sender() == get_service(),
+            "only symbol service can call this action",
+        );
         Symbol::add(symbol, recipient);
     }
 

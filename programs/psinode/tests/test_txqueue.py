@@ -21,6 +21,7 @@ class TestTransactionQueue(unittest.TestCase):
         auth = txqueue.login('alice')
         old_balance = tokens.balance('alice', token=1, token_auth=auth)
 
+        txqueue.push_action('alice', 'tokens', 'setUserConf', {"enable":True,"index":0}) 
         txqueue.push_action('alice', 'tokens', 'credit', {"token_id":1,"debitor":"bob","amount":{"value":10000}, "memo":"test"})
 
         a.wait(new_block())

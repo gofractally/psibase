@@ -34,7 +34,8 @@ SCENARIO("Using system token")
 
       auto alice = t.from(t.addAccount("alice"_a));
       auto a     = alice.to<Tokens>();
-      auto bob   = t.from(t.addAccount("bob"_a));
+      a.setUserConf(Tokens::autoDebit, true);
+      auto bob = t.from(t.addAccount("bob"_a));
 
       auto     sysIssuer = t.from(Symbol::service).to<Tokens>();
       Quantity userBalance{1'000'000'00e4};
@@ -153,6 +154,7 @@ SCENARIO("Minting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
 
       THEN("Bob may not mint them")
@@ -210,9 +212,12 @@ SCENARIO("Recalling tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       a.mint(tokenId, 1'000e4, memo);
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 1'000e4, memo);
 
       THEN("The token is recallable by default")
@@ -262,9 +267,15 @@ SCENARIO("Interactions with the Issuer NFT")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      bob.to<Nft>().setUserConf(Nft::autoDebit, true);
+
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto nft     = alice.to<Nft>().getNft(token.nft_id).returnVal();
+
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
 
       THEN("The Issuer NFT is owned by Alice")
       {
@@ -349,9 +360,13 @@ SCENARIO("Burning tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
+
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 100e4, memo);
 
       THEN("Alice may not burn 101 tokens")
@@ -428,52 +443,52 @@ SCENARIO("Toggling manual-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
-      THEN("Alice and Bob both have manualDebit disabled")
+      THEN("Alice and Bob both have autoDebit disabled")
       {
-         auto isManualDebit1 = a.getUserConf(alice, Tokens::manualDebit);
-         REQUIRE(isManualDebit1.succeeded());
-         CHECK(isManualDebit1.returnVal() == false);
+         auto isAutoDebit1 = a.getUserConf(alice, Tokens::autoDebit);
+         REQUIRE(isAutoDebit1.succeeded());
+         CHECK(isAutoDebit1.returnVal() == false);
 
-         auto isManualDebit2 = a.getUserConf(bob, Tokens::manualDebit);
-         REQUIRE(isManualDebit2.succeeded());
-         CHECK(isManualDebit2.returnVal() == false);
+         auto isAutoDebit2 = a.getUserConf(bob, Tokens::autoDebit);
+         REQUIRE(isAutoDebit2.succeeded());
+         CHECK(isAutoDebit2.returnVal() == false);
       }
-      THEN("Alice may enable manual-debit")
+      THEN("Alice may enable auto-debit")
       {  //
-         CHECK(a.setUserConf(Tokens::manualDebit, true).succeeded());
+         CHECK(a.setUserConf(Tokens::autoDebit, true).succeeded());
       }
-      WHEN("Alice enabled manual-debit")
+      WHEN("Alice enabled auto-debit")
       {
-         a.setUserConf(Tokens::manualDebit, true);
+         a.setUserConf(Tokens::autoDebit, true);
 
-         THEN("Alice has manual-debit enabled")
+         THEN("Alice has auto-debit enabled")
          {  //
-            CHECK(a.getUserConf(alice, Tokens::manualDebit).returnVal() == true);
+            CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == true);
          }
-         THEN("Bob still has manual-debit disabled")
+         THEN("Bob still has auto-debit disabled")
          {  //
-            CHECK(a.getUserConf(bob, Tokens::manualDebit).returnVal() == false);
+            CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
          }
-         THEN("Alice may enable manual-debit again. Idempotent.")
+         THEN("Alice may enable auto-debit again. Idempotent.")
          {
-            CHECK(a.setUserConf(Tokens::manualDebit, true).succeeded());
+            CHECK(a.setUserConf(Tokens::autoDebit, true).succeeded());
 
-            AND_THEN("But Bob may enable manual-debit")
+            AND_THEN("But Bob may enable auto-debit")
             {  //
-               CHECK(b.setUserConf(Tokens::manualDebit, true).succeeded());
+               CHECK(b.setUserConf(Tokens::autoDebit, true).succeeded());
             }
          }
-         THEN("Alice may disable manual-debit")
+         THEN("Alice may disable auto-debit")
          {  //
-            CHECK(a.setUserConf(Tokens::manualDebit, false).succeeded());
+            CHECK(a.setUserConf(Tokens::autoDebit, false).succeeded());
 
-            AND_THEN("Alice has manual-debit disabled")
+            AND_THEN("Alice has auto-debit disabled")
             {  //
-               CHECK(a.getUserConf(alice, Tokens::manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(alice, Tokens::autoDebit).returnVal() == false);
             }
-            AND_THEN("Bob still has manual-debit disabled")
+            AND_THEN("Bob still has auto-debit disabled")
             {
-               CHECK(a.getUserConf(bob, Tokens::manualDebit).returnVal() == false);
+               CHECK(a.getUserConf(bob, Tokens::autoDebit).returnVal() == false);
             }
          }
       }
@@ -491,9 +506,12 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
       auto mint    = a.mint(tokenId, 200e4, memo);
+      a.setUserConf(Tokens::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       a.credit(tokenId, bob, 100e4, memo);
 
       THEN("Alice may not credit Bob 101 tokens")
@@ -549,7 +567,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens")
    }
 }
 
-SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
+SCENARIO("Crediting/uncrediting/debiting tokens, with auto-debit")
 {
    GIVEN("A chain with users Alice and Bob, who each own 100 tokens")
    {
@@ -560,16 +578,16 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
       auto bob   = t.from(t.addAccount("bob"_a));
       auto b     = bob.to<Tokens>();
 
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      b.setUserConf(Tokens::autoDebit, true);
       auto tokenId = a.create(Precision{4}, 1'000'000'000e4).returnVal();
       auto token   = a.getToken(tokenId).returnVal();
 
       a.mint(tokenId, 200e4, memo);
       a.credit(tokenId, bob, 100e4, memo);
 
-      AND_GIVEN("Alice turns on manual-debit")
+      AND_GIVEN("Alice turns on auto-debit")
       {
-         a.setUserConf(Tokens::manualDebit, true);
-
          THEN("Alice may credit Bob 50 tokens")
          {
             CHECK(a.credit(tokenId, bob, 50e4, memo).succeeded());
@@ -600,7 +618,7 @@ SCENARIO("Crediting/uncrediting/debiting tokens, with manual-debit")
          }
          WHEN("Bob credits Alice 50 tokens")
          {
-            b.credit(tokenId, alice, 50e4, memo);
+            CHECK(b.credit(tokenId, alice, 50e4, memo).succeeded());
 
             THEN("Bob owns 50 tokens in his individual balance")
             {
@@ -695,7 +713,13 @@ SCENARIO("Mapping a symbol to a token")
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      auto sysToken    = sysIssuer.create(Precision{4}, userBalance).returnVal();
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      aliceTokens.setUserConf(Tokens::autoDebit, true);
+      bobTokens.setUserConf(Tokens::autoDebit, true);
+      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+      bob.to<Nft>().setUserConf(Nft::autoDebit, true);
+
+      auto sysToken = sysIssuer.create(Precision{4}, userBalance).returnVal();
 
       REQUIRE(t.from(Symbol::service)
                   .to<Nft>()
@@ -826,6 +850,10 @@ TEST_CASE("GraphQL Queries")
    auto a     = alice.to<Tokens>();
    auto bob   = t.from(t.addAccount("bob"_a));
 
+   a.setUserConf(Tokens::autoDebit, true);
+   bob.to<Tokens>().setUserConf(Tokens::autoDebit, true);
+   alice.to<Nft>().setUserConf(Nft::autoDebit, true);
+
    auto sysIssuer = t.from(Symbol::service).to<Tokens>();
    auto sysToken  = sysIssuer.create(Precision{4}, 1'000'000'000e4).returnVal();
    t.from(Symbol::service).to<Nft>().debit(sysIssuer.getToken(sysToken).returnVal().nft_id, "");
@@ -853,8 +881,8 @@ TEST_CASE("GraphQL Queries")
        R"({"data":{"userBalances":{"edges":[{"node":{"symbol":null,"tokenId":1,"precision":4,"balance":"1000000.0000"}}]}}})");
 
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 500e4, memo).succeeded());
-   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
-   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::manualDebit, true).succeeded());
+   REQUIRE(alice.to<Tokens>().setUserConf(Tokens::autoDebit, false).succeeded());
+   REQUIRE(bob.to<Tokens>().setUserConf(Tokens::autoDebit, false).succeeded());
    REQUIRE(alice.to<Tokens>().credit(sysToken, bob, 1'000e4, memo).succeeded());
    REQUIRE(bob.to<Tokens>().credit(sysToken, alice, 200e4, memo).succeeded());
 

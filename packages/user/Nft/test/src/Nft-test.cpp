@@ -19,7 +19,7 @@ using std::vector;
 
 namespace
 {
-   constexpr auto manualDebit = Nft::manualDebit;
+   constexpr auto autoDebit = Nft::autoDebit;
 }  // namespace
 
 SCENARIO("Minting & burning nfts")
@@ -107,14 +107,14 @@ SCENARIO("Transferring NFTs")
       auto b = bob.to<Nft>();
       auto c = charlie.to<Nft>();
 
-      THEN("Bob is configured to use auto-debit by default")
+      THEN("Bob is configured to use manual-debit by default")
       {
-         CHECK(b.getUserConf(bob, manualDebit).returnVal() == false);
+         CHECK(b.getUserConf(bob, autoDebit).returnVal() == false);
       }
-      THEN("Bob is able to opt in to manual-debit")
+      THEN("Bob is able to opt in to auto-debit")
       {
-         CHECK(b.setUserConf(manualDebit, true).succeeded());
-         CHECK(true == b.getUserConf(bob, manualDebit).returnVal());
+         CHECK(b.setUserConf(autoDebit, true).succeeded());
+         CHECK(true == b.getUserConf(bob, autoDebit).returnVal());
       }
 
       THEN("Alice is unable to credit, uncredit, or debit a non-existent NFT")
@@ -150,7 +150,8 @@ SCENARIO("Transferring NFTs")
          }
          WHEN("Alice credits the NFT to Bob")
          {
-            auto credit = a.credit(nft.id, bob, "memo");
+            bob.to<Nft>().setUserConf(autoDebit, true);
+            CHECK(a.credit(nft.id, bob, "memo").succeeded());
 
             THEN("Bob immediately owns the NFT")
             {
@@ -162,9 +163,9 @@ SCENARIO("Transferring NFTs")
                CHECK(a.uncredit(nft.id, "memo").failed(uncreditRequiresCredit));
             }
          }
-         WHEN("Bob opts in to manual-debit")
+         WHEN("Bob opts out of auto-debit")
          {
-            b.setUserConf(manualDebit, true);
+            b.setUserConf(autoDebit, false);
 
             AND_WHEN("Alice credits the NFT to Bob")
             {
