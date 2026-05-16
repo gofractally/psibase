@@ -138,7 +138,6 @@ pub mod service {
     /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
     fn set_dstrat(distribution_strategy: u8) {

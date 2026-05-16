@@ -160,14 +160,15 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Sets the occupation used to authorize the specified fractal role.
+    /// Add fractal member
+    ///
+    /// Adds an account to a fractal.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `role_id` - Role ID for fractal
-    /// * `new_occupation` - New occupation to set for role
+    /// * `member` - Account to be added as a member
+    /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
-    fn set_r_occ(fractal: AccountNumber, role_id: u8, new_occupation: AccountNumber) {
+    fn add_mem(member: AccountNumber, recruiter: Option<AccountNumber>) {
         unimplemented!()
     }
 
@@ -182,7 +183,6 @@ pub mod Service {
     fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
         unimplemented!()
     }
-
     /// Set genesis time for a fractal
     ///
     /// # Arguments
@@ -203,18 +203,6 @@ pub mod Service {
         unimplemented!()
     }
 
-    /// Add fractal member
-    ///
-    /// Adds an account to a fractal.
-    ///
-    /// # Arguments
-    /// * `member` - Account to be added as a member
-    /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
-    #[action]
-    fn add_mem(member: AccountNumber, recruiter: Option<AccountNumber>) {
-        unimplemented!()
-    }
-
     /// Set Fractal distribution interval
     ///
     /// # Arguments
@@ -230,6 +218,17 @@ pub mod Service {
     /// * `member` - The fractal member to be exiled.
     #[action]
     fn exile_member(member: AccountNumber) {
+        unimplemented!()
+    }
+
+    /// Sets the occupation used to authorize the specified fractal role.
+    ///
+    /// # Arguments
+    /// * `fractal` - The account number of the fractal.
+    /// * `role_id` - Role ID for fractal
+    /// * `new_occupation` - New occupation to set for role
+    #[action]
+    fn set_r_occ(role_id: u8, new_occupation: AccountNumber) {
         unimplemented!()
     }
 
