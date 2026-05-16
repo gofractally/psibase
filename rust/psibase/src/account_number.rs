@@ -35,6 +35,9 @@ pub struct AccountNumber {
 serialize_as_str!(AccountNumber, "account number");
 
 impl AccountNumber {
+    pub const MIN: Self = AccountNumber { value: 0 };
+    pub const MAX: Self = AccountNumber { value: u64::MAX };
+
     pub const fn new(value: u64) -> Self {
         AccountNumber { value }
     }

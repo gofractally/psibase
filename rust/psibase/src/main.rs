@@ -41,8 +41,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use tower::Service;
 
-mod cli;
-use cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
+use psibase::cli::config::{handle_cli_config_cmd, read_host_url, ConfigCommand};
 
 /// Basic commands
 #[derive(Parser, Debug)]

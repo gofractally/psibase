@@ -17,6 +17,8 @@ const QueryKey = {
     virtualServer: () => ["virtualServer"] as const,
     virtualServerPricing: () => ["virtualServer", "pricing"] as const,
     virtualServerResources: () => ["virtualServer", "resources"] as const,
+    premiumNameMarkets: () =>
+        ["nameMarketParams"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
