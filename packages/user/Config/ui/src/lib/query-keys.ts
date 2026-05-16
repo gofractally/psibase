@@ -12,6 +12,8 @@ const QueryKey = {
     sources: () => ["sources"] as const,
     stagedTransaction: (id: number) => ["stagedTransactions", id] as const,
     stagedTransactions: () => ["stagedTransactions"] as const,
+    unpackActionParams: (service: string, method: string, rawDataHex: string) =>
+        ["unpackActionParams", service, method, rawDataHex] as const,
     transactionHistory: (id: string | undefined | null) =>
         ["transactionHistory", id] as const,
     virtualServer: () => ["virtualServer"] as const,

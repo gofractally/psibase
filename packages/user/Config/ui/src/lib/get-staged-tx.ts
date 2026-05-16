@@ -15,6 +15,7 @@ const zStagedTx = z.object({
                 sender: zAccount,
                 method: z.string(),
                 service: zAccount,
+                rawData: z.string(),
             })
             .array(),
     }),
@@ -53,6 +54,7 @@ export const getStagedTx = async (id: number) => {
                                     sender
                                     method
                                     service
+                                    rawData
                                 }
                             }
                         }
