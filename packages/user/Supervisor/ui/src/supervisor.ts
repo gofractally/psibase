@@ -20,7 +20,6 @@ import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
-import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
@@ -58,6 +57,8 @@ export class Supervisor implements AppInterface {
     private context: CallContext | undefined;
 
     private embedder: string | undefined;
+
+    private promptSignal: "none" | "prompt" | "embedded-error" = "none";
 
     parser: Promise<any>;
 
@@ -276,6 +277,16 @@ export class Supervisor implements AppInterface {
         );
     }
 
+    requestPrompt(): void {
+        if (isEmbedded) {
+            this.promptSignal = "embedded-error";
+        } else {
+            this.promptSignal = "prompt";
+        }
+        this.plugins.disposeAll();
+        throw null;
+    }
+
     call(args: QualifiedFunctionCallArgs): any {
         assertTruthy(this.context, "Uninitialized call context");
 
@@ -426,22 +437,26 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } catch (e) {
-            const err = getRecoverableError(e);
-            if (err) {
-                let newError;
-                if (err.code === REDIRECT_ERROR_CODE) {
-                    newError = new RedirectErrorObject(
-                        err.producer,
-                        err.message,
-                    );
-                } else {
-                    newError = new PluginErrorObject(err.producer, err.message);
-                }
-                this.replyToParent(id, newError);
+            let result: any;
+            if (this.promptSignal === "prompt") {
+                result = new RedirectErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "user_prompt_request",
+                );
+                this.promptSignal = "none";
+            } else if (this.promptSignal === "embedded-error") {
+                result = new PluginErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "Cannot prompt in embedded mode",
+                );
+                this.promptSignal = "none";
             } else {
-                this.replyToParent(id, e);
+                const err = getRecoverableError(e);
+                result = err
+                    ? new PluginErrorObject(err.producer, err.message)
+                    : e;
             }
-
+            this.replyToParent(id, result);
             this.context = undefined;
         } finally {
             this.plugins.disposeAll();
