@@ -12,7 +12,7 @@ use crate::bindings::prem_accounts::plugin::api as PremAccounts;
 use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
-use crate::helpers::premium_market_ask;
+use crate::helpers::{max_cost_with_slippage, premium_market_ask};
 use crate::plugin::AccountsPlugin;
 use psibase::fracpack::Pack;
 use psibase::services::{accounts as AccountsService, auth_sig};
@@ -102,11 +102,11 @@ impl Prompt for AccountsPlugin {
         Ok(private_key)
     }
 
-    fn create_premium(account_name: String) -> Result<String, Error> {
+    fn create_premium(account_name: String, slippage_pct: u8) -> Result<String, Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        let max_cost = premium_market_ask(&account_name)?;
-
+        let ask = premium_market_ask(&account_name)?;
+        let max_cost = max_cost_with_slippage(&ask, slippage_pct)?;
         PremAccounts::buy(&account_name, &max_cost)?;
         PremAccounts::claim(&account_name)?;
 
