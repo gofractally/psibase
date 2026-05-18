@@ -10,7 +10,7 @@ using namespace psibase;
 
 namespace SystemService
 {
-   void AuthDelegate::checkAuthSys(std::uint32_t              flags,
+   bool AuthDelegate::checkAuthSys(std::uint32_t              flags,
                                    AccountNumber              requester,
                                    AccountNumber              sender,
                                    ServiceMethod              action,
@@ -23,8 +23,8 @@ namespace SystemService
          flags = (flags & ~AuthInterface::requestMask) | AuthInterface::runAsRequesterReq;
 
       auto _ = recurse();
-      authServiceOf(owner).checkAuthSys(flags, requester, owner, std::move(action),
-                                        std::move(allowedActions), std::move(claims));
+      return authServiceOf(owner).checkAuthSys(flags, requester, owner, std::move(action),
+                                               std::move(allowedActions), std::move(claims));
    }
 
    void AuthDelegate::canAuthUserSys(psibase::AccountNumber user)

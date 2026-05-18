@@ -56,17 +56,17 @@ pub mod service {
         action: ServiceMethod,
         _allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
+    ) -> bool {
         use psibase::services::transact::auth_interface::*;
 
         let auth_type = flags & REQUEST_MASK;
         match auth_type {
-            RUN_AS_REQUESTER_REQ | RUN_AS_MATCHED_REQ => return,
+            RUN_AS_REQUESTER_REQ | RUN_AS_MATCHED_REQ => return true,
             RUN_AS_MATCHED_EXPANDED_REQ => check(false, "runAs: caller attempted to expand powers"),
             RUN_AS_OTHER_REQ => {
                 if requester == Wrapper::SERVICE {
                     // This allows credentials service to call actions on behalf of any credential
-                    return;
+                    return true;
                 } else {
                     check(false, "runAs: caller is not authorized")
                 }
@@ -111,6 +111,7 @@ pub mod service {
             credential.expiry_date.is_none() || credential.expiry_date.unwrap() > now(),
             "Credential expired",
         );
+        true
     }
 
     #[action]
