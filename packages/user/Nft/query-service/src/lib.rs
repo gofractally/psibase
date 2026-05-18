@@ -48,7 +48,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, OwnerChangeEvent>> {
+        ) -> async_graphql::Result<EventConnection<OwnerChangeEvent>> {
             EventQuery::new("history.nft.ownerChange")
                 .condition(format!("nftId = {}", nft_id))
                 .first(first)
@@ -65,7 +65,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, UserConfEvent>> {
+        ) -> async_graphql::Result<EventConnection<UserConfEvent>> {
             EventQuery::new("history.nft.userConfSet")
                 .condition(format!("account = {}", account))
                 .first(first)
