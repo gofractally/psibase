@@ -1,8 +1,11 @@
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
+use crate::bindings::prem_accounts::plugin::authorized as PremAccountsAuth;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
+use psibase::services::tokens::Decimal;
+use serde::Deserialize;
 
 /// Asserts that the caller of the current plugin function is the top-level app,
 ///    or one of the privileged apps.
@@ -82,4 +85,67 @@ pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::E
         }
     }
     Err(MaxGenerationAttemptsExceeded().into())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketPriceDto {
+    length: u8,
+    price: Decimal,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketConfigLiteDto {
+    length: u8,
+    enabled: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketsOverviewData {
+    market_params: Vec<MarketConfigLiteDto>,
+    current_prices: Vec<MarketPriceDto>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketsOverviewResponse {
+    data: MarketsOverviewData,
+}
+
+pub fn premium_market_ask(account_name: &str) -> Result<String, CommonTypes::Error> {
+    let length = account_name.len() as u8;
+    let query = "query { marketParams { length enabled } currentPrices { length price } }";
+    let response = serde_json::from_str::<MarketsOverviewResponse>(&PremAccountsAuth::graphql(query)?)
+        .map_err(|e| QueryError(e.to_string()))?;
+
+    let status = response
+        .data
+        .market_params
+        .iter()
+        .find(|s| s.length == length);
+
+    let Some(st) = status else {
+        return Err(PremiumNameLengthNotOffered().into());
+    };
+
+    if !st.enabled {
+        return Err(PremiumNameMarketDisabled().into());
+    }
+
+    let row = response
+        .data
+        .current_prices
+        .iter()
+        .find(|p| p.length == length);
+
+    let Some(row) = row else {
+        return Err(QueryError(
+            "missing price row for configured premium name market".into(),
+        )
+        .into());
+    };
+
+    Ok(row.price.to_string())
 }

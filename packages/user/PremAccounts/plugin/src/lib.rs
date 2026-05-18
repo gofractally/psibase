@@ -89,7 +89,7 @@ impl MarketAdmin for PremAccountsPlugin {
 }
 
 impl Api for PremAccountsPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["accounts"])]
+    #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)
             .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
@@ -118,7 +118,7 @@ impl Api for PremAccountsPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
     fn claim(account: String) -> Result<(), Error> {
         let account = AccountNumber::from_exact(&account)
             .map_err(|_| ErrorType::InvalidAccountName(account))?;
