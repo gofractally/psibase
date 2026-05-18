@@ -89,14 +89,14 @@ pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::E
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct MarketPriceDto {
+struct MarketPrice {
     length: u8,
     price: Decimal,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct MarketConfigLiteDto {
+struct MarketConfigLite {
     length: u8,
     enabled: bool,
 }
@@ -104,8 +104,8 @@ struct MarketConfigLiteDto {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct MarketsOverviewData {
-    market_params: Vec<MarketConfigLiteDto>,
-    current_prices: Vec<MarketPriceDto>,
+    market_params: Vec<MarketConfigLite>,
+    current_prices: Vec<MarketPrice>,
 }
 
 #[derive(Deserialize)]
