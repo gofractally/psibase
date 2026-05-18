@@ -124,6 +124,7 @@ namespace UserService
    void Packages::setSchema(ServiceSchema schema)
    {
       auto service = getSender();
+      schema.checkValid();
       auto tables  = Tables(getReceiver());
       auto schemas = tables.open<InstalledSchemaTable>();
       if (auto existing = schemas.get(service))
