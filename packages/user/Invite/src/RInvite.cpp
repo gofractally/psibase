@@ -12,16 +12,14 @@ namespace UserService
    namespace InviteNs
    {
       using namespace psibase;
-      using SystemService::Credentials;
 
       struct InviteEvent
       {
          uint32_t      inviteId;
          AccountNumber actor;
-         TimePointUSec datetime;
          std::string   event;
       };
-      PSIO_REFLECT(InviteEvent, inviteId, actor, datetime, event);
+      PSIO_REFLECT(InviteEvent, inviteId, actor, event);
 
       struct InviteDetails
       {
@@ -34,7 +32,7 @@ namespace UserService
 
          auto expiryDate() const -> std::optional<TimePointSec>
          {
-            return to<Credentials>().get_expiry_date(cid);
+            return to<Invite>().getExpDate(this->inviteId);
          }
          PSIO_REFLECT(InviteDetails,
                       inviteId,
@@ -79,6 +77,8 @@ namespace UserService
                                          [](auto&& row) { return toInviteDetails(row); });
          }
 
+         /// This query returns the current cost of creating an invite, with a 50% buffer added to account for possible
+         /// resource cost increases between when the query is made and when the invite is created.
          auto getInviteCost(uint16_t numAccounts) const
          {
             auto sys = to<Tokens>().getSysToken();
@@ -87,6 +87,7 @@ namespace UserService
                return Decimal{Quantity{0ULL}, Precision{0}};
             }
             auto cost = to<Invite>().getInvCost(numAccounts);
+            cost += cost / 2;  // 50% buffer to allow resource cost increase
             return Decimal{cost, sys->precision};
          }
 

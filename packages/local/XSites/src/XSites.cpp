@@ -49,7 +49,7 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
          return reply;
       PSIBASE_SUBJECTIVE_TX
       {
-         table.erase(target);
+         table.erase(std::tuple(service, target));
       }
       return HttpReply{.headers = allowCors(req, XAdmin::service)};
    }
@@ -58,10 +58,11 @@ std::optional<HttpReply> XSites::serveSys(HttpRequest req, std::optional<std::in
       std::optional<ContentRow> row;
       PSIBASE_SUBJECTIVE_TX
       {
-         row = table.get(target);
+         row = table.get(std::tuple(service, target));
          if (!row)
          {
-            row = table.get(target + (target.ends_with('/') ? "index.html" : "/index.html"));
+            row = table.get(std::tuple(
+                service, target + (target.ends_with('/') ? "index.html" : "/index.html")));
          }
       }
       if (row)

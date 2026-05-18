@@ -2,7 +2,7 @@ use crate::bindings::fractals::plugin as FractalsPlugin;
 use crate::bindings::fractals::plugin::queries::{Fractal, Guild};
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
-    host::common::client::get_receiver, staged_tx::plugin::proposer::set_propose_latch,
+    host::common::client::get_receiver, transact::plugin::intf::set_propose_latch,
 };
 
 fn latch(account: &str) -> Result<(), Error> {

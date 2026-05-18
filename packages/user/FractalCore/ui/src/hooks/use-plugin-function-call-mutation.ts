@@ -1,9 +1,9 @@
 import { UseMutationOptions, useMutation } from "@tanstack/react-query";
 import z from "zod";
 
-import { TxStatus, checkLastTx } from "@/lib/checkStaging";
 import { PluginCall } from "@/lib/plugin";
 
+import { TxStatus, checkLastTx } from "@shared/lib/staging/check-staging";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 

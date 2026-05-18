@@ -20,6 +20,11 @@ impl Memo {
             Err(MemoError::MemoTooLarge)
         }
     }
+
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self(String::new())
+    }
 }
 
 impl fmt::Display for Memo {

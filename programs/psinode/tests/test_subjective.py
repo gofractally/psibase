@@ -18,6 +18,8 @@ def is_user_action(action):
         return False
     if action['service'] == 'events' and action['method'] == 'sync':
         return False
+    if action['sender'] == '':
+        return False
     return True
 
 def get_raw_retval(trace):

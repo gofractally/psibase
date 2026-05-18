@@ -1,7 +1,7 @@
 use async_graphql::ComplexObject;
 use psibase::{check_some, AccountNumber, Table};
 
-use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable};
+use crate::tables::tables::{Guild, GuildAttest, GuildAttestTable, GuildMember};
 
 impl GuildAttest {
     fn new(
@@ -22,12 +22,16 @@ impl GuildAttest {
 
     pub fn set(
         guild: AccountNumber,
-        member: AccountNumber,
-        attestee: AccountNumber,
+        applicant: AccountNumber,
+        attester: AccountNumber,
         comment: String,
         endorses: bool,
     ) {
-        Self::new(guild, member, attestee, comment, endorses).save();
+        check_some(
+            GuildMember::get(guild, attester),
+            "must be member of the guild to attest",
+        );
+        Self::new(guild, applicant, attester, comment, endorses).save();
     }
 
     pub fn get(
@@ -58,32 +62,18 @@ impl GuildAttest {
     pub fn attestations_by_guild_member(guild: AccountNumber, member: AccountNumber) -> Vec<Self> {
         GuildAttestTable::read()
             .get_index_by_guild()
-            .range(
-                (guild, member, AccountNumber::new(0))
-                    ..=(guild, member, AccountNumber::new(u64::MAX)),
-            )
+            .range((guild, member, AccountNumber::MIN)..=(guild, member, AccountNumber::MAX))
             .collect()
     }
 
-    pub fn attestations_by_member(member: AccountNumber) -> Vec<Self> {
-        GuildAttestTable::read()
-            .get_index_by_guild()
-            .range(
-                (member, AccountNumber::new(0), AccountNumber::new(0))
-                    ..=(
-                        member,
-                        AccountNumber::new(u64::MAX),
-                        AccountNumber::new(u64::MAX),
-                    ),
-            )
-            .collect()
-    }
-
-    pub fn remove_all_by_member(member: AccountNumber) {
+    pub fn remove_attestations_by_guild_member(guild: AccountNumber, member: AccountNumber) {
         let table = GuildAttestTable::read_write();
-        for attestation in GuildAttest::attestations_by_member(member) {
-            table.remove(&attestation);
-        }
+        table
+            .get_index_by_guild()
+            .range((guild, member, AccountNumber::MIN)..=(guild, member, AccountNumber::MAX))
+            .for_each(|guild| {
+                table.remove(&guild);
+            });
     }
 
     fn save(&self) {

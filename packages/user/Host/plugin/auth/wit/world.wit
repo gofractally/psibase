@@ -10,7 +10,7 @@ interface api {
     log-out-user: func(user: string, app: string);
 
     /// Privileged apps can get the query token to make calls on user's behalf
-    get-active-query-token: func(app: string) -> option<string>;
+    get-active-query-token: func(app: string, user: string) -> option<string>;
 }
 
 world imports {

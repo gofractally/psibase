@@ -95,23 +95,9 @@ void connect(boost::asio::io_context& ctx, node_type& node1, node_type& node2)
    p2->logger.add_attribute("Host", boost::log::attributes::constant(node2.name));
    p1->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(node2.name));
    p2->logger.add_attribute("RemoteEndpoint", boost::log::attributes::constant(node1.name));
-   p1->urls.push_back(node2.name);
-   p2->urls.push_back(node1.name);
-   p1->hosts.push_back(node2.name);
-   p2->hosts.push_back(node1.name);
 
-   node1.peers().connect(node2.name,
-                         [&node1, p1 = std::move(p1)](const std::string&, auto&& next) mutable
-                         {
-                            node1.peers().add_connection(std::move(p1));
-                            next(std::error_code());
-                         });
-   node2.peers().connect(node1.name,
-                         [&node2, p2 = std::move(p2)](const std::string&, auto&& next) mutable
-                         {
-                            node2.peers().add_connection(std::move(p2));
-                            next(std::error_code());
-                         });
+   node1.peers().add_connection(std::move(p1));
+   node2.peers().add_connection(std::move(p2));
 }
 
 struct TestNode : node_type
@@ -134,12 +120,14 @@ void disconnect(TestNode& node1, TestNode& node2)
 {
    for (const auto& [id, ptr] : node1.connections())
    {
-      if (ptr->urls.size() == 1 && ptr->urls.front() == node2.name)
+      if (boost::log::attribute attr = ptr->logger.get_attributes()["RemoteEndpoint"];
+          attr && attr.get_value().extract<std::string>() == node2.name)
       {
          node1.peers().disconnect(id);
-         break;
+         return;
       }
    }
+   FAIL("Disconnect failed to find connection");
 }
 
 TEST_CASE("basic routing")

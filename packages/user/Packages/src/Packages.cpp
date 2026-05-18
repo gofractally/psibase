@@ -117,6 +117,7 @@ namespace UserService
                  .description = std::move(package.description),
                  .depends     = std::move(package.depends),
                  .accounts    = std::move(package.accounts),
+                 .services    = std::move(package.services),
                  .owner       = sender});
    }
 
@@ -220,9 +221,11 @@ namespace UserService
           .owner       = sender,
           .name        = std::move(package.name),
           .version     = std::move(package.version),
+          .scope       = std::move(package.scope),
           .description = std::move(package.description),
           .depends     = std::move(package.depends),
           .accounts    = std::move(package.accounts),
+          .services    = std::move(package.services),
           .sha256      = std::move(sha256),
           .file        = std::move(file),
       });

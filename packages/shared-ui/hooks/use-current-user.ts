@@ -1,7 +1,12 @@
-import { QueryOptions, queryOptions, useQuery } from "@tanstack/react-query";
+import type { UndefinedInitialDataOptions } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 
+import { queryOptions, useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { queryClient as defaultQueryClient } from "../lib/query-client";
 import QueryKey from "../lib/query-keys";
-import { zAccount } from "../lib/schemas/account";
+import { Account, zAccount } from "../lib/schemas/account";
 import { supervisor } from "../lib/supervisor";
 
 export type GetCurrentUserRes = string | null;
@@ -21,13 +26,27 @@ export const queryCurrentUser = queryOptions({
 });
 
 export const useCurrentUser = (
-    options?: QueryOptions<
-        GetCurrentUserRes,
-        Error,
-        GetCurrentUserRes,
-        ReturnType<typeof QueryKey.currentUser>
+    options?: Omit<
+        UndefinedInitialDataOptions<
+            string | null,
+            Error,
+            GetCurrentUserRes,
+            ReturnType<typeof QueryKey.currentUser>
+        >,
+        "queryKey" | "queryFn"
     >,
 ) => {
     const queryOptions = options ?? {};
     return useQuery({ ...queryCurrentUser, ...queryOptions });
+};
+
+export const assertUser = (
+    queryClient: QueryClient = defaultQueryClient,
+): Account => zAccount.parse(queryClient.getQueryData(QueryKey.currentUser()));
+
+export const getCurrentUser = (
+    queryClient: QueryClient = defaultQueryClient,
+): string | null => {
+    const res = queryClient.getQueryData(QueryKey.currentUser());
+    return res ? z.string().parse(res) : null;
 };

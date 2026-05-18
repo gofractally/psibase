@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { PackageSource, getSources } from "@/lib/getSources";
-import QueryKey from "@/lib/queryKeys";
+import { PackageSource, getSources } from "@/lib/get-sources";
+import QueryKey from "@/lib/query-keys";
 
 export const useSources = () =>
     useQuery<PackageSource[], Error>({

@@ -1,15 +1,13 @@
-import type { Token } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balances";
+import type { Token } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { useStore } from "@tanstack/react-form";
 import { ArrowDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useContacts } from "@/apps/contacts/hooks/use-contacts";
-
-import { useCurrentUser } from "@/hooks/use-current-user";
-
 import { Avatar } from "@shared/components/avatar";
 import { withForm } from "@shared/components/form/app-form";
+import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
@@ -50,9 +48,7 @@ export const TransferModal = withForm({
         onSubmit,
     }) {
         const { data: currentUser } = useCurrentUser();
-        const { data: profile } = useProfile(currentUser, true, {
-            baseUrlIncludesSibling: false,
-        });
+        const { data: profile } = useProfile(currentUser, true);
         const { data: contacts } = useContacts(currentUser);
 
         const [to, amount, isSubmitting] = useStore(form.store, (state) => [

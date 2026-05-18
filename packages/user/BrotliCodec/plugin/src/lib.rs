@@ -4,7 +4,7 @@ mod errors;
 use errors::ErrorType::*;
 
 use bindings::exports::brotli_codec::plugin::api::{Error, Guest as API};
-use psibase::services::brotli_codec::brotli_impl;
+use psibase::services::brotli_svc::brotli_impl;
 
 struct BrotliPlugin;
 

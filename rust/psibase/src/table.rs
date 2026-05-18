@@ -40,9 +40,13 @@ pub trait Table<Record: TableRecord>: Sized {
     const TABLE_INDEX: u16;
     const SERVICE: AccountNumber;
 
-    fn with_prefix(db_id: DbId, prefix: Vec<u8>, mode: KvMode) -> Self;
+    fn from_handle(handle: KvHandle) -> Self;
     fn prefix(&self) -> &[u8];
     fn handle(&self) -> &KvHandle;
+
+    fn with_prefix(db_id: DbId, prefix: Vec<u8>, mode: KvMode) -> Self {
+        Self::from_handle(KvHandle::new(db_id, &prefix, mode))
+    }
 
     fn new() -> Self {
         Self::read_write()

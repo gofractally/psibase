@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { useFractal } from "@/hooks/fractals/use-fractal";
 import { useSetTokenThreshold } from "@/hooks/fractals/use-set-min-scorers";
-import { MIN_MINIMUM_REQUIRED_SCORERS } from "@/lib/constants";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { MIN_MINIMUM_REQUIRED_SCORERS } from "@shared/domains/fractal/lib/constants";
 import { zU8 } from "@shared/lib/schemas/u8";
 import {
     Dialog,
@@ -45,8 +45,9 @@ export const SetMinScorersModal = ({
                 <DialogHeader>
                     <DialogTitle>Set minimum scorers</DialogTitle>
                     <div className="text-muted-foreground text-sm">
-                        Set the minimum number of active guild members of the legislation
-                        before the fractal token is pushed into circulation.
+                        Set the minimum number of active guild members of the
+                        legislation before the fractal token is pushed into
+                        circulation.
                     </div>
                     <form
                         onSubmit={(e) => {

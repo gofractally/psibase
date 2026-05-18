@@ -1,5 +1,5 @@
 [package]
-name = "brotli-codec-plugin"
+name = "brotli-codec"
 version.workspace = true
 rust-version.workspace = true
 repository.workspace = true
@@ -8,11 +8,9 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
-brotli-codec = { path = "../service", version = "0.23.0" }
 psibase.workspace = true
 wit-bindgen-rt.workspace = true
-brotli = { version = "7.0.0" }
-psibase-user-workspace-hack.workspace = true
+psibase-plugin-workspace-hack.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -26,6 +24,3 @@ world = "impl"
 [package.metadata.component.target.dependencies]
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
-
-[dev-dependencies]
-brotli-codec-pkg = { path = "..", version = "0.23.0" }

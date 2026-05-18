@@ -1,7 +1,7 @@
-use crate::bindings::host::common::server;
-use crate::bindings::host::types::types::Error;
 use crate::errors::ErrorType;
+use crate::Error;
 use psibase::services::tokens::Decimal;
+use psibase_plugin::host::server;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -67,20 +67,7 @@ struct InternalBillingConfig {
     enabled: bool,
 }
 
-#[derive(Default)]
-pub struct BillingConfig {
-    pub enabled: bool,
-}
-
-impl From<InternalBillingConfig> for BillingConfig {
-    fn from(config: InternalBillingConfig) -> Self {
-        Self {
-            enabled: config.enabled,
-        }
-    }
-}
-
-pub fn billing_config() -> Result<BillingConfig, Error> {
+pub fn billing_enabled() -> Result<bool, Error> {
     let query = r#"query {
         getBillingConfig {
             enabled
@@ -97,5 +84,5 @@ pub fn billing_config() -> Result<BillingConfig, Error> {
         .data
         .get_billing_config
         .unwrap_or(InternalBillingConfig { enabled: false })
-        .into())
+        .enabled)
 }

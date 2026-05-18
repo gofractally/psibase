@@ -17,6 +17,9 @@ namespace LocalService
       std::vector<char>          content         = {};
       std::optional<std::string> contentEncoding = std::nullopt;
       std::optional<std::string> csp             = std::nullopt;
+
+      using Key = psibase::CompositeKey<&ContentRow::account, &ContentRow::path>;
+
       PSIO_REFLECT(ContentRow,
                    account,
                    path,
@@ -26,7 +29,7 @@ namespace LocalService
                    contentEncoding,
                    csp)
    };
-   using ContentTable = psibase::Table<ContentRow, &ContentRow::path>;
+   using ContentTable = psibase::Table<ContentRow, ContentRow::Key{}>;
    PSIO_REFLECT_TYPENAME(ContentTable)
 
    struct XSites : psibase::Service

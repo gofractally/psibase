@@ -1,14 +1,14 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, auth_delegate, brotli_codec::brotli_impl, http_server, packages, producers, setcode,
-    sites, transact,
+    accounts, auth_sig, brotli_svc::brotli_impl, http_server, packages, producers, setcode, sites,
+    transact, verify_sig, x_sites,
 };
 use crate::{
-    new_account_action, reg_server, schema_types, set_auth_service_action, set_code_action,
-    set_key_action, solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey,
-    Checksum256, CodeRow, GenesisService, Hex, MethodNumber, MethodString, Pack,
-    PackageDisposition, PackageOp, PackagePreference, Schema, ToSchema, Unpack, Version,
+    new_account_owned_action, preapprove_action, reg_server, schema_types, set_code_action,
+    solve_dependencies, version_match, AccountNumber, Action, AnyPublicKey, Checksum256, CodeRow,
+    GenesisService, Hex, MethodNumber, MethodString, Pack, PackageDisposition, PackageOp,
+    PackagePreference, Schema, ToSchema, Unpack, Version,
 };
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
@@ -27,7 +27,7 @@ use std::str::FromStr;
 use zip::ZipArchive;
 
 #[cfg(not(target_family = "wasm"))]
-use crate::services::{x_admin, x_packages};
+use crate::services::{x_admin, x_http, x_packages};
 #[cfg(not(target_family = "wasm"))]
 use crate::ChainUrl;
 #[cfg(not(target_family = "wasm"))]
@@ -39,10 +39,11 @@ custom_error! {
     pub Error
         MissingMeta          = "Service does not contain meta.json",
     InvalidFlags = "Invalid service flags",
-    DependencyCycle = "Cycle in service dependencies",
+    DependencyCycle{package: String} =  "Cycle in install dependencies for {package}",
     UnknownFileType{path:String} = "Cannot determine Mime-Type for {path}",
     UnknownAccount{name:AccountNumber} = "Account {name} not defined in meta.json",
-    AccountConflict{name: AccountNumber, old: String, new: String} = "The account {name} is defined by more than one package: {old}, {new}",
+    ServiceConflict{name: AccountNumber, old: String, new: String} = "The service {name} is defined by more than one package: {old}, {new}",
+    FileConflict{name: AccountNumber, filename: String, old: String, new: String} = "The file {name}:{filename} is defined by more than one package: {old}, {new}",
     MissingDepAccount{name: AccountNumber, package: String} = "The account {name} required by {package} is not defined by any package",
     MissingDepPackage{name: String, dep: String} = "The package {name} uses {dep} but does not depend on it",
     PackageNotFound{package: String} = "The package {package} was not found",
@@ -53,6 +54,7 @@ custom_error! {
     UnknownAction{service: AccountNumber, method: MethodNumber} = "{service} does not have an action called {method}",
     MissingSchema{service: AccountNumber} = "Cannot find schema for {service}",
     InvalidPackageSource = "Invalid package source",
+    InvalidVerifyService = "Invalid verify service",
 }
 
 fn should_compress(content_type: &str) -> bool {
@@ -101,17 +103,25 @@ pub struct PackageRef {
     pub version: String,
 }
 
+fn network_scope() -> String {
+    "network".to_string()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Meta {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
     pub depends: Vec<PackageRef>,
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
+    #[serde(default)]
+    pub services: Vec<AccountNumber>,
 }
 
 impl Meta {
@@ -119,9 +129,11 @@ impl Meta {
         return PackageInfo {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
             sha256,
             file,
         };
@@ -132,12 +144,16 @@ impl Meta {
 pub struct PackageInfo {
     pub name: String,
     pub version: String,
+    #[serde(default = "network_scope")]
+    pub scope: String,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
     pub depends: Vec<PackageRef>,
     #[serde(default)]
     pub accounts: Vec<AccountNumber>,
+    #[serde(default)]
+    pub services: Vec<AccountNumber>,
     #[serde(default)]
     pub sha256: Checksum256,
     #[serde(default)]
@@ -149,42 +165,34 @@ impl PackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: self.scope.clone(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
-        if self.accounts.is_empty() {
-            None
-        } else {
-            Some(
-                self.accounts
-                    .iter()
-                    .any(|account| account.to_string().starts_with("x-")),
-            )
+        match self.scope.as_str() {
+            "local" => Some(true),
+            "network" => Some(false),
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct InstalledPackageInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    pub depends: Vec<PackageRef>,
-    pub accounts: Vec<AccountNumber>,
-    pub owner: AccountNumber,
-}
+pub type InstalledPackageInfo = packages::InstalledPackage;
 
 impl InstalledPackageInfo {
     pub fn meta(&self) -> Meta {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "network".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
         }
     }
 }
@@ -196,6 +204,7 @@ pub struct LocalPackageInfo {
     pub description: String,
     pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
+    pub services: Vec<AccountNumber>,
     pub sha256: Checksum256,
 }
 
@@ -204,9 +213,11 @@ impl LocalPackageInfo {
         Meta {
             name: self.name.clone(),
             version: self.version.clone(),
+            scope: "local".to_string(),
             description: self.description.clone(),
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
+            services: self.services.clone(),
         }
     }
 }
@@ -241,6 +252,8 @@ pub struct PackagedService<R: Read + Seek> {
     meta: Meta,
     services: Vec<(AccountNumber, usize, ServiceInfo)>,
     data: Vec<(AccountNumber, usize)>,
+    postinstall: Vec<PrettyAction>,
+    hash: Checksum256,
 }
 
 pub type SchemaMap = HashMap<AccountNumber, Schema>;
@@ -263,23 +276,48 @@ pub struct PrettyAction {
 }
 
 impl PrettyAction {
+    fn pack_data(
+        service: AccountNumber,
+        method: MethodNumber,
+        data: &Option<serde_json::Value>,
+        schemas: &SchemaMap,
+    ) -> Result<Hex<Vec<u8>>, anyhow::Error> {
+        let schema = schemas.get(&service).unwrap();
+        let custom = schema_types();
+        let mut cschema = CompiledSchema::new(&schema.types, &custom);
+        let Some(act) = schema.actions.get(&MethodString(method.to_string())) else {
+            Err(Error::UnknownAction {
+                service: service,
+                method: method,
+            })?
+        };
+        cschema.extend(&act.params);
+        if let Some(data) = data {
+            Ok(cschema.from_value(&act.params, data)?.into())
+        } else {
+            Ok(cschema
+                .from_value(&act.params, &serde_json::json!({}))?
+                .into())
+        }
+    }
     pub fn into_action(self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
-        let raw_data = match self.raw_data {
-            Some(raw_data) => raw_data,
-            None => {
-                let schema = schemas.get(&self.service).unwrap();
-                let custom = schema_types();
-                let mut cschema = CompiledSchema::new(&schema.types, &custom);
-                let Some(act) = schema.actions.get(&MethodString(self.method.to_string())) else {
-                    Err(Error::UnknownAction {
-                        service: self.service,
-                        method: self.method,
-                    })?
-                };
-                cschema.extend(&act.params);
-                let data = self.data.unwrap_or_else(|| serde_json::json!({}));
-                cschema.from_value(&act.params, &data)?.into()
-            }
+        let raw_data = if let Some(raw_data) = self.raw_data {
+            raw_data
+        } else {
+            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+        };
+        Ok(Action {
+            sender: self.sender,
+            service: self.service,
+            method: self.method,
+            rawData: raw_data,
+        })
+    }
+    pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let raw_data = if let Some(raw_data) = &self.raw_data {
+            raw_data.clone()
+        } else {
+            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
@@ -310,7 +348,14 @@ fn read<T: Read>(reader: &mut T) -> Result<Vec<u8>, anyhow::Error> {
 }
 
 impl<R: Read + Seek> PackagedService<R> {
-    pub fn new(reader: R) -> Result<Self, anyhow::Error> {
+    pub fn new(mut reader: R) -> Result<Self, anyhow::Error> {
+        let mut hasher = Sha256::new();
+        std::io::copy(&mut reader, &mut hasher)?;
+        let hash: [u8; 32] = hasher.finalize().into();
+        reader.rewind()?;
+        Self::prehashed(reader, hash.into())
+    }
+    pub fn prehashed(reader: R, hash: Checksum256) -> Result<Self, anyhow::Error> {
         let mut archive = ZipArchive::new(reader)?;
         let mut info_files: HashMap<AccountNumber, usize> = HashMap::new();
         let mut service_files: Vec<(AccountNumber, usize)> = vec![];
@@ -363,11 +408,20 @@ impl<R: Read + Seek> PackagedService<R> {
                 Err(Error::UnknownAccount { name: *account })?
             }
         }
+
+        let postinstall = if let Ok(file) = archive.by_name("script/postinstall.json") {
+            serde_json::de::from_str::<Vec<PrettyAction>>(&std::io::read_to_string(file)?)?
+        } else {
+            Vec::new()
+        };
+
         Ok(PackagedService {
             archive: archive,
             meta: meta,
             services: services,
             data: data,
+            postinstall,
+            hash,
         })
     }
     pub fn name(&self) -> &str {
@@ -378,6 +432,9 @@ impl<R: Read + Seek> PackagedService<R> {
     }
     pub fn meta(&self) -> &Meta {
         &self.meta
+    }
+    pub fn hash(&self) -> &Checksum256 {
+        &self.hash
     }
     pub fn get_genesis(&mut self, services: &mut Vec<GenesisService>) -> Result<(), anyhow::Error> {
         for (account, index, info) in &self.services {
@@ -501,28 +558,26 @@ impl<R: Read + Seek> PackagedService<R> {
         &self.meta.accounts
     }
     pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            Ok(serde_json::de::from_str(&std::io::read_to_string(file)?)?)
-        } else {
-            Ok(Vec::new())
-        }
+        Ok(self.postinstall.clone())
     }
     pub fn postinstall(
         &mut self,
         schemas: &SchemaMap,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let script: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
-            actions.append(
-                &mut script
-                    .into_iter()
-                    .map(|act| act.into_action(schemas))
-                    .collect::<Result<Vec<Action>, anyhow::Error>>()?,
-            );
-        }
+        actions.append(
+            &mut self
+                .postinstall
+                .iter()
+                .map(|act| act.to_action(schemas))
+                .collect::<Result<Vec<Action>, anyhow::Error>>()?,
+        );
         Ok(())
+    }
+    pub fn needs_ui(&mut self) -> bool {
+        self.postinstall
+            .iter()
+            .any(|act| act.service == sites::SERVICE)
     }
 
     fn manifest_services(&self) -> HashMap<AccountNumber, ServiceInfo> {
@@ -533,17 +588,12 @@ impl<R: Read + Seek> PackagedService<R> {
         result
     }
 
-    fn manifest_data(&mut self) -> Vec<PackageDataFile> {
+    fn manifest_data(&self) -> Vec<PackageDataFile> {
         let mut manifest = vec![];
         let data_re = Regex::new(r"^data/[-a-zA-Z0-9]*(/.*)$").unwrap();
         for (sender, index) in &self.data {
-            let file = self.archive.by_index(*index).unwrap();
-            let path = data_re
-                .captures(file.name())
-                .unwrap()
-                .get(1)
-                .unwrap()
-                .as_str();
+            let file = self.archive.name_for_index(*index).unwrap();
+            let path = data_re.captures(file).unwrap().get(1).unwrap().as_str();
             manifest.push(PackageDataFile {
                 account: *sender,
                 filename: path.to_string(),
@@ -552,7 +602,7 @@ impl<R: Read + Seek> PackagedService<R> {
         manifest
     }
 
-    pub fn manifest(&mut self) -> PackageManifest {
+    pub fn manifest(&self) -> PackageManifest {
         let services = self.manifest_services();
         let data = self.manifest_data();
         PackageManifest { services, data }
@@ -580,13 +630,19 @@ impl<R: Read + Seek> PackagedService<R> {
         sender: AccountNumber,
         actions: &mut Vec<Action>,
     ) -> Result<(), anyhow::Error> {
-        actions.push(new_account_action(accounts::SERVICE, account));
+        if let Some(preapprove) = preapprove_action(sender, account) {
+            actions.push(preapprove)
+        }
         if let Some(key) = key {
-            actions.push(set_key_action(account, key));
-            actions.push(set_auth_service_action(account, key.auth_service()));
+            if key.key.service != verify_sig::SERVICE {
+                return Err(Error::InvalidVerifyService)?;
+            }
+            actions.push(
+                auth_sig::Wrapper::pack_from(sender)
+                    .newAccount(account, key.key.rawData.0.clone().into()),
+            );
         } else {
-            actions.push(auth_delegate::Wrapper::pack_from(account).setOwner(sender));
-            actions.push(set_auth_service_action(account, auth_delegate::SERVICE));
+            actions.push(new_account_owned_action(sender, account, sender));
         }
         Ok(())
     }
@@ -665,39 +721,58 @@ impl<R: Read + Seek> PackagedService<R> {
     }
 
     // Returns accounts that must be defined by either this package or its
-    // immediate dependencies
-    pub fn get_required_accounts(&mut self) -> Result<Vec<AccountNumber>, anyhow::Error> {
-        let mut result = vec![];
+    // immediate dependencies. The first group can be any account, the second
+    // must be services
+    pub fn get_required_accounts(
+        &self,
+    ) -> Result<(Vec<AccountNumber>, Vec<AccountNumber>), anyhow::Error> {
+        let mut accounts = vec![];
+        let mut services = vec![];
+
+        let local = &self.meta.scope == "local";
 
         for account in self.get_accounts() {
             if !self.has_service(*account) {
-                result.push(accounts::SERVICE)
+                if !local {
+                    services.push(accounts::SERVICE)
+                } else {
+                    Err(anyhow!(
+                        "Local packages do not support non-service accounts"
+                    ))?
+                }
             }
         }
 
         if !self.data.is_empty() {
-            result.push(sites::SERVICE);
+            if !local {
+                services.push(sites::SERVICE);
+            } else {
+                services.push(x_sites::SERVICE);
+            }
         }
 
         for (_, _, info) in &self.services {
             if let Some(_) = &info.server {
-                result.push(http_server::SERVICE)
+                if !local {
+                    services.push(http_server::SERVICE)
+                } else {
+                    // x-http is always present
+                }
             }
         }
 
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let actions: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
-            for act in actions {
-                result.push(act.sender);
-                result.push(act.service);
-            }
+        for act in &self.postinstall {
+            accounts.push(act.sender);
+            services.push(act.service);
         }
 
-        result.sort_unstable_by(|a, b| a.value.cmp(&b.value));
-        result.dedup();
+        accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        accounts.dedup();
 
-        Ok(result)
+        services.sort_unstable_by(|a, b| a.value.cmp(&b.value));
+        services.dedup();
+
+        Ok((accounts, services))
     }
 
     // returns accounts whose schemas are required
@@ -705,13 +780,9 @@ impl<R: Read + Seek> PackagedService<R> {
         &mut self,
         out: &mut HashSet<AccountNumber>,
     ) -> Result<(), anyhow::Error> {
-        if let Ok(file) = self.archive.by_name("script/postinstall.json") {
-            let actions: Vec<PrettyAction> =
-                serde_json::de::from_str(&std::io::read_to_string(file)?)?;
-            for act in actions {
-                if act.raw_data.is_none() {
-                    out.insert(act.service);
-                }
+        for act in &self.postinstall {
+            if act.raw_data.is_none() {
+                out.insert(act.service);
             }
         }
         Ok(())
@@ -781,7 +852,19 @@ impl<R: Read + Seek> PackagedService<R> {
         client: &mut reqwest::Client,
         _compression_level: u32,
     ) -> Result<(), anyhow::Error> {
-        for (account, index, _info) in &self.services {
+        for (account, index, info) in &self.services {
+            if let Some(server) = &info.server {
+                crate::as_text(
+                    client
+                        .post(x_http::SERVICE.url(base_url)?.join("/register_server")?)
+                        .body(serde_json::to_string(&x_http::RegisterServerRequest {
+                            service: *account,
+                            server: *server,
+                        })?)
+                        .header("Content-Type", "application/json"),
+                )
+                .await?;
+            }
             crate::as_text(
                 client
                     .put(
@@ -1023,18 +1106,37 @@ impl PackageManifest {
     }
 }
 
-// Two packages shall not create the same account
-// Accounts used in any way during installation must be part of the package or
+// Two packages shall not create the same service or data file
+// Services used in any way during installation must be part of the package or
 // its direct dependencies
 pub fn validate_dependencies<T: Read + Seek>(
     packages: &mut [PackagedService<T>],
 ) -> Result<(), anyhow::Error> {
-    let mut accounts: HashMap<AccountNumber, String> = HashMap::new();
-    for p in &packages[..] {
+    let mut accounts: HashMap<AccountNumber, HashSet<String>> = HashMap::new();
+    let mut services: HashMap<AccountNumber, String> = HashMap::new();
+    let mut files: HashMap<PackageDataFile, String> = HashMap::new();
+    for p in &mut packages[..] {
         for account in p.get_accounts() {
-            match accounts.entry(*account) {
-                hash_map::Entry::Occupied(entry) => Err(Error::AccountConflict {
+            accounts
+                .entry(*account)
+                .or_insert_with(|| HashSet::new())
+                .insert(p.meta.name.clone());
+        }
+        for (account, _, _) in &p.services {
+            match services.entry(*account) {
+                hash_map::Entry::Occupied(entry) => Err(Error::ServiceConflict {
                     name: *account,
+                    old: entry.get().to_string(),
+                    new: p.meta.name.clone(),
+                })?,
+                hash_map::Entry::Vacant(entry) => entry.insert(p.meta.name.clone()),
+            };
+        }
+        for file in p.manifest_data() {
+            match files.entry(file) {
+                hash_map::Entry::Occupied(entry) => Err(Error::FileConflict {
+                    name: entry.key().account,
+                    filename: entry.key().filename.to_string(),
                     old: entry.get().to_string(),
                     new: p.meta.name.clone(),
                 })?,
@@ -1043,8 +1145,30 @@ pub fn validate_dependencies<T: Read + Seek>(
         }
     }
     for p in &mut packages[..] {
-        for account in p.get_required_accounts()? {
-            if let Some(package) = accounts.get(&account) {
+        let (required_accounts, required_services) = p.get_required_accounts()?;
+        for account in required_accounts {
+            if let Some(packages) = accounts.get(&account) {
+                if !packages.contains(&p.meta.name)
+                    && !p
+                        .meta
+                        .depends
+                        .iter()
+                        .any(|dep| packages.contains(&dep.name))
+                {
+                    Err(Error::MissingDepPackage {
+                        name: p.meta.name.clone(),
+                        dep: packages.iter().next().unwrap().clone(),
+                    })?;
+                }
+            } else {
+                Err(Error::MissingDepAccount {
+                    name: account,
+                    package: p.meta.name.clone(),
+                })?
+            }
+        }
+        for account in required_services {
+            if let Some(package) = services.get(&account) {
                 if &p.meta.name != package && !p.meta.depends.iter().any(|dep| &dep.name == package)
                 {
                     Err(Error::MissingDepPackage {
@@ -1060,6 +1184,297 @@ pub fn validate_dependencies<T: Read + Seek>(
             }
         }
     }
+    Ok(())
+}
+
+pub enum PackageOpFull<R: Read + Seek> {
+    Install(PackagedService<R>),
+    Replace(Meta, PackagedService<R>),
+    Remove(Meta),
+}
+
+impl<R: Read + Seek> PackageOpFull<R> {
+    pub fn name(&self) -> &str {
+        match self {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => package.name(),
+            PackageOpFull::Remove(meta) => &meta.name,
+        }
+    }
+    pub fn old(&self) -> Option<&Meta> {
+        match self {
+            PackageOpFull::Install(_) => None,
+            PackageOpFull::Replace(meta, _) | PackageOpFull::Remove(meta) => Some(meta),
+        }
+    }
+    pub fn new(&mut self) -> Option<&mut PackagedService<R>> {
+        match self {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => Some(package),
+            PackageOpFull::Remove(_) => None,
+        }
+    }
+}
+
+pub async fn fetch_packages<R: PackageRegistry + ?Sized>(
+    reg: &R,
+    ops: Vec<PackageOp>,
+    existing: &PackageList,
+) -> Result<Vec<PackageOpFull<R::R>>, anyhow::Error> {
+    let mut result = Vec::with_capacity(ops.len());
+    for op in ops {
+        result.push(match op {
+            PackageOp::Install(info) => PackageOpFull::Install(reg.get_by_info(&info).await?),
+            PackageOp::Replace(meta, info) => {
+                PackageOpFull::Replace(meta, reg.get_by_info(&info).await?)
+            }
+            PackageOp::Remove(meta) => PackageOpFull::Remove(meta),
+        })
+    }
+    sort_package_ops(&mut result, existing)?;
+    Ok(result)
+}
+
+// Finds all packages reachable from package in deps.
+// Packages that should not be considered should be excluded from deps.
+fn get_transitive_services<'a>(
+    package: &'a str,
+    deps: &'a HashMap<String, &Vec<PackageRef>>,
+    visited: &mut HashSet<&'a str>,
+    out: &mut Vec<String>,
+) -> Result<(), anyhow::Error> {
+    if let Some(children) = deps.get(package) {
+        if visited.insert(package) {
+            out.push(package.to_string());
+            for dep in *children {
+                get_transitive_services(&dep.name, deps, visited, out)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_package_order_graph<R: Read + Seek>(
+    packages: &Vec<PackageOpFull<R>>,
+    existing: &PackageList,
+) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+    let mut result: HashMap<String, Vec<String>> = HashMap::new();
+    let mut provides_service: HashMap<AccountNumber, &Meta> = HashMap::new();
+    let mut has_postinstall = HashSet::new();
+    let empty_deps = Vec::new();
+    let mut service_deps = HashMap::new();
+    // Build the graph of service dependencies. Service dependencies
+    // can be cyclic as long as nothing calls any of the services in
+    // the cycle before all of them are installed.
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                // Create lookup table to find the package that contains
+                // each service. Duplicates are an error.
+                for (service, _, _) in &package.services {
+                    if let Some(prev) = provides_service.insert(*service, package.meta()) {
+                        Err(Error::ServiceConflict {
+                            name: *service,
+                            old: prev.name.clone(),
+                            new: package.name().to_string(),
+                        })?
+                    }
+                }
+                if !package.postinstall.is_empty() {
+                    has_postinstall.insert(package.name());
+                }
+                if !package.services.is_empty() {
+                    // If a package provides any services, direct dependents can
+                    // assume they are installed. This transitively requires all
+                    // services that this package might use to be installed.
+                    service_deps.insert(package.name().to_string(), &package.meta().depends);
+                } else if !package.postinstall.is_empty() {
+                    // If a package provides a postinstall script, direct dependents
+                    // can assume that it has been run. Dependencies only need to
+                    // be installed first if they are required to install this package
+                    service_deps.insert(package.name().to_string(), &empty_deps);
+                }
+            }
+            PackageOpFull::Remove(_) => {}
+        }
+    }
+    // Collect packages that are updated, so we can exclude them
+    // when processing `existing`
+    let mut updated_packages: HashSet<&str> = HashSet::new();
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) => {
+                updated_packages.insert(package.name());
+            }
+            PackageOpFull::Replace(meta, package) => {
+                updated_packages.insert(&meta.name);
+                updated_packages.insert(package.name());
+            }
+            PackageOpFull::Remove(meta) => {
+                updated_packages.insert(&meta.name);
+            }
+        }
+    }
+    // Add existing packages that are unmodified to the graph
+    for (name, versions) in &existing.packages {
+        if !updated_packages.contains(&name.as_str()) {
+            for (_version, (meta, _origin)) in versions {
+                // Services provided by existing packages that are not
+                // being updated are available to be called during installation
+                for service in &meta.services {
+                    if let Some(prev) = provides_service.insert(*service, meta) {
+                        Err(Error::ServiceConflict {
+                            name: *service,
+                            old: name.clone(),
+                            new: prev.name.clone(),
+                        })?
+                    }
+                }
+                // Transitive dependencies need to be in a consistent
+                // state, when any services in this package are called
+                if !meta.services.is_empty() {
+                    service_deps.insert(name.clone(), &meta.depends);
+                }
+                // We don't know whether this package has a postinstall
+                // script, and it doesn't matter, because it's already
+                // been executed and won't be executed again.
+            }
+        }
+    }
+    // Construct a graph describing constraints on install order
+    // All services that might be run during installation must
+    // be installed first.
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                let mut all_required_packages = Vec::new();
+                let mut visited = HashSet::new();
+                for service in package.get_required_accounts()?.1 {
+                    let Some(required_package) = provides_service.get(&service) else {
+                        Err(Error::MissingDepAccount {
+                            name: service,
+                            package: package.name().to_string(),
+                        })?
+                    };
+                    if &required_package.name != package.name() {
+                        if visited.insert(required_package.name.as_str()) {
+                            all_required_packages.push(required_package.name.clone());
+                        }
+                    }
+                    for dep in &required_package.depends {
+                        get_transitive_services(
+                            &dep.name,
+                            &service_deps,
+                            &mut visited,
+                            &mut all_required_packages,
+                        )?;
+                    }
+                }
+                // The postinstall script can rely on direct dependencies'
+                // postinstall scripts having run first.
+                if has_postinstall.contains(&package.name()) {
+                    for dep in &package.meta().depends {
+                        if has_postinstall.contains(&dep.name.as_str()) && visited.insert(&dep.name)
+                        {
+                            all_required_packages.push(dep.name.clone());
+                        }
+                    }
+                }
+                // Drop packages that are not being modified
+                all_required_packages.retain(|name| updated_packages.contains(&name.as_str()));
+                result.insert(package.name().to_string(), all_required_packages);
+            }
+            PackageOpFull::Remove(_) => {
+                // There is no postrm for now, so remove order doesn't matter
+            }
+        }
+    }
+    Ok(result)
+}
+
+fn topological_sort_impl(
+    vertex: &str,
+    graph: &HashMap<String, Vec<String>>,
+    indexes: &HashMap<String, usize>,
+    out: &mut Vec<usize>,
+    mut i: usize,
+) -> Result<usize, anyhow::Error> {
+    const NEW: usize = usize::MAX;
+    const ON_STACK: usize = NEW - 1;
+    let index = *indexes.get(vertex).unwrap();
+    if out[index] == ON_STACK {
+        Err(Error::DependencyCycle {
+            package: vertex.to_string(),
+        })?
+    } else if out[index] == NEW {
+        out[index] = ON_STACK;
+        let Some(edges) = graph.get(vertex) else {
+            Err(anyhow!("Missing vertex {vertex}"))?
+        };
+        for edge in edges {
+            i = topological_sort_impl(edge.as_str(), graph, indexes, out, i)
+                .with_context(|| format!("Installing {vertex}"))?;
+        }
+        out[index] = i;
+        i += 1;
+    }
+    Ok(i)
+}
+
+fn get_package_order<R: Read + Seek>(
+    packages: &Vec<PackageOpFull<R>>,
+    existing: &PackageList,
+) -> Result<Vec<usize>, anyhow::Error> {
+    let mut permutation = vec![usize::MAX; packages.len()];
+    let mut indexes = HashMap::new();
+    for (i, package) in packages.iter().enumerate() {
+        indexes.insert(package.name().to_string(), i);
+    }
+    let graph = build_package_order_graph(packages, existing)?;
+
+    // Process packages containing essential services first
+    let essential_services = EssentialServices::new();
+    let mut i = 0;
+    for package in packages {
+        match package {
+            PackageOpFull::Install(package) | PackageOpFull::Replace(_, package) => {
+                if essential_services.intersects(&package.meta().accounts) {
+                    i = topological_sort_impl(
+                        package.name(),
+                        &graph,
+                        &indexes,
+                        &mut permutation,
+                        i,
+                    )?;
+                }
+            }
+            PackageOpFull::Remove(_) => {}
+        }
+    }
+    for package in packages {
+        i = topological_sort_impl(package.name(), &graph, &indexes, &mut permutation, i)?;
+    }
+    Ok(permutation)
+}
+
+fn apply_permutation<T>(vec: &mut Vec<T>, permutation: &mut [usize]) {
+    assert!(vec.len() == permutation.len());
+    for i in 0..vec.len() {
+        while permutation[i] != i {
+            let pos = permutation[i];
+            permutation.swap(i, pos);
+            vec.swap(i, pos);
+        }
+    }
+}
+
+// existing should at least contain all packages that connect
+// packages being updated and packages that are direct dependencies
+// of packages being updated.
+pub fn sort_package_ops<R: Read + Seek>(
+    packages: &mut Vec<PackageOpFull<R>>,
+    existing: &PackageList,
+) -> Result<(), anyhow::Error> {
+    let mut order = get_package_order(packages, existing)?;
+    apply_permutation(packages, &mut order);
     Ok(())
 }
 
@@ -1118,19 +1533,6 @@ impl EssentialServices {
     }
 }
 
-pub fn get_essential_packages(
-    packages: &Vec<PackageInfo>,
-    essential_services: &EssentialServices,
-) -> Vec<String> {
-    let mut result = Vec::new();
-    for info in packages {
-        if essential_services.intersects(&info.accounts) {
-            result.push(info.name.clone());
-        }
-    }
-    result
-}
-
 #[async_trait(?Send)]
 pub trait PackageRegistry {
     type R: Read + Seek;
@@ -1144,26 +1546,23 @@ pub trait PackageRegistry {
     async fn resolve(
         &self,
         packages: &[String],
+        local: bool,
     ) -> Result<Vec<PackagedService<Self::R>>, anyhow::Error> {
-        let mut result = vec![];
-        let index = self.index()?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
-        for op in solve_dependencies(
-            index,
-            make_refs(packages)?,
-            vec![],
-            essential,
-            false,
-            PackagePreference::Latest,
-            PackagePreference::Current,
-        )? {
-            let PackageOp::Install(info) = op else {
-                panic!("Only install is expected when there are no existing packages");
-            };
-            result.push(self.get_by_info(&info).await?);
-        }
-
-        Ok(result)
+        let installed = PackageList::new();
+        let packages = installed
+            .resolve_changes(self, packages, false, local)
+            .await?;
+        Ok(fetch_packages(self, packages, &installed)
+            .await?
+            .into_iter()
+            .map(|op| {
+                if let PackageOpFull::Install(package) = op {
+                    package
+                } else {
+                    panic!("Only install is expected when there are no existing packages")
+                }
+            })
+            .collect())
     }
 }
 
@@ -1329,7 +1728,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))
@@ -1537,12 +1936,6 @@ struct LocalPackageQuery {
     installed: LocalPackageConnection,
 }
 
-#[allow(non_snake_case)]
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct NewAccountsQuery {
-    newAccounts: Vec<AccountNumber>,
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct PackagesEdge {
     node: PackageInfo,
@@ -1563,27 +1956,6 @@ struct PackagesQuery {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct SourcesQuery {
     sources: Vec<packages::PackageSource>,
-}
-
-#[cfg(not(target_family = "wasm"))]
-pub async fn get_accounts_to_create(
-    base_url: &reqwest::Url,
-    client: &mut reqwest::Client,
-    accounts: &[AccountNumber],
-    sender: AccountNumber,
-) -> Result<Vec<AccountNumber>, anyhow::Error> {
-    let result: NewAccountsQuery = crate::gql_query(
-        base_url,
-        client,
-        packages::SERVICE,
-        format!(
-            "query {{ newAccounts(accounts: {}, owner: {}) }}",
-            serde_json::to_string(accounts)?,
-            serde_json::to_string(&sender)?,
-        ),
-    )
-    .await?;
-    Ok(result.newAccounts)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -1643,7 +2015,7 @@ pub async fn get_manifest<T: PackageRegistry + ?Sized>(
             get_installed_manifest(base_url, client, &package.name, *owner).await
         }
         PackageOrigin::Repo { sha256, file } => {
-            let mut package = reg
+            let package = reg
                 .get_by_info(&package.info(sha256.clone(), file.clone()))
                 .await?;
             Ok(package.manifest())
@@ -1667,12 +2039,20 @@ fn check_destination(packages: &Vec<PackageOp>, local: bool) -> Result<(), anyho
     for package in packages {
         match package {
             PackageOp::Install(info) | PackageOp::Replace(_, info) => {
-                if info.is_local() == Some(!local) {
-                    Err(anyhow!(
-                        "{} is{} a local package",
-                        &info.name,
-                        if local { " not" } else { "" }
-                    ))?
+                match (info.is_local(), local) {
+                    (Some(true), false) => {
+                        Err(anyhow!(
+                            "The package you are installing, or one of its dependencies ({}), is a local package. Local packages must be installed with the `--local` flag.",
+                            &info.name
+                        ))?
+                    }
+                    (Some(false), true) => {
+                        Err(anyhow!(
+                            "The package you are installing, or one of its dependencies ({}), is not a local package. Remove the `--local` flag to install this package.",
+                            &info.name
+                        ))?
+                    }
+                    _ => {}
                 }
             }
             PackageOp::Remove(_) => {}
@@ -1696,7 +2076,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
@@ -1717,7 +2097,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_local(edge.node);
@@ -1792,12 +2172,10 @@ impl PackageList {
         local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
         let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
-            essential,
             reinstall,
             PackagePreference::Latest,
             PackagePreference::Current,
@@ -1813,12 +2191,10 @@ impl PackageList {
         local: bool,
     ) -> Result<Vec<PackageOp>, anyhow::Error> {
         let index = reg.index()?;
-        let essential = get_essential_packages(&index, &EssentialServices::new());
         let result = solve_dependencies(
             index,
             make_refs(packages)?,
             self.as_upgradable(),
-            essential,
             false,
             pref,
             if packages.is_empty() {

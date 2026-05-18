@@ -2021,11 +2021,12 @@ namespace psibase
       void onValidateHostConfig(auto&& fn) { dbCallbacks.validateHostConfig = fn; }
       void onChangeShutdown(auto&& fn) { dbCallbacks.shutdown = fn; }
       void onSocketOpen(auto&& fn) { dbCallbacks.socketOpen = fn; }
+      void onSocketP2P(auto&& fn) { dbCallbacks.socketP2P = fn; }
 
       void recvMessage(const Socket& sock, const std::vector<char>& data)
       {
          Action action{.service = proxyServiceNum,
-                       .rawData = psio::to_frac(std::tuple(sock.id, data))};
+                       .rawData = psio::to_frac(std::tuple(sock.id, data, std::uint32_t{0}))};
 
          // TODO: This can run concurrently
          BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),

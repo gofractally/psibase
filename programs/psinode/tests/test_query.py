@@ -109,8 +109,9 @@ class TestQuery(unittest.TestCase):
         ''')
         sockets = [edge['node']['fd'] for edge in sockets['sockets']['edges']]
         # 0 = producer multicast
-        # 1 = current request
-        self.assertEqual(sockets, [0, 1])
+        # 1 = log
+        # 2 = current request
+        self.assertEqual(sockets, [0, 1, 2])
 
 if __name__ == '__main__':
     testutil.main()

@@ -71,14 +71,16 @@ function(json_append_deps VAR KEY)
 endfunction()
 
 function(write_meta)
-    cmake_parse_arguments(PARSE_ARGV 0 "" "" "NAME;VERSION;DESCRIPTION;OUTPUT" "DEPENDS;ACCOUNTS")
+    cmake_parse_arguments(PARSE_ARGV 0 "" "" "NAME;VERSION;SCOPE;DESCRIPTION;OUTPUT" "DEPENDS;ACCOUNTS;SERVICES")
     set(result)
     string(APPEND result "{")
     json_append_key(result "name" ${_NAME})
     json_append_key(result "version" ${_VERSION})
+    json_append_key(result "scope" ${_SCOPE})
     json_append_key(result "description" ${_DESCRIPTION})
     json_append_deps(result "depends" ${_DEPENDS})
     json_append_list(result "accounts" ${_ACCOUNTS})
+    json_append_list(result "services" ${_SERVICES})
     string(APPEND result "}")
     file(GENERATE OUTPUT ${_OUTPUT} CONTENT ${result})
 endfunction()
@@ -95,6 +97,8 @@ endfunction()
 
 # NAME <name>               - The name of the package
 # VERSION <version>         - The package version
+# LOCAL                     - The package is installed to a single node. Default is NETWORK
+# NETWORK                   - The package is installed to the whole network
 # DESCRIPTION <text>        - The package description
 # OUTPUT <filename>         - The package file. Defaults to ${NAME}.psi
 # ACCOUNTS <name>...        - Additional non-service accounts to create
@@ -110,11 +114,12 @@ endfunction()
 #   INIT                    - The service has an init action that should be run with no arguments
 #   POSTINSTALL <filename>  - Additional actions that should be run at the end of installation
 function(psibase_package)
-    set(keywords NAME VERSION DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL SCHEMA)
+    set(keywords NAME VERSION LOCAL NETWORK DESCRIPTION OUTPUT PACKAGE_DEPENDS DEPENDS ACCOUNTS SERVICE DATA TARGET WASM FLAGS SERVER INIT POSTINSTALL SCHEMA)
     foreach(keyword IN LISTS keywords)
         set(_${keyword})
     endforeach()
     set(_SERVICES)
+    set(_SCOPE network)
     foreach(arg IN LISTS ARGN)
         set(my_keyword)
         foreach(keyword IN LISTS keywords)
@@ -129,6 +134,10 @@ function(psibase_package)
             if (my_keyword STREQUAL "INIT")
                 set(_INIT_${_SERVICE} TRUE)
                 set(current_keyword)
+            elseif(my_keyword STREQUAL "LOCAL")
+                set(_SCOPE local)
+            elseif(my_keyword STREQUAL "NETWORK")
+                set(_SCOPE network)
             else()
                 set(current_keyword ${my_keyword})
             endif()
@@ -191,8 +200,10 @@ function(psibase_package)
     set(contents meta.json)
     set(zip-deps ${outdir}/meta.json)
     set(init-services)
+    set(wasm-services)
     foreach(service IN LISTS _SERVICES)
         if(_WASM_${service} OR _TARGET_${service})
+            list(APPEND wasm-services ${service})
             if(NOT _SCHEMA_${service})
                 if(_TARGET_${service})
                     set(_SCHEMA_${service} ${CMAKE_CURRENT_BINARY_DIR}/${service}-schema.json)
@@ -300,8 +311,10 @@ function(psibase_package)
         OUTPUT ${outdir}/meta.json
         NAME ${_NAME}
         VERSION ${_VERSION}
+        SCOPE ${_SCOPE}
         DESCRIPTION ${_DESCRIPTION}
         ACCOUNTS ${_ACCOUNTS} ${_SERVICES}
+        SERVICES ${wasm-services}
         DEPENDS ${_PACKAGE_DEPENDS}
     )
     string(REGEX REPLACE "/[^/]+/?$" "" output-dir ${_OUTPUT})

@@ -4,9 +4,9 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { AppSplashScreen } from "@/components/app-splash-screen";
 import { Loading } from "@/components/loading";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useNavLocation } from "@/hooks/use-nav-location";
 
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     Breadcrumb,
     BreadcrumbItem,

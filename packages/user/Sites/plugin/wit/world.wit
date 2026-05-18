@@ -13,16 +13,16 @@ interface api {
     use host:types/types.{error};
 
     /// Upload a single file to Sites.
-    /// 
-    /// This file will be accessible at the subdomain of the caller, 
+    ///
+    /// This file will be accessible at the subdomain of the caller,
     /// at the specified path.
-    /// 
-    /// Brotli file compression is applied at the specified level if the 
-    /// file-type of the content is supported. Compression-quality must be 
+    ///
+    /// Brotli file compression is applied at the specified level if the
+    /// file-type of the content is supported. Compression-quality must be
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
-    /// 
+    ///
     /// The maximum size of a transaction submitted to upload content is 3mb.
-    /// This also serves as the de facto limit on the size of a single uploaded 
+    /// This also serves as the de facto limit on the size of a single uploaded
     /// file (after compression if applied).
     upload: func(file: file, compression-quality: u8) -> result<_, error>;
 
@@ -40,23 +40,23 @@ interface api {
     upload-encoded: func(file: file, content-encoding: string) -> result<_, error>;
 
     /// Upload multiple files to Sites.
-    /// 
-    /// These files will be accessible at the subdomain of the caller, 
+    ///
+    /// These files will be accessible at the subdomain of the caller,
     /// at the specified paths.
-    /// 
-    /// Brotli file compression is applied at the specified level if the 
-    /// file-type of the content is supported. Compression-quality must be 
+    ///
+    /// Brotli file compression is applied at the specified level if the
+    /// file-type of the content is supported. Compression-quality must be
     /// within 1-11 (inclusive). Specifying level 0 will disable compression.
-    /// 
+    ///
     /// The maximum size of a transaction submitted to upload content is 3mb.
-    /// This also serves as the de facto limit on the size of a single uploaded 
+    /// This also serves as the de facto limit on the size of a single uploaded
     /// file (after compression if applied).
-    /// 
+    ///
     /// If the transaction size limit is exceeded, returns the index of the
     /// first file that was not uploaded.
-    /// 
+    ///
     /// If all files are uploaded successfully, returns 0.
-    /// 
+    ///
     /// If the first file in the list exceeds the transaction size limit,
     /// the transaction will be aborted and the error will contain the path
     /// of the file that caused the error.
@@ -86,7 +86,8 @@ interface api {
     /// - If the hash does not match, the new content is returned with an updated `ETag` header
     set-cache-mode: func(enable: bool) -> result<_, error>;
 
-    /// Reverse proxies the sender account UI to the specified proxy account
+    /// If content is not found on the caller's subdomain, transparently serve it from
+    /// the specified account's subdomain instead (reverse proxy).
     set-proxy: func(proxy: string);
 
     /// Clears the reverse-proxy set with `set-proxy`

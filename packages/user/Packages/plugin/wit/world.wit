@@ -9,9 +9,11 @@ interface types {
     record package-info {
         name: string,
         version: string,
+        scope: string,
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
         sha256: string,
         file: string,
     }
@@ -19,9 +21,11 @@ interface types {
     record meta {
         name: string,
         version: string,
+        scope: string,
         description: string,
         depends: list<package-ref>,
         accounts: list<string>,
+        services: list<string>,
     }
     /// The location of a package repository.
     ///

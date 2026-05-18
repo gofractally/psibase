@@ -24,8 +24,10 @@
             "user/Identity/ui",
             "user/Packages/ui",
             "user/Permissions/ui",
+            "user/PremAccounts/ui",
             "user/Workshop/ui",
-            "local/XAdmin/ui"
+            "local/XAdmin/ui",
+            "local/XProxy/ui"
         ]
     },
     "dependencies": {
@@ -64,11 +66,13 @@
         "dayjs": "^1.11.13",
         "elliptic": "^6.5.4",
         "hash.js": "^1.1.7",
+        "humanize-duration": "^3.32.2",
         "lucide-react": "^0.562.0",
         "motion": "^12.18.1",
         "next-themes": "^0.4.6",
         "prettier": "^3.2.5",
         "prettier-plugin-tailwindcss": "^0.5.14",
+        "radix-ui": "^1.4.3",
         "react": "^19.1.0",
         "react-day-picker": "^9.7.0",
         "react-dom": "^19.1.0",
@@ -92,6 +96,7 @@
         "@tailwindcss/vite": "^4.1.8",
         "@types/babel__template": "^7.4.4",
         "@types/elliptic": "^6",
+        "@types/humanize-duration": "^3.27.4",
         "@types/node": "^22.15.0",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",
@@ -126,5 +131,13 @@
         "vite-tsconfig-paths": "^4.3.2"
     },
     "noHoist": [],
-    "packageManager": "yarn@4.9.1"
+    "packageManager": "yarn@4.9.1",
+    "dependenciesMeta": {
+        "@trivago/prettier-plugin-sort-imports@5.2.2": {
+            "unplugged": true
+        },
+        "prettier-plugin-tailwindcss@0.5.14": {
+            "unplugged": true
+        }
+    }
 }

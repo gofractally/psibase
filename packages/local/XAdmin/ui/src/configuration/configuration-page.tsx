@@ -16,6 +16,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@shared/shadcn/ui/select";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Switch } from "@shared/shadcn/ui/switch";
 import {
     Tabs,
@@ -24,15 +25,91 @@ import {
     TabsTrigger,
 } from "@shared/shadcn/ui/tabs";
 
-import { Service } from "../components";
-import { useConfig, useConfigUpdate } from "../hooks/useConfig";
+import { useConfig, useConfigUpdate } from "../hooks/use-config";
+import { useServerSpecs } from "../hooks/use-server-specs";
 import { Logger } from "../log/logger";
-import {
-    PsinodeConfigUI,
-    PsinodeConfigUpdate,
-    ServiceConfig,
-} from "./interfaces";
-import { defaultService, newId, writeConfig } from "./utils";
+import { PsinodeConfigUI, PsinodeConfigUpdate } from "./interfaces";
+import { newId, writeConfig } from "./utils";
+
+const getHumanFriendlyNumber = (
+    value: number,
+    baseUnit: string,
+    decimals: number = 0,
+): string => {
+    if (value >= 1e15) {
+        return `${(value / 1e15).toFixed(decimals)} P${baseUnit}`;
+    }
+    if (value >= 1e12) {
+        return `${(value / 1e12).toFixed(decimals)} T${baseUnit}`;
+    }
+    if (value >= 1e9) {
+        return `${(value / 1e9).toFixed(decimals)} G${baseUnit}`;
+    }
+    if (value >= 1e6) {
+        return `${(value / 1e6).toFixed(decimals)} M${baseUnit}`;
+    }
+    if (value >= 1e3) {
+        return `${(value / 1e3).toFixed(decimals)} K${baseUnit}`;
+    }
+    return `${Math.round(value)} ${baseUnit}`;
+};
+
+const NodeSpecsContent = () => {
+    const { data: serverSpecs, isLoading: isLoadingSpecs } = useServerSpecs();
+    const ramBytes = serverSpecs?.recommendedMinMemoryBytes;
+
+    return (
+        <div className="space-y-4">
+            <div className="space-y-4 rounded-lg border p-4">
+                {isLoadingSpecs ? (
+                    <div className="space-y-3">
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-6 w-32" />
+                    </div>
+                ) : (
+                    <>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                                Bandwidth:
+                            </span>
+                            <span className="text-sm">
+                                {serverSpecs
+                                    ? getHumanFriendlyNumber(
+                                          serverSpecs.bandwidthBps,
+                                          "bps",
+                                          1,
+                                      )
+                                    : "N/A"}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">
+                                Storage:
+                            </span>
+                            <span className="text-sm">
+                                {serverSpecs
+                                    ? getHumanFriendlyNumber(
+                                          serverSpecs.storageBytes,
+                                          "B",
+                                      )
+                                    : "N/A"}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">RAM:</span>
+                            <span className="text-sm">
+                                {ramBytes
+                                    ? getHumanFriendlyNumber(ramBytes, "B")
+                                    : "N/A"}
+                            </span>
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export const ConfigurationPage = () => {
     const { data: config, isLoading, isError } = useConfig();
@@ -67,32 +144,14 @@ export const ConfigurationForm = ({
         name: "listen",
     });
 
-    const services = useFieldArray({
-        control: configForm.control,
-        name: "services",
-    });
-
     const hosts = useFieldArray({
         control: configForm.control,
         name: "hosts",
     });
 
     const onConfig = async (input: PsinodeConfigUI) => {
-        for (const service of input.services) {
-            if (service.host == "") {
-                service.host = defaultService(service.root);
-            }
-        }
         void (await onSubmit(writeConfig(input)));
         configForm.reset(input);
-    };
-
-    const addNewService = () => {
-        services.append({
-            host: "",
-            key: Math.floor(Math.random() * 100000).toString(),
-            root: "",
-        });
     };
 
     const onAddNewLoggerClick = () => {
@@ -171,7 +230,9 @@ export const ConfigurationForm = ({
                                 Connections
                             </TabsTrigger>
                             <TabsTrigger value="logs">Logs</TabsTrigger>
-                            <TabsTrigger value="services">Services</TabsTrigger>
+                            <TabsTrigger value="node-specs">
+                                Node Specs
+                            </TabsTrigger>
                         </TabsList>
                         <TabsContent value="connections">
                             <Controller
@@ -388,58 +449,9 @@ export const ConfigurationForm = ({
                                 </div>
                             )}
                         </TabsContent>
-                        <TabsContent value="services">
-                            <div className="flex justify-between">
-                                <h2 className="my-3 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">
-                                    Built-in Services
-                                </h2>
-                                <div>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            addNewService();
-                                        }}
-                                    >
-                                        <Plus size={20} className="" />
-                                    </Button>
-                                </div>
-                            </div>
 
-                            <fieldset>
-                                <table className="w-full">
-                                    <thead>
-                                        <tr>
-                                            <th className="text-left">
-                                                Hostname
-                                            </th>
-                                            <th className="text-left">Path</th>
-                                            <th></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {services.fields.map((field, index) => (
-                                            <Service
-                                                key={field.key}
-                                                register={(name, options) =>
-                                                    configForm.register(
-                                                        `services.${name}`,
-                                                        // @ts-expect-error eeej
-                                                        options,
-                                                    )
-                                                }
-                                                getValues={() =>
-                                                    configForm.getValues(
-                                                        `services.${index}`,
-                                                    ) as ServiceConfig
-                                                }
-                                                index={index}
-                                                services={services}
-                                            />
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </fieldset>
+                        <TabsContent value="node-specs">
+                            <NodeSpecsContent />
                         </TabsContent>
                     </Tabs>
 

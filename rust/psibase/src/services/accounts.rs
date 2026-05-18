@@ -23,7 +23,12 @@ mod service {
     }
 
     #[action]
-    fn newAccount(name: AccountNumber, authService: AccountNumber, requireNew: bool) {
+    fn preapproveAcc(name: AccountNumber) {
+        unimplemented!()
+    }
+
+    #[action]
+    fn newAccount(name: AccountNumber, authService: AccountNumber, requireMatch: bool) -> bool {
         unimplemented!()
     }
 

@@ -9,7 +9,9 @@ use host::types::types::Error;
 use sites::plugin::api::{upload, File};
 use transact::plugin::intf::add_action_to_transaction;
 
+use branding::action_structs as Actions;
 use psibase::fracpack::Pack;
+use psibase::AccountNumber;
 
 mod errors;
 use errors::ErrorType;
@@ -30,8 +32,14 @@ impl Api for BrandingPlugin {
     fn set_network_name(name: String) {
         assert_caller(&["config"], "set_network_name");
 
-        let packed_network_name_args = branding::action_structs::setNetworkName { name }.packed();
-        add_action_to_transaction("setNetworkName", &packed_network_name_args).unwrap();
+        let _ = AccountNumber::from_exact(name.as_str()).expect("Network name invalid");
+
+        let packed_network_name_args = Actions::setNetworkName { name }.packed();
+        add_action_to_transaction(
+            Actions::setNetworkName::ACTION_NAME,
+            &packed_network_name_args,
+        )
+        .unwrap();
     }
 
     fn set_logo(logo: Vec<u8>) {
@@ -65,7 +73,8 @@ impl Queries for BrandingPlugin {
         let graphql_str = "query { networkName }";
 
         let netname_val = serde_json::from_str::<NetworkNameResponse>(
-            &CommonServer::post_graphql_get_json(&graphql_str).map_err(|err| ErrorType::QueryAuthError(err.to_string()))?,
+            &CommonServer::post_graphql_get_json(&graphql_str)
+                .map_err(|err| ErrorType::QueryAuthError(err.to_string()))?,
         );
 
         let netname_val =

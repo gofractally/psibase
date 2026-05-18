@@ -2,6 +2,7 @@
 
 #include <psibase/psibase.hpp>
 #include <services/local/XAdmin.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/system/Accounts.hpp>
 #include <services/system/AuthSig.hpp>
 #include <services/system/CommonApi.hpp>

@@ -74,6 +74,7 @@ fn genesis_transaction<R: Read + Seek>(
     Ok(SignedTransaction {
         transaction: without_tapos(actions, expiration).packed().into(),
         proofs: vec![],
+        subjectiveData: None,
     })
 }
 
@@ -117,7 +118,7 @@ pub fn get_initial_actions<
     install_ui: bool,
     service_packages: &mut [PackagedService<R>],
     compression_level: u32,
-    builder: &mut TransactionBuilder<F>,
+    builder: &mut TransactionBuilder<SignedTransaction, F>,
     schemas: &SchemaMap,
 ) -> Result<(), anyhow::Error> {
     let has_packages = true;
@@ -156,8 +157,9 @@ pub fn get_initial_actions<
         }
 
         let mut actions = Vec::new();
-        if install_ui {
-            s.reg_server(&mut actions)?;
+        s.reg_server(&mut actions)?;
+
+        if install_ui || s.needs_ui() {
             s.store_data(&mut actions, None, compression_level)?;
         }
 
@@ -261,6 +263,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         Ok(SignedTransaction {
             transaction: without_tapos(actions, expiration).packed().into(),
             proofs: vec![],
+            subjectiveData: None,
         })
     });
     get_initial_actions(
@@ -288,6 +291,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .packed()
         .into(),
         proofs: vec![],
+        subjectiveData: None,
     });
 
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
@@ -306,6 +310,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .packed()
         .into(),
         proofs: vec![],
+        subjectiveData: None,
     });
     Ok((boot_transactions, transaction_groups))
 }

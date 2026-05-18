@@ -99,25 +99,10 @@ namespace SystemService
 
       void AuthSig::newAccount(psibase::AccountNumber name, SubjectPublicKeyInfo key)
       {
-         to<Accounts>().newAccount(name, AuthAny::service, true);
+         auto authTable = open<AuthTable>(KvMode::readWrite);
+         authTable.put(AuthRecord{.account = name, .pubkey = std::move(key)});
 
-         Action setKey{
-             .sender  = name,
-             .service = AuthSig::AuthSig::service,
-             .method  = "setKey"_m,
-             .rawData = psio::convert_to_frac(std::make_tuple(key))  //
-         };
-
-         Action setAuth{
-             .sender  = name,
-             .service = Accounts::service,
-             .method  = "setAuthServ"_m,
-             .rawData = psio::convert_to_frac(std::make_tuple(AuthSig::AuthSig::service))  //
-         };
-
-         auto _ = recurse();
-         to<Transact>().runAs(std::move(setKey), std::vector<ServiceMethod>{});
-         to<Transact>().runAs(std::move(setAuth), std::vector<ServiceMethod>{});
+         to<Accounts>().newAccount(name, AuthSig::service, true);
       }
    }  // namespace AuthSig
 }  // namespace SystemService

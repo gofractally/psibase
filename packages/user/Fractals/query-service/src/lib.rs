@@ -5,8 +5,8 @@ mod service {
     use async_graphql::{connection::Connection, *};
     use fractals::tables::tables::{
         EvaluationInstance, EvaluationInstanceTable, Fractal, FractalMember, FractalMemberTable,
-        FractalTable, Guild, GuildApplication, GuildApplicationTable, GuildMember,
-        GuildMemberTable, GuildTable,
+        FractalTable, Guild, GuildApplication, GuildApplicationTable, GuildInvite,
+        GuildInviteTable, GuildMember, GuildMemberTable, GuildTable,
     };
     use psibase::{AccountNumber, *};
     use serde::{Deserialize, Deserializer};
@@ -89,7 +89,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, NewGroup>> {
+        ) -> async_graphql::Result<EventConnection<NewGroup>> {
             EventQuery::new("history.evaluations.new_group")
                 .condition(format!(
                     "owner = 'fractals' AND evaluation_id = {}",
@@ -109,7 +109,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, EvaluationFinish>> {
+        ) -> async_graphql::Result<EventConnection<EvaluationFinish>> {
             EventQuery::new("history.fractals.evaluation_finished")
                 .condition(format!("guild = '{}'", guild))
                 .first(first)
@@ -126,7 +126,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, ScheduledEvaluation>> {
+        ) -> async_graphql::Result<EventConnection<ScheduledEvaluation>> {
             EventQuery::new("history.fractals.scheduled_evaluation")
                 .condition(format!("guild = '{}'", guild))
                 .first(first)
@@ -143,7 +143,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, GroupFinish>> {
+        ) -> async_graphql::Result<EventConnection<GroupFinish>> {
             EventQuery::new("history.evaluations.group_fin")
                 .condition(format!(
                     "owner = 'fractals' AND evaluation_id = {}",
@@ -183,6 +183,33 @@ mod service {
             TableQuery::subindex::<AccountNumber>(
                 GuildApplicationTable::with_service(fractals::SERVICE).get_index_pk(),
                 &(guild),
+            )
+            .first(first)
+            .last(last)
+            .before(before)
+            .after(after)
+            .query()
+            .await
+        }
+
+        async fn guild_invite(&self, id: u32) -> Option<GuildInvite> {
+            GuildInviteTable::with_service(fractals::SERVICE)
+                .get_index_pk()
+                .get(&id)
+        }
+
+        async fn guild_invites(
+            &self,
+            guild: AccountNumber,
+            account: AccountNumber,
+            first: Option<i32>,
+            last: Option<i32>,
+            before: Option<String>,
+            after: Option<String>,
+        ) -> async_graphql::Result<Connection<RawKey, GuildInvite>> {
+            TableQuery::subindex::<u32>(
+                GuildInviteTable::with_service(fractals::SERVICE).get_index_by_member(),
+                &(guild, account),
             )
             .first(first)
             .last(last)

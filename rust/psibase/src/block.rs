@@ -226,6 +226,7 @@ pub struct SignedTransaction {
     // Contains a packed `Transaction`. TODO: shared_view_ptr
     pub transaction: Hex<Vec<u8>>,
     pub proofs: Vec<Hex<Vec<u8>>>,
+    pub subjectiveData: Option<Vec<Hex<Vec<u8>>>>,
 }
 
 type TermNum = u32;
@@ -410,7 +411,6 @@ pub struct BlockHeader {
 pub struct Block {
     pub header: BlockHeader,
     pub transactions: Vec<SignedTransaction>,
-    pub subjectiveData: Vec<Hex<Vec<u8>>>,
 }
 
 #[derive(Debug, Clone, Default, Pack, Unpack, ToSchema, Serialize, Deserialize)]

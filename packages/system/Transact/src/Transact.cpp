@@ -35,6 +35,7 @@ namespace SystemService
 
    void Transact::startBoot(psio::view<const std::vector<Checksum256>> bootTransactions)
    {
+      auto _           = recurse();
       auto statusTable = open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
       check(!statusIdx.get(std::tuple{}), "already started");
@@ -43,6 +44,7 @@ namespace SystemService
 
    void Transact::finishBoot()
    {
+      auto _           = recurse();
       auto tables      = Transact::Tables(Transact::service);
       auto statusTable = tables.open<TransactStatusTable>();
       auto statusIdx   = statusTable.getIndex<0>();
@@ -83,6 +85,7 @@ namespace SystemService
    void Transact::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
+      auto _ = recurse();
 
       Tables tables(Transact::service);
 
@@ -90,12 +93,14 @@ namespace SystemService
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
+      const auto& stat = getStatus();
+      emit().history().blockStart(stat.current.blockNum, stat.current.time);
+
       // Remove expired transaction IDs. The iteration limit on the loop helps to
       // mitigate a potential attack.
-      const auto& stat          = getStatus();
-      auto        includedTable = tables.open<IncludedTrxTable>();
-      auto        includedIndex = includedTable.getIndex<0>();
-      auto        includedEnd   = includedIndex.end();
+      auto includedTable = tables.open<IncludedTrxTable>();
+      auto includedIndex = includedTable.getIndex<0>();
+      auto includedEnd   = includedIndex.end();
       for (int i = 0; i < 20; ++i)
       {
          auto it = includedIndex.begin();
@@ -135,6 +140,7 @@ namespace SystemService
    void Transact::setSnapTime(uint32_t seconds)
    {
       check(getSender() == getReceiver(), "Wrong sender");
+      auto   _ = recurse();
       Tables tables(Transact::service);
 
       auto& stat = getStatus();
@@ -183,6 +189,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       if (objective)
       {
          check(act.sender == me, "Objective callbacks must have 'transact' as sender");
@@ -223,6 +230,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       if (objective)
       {
          Tables tables(me);
@@ -267,6 +275,7 @@ namespace SystemService
    {
       auto me = getReceiver();
       check(getSender() == me, "Wrong sender");
+      auto _ = recurse();
       Transact::Tables(Transact::service).open<EventIndexerTable>().put({service});
    }
 
@@ -301,6 +310,7 @@ namespace SystemService
                psibase::writeConsole(" - " + a.service.str() + "->" + a.method.str() + "\n");
          }
       }
+      auto _ = recurse();
 
       if (transactStatus && transactStatus->enforceAuth)
       {
@@ -368,7 +378,6 @@ namespace SystemService
       for (auto& a : allowedActions)
          ++runAsMap[{action.sender, action.service, a.service, a.method}];
 
-      auto _      = recurse();
       auto result = call(action);
 
       for (auto& a : allowedActions)
@@ -518,6 +527,7 @@ namespace SystemService
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
       check(trx.actions().size() > 0, "transaction has no actions");
+      auto _           = recurse();
       bool enforceAuth = checkTapos(id, trx.tapos(), true);
       if (enforceAuth)
          checkAuth(trx.actions().front(), trx.claims(), true, true);
@@ -527,6 +537,7 @@ namespace SystemService
    void Transact::resMonitoring(bool enable)
    {
       check(getSender() == VirtualServer::service, "Wrong sender");
+      auto _ = recurse();
 
       Transact::Tables(Transact::service)
           .open<ResMonitoringConfigTable>()  //
@@ -632,6 +643,15 @@ namespace SystemService
       check(sender == AccountNumber{} || sender == RTransact::service, "Wrong sender");
       auto _ = recurse();
       processTransactionImpl(trx, speculative);
+   }
+
+   void Transact::kvNotify(AccountNumber service,
+                           DbId          db,
+                           std::uint32_t keyLen,
+                           std::uint32_t oldValueLen,
+                           std::uint32_t newValueLen)
+   {
+      check(getSender() == AccountNumber{}, "Wrong sender");
    }
 
 #ifndef PSIBASE_GENERATE_SCHEMA

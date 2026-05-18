@@ -1,7 +1,7 @@
 #[psibase::service]
 #[allow(non_snake_case)]
 mod service {
-    use async_graphql::{connection::Connection, *};
+    use async_graphql::*;
     use psibase::*;
     use serde::Deserialize;
 
@@ -27,7 +27,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, HistoricalUpdate>> {
+        ) -> async_graphql::Result<EventConnection<HistoricalUpdate>> {
             EventQuery::new("history.{{project-name | kebab_case}}.updated")
                 .first(first)
                 .last(last)

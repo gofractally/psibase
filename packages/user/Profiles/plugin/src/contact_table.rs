@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::bindings::clientdata::plugin::keyvalue as Keyvalue;
+use crate::bindings::host::db::store::{Bucket, Database, DbMode, StorageDuration};
 use psibase::fracpack::{Pack, Unpack};
 use psibase::AccountNumber;
 
@@ -10,6 +10,16 @@ use crate::bindings::host::types::types::Error;
 
 use crate::errors;
 use errors::ErrorType;
+
+fn contacts_table() -> Bucket {
+    Bucket::new(
+        Database {
+            mode: DbMode::NonTransactional,
+            duration: StorageDuration::Persistent,
+        },
+        "contacts",
+    )
+}
 
 #[derive(Pack, Unpack, Debug, Default)]
 pub struct ContactEntry {
@@ -47,7 +57,7 @@ impl ContactTable {
     }
 
     fn save_contacts(&self, contacts: Vec<ContactEntry>) {
-        Keyvalue::set(&self.key(), &contacts.packed());
+        contacts_table().set(&self.key(), &contacts.packed());
     }
 
     pub fn set(&self, contact: Contact, overwrite: bool) -> Result<(), Error> {
@@ -69,7 +79,7 @@ impl ContactTable {
     }
 
     pub fn get_contacts(&self) -> Vec<ContactEntry> {
-        let contacts = Keyvalue::get(&self.key());
+        let contacts = contacts_table().get(&self.key());
 
         contacts
             .map(|c| <Vec<ContactEntry>>::unpacked(&c).unwrap())

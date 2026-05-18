@@ -67,7 +67,7 @@ mod tests {
 
         assert_eq!(get_nr_nfts(&chain, bob)?, 0);
 
-        Wrapper::push_from(&chain, alice)
+        let id = Wrapper::push_from(&chain, alice)
             .propose(
                 vec![Action {
                     sender: bob,
@@ -77,6 +77,14 @@ mod tests {
                 }],
                 true,
             )
+            .get()?;
+
+        assert_eq!(get_nr_nfts(&chain, bob)?, 0);
+
+        let txid = Wrapper::push(&chain).get_staged_tx(id).get()?.txid;
+
+        Wrapper::push_from(&chain, bob)
+            .accept(id, txid)
             .get()?;
 
         assert_eq!(get_nr_nfts(&chain, bob)?, 1);
