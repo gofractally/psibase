@@ -1,1 +1,4 @@
-[{"sender":"prods-weak","service":"accounts","method":"setauthserv","data":{"authService":"producers"}},{"sender":"prods-strong","service":"accounts","method":"setauthserv","data":{"authService":"producers"}}]
+[
+    {"sender":"accounts","service":"accounts","method":"newAccount","data":{"name":"prods-weak","authService":"producers","requireMatch":true}},
+    {"sender":"accounts","service":"accounts","method":"newAccount","data":{"name":"prods-strong","authService":"producers","requireMatch":true}}
+]
