@@ -186,8 +186,11 @@ pub mod Service {
 
     /// Set genesis time for a fractal
     ///
-    /// Genesis time sets the starting point of when token rewards can be claimed.
+    /// Genesis time sets the starting point of when fractal token rewards can be claimed.
     /// Subsequent claims are according to the distribution interval set for the fractal.
+    ///
+    /// # Arguments
+    /// * `genesis_time` - New genesis time for the fractal.
     #[action]
     fn set_gen_time(genesis_time: u64) {
         unimplemented!()
@@ -205,6 +208,8 @@ pub mod Service {
     }
 
     /// Set Fractal distribution interval
+    ///
+    /// Used in conjunction with genesis time to determine when fractal token distribution can be triggered.
     ///
     /// # Arguments
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
@@ -225,7 +230,6 @@ pub mod Service {
     /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `role_id` - Role ID for fractal
     /// * `new_occupation` - New occupation to set for role
     #[action]

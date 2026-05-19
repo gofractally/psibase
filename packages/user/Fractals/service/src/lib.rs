@@ -111,23 +111,23 @@ pub mod service {
     /// * `fractal` - The account number of the fractal.
     #[action]
     fn init_token() {
-        let fractal = Fractal::by_sender();
-        fractal.init_token();
+        Fractal::by_sender().init_token();
     }
 
     /// Set Fractal distribution interval
+    ///
+    /// Used in conjunction with genesis time to determine when fractal token distribution can be triggered.
     ///
     /// # Arguments
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
     fn set_dist_int(distribution_interval_secs: u32) {
-        let mut fractal = Fractal::by_sender();
-        fractal.set_distribution_interval(distribution_interval_secs);
+        Fractal::by_sender().set_distribution_interval(distribution_interval_secs);
     }
 
     /// Set genesis time for a fractal
     ///
-    /// Genesis time sets the starting point of when token rewards can be claimed.
+    /// Genesis time sets the starting point of when fractal token rewards can be claimed.
     /// Subsequent claims are according to the distribution interval set for the fractal.
     ///
     /// # Arguments
@@ -143,8 +143,7 @@ pub mod service {
     /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
     fn set_dstrat(distribution_strategy: u8) {
-        let mut fractal = Fractal::by_sender();
-        fractal.set_distribution_strategy(distribution_strategy.into());
+        Fractal::by_sender().set_distribution_strategy(distribution_strategy.into());
     }
 
     /// Exile a fractal member.
@@ -165,13 +164,11 @@ pub mod service {
     /// Sets the occupation used to authorize the specified fractal role.
     ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `role_id` - Role ID for fractal
     /// * `new_occupation` - New occupation to set for role
     #[action]
     fn set_r_occ(role_id: u8, new_occupation: AccountNumber) {
-        let fractal = get_sender();
-        Role::get_assert(fractal, role_id.into()).set_occupation(new_occupation);
+        Role::get_assert(get_sender(), role_id.into()).set_occupation(new_occupation);
     }
 
     /// Claim member rewards
