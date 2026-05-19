@@ -42,6 +42,11 @@ interface prompt {
     ///   is met, then the attempt to create an account will fail.
     create-account: func(account-name: string) -> result<string, error>;
 
+    /// Purchases a premium account name, claims it, configures auth-sig, and returns the new account's private key.
+    ///
+    /// The account is not imported onto this device.
+    create-premium: func(account-name: string, slippage-pct: u8) -> result<string, error>;
+
     /// Will connect the specified account with the active app, if not already
     ///   connected, and login.
     /// If there is currently an active invite, calling this will automatically accept it.

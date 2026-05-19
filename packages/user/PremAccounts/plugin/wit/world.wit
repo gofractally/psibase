@@ -36,7 +36,7 @@ interface api {
     use host:types/types.{error};
     /// Purchase a premium name
     /// * `account`: the account to purchase the name for
-    /// * `max-cost`: the maximum cost in the network token as Quantity string
+    /// * `max-cost`: maximum payment in network token (Quantity string)
     buy: func(account: string, max-cost: string) -> result<_, error>;
 
     /// Claim a premium name
