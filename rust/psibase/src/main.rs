@@ -1626,6 +1626,7 @@ async fn apply_packages<
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
     let ops = fetch_packages(reg, ops, &existing).await?;
+    let updated_packages = existing.into_updated(&ops, sender);
     let mut schemas = SchemaMap::new();
     for op in ops {
         match op {
@@ -1652,6 +1653,7 @@ async fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
@@ -1673,7 +1675,7 @@ async fn apply_packages<
                 ));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.upgrade(package.manifest(), out)?;
+                old_manifest.upgrade(package.manifest(), &meta.name, out)?;
                 // Install the new package
                 let mut account_actions = vec![];
                 package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
@@ -1686,6 +1688,7 @@ async fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )?;
                 out.push_all(actions)?;
                 files.push_all(std::mem::take(&mut uploader.actions))?;
@@ -1694,7 +1697,7 @@ async fn apply_packages<
                 out.set_label(format!("Removing {}", &meta.name));
                 let old_manifest =
                     get_installed_manifest(base_url, client, &meta.name, sender).await?;
-                old_manifest.remove(out)?;
+                old_manifest.remove(&meta.name, out)?;
             }
         }
     }
