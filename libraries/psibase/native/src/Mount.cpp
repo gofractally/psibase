@@ -3,6 +3,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#ifndef O_PATH
+#define O_PATH 0
+#endif
 #include <algorithm>
 #include <filesystem>
 #include <psibase/check.hpp>

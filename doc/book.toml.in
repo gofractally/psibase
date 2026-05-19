@@ -1,6 +1,5 @@
 [book]
 language = "en"
-multilingual = false
 src = "${CMAKE_CURRENT_SOURCE_DIR}/doc/src"
 title = "psibase"
 
@@ -46,6 +45,7 @@ runnable = false
 enable = true
 
 [output.linkcheck]
+optional = true
 follow-web-links = false
 traverse-parent-directories = false
 warning-policy = "ignore"

@@ -1,8 +1,6 @@
 use crate::bindings::exports::permissions::plugin::admin::{Descriptions, PromptContext};
 use crate::bindings::exports::permissions::plugin::api::TrustLevel;
 use psibase::fracpack::{FracInputStream, Pack, Result, Unpack};
-use std::cmp::Ordering;
-
 impl From<u8> for TrustLevel {
     fn from(level: u8) -> Self {
         match level {
@@ -31,18 +29,6 @@ impl From<TrustLevel> for u8 {
 impl Default for TrustLevel {
     fn default() -> Self {
         TrustLevel::Max
-    }
-}
-
-impl Ord for TrustLevel {
-    fn cmp(&self, other: &Self) -> Ordering {
-        (*self as u8).cmp(&(*other as u8))
-    }
-}
-
-impl PartialOrd for TrustLevel {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some((*self as u8).cmp(&(*other as u8)))
     }
 }
 

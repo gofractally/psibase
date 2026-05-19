@@ -181,7 +181,14 @@ namespace psibase::net
 
       struct DeferredMessage
       {
-         using MessageKey = std::tuple<peer_id, Checksum256>;
+         // Plain struct instead of std::tuple to avoid GCC 15 / libstdc++ P2165R4
+         // treating DeferredMessage as tuple-like during heterogeneous set lookups.
+         struct MessageKey
+         {
+            peer_id     peer;
+            Checksum256 blockid;
+            auto        operator<=>(const MessageKey&) const = default;
+         };
          peer_id           peer;
          Checksum256       blockid;
          std::vector<char> message;
@@ -193,6 +200,10 @@ namespace psibase::net
          friend auto operator<=>(const DeferredMessage& lhs, const MessageKey& rhs)
          {
             return MessageKey{lhs.peer, lhs.blockid} <=> rhs;
+         }
+         friend auto operator<=>(const MessageKey& lhs, const DeferredMessage& rhs)
+         {
+            return lhs <=> MessageKey{rhs.peer, rhs.blockid};
          }
       };
 
@@ -275,7 +286,8 @@ namespace psibase::net
       }
       void on_peer_block(peer_id peer, const Checksum256& blockid)
       {
-         auto r = deferredMessages.equal_range(std::tuple{peer, blockid});
+         typename DeferredMessage::MessageKey key{peer, blockid};
+         auto                               r = deferredMessages.equal_range(key);
          for (const auto& value : std::ranges::subrange(r.first, r.second))
          {
             async_send(peer, value.message);

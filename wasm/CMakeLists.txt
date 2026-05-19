@@ -135,6 +135,7 @@ if(NOT EXISTS ${DEP_PREFIX}/lib/libz.a)
             && export AR=${CMAKE_AR}                                                \
             && export RANLIB=${CMAKE_RANLIB}                                        \
             && export CFLAGS=\"--sysroot=${CMAKE_SYSROOT} --target=wasm32-wasip1\"  \
+            && export uname=wasi                                                    \
             && ./configure --prefix=${DEP_PREFIX} --static                          \
             && make -j                                                              \
             && make -j install                                                      \

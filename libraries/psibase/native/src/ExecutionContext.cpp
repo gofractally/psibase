@@ -244,6 +244,21 @@ namespace psibase
 
       eosio::vm::stack_manager& getAltStack() { return transactionContext.getAltStack(); }
 
+      // WASI fd_fdstat_get stub for services that import it
+      uint32_t wasi_fd_fdstat_get(uint32_t fd, eosio::vm::argument_proxy<uint32_t*> stat_ptr)
+      {
+         // Write a minimal fdstat struct: filetype=CHARACTER_DEVICE, flags=APPEND, rights=READ|WRITE
+         auto* mem = backend.backend->get_context().linear_memory();
+         auto* stat = reinterpret_cast<uint8_t*>(mem + *stat_ptr);
+         std::memset(stat, 0, 24);  // sizeof(__wasi_fdstat_t) = 24
+         stat[0] = 2;              // fs_filetype = CHARACTER_DEVICE
+         // fs_flags at offset 2 = APPEND (1)
+         stat[2] = 1;
+         // fs_rights_base at offset 8 = FD_READ | FD_WRITE = 0x42
+         stat[8] = 0x42;
+         return 0;
+      }
+
       std::pair<CodeRow, DbId> getCode(AccountNumber service)
       {
          if (dbMode.isSubjective)
@@ -381,6 +396,11 @@ namespace psibase
       rhf_t::add<&ExecutionContextImpl::socketSend>("env", "socketSend");
       rhf_t::add<&ExecutionContextImpl::socketSetFlags>("env", "socketSetFlags");
       rhf_t::add<&ExecutionContextImpl::readFile>("env", "readFile");
+
+      // WASI polyfill: fd_fdstat_get is imported by Rust services compiled with
+      // wasi-sdk 29. Returns sensible defaults for stdin/stdout/stderr behavior.
+      rhf_t::add<&ExecutionContextImpl::wasi_fd_fdstat_get>("wasi_snapshot_preview1",
+                                                            "fd_fdstat_get");
    }
 
    std::uint32_t ExecutionContext::remainingStack() const

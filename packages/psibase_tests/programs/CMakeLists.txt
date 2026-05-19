@@ -1,6 +1,7 @@
 function(add suffix)
     add_executable(generate_verify_with_call${suffix} generate_verify_with_call.cpp)
-    target_link_libraries(generate_verify_with_call${suffix} services_system${suffix} services_user${suffix} services_test psitestlib${suffix})
+    target_link_libraries(generate_verify_with_call${suffix} services_system${suffix} services_user${suffix} services_test psitestlib${suffix}
+        -Wl,--whole-archive psibase-service-wasi-polyfill${suffix} -Wl,--no-whole-archive)
     set_target_properties(generate_verify_with_call${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add)
 

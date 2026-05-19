@@ -1,7 +1,8 @@
 use std::ptr::{null, null_mut};
 use wasi::{
-    Ciovec, Exitcode, Fd, Fdflags, Filedelta, Filesize, Lookupflags, Oflags, Prestat, Rights, Size,
-    ERRNO_BADF, ERRNO_INVAL, PREOPENTYPE_DIR,
+    Ciovec, Exitcode, Fd, Fdflags, Fdstat, Filedelta, Filesize, Lookupflags, Oflags, Prestat,
+    Rights, Size, ERRNO_BADF, ERRNO_INVAL, FDFLAGS_APPEND, FILETYPE_CHARACTER_DEVICE,
+    PREOPENTYPE_DIR, RIGHTS_FD_READ, RIGHTS_FD_WRITE,
 };
 
 type Errno = u16;
@@ -120,6 +121,15 @@ pub unsafe extern "C" fn fd_write(
         iovs = iovs.offset(1);
         iovs_len -= 1;
     }
+    0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn fd_fdstat_get(fd: Fd, buf: *mut Fdstat) -> Errno {
+    (*buf).fs_filetype = FILETYPE_CHARACTER_DEVICE;
+    (*buf).fs_flags = FDFLAGS_APPEND;
+    (*buf).fs_rights_base = RIGHTS_FD_READ | RIGHTS_FD_WRITE;
+    (*buf).fs_rights_inheriting = 0;
     0
 }
 
