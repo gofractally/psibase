@@ -6,7 +6,7 @@ function(service name suffix)
     target_link_libraries(${name}${suffix} services_system${suffix} services_user${suffix} services_test psibase-service-simple-malloc${suffix} )
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
     if(TEST_GENERATE_SCHEMA)
-        psibase_schema(${name}${suffix})
+        psibase_schema(${name}${suffix} OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
     endif()
 endfunction()
 
