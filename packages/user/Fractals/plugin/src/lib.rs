@@ -90,19 +90,19 @@ impl AdminFractal for FractallyPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(None)]
+    #[psibase_plugin::authorized(High)]
     fn init_token() -> Result<(), Error> {
         Fractals::add_to_tx().init_token();
         Ok(())
     }
 
-    #[psibase_plugin::authorized(None)]
+    #[psibase_plugin::authorized(High)]
     fn exile_member(member: String) -> Result<(), Error> {
         Fractals::add_to_tx().exile_member(member.parse().unwrap());
         Ok(())
     }
 
-    #[psibase_plugin::authorized(None)]
+    #[psibase_plugin::authorized(High)]
     fn set_dist_interval(distribution_interval_secs: u32) -> Result<(), Error> {
         Fractals::add_to_tx().set_dist_int(distribution_interval_secs);
         Ok(())
