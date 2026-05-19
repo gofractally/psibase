@@ -183,10 +183,11 @@ pub mod Service {
     fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
         unimplemented!()
     }
+
     /// Set genesis time for a fractal
     ///
-    /// # Arguments
-    /// * `genesis_time` - New genesis time for the fractal.
+    /// Genesis time sets the starting point of when token rewards can be claimed.
+    /// Subsequent claims are according to the distribution interval set for the fractal.
     #[action]
     fn set_gen_time(genesis_time: u64) {
         unimplemented!()

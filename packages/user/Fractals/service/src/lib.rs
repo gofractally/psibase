@@ -127,12 +127,14 @@ pub mod service {
 
     /// Set genesis time for a fractal
     ///
+    /// Genesis time sets the starting point of when token rewards can be claimed.
+    /// Subsequent claims are according to the distribution interval set for the fractal.
+    ///
     /// # Arguments
     /// * `genesis_time` - New genesis time for the fractal.
     #[action]
     fn set_gen_time(genesis_time: u64) {
-        let mut fractal = Fractal::by_sender();
-        fractal.set_genesis_time(TimePointSec::from(genesis_time as i64));
+        Fractal::by_sender().set_genesis_time(TimePointSec::from(genesis_time as i64));
     }
 
     /// Set distribution strategy
