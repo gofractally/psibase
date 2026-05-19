@@ -6,6 +6,7 @@ import {
 } from "@shared/shadcn/ui/dialog";
 import { Button } from '@shared/shadcn/ui/button';
 import { useInitToken } from "@/hooks/fractals/use-init-token";
+import { invalidateFractal } from "@/hooks/fractals/use-fractal";
 
 export const InitTokenModal = ({
     show,
@@ -14,7 +15,10 @@ export const InitTokenModal = ({
     show: boolean;
     openChange: (show: boolean) => void;
 }) => {
-    const { mutateAsync: intialiseToken, isPending: isLoading } = useInitToken();
+    const { mutateAsync: intialiseToken, isPending: isLoading } = useInitToken(() => {
+        invalidateFractal();
+        openChange(false);
+    });
 
     return (
         <Dialog open={show} onOpenChange={openChange}>
