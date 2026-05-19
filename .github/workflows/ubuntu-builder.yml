@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404","2604"]' || '["2204","2604"]') }}
+        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404","2604"]' || '["2204"]') }}
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
