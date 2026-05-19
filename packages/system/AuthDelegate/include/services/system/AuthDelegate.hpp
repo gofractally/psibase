@@ -41,7 +41,7 @@ namespace SystemService
       /// transaction.
       ///
       /// This action forwards verification to the owning account
-      void checkAuthSys(std::uint32_t               flags,
+      bool checkAuthSys(std::uint32_t               flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
