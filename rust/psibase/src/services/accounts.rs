@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 pub struct Account {
     pub accountNum: AccountNumber,
     pub authService: AccountNumber,
+    pub authSequence: u64,
 }
 
 #[crate::service(name = "accounts", dispatch = false, psibase_mod = "crate")]
@@ -49,6 +50,11 @@ mod service {
 
     #[action]
     fn getAuthOf(account: AccountNumber) -> AccountNumber {
+        unimplemented!()
+    }
+
+    #[action]
+    fn incAuthSeq(num: AccountNumber) {
         unimplemented!()
     }
 }
