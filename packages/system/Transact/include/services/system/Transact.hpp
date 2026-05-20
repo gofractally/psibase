@@ -121,9 +121,7 @@ namespace SystemService
       /// * `allowedActions`: Argument from `runAs`
       /// * `claims`:         Claims in transaction (e.g. public keys).
       ///                     Empty if `runAs`
-      //
-      // TODO: return error message instead?
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,

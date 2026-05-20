@@ -1544,9 +1544,12 @@ std::optional<HttpReply> RTransact::serveSys(const psibase::HttpRequest&  reques
             return make404("Account not found");
          Actor<AuthInterface> auth(RTransact::service, account->authService);
          auto                 flags = AuthInterface::topActionReq | AuthInterface::firstAuthFlag;
-         auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
-                           ServiceMethod{AccountNumber{}, MethodNumber{}},
-                           std::vector<ServiceMethod>{}, claims);
+         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, sender,
+                                ServiceMethod{AccountNumber{}, MethodNumber{}},
+                                std::vector<ServiceMethod>{}, claims))
+         {
+            return make400("Login failed");
+         }
          // Construct token
          auto exp = std::chrono::time_point_cast<std::chrono::seconds>(
              std::chrono::system_clock::now() + std::chrono::days(30));

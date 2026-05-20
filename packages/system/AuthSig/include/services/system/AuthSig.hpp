@@ -50,7 +50,7 @@ namespace SystemService
          /// transaction.
          ///
          /// This action verifies that the transaction contains a claim for the user's public key.
-         void checkAuthSys(uint32_t                    flags,
+         bool checkAuthSys(uint32_t                    flags,
                            psibase::AccountNumber      requester,
                            psibase::AccountNumber      sender,
                            ServiceMethod               action,

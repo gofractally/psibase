@@ -24,7 +24,7 @@ namespace SystemService
          return lhs.size() == rhs.size() && std::memcmp(lhs.data(), rhs.data(), lhs.size()) == 0;
       }
 
-      void AuthSig::checkAuthSys(uint32_t                    flags,
+      bool AuthSig::checkAuthSys(uint32_t                    flags,
                                  psibase::AccountNumber      requester,
                                  psibase::AccountNumber      sender,
                                  ServiceMethod               action,
@@ -33,9 +33,9 @@ namespace SystemService
       {
          auto type = flags & AuthInterface::requestMask;
          if (type == AuthInterface::runAsRequesterReq)
-            return;  // Request is valid
+            return true;  // Request is valid
          else if (type == AuthInterface::runAsMatchedReq)
-            return;  // Request is valid
+            return true;  // Request is valid
          else if (type == AuthInterface::runAsMatchedExpandedReq)
             abortMessage("runAs: caller attempted to expand powers");
          else if (type == AuthInterface::runAsOtherReq)
@@ -62,14 +62,10 @@ namespace SystemService
                // other errors when appropriate.
                if ((flags & AuthInterface::firstAuthFlag) && &claim != &claims[0])
                   abortMessage("first sender is not verified by first signature");
-               return;
+               return true;
             }
          }
-         auto fingerprint = keyFingerprint(row->pubkey);
-         auto hex         = psio::hex(fingerprint.data(), fingerprint.data() + 32);
-         abortMessage("transaction does not include a claim for the key " + hex +
-                      " needed to authenticate sender " + sender.str() + " for action " +
-                      action.service.str() + "::" + action.method.str());
+         return false;
       }
 
       void AuthSig::canAuthUserSys(psibase::AccountNumber user)

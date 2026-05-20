@@ -368,7 +368,7 @@ fn apply_packages<
             ));
             let mut account_actions = vec![];
             package
-                .install_accounts(&mut account_actions, Some(&mut uploader), sender, &None)
+                .install_accounts(&mut account_actions, Some(&mut uploader), sender)
                 .map_err(|e| ErrorType::PackageFormatError(e.to_string()))?;
             out.push_all(account_actions).unwrap();
             let mut actions = vec![];
