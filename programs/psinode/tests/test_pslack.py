@@ -56,7 +56,7 @@ class TestPslack(unittest.TestCase):
     def _boot_with_pslack(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
         a.boot(packages=['Minimal', 'Explorer', 'TokenUsers', 'AuthSig'])
-        a.install_local(['XPSlack'])
+        a.install_local(['XWebRtcSig'])
         a.wait(new_block())
         return a
 

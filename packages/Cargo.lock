@@ -4356,14 +4356,28 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1",
- "x-pslack-pkg",
+ "x-webrtc-sig-pkg",
 ]
 
 [[package]]
-name = "x-pslack-pkg"
+name = "x-webrtc-sig-pkg"
 version = "0.23.0"
 dependencies = [
  "x-pslack",
+ "x-webrtcsig",
+]
+
+[[package]]
+name = "x-webrtcsig"
+version = "0.23.0"
+dependencies = [
+ "base64 0.22.1",
+ "psibase",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "sha1",
+ "x-webrtc-sig-pkg",
 ]
 
 [[package]]

@@ -483,6 +483,12 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
+    OUTPUT ${SERVICE_DIR}/Chat.psi
+    PATH packages/user/Chat
+    TARGET_DIR ${USER_WORKSPACE_TARGET}
+)
+
+cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/Symbol.psi
     PATH packages/user/Symbol
     TARGET_DIR ${USER_WORKSPACE_TARGET}
@@ -607,8 +613,8 @@ cargo_psibase_package(
 )
 
 cargo_psibase_package(
-    OUTPUT ${SERVICE_DIR}/XPSlack.psi
-    PATH packages/local/XPSlack
+    OUTPUT ${SERVICE_DIR}/XWebRtcSig.psi
+    PATH packages/local/XWebRtcSig
     TARGET_DIR ${LOCAL_WORKSPACE_TARGET}
 )
 
@@ -1224,7 +1230,7 @@ psibase_package(
     NAME DevDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail Chat ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
@@ -1234,7 +1240,7 @@ psibase_package(
     NAME ProdDefault
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Network initializes with production-ready apps, secure authentication, and no governance."
-    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
+    PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail Chat ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Explorer Fractals FractalCore Guilds Homepage Host HttpServer Invite Kdf Nft Packages Permissions Producers Profiles Registry
                     Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
@@ -1270,7 +1276,7 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Default set of local packages to install on a new server"
     LOCAL
-    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XPSlack XRun XSites XTimer XTransact
+    PACKAGE_DEPENDS XHttp XAdmin XDb XPackages XPeers XRun XSites XTimer XTransact XWebRtcSig
 )
 
 function(write_package_index target dir)
@@ -1287,10 +1293,10 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail Chat ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
-    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XPSlack XPSlack XProxy XRun XSites XTimer XTransact)
+    XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact XWebRtcSig)
 
 install(
     FILES ${SERVICE_DIR}/index.json
@@ -1308,6 +1314,7 @@ install(
           ${SERVICE_DIR}/BrotliCodec.psi
           ${SERVICE_DIR}/BrotliSvc.psi
           ${SERVICE_DIR}/Chainmail.psi
+          ${SERVICE_DIR}/Chat.psi
           ${SERVICE_DIR}/ClientData.psi
           ${SERVICE_DIR}/CommonApi.psi
           ${SERVICE_DIR}/Credentials.psi
@@ -1369,7 +1376,7 @@ install(
           ${SERVICE_DIR}/XHttp.psi
           ${SERVICE_DIR}/XPackages.psi
           ${SERVICE_DIR}/XPeers.psi
-          ${SERVICE_DIR}/XPSlack.psi
+          ${SERVICE_DIR}/XWebRtcSig.psi
           ${SERVICE_DIR}/XProxy.psi
           ${SERVICE_DIR}/XRun.psi
           ${SERVICE_DIR}/XSites.psi

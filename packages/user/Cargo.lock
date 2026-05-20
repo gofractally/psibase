@@ -585,6 +585,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "chat"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "chat-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "chat-pkg"
+version = "0.23.0"
+dependencies = [
+ "chat",
+ "chat-plugin",
+ "r-chat",
+]
+
+[[package]]
+name = "chat-plugin"
+version = "0.23.0"
+dependencies = [
+ "chat",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.42"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2936,6 +2971,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce25767e7b499d1b604768e7cde645d14cc8584231ea6b295e9c9eb22c02e1d1"
 dependencies = [
  "proc-macro2",
+]
+
+[[package]]
+name = "r-chat"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "chat",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

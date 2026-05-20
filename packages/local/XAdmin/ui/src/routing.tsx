@@ -43,9 +43,9 @@ export const routes = [
         element: <PeersPage />,
     },
     {
-        name: "Pslack",
+        name: "Chat",
         icon: Video,
-        path: "pslack",
+        path: "chat-openrelay",
         element: <PslackOpenRelayPage />,
     },
     {

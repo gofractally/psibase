@@ -75,6 +75,7 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_websocket)
     add_psinode_test(test_pslack)
     add_psinode_test(test_pslack_call)
+    add_psinode_test(test_xwebrtcsig)
     add_psinode_test(test_timer)
 endif()
 

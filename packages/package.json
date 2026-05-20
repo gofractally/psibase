@@ -14,6 +14,7 @@
             "system/Producers/ui",
             "user/Supervisor/ui",
             "user/Branding/ui",
+            "user/Chat/ui",
             "user/Explorer/ui",
             "user/Evaluations/ui",
             "user/Config/ui",
