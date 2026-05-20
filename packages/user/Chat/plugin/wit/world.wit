@@ -1,0 +1,13 @@
+package chat:plugin;
+
+interface api {
+    use host:types/types.{error};
+
+    ensure-space: func(members: list<string>) -> result<_, error>;
+    ensure-dm: func(contact: string) -> result<_, error>;
+    ensure-group: func(other-members: list<string>) -> result<_, error>;
+}
+
+world imports {
+    import api;
+}

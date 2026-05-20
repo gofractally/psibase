@@ -3,8 +3,8 @@ import { z } from "zod";
 import { zAccount } from "@shared/lib/schemas/account";
 
 import { chainMailConfig } from "./apps/chainmail";
+import { chatConfig } from "./apps/chat";
 import { contactsConfig } from "./apps/contacts";
-import { pslackConfig } from "./apps/pslack";
 import { tokenSwapConfig } from "./apps/token-swap";
 import { tokensConfig } from "./apps/tokens";
 
@@ -17,6 +17,7 @@ export const AppConfig = z.object({
     description: z.string(),
     isLoginRequired: z.boolean(),
     showLoginLoadingSpinner: z.boolean(),
+    href: z.string().url().optional(),
     children: z.array(
         z.object({
             path: z.string(),
@@ -35,5 +36,5 @@ export const configuredApps: AppConfigType[] = [
     tokenSwapConfig,
     chainMailConfig,
     contactsConfig,
-    pslackConfig,
+    chatConfig,
 ].map((config) => AppConfig.parse(config));

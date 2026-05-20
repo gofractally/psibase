@@ -769,7 +769,8 @@ namespace LocalService
 
    std::string XAdmin::pslackTurnIceServersJson()
    {
-      check(getSender() == psibase::AccountNumber{"x-pslack"}, "Wrong sender");
+      const auto sender = getSender();
+      check(sender == psibase::AccountNumber{"x-webrtcsig"}, "Wrong sender");
       std::optional<std::string> json;
       PSIBASE_SUBJECTIVE_TX
       {
@@ -901,7 +902,7 @@ namespace LocalService
                    .body        = toVec("Content-Type must be application/json\n"),
                };
             }
-            auto               obj = psio::convert_from_json<psio::json::any_object>(
+            auto obj = psio::convert_from_json<psio::json::any_object>(
                 std::string(req.body.begin(), req.body.end()));
             PslackOpenRelayRow row{};
             PSIBASE_SUBJECTIVE_TX

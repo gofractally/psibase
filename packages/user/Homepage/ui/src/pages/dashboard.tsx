@@ -1,5 +1,13 @@
 import { motion } from "framer-motion";
-import { Book, BookUser, Coins, Mail, MoveRight, ArrowRightLeft, } from "lucide-react";
+import {
+    ArrowRightLeft,
+    Book,
+    BookUser,
+    Coins,
+    Mail,
+    MessagesSquare,
+    MoveRight,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -46,6 +54,12 @@ const apps: App[] = [
         description: "Add and manage contacts.",
         icon: <BookUser className="h-6 w-6" />,
         service: zAccount.parse("contacts"),
+    },
+    {
+        title: "Chat",
+        description: "Direct and group chat.",
+        icon: <MessagesSquare className="h-6 w-6" />,
+        service: zAccount.parse("chat"),
     },
     {
         title: "Doc",

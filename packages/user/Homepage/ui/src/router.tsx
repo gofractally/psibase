@@ -16,14 +16,16 @@ export default createBrowserRouter([
                 path: "/",
                 element: <Dashboard />,
             },
-            ...configuredApps.map((app) => ({
-                path: app.service,
-                element: app.element,
-                children: app.children.map((child) => ({
-                    path: child.path,
-                    element: child.element,
+            ...configuredApps
+                .filter((app) => !app.href && app.children.length > 0)
+                .map((app) => ({
+                    path: app.service,
+                    element: app.element,
+                    children: app.children.map((child) => ({
+                        path: child.path,
+                        element: child.element,
+                    })),
                 })),
-            })),
             {
                 path: "invite",
                 element: <Invite />,
