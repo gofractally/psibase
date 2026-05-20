@@ -15,9 +15,6 @@ const zGuildInviteDetailsResponse = z.object({
                     account: zAccount,
                     bio: z.string(),
                     displayName: z.string(),
-                    fractal: z.object({
-                        name: z.string(),
-                    }),
                 }),
             })
             .nullable(),
@@ -26,7 +23,7 @@ const zGuildInviteDetailsResponse = z.object({
 
 export const getGuildInvite = async (inviteId: number) => {
     const response = await postGraphQLGetJson(
-        siblingUrl(undefined, "fractals", "graphql"),
+        siblingUrl(undefined, "guilds", "graphql"),
         `
         {
             guildInvite(id: ${inviteId}) {
@@ -35,9 +32,6 @@ export const getGuildInvite = async (inviteId: number) => {
                     account
                     bio
                     displayName
-                    fractal {
-                        name
-                    }
                 }
                 inviter
             }

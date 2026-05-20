@@ -150,10 +150,6 @@ impl Intf for TransactPlugin {
             return flush_propose_latch();
         };
 
-        if accounts::plugin::api::get_account(&acct)?.is_none() {
-            return Err(InvalidAccount(&acct).into());
-        }
-
         if let Some(existing) = ProposeLatch::subsequent_action_sender() {
             if existing == acct {
                 return Ok(());

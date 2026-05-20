@@ -15,7 +15,7 @@ use regex::Regex;
 use sha2::{Digest, Sha256};
 
 pub fn validate_action_name(action_name: &str) -> Result<(), HostTypes::Error> {
-    let re = Regex::new(r"^[a-zA-Z0-9_]+$").unwrap();
+    let re = Regex::new(r"^([a-zA-Z0-9_]+|#[a-z]{16})$").unwrap();
     if re.is_match(action_name) {
         return Ok(());
     }

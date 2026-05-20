@@ -1,17 +1,13 @@
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account } from "@shared/lib/schemas/account";
-
-const FractalSchema = z.object({
-    account: z.string(),
-});
 
 const GuildSchema = z.object({
     account: z.string(),
     displayName: z.string(),
-    fractal: FractalSchema,
+    fractal: z.string(),
 });
 
 const NodeSchema = z.object({
@@ -23,28 +19,26 @@ const GuildMembershipsSchema = z.object({
 });
 
 const DataSchema = z.object({
-    guildMemberships: GuildMembershipsSchema,
+    memberships: GuildMembershipsSchema,
 });
 
 export const getGuildMemberships = async (member: Account) => {
     const res = await graphql(
         `
         {
-            guildMemberships(member:"${member}") {
+            memberships(member:"${member}") {
                 nodes {
                     guild {
                         account
                         displayName
-                        fractal {
-                            account
-                        }
+                        fractal
                     }
                 }
             }
         }
     `,
-        { service: FRACTALS_SERVICE },
+        { service: GUILDS_SERVICE },
     );
 
-    return DataSchema.parse(res).guildMemberships.nodes;
+    return DataSchema.parse(res).memberships.nodes;
 };
