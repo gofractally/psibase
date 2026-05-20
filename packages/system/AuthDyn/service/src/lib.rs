@@ -123,7 +123,10 @@ pub mod service {
         _allowedActions: Vec<ServiceMethod>,
         _claims: Vec<Claim>,
     ) -> bool {
-        abort_message("This account can only be exercised through staged transactions.")
+        abort_message(&format!(
+            "Account {} can only be exercised through staged transactions.",
+            sender.to_string()
+        ))
     }
 
     #[action]
