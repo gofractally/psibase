@@ -24,7 +24,7 @@
         "service": "tokens",
         "method": "setUserConf",
         "data": {
-            "enabled": true,
+            "enable": true,
             "index": 0
         }
     },
@@ -33,7 +33,7 @@
         "service": "tokens",
         "method": "setUserConf",
         "data": {
-            "enabled": true,
+            "enable": true,
             "index": 0
         }
     },
@@ -48,23 +48,5 @@
         "service": "faucet-tok",
         "method": "dispense",
         "data": { "account": "bob" }
-    },
-    {
-        "sender": "alice",
-        "service": "tokens",
-        "method": "setUserConf",
-        "data": {
-            "enabled": false,
-            "index": 0
-        }
-    },
-    {
-        "sender": "bob",
-        "service": "tokens",
-        "method": "setUserConf",
-        "data": {
-            "enabled": false,
-            "index": 0
-        }
     }
 ]
