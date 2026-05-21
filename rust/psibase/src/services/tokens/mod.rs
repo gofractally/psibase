@@ -90,9 +90,8 @@ mod service {
 
     /// Credit tokens to a debitor (recipient).
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -112,9 +111,8 @@ mod service {
 
     /// Uncredit tokens that were credited into a shared balance
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -134,9 +132,8 @@ mod service {
 
     /// Debit tokens that were credited into a shared balance
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -228,7 +225,7 @@ mod service {
     ///                See `Configurations` for details
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token will be automatically debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -248,7 +245,7 @@ mod service {
     /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token will be automatically debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -267,7 +264,7 @@ mod service {
     ///                See `Configurations` for details
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token will be automatically debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -288,7 +285,7 @@ mod service {
     /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
     ///
     /// Configurations:
-    /// * 0: manual_debit       - If enabled, any credits of this token will be automatically debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -326,9 +323,8 @@ mod service {
 
     /// Rejects the shared balance between a creditor and a debitor
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `manual_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:

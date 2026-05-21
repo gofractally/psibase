@@ -339,9 +339,8 @@ pub mod service {
 
     /// Credit tokens to a debitor (recipient).
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `auto_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -371,9 +370,8 @@ pub mod service {
 
     /// Uncredit tokens that were credited into a shared balance
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `auto_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
@@ -404,9 +402,8 @@ pub mod service {
 
     /// Debit tokens that were credited into a shared balance
     ///
-    /// On credit, tokens are typically automatically debited by the debitor. However,
-    /// if the debitor has enabled `auto_debit`, then the tokens will be placed in an intermediate
-    /// "shared balance".
+    /// On credit, tokens are typically placed in the shared balance and debited by the debitor. However,
+    /// if the debitor has enabled `auto_debit`, then the tokens will be debited automatically.
     ///
     /// # Shared balance mechanics
     /// When in the shared balance, the tokens can be:
