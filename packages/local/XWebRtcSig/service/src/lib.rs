@@ -1,5 +1,8 @@
+pub mod cleanup;
+pub mod ice_config;
 pub mod protocol;
 pub mod state;
+pub mod trace;
 
 pub mod presence;
 pub mod signaling;
@@ -62,13 +65,20 @@ mod r_transact {
 #[psibase::service(name = "x-webrtcsig", tables = "state::tables")]
 #[allow(non_snake_case)]
 mod service {
+    use crate::ice_config::merged_ice_servers;
     use crate::protocol::{
-        encode_server_frame, merged_ice_servers, parse_client_frame, validate_client_frame,
-        ClientFrame, ProtocolError, ServerFrame, REALTIME_SUBPROTOCOL_V1,
+        decode_server_frame_json, encode_server_frame, parse_client_frame, validate_client_frame,
+        ClientFrame, ProtocolError, ServerFrame, WEBSOCKET_TEXT, REALTIME_SUBPROTOCOL_V1,
     };
-    use crate::presence::{connect_presence_fanout, disconnect_presence_fanout};
+    use crate::signaling::dispatch_signaling_client_frame;
     use crate::r_transact::Wrapper as RTransact;
-    use crate::state::{remove_socket_session, socket_session, store_client_ready, upsert_socket_session};
+    use crate::state::subjective::{
+        connect_presence_fanout_tx, disconnect_presence_fanout_tx,
+        enqueue_pending_outbound_frames_tx, remove_socket_session_tx, socket_session_tx,
+        store_client_ready_tx, sweep_stale_sessions_tx, take_pending_outbound_payloads_tx,
+        tear_down_signaling_for_dead_socket_tx, upsert_session_tx,
+    };
+    use crate::trace::xrtcsig_trace;
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     #[cfg(not(test))]
     use psibase::services::x_admin::Wrapper as XAdminWrapper;
@@ -80,7 +90,6 @@ mod service {
     use sha1::{Digest, Sha1};
 
     const BEARER_SUBPROTOCOL_PREFIX: &str = "psibase.bearer.";
-    const WEBSOCKET_TEXT: u32 = 1;
 
     fn plain_reply(status: u16, message: &str) -> HttpReply {
         HttpReply {
@@ -237,12 +246,35 @@ mod service {
         }
         #[cfg(not(test))]
         {
-            XAdminWrapper::call_from(account!("x-webrtcsig")).pslackTurnIceServersJson()
+            XAdminWrapper::call_from(account!("x-webrtcsig")).turnIceServersJson()
+        }
+    }
+
+    #[cfg_attr(not(feature = "rt-trace"), allow(dead_code))]
+    fn server_frame_kind(frame: &ServerFrame) -> &'static str {
+        match frame {
+            ServerFrame::Welcome { .. } => "welcome",
+            ServerFrame::Error { .. } => "error",
+            ServerFrame::SessionInvite { .. } => "sessionInvite",
+            ServerFrame::ParticipantJoined { .. } => "participantJoined",
+            ServerFrame::ParticipantState { .. } => "participantState",
+            ServerFrame::Signal { .. } => "signal",
+            ServerFrame::SessionEnded { .. } => "sessionEnded",
+            ServerFrame::Pong => "pong",
+            ServerFrame::PresenceSnapshot { .. } => "presenceSnapshot",
+            ServerFrame::Presence { .. } => "presence",
+            ServerFrame::SessionSnapshot { .. } => "sessionSnapshot",
+            ServerFrame::TransportLost { .. } => "transportLost",
         }
     }
 
     fn send_frame(socket: i32, frame: &ServerFrame) {
         let payload = encode_server_frame(frame).expect("server frame must serialize");
+        xrtcsig_trace!(
+            "[xrtcsig-trace] send sock={} kind={}\n",
+            socket,
+            server_frame_kind(frame),
+        );
         XHttp::call().send(socket, payload.into_bytes(), WEBSOCKET_TEXT);
     }
 
@@ -254,6 +286,9 @@ mod service {
                 user: user.into(),
                 server_time,
                 ice_servers,
+                // Plan B #6: active_sessions hint is added in B5; cold-start
+                // welcome leaves it None.
+                active_sessions: None,
             },
         );
     }
@@ -264,73 +299,95 @@ mod service {
             &ServerFrame::Error {
                 code: err.code().into(),
                 reason: err.reason(),
+                session_id: None,
             },
         );
     }
 
-    fn subjective_socket_session(socket: i32) -> Option<crate::state::tables::SocketSessionRow> {
-        ::psibase::subjective_tx! {
-            socket_session(socket)
+    fn send_sweep_frames(now: i64) {
+        let frames = sweep_stale_sessions_tx(now);
+        enqueue_peer_outbound_frames(now, frames);
+    }
+
+    /// Deliver any server frames queued for this socket on a prior recv where
+    /// inline peer fanout would have aborted the action.
+    fn flush_pending_outbound_for_socket(socket: i32) {
+        for payload in take_pending_outbound_payloads_tx(socket) {
+            let Ok(frame) = decode_server_frame_json(&payload) else {
+                continue;
+            };
+            send_frame(socket, &frame);
         }
     }
 
-    fn subjective_upsert_session(socket: i32, user: AccountNumber, now: i64) {
-        ::psibase::subjective_tx! {
-            upsert_socket_session(socket, user, now);
+    /// Send frames for the requesting socket immediately; queue peer targets so
+    /// a dead peer socket cannot abort before the joiner receives its response.
+    fn deliver_signaling_frames(requesting_socket: i32, frames: Vec<(i32, ServerFrame)>, now: i64) {
+        let mut to_peers = Vec::new();
+        for (target_socket, frame) in frames {
+            if target_socket == requesting_socket {
+                send_frame(requesting_socket, &frame);
+            } else {
+                to_peers.push((target_socket, frame));
+            }
         }
+        enqueue_peer_outbound_frames(now, to_peers);
     }
 
-    fn subjective_store_client_ready(
-        socket: i32,
-        now: i64,
-        client_instance_id: String,
-        active: bool,
-        visible: bool,
-        supports: crate::protocol::ClientSupports,
-    ) -> bool {
-        ::psibase::subjective_tx! {
-            let ok = store_client_ready(
-                socket,
-                now,
-                &client_instance_id,
-                active,
-                visible,
-                &supports,
-            );
-            ok
+    fn enqueue_peer_outbound_frames(now: i64, frames: Vec<(i32, ServerFrame)>) {
+        if frames.is_empty() {
+            return;
         }
-    }
-
-    fn subjective_connect_presence_fanout(user: AccountNumber) -> crate::presence::ConnectPresenceFanout {
-        ::psibase::subjective_tx! {
-            let fanout = connect_presence_fanout(user);
-            fanout
-        }
-    }
-
-    fn subjective_disconnect_presence_fanout(
-        user: AccountNumber,
-        was_final_socket: bool,
-    ) -> crate::presence::DisconnectPresenceFanout {
-        ::psibase::subjective_tx! {
-            let fanout = disconnect_presence_fanout(user, was_final_socket);
-            fanout
-        }
-    }
-
-    fn subjective_remove_socket_session(socket: i32) -> Option<crate::state::RemovedSocket> {
-        ::psibase::subjective_tx! {
-            let removed = remove_socket_session(socket);
-            removed
-        }
+        enqueue_pending_outbound_frames_tx(frames, now);
     }
 
     fn handle_socket_cleanup(socket: i32) {
-        let removed = subjective_remove_socket_session(socket);
+        let now = Transact::call().currentBlock().time.microseconds;
+        // Drain ALL subjective state first (each call commits its own
+        // subjective_tx). Doing all writes before any sends prevents zombie
+        // rows from leaking into UserSessionTable / SocketSessionTable when a
+        // later `send_frame` aborts on a peer socket whose tcp already died.
+        let tear_down_frames = tear_down_signaling_for_dead_socket_tx(socket, now);
+        let removed = remove_socket_session_tx(socket);
+        let disconnect_fanout = removed.as_ref().map(|r| {
+            disconnect_presence_fanout_tx(r.user, r.was_final_socket())
+        });
+
+        #[cfg(feature = "rt-trace")]
+        {
+            let teardown_targets: Vec<i32> =
+                tear_down_frames.iter().map(|(s, _)| *s).collect();
+            xrtcsig_trace!(
+                "[xrtcsig-trace] cleanup-tear-down sock={} teardown_targets={:?}\n",
+                socket,
+                teardown_targets,
+            );
+        }
+        for (peer_socket, frame) in tear_down_frames {
+            send_frame(peer_socket, &frame);
+        }
+
         let Some(removed) = removed else {
+            xrtcsig_trace!("[xrtcsig-trace] cleanup-no-row sock={}\n", socket);
             return;
         };
-        let fanout = subjective_disconnect_presence_fanout(removed.user, removed.was_final_socket());
+        #[cfg(not(feature = "rt-trace"))]
+        let _ = &removed;
+        let Some(fanout) = disconnect_fanout else {
+            return;
+        };
+        #[cfg(feature = "rt-trace")]
+        {
+            let disconnect_targets: Vec<i32> =
+                fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
+            xrtcsig_trace!(
+                "[xrtcsig-trace] cleanup-disconnect sock={} user={} final={} disconnect_targets={:?}\n",
+                socket,
+                removed.user,
+                removed.was_final_socket(),
+                disconnect_targets,
+            );
+        }
         for (peer_socket, frame) in fanout.peer_deltas {
             send_frame(peer_socket, &frame);
         }
@@ -371,13 +428,26 @@ mod service {
             MethodNumber::from("close"),
         );
         let now = Transact::call().currentBlock().time.microseconds;
-        subjective_upsert_session(socket, user, now);
+        upsert_session_tx(socket, user, now);
         send_welcome(socket, user, now);
-        let fanout = subjective_connect_presence_fanout(user);
-        send_frame(socket, &fanout.snapshot);
-        for (peer_socket, frame) in fanout.peer_deltas {
-            send_frame(peer_socket, &frame);
+        let fanout = connect_presence_fanout_tx(user);
+        #[cfg(feature = "rt-trace")]
+        {
+            let peer_targets: Vec<i32> =
+                fanout.peer_deltas.iter().map(|(s, _)| *s).collect();
+            xrtcsig_trace!(
+                "[xrtcsig-trace] accept sock={} user={} peer_delta_targets={:?}\n",
+                socket,
+                user,
+                peer_targets,
+            );
         }
+        send_frame(socket, &fanout.snapshot);
+        enqueue_peer_outbound_frames(now, fanout.peer_deltas);
+        // Sweep after responding to the new connection so a dead peer socket
+        // cannot abort before welcome / presence delivery.
+        send_sweep_frames(now);
+        flush_pending_outbound_for_socket(socket);
         None
     }
 
@@ -398,8 +468,8 @@ mod service {
             return;
         }
 
-        let session = subjective_socket_session(socket);
-        let Some(_session) = session else {
+        let session = socket_session_tx(socket);
+        let Some(session) = session else {
             send_protocol_error(
                 socket,
                 ProtocolError::InvalidFrame("socket is not an active x-webrtcsig session".into()),
@@ -421,6 +491,25 @@ mod service {
         }
 
         let now = Transact::call().currentBlock().time.microseconds;
+        let user = session.user;
+
+        #[cfg(feature = "rt-trace")]
+        let frame_kind: &'static str = match &frame {
+            ClientFrame::ClientReady { .. } => "clientReady",
+            ClientFrame::Ping => "ping",
+            ClientFrame::JoinSession { .. } => "joinSession",
+            ClientFrame::Signal { .. } => "signal",
+            ClientFrame::LeaveSession { .. } => "leaveSession",
+            ClientFrame::ParticipantState { .. } => "participantState",
+        };
+        #[cfg(feature = "rt-trace")]
+        xrtcsig_trace!(
+            "[xrtcsig-trace] recv sock={} user={} frame={}\n",
+            socket,
+            user,
+            frame_kind,
+        );
+
         match frame {
             ClientFrame::ClientReady {
                 client_instance_id,
@@ -428,7 +517,7 @@ mod service {
                 visible,
                 supports,
             } => {
-                if !subjective_store_client_ready(
+                if !store_client_ready_tx(
                     socket,
                     now,
                     client_instance_id,
@@ -442,9 +531,37 @@ mod service {
                             "socket is not an active x-webrtcsig session".into(),
                         ),
                     );
+                } else {
+                    send_sweep_frames(now);
+                    flush_pending_outbound_for_socket(socket);
                 }
             }
-            ClientFrame::Ping => send_frame(socket, &ServerFrame::Pong),
+            ClientFrame::Ping => {
+                send_frame(socket, &ServerFrame::Pong);
+                send_sweep_frames(now);
+                flush_pending_outbound_for_socket(socket);
+            }
+            session_frame => {
+                let dispatch =
+                    dispatch_signaling_client_frame(socket, user, now, session_frame);
+                #[cfg(feature = "rt-trace")]
+                {
+                    let dispatch_targets: Vec<i32> =
+                        dispatch.frames.iter().map(|(s, _)| *s).collect();
+                    xrtcsig_trace!(
+                        "[xrtcsig-trace] recv-dispatch sock={} user={} frame={} targets={:?}\n",
+                        socket,
+                        user,
+                        frame_kind,
+                        dispatch_targets,
+                    );
+                }
+                deliver_signaling_frames(socket, dispatch.frames, now);
+                // Run stale-session sweep after the requesting socket has been
+                // answered — same ordering contract as handle_socket_cleanup.
+                send_sweep_frames(now);
+                flush_pending_outbound_for_socket(socket);
+            }
         }
     }
 
@@ -611,7 +728,8 @@ mod tests {
         let frame = ServerFrame::Welcome {
             user: "alice".parse().unwrap(),
             server_time: 1,
-            ice_servers: super::protocol::default_stun_ice_server_configs(),
+            ice_servers: super::ice_config::default_stun_ice_server_configs(),
+            active_sessions: None,
         };
         let json = encode_server_frame(&frame).unwrap();
         assert!(json.contains(r#""t":"welcome""#));

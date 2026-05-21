@@ -48,8 +48,107 @@ pub mod tables {
         pub space_uuid: String,
         pub members: Vec<AccountNumber>,
     }
+
+    #[table(name = "SessionTable", index = 3)]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, ToSchema, Serialize, Deserialize)]
+    pub struct SessionRow {
+        #[primary_key]
+        pub session_id: String,
+        pub space_uuid: String,
+        pub purpose: String,
+        pub lifecycle: u8,
+        pub created_at: i64,
+        pub expires_at: i64,
+        pub created_by: AccountNumber,
+    }
+
+    impl SessionRow {
+        #[secondary_key(1)]
+        fn by_space_purpose(&self) -> (String, String) {
+            (self.space_uuid.clone(), self.purpose.clone())
+        }
+    }
+
+    #[table(name = "SessionParticipantTable", index = 4)]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, ToSchema, Serialize, Deserialize)]
+    pub struct SessionParticipantRow {
+        pub session_id: String,
+        pub participant: AccountNumber,
+    }
+
+    impl SessionParticipantRow {
+        #[primary_key]
+        fn pk(&self) -> (String, AccountNumber) {
+            (self.session_id.clone(), self.participant)
+        }
+    }
+
+    #[table(name = "SessionEventTable", index = 5)]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, ToSchema, Serialize, Deserialize)]
+    pub struct SessionEventRow {
+        pub session_id: String,
+        pub kind: u8,
+        pub account: AccountNumber,
+        pub reason: String,
+        pub at: i64,
+    }
+
+    impl SessionEventRow {
+        #[primary_key]
+        fn pk(&self) -> (String, i64, u8, AccountNumber) {
+            (
+                self.session_id.clone(),
+                self.at,
+                self.kind,
+                self.account,
+            )
+        }
+    }
+
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct CallEvent {
+        pub space_uuid: String,
+        pub session_id: String,
+        pub kind: u8,
+        pub account: AccountNumber,
+        pub reason: String,
+        pub at: i64,
+    }
+
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct Session {
+        pub session_id: String,
+        pub space_uuid: String,
+        pub purpose: String,
+        pub participants: Vec<AccountNumber>,
+        pub lifecycle: u8,
+        pub expires_at: i64,
+        pub created_at: i64,
+    }
+
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct WebRtcSessionEvent {
+        pub session_id: String,
+        pub kind: u8,
+        pub account: AccountNumber,
+        pub reason: String,
+    }
+
+    #[derive(Default, Fracpack, ToSchema, SimpleObject, Serialize, Deserialize, Debug, Clone)]
+    pub struct SessionJoinAuth {
+        pub session_id: String,
+        pub authorized: bool,
+        pub purpose: String,
+        pub space_uuid: String,
+        pub participants: Vec<AccountNumber>,
+        pub lifecycle: u8,
+        pub expires_at: i64,
+        pub expired: bool,
+    }
 }
 
+pub mod call_timeline;
+pub mod sessions;
 pub mod spaces;
 
 #[psibase::service(name = "chat", tables = "tables")]
@@ -58,7 +157,8 @@ pub mod service {
         dm_members, group_members, open_space, space_with_members, spaces_for_user,
         validate_group_members, SpaceError,
     };
-    use crate::tables::{InitRow, InitTable, Space};
+    use crate::sessions::{self, SessionError};
+    use crate::tables::{CallEvent, InitRow, InitTable, Session, SessionJoinAuth, Space, WebRtcSessionEvent};
     use psibase::services::transact::Wrapper as TransactSvc;
     use psibase::*;
 
@@ -74,6 +174,25 @@ pub mod service {
     fn abort_on_space_err(result: Result<(), SpaceError>) {
         if let Err(err) = result {
             abort_message(&err.message());
+        }
+    }
+
+    fn abort_on_session_err<T>(result: Result<T, SessionError>) -> T {
+        match result {
+            Ok(value) => value,
+            Err(err) => abort_message(&err.message()),
+        }
+    }
+
+    fn session_view(session: sessions::Session) -> Session {
+        Session {
+            session_id: session.session_id,
+            space_uuid: session.space_uuid,
+            purpose: session.purpose,
+            participants: session.participants,
+            lifecycle: session.lifecycle,
+            expires_at: session.expires_at,
+            created_at: session.created_at,
         }
     }
 
@@ -157,6 +276,101 @@ pub mod service {
             .into_iter()
             .map(space_with_members)
             .collect()
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn createSession(
+        space_uuid: String,
+        purpose: String,
+        participants: Vec<AccountNumber>,
+    ) -> Session {
+        let sender = get_sender();
+        let session = abort_on_session_err(sessions::create_session(
+            &space_uuid,
+            &purpose,
+            participants,
+            sender,
+            now_micros(),
+        ));
+        session_view(session)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn closeSession(session_id: String, reason: String) {
+        let sender = get_sender();
+        abort_on_session_err(sessions::close_session(
+            &session_id,
+            &reason,
+            sender,
+            now_micros(),
+        ));
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn webrtcSessionEvent(event: WebRtcSessionEvent) {
+        check(
+            get_sender() == account!("x-webrtcsig"),
+            "permission denied: webrtcSessionEvent only callable by x-webrtcsig",
+        );
+        abort_on_session_err(sessions::apply_webrtc_session_event(
+            sessions::WebRtcSessionEvent {
+                session_id: event.session_id,
+                kind: event.kind,
+                account: event.account,
+                reason: event.reason,
+            },
+            now_micros(),
+        ));
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn commitWebRtcSessionEvent(session_id: String, kind: u8, reason: String) {
+        let sender = get_sender();
+        abort_on_session_err(sessions::commit_webrtc_session_event(
+            &session_id,
+            kind,
+            sender,
+            &reason,
+            now_micros(),
+        ));
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getSession(session_id: String) -> Option<Session> {
+        sessions::session_row(&session_id).map(|row| session_view(sessions::session_to_view(row)))
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn isSessionParticipant(session_id: String, account: AccountNumber) -> bool {
+        sessions::is_session_participant(&session_id, account)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn getCallEvents(session_id: String) -> Vec<CallEvent> {
+        crate::call_timeline::call_events_for_session(&session_id)
+    }
+
+    #[action]
+    #[allow(non_snake_case)]
+    fn authorizeSessionJoin(session_id: String, account: AccountNumber) -> SessionJoinAuth {
+        let auth = sessions::authorize_session_join(&session_id, account, now_micros());
+        SessionJoinAuth {
+            session_id: auth.session_id,
+            authorized: auth.authorized,
+            purpose: auth.purpose,
+            space_uuid: auth.space_uuid,
+            participants: auth.participants,
+            lifecycle: auth.lifecycle,
+            expires_at: auth.expires_at,
+            expired: auth.expired,
+        }
     }
 }
 

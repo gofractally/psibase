@@ -1,6 +1,5 @@
 /** Browser getUserMedia helper for Meet / WebRTC paths. */
-
-export async function acquirePslackMeetLocalMedia(
+export async function acquireMeetLocalMedia(
     wantVideo: boolean,
     wantAudio: boolean,
 ): Promise<{ stream: MediaStream; videoDisabled: boolean }> {
@@ -22,3 +21,6 @@ export async function acquirePslackMeetLocalMedia(
         throw new Error("media_denied");
     }
 }
+
+/** @deprecated use acquireMeetLocalMedia (T-054 cutover) */
+export const acquirePslackMeetLocalMedia = acquireMeetLocalMedia;

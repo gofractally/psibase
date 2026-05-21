@@ -200,13 +200,7 @@ export function ConversationList({
             !isDmPeerInContacts(dmPeerAccount);
 
         return (
-            <div
-                className={cn(
-                    "hover:bg-muted/60 flex w-full items-center gap-2 rounded-sm pr-2",
-                    selectedConversationId === conv.conversationId &&
-                        "bg-muted",
-                )}
-            >
+            <div className="flex w-full items-center gap-2 rounded-sm pr-2">
                 <button
                     type="button"
                     onClick={() => onSelectConversation(conv.conversationId)}
@@ -220,13 +214,17 @@ export function ConversationList({
                             ? `, ${undeliveredByConversation[conv.conversationId]} undelivered`
                             : ""
                     }`}
-                    className="flex min-w-0 items-center gap-2 py-1.5 pl-3 text-left"
+                    className={cn(
+                        "hover:bg-muted/60 flex min-w-0 flex-1 items-center gap-2 rounded-sm py-1.5 pl-3 pr-2 text-left",
+                        selectedConversationId === conv.conversationId &&
+                            "bg-muted",
+                    )}
                 >
                     <Avatar
                         account={avatarAccount}
                         className="size-7 shrink-0"
                     />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                         <p className="truncate text-[14px] font-medium leading-snug">
                             {title}
                         </p>
@@ -236,11 +234,32 @@ export function ConversationList({
                             </p>
                         ) : null}
                     </div>
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                        {undeliveredByConversation[conv.conversationId] ? (
+                            <span
+                                className="inline-flex min-w-5 shrink-0 justify-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
+                                title={`${undeliveredByConversation[conv.conversationId]} undelivered recipients`}
+                            >
+                                !
+                            </span>
+                        ) : null}
+                        {unreadByConversation[conv.conversationId] ? (
+                            <span
+                                className="bg-primary text-primary-foreground inline-flex min-w-5 shrink-0 justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                                title={`${unreadByConversation[conv.conversationId]} new messages`}
+                            >
+                                {unreadByConversation[conv.conversationId]}
+                            </span>
+                        ) : null}
+                        {dmPresence !== null ? (
+                            <PresenceDot status={dmPresence} />
+                        ) : null}
+                    </div>
                 </button>
                 {showAddContact ? (
                     <button
                         type="button"
-                        className="text-muted-foreground/80 hover:text-foreground -ml-1 shrink-0 text-[12px] underline"
+                        className="text-muted-foreground/80 hover:text-foreground shrink-0 text-[12px] underline"
                         aria-label={`Add ${title} to Contacts`}
                         onClick={() => {
                             if (dmPeerAccount)
@@ -250,27 +269,6 @@ export function ConversationList({
                         Add
                     </button>
                 ) : null}
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                    {undeliveredByConversation[conv.conversationId] ? (
-                        <span
-                            className="inline-flex min-w-5 shrink-0 justify-center rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
-                            title={`${undeliveredByConversation[conv.conversationId]} undelivered recipients`}
-                        >
-                            !
-                        </span>
-                    ) : null}
-                    {unreadByConversation[conv.conversationId] ? (
-                        <span
-                            className="bg-primary text-primary-foreground inline-flex min-w-5 shrink-0 justify-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                            title={`${unreadByConversation[conv.conversationId]} new messages`}
-                        >
-                            {unreadByConversation[conv.conversationId]}
-                        </span>
-                    ) : null}
-                    {dmPresence !== null ? (
-                        <PresenceDot status={dmPresence} />
-                    ) : null}
-                </div>
             </div>
         );
     };
@@ -292,7 +290,7 @@ export function ConversationList({
                 >
                     {dms.length === 0 ? (
                         <p className="text-muted-foreground px-1 py-2 text-[14px]">
-                            None - click a Contact (below) to start.
+                            None — expand Contacts to start a new DM.
                         </p>
                     ) : (
                         dms.map((c) => {

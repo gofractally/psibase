@@ -22,6 +22,7 @@ import { TwoColumnSelect } from "@/apps/chat/components/two-column-select";
 import { NewContactDialog } from "@/apps/chat/contacts/components/new-contact-dialog";
 import { formatNames } from "@/apps/chat/contacts/utils/format-names";
 import { useChatSocket } from "@/apps/chat/hooks/use-chat-socket";
+import { useChatUrlSpaceSync } from "@/apps/chat/hooks/chat/use-chat-url-space-sync";
 
 import { Avatar } from "@shared/components/avatar";
 import { useContacts } from "@shared/hooks/use-contacts";
@@ -151,12 +152,15 @@ export const ChatPage = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: contactsData, isLoading: isLoadingContacts } =
         useContacts(currentUser);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const spaceFromUrl = searchParams.get("space") ?? undefined;
 
     const {
         connectionState,
         lastRealtimeError,
         presenceReady,
         lastInboundError,
+        pendingStorageQuotaExceeded,
         authLost,
         reconnectNow,
         selfAccount,
@@ -164,6 +168,8 @@ export const ChatPage = () => {
         conversations,
         selectedConversationId,
         setSelectedConversationId,
+        selectConversation,
+        composePendingDmPeer,
         selectedConversation,
         selectedTimeline,
         unreadByConversation,
@@ -180,25 +186,28 @@ export const ChatPage = () => {
         endPlaceholderCall,
         callLocalStream,
         callRemoteStream,
+        callRemoteStreamsByAccount,
         callAudioMuted,
         callVideoMuted,
         callRemoteAudioMuted,
         callRemoteVideoMuted,
+        callRemoteAvStateByAccount,
         callAudioOnlyFallback,
         toggleCallAudioMuted,
         toggleCallVideoMuted,
         composerDisabledReason,
-    } = useChatSocket();
+        threadEstablishingConnection,
+        composeSurfaceFocusKey,
+    } = useChatSocket({ urlConversationId: spaceFromUrl });
 
-    const [searchParams] = useSearchParams();
-    const spaceFromUrl = searchParams.get("space") ?? undefined;
-
-    useEffect(() => {
-        if (!spaceFromUrl) return;
-        if (conversations.some((c) => c.conversationId === spaceFromUrl)) {
-            setSelectedConversationId(spaceFromUrl);
-        }
-    }, [spaceFromUrl, conversations, setSelectedConversationId]);
+    useChatUrlSpaceSync({
+        spaceFromUrl,
+        selectedConversationId,
+        composePendingDmPeer,
+        setSelectedConversationId,
+        searchParams,
+        setSearchParams,
+    });
 
     const [sidebarKey, setSidebarKey] = useState<string | undefined>();
 
@@ -206,7 +215,7 @@ export const ChatPage = () => {
         () => new Set(),
     );
     const [groupPickMode, setGroupPickMode] = useState(false);
-    const [contactsExpanded, setContactsExpanded] = useState(true);
+    const [contactsExpanded, setContactsExpanded] = useState(false);
     const [addContactAccount, setAddContactAccount] = useState<string>();
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
@@ -292,6 +301,20 @@ export const ChatPage = () => {
         !!selfAccount &&
         selectedConversation.members.includes(selfAccount);
 
+    const selectedIsPendingDmMeet =
+        !!composePendingDmPeer &&
+        !!selfAccount &&
+        composePendingDmPeer !== selfAccount;
+
+    const showDmMeetBar = selectedIsTwoPersonDm || selectedIsPendingDmMeet;
+
+    const selectedIsGroupSpace =
+        !!selectedConversation &&
+        selectedConversation.kind === "group" &&
+        selectedConversation.members.length > 2 &&
+        !!selfAccount &&
+        selectedConversation.members.includes(selfAccount);
+
     const activeCallForSelected =
         activeCall && activeCall.conversationId === selectedConversationId
             ? activeCall
@@ -302,6 +325,7 @@ export const ChatPage = () => {
         void openGroupChat([...groupCandidates]);
         setGroupPickMode(false);
         setGroupCandidates(new Set());
+        setContactsExpanded(false);
     };
 
     return (
@@ -310,6 +334,7 @@ export const ChatPage = () => {
                 connectionState={connectionState}
                 lastRealtimeError={lastRealtimeError}
                 lastInboundError={lastInboundError}
+                pendingStorageQuotaExceeded={pendingStorageQuotaExceeded}
                 authLost={authLost}
                 presenceReady={presenceReady}
                 onReconnect={reconnectNow}
@@ -351,7 +376,9 @@ export const ChatPage = () => {
                                 conversations={conversations}
                                 selfAccount={selfAccount}
                                 selectedConversationId={selectedConversationId}
-                                onSelectConversation={setSelectedConversationId}
+                                onSelectConversation={(id) =>
+                                    selectConversation(id, "conversation-list")
+                                }
                                 unreadByConversation={unreadByConversation}
                                 undeliveredByConversation={
                                     undeliveredByConversation
@@ -388,6 +415,7 @@ export const ChatPage = () => {
                                                         new Set(),
                                                     );
                                                     setGroupPickMode(false);
+                                                    setContactsExpanded(false);
                                                 }}
                                             >
                                                 Cancel group pick
@@ -569,21 +597,44 @@ export const ChatPage = () => {
                             </div>
                         ) : null}
 
-                        {selectedConversation ? (
+                        {selectedConversationId || composePendingDmPeer ? (
                             <>
-                                {selectedIsTwoPersonDm ? (
+                                {showDmMeetBar ? (
                                     <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
                                         <div>
                                             <p className="text-sm font-medium">
                                                 Meet
                                             </p>
                                             <p className="text-muted-foreground text-xs">
-                                                Start a DM Meet call. Connected
-                                                sessions use WebRTC (STUN plus
-                                                optional OpenRelay TURN when the
-                                                node admin configures it in
-                                                x-admin) with in-call controls
-                                                below video.
+                                                {selectedIsPendingDmMeet &&
+                                                !selectedIsTwoPersonDm
+                                                    ? "Start a DM Meet call with this contact. The DM space is created automatically if needed."
+                                                    : "Start a DM Meet call. Connected sessions use WebRTC (STUN plus optional OpenRelay TURN when the node admin configures it in x-admin) with in-call controls below video."}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={startMeetCall}
+                                        >
+                                            <PhoneCall className="size-4" />
+                                            Meet
+                                        </Button>
+                                    </div>
+                                ) : null}
+                                {selectedIsGroupSpace ? (
+                                    <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
+                                        <div>
+                                            <p className="text-sm font-medium">
+                                                Meet
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">
+                                                Start a group Meet call with all
+                                                Space members. Offline members
+                                                miss the invite until online;
+                                                online participants can join
+                                                with mesh A/V in the background.
                                             </p>
                                         </div>
                                         <Button
@@ -603,10 +654,16 @@ export const ChatPage = () => {
                                         onEnd={endPlaceholderCall}
                                         localStream={callLocalStream}
                                         remoteStream={callRemoteStream}
+                                        remoteStreamsByAccount={
+                                            callRemoteStreamsByAccount
+                                        }
                                         audioMuted={callAudioMuted}
                                         videoMuted={callVideoMuted}
                                         remoteAudioMuted={callRemoteAudioMuted}
                                         remoteVideoMuted={callRemoteVideoMuted}
+                                        remoteAvStateByAccount={
+                                            callRemoteAvStateByAccount
+                                        }
                                         audioOnlyFallback={callAudioOnlyFallback}
                                         onToggleAudio={toggleCallAudioMuted}
                                         onToggleVideo={toggleCallVideoMuted}
@@ -616,16 +673,27 @@ export const ChatPage = () => {
                                     timeline={selectedTimeline}
                                     selfAccount={selfAccount}
                                 />
+                                {threadEstablishingConnection ? (
+                                    <div
+                                        role="status"
+                                        aria-live="polite"
+                                        aria-label="Establishing connection"
+                                        className="text-muted-foreground border-t px-4 py-2 text-xs"
+                                    >
+                                        Establishing connection…
+                                    </div>
+                                ) : null}
                                 {selectedHasPendingMessages ? (
                                     <div className="text-muted-foreground border-t px-4 py-2 text-xs">
-                                        Pending messages are stored only in this
-                                        browser profile until each recipient is
-                                        online and acknowledged.
+                                        {selectedConversation?.kind === "dm"
+                                            ? "Pending messages stay in this browser until the chat connection is ready, then send automatically."
+                                            : "Pending messages are stored only in this browser profile until each recipient is online and acknowledged."}
                                     </div>
                                 ) : null}
                                 <ChatComposer
                                     disabledReason={composerDisabledReason}
                                     onSend={sendChatMessage}
+                                    focusKey={composeSurfaceFocusKey}
                                 />
                             </>
                         ) : (
@@ -633,7 +701,7 @@ export const ChatPage = () => {
                                 <p>
                                     {groupPickMode
                                         ? "Choose at least two contacts below, then Start group."
-                                        : "Pick a conversation on the left or open a DM from Contacts below."}
+                                        : "Pick a conversation on the left."}
                                 </p>
                             </div>
                         )}

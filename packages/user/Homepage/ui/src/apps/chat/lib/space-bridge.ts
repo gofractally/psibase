@@ -3,11 +3,11 @@ import type { ConversationSnapshot } from "./protocol";
 /** Objective Chat `space_uuid` prefix (architecture §4.2). */
 export const SPACE_UUID_PREFIX = "space:";
 
-/** Legacy x-pslack subjective conversation id prefix (same member-set hash, different prefix). */
+/** Legacy subjective conversation id prefix (same member-set hash, different prefix). */
 export const PSLACK_CONVERSATION_PREFIX = "c:";
 
 /**
- * Map objective Space id to x-pslack conversation id for chat socket frames.
+ * Map objective Space id to legacy group-chat conversation id for interim websocket frames.
  * Both derive from the same canonical member-set hash; only the prefix differs.
  */
 export function pslackConversationIdFromSpaceUuid(spaceUuid: string): string {
@@ -30,6 +30,29 @@ export function spaceUuidFromPslackConversationId(
         return conversationId;
     }
     return conversationId;
+}
+
+/** Canonical member order matches objective Chat (sort by account string). */
+export function canonicalSpaceMembers(
+    members: readonly string[],
+): string[] {
+    return [...new Set(members)].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Deterministic objective space id — mirrors Chat service
+ * `space_uuid_for_members` (JSON canonical member list → sha256 hex).
+ */
+export async function deriveSpaceUuidForCanonicalMembers(
+    members: readonly string[],
+): Promise<string> {
+    const canonical = canonicalSpaceMembers(members);
+    const bytes = new TextEncoder().encode(JSON.stringify(canonical));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const hex = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    return `${SPACE_UUID_PREFIX}${hex}`;
 }
 
 export type GraphqlSpaceEntry = {

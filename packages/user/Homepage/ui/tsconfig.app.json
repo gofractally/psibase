@@ -4,5 +4,10 @@
         "tsBuildInfoFile": ".tmp/tsconfig.app.tsbuildinfo",
         "baseUrl": "./"
     },
-    "include": ["src"]
+    "include": ["src"],
+    "exclude": [
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "src/apps/chat/transport-v2/stack-test-harness.ts"
+    ]
 }

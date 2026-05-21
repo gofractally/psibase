@@ -51,3 +51,6 @@ if(DEFINED IS_WASM)
     add_subdirectory(XTimer)
     add_subdirectory(XTransact)
 endif()
+
+# Always processed: XWebRtcSig owns its native Python integration tests.
+add_subdirectory(XWebRtcSig)

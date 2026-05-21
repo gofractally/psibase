@@ -1,6 +1,6 @@
 [package]
 name = "x-webrtc-sig-pkg"
-description = "Node-local WebRTC signaling, presence, and interim x-pslack chat service package"
+description = "Node-local WebRTC signaling and presence package"
 version.workspace = true
 rust-version.workspace = true
 edition.workspace = true
@@ -11,9 +11,12 @@ publish.workspace = true
 [package.metadata.psibase]
 package-name = "XWebRtcSig"
 scope = "local"
-services = ["x-webrtcsig", "x-pslack"]
+services = ["x-webrtcsig"]
 
 [package.metadata.psibase.dependencies]
+# Chat is a runtime dependency (authorizeSessionJoin) installed at boot via DevDefault,
+# not during XDefault subjective init — listing it here breaks fresh Launch (PUT/postinstall
+# hits HttpServer before the chain is booted).
 XHttp = "0.23.0"
 
 [lib]
@@ -21,4 +24,3 @@ crate-type = ["rlib"]
 
 [dependencies]
 x-webrtcsig = { path = "service", version = "0.23.0" }
-x-pslack = { path = "x-pslack-service", version = "0.23.0" }

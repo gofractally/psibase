@@ -11,6 +11,10 @@ publish.workspace = true
 server = "x-webrtcsig"
 flags = ["isPrivileged"]
 
+[features]
+default = []
+rt-trace = []
+
 [dependencies]
 base64 = { version = "0.22" }
 psibase.workspace = true

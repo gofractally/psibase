@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Offer v2 first, then fall back to v1 (architecture §3.1). */
+/** Legacy interim group-chat websocket subprotocols (pre-realtime.v1). */
 export const PSLACK_SUBPROTOCOL_V1 = "psibase.pslack.v1";
 export const PSLACK_SUBPROTOCOL_V2 = "psibase.pslack.v2";
 

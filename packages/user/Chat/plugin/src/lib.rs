@@ -22,7 +22,7 @@ define_trust! {
         High => "",
     }
     functions {
-        Low => [ensure_space, ensure_dm, ensure_group],
+        Low => [ensure_space, ensure_dm, ensure_group, create_session],
     }
 }
 
@@ -70,6 +70,50 @@ impl Api for ChatPlugin {
         let packed = chat::action_structs::ensureGroup { other_members }.packed();
         add_action_to_transaction(chat::action_structs::ensureGroup::ACTION_NAME, &packed)
             .unwrap();
+        Ok(())
+    }
+
+    fn create_session(
+        space_uuid: String,
+        purpose: String,
+        participants: Vec<String>,
+    ) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::create_session,
+            vec!["homepage".into()],
+        )?;
+        let participants = parse_members(participants)?;
+        let packed = chat::action_structs::createSession {
+            space_uuid,
+            purpose,
+            participants,
+        }
+        .packed();
+        add_action_to_transaction(chat::action_structs::createSession::ACTION_NAME, &packed)
+            .unwrap();
+        Ok(())
+    }
+
+    fn commit_webrtc_session_event(
+        session_id: String,
+        kind: u8,
+        reason: String,
+    ) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::create_session,
+            vec!["homepage".into()],
+        )?;
+        let packed = chat::action_structs::commitWebRtcSessionEvent {
+            session_id,
+            kind,
+            reason,
+        }
+        .packed();
+        add_action_to_transaction(
+            chat::action_structs::commitWebRtcSessionEvent::ACTION_NAME,
+            &packed,
+        )
+        .unwrap();
         Ok(())
     }
 }
