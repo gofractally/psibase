@@ -110,8 +110,6 @@ pub mod service {
         let table = InitTable::new();
 
         table.put(&InitRow {}).unwrap();
-        Tokens::Wrapper::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-        Nfts::Wrapper::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
 
         register_prem_acct_event_indices();
     }
