@@ -24,7 +24,7 @@
         "service": "tokens",
         "method": "setUserConf",
         "data": {
-            "enable": true,
+            "enabled": true,
             "index": 0
         }
     },
@@ -33,7 +33,7 @@
         "service": "tokens",
         "method": "setUserConf",
         "data": {
-            "enable": true,
+            "enabled": true,
             "index": 0
         }
     },
