@@ -89,6 +89,8 @@ namespace SystemService
          abortMessage("circular ownership");
       }
 
+      to<Accounts>().incAuthSeq(sender);
+
       table.put(AuthDelegateRecord{.account = getSender(), .owner = owner});
    }
 

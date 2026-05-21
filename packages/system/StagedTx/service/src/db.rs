@@ -77,6 +77,9 @@ pub mod tables {
         /// The account that responded to the staged transaction
         pub account: AccountNumber,
 
+        /// The account's authSequence when the response was made
+        pub seq: u64,
+
         /// Whether the response is an acceptance or rejection
         pub accepted: bool,
     }
@@ -229,7 +232,7 @@ pub mod impls {
             ResponseTable::new()
                 .get_index_pk()
                 .range((self.id, AccountNumber::MIN)..=(self.id, AccountNumber::MAX))
-                .filter(|response| response.accepted)
+                .filter(|response| response.accepted && response.is_valid())
                 .map(|response| response.account)
                 .collect()
         }
@@ -238,7 +241,7 @@ pub mod impls {
             ResponseTable::new()
                 .get_index_pk()
                 .range((self.id, AccountNumber::MIN)..=(self.id, AccountNumber::MAX))
-                .filter(|response| !response.accepted)
+                .filter(|response| !response.accepted && response.is_valid())
                 .map(|response| response.account)
                 .collect()
         }
@@ -258,20 +261,24 @@ pub mod impls {
     impl Response {
         fn upsert(id: u32, accepted: bool) {
             let table = ResponseTable::new();
-            let response = table
-                .get_index_pk()
-                .get(&(id, get_sender()))
-                .map(|mut response| {
-                    response.accepted = accepted;
-                    response
-                })
-                .unwrap_or_else(|| Response {
-                    id,
-                    account: get_sender(),
-                    accepted,
-                });
+            let account = get_sender();
+            let seq = Accounts::call().getAccount(account).unwrap().authSequence;
 
-            table.put(&response).unwrap();
+            table
+                .put(&Response {
+                    id,
+                    account,
+                    seq,
+                    accepted,
+                })
+                .unwrap();
+        }
+        fn is_valid(&self) -> bool {
+            return Accounts::call()
+                .getAccount(self.account)
+                .unwrap()
+                .authSequence
+                == self.seq;
         }
     }
 
