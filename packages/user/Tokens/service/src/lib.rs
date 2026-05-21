@@ -98,7 +98,7 @@ pub mod service {
     ///                See `Configurations` for details
     ///
     /// Configurations:
-    /// * 0: auto_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -119,7 +119,7 @@ pub mod service {
     /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
     ///
     /// Configurations:
-    /// * 0: auto_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -148,7 +148,7 @@ pub mod service {
     ///                See `Configurations` for details
     ///
     /// Configurations:
-    /// * 0: auto_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.
@@ -168,7 +168,7 @@ pub mod service {
     /// * `enabled`  - A `bool` indicating the intended value of the specified configuration flag
     ///
     /// Configurations:
-    /// * 0: auto_debit       - If enabled, any credits of this token must be manually debited by
+    /// * 0: auto_debit       - If enabled, any credits of this token will be automatically debited by
     ///                           the receiver.
     /// * 1: keep_zero_balances - If enabled, records with a balance of zero will still be kept in the
     ///                           balance table, and will not need to be recreated on the next deposit.

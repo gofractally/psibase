@@ -35,7 +35,7 @@ export const AutoDebitSwitch = ({
 
     const handleConfirm = async () => {
         try {
-            await mutateAsync({ enable: !!autoDebit });
+            await mutateAsync({ enable: !autoDebit });
             toast.success(
                 autoDebit ? "Auto debit turned on" : "Auto debit turned off",
             );

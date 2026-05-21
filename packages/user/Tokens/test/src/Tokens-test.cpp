@@ -713,7 +713,6 @@ SCENARIO("Mapping a symbol to a token")
       // Issue system tokens
       auto sysIssuer   = t.from(Symbol::service).to<Tokens>();
       auto userBalance = 1'000'000e4;
-      alice.to<Nft>().setUserConf(Nft::autoDebit, true);
       aliceTokens.setUserConf(Tokens::autoDebit, true);
       bobTokens.setUserConf(Tokens::autoDebit, true);
       alice.to<Nft>().setUserConf(Nft::autoDebit, true);

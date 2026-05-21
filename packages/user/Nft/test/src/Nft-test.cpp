@@ -107,7 +107,7 @@ SCENARIO("Transferring NFTs")
       auto b = bob.to<Nft>();
       auto c = charlie.to<Nft>();
 
-      THEN("Bob is configured to use manual-debit by default")
+      THEN("Bob has auto-debit disabled by default")
       {
          CHECK(b.getUserConf(bob, autoDebit).returnVal() == false);
       }
