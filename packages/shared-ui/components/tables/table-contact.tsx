@@ -1,6 +1,7 @@
 import { Avatar } from "@shared/components/avatar";
 import { useContacts } from "@shared/hooks/use-contacts";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useHasProfilesReadPermission } from "@shared/hooks/use-has-profiles-read-permission";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const TableContact = ({ account }: { account: string }) => {
@@ -12,13 +13,26 @@ export const TableContact = ({ account }: { account: string }) => {
     } = useCurrentUser();
 
     const {
+        data: hasProfilesReadPermission,
+        isPending: isPendingHasProfilesReadPermission,
+        isError: isErrorHasProfilesReadPermission,
+        error: errorHasProfilesReadPermission,
+    } = useHasProfilesReadPermission({
+        enabled: !!currentUser,
+    });
+
+    const {
         data: contacts,
-        isPending: isPendingContacts,
+        isLoading: isLoadingContacts,
         isError: isErrorContacts,
         error: errorContacts,
-    } = useContacts(currentUser);
+    } = useContacts(currentUser, { enabled: !!hasProfilesReadPermission });
 
-    if (isPendingCurrentUser || isPendingContacts) {
+    if (
+        isPendingCurrentUser ||
+        isPendingHasProfilesReadPermission ||
+        isLoadingContacts
+    ) {
         return (
             <div className="@lg:h-auto flex h-10 items-center gap-2">
                 <Skeleton className="@lg:h-5 @lg:w-5 h-8 w-8 shrink-0 rounded-full" />
@@ -27,9 +41,17 @@ export const TableContact = ({ account }: { account: string }) => {
         );
     }
 
-    if (isErrorCurrentUser || isErrorContacts) {
-        console.error(errorCurrentUser);
-        console.error(errorContacts);
+    if (
+        isErrorCurrentUser ||
+        isErrorHasProfilesReadPermission ||
+        isErrorContacts
+    ) {
+        console.error("Error fetching current user:", errorCurrentUser);
+        console.error("Error fetching contacts:", errorContacts);
+        console.error(
+            "Error fetching profiles read permission:",
+            errorHasProfilesReadPermission,
+        );
         return <div>{account}</div>;
     }
 

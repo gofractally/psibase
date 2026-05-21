@@ -173,7 +173,7 @@ namespace psibase
                return i;
             ++i;
          }
-         return i;
+         abortMessage("Member is not reflected");
       }
 
       template <bool Last, auto K, typename T, typename M>
@@ -195,8 +195,9 @@ namespace psibase
          {
             static_assert(!std::is_function_v<M>,
                           "Member function keys not supported. Use CompositeKey instead.");
-            prefix.path.push_back(
-                get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr));
+            constexpr auto idx =
+                get_member_index<K>((typename psio::reflect<T>::data_members*)nullptr);
+            prefix.path.push_back(idx);
             if constexpr (Last)
             {
                out.push_back(std::move(prefix));
@@ -407,6 +408,8 @@ namespace psibase
          }
          return result;
       }
+      // checks that all names and indexes are valid
+      void checkValid() const;
       PSIO_REFLECT(ServiceSchema, service, types, actions, ui, history, merkle, database)
    };
 

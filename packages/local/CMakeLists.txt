@@ -3,7 +3,7 @@ function(add_local_service suffix name)
     target_mapped_include_directories(${name}${suffix} PUBLIC include)
     target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} services_user${suffix} services_local psibase-service${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-    psibase_schema(${name}${suffix})
+    psibase_schema(${name}${suffix} OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction()
 
 function(add_local_test_impl suffix name)
