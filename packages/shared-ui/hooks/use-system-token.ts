@@ -7,6 +7,8 @@ export interface SystemTokenInfo {
     id: string;
     /** Display label: token symbol, or "ID: {id}" when no symbol is set */
     symbol: string;
+    /** Decimal places for the system token (0 when no system token is configured). */
+    precision: number;
 }
 
 interface ConfigResponse {
@@ -18,12 +20,13 @@ interface ConfigResponse {
 interface TokenResponse {
     token: {
         id: string;
+        precision: number;
         /** Symbol is the account name (symbol id) returned by the Tokens GraphQL API */
         symbol?: string | null;
     } | null;
 }
 
-const NO_SYSTEM_TOKEN: SystemTokenInfo = { id: "", symbol: "" };
+const NO_SYSTEM_TOKEN: SystemTokenInfo = { id: "", symbol: "", precision: 0 };
 
 export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
     return useQuery<SystemTokenInfo>({
@@ -52,6 +55,7 @@ export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
                     query {
                         token(tokenId: "${sysTid}") {
                             id
+                            precision
                             symbol
                         }
                     }
@@ -73,6 +77,7 @@ export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
                 return {
                     id: idStr,
                     symbol,
+                    precision: tokenRes.token.precision,
                 };
             } catch (error) {
                 console.error("Error fetching system token:", error);
