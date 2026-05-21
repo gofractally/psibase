@@ -6,7 +6,19 @@
         "dev": "vite",
         "build": "node ../../../if-build-needed.mjs 'tsc -b --noEmit && vite build'",
         "lint": "eslint .",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "e2e": "playwright test --config e2e/playwright.config.ts",
+        "e2e:headed": "playwright test --config e2e/playwright.config.ts --headed",
+        "e2e:random-churn": "PSIBASE_E2E_RANDOM_CHURN_RUNS=${PSIBASE_E2E_RANDOM_CHURN_RUNS:-10} playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
+        "e2e:random-churn:mesh": "PSIBASE_E2E_RANDOM_CHURN_RUNS=${PSIBASE_E2E_RANDOM_CHURN_RUNS:-1} PSIBASE_E2E_RANDOM_CHURN_SPEED=mesh PSIBASE_E2E_RANDOM_CHURN_STRICT=1 playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
+        "e2e:random-churn:decaf": "PSIBASE_E2E_RANDOM_CHURN_RUNS=1 PSIBASE_E2E_RANDOM_CHURN_SEED=0xdecafbad PSIBASE_E2E_RANDOM_CHURN_SPEED=mesh PSIBASE_E2E_RANDOM_CHURN_STRICT=1 PSIBASE_E2E_RANDOM_CHURN_OFFLINE=1 PSIBASE_E2E_RANDOM_CHURN_TIMEOUT_SEC=4800 playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
+        "e2e:delivery-gate": "playwright test --config e2e/playwright.config.ts e2e/tests/chat-three-party-pending-delivery-matrix.spec.ts e2e/tests/chat-dm-pending-flush-on-rejoin.spec.ts e2e/tests/chat-dm-send-before-peer-join.spec.ts e2e/tests/chat-group-offline-member-catchup.spec.ts e2e/tests/chat-three-party-online-offline-flow.spec.ts",
+        "e2e:random-churn:diag:wedge": "PSIBASE_E2E_RANDOM_CHURN_RUNS=1 PSIBASE_E2E_RANDOM_CHURN_SEED=0xdecafbad PSIBASE_E2E_RANDOM_CHURN_SPEED=mesh PSIBASE_E2E_RANDOM_CHURN_STRICT=1 PSIBASE_E2E_RANDOM_CHURN_DISABLE_RECYCLE=1 PSIBASE_E2E_RANDOM_CHURN_DIAG_STEPS=11-13 PSIBASE_E2E_RANDOM_CHURN_DIAG_STOP_AT=13 PSIBASE_E2E_RANDOM_CHURN_DIAG_STEP_MS=300000 PSIBASE_E2E_RANDOM_CHURN_HUMAN_MS=3000 playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
+        "e2e:random-churn:stress": "PSIBASE_E2E_RANDOM_CHURN_RUNS=${PSIBASE_E2E_RANDOM_CHURN_RUNS:-1} PSIBASE_E2E_RANDOM_CHURN_SPEED=stress PSIBASE_E2E_RANDOM_CHURN_STRICT=0 playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
+        "e2e:random-churn:watch": "bash e2e/scripts/run-random-churn-watchdog.sh",
+        "e2e:random-churn:watch:mesh": "PSIBASE_E2E_RANDOM_CHURN_SPEED=mesh PSIBASE_E2E_RANDOM_CHURN_TIMEOUT_SEC=1200 bash e2e/scripts/run-random-churn-watchdog.sh"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.1.1",
@@ -31,13 +43,16 @@
         "zod": "^3.24.2"
     },
     "devDependencies": {
+        "@playwright/test": "^1.60.0",
         "@types/node": "^22.15.0",
         "@types/react": "^19.1.0",
         "@types/react-dom": "^19.1.0",
         "@types/react-router-dom": "5.3.3",
         "eslint": "^9.15.0",
+        "happy-dom": "^17.4.4",
         "typescript": "^5.7.3",
         "vite": "^5.4.1",
-        "vite-plugin-svgr": "^4.3.0"
+        "vite-plugin-svgr": "^4.3.0",
+        "vitest": "^3.1.1"
     }
 }

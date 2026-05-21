@@ -28,17 +28,17 @@ namespace LocalService
    using AdminOptionsTable = psibase::Table<AdminOptionsRow, psibase::SingletonKey{}>;
    PSIO_REFLECT_TYPENAME(AdminOptionsTable)
 
-   /// Node-local OpenRelay/Metered credentials and cached ICE servers for Pslack Meet TURN.
-   struct PslackOpenRelayRow
+   /// Node-local OpenRelay/Metered credentials and cached ICE servers for Chat WebRTC TURN.
+   struct OpenRelayRow
    {
       std::string app_name;
       std::string api_key;
       /// JSON array of WebRTC iceServers entries (Metered credential response shape).
       std::string ice_servers_json = "[]";
-      PSIO_REFLECT(PslackOpenRelayRow, app_name, api_key, ice_servers_json)
+      PSIO_REFLECT(OpenRelayRow, app_name, api_key, ice_servers_json)
    };
-   using PslackOpenRelayTable = psibase::Table<PslackOpenRelayRow, psibase::SingletonKey{}>;
-   PSIO_REFLECT_TYPENAME(PslackOpenRelayTable)
+   using OpenRelayTable = psibase::Table<OpenRelayRow, psibase::SingletonKey{}>;
+   PSIO_REFLECT_TYPENAME(OpenRelayTable)
 
    namespace Auth
    {
@@ -89,7 +89,7 @@ namespace LocalService
    {
       static constexpr auto service = psibase::AccountNumber{"x-admin"};
       using Subjective =
-          psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable, PslackOpenRelayTable>;
+          psibase::SubjectiveTables<AdminAccountTable, CodeRefCountTable, OpenRelayTable>;
       using Session = psibase::SessionTables<AdminOptionsTable>;
       /// Returns true if the account or the remote end of socket is a node admin
       bool isAdmin(std::optional<psibase::AccountNumber>          account,
@@ -105,8 +105,8 @@ namespace LocalService
       /// This action can be called inside a subjective tx
       AdminOptionsRow options();
 
-      /// JSON array string (possibly empty) of TURN/STUN entries for Pslack; only x-pslack may call.
-      std::string pslackTurnIceServersJson();
+      /// JSON array string (possibly empty) of TURN/STUN entries; only x-webrtc-sig may call.
+      std::string turnIceServersJson();
    };
    PSIO_REFLECT(XAdmin,
                 method(isAdmin, account, socket),
@@ -114,6 +114,6 @@ namespace LocalService
                 method(serveSys, req, socket),
                 method(startSession),
                 method(options),
-                method(pslackTurnIceServersJson))
+                method(turnIceServersJson))
    PSIBASE_REFLECT_TABLES(XAdmin, XAdmin::Subjective, XAdmin::Session)
 }  // namespace LocalService

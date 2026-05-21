@@ -92,7 +92,7 @@ const TransactStats = z.object({
 });
 export type TransactStatsType = z.infer<typeof TransactStats>;
 
-export const pslackOpenRelayStatusSchema = z
+export const openRelayStatusSchema = z
     .object({
         configured: z.boolean(),
         hasIceServers: z.boolean(),
@@ -100,7 +100,7 @@ export const pslackOpenRelayStatusSchema = z
     })
     .strict();
 
-export type PslackOpenRelayStatus = z.infer<typeof pslackOpenRelayStatusSchema>;
+export type OpenRelayStatus = z.infer<typeof openRelayStatusSchema>;
 
 class Chain {
     public async getPeers(): Promise<z.infer<typeof Peers>> {
@@ -275,21 +275,21 @@ class Chain {
         return TransactStats.parse(await getJson(url));
     }
 
-    public async getPslackOpenRelay(): Promise<PslackOpenRelayStatus> {
-        return pslackOpenRelayStatusSchema.parse(
-            await getJson("/pslack/openrelay"),
+    public async getOpenRelay(): Promise<OpenRelayStatus> {
+        return openRelayStatusSchema.parse(
+            await getJson("/chat/openrelay"),
         );
     }
 
-    public async putPslackOpenRelay(body: {
+    public async putOpenRelay(body: {
         appName?: string;
         apiKey?: string;
         iceServers?: unknown;
     }): Promise<void> {
-        const res = await putJson("/pslack/openrelay", body);
+        const res = await putJson("/chat/openrelay", body);
         if (!res.ok) {
             throw new Error(
-                `Saving Pslack OpenRelay settings failed (HTTP ${res.status})`,
+                `Saving TURN/OpenRelay settings failed (HTTP ${res.status})`,
             );
         }
     }

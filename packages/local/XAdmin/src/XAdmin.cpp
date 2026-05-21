@@ -583,13 +583,13 @@ namespace LocalService
          }
       }
 
-      struct PslackOpenRelayStatusDto
+      struct OpenRelayStatusDto
       {
          bool        configured    = false;
          bool        hasIceServers = false;
          std::string appName;
       };
-      PSIO_REFLECT(PslackOpenRelayStatusDto, configured, hasIceServers, appName)
+      PSIO_REFLECT(OpenRelayStatusDto, configured, hasIceServers, appName)
 
       AuthResult checkAuthChain(const HttpRequest& req, std::optional<std::int32_t> socket)
       {
@@ -767,14 +767,14 @@ namespace LocalService
       return result.value_or(AdminOptionsRow{});
    }
 
-   std::string XAdmin::pslackTurnIceServersJson()
+   std::string XAdmin::turnIceServersJson()
    {
       const auto sender = getSender();
       check(sender == psibase::AccountNumber{"x-webrtcsig"}, "Wrong sender");
       std::optional<std::string> json;
       PSIBASE_SUBJECTIVE_TX
       {
-         if (auto row = XAdmin{}.open<PslackOpenRelayTable>().get({}))
+         if (auto row = XAdmin{}.open<OpenRelayTable>().get({}))
             json = row->ice_servers_json;
       }
       return json.value_or("[]");
@@ -866,17 +866,17 @@ namespace LocalService
             return HttpReply::methodNotAllowed(req);
          }
       }
-      else if (target == "/pslack/openrelay")
+      else if (target == "/chat/openrelay")
       {
          if (auto reply = checkAuth(req, socket))
             return reply;
 
          if (req.method == "GET")
          {
-            PslackOpenRelayStatusDto status{};
+            OpenRelayStatusDto status{};
             PSIBASE_SUBJECTIVE_TX
             {
-               if (auto row = XAdmin{}.open<PslackOpenRelayTable>().get({}))
+               if (auto row = XAdmin{}.open<OpenRelayTable>().get({}))
                {
                   status.appName = row->app_name;
                   const bool hasIce =
@@ -904,10 +904,10 @@ namespace LocalService
             }
             auto obj = psio::convert_from_json<psio::json::any_object>(
                 std::string(req.body.begin(), req.body.end()));
-            PslackOpenRelayRow row{};
+            OpenRelayRow row{};
             PSIBASE_SUBJECTIVE_TX
             {
-               row = XAdmin{}.open<PslackOpenRelayTable>().get({}).value_or(PslackOpenRelayRow{});
+               row = XAdmin{}.open<OpenRelayTable>().get({}).value_or(OpenRelayRow{});
             }
             for (auto& entry : obj)
             {
@@ -928,7 +928,7 @@ namespace LocalService
             }
             PSIBASE_SUBJECTIVE_TX
             {
-               XAdmin{}.open<PslackOpenRelayTable>().put(row);
+               XAdmin{}.open<OpenRelayTable>().put(row);
             }
             return HttpReply{.status = HttpStatus::ok};
          }

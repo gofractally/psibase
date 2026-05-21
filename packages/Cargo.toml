@@ -9,7 +9,6 @@ members = [
     "system/Producers/plugin/",
     "local/XWebRtcSig",
     "local/XWebRtcSig/service",
-    "local/XWebRtcSig/x-pslack-service",
     "user/Aes/plugin",
     "user/Base64/plugin",
     "user/BrotliCodec/plugin",

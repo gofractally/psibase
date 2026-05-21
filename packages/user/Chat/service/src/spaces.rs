@@ -96,10 +96,13 @@ pub fn sender_is_member(members: &[AccountNumber], sender: AccountNumber) -> boo
 }
 
 pub fn space_exists(space_uuid: &str) -> bool {
+    space_row(space_uuid).is_some()
+}
+
+pub fn space_row(space_uuid: &str) -> Option<SpaceRow> {
     SpaceTable::read()
         .get_index_pk()
         .get(&space_uuid.to_owned())
-        .is_some()
 }
 
 pub fn open_space(members: Vec<AccountNumber>, created_at: i64) -> Result<SpaceRow, SpaceError> {

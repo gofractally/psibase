@@ -61,13 +61,26 @@ export function IncomingCallDialog({ call, onAccept, onDecline }: Props) {
                     <DialogTitle>Incoming Meet call</DialogTitle>
                     <DialogDescription>
                         {call ? (
-                            <>
-                                <span className="font-medium text-foreground">
-                                    {call.from}
-                                </span>{" "}
-                                        is calling (signaling + WebRTC after you
-                                        answer).
-                            </>
+                            call.groupParticipantCount &&
+                            call.groupParticipantCount > 2 ? (
+                                <>
+                                    <span className="font-medium text-foreground">
+                                        {call.from}
+                                    </span>{" "}
+                                    is inviting you to a group Meet (
+                                    {call.groupParticipantCount} members).
+                                    Signaling and WebRTC mesh start after you
+                                    answer.
+                                </>
+                            ) : (
+                                <>
+                                    <span className="font-medium text-foreground">
+                                        {call.from}
+                                    </span>{" "}
+                                    is calling (signaling + WebRTC after you
+                                    answer).
+                                </>
+                            )
                         ) : null}
                     </DialogDescription>
                 </DialogHeader>

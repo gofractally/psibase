@@ -73,9 +73,9 @@ if(Python_Interpreter_FOUND)
     add_psinode_test(test_config)
     add_psinode_test(test_fetch)
     add_psinode_test(test_websocket)
-    add_psinode_test(test_pslack)
-    add_psinode_test(test_pslack_call)
-    add_psinode_test(test_xwebrtcsig)
+    # x-webrtcsig tests live with the package they exercise:
+    #   packages/local/XWebRtcSig/tests/python/test_xwebrtcsig.py
+    # Registered via packages/local/XWebRtcSig/CMakeLists.txt as xwebrtcsig_test_*.
     add_psinode_test(test_timer)
 endif()
 

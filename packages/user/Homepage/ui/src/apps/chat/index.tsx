@@ -3,6 +3,7 @@ import { MessagesSquare } from "lucide-react";
 
 import { zAccount } from "@shared/lib/schemas/account";
 
+import { ChatAppShell } from "./chat-app-shell";
 import { ChatPage } from "./pages/chat-page";
 
 export const chatConfig: AppConfigType = {
@@ -16,7 +17,11 @@ export const chatConfig: AppConfigType = {
     children: [
         {
             path: "",
-            element: <ChatPage />,
+            element: (
+                <ChatAppShell>
+                    <ChatPage />
+                </ChatAppShell>
+            ),
             name: "Home",
         },
     ],

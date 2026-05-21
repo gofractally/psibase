@@ -246,7 +246,18 @@ impl Chain {
             .into();
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
-        let package_names = vec!["XDefault".to_string()];
+        // Load local native services without XWebRtcSig (its Chat dependency is network-scoped).
+        let package_names = vec![
+            "XHttp".to_string(),
+            "XAdmin".to_string(),
+            "XDb".to_string(),
+            "XPackages".to_string(),
+            "XPeers".to_string(),
+            "XRun".to_string(),
+            "XSites".to_string(),
+            "XTimer".to_string(),
+            "XTransact".to_string(),
+        ];
         let packages = block_on(registry.resolve(&package_names, true)).unwrap();
         let mut requests = Vec::new();
         let mut early_requests = Vec::new();

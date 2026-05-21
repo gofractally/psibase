@@ -19,7 +19,7 @@ import { DashboardPage } from "./pages/dashboard-page";
 import { JoinPage } from "./pages/join-page";
 import { KeysPage } from "./pages/keys-page";
 import { NodeLocalPage } from "./pages/node-local-page";
-import { PslackOpenRelayPage } from "./pages/pslack-openrelay-page";
+import { ChatOpenRelayPage } from "./pages/chat-openrelay-page";
 import { SetupPage } from "./pages/setup-page";
 import { PeersPage } from "./peers/peers-page";
 
@@ -46,7 +46,7 @@ export const routes = [
         name: "Chat",
         icon: Video,
         path: "chat-openrelay",
-        element: <PslackOpenRelayPage />,
+        element: <ChatOpenRelayPage />,
     },
     {
         name: "Logs",

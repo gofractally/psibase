@@ -35,9 +35,9 @@ mod service {
         unimplemented!()
     }
 
-    /// JSON array of additional ICE server entries from node OpenRelay config; only x-pslack may rely on this.
+    /// JSON array of additional ICE server entries from node OpenRelay config; only x-webrtc-sig may call.
     #[action]
-    fn pslackTurnIceServersJson() -> String {
+    fn turnIceServersJson() -> String {
         unimplemented!()
     }
 

@@ -3,11 +3,11 @@ import type { ConversationSnapshot } from "./protocol";
 /** Objective Chat `space_uuid` prefix (architecture §4.2). */
 export const SPACE_UUID_PREFIX = "space:";
 
-/** Legacy x-pslack subjective conversation id prefix (same member-set hash, different prefix). */
+/** Legacy subjective conversation id prefix (same member-set hash, different prefix). */
 export const PSLACK_CONVERSATION_PREFIX = "c:";
 
 /**
- * Map objective Space id to x-pslack conversation id for chat socket frames.
+ * Map objective Space id to legacy group-chat conversation id for interim websocket frames.
  * Both derive from the same canonical member-set hash; only the prefix differs.
  */
 export function pslackConversationIdFromSpaceUuid(spaceUuid: string): string {

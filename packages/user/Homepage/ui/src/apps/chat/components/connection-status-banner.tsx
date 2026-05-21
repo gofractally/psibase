@@ -8,6 +8,8 @@ type Props = {
     connectionState: RealtimeConnectionState;
     lastRealtimeError: string | null;
     lastInboundError: string | null;
+    /** Plan C4: surfaces "outbox storage is full" with a specific tone. */
+    pendingStorageQuotaExceeded?: boolean;
     authLost: boolean;
     presenceReady: boolean;
     onReconnect: () => void;
@@ -20,6 +22,7 @@ export function ConnectionStatusBanner({
     connectionState,
     lastRealtimeError,
     lastInboundError,
+    pendingStorageQuotaExceeded,
     authLost,
     presenceReady,
     onReconnect,
@@ -28,7 +31,8 @@ export function ConnectionStatusBanner({
         connectionState === "connected" &&
         presenceReady &&
         !authLost &&
-        !lastInboundError
+        !lastInboundError &&
+        !pendingStorageQuotaExceeded
     ) {
         return null;
     }
@@ -43,6 +47,10 @@ export function ConnectionStatusBanner({
         tone = "danger";
         Icon = AlertTriangle;
         headline = "Sign-in expired or blocked";
+    } else if (pendingStorageQuotaExceeded) {
+        tone = "danger";
+        Icon = AlertTriangle;
+        headline = "Outbox storage is full";
     } else if (lastInboundError) {
         tone = "warn";
         Icon = AlertTriangle;

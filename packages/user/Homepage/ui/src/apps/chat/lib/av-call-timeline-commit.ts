@@ -1,0 +1,43 @@
+import { normalizeAvCallTerminalReason } from "./av-call-terminal";
+import {
+    CHAT_WEBRTC_EVENT_PARTICIPANT_JOINED,
+    CHAT_WEBRTC_EVENT_SESSION_ENDED,
+    CHAT_WEBRTC_EVENT_SESSION_FAILED,
+    commitWebRtcSessionEvent,
+} from "./chat-api";
+
+export function avCallTimelineCommitKind(reason: string): number {
+    const normalized = normalizeAvCallTerminalReason(reason);
+    if (
+        normalized === "timeout" ||
+        normalized === "missed" ||
+        normalized === "transport"
+    ) {
+        return CHAT_WEBRTC_EVENT_SESSION_FAILED;
+    }
+    return CHAT_WEBRTC_EVENT_SESSION_ENDED;
+}
+
+export function commitAvCallJoin(sessionId: string): void {
+    void commitWebRtcSessionEvent(
+        sessionId,
+        CHAT_WEBRTC_EVENT_PARTICIPANT_JOINED,
+        "joined",
+    ).catch(() => {
+        /* Non-fatal; timeline may lag until retry. */
+    });
+}
+
+export function commitAvCallTimelineEvent(
+    sessionId: string,
+    reason: string,
+): void {
+    const normalized = normalizeAvCallTerminalReason(reason);
+    void commitWebRtcSessionEvent(
+        sessionId,
+        avCallTimelineCommitKind(normalized),
+        normalized,
+    ).catch(() => {
+        /* Non-fatal; timeline may lag until retry. */
+    });
+}
