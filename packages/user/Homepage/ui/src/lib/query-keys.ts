@@ -19,6 +19,16 @@ const QueryKey = {
         ["userTokenBalances", user] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
         ["userTokenBalanceChanges", user, tokenId] as const,
+    premPrices: () => ["premPrices"] as const,
+    premSystemToken: () => ["premSystemToken"] as const,
+    premAccountAvailability: (accountName: string) =>
+        ["premAccountAvailability", accountName] as const,
+    premValidatedMaxCost: (tokenId: number | undefined, maxCost: string) =>
+        ["premValidatedMaxCost", tokenId, maxCost] as const,
+    premUnclaimedNames: (user?: string | null) =>
+        ["premUnclaimedNames", user] as const,
+    premNameEvents: (user?: string | null) =>
+        ["premNameEvents", user] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
