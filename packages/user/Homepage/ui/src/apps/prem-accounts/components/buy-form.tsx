@@ -4,7 +4,6 @@ import { useStore } from "@tanstack/react-form";
 import { useAccountAvailability } from "@/apps/prem-accounts/hooks/use-account-availability";
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
 import { usePremPrices } from "@/apps/prem-accounts/hooks/use-prem-prices";
-import { usePremSystemToken } from "@/apps/prem-accounts/hooks/use-prem-system-token";
 import { useValidatedMaxCost } from "@/apps/prem-accounts/hooks/use-validated-max-cost";
 import {
     defaultBuyFormValues,
@@ -17,6 +16,7 @@ import {
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -31,8 +31,9 @@ import {
 
 export function BuyForm() {
     const { data: priceByLength, isSuccess: hasLoadedPrices } = usePremPrices();
-    const { data: systemToken, isSuccess: hasLoadedToken } =
-        usePremSystemToken();
+    const { data: systemToken, isSuccess: hasLoadedToken } = useSystemToken();
+    const hasSystemToken = Boolean(systemToken?.id);
+    const tokenId = hasSystemToken ? Number(systemToken!.id) : undefined;
     const { mutateAsync: buyName, isPending: isBuying } = useBuyName();
 
     const form = useAppForm({
@@ -44,8 +45,11 @@ export function BuyForm() {
                 maxCost: parsed.maxCost,
             });
             form.reset();
-            if (systemToken) {
-                form.setFieldValue("maxCost", unitTokenDecimal(systemToken.precision));
+            if (hasSystemToken && systemToken) {
+                form.setFieldValue(
+                    "maxCost",
+                    unitTokenDecimal(systemToken.precision),
+                );
             }
         },
         validators: {
@@ -54,13 +58,16 @@ export function BuyForm() {
     });
 
     useEffect(() => {
-        if (!hasLoadedToken || !systemToken) {
+        if (!hasLoadedToken || !hasSystemToken || !systemToken) {
             return;
         }
         if (form.state.values.maxCost === "") {
-            form.setFieldValue("maxCost", unitTokenDecimal(systemToken.precision));
+            form.setFieldValue(
+                "maxCost",
+                unitTokenDecimal(systemToken.precision),
+            );
         }
-    }, [form, hasLoadedToken, systemToken]);
+    }, [form, hasLoadedToken, hasSystemToken, systemToken]);
 
     const accountName = useStore(form.store, (state) => state.values.accountName);
     const maxCost = useStore(form.store, (state) => state.values.maxCost);
@@ -75,7 +82,7 @@ export function BuyForm() {
 
     const { data: availability } = useAccountAvailability(accountName);
     const { data: validatedMaxCostU64, isFetching: isValidatingMaxCost } =
-        useValidatedMaxCost(maxCost, systemToken?.id);
+        useValidatedMaxCost(maxCost, tokenId);
 
     const price = useMemo(() => {
         if (!priceByLength || availability !== "available") {
@@ -84,9 +91,9 @@ export function BuyForm() {
         return priceByLength.get(trimmedAccount.length) ?? null;
     }, [availability, priceByLength, trimmedAccount.length]);
 
-    const maxCostLabel =
-        systemToken?.symbol ??
-        (systemToken?.id != null ? `token ${systemToken.id}` : "SysToken");
+    const maxCostLabel = hasSystemToken
+        ? systemToken!.symbol
+        : "SysToken";
 
     const noMarketForNameLength =
         hasLoadedPrices &&
@@ -97,7 +104,7 @@ export function BuyForm() {
 
     const canBuy =
         hasLoadedToken &&
-        systemToken != null &&
+        hasSystemToken &&
         validatedMaxCostU64 !== undefined &&
         !isValidatingMaxCost &&
         nameZodResult?.success === true &&
@@ -138,7 +145,7 @@ export function BuyForm() {
                                 <field.TextField
                                     label={`Max cost (${maxCostLabel})`}
                                     placeholder={
-                                        systemToken
+                                        hasSystemToken && systemToken
                                             ? unitTokenDecimal(
                                                   systemToken.precision,
                                               )
@@ -165,13 +172,15 @@ export function BuyForm() {
                                         )}
                                         {availability === "available" &&
                                             price !== null &&
-                                            systemToken && (
+                                            hasSystemToken &&
+                                            systemToken &&
+                                            tokenId !== undefined && (
                                                 <p className="text-green-600">
                                                     Buy for{" "}
                                                     {formatCanonicalPrice(
                                                         price,
                                                         systemToken.precision,
-                                                        systemToken.id,
+                                                        tokenId,
                                                         systemToken.symbol,
                                                     )}
                                                 </p>
@@ -194,7 +203,7 @@ export function BuyForm() {
                             {maxCost.trim().length > 0 &&
                                 !isValidatingMaxCost &&
                                 validatedMaxCostU64 === undefined &&
-                                systemToken && (
+                                hasSystemToken && (
                                     <p className="text-destructive">
                                         Enter a valid max cost amount.
                                     </p>
