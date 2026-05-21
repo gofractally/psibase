@@ -1,11 +1,7 @@
 #[psibase::service_tables]
 pub mod tables {
     use psibase::fracpack::{Pack, Unpack};
-    use psibase::services::{
-        nft::{NftHolderFlags, Wrapper as Nft},
-        tokens::{BalanceFlags, Wrapper as Tokens},
-        transact::Wrapper as Transact,
-    };
+    use psibase::services::transact::Wrapper as Transact;
     use psibase::{Checksum256, *};
     use serde::{Deserialize, Serialize};
 

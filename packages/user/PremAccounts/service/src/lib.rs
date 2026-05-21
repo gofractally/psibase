@@ -50,8 +50,8 @@ pub mod service {
     use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::events;
-    use psibase::services::nft::{self as Nfts, NftHolderFlags};
-    use psibase::services::tokens::{self as Tokens, BalanceFlags};
+    use psibase::services::nft as Nfts;
+    use psibase::services::tokens as Tokens;
     use psibase::services::tokens::{Quantity, TID};
     use psibase::AccountNumber;
     use psibase::*;
