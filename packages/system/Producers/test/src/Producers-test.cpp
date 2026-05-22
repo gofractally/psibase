@@ -163,10 +163,10 @@ SCENARIO("Producers")
 
       auto getNfts = [](DefaultTestChain& t, AccountNumber acc)
       {
-         std::string query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
-                                 "\" ) { edges { node { id issuer owner } } } "
-                                 "}";
-         std::string_view query_sv = query_str;
+         std::string      query_str = "query UserNfts { userNfts( user: \"" + acc.str() +
+                                      "\" ) { edges { node { id issuer owner } } } "
+                                      "}";
+         std::string_view query_sv  = query_str;
 
          auto query = GraphQLBody{query_sv};
 
@@ -186,7 +186,7 @@ SCENARIO("Producers")
       THEN("Producers can be retrieved")
       {
          auto prods = alice.to<Producers>().getProducers().returnVal();
-         REQUIRE(prods == std::vector<AccountNumber>{"firstproducer"_a});
+         REQUIRE(prods == std::vector<AccountNumber>{"firstprod"_a});
       }
 
       THEN("CFT Producer set can be changed")
