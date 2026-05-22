@@ -3,7 +3,7 @@ import { useStore } from "@tanstack/react-form";
 
 import { useAccountAvailability } from "@/apps/prem-accounts/hooks/use-account-availability";
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
-import { usePremPrices } from "@/apps/prem-accounts/hooks/use-prem-prices";
+import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { useValidatedMaxCost } from "@/apps/prem-accounts/hooks/use-validated-max-cost";
 import {
     defaultBuyFormValues,
@@ -135,6 +135,9 @@ export function BuyForm() {
                                 <field.TextField
                                     label="Desired account name"
                                     placeholder={`e.g. my-name (${MIN_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} chars)`}
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    spellCheck={false}
                                 />
                             )}
                         />

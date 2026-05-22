@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { PREM_ACCOUNTS_SERVICE } from "@/apps/prem-accounts/lib/prem-service";
 import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { premAccounts } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
@@ -16,7 +16,7 @@ export const useClaimName = () => {
         mutationFn: async (name: string) => {
             const parsed = zAccount.parse(name.trim());
             await supervisor.functionCall({
-                service: PREM_ACCOUNTS_SERVICE,
+                service: premAccounts.service,
                 plugin: "plugin",
                 intf: "api",
                 method: "claim",

@@ -16,6 +16,7 @@ const QueryKey = {
     contacts: (user: string | undefined | null) => ["contacts", user] as const,
     currentUser: () => ["currentUser"] as const,
     billingConfig: () => ["billingConfig"] as const,
+    premPrices: () => ["premPrices"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

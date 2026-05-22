@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { graphql } from "@shared/lib/graphql";
+import { premAccounts } from "@shared/lib/plugins";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -44,7 +45,7 @@ export const useConfiguredPremiumNameMarkets = () =>
                     }
                 }
             `;
-            const raw = await graphql(query, { service: "namemarket" });
+            const raw = await graphql(query, { service: premAccounts.service });
             const parsed = zData.parse(raw);
             return parsed.marketParams;
         },

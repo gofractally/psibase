@@ -3,6 +3,7 @@ import { type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
+import { premAccounts } from "@shared/lib/plugins";
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -17,12 +18,9 @@ export interface App {
     icon: LucideIcon;
 }
 
-const PREM_ACCOUNTS_PACKAGE = "PremAccounts";
-
 export function NavApps() {
-    const { data: isPremAccountsInstalled } = useIsPackageInstalled(
-        PREM_ACCOUNTS_PACKAGE,
-    );
+    const { data: isPremAccountsInstalled } =
+        useIsPackageInstalled("PremAccounts");
 
     return (
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
@@ -32,7 +30,7 @@ export function NavApps() {
                     .filter((app) => !app.isMore)
                     .filter(
                         (app) =>
-                            app.service !== "prem-accounts" ||
+                            app.service !== premAccounts.service ||
                             isPremAccountsInstalled === true,
                     )
                     .map((item) => (

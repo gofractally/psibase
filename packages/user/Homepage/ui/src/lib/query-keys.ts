@@ -19,7 +19,6 @@ const QueryKey = {
         ["userTokenBalances", user] as const,
     userTokenBalanceChanges: (user?: string | null, tokenId?: number) =>
         ["userTokenBalanceChanges", user, tokenId] as const,
-    premPrices: () => ["premPrices"] as const,
     premAccountAvailability: (accountName: string) =>
         ["premAccountAvailability", accountName] as const,
     premValidatedMaxCost: (tokenId: number | undefined, maxCost: string) =>

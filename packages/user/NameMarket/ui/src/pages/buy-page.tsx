@@ -6,11 +6,11 @@ import { useOutletContext } from "react-router-dom";
 import {
     zCurrentPricesData,
     zTokenQueryData,
-} from "@/lib/graphql/name-market.schemas";
-import { NAME_MARKET_SERVICE } from "@/lib/name-market-service";
+} from "@/lib/graphql/prem-accounts.schemas";
 
 import { isAccountAvailable } from "@shared/lib/get-account";
 import { graphql } from "@shared/lib/graphql";
+import { premAccounts } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
@@ -140,7 +140,7 @@ export function BuyPage() {
                         }
                     }
                 `,
-                { service: NAME_MARKET_SERVICE },
+                { service: premAccounts.service },
             );
             const { currentPrices: rows } = zCurrentPricesData.parse(raw);
 
@@ -274,7 +274,7 @@ export function BuyPage() {
 
         try {
             await supervisor.functionCall({
-                service: NAME_MARKET_SERVICE,
+                service: premAccounts.service,
                 intf: "api",
                 method: "buy",
                 params: [trimmed, maxCostForTx],

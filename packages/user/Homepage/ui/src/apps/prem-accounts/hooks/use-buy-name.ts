@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { PREM_ACCOUNTS_SERVICE } from "@/apps/prem-accounts/lib/prem-service";
 import QueryKey from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { premAccounts } from "@shared/lib/plugins";
+import SharedQueryKey from "@shared/lib/query-keys";
 import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
@@ -19,7 +20,7 @@ export const useBuyName = () => {
     return useMutation({
         mutationFn: async ({ accountName, maxCost }: BuyNameInput) => {
             await supervisor.functionCall({
-                service: PREM_ACCOUNTS_SERVICE,
+                service: premAccounts.service,
                 intf: "api",
                 method: "buy",
                 params: [accountName, maxCost],
@@ -32,7 +33,7 @@ export const useBuyName = () => {
                 id: context.toastId,
             });
             void queryClient.invalidateQueries({
-                queryKey: QueryKey.premPrices(),
+                queryKey: SharedQueryKey.premPrices(),
             });
             void queryClient.invalidateQueries({
                 queryKey: QueryKey.premUnclaimedNames(currentUser),
