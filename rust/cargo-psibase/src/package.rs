@@ -387,6 +387,25 @@ impl<'a> PackageBuilder<'a> {
             })
             .collect();
 
+        let service_wasms: Vec<_> = service_crates
+            .iter()
+            .zip(service_wasms.into_iter())
+            .map(|(p, (service, info, path))| {
+                (
+                    service,
+                    ServiceInfo {
+                        flags: info.flags,
+                        server: get_metadata(p)
+                            .unwrap()
+                            .server
+                            .map(|s| crate_to_account[&s.as_str()]),
+                        schema: info.schema,
+                    },
+                    path,
+                )
+            })
+            .collect();
+
         let mut data_files = Vec::new();
         for (service, src, dest) in data_sources {
             add_files(crate_to_account[service], &src, &dest, &mut data_files)?;
