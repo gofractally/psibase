@@ -156,7 +156,7 @@ namespace psibase
             for (const auto& act : readPostinstall(package))
             {
                accounts.push_back(act.sender);
-               services.push_back(act.service);
+               services.push_back(AccountNumber{act.service});
             }
 
             std::ranges::sort(accounts);

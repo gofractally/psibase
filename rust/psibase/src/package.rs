@@ -332,14 +332,15 @@ impl PrettyAction {
         })
     }
     pub fn to_action(&self, schemas: &SchemaMap) -> Result<Action, anyhow::Error> {
+        let service = AccountNumber::from_exact(&self.service)?;
         let raw_data = if let Some(raw_data) = &self.raw_data {
             raw_data.clone()
         } else {
-            PrettyAction::pack_data(self.service, self.method, &self.data, schemas)?
+            PrettyAction::pack_data(service, self.method, &self.data, schemas)?
         };
         Ok(Action {
             sender: self.sender,
-            service: self.service,
+            service: service,
             method: self.method,
             rawData: raw_data,
         })
@@ -771,9 +772,10 @@ impl<R: Read + Seek> PackagedService<R> {
         }
 
         for act in &self.postinstall {
+            let service = act.service.parse()?;
             accounts.push(act.sender);
-            services.push(act.service.parse()?);
-            if act.service == transact::SERVICE
+            services.push(service);
+            if service == transact::SERVICE
                 && act.method == MethodNumber::from(transact::action_structs::runAs::ACTION_NAME)
             {
                 let nested = act.parse_data_as::<transact::action_structs::runAs>()?;
