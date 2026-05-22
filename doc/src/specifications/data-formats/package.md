@@ -13,7 +13,8 @@ A psibase package is a zip archive that contains the following files:
 | depends            | Array  | Other packages that this package depends on                                                                   |
 | depends[n].name    | String | The name of the other package                                                                                 |
 | depends[n].version | String | An expression that describes the compatible versions of the dependency                                        |
-| accounts           | Array  | Accounts that are created by this package                                                                     |
+| accounts           | Array  | Accounts, including services, that are created by this package                                                |
+| services           | Array  | Services provided by this package                                                                             |
 
 ### Semantic version matching
 
@@ -29,6 +30,10 @@ Examples:
 - `1`: matches `1.0.0` and `1.3.1`, but not `2.0.0` or `1.2.0-rc1`
 - `>=1.1.2, <2.0.0` matches `1.1.3` and `2.0.0-beta`
 - `>1, <3` matches all versions with major version 2, including prereleases
+
+### Installation order
+
+A package is installed after any packages that might be needed to install it. If the package has no postinstall script, then only the standard services that are used by the package installer are needed. It is an error if there is no possible install order that can satisfy this for all packages.
 
 ## service/&lt;service&gt;.wasm
 

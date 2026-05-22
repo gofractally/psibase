@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { Avatar } from "@shared/components/avatar";
 import { CustomSelect, type SelectOption } from "@shared/shadcn/custom/select";
 
-import { Token } from "../hooks/tokensPlugin/use-user-token-balances";
+import { Token } from "../hooks/tokens-plugin/use-user-token-balances";
 import { AnimateNumber } from "./animate-number";
 
 export const TokenSelector = ({

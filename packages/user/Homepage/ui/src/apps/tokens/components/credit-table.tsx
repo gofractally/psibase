@@ -1,11 +1,11 @@
 import type {
     ActionType,
     Transaction,
-} from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
+} from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balance-changes";
 
 import { ArrowDown, ArrowUp, ReceiptText, Undo2, X } from "lucide-react";
 
-import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokensPlugin/use-user-token-balance-changes";
+import { useUserTokenBalanceChanges } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balance-changes";
 
 import { Loading } from "@/components/loading";
 
@@ -27,7 +27,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { Token } from "../hooks/tokensPlugin/use-user-token-balances";
+import { Token } from "../hooks/tokens-plugin/use-user-token-balances";
 
 interface Props {
     user: string;

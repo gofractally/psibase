@@ -44,8 +44,8 @@ class Transact(Service):
 
 class Accounts(Service):
     service = 'accounts'
-    def new_account(self, name, auth_service='auth-any', require_new=True, *, sender='root'):
-        self.push_action(sender, 'newAccount', {"name": name, "authService": auth_service,"requireNew": require_new})
+    def new_account(self, name, auth_service='auth-any', require_match=True, *, sender='root'):
+        self.push_action(sender, 'newAccount', {"name": name, "authService": auth_service,"requireMatch": require_match})
     def set_auth_service(self, account, auth_service):
         self.push_action(account, 'setAuthServ', {'authService': auth_service})
 

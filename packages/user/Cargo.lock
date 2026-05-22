@@ -510,12 +510,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
-name = "byteorder"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
-
-[[package]]
 name = "bytes"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -786,12 +780,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
-name = "crossbeam-utils"
-version = "0.8.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
-
-[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -925,6 +913,20 @@ dependencies = [
  "darling_core 0.20.11",
  "quote",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "de-facto"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "fractals",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1226,6 +1228,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc5a4e564e38c699f2880d3fda590bedc2e69f3f84cd48b457bd892ce61d0aa9"
 dependencies = [
  "crc32fast",
+ "libz-rs-sys",
  "miniz_oxide",
 ]
 
@@ -1251,6 +1254,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "frac-tester"
+version = "0.23.0"
+dependencies = [
+ "frac-tester-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "frac-tester-pkg"
+version = "0.23.0"
+dependencies = [
+ "frac-tester",
+ "psibase-user-workspace-hack",
+]
+
+[[package]]
 name = "fracpack"
 version = "0.23.0"
 dependencies = [
@@ -1262,6 +1284,25 @@ dependencies = [
  "serde",
  "serde-aux",
  "serde_json",
+]
+
+[[package]]
+name = "fractal-gen"
+version = "0.23.0"
+dependencies = [
+ "fractal-gen-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+]
+
+[[package]]
+name = "fractal-gen-pkg"
+version = "0.23.0"
+dependencies = [
+ "fractal-gen",
+ "psibase-user-workspace-hack",
 ]
 
 [[package]]
@@ -1283,6 +1324,7 @@ dependencies = [
 name = "fractals-pkg"
 version = "0.23.0"
 dependencies = [
+ "de-facto",
  "fractals",
  "fractals-plugin",
  "psibase-user-workspace-hack",
@@ -1297,8 +1339,10 @@ dependencies = [
  "fractals-pkg",
  "psibase",
  "psibase-user-workspace-hack",
+ "psibase_plugin",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "wit-bindgen-rt",
 ]
 
@@ -1523,6 +1567,45 @@ dependencies = [
  "ff",
  "rand_core 0.6.4",
  "subtle",
+]
+
+[[package]]
+name = "guilds"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "evaluations",
+ "fractals",
+ "guilds-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "guilds-pkg"
+version = "0.23.0"
+dependencies = [
+ "guilds",
+ "guilds-plugin",
+ "r-guilds",
+]
+
+[[package]]
+name = "guilds-plugin"
+version = "0.23.0"
+dependencies = [
+ "guilds",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_plugin",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "wit-bindgen-rt",
 ]
 
 [[package]]
@@ -2113,6 +2196,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libz-rs-sys"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c10501e7805cee23da17c7790e59df2870c0d4043ec6d03f67d31e2b53e77415"
+dependencies = [
+ "zlib-rs",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2491,6 +2583,46 @@ dependencies = [
 ]
 
 [[package]]
+name = "prem-accounts"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "pem",
+ "prem-accounts-pkg",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "prem-accounts-pkg"
+version = "0.23.0"
+dependencies = [
+ "prem-accounts",
+ "prem-accounts-plugin",
+ "psibase-user-workspace-hack",
+ "r-prem-accts",
+]
+
+[[package]]
+name = "prem-accounts-plugin"
+version = "0.23.0"
+dependencies = [
+ "pem",
+ "prem-accounts",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_plugin",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2851,6 +2983,19 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-guilds"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "guilds",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
  "serde-aux",
  "serde_json",
 ]
@@ -2865,6 +3010,20 @@ dependencies = [
  "psibase-user-workspace-hack",
  "psibase_service",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "r-prem-accts"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "prem-accounts",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde-aux",
  "serde_json",
 ]
 
@@ -2921,6 +3080,19 @@ dependencies = [
  "serde-aux",
  "serde_json",
  "token-stream",
+]
+
+[[package]]
+name = "r-token-swap"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "token-swap",
 ]
 
 [[package]]
@@ -3519,12 +3691,12 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "socket2"
-version = "0.6.2"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f4aa3ad99f2088c990dfa82d367e19cb29268ed67c574d10d0a4bfe71f07e0"
+checksum = "233504af464074f9d066d7b5416c5f9b894a5862a6506e306f7b816cdd6f1807"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3839,6 +4011,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "token-swap"
+version = "0.23.0"
+dependencies = [
+ "async-graphql",
+ "psibase",
+ "psibase-user-workspace-hack",
+ "psibase_macros",
+ "psibase_service",
+ "serde",
+ "serde_json",
+ "token-swap-pkg",
+]
+
+[[package]]
+name = "token-swap-pkg"
+version = "0.23.0"
+dependencies = [
+ "r-token-swap",
+ "token-swap",
+ "token-swap-plugin",
+]
+
+[[package]]
+name = "token-swap-plugin"
+version = "0.23.0"
+dependencies = [
+ "psibase",
+ "psibase-user-workspace-hack",
+ "serde",
+ "serde_json",
+ "token-swap",
+ "wit-bindgen-rt",
+]
+
+[[package]]
 name = "tokens"
 version = "0.23.0"
 dependencies = [
@@ -4075,6 +4282,12 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "typed-path"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
 
 [[package]]
 name = "typenum"
@@ -4974,12 +5187,32 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "0.6.6"
+version = "7.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
+checksum = "c42e33efc22a0650c311c2ef19115ce232583abbe80850bc8b66509ebef02de0"
 dependencies = [
- "byteorder",
  "crc32fast",
- "crossbeam-utils",
  "flate2",
+ "indexmap",
+ "memchr",
+ "typed-path",
+ "zopfli",
+]
+
+[[package]]
+name = "zlib-rs"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40990edd51aae2c2b6907af74ffb635029d5788228222c4bb811e9351c0caad3"
+
+[[package]]
+name = "zopfli"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f05cd8797d63865425ff89b5c4a48804f35ba0ce8d125800027ad6017d2b5249"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "log",
+ "simd-adler32",
 ]

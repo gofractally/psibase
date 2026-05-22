@@ -17,10 +17,9 @@ namespace UserService
       {
          uint32_t      inviteId;
          AccountNumber actor;
-         TimePointUSec datetime;
          std::string   event;
       };
-      PSIO_REFLECT(InviteEvent, inviteId, actor, datetime, event);
+      PSIO_REFLECT(InviteEvent, inviteId, actor, event);
 
       struct InviteDetails
       {

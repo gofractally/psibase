@@ -13,6 +13,9 @@ postinstall = [
     { sender = "fractals", service = "sites", method = "enablespa", rawData = "010001" },
 ]
 
+[package.metadata.psibase.dependencies]
+TokenStream = "0.23.0"
+
 [dependencies]
 psibase.workspace = true
 psibase_service.workspace = true

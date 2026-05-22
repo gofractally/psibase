@@ -1,7 +1,7 @@
-import { AppConfigType } from "@/configuredApps";
+import { AppConfigType } from "@/configured-apps";
 import { BookUser } from "lucide-react";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { ContactsPage } from "./page";
 

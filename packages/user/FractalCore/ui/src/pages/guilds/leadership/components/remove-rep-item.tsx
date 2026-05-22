@@ -1,22 +1,28 @@
 import { AlertItem } from "@/components/alert-item";
 
+import { useGuildMemberRoles } from "@/hooks/fractals/use-guild-member-roles";
 import { useRemoveGuildRep } from "@/hooks/fractals/use-remove-guild-rep";
 import { useGuild } from "@/hooks/use-guild";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { ErrorCard } from "@shared/components/error-card";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const RemoveRepItem = () => {
     const { data: guild } = useGuild();
-    const { data: currentUser } = useCurrentUser();
-
-    const isRep = guild?.rep?.member === currentUser;
-    const isCouncilMember =
-        currentUser && guild?.council?.includes(currentUser);
+    const { data: roles, isPending, error } = useGuildMemberRoles();
 
     const { mutateAsync: removeGuildRep, isPending: isRemoving } =
         useRemoveGuildRep();
 
-    if (isCouncilMember && !isRep && guild?.rep?.member) {
+    if (isPending) {
+        return <Skeleton className="h-20 w-full" />;
+    }
+
+    if (error) {
+        return <ErrorCard error={error} />;
+    }
+
+    if (roles?.isCouncilMember && !roles?.isRep && guild?.rep?.member) {
         return (
             <AlertItem
                 title="Remove Representative"

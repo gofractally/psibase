@@ -185,6 +185,8 @@ TEST_CASE("test event in failed transaction")
    auto event_service =
        t.from(t.addService(EmitEvents::service, "EmitEvents.wasm")).to<EmitEvents>();
 
+   t.setAutoBlockStart(false);  // Avoid blockStart events
+
    auto id1 = event_service.foo("a", 1).returnVal();
    auto id2 = event_service.foo("b", 2).returnVal();
    CHECK(event_service.emitFail("c", 3).failed("die"));

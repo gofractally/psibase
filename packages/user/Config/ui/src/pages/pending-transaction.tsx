@@ -1,7 +1,6 @@
 import { Ban, Check, Trash } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { ErrorCard } from "@shared/components/error-card";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useAcceptStaged } from "@/hooks/use-accept-staged";
@@ -10,10 +9,12 @@ import { useRejectStaged } from "@/hooks/use-reject-staged";
 import { useRemoveStaged } from "@/hooks/use-remove-staged";
 import { useStagedTransaction } from "@/hooks/use-staged-transaction";
 import { useTxHistory } from "@/hooks/use-tx-history";
-import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { generateAvatar } from "@/lib/createIdenticon";
 
+import { ErrorCard } from "@shared/components/error-card";
+import { PageContainer } from "@shared/components/page-container";
 import { useChainId } from "@shared/hooks/use-chain-id";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { generateAvatar } from "@shared/lib/create-identicon";
 import { Avatar, AvatarImage } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
@@ -77,7 +78,7 @@ export const PendingTransaction = () => {
 
     if (data?.details) {
         return (
-            <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+            <PageContainer className="space-y-6">
                 <div className="flex flex-col justify-between rounded-sm border p-4">
                     <div className="flex w-full justify-between">
                         <div className="flex flex-col">
@@ -275,7 +276,7 @@ export const PendingTransaction = () => {
                         </Table>
                     </div>
                 </div>
-            </div>
+            </PageContainer>
         );
     } else if (isLoading) {
         return <LoadingBlock />;

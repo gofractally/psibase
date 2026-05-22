@@ -1,7 +1,7 @@
-import { AppConfigType } from "@/configuredApps";
+import { AppConfigType } from "@/configured-apps";
 import { Coins } from "lucide-react";
 
-import { zAccount } from "@/lib/zod/Account";
+import { zAccount } from "@shared/lib/schemas/account";
 
 import { TokensLayout } from "./layout";
 import { PendingPage } from "./pending";

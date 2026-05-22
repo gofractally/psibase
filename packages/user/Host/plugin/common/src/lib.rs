@@ -171,10 +171,6 @@ impl Client for HostCommon {
 
     fn get_app_url(app: String) -> String {
         let root = Supervisor::get_root_domain();
-        if app == "homepage" {
-            return root;
-        }
-
         let mut url = Url::parse(&root).unwrap();
         url.set_host(Some(&format!("{}.{}", app, url.host_str().unwrap())))
             .unwrap();

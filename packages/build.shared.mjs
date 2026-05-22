@@ -15,6 +15,8 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
       console.error(`Error: Source directory does not exist: ${path.relative(projectDir, source)}`);
       process.exit(1);
     }
+    // Source-only entries (no output, e.g. shared-ui consumed via path aliases) skip output validation
+    if (!output) continue;
     const outputParent = path.dirname(output);
     if (!fs.existsSync(outputParent)) {
       console.error(`Error: Output parent directory does not exist: ${path.relative(projectDir, outputParent)}`);
@@ -24,6 +26,7 @@ export function shouldSkipBuild(projectDir, buildDirs = []) {
 
   // Check if any output directories are missing or empty
   for (const { output } of buildDirs) {
+    if (!output) continue;
     if (!fs.existsSync(output) || fs.readdirSync(output).length === 0) {
       console.log(`Building (${path.relative(projectDir, output)} folder missing or empty)`);
       return false;

@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getStream } from "@/lib/getStream";
-import QueryKey, { OptionalString } from "@/lib/queryKeys";
+import { getStream } from "@/lib/get-stream";
+import QueryKey, { OptionalString } from "@/lib/query-keys";
 
 export const useStream = (id: OptionalString) =>
     useQuery({

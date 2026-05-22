@@ -15,7 +15,7 @@ mod service {
     use super::PackageSource;
     use crate as psibase;
     use crate::package::Meta;
-    use crate::{AccountNumber, Checksum256, Hex, PackageRef, Schema};
+    use crate::{AccountNumber, Checksum256, Hex, PackageExport, PackageRef, Schema};
     use fracpack::{Pack, ToSchema, Unpack};
     use serde::{Deserialize, Serialize};
 
@@ -29,6 +29,8 @@ mod service {
         pub description: String,
         pub depends: Vec<PackageRef>,
         pub accounts: Vec<AccountNumber>,
+        pub services: Vec<AccountNumber>,
+        pub exports: Vec<PackageExport>,
         pub owner: AccountNumber,
     }
 

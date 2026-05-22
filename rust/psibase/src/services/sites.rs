@@ -83,7 +83,7 @@ pub mod service {
 
     /// Serves a request by looking up the content uploaded to the specified subdomain
     #[action]
-    fn serveSys(request: HttpRequest) -> Option<crate::http::HttpReply> {
+    fn serveSys(request: HttpRequest, socket: Option<i32>) -> Option<crate::http::HttpReply> {
         unimplemented!()
     }
 
@@ -120,7 +120,25 @@ pub mod service {
     /// Note: For single-page applications, static assets (e.g. 'style.css') can be checked normally. However, all other assets
     /// are routed client-side, so a route like `/page1` is considered a valid route as long as the SPA serves a root document.
     #[action]
-    fn isValidPath(site: crate::AccountNumber, path: String) -> bool {
+    fn isValidPath(site: AccountNumber, path: String) -> bool {
+        unimplemented!()
+    }
+
+    /// Get file properties for a given site and path
+    #[action]
+    fn getProps(site: AccountNumber, path: String) -> Option<SitesContentRow> {
+        unimplemented!()
+    }
+
+    /// Get raw file data from a site, optionally decompressing it.
+    ///
+    /// Aborts if the file is not found.
+    ///
+    /// If the file has no encoding, or decompression is not requested, the raw data is returned.
+    /// Otherwise, the data is decompressed. This action aborts if no decompressor is available
+    /// for the file's encoding.
+    #[action]
+    fn getData(site: AccountNumber, path: String, decompress: bool) -> Vec<u8> {
         unimplemented!()
     }
 
@@ -156,14 +174,19 @@ pub mod service {
         unimplemented!()
     }
 
-    /// If content requested for the sender service is not found, proxy the request to the
-    /// specified proxy.
+    /// When `serveSys` looks up a path on the caller's site, and no file matches (after SPA and
+    /// index rules), it tries the same path on `proxy`'s uploaded content, then on that site's
+    /// proxy if configured, and so on.
+    ///
+    /// Files that exist on the caller's site always take precedence.
+    ///
+    ///  A proxy chain must not contain a cycle or `setProxy` aborts.
     #[action]
     fn setProxy(proxy: AccountNumber) {
         unimplemented!()
     }
 
-    /// Removes the proxy set with `setProxy`.
+    /// Removes the proxy fallback for the caller's site. No-op if none is set.
     #[action]
     fn clearProxy() {
         unimplemented!()

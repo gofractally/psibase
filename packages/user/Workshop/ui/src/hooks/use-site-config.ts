@@ -1,0 +1,85 @@
+import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
+
+import { graphql } from "@shared/lib/graphql";
+import { zAccount } from "@shared/lib/schemas/account";
+import { toast } from "@shared/shadcn/ui/sonner";
+
+const CSPString = z.string();
+
+const Config = z.object({
+    account: zAccount,
+    spa: z.boolean(),
+    cache: z.boolean(),
+    globalCsp: CSPString,
+});
+
+export const siteConfigQueryKey = (
+    account: z.infer<typeof zAccount> | undefined | null,
+) => ["siteConfig", account];
+
+export const SiteConfigResponse = z.object({
+    getConfig: Config.or(z.null()),
+    getContent: z.object({
+        edges: z
+            .object({
+                node: z.object({
+                    account: zAccount,
+                    path: z.string(),
+                    contentType: z.string(),
+                    hash: z.string(),
+                    contentEncoding: z.string().or(z.null()),
+                    csp: CSPString,
+                }),
+            })
+            .array(),
+    }),
+});
+
+export const useSiteConfig = (
+    account: z.infer<typeof zAccount> | undefined | null,
+) =>
+    useQuery({
+        queryKey: siteConfigQueryKey(account),
+        enabled: !!account,
+        queryFn: async () => {
+            try {
+                const res = await graphql(
+                    `
+          {
+          getConfig(account: "${account}") {
+            account
+            spa
+            cache
+            globalCsp
+          }
+          getContent(account: "${account}", first: 99) {
+            edges {
+              node {
+                account
+                path
+                contentType
+                hash
+                contentEncoding
+                csp
+              }
+            }
+            pageInfo {
+              hasPreviousPage
+              hasNextPage
+              startCursor
+              endCursor
+              }
+              }
+              }
+              `,
+                    { service: "sites" },
+                );
+
+                return SiteConfigResponse.parse(res);
+            } catch (e) {
+                toast("failure");
+                console.error(e);
+            }
+        },
+    });

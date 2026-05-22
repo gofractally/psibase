@@ -121,9 +121,7 @@ namespace SystemService
       /// * `allowedActions`: Argument from `runAs`
       /// * `claims`:         Claims in transaction (e.g. public keys).
       ///                     Empty if `runAs`
-      //
-      // TODO: return error message instead?
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,
@@ -459,6 +457,21 @@ namespace SystemService
       /// This is *not* the currently executing block time.
       /// TODO: remove
       psibase::BlockTime headBlockTime() const;
+
+      struct Events
+      {
+         struct History
+         {
+            /// Emitted at the start of each block
+            void blockStart(psibase::BlockNum blockNum, psibase::BlockTime blockTime) {}
+         };
+         struct Ui
+         {
+         };
+         struct Merkle
+         {
+         };
+      };
    };
    PSIO_REFLECT(Transact,
                 method(startBoot, bootTransactions),
@@ -482,6 +495,10 @@ namespace SystemService
    )
 
    PSIBASE_REFLECT_TABLES(Transact, Transact::Tables)
+   PSIBASE_REFLECT_EVENTS(Transact);
+   PSIBASE_REFLECT_HISTORY_EVENTS(Transact, method(blockStart, blockNum, blockTime));
+   PSIBASE_REFLECT_UI_EVENTS(Transact);
+   PSIBASE_REFLECT_MERKLE_EVENTS(Transact);
 
    // The status will never be nullopt during transaction execution or during RPC.
    // It will be nullopt when called by a test wasm before the genesis transaction

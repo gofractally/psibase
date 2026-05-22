@@ -1,10 +1,10 @@
 import { siblingUrl } from "@psibase/common-lib";
 
-import { useAppForm } from "@shared/components/form/app-form";
-
 import { useSetSnapshot } from "@/hooks/use-set-snapshot";
 import { useSnapshotSeconds } from "@/hooks/use-snapshot-seconds";
 
+import { useAppForm } from "@shared/components/form/app-form";
+import { PageContainer } from "@shared/components/page-container";
 import { Label } from "@shared/shadcn/ui/label";
 import {
     Select,
@@ -35,7 +35,7 @@ export const Settings = () => {
     });
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Settings</h2>
                 <p className="text-muted-foreground text-sm">
@@ -125,6 +125,6 @@ export const Settings = () => {
                     </div>
                 </div>
             </form>
-        </div>
+        </PageContainer>
     );
 };

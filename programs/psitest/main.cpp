@@ -1278,34 +1278,46 @@ struct callbacks
       BOOST_LOG_SCOPED_THREAD_TAG("Host", chain.getName());
       psibase::TransactionTrace trace;
       trace.actionTraces.emplace_back();
+
+      auto exec = [&](psibase::BlockContext& bc)
+      {
+         psibase::SignedTransaction  trx;
+         psibase::TransactionContext tc{bc, trx, trace, dbMode};
+
+         try
+         {
+            tc.execNonTrxAction(0, act, trace.actionTraces.back());
+            PSIBASE_LOG(bc.trxLogger, debug)
+                << act.service.str() << "::" << act.method.str() << " succeeded";
+         }
+         catch (std::exception& e)
+         {
+            if (!trace.error)
+            {
+               trace.error = e.what();
+            }
+            BOOST_LOG_SCOPED_LOGGER_TAG(bc.trxLogger, "Trace", trace);
+            PSIBASE_LOG(bc.trxLogger, debug)
+                << act.service.str() << "::" << act.method.str() << " failed: " << e.what();
+         }
+      };
+
       try
       {
          if (head)
          {
             psibase::BlockContext bc{*chain.sys, chain.head, chain.writer, true};
             bc.start();
-
-            psibase::SignedTransaction  trx;
-            psibase::TransactionContext tc{bc, trx, trace, dbMode};
-
-            tc.execNonTrxAction(0, act, trace.actionTraces.back());
+            exec(bc);
          }
          else
          {
-            auto* bc = chain.readBlockContext();
-
-            psibase::SignedTransaction  trx;
-            psibase::TransactionContext tc{*bc, trx, trace, dbMode};
-
-            tc.execNonTrxAction(0, act, trace.actionTraces.back());
+            exec(*chain.readBlockContext());
          }
       }
       catch (const std::exception& e)
       {
-         if (!trace.error)
-         {
-            trace.error = e.what();
-         }
+         trace.error = e.what();
       }
 
       state.result_value = psio::convert_to_frac(trace);

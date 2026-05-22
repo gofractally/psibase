@@ -1,4 +1,4 @@
-import type { PendingBalance } from "../../hooks/tokensPlugin/use-pending-balances";
+import type { PendingBalance } from "../../hooks/tokens-plugin/use-pending-balances";
 import type { PendingActionProps } from "../../pending";
 
 import { Loader2, X } from "lucide-react";
@@ -24,7 +24,7 @@ import {
     TooltipTrigger,
 } from "@shared/shadcn/ui/tooltip";
 
-import { useReject } from "../../hooks/tokensPlugin/use-reject";
+import { useReject } from "../../hooks/tokens-plugin/use-reject";
 import { zTransferFormMemo } from "../../lib/transfer-form-schema";
 
 export const RejectButton = ({

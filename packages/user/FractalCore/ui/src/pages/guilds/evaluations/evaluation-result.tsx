@@ -1,11 +1,10 @@
 import { CircleSlash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useEvaluationResults } from "@/hooks/fractals/use-evaluation-results";
 
 import { EmptyBlock } from "@shared/components/empty-block";
+import { PageContainer } from "@shared/components/page-container";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {

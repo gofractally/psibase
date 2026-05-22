@@ -114,6 +114,30 @@ std::optional<HttpReply> XProxy::serveSys(HttpRequest req, std::optional<std::in
          }
          return HttpReply{.headers = allowCors()};
       }
+
+      if (target == "/remove_origin_server")
+      {
+         if (req.method != "POST")
+            return HttpReply::methodNotAllowed(req);
+         if (req.contentType != "application/json")
+         {
+            std::string_view msg = "Content-Type must be application/json\n";
+            return makeError(HttpStatus::unsupportedMediaType, msg);
+         }
+         auto originSubdomain = psio::convert_from_json<AccountNumber>(
+             std::string(req.body.begin(), req.body.end()));
+         auto table = open<OriginServerTable>();
+         PSIBASE_SUBJECTIVE_TX
+         {
+            if (!table.get(originSubdomain))
+            {
+               std::string_view msg{"Origin server not found\n"};
+               return makeError(HttpStatus::notFound, msg);
+            }
+            table.erase(originSubdomain);
+         }
+         return HttpReply{.headers = allowCors()};
+      }
    }
    else
    {

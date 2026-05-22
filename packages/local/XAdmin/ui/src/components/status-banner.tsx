@@ -1,8 +1,8 @@
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 
-import { useConfig } from "../hooks/useConfig";
-import { usePeers } from "../hooks/usePeers";
-import { useStatuses } from "../hooks/useStatuses";
+import { useConfig } from "../hooks/use-config";
+import { usePeers } from "../hooks/use-peers";
+import { useStatuses } from "../hooks/use-statuses";
 
 export const StatusBanner = () => {
     const { error: peersError } = usePeers();
@@ -29,9 +29,7 @@ export const StatusBanner = () => {
             case "needgenesis":
                 return (
                     <div>
-                        <div>
-                            No chain running.
-                        </div>
+                        <div>No chain running.</div>
                         <div className="flex gap-1">
                             <a
                                 className="text-primary font-medium underline underline-offset-4"

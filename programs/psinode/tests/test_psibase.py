@@ -65,7 +65,7 @@ class TestPackage:
     def write(self, directory):
         filename = self.filename()
         package_filename = os.path.join(directory, filename)
-        meta = {'name': self.name, 'version': self.version, 'scope': self.scope, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts}
+        meta = {'name': self.name, 'version': self.version, 'scope': self.scope, 'description': self.description, 'depends': self._depends, 'accounts': self.accounts, 'exports': [{'name': a, 'service': a} for a in self.accounts]}
         with zipfile.ZipFile(package_filename, 'w', zipfile.ZIP_DEFLATED) as archive:
             with archive.open('meta.json', 'w') as file:
                 json.dump(meta, TextIOWrapper(file, encoding='utf-8'))
@@ -142,7 +142,7 @@ class TestPsibase(unittest.TestCase):
                 [{"sender":"root",
                   "service":"accounts",
                   "method":"newAccount",
-                  "data":{"name":account,"authService":"auth-any","requireNew":False}}])
+                  "data":{"name":account,"authService":"auth-any","requireMatch":False}}])
         a.run_psibase(['push'] + a.node_args(), input=make_input('bbbbb12345'), text=True)
         a.run_psibase(['push', '-'] + a.node_args(), input=make_input('ccccc12345'), text=True)
         with tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8') as f:

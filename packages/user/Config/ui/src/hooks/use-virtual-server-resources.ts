@@ -1,9 +1,10 @@
-import { siblingUrl } from "@psibase/common-lib";
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { graphql } from "@/lib/graphql";
-import QueryKey from "@/lib/queryKeys";
+import QueryKey from "@/lib/query-keys";
+
+import { graphql } from "@shared/lib/graphql";
+
 // import { CpuPricing, NetPricing } from "./use-resource-pricing";
 
 const zServerSpecs = z.object({
@@ -74,10 +75,7 @@ export const useVirtualServerResources = () => {
                 }
             `;
 
-            const res = await graphql(
-                query,
-                siblingUrl(null, "vserver", "/graphql"),
-            );
+            const res = await graphql(query, { service: "vserver" });
             const parsed = zResourcesResponse.parse(res);
             return {
                 serverSpecs: parsed.getServerSpecs,

@@ -39,13 +39,7 @@ pub fn service_macro_impl(attr: TokenStream, item: TokenStream) -> TokenStream {
         options.name = std::env::var("CARGO_PKG_NAME").unwrap().replace('_', "-");
     }
     if options.dispatch.is_none() {
-        options.dispatch = Some(std::env::var_os("CARGO_PRIMARY_PACKAGE").is_some());
-    }
-    if options.generate_schema.is_none() {
-        options.generate_schema = options.dispatch.clone();
-    }
-    if std::env::var_os("CARGO_PSIBASE_TEST").is_some() {
-        options.dispatch = Some(false);
+        options.dispatch = Some(true);
     }
 
     let psibase_mod = proc_macro2::TokenStream::from_str(&options.psibase_mod).unwrap();
@@ -754,17 +748,20 @@ fn process_mod(
         };
         if options.dispatch.unwrap() {
             items.push(parse_quote! {
+                #[cfg(not(test))]
                 #[automatically_derived]
                 #[cfg(target_family = "wasm")]
-                mod service_wasm_interface {
+                pub mod service_wasm_interface {
+                    use super::super::*;
+                    pub use #psibase_mod as psibase;
+                    pub use psibase_service;
+                    pub use super::#wrapper as Wrapper;
                     fn dispatch(act: #psibase_mod::SharedAction) -> #psibase_mod::fracpack::Result<()> {
-                        psibase_service::force_use();
                         #dispatch_body
                         Ok(())
                     }
 
-                    #[no_mangle]
-                    pub unsafe extern "C" fn called(_this_service: u64, sender: u64) {
+                    pub unsafe fn called(_this_service: u64, sender: u64) {
                         #begin_protection
                         let prev = #psibase_mod::get_sender();
                         #psibase_mod::set_sender(#psibase_mod::AccountNumber::new(sender));
@@ -776,13 +773,7 @@ fn process_mod(
                         #end_protection
                     }
 
-                    extern "C" {
-                        fn __wasm_call_ctors();
-                    }
-
-                    #[no_mangle]
-                    pub unsafe extern "C" fn start(this_service: u64) {
-                        __wasm_call_ctors();
+                    pub unsafe fn start(this_service: u64) {
                         #psibase_mod::set_service(#psibase_mod::AccountNumber::new(this_service));
                     }
                 }
@@ -822,17 +813,17 @@ fn process_mod(
         quote! {#[allow(dead_code)]}
     };
     let polyfill = gen_polyfill(psibase_mod);
-    let schema_gen = if options.generate_schema.unwrap() {
+    let export_wasm_interface = if options.dispatch.unwrap() {
         quote! {
-            #[test]
-            #[ignore]
-            fn _psibase_get_schema() {
-                #psibase_mod::print_schema_impl::<#mod_name::#wrapper>()
-            }
+            #[cfg(not(test))]
+            #[automatically_derived]
+            #[cfg(target_family = "wasm")]
+            pub use #mod_name::service_wasm_interface;
         }
     } else {
         quote! {}
     };
+
     quote! {
         #silence
         #impl_mod
@@ -847,9 +838,8 @@ fn process_mod(
         #[automatically_derived]
         pub use #mod_name::#structs;
 
+        #export_wasm_interface
         #polyfill
-
-        #schema_gen
     }
     .into()
 } // process_mod

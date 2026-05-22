@@ -1,6 +1,7 @@
 //! Interfaces for standard services
 
 pub mod accounts;
+pub mod auth_any;
 pub mod auth_delegate;
 pub mod auth_dyn;
 pub mod auth_sig;
@@ -11,9 +12,11 @@ pub mod cpu_limit;
 pub mod credentials;
 pub mod db;
 pub mod diff_adjust;
+pub mod dyn_ld;
 pub mod evaluations;
 pub mod events;
 pub mod fractals;
+pub mod guilds;
 pub mod http_server;
 #[allow(non_snake_case)]
 pub mod invite;
@@ -29,6 +32,7 @@ pub mod staged_tx;
 pub mod subgroups;
 pub mod symbol;
 pub mod token_stream;
+pub mod token_swap;
 pub mod tokens;
 pub mod transact;
 pub mod verify_sig;
@@ -37,3 +41,4 @@ pub mod x_admin;
 pub mod x_db;
 pub mod x_http;
 pub mod x_packages;
+pub mod x_sites;

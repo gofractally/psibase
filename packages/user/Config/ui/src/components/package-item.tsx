@@ -5,7 +5,7 @@ import {
     LucideShieldQuestion,
 } from "lucide-react";
 
-import { ProcessedPackage } from "@/lib/zod/CommonPackage";
+import { ProcessedPackage } from "@/lib/zod/common-package";
 
 import { cn } from "@shared/lib/utils";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";

@@ -1,13 +1,15 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { ProtectedRoute } from "@shared/components/protected-route";
+
 import { Layout } from "./components/layout";
-import { ProtectedRoute } from "./components/protected-route";
-import { Loader } from "./pages/Loader";
 import { BlockProduction } from "./pages/block-production";
 import { Branding } from "./pages/branding";
+import { Loader } from "./pages/loader";
 import { Packages } from "./pages/packages";
 import { PendingTransaction } from "./pages/pending-transaction";
 import { PendingTransactions } from "./pages/pending-transactions";
+import { PremiumNameMarketConfig } from "./pages/premium-name-market-config";
 import { ResourcePricing } from "./pages/resource-pricing";
 import { Resources } from "./pages/resources";
 import { Settings } from "./pages/settings";
@@ -74,6 +76,14 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <ResourcePricing />
+                    </ProtectedRoute>
+                ),
+            },
+            {
+                path: "premium-name-market-config",
+                element: (
+                    <ProtectedRoute>
+                        <PremiumNameMarketConfig />
                     </ProtectedRoute>
                 ),
             },

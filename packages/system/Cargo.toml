@@ -22,6 +22,7 @@ exclude = [
     "AuthAny/plugin/",
     "AuthDelegate/plugin/",
     "AuthSig/plugin/",
+    "HttpServer/plugin/",
     "Producers/plugin/",
     "SetCode/plugin/",
     "Transact/plugin/",

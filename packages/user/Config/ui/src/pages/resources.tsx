@@ -1,13 +1,15 @@
-import { useSystemToken } from "@shared/hooks/use-system-token";
-
 import { Billing } from "@/components/billing";
 import { VirtualServer } from "@/components/virtual-server";
 
+import { PageContainer } from "@shared/components/page-container";
+import { useSystemToken } from "@shared/hooks/use-system-token";
+
 export const Resources = () => {
-    const { data: systemToken, isLoading: systemTokenLoading } = useSystemToken();
+    const { data: systemToken, isLoading: systemTokenLoading } =
+        useSystemToken();
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Resources</h2>
                 <p className="text-muted-foreground text-sm">
@@ -22,7 +24,6 @@ export const Resources = () => {
                     systemTokenLoading={systemTokenLoading}
                 />
             </div>
-        </div>
+        </PageContainer>
     );
 };
-

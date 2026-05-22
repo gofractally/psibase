@@ -1559,13 +1559,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@noble/hashes@npm:^1.7.1":
-  version: 1.8.0
-  resolution: "@noble/hashes@npm:1.8.0"
-  checksum: 10c0/06a0b52c81a6fa7f04d67762e08b2c476a00285858150caeaaff4037356dd5e119f45b2a530f638b77a5eeca013168ec1b655db41bae3236cb2e9d511484fc77
-  languageName: node
-  linkType: hard
-
 "@nodelib/fs.scandir@npm:2.1.5":
   version: 2.1.5
   resolution: "@nodelib/fs.scandir@npm:2.1.5"
@@ -1836,21 +1829,19 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/evaluations-ui@workspace:user/Evaluations/ui"
   dependencies:
-    "@noble/hashes": "npm:^1.7.1"
+    "@psibase/common-lib": "workspace:*"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
-    "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
-    humanize-duration: "npm:^3.32.1"
     lucide-react: "npm:^0.475.0"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
+    react-easy-sort: "npm:^1.8.0"
     react-router-dom: "npm:^6.23.1"
     typescript: "npm:^5.7.3"
     usehooks-ts: "npm:^3.1.1"
@@ -1902,25 +1893,21 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@psibase/fractal-core-ui@workspace:user/FractalCore/ui"
   dependencies:
-    "@dicebear/collection": "npm:^9.2.2"
-    "@dicebear/core": "npm:^9.2.2"
     "@tanstack/react-form": "npm:^1.11.1"
-    "@tanstack/react-pacer": "npm:^0.6.0"
+    "@tanstack/react-pacer": "npm:0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
-    "@uidotdev/usehooks": "npm:^2.4.1"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
     humanize-duration: "npm:^3.32.2"
     lucide-react: "npm:^0.475.0"
-    nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
     react-confetti-explosion: "npm:^3.0.3"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
+    react-easy-sort: "npm:^1.8.0"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
     usehooks-ts: "npm:^3.1.1"
@@ -1936,24 +1923,18 @@ __metadata:
     "@dicebear/collection": "npm:^9.2.2"
     "@dicebear/core": "npm:^9.2.2"
     "@tanstack/react-form": "npm:^1.11.1"
-    "@tanstack/react-pacer": "npm:^0.16.1"
     "@tanstack/react-query": "npm:^5.90.6"
-    "@types/humanize-duration": "npm:^3.27.4"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
     "@types/react-dom": "npm:^19.1.0"
     "@uidotdev/usehooks": "npm:^2.4.1"
     dayjs: "npm:^1.11.13"
     eslint: "npm:^9.15.0"
-    humanize-duration: "npm:^3.32.2"
     lucide-react: "npm:^0.475.0"
-    nuqs: "npm:^2.4.3"
     react: "npm:^19.1.0"
     react-dom: "npm:^19.1.0"
-    react-easy-sort: "npm:^1.6.0"
     react-router-dom: "npm:^6.26.1"
     typescript: "npm:^5.7.3"
-    usehooks-ts: "npm:^3.1.1"
     vite: "npm:^5.4.1"
     zod: "npm:^3.24.2"
   languageName: unknown
@@ -2063,7 +2044,6 @@ __metadata:
     "@bytecodealliance/jco": "npm:1.10.2"
     "@bytecodealliance/preview2-shim": "npm:^0.17.2"
     "@psibase/common-lib": "workspace:*"
-    "@rollup/browser": "npm:^4.9.0"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"
     "@types/react": "npm:^19.1.0"
@@ -3977,13 +3957,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@standard-schema/spec@npm:1.0.0":
-  version: 1.0.0
-  resolution: "@standard-schema/spec@npm:1.0.0"
-  checksum: 10c0/a1ab9a8bdc09b5b47aa8365d0e0ec40cc2df6437be02853696a0e377321653b0d3ac6f079a8c67d5ddbe9821025584b1fb71d9cc041a6666a96f1fadf2ece15f
-  languageName: node
-  linkType: hard
-
 "@standard-schema/spec@npm:^1.0.0":
   version: 1.1.0
   resolution: "@standard-schema/spec@npm:1.1.0"
@@ -4541,6 +4514,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/devtools-event-client@npm:^0.2.2":
+  version: 0.2.5
+  resolution: "@tanstack/devtools-event-client@npm:0.2.5"
+  checksum: 10c0/3fb7a171d63bc27fb683bbdb274ac9bb00cee01b70fe74d2a8d62f49243468991182d622901dba8b4aa79a26783ba03e55c7498eba78bd52795e926125c1be59
+  languageName: node
+  linkType: hard
+
 "@tanstack/devtools-event-client@npm:^0.3.2":
   version: 0.3.5
   resolution: "@tanstack/devtools-event-client@npm:0.3.5"
@@ -4573,6 +4553,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/pacer@npm:0.15.1":
+  version: 0.15.1
+  resolution: "@tanstack/pacer@npm:0.15.1"
+  dependencies:
+    "@tanstack/devtools-event-client": "npm:^0.2.2"
+    "@tanstack/store": "npm:^0.7.2"
+  checksum: 10c0/1034c9bd8961f946db348258d7f115daaeb6bca762d754106b752bcfbfcbfda6c8bcbded32729d12d90260c8ade8abfeb8a31a600908308e7da1d3a18bcf8300
+  languageName: node
+  linkType: hard
+
 "@tanstack/pacer@npm:0.15.4":
   version: 0.15.4
   resolution: "@tanstack/pacer@npm:0.15.4"
@@ -4580,13 +4570,6 @@ __metadata:
     "@tanstack/devtools-event-client": "npm:^0.3.2"
     "@tanstack/store": "npm:^0.7.5"
   checksum: 10c0/0f926f508205a1892e86fb22f4818cb4afe1c28db08f94dda63d567db164c2cfe73b181ca936de4a7c848765181853b28d8d5cd9da6d2c0173215c5d4594b233
-  languageName: node
-  linkType: hard
-
-"@tanstack/pacer@npm:0.6.0":
-  version: 0.6.0
-  resolution: "@tanstack/pacer@npm:0.6.0"
-  checksum: 10c0/4deae6181d77cfab8099325cb1712fc583ff71870d1d5011461896b5c35cf20fa9d20ae7d0bd9f89ef1429cc355b798da82d392ff74c0678e68302eba48e72ee
   languageName: node
   linkType: hard
 
@@ -4612,6 +4595,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tanstack/react-pacer@npm:0.16.1":
+  version: 0.16.1
+  resolution: "@tanstack/react-pacer@npm:0.16.1"
+  dependencies:
+    "@tanstack/pacer": "npm:0.15.1"
+    "@tanstack/react-store": "npm:^0.7.3"
+  peerDependencies:
+    react: ">=16.8"
+    react-dom: ">=16.8"
+  checksum: 10c0/48c378d61dbb78aa2f3abf12e222da666ab66a567223d975304805059676b22e7e397e08461364a822cebe187dec8d83dbfb6cc1625d1614b952dcce2f9569ac
+  languageName: node
+  linkType: hard
+
 "@tanstack/react-pacer@npm:^0.16.1":
   version: 0.16.4
   resolution: "@tanstack/react-pacer@npm:0.16.4"
@@ -4622,18 +4618,6 @@ __metadata:
     react: ">=16.8"
     react-dom: ">=16.8"
   checksum: 10c0/0204f60505215cba9729de13de5ca2b11a46bcbf349162bbf543ce618125dfca0e16a89da550d86dd3b4a2f360a92edd6d28216afc6ce88a2c4e90d47e559e93
-  languageName: node
-  linkType: hard
-
-"@tanstack/react-pacer@npm:^0.6.0":
-  version: 0.6.0
-  resolution: "@tanstack/react-pacer@npm:0.6.0"
-  dependencies:
-    "@tanstack/pacer": "npm:0.6.0"
-  peerDependencies:
-    react: ">=16.8"
-    react-dom: ">=16.8"
-  checksum: 10c0/4854e329ada0c3c95b05e1fbdaa9a9b1636a4b5e89a0b9f346adac3d103f87b9c9a26569e95a49ded712f019439b30a8a57cc26217ade8f42d222fdb9c72bf79
   languageName: node
   linkType: hard
 
@@ -4648,7 +4632,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/react-store@npm:^0.7.5":
+"@tanstack/react-store@npm:^0.7.3, @tanstack/react-store@npm:^0.7.5":
   version: 0.7.7
   resolution: "@tanstack/react-store@npm:0.7.7"
   dependencies:
@@ -4686,7 +4670,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@tanstack/store@npm:0.7.7, @tanstack/store@npm:^0.7.5, @tanstack/store@npm:^0.7.7":
+"@tanstack/store@npm:0.7.7, @tanstack/store@npm:^0.7.2, @tanstack/store@npm:^0.7.5, @tanstack/store@npm:^0.7.7":
   version: 0.7.7
   resolution: "@tanstack/store@npm:0.7.7"
   checksum: 10c0/bf90fa957bd97336d7dbc0d7b87379b5fe4baea030efef8a93fe4e49ac1c8bc929247d1a9f84b16a1642e386b67fe53be14df8d5415efdf85f83733ccdf8877a
@@ -9858,15 +9842,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lucide-react@npm:^0.378.0":
-  version: 0.378.0
-  resolution: "lucide-react@npm:0.378.0"
-  peerDependencies:
-    react: ^16.5.1 || ^17.0.0 || ^18.0.0
-  checksum: 10c0/b420601bdda257ec9f62c40f6e048d4a3b2845d1db8599dce80497fa4ffe438a227dceedeb4a9b7afca17dfc7a07f23ef0a06e72276c5c6c6f51c32b581ece67
-  languageName: node
-  linkType: hard
-
 "lucide-react@npm:^0.429.0":
   version: 0.429.0
   resolution: "lucide-react@npm:0.429.0"
@@ -10407,33 +10382,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nuqs@npm:^2.4.3":
-  version: 2.8.6
-  resolution: "nuqs@npm:2.8.6"
-  dependencies:
-    "@standard-schema/spec": "npm:1.0.0"
-  peerDependencies:
-    "@remix-run/react": ">=2"
-    "@tanstack/react-router": ^1
-    next: ">=14.2.0"
-    react: ">=18.2.0 || ^19.0.0-0"
-    react-router: ^5 || ^6 || ^7
-    react-router-dom: ^5 || ^6 || ^7
-  peerDependenciesMeta:
-    "@remix-run/react":
-      optional: true
-    "@tanstack/react-router":
-      optional: true
-    next:
-      optional: true
-    react-router:
-      optional: true
-    react-router-dom:
-      optional: true
-  checksum: 10c0/51cd3cbc77903688844daa2f189ce5548db05f43b9e98a62cd5fd0e62334dd270e413cfd9365ebcaa08d38be77bd9864563bca5c2e2a237f0f80b1d8ad1c0cad
-  languageName: node
-  linkType: hard
-
 "object-assign@npm:^4.0.1, object-assign@npm:^4.1.1":
   version: 4.1.1
   resolution: "object-assign@npm:4.1.1"
@@ -10673,24 +10621,6 @@ __metadata:
   checksum: 10c0/c36c19907734c904b16994e6535b02c36c2224d433e01a2f1ab777237f4d86e6289fd5fd464850491e940379d4606ed850c03e0f9ab600b0ebddb511312e177f
   languageName: node
   linkType: hard
-
-"packages@workspace:user/Packages/ui":
-  version: 0.0.0-use.local
-  resolution: "packages@workspace:user/Packages/ui"
-  dependencies:
-    "@tanstack/react-query": "npm:^5.90.6"
-    "@types/node": "npm:^22.15.0"
-    "@types/react": "npm:^19.1.0"
-    "@types/react-dom": "npm:^19.1.0"
-    eslint: "npm:^9.15.0"
-    lucide-react: "npm:^0.378.0"
-    react: "npm:^19.1.0"
-    react-dom: "npm:^19.1.0"
-    typescript: "npm:^5.7.3"
-    vite: "npm:^5.4.1"
-    zod: "npm:^3.24.2"
-  languageName: unknown
-  linkType: soft
 
 "pako@npm:~1.0.2":
   version: 1.0.11
@@ -11036,6 +10966,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"prem-accounts@workspace:user/PremAccounts/ui":
+  version: 0.0.0-use.local
+  resolution: "prem-accounts@workspace:user/PremAccounts/ui"
+  dependencies:
+    "@tanstack/react-query": "npm:^5.90.6"
+    "@types/node": "npm:^22.15.0"
+    "@types/react": "npm:^19.1.0"
+    "@types/react-dom": "npm:^19.1.0"
+    eslint: "npm:^9.15.0"
+    lucide-react: "npm:^0.475.0"
+    react: "npm:^19.1.0"
+    react-dom: "npm:^19.1.0"
+    react-router-dom: "npm:^6.26.1"
+    typescript: "npm:^5.7.3"
+    vite: "npm:^5.4.1"
+    zod: "npm:^3.24.2"
+  languageName: unknown
+  linkType: soft
+
 "prettier-linter-helpers@npm:^1.0.0":
   version: 1.0.1
   resolution: "prettier-linter-helpers@npm:1.0.1"
@@ -11338,7 +11287,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-easy-sort@npm:^1.6.0":
+"react-easy-sort@npm:^1.8.0":
   version: 1.8.0
   resolution: "react-easy-sort@npm:1.8.0"
   dependencies:
@@ -12889,6 +12838,7 @@ __metadata:
   resolution: "token-stream@workspace:user/TokenStream/ui"
   dependencies:
     "@number-flow/react": "npm:^0.5.10"
+    "@psibase/common-lib": "workspace:*"
     "@tanstack/react-form": "npm:^1.19.3"
     "@tanstack/react-query": "npm:^5.90.6"
     "@types/node": "npm:^22.15.0"

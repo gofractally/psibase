@@ -9,16 +9,19 @@
 #![cfg_attr(not(target_family = "wasm"), allow(unused_imports, dead_code))]
 
 use crate::{
-    actions::login_action, check, create_boot_transactions, get_optional_result_bytes,
-    get_result_bytes, services, status_key, tester_raw, AccountNumber, Action, BlockTime, Caller,
-    Checksum256, CodeByHashRow, CodeRow, DbId, DirectoryRegistry, Error, HostConfigRow, HttpBody,
-    HttpHeader, HttpReply, HttpRequest, InnerTraceEnum, KvHandle, KvMode, PackageRegistry,
-    PackagedService, RunMode, SchemaMap, Seconds, SignedTransaction, StatusRow, Table, TableRecord,
-    Tapos, TimePointSec, TimePointUSec, ToKey, Transaction, TransactionBuilder, TransactionTrace,
+    actions::login_action, check, create_boot_transactions, fetch_packages,
+    get_optional_result_bytes, get_result_bytes, services, status_key, tester_raw, AccountNumber,
+    Action, ActionFormatter, BlockTime, Caller, Checksum256, CodeByHashRow, CodeRow, DbId,
+    DirectoryRegistry, Error, HostConfigRow, HttpBody, HttpHeader, HttpReply, HttpRequest,
+    InnerTraceEnum, JointRegistry, KvHandle, KvMode, PackageOpFull, PackageRegistry,
+    PackagedService, RunMode, Schema, SchemaFetcher, SchemaMap, Seconds, SignedTransaction,
+    StatusRow, Table, TableRecord, Tapos, TimePointSec, TimePointUSec, ToKey, Transaction,
+    TransactionBuilder, TransactionTrace,
 };
 #[cfg(target_family = "wasm")]
-use crate::{MicroSeconds, PackageList, PackageOp};
+use crate::{MicroSeconds, PackageList};
 use anyhow::anyhow;
+use async_trait::async_trait;
 use chrono::Utc;
 use fracpack::{Pack, Unpack, UnpackOwned};
 use futures::executor::block_on;
@@ -27,7 +30,8 @@ use serde::{de::DeserializeOwned, Deserialize};
 use sha2::{Digest, Sha256};
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
-use std::io::{Read, Seek};
+use std::fs::File;
+use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::{marker::PhantomData, ptr::null_mut};
 
@@ -127,6 +131,17 @@ impl Chain {
         self.boot_with(&Self::default_registry(), &default_services[..])
     }
 
+    pub fn test_registry() -> JointRegistry<BufReader<File>> {
+        let mut registry = JointRegistry::new();
+        if let Ok(local_packages) = std::env::var("CARGO_PSIBASE_PACKAGE_PATH") {
+            for path in local_packages.split(':') {
+                registry.push(DirectoryRegistry::new(path.into())).unwrap();
+            }
+        }
+        registry.push(Self::default_registry()).unwrap();
+        registry
+    }
+
     pub fn default_registry() -> DirectoryRegistry {
         let psibase_data_dir = std::env::var("PSIBASE_DATADIR")
             .expect("Cannot find package directory: PSIBASE_DATADIR not defined");
@@ -135,7 +150,7 @@ impl Chain {
     }
 
     pub fn boot_with<R: PackageRegistry>(&self, reg: &R, services: &[String]) -> Result<(), Error> {
-        let mut services = block_on(reg.resolve(services))?;
+        let mut services = block_on(reg.resolve(services, false))?;
 
         const COMPRESSION_LEVEL: u32 = 4;
         let (boot_tx, subsequent_tx) = create_boot_transactions(
@@ -143,7 +158,7 @@ impl Chain {
             &None,
             PRODUCER_ACCOUNT,
             false,
-            TimePointSec { seconds: 10 },
+            TimePointSec { seconds: 120 },
             &mut services[..],
             COMPRESSION_LEVEL,
         )
@@ -158,6 +173,7 @@ impl Chain {
         for (_, group, _) in subsequent_tx {
             for trx in group {
                 self.push(&trx).ok()?;
+                self.start_block();
             }
         }
 
@@ -231,20 +247,14 @@ impl Chain {
         let packages_dir = packages_root.join("packages");
         let registry = DirectoryRegistry::new(packages_dir);
         let package_names = vec!["XDefault".to_string()];
-        let packages =
-            block_on(PackageList::new().resolve_changes(&registry, &package_names, false, true))
-                .unwrap();
+        let packages = block_on(registry.resolve(&package_names, true)).unwrap();
         let mut requests = Vec::new();
         let mut early_requests = Vec::new();
         unsafe {
             tester_raw::checkoutSubjective(self.chain_handle);
         }
         let root_host = "\0";
-        for op in packages {
-            let PackageOp::Install(info) = op else {
-                panic!("Only install is expected when there are no existing packages")
-            };
-            let mut package = block_on(registry.get_by_info(&info)).unwrap();
+        for mut package in packages {
             for (account, info, code) in package.services() {
                 let hash: [u8; 32] = Sha256::digest(&code).into();
                 let code_hash: Checksum256 = hash.into();
@@ -307,7 +317,7 @@ impl Chain {
             requests.push(HttpRequest {
                 host: services::x_packages::SERVICE.to_string() + "." + root_host,
                 method: "PUT".to_string(),
-                target: format!("/manifest/{}", info.sha256),
+                target: format!("/manifest/{}", package.hash()),
                 contentType: "application/json".to_string(),
                 headers: vec![],
                 body: serde_json::to_string(&package.manifest())
@@ -321,7 +331,12 @@ impl Chain {
                 target: "/postinstall".to_string(),
                 contentType: "application/json".to_string(),
                 headers: vec![],
-                body: serde_json::to_string(&info).unwrap().into_bytes().into(),
+                body: serde_json::to_string(
+                    &package.meta().info(package.hash().clone(), String::new()),
+                )
+                .unwrap()
+                .into_bytes()
+                .into(),
             });
         }
         check(
@@ -595,7 +610,8 @@ impl Chain {
     pub fn new_account(&self, account: AccountNumber) -> Result<(), anyhow::Error> {
         services::accounts::Wrapper::push(self)
             .newAccount(account, AccountNumber::new(account_raw!("auth-any")), false)
-            .get()
+            .get()?;
+        Ok(())
     }
 
     /// Deploy a service
@@ -624,7 +640,9 @@ impl Chain {
                 let trace = self.push(&SignedTransaction {
                     transaction: trx.packed().into(),
                     proofs: Default::default(),
+                    subjectiveData: None,
                 });
+                self.start_block();
                 ChainEmptyResult { trace }.get()?
             }
         }
@@ -660,26 +678,31 @@ impl Chain {
         packages: &[String],
     ) -> Result<(), anyhow::Error> {
         use crate::Table;
+        let sender = services::producers::ROOT;
         let installed_table = self.open::<services::packages::InstalledPackage, services::packages::InstalledPackageTable>();
         let mut installed = PackageList::new();
         for p in &installed_table.get_index_pk() {
             installed.insert_installed(p)
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
+        let packages = block_on(fetch_packages(reg, packages, &installed))?;
+        let updated_packages = installed.into_updated(&packages, sender);
 
         let mut schemas = SchemaMap::new();
-        let sender = services::producers::ROOT;
         const TARGET_SIZE: usize = 1024 * 1024;
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {
             match op {
-                PackageOp::Install(info) => {
+                PackageOpFull::Install(mut package) => {
                     let mut builder = TransactionBuilder::new(TARGET_SIZE, |actions| Ok(actions));
-                    let mut package = block_on(reg.get_by_info(&info))?;
                     self.load_schemas(&mut package, &mut schemas)?;
-                    builder.set_label(format!("Installing {}-{}", &info.name, &info.version));
+                    builder.set_label(format!(
+                        "Installing {}-{}",
+                        package.name(),
+                        package.version()
+                    ));
                     let mut account_actions = vec![];
-                    package.install_accounts(&mut account_actions, None, sender, &None)?;
+                    package.install_accounts(&mut account_actions, None, sender)?;
                     builder.push_all(account_actions)?;
                     let mut actions = vec![];
                     package.install(
@@ -689,6 +712,7 @@ impl Chain {
                         true,
                         COMPRESSION_LEVEL,
                         &mut schemas,
+                        &updated_packages,
                     )?;
                     builder.push_all(actions)?;
 
@@ -821,6 +845,7 @@ impl Chain {
         let strx = SignedTransaction {
             transaction: trx.packed().into(),
             proofs: vec![],
+            subjectiveData: None,
         };
 
         let reply = self.post(
@@ -839,6 +864,10 @@ impl Chain {
 
         let login_reply: LoginReply = reply.json()?;
         Ok(login_reply.access_token)
+    }
+
+    pub fn display_trace<'a>(&'a self, trace: &'a TransactionTrace) -> ChainDisplayTrace<'a> {
+        ChainDisplayTrace { chain: self, trace }
     }
 }
 
@@ -860,6 +889,41 @@ impl Chain {
                 trx.tapos.refBlockSuffix = u32::from_le_bytes(suffix);
             }
         }
+    }
+}
+
+#[cfg(target_family = "wasm")]
+pub struct ChainDisplayTrace<'a> {
+    chain: &'a Chain,
+    trace: &'a TransactionTrace,
+}
+
+#[cfg(target_family = "wasm")]
+impl<'a> std::fmt::Display for ChainDisplayTrace<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let formatter = ActionFormatter::new(ChainSchemaFetcher { chain: self.chain });
+        let _ = block_on(formatter.prepare_transaction_trace(self.trace));
+        write!(f, "{}", formatter.display_transaction_trace(self.trace))
+    }
+}
+
+#[cfg(target_family = "wasm")]
+struct ChainSchemaFetcher<'a> {
+    chain: &'a Chain,
+}
+
+#[cfg(target_family = "wasm")]
+#[async_trait(?Send)]
+impl<'a> SchemaFetcher for ChainSchemaFetcher<'a> {
+    async fn fetch_schema(&self, service: AccountNumber) -> Result<Schema, anyhow::Error> {
+        let index = self
+            .chain
+            .open::<services::packages::InstalledSchema, services::packages::InstalledSchemaTable>()
+            .get_index_pk();
+        index
+            .get(&service)
+            .map(|row| row.schema)
+            .ok_or_else(|| anyhow!("Could not find schema for {service}"))
     }
 }
 
@@ -908,33 +972,28 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             return Err(anyhow!("{}", e));
         }
         if let Some(transact) = self.trace.action_traces.last() {
-            let ret = transact
+            let at = transact
                 .inner_traces
                 .iter()
                 // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
-                        if !Self::is_user_action(&at.action) {
-                            return None;
+                        if Self::is_user_action(&at.action) {
+                            return Some(at);
                         }
-                        if debug {
-                            println!(
-                                ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
-                                at.action.method, at.raw_retval
-                            );
-                        }
-                        if at.raw_retval.is_empty() {
-                            return None;
-                        } else {
-                            Some(&at.raw_retval)
-                        }
-                    } else {
-                        None
                     }
+                    return None;
                 })
+                .skip(1)
                 .next();
-            if let Some(ret) = ret {
+
+            if let Some(at) = at {
+                let ret = &at.raw_retval;
                 if debug {
+                    println!(
+                        ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
+                        at.action.method, at.raw_retval
+                    );
                     println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
                 }
                 let unpacked_ret = T::unpacked(ret)?;
@@ -979,6 +1038,7 @@ impl<'a> Caller for ChainPusher<'a> {
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
+            subjectiveData: None,
         });
 
         if self.chain.is_auto_block_start {
@@ -1007,6 +1067,7 @@ impl<'a> Caller for ChainPusher<'a> {
         let trace = self.chain.push(&SignedTransaction {
             transaction: trx.packed().into(),
             proofs: Default::default(),
+            subjectiveData: None,
         });
         let ret = ChainResult::<Ret> {
             trace,

@@ -2,10 +2,10 @@ import dayjs from "dayjs";
 import { useState } from "react";
 
 import { useEvaluationInstance } from "@/hooks/fractals/use-evaluation-instance";
+import { useGuildMemberRoles } from "@/hooks/fractals/use-guild-member-roles";
 import { useEvaluationStatus } from "@/hooks/use-evaluation-status";
-import { useGuild } from "@/hooks/use-guild";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { ErrorCard } from "@shared/components/error-card";
 import { useNowUnix } from "@shared/hooks/use-now-unix";
 import {
     Item,
@@ -14,6 +14,7 @@ import {
     ItemDescription,
     ItemTitle,
 } from "@shared/shadcn/ui/item";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { ScheduleDialog } from "./schedule-dialog";
 
@@ -23,18 +24,19 @@ export const SetEvaluationsScheduleItem = () => {
     const now = useNowUnix();
     const status = useEvaluationStatus(now);
 
-    const { data: guild } = useGuild();
-    const isUpcomingEvaluation = !!guild?.evalInstance;
+    const { data: roles, isPending, error } = useGuildMemberRoles();
 
     const { evaluation } = useEvaluationInstance();
 
-    const { data: currentUser } = useCurrentUser();
+    if (isPending) {
+        return <Skeleton className="h-20 w-full" />;
+    }
 
-    const isRep = guild?.rep?.member === currentUser;
-    const isCouncilMember =
-        currentUser && guild?.council?.includes(currentUser);
+    if (error) {
+        return <ErrorCard error={error} />;
+    }
 
-    if (!isRep && !isCouncilMember) {
+    if (!roles?.isGuildAdmin) {
         return null;
     }
 
@@ -43,7 +45,7 @@ export const SetEvaluationsScheduleItem = () => {
             <ItemContent>
                 <ItemTitle>Evaluations schedule</ItemTitle>
                 <ItemDescription>
-                    {isUpcomingEvaluation && evaluation
+                    {evaluation
                         ? `Next evaluation at ${dayjs.unix(evaluation.registrationStarts).format("MMM, DD")}`
                         : `No evaluation scheduled`}
                 </ItemDescription>

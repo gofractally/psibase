@@ -2,8 +2,8 @@ use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
     get_schemas, method_raw, new_account_action, set_auth_service_action, set_key_action,
     validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim, EssentialServices,
-    GenesisActionData, MethodNumber, PackagedService, Producer, SchemaMap, SignedTransaction,
-    Tapos, TimePointSec, Transaction, TransactionBuilder,
+    GenesisActionData, MethodNumber, PackageList, PackageOrigin, PackagedService, Producer,
+    SchemaMap, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -52,7 +52,7 @@ fn genesis_transaction<R: Read + Seek>(
     for s in service_packages {
         s.get_genesis(&mut services)?;
         // Only install the transact service and its dependencies
-        essential.remove(s.get_accounts());
+        essential.remove(s.get_services());
         if essential.is_empty() {
             break;
         }
@@ -74,6 +74,7 @@ fn genesis_transaction<R: Read + Seek>(
     Ok(SignedTransaction {
         transaction: without_tapos(actions, expiration).packed().into(),
         proofs: vec![],
+        subjectiveData: None,
     })
 }
 
@@ -89,7 +90,7 @@ fn genesis_block_actions<R: Read + Seek>(
     let mut actions = Vec::new();
 
     for s in &mut service_packages[..] {
-        if s.get_accounts().contains(&transact::SERVICE) {
+        if s.get_services().contains(&transact::SERVICE) {
             s.reg_server(&mut actions)?;
             s.postinstall(schemas, &mut actions)?;
         }
@@ -132,12 +133,13 @@ pub fn get_initial_actions<
                 builder.push(act)?;
             }
         } else {
-            essential.remove(s.get_accounts());
+            essential.remove(s.get_services());
         }
     }
 
     // If a package sets an auth service for an account, we should not override it
     let mut accounts_with_auth = HashSet::new();
+    let mut installed_packages = PackageList::new();
 
     for s in &mut service_packages[..] {
         let mut actions = Vec::new();
@@ -145,6 +147,12 @@ pub fn get_initial_actions<
         for act in actions {
             builder.push(act)?;
         }
+        installed_packages.insert(
+            s.meta().clone(),
+            PackageOrigin::Installed {
+                owner: producers::ROOT,
+            },
+        );
     }
 
     for s in &mut service_packages[..] {
@@ -161,6 +169,8 @@ pub fn get_initial_actions<
         if install_ui || s.needs_ui() {
             s.store_data(&mut actions, None, compression_level)?;
         }
+
+        s.link(&installed_packages, &mut actions)?;
 
         s.postinstall(schemas, &mut actions)?;
         for act in &actions {
@@ -262,6 +272,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         Ok(SignedTransaction {
             transaction: without_tapos(actions, expiration).packed().into(),
             proofs: vec![],
+            subjectiveData: None,
         })
     });
     get_initial_actions(
@@ -289,6 +300,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .packed()
         .into(),
         proofs: vec![],
+        subjectiveData: None,
     });
 
     let mut transaction_ids: Vec<crate::Checksum256> = Vec::new();
@@ -307,6 +319,7 @@ pub fn create_boot_transactions<R: Read + Seek>(
         .packed()
         .into(),
         proofs: vec![],
+        subjectiveData: None,
     });
     Ok((boot_transactions, transaction_groups))
 }

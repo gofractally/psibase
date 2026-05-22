@@ -292,9 +292,7 @@ namespace SystemService
                             psibase::AccountNumber recipient,
                             uint64_t               amount,
                             psibase::Memo          memo);
-            void block_summary(psibase::BlockNum block_num,
-                               uint32_t          net_usage_ppm,
-                               uint32_t          cpu_usage_ppm);
+            void block_summary(uint32_t net_usage_ppm, uint32_t cpu_usage_ppm);
          };
       };
    };

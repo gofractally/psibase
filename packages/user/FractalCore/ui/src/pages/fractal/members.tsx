@@ -1,17 +1,22 @@
 import dayjs from "dayjs";
 import { Users } from "lucide-react";
 
-import { PageContainer } from "@/components/page-container";
-
 import { useFractalAccount } from "@/hooks/fractals/use-fractal-account";
 import { useMembers } from "@/hooks/fractals/use-members";
-import { COUNCIL_SEATS } from "@/lib/constants";
-import { getMemberLabel } from "@/lib/getMemberLabel";
+import { paths } from "@/lib/paths";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
+import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
 import { Badge } from "@shared/shadcn/ui/badge";
-import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
+import {
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@shared/shadcn/ui/card";
 import {
     Table,
     TableBody,
@@ -42,6 +47,11 @@ export const Members = () => {
             <GlowingCard>
                 <CardHeader>
                     <CardTitle>All Members</CardTitle>
+                    <CardAction>
+                        <ShowContactsButton
+                            returnPath={paths.fractal.members()}
+                        />
+                    </CardAction>
                 </CardHeader>
                 <CardContent className="@container">
                     <Table>
@@ -75,9 +85,7 @@ export const Members = () => {
                                             </Tooltip>
                                         )}
                                         <Badge variant="default">
-                                            {getMemberLabel(
-                                                member.memberStatus,
-                                            )}
+                                            Member
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-end">

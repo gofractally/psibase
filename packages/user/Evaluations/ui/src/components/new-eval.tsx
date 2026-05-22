@@ -1,8 +1,9 @@
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
 
-import { useCreateEvaluation } from "@/hooks/app/use-create-evaluation";
-import { humanize } from "@/lib/humanize";
+import { useCreateEvaluation } from "@/hooks/use-create-evaluation";
+
+import { humanize } from "@shared/lib/humanize";
 
 import { useAppForm } from "./app-form";
 import { NumbersField } from "./numbers-field";
@@ -87,7 +88,9 @@ export const NewEval = ({ onSubmit }: { onSubmit: () => void }) => {
                                 dayjs(field.state.value).isBefore(now)
                                     ? "Now"
                                     : humanize(
-                                          dayjs(field.state.value).diff(now),
+                                          dayjs(field.state.value).diff(now) /
+                                              1000,
+                                          3,
                                       )
                             }
                         />

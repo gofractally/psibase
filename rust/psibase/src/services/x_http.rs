@@ -137,6 +137,13 @@ mod service {
     fn startSession() {
         unimplemented!()
     }
+
+    /// Returns true if the socket is over a secure connection (e.g. https)
+    /// The sender must be the current owner of the socket.
+    #[action]
+    fn isSecure(socket: i32) -> bool {
+        unimplemented!()
+    }
 }
 
 #[test]

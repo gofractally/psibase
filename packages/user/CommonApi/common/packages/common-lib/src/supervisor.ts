@@ -2,13 +2,13 @@ import { siblingUrl } from "./rpc";
 import {
     buildFunctionCallRequest,
     toString,
-} from "./messaging/FunctionCallRequest";
+} from "./messaging/function-call-request";
 import {
     PluginId,
     pluginString,
     QualifiedPluginId,
-} from "./messaging/PluginId";
-import { buildPreLoadPluginsRequest } from "./messaging/PreLoadPluginsRequest";
+} from "./messaging/plugin-id";
+import { buildPreLoadPluginsRequest } from "./messaging/preload-plugins-request";
 import {
     isSupervisorInitialized,
     isFunctionCallResponse,
@@ -158,7 +158,10 @@ export class Supervisor {
 
         if (isRedirectErrorObject(result)) {
             if (pendingRequest.autoRedirectConfig.enabled) {
-                handlePluginUserPrompt(result, pendingRequest.autoRedirectConfig.returnPath);
+                handlePluginUserPrompt(
+                    result,
+                    pendingRequest.autoRedirectConfig.returnPath,
+                );
             } else {
                 pendingRequest.reject(result);
             }
@@ -169,7 +172,10 @@ export class Supervisor {
 
             console.error(`Call to ${resolved.details} failed`);
             console.error(`[${service}:${plugin}] ${result.message}`);
-            const resultAsError = new PluginError(result.pluginId, result.message);
+            const resultAsError = new PluginError(
+                result.pluginId,
+                result.message,
+            );
             pendingRequest.reject(resultAsError);
             return;
         }
@@ -197,7 +203,11 @@ export class Supervisor {
         return iframe;
     }
 
-    private async sendRequest(description: string, autoRedirectConfig: AutoRedirectConfig, request: any): Promise<any> {
+    private async sendRequest(
+        description: string,
+        autoRedirectConfig: AutoRedirectConfig,
+        request: any,
+    ): Promise<any> {
         await this.onLoaded();
         const iframe = this.getSupervisorIframe();
 
@@ -217,15 +227,28 @@ export class Supervisor {
         });
     }
 
-    public functionCall(args: FunctionCallArgs, autoRedirectConfig: AutoRedirectConfig = { enabled: true, returnPath: "/" }) {
+    public functionCall(
+        args: FunctionCallArgs,
+        autoRedirectConfig: AutoRedirectConfig = {
+            enabled: true,
+            returnPath: "/",
+        },
+    ) {
         const request = buildFunctionCallRequest(args);
         return this.sendRequest(toString(args), autoRedirectConfig, request);
     }
 
     public getJson(plugin: QualifiedPluginId) {
         const request = buildGetJsonRequest(plugin);
-        const autoRedirectConfig: AutoRedirectConfig = { enabled: true, returnPath: "/" };
-        return this.sendRequest(`Get JSON: ${pluginString(plugin)}`, autoRedirectConfig, request);
+        const autoRedirectConfig: AutoRedirectConfig = {
+            enabled: true,
+            returnPath: "/",
+        };
+        return this.sendRequest(
+            `Get JSON: ${pluginString(plugin)}`,
+            autoRedirectConfig,
+            request,
+        );
     }
 
     public async onLoaded() {

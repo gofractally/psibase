@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getGuildMembership } from "@/lib/graphql/fractals/getGuildMembership";
-import QueryKey, { OptionalAccount } from "@/lib/queryKeys";
+import { getGuildMembership } from "@/lib/graphql/fractals/get-guild-membership";
+import QueryKey, { OptionalAccount } from "@/lib/query-keys";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 

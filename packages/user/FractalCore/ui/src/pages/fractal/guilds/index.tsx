@@ -2,13 +2,11 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { FractalGuildIdentifier } from "@/components/fractal-guild-header-identifier";
-import { PageContainer } from "@/components/page-container";
-
-import { useFractal } from "@/hooks/fractals/use-fractal";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { TableContact } from "@shared/components/tables/table-contact";
+import { FractalGuildIdentifier } from "@shared/domains/fractal/components/fractal-guild-header-identifier";
 import { Button } from "@shared/shadcn/ui/button";
 import { CardContent, CardHeader, CardTitle } from "@shared/shadcn/ui/card";
 import {
@@ -22,16 +20,15 @@ import {
 } from "@shared/shadcn/ui/table";
 
 import { ModalCreateGuild } from "./components/modal-create-guild";
+import { useGuilds } from "@/hooks/fractals/use-guilds";
 
 export const Guilds = () => {
     const [showModal, setShowModal] = useState(false);
 
-    const { data: fractal } = useFractal();
+    const { data: guilds } = useGuilds()
 
     const navigate = useNavigate();
-    const guildsData = fractal?.guilds.nodes;
 
-    const guilds = guildsData || [];
 
     return (
         <>

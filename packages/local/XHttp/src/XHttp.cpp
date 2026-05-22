@@ -143,6 +143,19 @@ namespace
       psibase::socketSend(sock, psio::to_frac(std::move(reply)));
    }
 
+   bool hasTls(const SocketInfo& info)
+   {
+      return std::visit(
+          [](const auto& i) -> bool
+          {
+             if constexpr (requires { i.tls; })
+                return i.tls.has_value();
+             else
+                return false;
+          },
+          info);
+   }
+
    bool chainIsBooted()
    {
       auto mode   = KvMode::read;
@@ -559,6 +572,35 @@ void XHttp::startSession()
    recurse().to<XAdmin>().startSession();
 }
 
+bool XHttp::isSecure(int32_t socket)
+{
+   auto sender   = getSender();
+   auto receiver = getReceiver();
+
+   auto ownedBySender = [&](auto table, auto field)
+   {
+      if (auto row = table.get(socket))
+         return (*row).*field == sender;
+      return false;
+   };
+
+   std::optional<SocketRow> socketRow;
+   PSIBASE_SUBJECTIVE_TX
+   {
+      auto session = Session{receiver, KvMode::read};
+      auto temp    = Temporary{receiver, KvMode::read};
+      if (!ownedBySender(session.open<PendingRequestTable>(), &PendingRequestRow::owner) &&
+          !ownedBySender(temp.open<TempPendingRequestTable>(), &TempPendingRequestRow::owner) &&
+          !ownedBySender(session.open<ResponseHandlerTable>(), &ResponseHandlerRow::service) &&
+          !ownedBySender(temp.open<TempResponseHandlerTable>(), &TempResponseHandlerRow::service))
+         abortMessage(sender.str() + " does not own socket " + std::to_string(socket));
+
+      socketRow = Native::session(KvMode::read).open<SocketTable>().get(socket);
+   }
+
+   return hasTls(socketRow.value().info);
+}
+
 auto XHttp::serveSys(HttpRequest                 req,
                      std::optional<std::int32_t> socket) -> std::optional<HttpReply>
 {
@@ -584,6 +626,26 @@ auto XHttp::serveSys(HttpRequest                 req,
       PSIBASE_SUBJECTIVE_TX
       {
          open<RegServTable>().put(body);
+      }
+      return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
+   }
+
+   if (target == "/unregister_server")
+   {
+      if (req.method != "POST")
+         return HttpReply::methodNotAllowed(req);
+
+      if (req.contentType != "application/json")
+         return error(HttpStatus::unsupportedMediaType, "Content-Type must be application/json");
+
+      auto service = psio::convert_from_json<AccountNumber>(
+          std::string(req.body.begin(), req.body.end()));
+      PSIBASE_SUBJECTIVE_TX
+      {
+         auto serverTable = open<RegServTable>();
+         if (!serverTable.get(service))
+            return error(HttpStatus::notFound, "Service is not registered");
+         serverTable.erase(service);
       }
       return HttpReply{.headers = allowCors(req, {XAdmin::service, AccountNumber{"x-proxy"}})};
    }

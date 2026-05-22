@@ -2,6 +2,7 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 
 import {
+    QualifiedFunctionCallArgs,
     buildMessageSupervisorInitialized,
     isFunctionCallRequest,
     isGetJsonRequest,
@@ -9,15 +10,16 @@ import {
 } from "@psibase/common-lib/messaging";
 import { siblingUrl } from "@psibase/common-lib/rpc";
 
-import { AppInterface } from "./appInterace";
-import { MainPage } from "./mainPage";
+import { AppInterface } from "./app-interface";
+import { camelToKebab } from "./case";
+import { MainPage } from "./main-page";
 import { Supervisor } from "./supervisor";
 import { isEmbedded } from "./utils";
 import {
     CallHandler,
     addCallHandler,
     registerCallHandlers,
-} from "./windowMessaging";
+} from "./window-messaging";
 
 const appContainer = document.querySelector<HTMLDivElement>("#app")!;
 const root = createRoot(appContainer);
@@ -44,10 +46,21 @@ const shouldHandleMessage = (message: MessageEvent) => {
     return shouldRespond;
 };
 
+// Canonical internal form of intf/method is WIT kebab-case. Apps still pass
+//   camelCase strings from hand-written code today; once apps consume generated
+//   bindings that already emit kebab, this normalization can go.
+const normalizeCallArgs = (
+    args: QualifiedFunctionCallArgs,
+): QualifiedFunctionCallArgs => ({
+    ...args,
+    intf: args.intf ? camelToKebab(args.intf) : args.intf,
+    method: camelToKebab(args.method),
+});
+
 // When the supervisor is first loaded, all it does is register some handlers for
 //   calls from the parent window, and also tells the parent window that it's ready.
 addCallHandler(callHandlers, isFunctionCallRequest, (msg) =>
-    supervisor.entry(msg.origin, msg.data.id, msg.data.args),
+    supervisor.entry(msg.origin, msg.data.id, normalizeCallArgs(msg.data.args)),
 );
 addCallHandler(callHandlers, isPreLoadPluginsRequest, (msg) =>
     supervisor.preloadPlugins(msg.origin, msg.data.payload.plugins),

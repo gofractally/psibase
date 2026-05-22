@@ -42,7 +42,6 @@ export const InviteGuildMemberModal = ({
         null,
         getSubDomain(),
         `/invite?token=${inviteString}`,
-        true,
     );
 
     useEffect(() => {
@@ -98,7 +97,9 @@ export const InviteGuildMemberModal = ({
                         size="sm"
                         variant="outline"
                         className="px-3"
-                        onClick={() => createGuildInvite([guildAccount!, 1, true])}
+                        onClick={() =>
+                            createGuildInvite([guildAccount!, 1, true])
+                        }
                     >
                         <span className="sr-only">Refresh</span>
                         <RefreshCcw className="h-4 w-4" />

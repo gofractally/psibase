@@ -21,7 +21,7 @@ namespace SystemService
 
       void canAuthUserSys(psibase::AccountNumber user);
 
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,

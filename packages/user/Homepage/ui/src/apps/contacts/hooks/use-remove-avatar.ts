@@ -1,12 +1,9 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 
-import { supervisor } from "@/supervisor";
-
 import { useCacheBust } from "@shared/hooks/use-cache-bust";
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
-
+import SharedQueryKey from "@shared/lib/query-keys";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const useRemoveAvatar = () => {
@@ -19,11 +16,11 @@ export const useRemoveAvatar = () => {
                 service: "profiles",
                 intf: "api",
             }),
-        onSuccess: async () => {
+        onSuccess: async (_data, _variables, _onMutateResult, context) => {
             toast.success("Avatar removed");
 
             const currentUser = zAccount.parse(
-                await queryClient.getQueryData(QueryKey.currentUser()),
+                await context.client.getQueryData(SharedQueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");
 

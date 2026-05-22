@@ -11,9 +11,9 @@ import { useToast } from "@/components/ui/use-toast";
 import {
     useInstalledLocalPackages,
     useLocalPackages,
-} from "@/hooks/usePackages";
-import { chain } from "@/lib/chainEndpoints";
-import { queryKeys } from "@/lib/queryKeys";
+} from "@/hooks/use-packages";
+import { chain } from "@/lib/chain-endpoints";
+import { queryKeys } from "@/lib/query-keys";
 
 import { compareSemVer } from "@shared/lib/semver";
 import { Button } from "@shared/shadcn/ui/button";

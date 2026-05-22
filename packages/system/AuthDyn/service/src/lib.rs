@@ -118,12 +118,15 @@ pub mod service {
     fn checkAuthSys(
         _flags: u32,
         _requester: AccountNumber,
-        _sender: AccountNumber,
+        sender: AccountNumber,
         _action: ServiceMethod,
         _allowedActions: Vec<ServiceMethod>,
         _claims: Vec<Claim>,
-    ) {
-        abort_message("This account can only be exercised through staged transactions.")
+    ) -> bool {
+        abort_message(&format!(
+            "Account {} can only be exercised through staged transactions.",
+            sender.to_string()
+        ))
     }
 
     #[action]

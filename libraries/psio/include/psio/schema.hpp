@@ -160,6 +160,9 @@ namespace psio
          void           insert(std::string name, AnyType type);
          //
          bool merge(const AnyType&, const Schema& other, const AnyType& otherType);
+
+         // checks that all named types referenced by this type exist
+         void checkType(const AnyType&) const;
       };
       PSIO_REFLECT(Schema, types)
 

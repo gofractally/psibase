@@ -201,6 +201,7 @@ impl Sites for SitesPlugin {
         Transact::add_action_to_transaction("clearProxy", &Actions::clearProxy {}.packed())
             .unwrap();
     }
+
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);

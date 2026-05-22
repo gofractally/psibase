@@ -1,13 +1,12 @@
+import type { Supervisor } from "@psibase/common-lib";
+
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
-
-import { Supervisor } from "@psibase/common-lib";
-
-import { useCurrentUser } from "@/hooks/use-current-user";
 
 import { withFieldGroup } from "@shared/components/form/app-form";
 import { FieldErrors } from "@shared/components/form/internal/field-errors";
 import { useContacts } from "@shared/hooks/use-contacts";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { zAccount } from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/shadcn/ui/button";

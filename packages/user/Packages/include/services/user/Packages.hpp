@@ -12,6 +12,13 @@ namespace UserService
    };
    PSIO_REFLECT(PackageRef, name, version)
 
+   struct PackageExport
+   {
+      std::string            name;
+      psibase::AccountNumber service;
+   };
+   PSIO_REFLECT(PackageExport, name, service)
+
    struct PackageMeta
    {
       std::string                         name;
@@ -20,18 +27,22 @@ namespace UserService
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
+      std::vector<PackageExport>          exports;
    };
-   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts)
+   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts, services, exports)
 
    struct PublishedPackage
    {
       psibase::AccountNumber              owner;
       std::string                         name;
-      std::string                         scope;
       std::string                         version;
+      std::string                         scope;
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
+      std::vector<PackageExport>          exports;
       psibase::Checksum256                sha256;
       std::string                         file;
 
@@ -40,12 +51,15 @@ namespace UserService
                                         &PublishedPackage::version>;
    };
    PSIO_REFLECT(PublishedPackage,
+                owner,
                 name,
                 version,
                 scope,
                 description,
                 depends,
                 accounts,
+                services,
+                exports,
                 sha256,
                 file)
 
@@ -77,11 +91,13 @@ namespace UserService
       std::string                         description;
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
+      std::vector<psibase::AccountNumber> services;
+      std::vector<PackageExport>          exports;
       psibase::AccountNumber              owner;
 
       using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
-   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, owner)
+   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, services, exports, owner)
 
    struct PackageDataFile
    {

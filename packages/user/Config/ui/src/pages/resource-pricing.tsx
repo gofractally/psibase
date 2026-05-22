@@ -1,16 +1,19 @@
+import { PricingSection } from "@/components/pricing-section";
+
 import { useResourcePricing } from "@/hooks/use-resource-pricing";
 
-import { PricingSection } from "@/components/pricing-section";
+import { PageContainer } from "@shared/components/page-container";
 
 export const ResourcePricing = () => {
     const { data: pricing, isLoading } = useResourcePricing();
 
     return (
-        <div className="mx-auto w-full max-w-screen-lg space-y-6 px-2">
+        <PageContainer className="space-y-6">
             <div>
                 <h2 className="text-lg font-medium">Resource Pricing</h2>
                 <p className="text-muted-foreground text-sm">
-                    View and configure CPU and network resource pricing parameters.
+                    View and configure CPU and network resource pricing
+                    parameters.
                 </p>
             </div>
 
@@ -30,6 +33,6 @@ export const ResourcePricing = () => {
                     billableUnitLabel="bytes"
                 />
             </div>
-        </div>
+        </PageContainer>
     );
 };

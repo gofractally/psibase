@@ -292,7 +292,7 @@ namespace psibase
       return host;
    }
 
-   std::vector<HttpHeader> allowCors(std::string_view origin)
+   std::vector<HttpHeader> allowCors(std::string_view origin /* = "*" */)
    {
       return {
           {"Access-Control-Allow-Origin", std::string(origin)},

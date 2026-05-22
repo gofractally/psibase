@@ -20,6 +20,7 @@ services = ["basicwquery", "mincallrecvr", "addcheckinit"]
 [dependencies]
 psibase.workspace = true
 psibase_macros.workspace = true
+psibase_service.workspace = true
 async-graphql.workspace = true
 serde = { version = "1.0.209", features = ["derive"] }
 serde_json.workspace = true

@@ -1,11 +1,13 @@
-import { queryOptions, useQuery } from "@tanstack/react-query";
 import type { QueryOptions } from "./types";
+import type { AutoRedirectConfig } from "@psibase/common-lib";
+
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "../lib/supervisor";
-import { queryClient } from "../lib/queryClient";
+import { queryClient } from "../lib/query-client";
 import QueryKey from "../lib/query-keys";
-import { zAccount, type Account } from "../lib/schemas/account";
+import { type Account, zAccount } from "../lib/schemas/account";
+import { supervisor } from "../lib/supervisor";
 
 export const zLocalContact = z.object({
     account: zAccount,
@@ -23,16 +25,20 @@ export type ProcessedContact = z.infer<typeof zProcessedContact>;
 
 export const queryContacts = (
     username: Account | null | undefined,
+    autoRedirectConfig: AutoRedirectConfig,
 ) =>
     queryOptions({
         queryKey: QueryKey.contacts(username),
         queryFn: async () => {
-            const res = await supervisor.functionCall({
-                service: zAccount.parse("profiles"),
-                method: "get",
-                params: [],
-                intf: "contacts",
-            });
+            const res = await supervisor.functionCall(
+                {
+                    service: zAccount.parse("profiles"),
+                    method: "get",
+                    params: [],
+                    intf: "contacts",
+                },
+                autoRedirectConfig,
+            );
             return zLocalContact.array().parse(res);
         },
     });
@@ -45,15 +51,20 @@ export const useContacts = (
         LocalContact[],
         ReturnType<typeof QueryKey.contacts>
     >,
+    autoRedirectConfig: AutoRedirectConfig = {
+        enabled: true,
+        returnPath: "/",
+    },
 ) => {
     const queryOptions = options ?? {};
-    return useQuery({ ...queryContacts(username), ...queryOptions, enabled: !!username && queryOptions.enabled })
+    return useQuery({
+        ...queryContacts(username, autoRedirectConfig),
+        ...queryOptions,
+        enabled: !!username && queryOptions.enabled,
+    });
 };
 
-export const upsertUserToCache = (
-    username: Account,
-    contact: LocalContact,
-) => {
+export const upsertUserToCache = (username: Account, contact: LocalContact) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
         if (data) {
             const parsed = zLocalContact.array().parse(data);
@@ -63,18 +74,15 @@ export const upsertUserToCache = (
 
             return isExisting
                 ? parsed.map((c) =>
-                    c.account === contact.account ? contact : c,
-                )
+                      c.account === contact.account ? contact : c,
+                  )
                 : [...parsed, contact];
         }
         return [contact];
     });
 };
 
-export const removeUserFromCache = (
-    username: Account,
-    account: Account,
-) => {
+export const removeUserFromCache = (username: Account, account: Account) => {
     queryClient.setQueryData(QueryKey.contacts(username), (data: unknown) => {
         if (data) {
             const parsed = zLocalContact.array().parse(data);

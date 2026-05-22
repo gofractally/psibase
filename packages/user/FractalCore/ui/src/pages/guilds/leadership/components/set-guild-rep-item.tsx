@@ -1,8 +1,8 @@
 import { useState } from "react";
 
-import { useGuild } from "@/hooks/use-guild";
+import { useGuildMemberRoles } from "@/hooks/fractals/use-guild-member-roles";
 
-import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { ErrorCard } from "@shared/components/error-card";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     Item,
@@ -11,18 +11,22 @@ import {
     ItemDescription,
     ItemTitle,
 } from "@shared/shadcn/ui/item";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { SetGuildRepModal } from "./set-guild-rep-modal";
 
 export const SetGuildRepItem = () => {
-    const { data: guild } = useGuild();
-    const { data: currentUser } = useCurrentUser();
-
-    const isRep = guild?.rep?.member === currentUser;
-    const isCouncilMember =
-        currentUser && guild?.council?.includes(currentUser);
+    const { data: roles, isPending, error } = useGuildMemberRoles();
 
     const [showRepModal, setShowRepModal] = useState(false);
+
+    if (isPending) {
+        return <Skeleton className="h-20 w-full" />;
+    }
+
+    if (error) {
+        return <ErrorCard error={error} />;
+    }
 
     return (
         <>
@@ -30,7 +34,7 @@ export const SetGuildRepItem = () => {
                 openChange={(show) => setShowRepModal(show)}
                 show={showRepModal}
             />
-            {(isRep || isCouncilMember) && (
+            {roles?.isGuildAdmin && (
                 <Item variant="muted">
                     <ItemContent>
                         <ItemTitle>Set representative</ItemTitle>
