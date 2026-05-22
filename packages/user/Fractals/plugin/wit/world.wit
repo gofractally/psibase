@@ -6,71 +6,20 @@ interface admin-fractal {
     create-fractal: func(fractal-account: string, guild-account: string, name: string, mission: string) -> result<_, error>;
     exile-member: func(member: string) -> result<_, error>;
     set-dist-interval: func(distribution-interval-sec: u32) -> result<_, error>;
-    set-ranked-guild-slots: func(slots-count: u8) -> result<_, error>;
-    set-ranked-guilds: func(guilds: list<string>) -> result<_, error>;
     init-token: func() -> result<_, error>;
-    set-token-threshold: func(threshold: u8) -> result<_, error>;
+
+    set-role-occupation: func(role-id: u8, occupation: string) -> result<_, error>;
 }
 
-interface admin-guild {
-    use host:types/types.{error};
-
-    create-guild: func(display-name: string, slug: string) -> result<_, error>;
-    set-display-name: func(guild-account: string, display-name: string) -> result<_, error>;
-    set-bio: func(guild-account: string, bio: string) -> result<_, error>;
-    set-description: func(guild-account: string, description: string) -> result<_, error>;
-
-    set-eval-schedule: func(guild-account: string, registration: u32, deliberation: u32, submission: u32, finish-by: u32, interval-seconds: u32) -> result<_, error>;
-    start-eval: func(guild-account: string) -> result<_, error>;
-    close-eval: func(guild-account: string) -> result<_, error>;
-
-    set-guild-rep: func(guild-account: string, rep: string) -> result<_, error>;
-    resign-guild-rep: func(guild-account: string) -> result<_, error>;
-    remove-guild-rep: func(guild-account: string) -> result<_, error>;
-
-    set-rank-ordering-threshold: func(threshold: u8) -> result<_, error>;
-
-}
 
 interface user-fractal {
     use host:types/types.{error};
 
-    join: func() -> result<_, error>;
     dist-token: func() -> result<_, error>;
-}
-
-
-interface user-guild {
-    use host:types/types.{error};
-
-    register-candidacy: func(guild-account: string, active: bool) -> result<_, error>;
-    apply-guild: func(guild-account: string, extra-info: string) -> result<_, error>;
-    set-guild-app-info: func(guild-account: string, extra-info: string) -> result<_, error>;
-
-    attest-membership-app: func(guild-account: string, applicant: string, comment: string, endorses: bool) -> result<_, error>;
-    invite-member: func(guild-account: string, num-accounts: u16, pre-attest: bool) -> result<string, error>;
-    delete-guild-invite: func(invite-id: u32) -> result<_, error>;
-}
-
-interface user-eval {
-    use host:types/types.{error};
-
-    register: func(guild-account: string) -> result<_, error>;
-    unregister: func(guild-account: string) -> result<_, error>;
-    get-group-users: func(guild-account: string, group-number: u32) -> result<list<string>, error>;
-    get-proposal: func(guild-account: string, group-number: u32) -> result<option<list<string>>, error>;
-    propose: func(guild-account: string, group-number: u32, proposal: list<string>) -> result<_, error>;
-    attest: func(guild-account: string, group-number: u32) -> result<_, error>;
+    claim-rewards: func(member: string) -> result<_, error>;
 }
 
 interface types {
-    record guild {
-        fractal: string,
-        guild: string,
-        evaluation-id: option<u32>,
-        council-role: string,
-        rep-role: string
-    }
 
     record fractal {
         fractal: string,
@@ -81,11 +30,9 @@ interface types {
 }
 
 interface queries {
-    use types.{guild, fractal};
+    use types.{fractal};
     use host:types/types.{error};
 
-
-    get-guild: func(guild-account: string) -> result<guild, error>;
     get-fractal: func(fractal-account: string) -> result<fractal, error>;
 }
 
@@ -93,10 +40,6 @@ interface queries {
 world imports {
     import admin-fractal;
     import user-fractal;
-    import admin-guild;
-    import user-guild;
-    import user-eval;
     import queries;
     import types;
-
 }

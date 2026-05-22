@@ -1,5 +1,6 @@
-use crate::bindings::fractals::plugin as FractalsPlugin;
-use crate::bindings::fractals::plugin::queries::{Fractal, Guild};
+use crate::bindings::guilds::plugin as GuildsPlugin;
+use crate::bindings::guilds::plugin::queries::Guild;
+
 use crate::bindings::host::types::types::Error;
 use crate::bindings::{
     host::common::client::get_receiver, transact::plugin::intf::set_propose_latch,
@@ -9,20 +10,12 @@ fn latch(account: &str) -> Result<(), Error> {
     set_propose_latch(Some(account))
 }
 
-fn get_fractal() -> Result<Fractal, Error> {
-    FractalsPlugin::queries::get_fractal(&get_receiver())
-}
-
 fn get_guild(guild_account: &str) -> Result<Guild, Error> {
-    FractalsPlugin::queries::get_guild(guild_account)
+    GuildsPlugin::queries::get_guild(guild_account)
 }
 
-pub fn legislature() -> Result<(), Error> {
-    get_fractal().and_then(|fractal| latch(&fractal.legislature))
-}
-
-pub fn judiciary() -> Result<(), Error> {
-    get_fractal().and_then(|fractal| latch(&fractal.judiciary))
+pub fn fractal() -> Result<(), Error> {
+    latch(&get_receiver())
 }
 
 pub fn guild(guild_account: &str) -> Result<(), Error> {

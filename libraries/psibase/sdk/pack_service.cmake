@@ -122,10 +122,10 @@ function(write_meta)
 endfunction()
 
 function(write_service_info)
-    cmake_parse_arguments(PARSE_ARGV 0 "" "" "SERVER;OUTPUT;SCHEMA" "FLAGS")
+    cmake_parse_arguments(PARSE_ARGV 0 "" "" "SERVER;OUTPUT;SCHEMA;DEPENDS" "FLAGS")
     add_custom_command(
         OUTPUT ${_OUTPUT}
-        DEPENDS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake ${_SCHEMA}
+        DEPENDS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake ${_SCHEMA} ${_DEPENDS}
         COMMAND ${CMAKE_COMMAND} -DPSIBASE_OUTPUT=${_OUTPUT} -DPSIBASE_SERVER=${_SERVER} "-DPSIBASE_FLAGS=${_FLAGS}" -DPSIBASE_SCHEMA=${_SCHEMA} -P ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/generate_service_info.cmake
         VERBATIM
     )
@@ -244,10 +244,12 @@ function(psibase_package)
     foreach(service IN LISTS _SERVICES)
         if(_WASM_${service} OR _TARGET_${service})
             list(APPEND wasm-services ${service})
+            set(schema-target)
             if(NOT _SCHEMA_${service})
                 if(_TARGET_${service})
                     set(_SCHEMA_${service} ${CMAKE_CURRENT_BINARY_DIR}/${service}-schema.json)
-                    psibase_schema(${_TARGET_${service}} ${_SCHEMA_${service}})
+                    psibase_schema(${_TARGET_${service}} OUTPUT ${_SCHEMA_${service}})
+                    set(schema-target ${_TARGET_${service}}-schema)
                 else()
                     message(FATAL_ERROR "Missing schema for ${service}")
                 endif()
@@ -257,6 +259,7 @@ function(psibase_package)
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
                 SCHEMA ${_SCHEMA_${service}}
+                DEPENDS ${schema-target}
             )
             list(APPEND zip-deps ${outdir}/service/${service}.json)
             if(_INIT_${service})
@@ -430,6 +433,16 @@ function(cargo_psibase_package)
 endfunction()
 
 function(psibase_schema target)
+    cmake_parse_arguments(PARSE_ARGV 1 "" "" "OUTPUT;OUTPUT_DIRECTORY" "")
+    if (_KEYWORDS_MISSING_VALUES)
+        list(JOIN _KEYWORDS_MISSING_VALUES " " kw)
+        message(FATAL_ERROR "psibase_schema missing arguments for ${kw}")
+    endif()
+    if (_UNPARSED_ARGUMENTS)
+        list(JOIN _UNPARSED_ARGUMENTS " " args)
+        message(FATAL_ERROR "Invalid arguments to psibase_schema: ${args}")
+    endif()
+
     add_executable(${target}-schema-gen $<TARGET_PROPERTY:${target},SOURCES>)
     target_compile_definitions(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS> PSIBASE_GENERATE_SCHEMA)
     target_compile_options(${target}-schema-gen PRIVATE $<TARGET_PROPERTY:${target},COMPILE_OPTIONS>)
@@ -440,14 +453,23 @@ function(psibase_schema target)
         target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(Psibase::service).*>" Psibase::test)
     endif()
 
-    if(ARGC GREATER_EQUAL 2)
-        set(_OUTFILE ${ARGV1})
+    if (NOT _OUTPUT)
+        set(_OUTPUT "${target}-schema.json")
+    endif()
+    if (NOT _OUTPUT_DIRECTORY)
+        set(_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
+    if (CMAKE_VERSION VERSION_LESS 3.20)
+        if (_OUTPUT MATCHES "^[^/]")
+            set(_OUTFILE "${_OUTPUT_DIRECTORY}/${_OUTPUT}")
+        endif()
     else()
-        set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+        cmake_path(APPEND _OUTFILE "${_OUTPUT_DIRECTORY}" "${_OUTPUT}")
     endif()
 
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        BYPRODUCTS ${_OUTFILE}
         DEPENDS ${target}
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
         COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp

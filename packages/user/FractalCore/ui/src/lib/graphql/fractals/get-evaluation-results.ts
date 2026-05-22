@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { zAccount } from "@shared/lib/schemas/account";
 
@@ -34,7 +34,7 @@ export const getEvaluationResults = async (evaluationId: number) => {
         }
     }`;
 
-    const results = await graphql(gql, { service: FRACTALS_SERVICE });
+    const results = await graphql(gql, { service: GUILDS_SERVICE });
 
     const response = z
         .object({

@@ -336,10 +336,6 @@ struct InstallArgs {
     #[clap(required = true)]
     packages: Vec<OsString>,
 
-    /// Set all accounts to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
-
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
     package_source: Vec<String>,
@@ -380,10 +376,6 @@ struct UpgradeArgs {
 
     /// Packages to update
     packages: Vec<OsString>,
-
-    /// Set all accounts to authenticate using this key
-    #[clap(short = 'k', long, value_name = "KEY")]
-    key: Option<AnyPublicKey>,
 
     /// A URL or path to a package repository (repeatable)
     #[clap(long, value_name = "URL")]
@@ -1621,7 +1613,6 @@ async fn apply_packages<
     out: &mut TransactionBuilder<SignedTransaction, F>,
     files: &mut TransactionBuilder<SignedTransaction, G>,
     sender: AccountNumber,
-    key: &Option<AnyPublicKey>,
     compression_level: u32,
     existing: PackageList,
 ) -> Result<SchemaMap, anyhow::Error> {
@@ -1643,7 +1634,7 @@ async fn apply_packages<
                     package.version()
                 ));
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(
@@ -1678,7 +1669,7 @@ async fn apply_packages<
                 old_manifest.upgrade(package.manifest(), &meta.name, out)?;
                 // Install the new package
                 let mut account_actions = vec![];
-                package.install_accounts(&mut account_actions, Some(&mut uploader), sender, key)?;
+                package.install_accounts(&mut account_actions, Some(&mut uploader), sender)?;
                 out.push_all(account_actions)?;
                 let mut actions = vec![];
                 package.install(
@@ -1712,7 +1703,6 @@ async fn do_install<T: Read + Seek>(
     node_args: &NodeArgs,
     sig_args: &SigArgs,
     tx_args: &TxArgs,
-    key: &Option<AnyPublicKey>,
     compression_level: u32,
     existing: PackageList,
 ) -> Result<(), anyhow::Error> {
@@ -1764,7 +1754,6 @@ async fn do_install<T: Read + Seek>(
         &mut trx_builder,
         &mut upload_builder,
         sender,
-        key,
         compression_level,
         existing,
     )
@@ -1930,7 +1919,6 @@ async fn install(args: &InstallArgs) -> Result<(), anyhow::Error> {
             &args.node_args,
             &args.sig_args,
             &args.tx_args,
-            &args.key,
             args.compression_level,
             installed,
         )
@@ -2232,7 +2220,6 @@ async fn upgrade(args: &UpgradeArgs) -> Result<(), anyhow::Error> {
             &args.node_args,
             &args.sig_args,
             &args.tx_args,
-            &args.key,
             args.compression_level,
             installed,
         )

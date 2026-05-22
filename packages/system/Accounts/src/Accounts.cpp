@@ -98,8 +98,9 @@ namespace SystemService
       check(accountIndex.get(authService) != std::nullopt, "unknown auth service");
 
       Account account{
-          .accountNum  = name,
-          .authService = authService,
+          .accountNum   = name,
+          .authService  = authService,
+          .authSequence = 0,
       };
       accountTable.put(account);
 
@@ -119,6 +120,7 @@ namespace SystemService
       to<AuthInterface>(authService).canAuthUserSys(getSender());
 
       account->authService = authService;
+      ++account->authSequence;
       accountTable.put(*account);
    }
 
@@ -135,6 +137,17 @@ namespace SystemService
       auto accountRow = getAccount(account);
       check(accountRow.has_value(), "account " + account.str() + " does not exist");
       return accountRow->authService;
+   }
+
+   void Accounts::incAuthSeq(psibase::AccountNumber name)
+   {
+      auto accountTable = open<AccountTable>();
+      auto accountRow   = accountTable.getIndex<0>().get(name);
+      if (accountRow && accountRow->authService == getSender())
+      {
+         ++accountRow->authSequence;
+         accountTable.put(*accountRow);
+      }
    }
 
    bool Accounts::exists(AccountNumber name)

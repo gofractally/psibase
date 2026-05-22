@@ -12,19 +12,17 @@ export const useResignRep = () => {
         error: "Failed resignation",
         loading: "Resigning",
         success: "Resigned",
-        isStagable: true,
-        onSuccess: ([guildAccount], status) => {
-            if (status.type == "executed") {
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.fractal(fractalAccount),
-                });
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.fractals(),
-                });
-                queryClient.invalidateQueries({
-                    queryKey: QueryKey.guild(guildAccount),
-                });
-            }
+        isStagable: false,
+        onSuccess: ([guildAccount]) => {
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.fractal(fractalAccount),
+            });
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.fractals(),
+            });
+            queryClient.invalidateQueries({
+                queryKey: QueryKey.guild(guildAccount),
+            });
         },
     });
 };

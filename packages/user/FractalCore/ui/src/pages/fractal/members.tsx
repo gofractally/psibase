@@ -10,7 +10,6 @@ import { PageContainer } from "@shared/components/page-container";
 import { ShowContactsButton } from "@shared/components/show-contacts-button";
 import { TableContact } from "@shared/components/tables/table-contact";
 import { COUNCIL_SEATS } from "@shared/domains/fractal/lib/constants";
-import { getMemberLabel } from "@shared/domains/fractal/lib/get-member-label";
 import { Badge } from "@shared/shadcn/ui/badge";
 import {
     CardAction,
@@ -86,9 +85,7 @@ export const Members = () => {
                                             </Tooltip>
                                         )}
                                         <Badge variant="default">
-                                            {getMemberLabel(
-                                                member.memberStatus,
-                                            )}
+                                            Member
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-end">

@@ -1,0 +1,56 @@
+use psibase::services::fractals::distribute::combine_group_scores;
+use psibase::services::fractals::weighted_normalization::{
+    curves::{get_curve, Curve},
+    weighted_normalization,
+};
+use psibase::{AccountNumber, Table};
+
+use crate::tables::tables::{FractalSettings, FractalSettingsTable, Guild, Ranking};
+
+impl FractalSettings {
+    fn new(fractal: AccountNumber, dist_strat: Curve) -> Self {
+        Self {
+            fractal,
+            guild_weight_curve: dist_strat.into(),
+            auto_join_fractal: false,
+        }
+    }
+
+    fn save(&self) {
+        FractalSettingsTable::read_write()
+            .put(&self)
+            .expect("failed to save");
+    }
+
+    pub fn get_or_default(fractal: AccountNumber) -> Self {
+        FractalSettingsTable::read()
+            .get_index_pk()
+            .get(&fractal)
+            .unwrap_or_else(|| Self::new(fractal, Curve::Fibonacci))
+    }
+
+    pub fn set_guild_weight_curve(&mut self, guild_weight_curve: Curve) {
+        self.guild_weight_curve = guild_weight_curve.into();
+        self.save();
+    }
+
+    pub fn set_auto_join_fractal(&mut self, enabled: bool) {
+        self.auto_join_fractal = enabled;
+        self.save();
+    }
+
+    pub fn scores(&self) -> Vec<(AccountNumber, u32)> {
+        let ranked_guilds = Ranking::get_ordered_rankings(self.fractal);
+        let weights = weighted_normalization(
+            ranked_guilds.iter(),
+            get_curve(self.guild_weight_curve.into()),
+        );
+
+        let groups = ranked_guilds
+            .iter()
+            .zip(weights)
+            .map(|(r, gw)| (gw, Guild::get_assert(r.guild).scores()));
+
+        combine_group_scores(groups).into_iter().collect()
+    }
+}

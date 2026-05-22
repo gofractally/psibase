@@ -16,4 +16,5 @@ export const useCreateGuild = () =>
         error: "Failed creating guild",
         loading: "Creating guild",
         success: "Created guild",
+        isStagable: false,
     });
