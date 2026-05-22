@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "r-prem-acc")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::{connection::Connection, *};
