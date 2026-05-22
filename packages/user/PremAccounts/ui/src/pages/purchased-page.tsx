@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { zUnclaimedNamesPageData } from "@/lib/graphql/prem-accounts.schemas";
-import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { graphql } from "@shared/lib/graphql";
+import { premAccounts } from "@shared/lib/plugins";
 import { zAccount } from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 import { Button } from "@shared/shadcn/ui/button";
@@ -55,7 +55,7 @@ export function PurchasedPage() {
                             }
                         `,
                         {
-                            service: PREM_ACCOUNTS_SERVICE,
+                            service: premAccounts.service,
                         },
                     ),
                 );
@@ -124,7 +124,7 @@ export function PurchasedPage() {
 
         try {
             await supervisor.functionCall({
-                service: PREM_ACCOUNTS_SERVICE,
+                service: premAccounts.service,
                 plugin: "plugin",
                 intf: "api",
                 method: "claim",

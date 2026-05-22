@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { zNameEventsPageData } from "@/lib/graphql/prem-accounts.schemas";
-import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { graphql } from "@shared/lib/graphql";
+import { premAccounts } from "@shared/lib/plugins";
 
 type Props = {
     /** Increment (e.g. after a purchase) to refetch history while logged in. */
@@ -61,7 +61,7 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                                 }
                             `,
                             {
-                                service: PREM_ACCOUNTS_SERVICE,
+                                service: premAccounts.service,
                             },
                         ),
                     );

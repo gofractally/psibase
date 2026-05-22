@@ -1,11 +1,7 @@
-import { PREM_ACCOUNTS_SERVICE } from "@/apps/prem-accounts/lib/prem-service";
-
 import { pluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
-import { graphql } from "@shared/lib/graphql";
 import { premAccounts } from "@shared/lib/plugins";
 
 import {
-    zCurrentPricesData,
     zNameEvent,
     zNameEventsPageData,
     zUnclaimedNamesPageData,
@@ -28,23 +24,6 @@ async function premAccountsAuthorizedGraphql<T>(query: string): Promise<T> {
     }
 
     return response.data;
-}
-
-export async function fetchCurrentPrices() {
-    const raw = await graphql(
-        `
-            query {
-                currentPrices {
-                    length
-                    price
-                }
-            }
-        `,
-        { service: PREM_ACCOUNTS_SERVICE },
-    );
-
-    const { currentPrices } = zCurrentPricesData.parse(raw);
-    return new Map(currentPrices.map((row) => [row.length, row.price]));
 }
 
 export async function fetchAllUnclaimedNames() {

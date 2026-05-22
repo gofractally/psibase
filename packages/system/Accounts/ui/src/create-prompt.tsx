@@ -8,8 +8,12 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
+import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
+import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
+import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -30,6 +34,13 @@ import { PasswordVisibilityButton } from "./components/password-visibility-butto
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
+import { usePurchaseAccount } from "./hooks/use-purchase-account";
+import {
+    DEFAULT_MAX_PREMIUM_NAME_LENGTH,
+    DEFAULT_NAME_PURCHASE_SLIPPAGE,
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_ACCOUNT_NAME_LENGTH,
+} from "./lib/constants";
 
 export const CreatePrompt = () => {
     const [key, setKey] = useState<string>("");
@@ -38,22 +49,30 @@ export const CreatePrompt = () => {
     );
     const [showPassword, setShowPassword] = useState(false);
     const [acknowledged, setAcknowledged] = useState(false);
-
+    const [price, setPrice] = useState<Quantity | null>(null);
     const { data: networkName } = useBranding();
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
+    const purchaseAccountMutation = usePurchaseAccount();
     const connectAccountMutation = useConnectAccount();
+
+    const { data: systemToken } = useSystemToken();
+    const { data: isPremAccountsInstalled } =
+        useIsPackageInstalled("PremAccounts");
 
     const createForm = useAppForm({
         defaultValues: {
             account: "",
         },
         validators: {
-            onSubmit: z.object({
-                account: zAccount.refine((val) => val.length >= 10, {
-                    message: "Account must be at least 10 characters.",
-                }),
+            onChange: z.object({
+                account: zAccount.refine(
+                    (val) => val.length <= MAX_ACCOUNT_NAME_LENGTH,
+                    {
+                        message: `Account name cannot be longer than ${MAX_ACCOUNT_NAME_LENGTH} characters`,
+                    },
+                ),
             }),
             onSubmitAsync: async ({ value }) => {
                 const account = await getAccount(value.account);
@@ -67,19 +86,27 @@ export const CreatePrompt = () => {
             },
         },
         onSubmit: async (data) => {
-            await handleCreate(data.value.account);
+            await handleCreateOrBuy(data.value.account);
         },
     });
 
-    const handleCreate = async (account: string) => {
+    const handleCreateOrBuy = async (account: string) => {
         const name = account.trim();
         if (!name) return;
         try {
-            const privateKey = await createAccountMutation.mutateAsync(name);
+            let privateKey: string;
+            if (price) {
+                privateKey = await purchaseAccountMutation.mutateAsync([
+                    name,
+                    DEFAULT_NAME_PURCHASE_SLIPPAGE,
+                ]);
+            } else {
+                privateKey = await createAccountMutation.mutateAsync(name);
+            }
             setKey(pemToB64(privateKey));
             setStep("2_SAVE");
         } catch (error) {
-            console.error("Create account failed:");
+            console.error("Failed to secure account:");
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
             );
@@ -190,8 +217,9 @@ export const CreatePrompt = () => {
                                     Create a {networkName} account
                                 </CardTitle>
                                 <CardDescription>
-                                    Valid account names are 10-18 characters
-                                    long, must start with a letter, and can only
+                                    Account names can be up to{" "}
+                                    {MAX_ACCOUNT_NAME_LENGTH} characters long,
+                                    must start with a letter, and can only
                                     contain letters, numbers, and underscores.
                                 </CardDescription>
                             </div>
@@ -201,14 +229,77 @@ export const CreatePrompt = () => {
                                     <field.TextField
                                         label="Account name"
                                         placeholder="Account name"
+                                        autoComplete="off"
+                                        autoCorrect="off"
+                                        spellCheck={false}
+                                        rightLabel={
+                                            price ? (
+                                                <Label className="text-green-500">
+                                                    Available for{" "}
+                                                    {price.format({
+                                                        includeLabel: true,
+                                                    })}
+                                                </Label>
+                                            ) : undefined
+                                        }
                                     />
                                 )}
+                                validators={{
+                                    onChange: () => {
+                                        if (isPremAccountsInstalled) {
+                                            setPrice(null);
+                                        }
+                                    },
+                                    onChangeAsyncDebounceMs: 500,
+                                    onChangeAsync: async ({ value }) => {
+                                        const account = await getAccount(value);
+                                        const exists = Boolean(
+                                            account?.accountNum,
+                                        );
+                                        if (exists) {
+                                            return "Account name is already taken";
+                                        }
+                                        if (
+                                            value.length >=
+                                                MIN_ACCOUNT_NAME_LENGTH &&
+                                            value.length <=
+                                                DEFAULT_MAX_PREMIUM_NAME_LENGTH
+                                        ) {
+                                            const price =
+                                                await fetchCurrentPriceForLength(
+                                                    value.length,
+                                                );
+                                            if (!price) {
+                                                return `${value.length} character account names are not available`;
+                                            }
+                                            if (price) {
+                                                const {
+                                                    id,
+                                                    precision,
+                                                    symbol,
+                                                } = systemToken!;
+                                                const priceQuantity =
+                                                    new Quantity(
+                                                        price,
+                                                        precision,
+                                                        Number(id),
+                                                        symbol,
+                                                    );
+                                                setPrice(priceQuantity);
+                                            }
+                                        }
+                                    },
+                                }}
                             />
                         </CardContent>
                         <CardFooter className="flex flex-1 justify-end">
                             <CardAction>
                                 <createForm.SubmitButton
-                                    labels={["Create", "Creating..."]}
+                                    labels={
+                                        price
+                                            ? ["Buy now", "Buying..."]
+                                            : ["Create", "Creating..."]
+                                    }
                                 />
                             </CardAction>
                         </CardFooter>

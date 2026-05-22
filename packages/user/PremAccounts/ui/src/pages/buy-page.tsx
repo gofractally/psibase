@@ -7,10 +7,10 @@ import {
     zCurrentPricesData,
     zTokenQueryData,
 } from "@/lib/graphql/prem-accounts.schemas";
-import { PREM_ACCOUNTS_SERVICE } from "@/lib/prem-service";
 
 import { isAccountAvailable } from "@shared/lib/get-account";
 import { graphql } from "@shared/lib/graphql";
+import { premAccounts } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
@@ -140,7 +140,7 @@ export function BuyPage() {
                         }
                     }
                 `,
-                { service: PREM_ACCOUNTS_SERVICE },
+                { service: premAccounts.service },
             );
             const { currentPrices: rows } = zCurrentPricesData.parse(raw);
 
@@ -274,7 +274,7 @@ export function BuyPage() {
 
         try {
             await supervisor.functionCall({
-                service: PREM_ACCOUNTS_SERVICE,
+                service: premAccounts.service,
                 intf: "api",
                 method: "buy",
                 params: [trimmed, maxCostForTx],

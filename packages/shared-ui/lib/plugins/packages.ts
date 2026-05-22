@@ -12,8 +12,10 @@ class Queries extends PluginInterface {
 
 export class Plugin {
     readonly queries: Queries;
+    readonly service: Account;
 
-    constructor(readonly service: Account) {
+    constructor(service: Account) {
+        this.service = service;
         this.queries = new Queries();
         Object.assign(this.queries, { _service: service });
     }
