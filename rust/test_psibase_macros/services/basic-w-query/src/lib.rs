@@ -1,4 +1,4 @@
-#[psibase::service(name = "basicwquery")]
+#[psibase::service(name = "basicquery")]
 #[allow(non_snake_case)]
 mod service {
     use psibase::{serve_graphql, serve_simple_ui, HttpReply, HttpRequest};
