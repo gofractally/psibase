@@ -2,9 +2,7 @@ use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
 use crate::bindings::host::{
-    auth::api as HostAuth,
-    common::client as Client,
-    crypto::keyvault as HostCrypto,
+    auth::api as HostAuth, common::client as Client, crypto::keyvault as HostCrypto,
     types::types::Error,
 };
 use crate::bindings::invite::plugin::redemption as Invites;
@@ -104,6 +102,10 @@ impl Prompt for AccountsPlugin {
 
     fn create_premium(account_name: String, slippage_pct: u8) -> Result<String, Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
+
+        if account_name.len() >= 10 {
+            return Self::create_account(account_name);
+        }
 
         let ask = premium_market_ask(&account_name)?;
         let max_cost = max_cost_with_slippage(&ask, slippage_pct)?;
