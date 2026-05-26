@@ -1,5 +1,6 @@
 import { useStore } from "@tanstack/react-form";
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
+import z from "zod";
 
 import { useAccountAvailability } from "@/apps/prem-accounts/hooks/use-account-availability";
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
@@ -8,15 +9,16 @@ import {
     defaultBuyFormValues,
     zBuyForm,
 } from "@/apps/prem-accounts/lib/buy-form-schema";
-import {
-    formatCanonicalPrice,
-    unitTokenDecimal,
-} from "@/apps/prem-accounts/lib/format-token";
+import { unitTokenDecimal } from "@/apps/prem-accounts/lib/format-token";
 
+import { ErrorCard } from "@shared/components/error-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { useSystemToken } from "@shared/hooks/use-system-token";
+import { getAccount } from "@shared/lib/get-account";
+import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
+import { Quantity } from "@shared/lib/quantity";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
@@ -30,21 +32,25 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
+import { Label } from "@shared/shadcn/ui/label";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Spinner } from "@shared/shadcn/ui/spinner";
 
 export function BuyForm() {
-    const {
-        data: priceByLength,
-        isSuccess: hasLoadedPrices,
-        isPending: isPendingPrices,
-    } = usePremPrices();
+    const [price, setPrice] = useState<Quantity | null>(null);
+    const [isLoadingFreshPrice, setIsLoadingFreshPrice] = useState(false);
+
     const {
         data: systemToken,
         isSuccess: hasLoadedToken,
         isPending: isPendingToken,
     } = useSystemToken();
-    const hasSystemToken = Boolean(systemToken?.id);
-    const tokenId = hasSystemToken ? Number(systemToken!.id) : undefined;
+    const {
+        data: prices,
+        isSuccess: hasLoadedPrices,
+        isPending: isPendingPrices,
+    } = usePremPrices();
+
     const { mutateAsync: buyName, isPending: isBuying } = useBuyName();
 
     const form = useAppForm({
@@ -56,7 +62,7 @@ export function BuyForm() {
                 maxCost: parsed.maxCost,
             });
             form.reset();
-            if (hasSystemToken && systemToken) {
+            if (systemToken) {
                 form.setFieldValue(
                     "maxCost",
                     unitTokenDecimal(systemToken.precision),
@@ -64,21 +70,39 @@ export function BuyForm() {
             }
         },
         validators: {
-            onSubmit: zBuyForm,
+            onChange: z.object({
+                accountName: zAccount.or(z.literal("")),
+                maxCost: z.string(),
+            }),
+            onSubmitAsync: async ({ value }) => {
+                const account = await getAccount(value.accountName);
+                const trimmedMaxCost = value.maxCost.trim();
+                return {
+                    fields: {
+                        account: account
+                            ? "This account name is not available"
+                            : undefined,
+                        maxCost:
+                            trimmedMaxCost.length > 0 &&
+                            !isPendingMaxCostValidation &&
+                            validatedMaxCostU64 === undefined
+                                ? "Enter a valid max cost amount."
+                                : undefined,
+                    },
+                };
+            },
         },
     });
 
     useEffect(() => {
-        if (!hasLoadedToken || !hasSystemToken || !systemToken) {
-            return;
-        }
+        if (!systemToken) return;
         if (form.state.values.maxCost === "") {
             form.setFieldValue(
                 "maxCost",
                 unitTokenDecimal(systemToken.precision),
             );
         }
-    }, [form, hasLoadedToken, hasSystemToken, systemToken]);
+    }, [form, systemToken]);
 
     const accountName = useStore(
         form.store,
@@ -86,37 +110,33 @@ export function BuyForm() {
     );
     const maxCost = useStore(form.store, (state) => state.values.maxCost);
 
+    const { data: availability } = useAccountAvailability(accountName);
+    const { data: validatedMaxCostU64, isPending: isPendingMaxCostValidation } =
+        useValidatedMaxCost(maxCost, Number(systemToken?.id));
+
+    if (hasLoadedToken && !systemToken) {
+        return (
+            <ErrorCard
+                title="System token not found"
+                error={new Error("Refresh the page and try again.")}
+            />
+        );
+    }
+
+    if (hasLoadedPrices && !prices) {
+        return (
+            <ErrorCard
+                title="Premium account name pricing is not available"
+                error={new Error("Refresh the page and try again.")}
+            />
+        );
+    }
+
     const trimmedAccount = accountName.trim();
     const nameZodResult =
         trimmedAccount.length > 0 ? zAccount.safeParse(trimmedAccount) : null;
-    const nameValidationMessage =
-        nameZodResult && !nameZodResult.success
-            ? (nameZodResult.error.issues[0]?.message ?? "Invalid account name")
-            : "";
-
-    const { data: availability } = useAccountAvailability(accountName);
-    const { data: validatedMaxCostU64, isPending: isPendingMaxCostValidation } =
-        useValidatedMaxCost(maxCost, tokenId);
-
-    const price = useMemo(() => {
-        if (!priceByLength || availability !== "available") {
-            return null;
-        }
-        return priceByLength.get(trimmedAccount.length) ?? null;
-    }, [availability, priceByLength, trimmedAccount.length]);
-
-    const maxCostLabel = hasSystemToken ? systemToken!.symbol : "SysToken";
-
-    const noMarketForNameLength =
-        hasLoadedPrices &&
-        availability === "available" &&
-        trimmedAccount.length > 0 &&
-        priceByLength !== undefined &&
-        !priceByLength.has(trimmedAccount.length);
-
     const canBuy =
-        hasLoadedToken &&
-        hasSystemToken &&
+        systemToken &&
         validatedMaxCostU64 !== undefined &&
         !isPendingMaxCostValidation &&
         nameZodResult?.success === true &&
@@ -124,14 +144,80 @@ export function BuyForm() {
         price !== null &&
         !isBuying;
 
-    const isLoadingForm = isPendingPrices || isPendingToken;
+    const validateAccountOnChange = ({ value }: { value: string }) => {
+        setPrice(null);
+
+        if (
+            value.length < MIN_ACCOUNT_NAME_LENGTH ||
+            value.length > MAX_ACCOUNT_NAME_LENGTH
+        ) {
+            setIsLoadingFreshPrice(false);
+            return;
+        }
+
+        const isMarketAvailable = prices?.has(value.length);
+        if (!isMarketAvailable) {
+            setIsLoadingFreshPrice(false);
+            return `${value.length} character account names are not available`;
+        }
+
+        setIsLoadingFreshPrice(true);
+    };
+
+    const validateAccountOnChangeAsync = async ({
+        value,
+    }: {
+        value: string;
+    }) => {
+        if (
+            value.length < MIN_ACCOUNT_NAME_LENGTH ||
+            value.length > MAX_ACCOUNT_NAME_LENGTH
+        ) {
+            setIsLoadingFreshPrice(false);
+            return;
+        }
+
+        try {
+            const account = await getAccount(value);
+            const exists = Boolean(account?.accountNum);
+            if (exists) {
+                setIsLoadingFreshPrice(false);
+                return "Account name is already taken";
+            }
+
+            const freshPrice = await fetchCurrentPriceForLength(value.length);
+            const priceQuantity = new Quantity(
+                freshPrice!,
+                systemToken!.precision,
+                Number(systemToken!.id),
+                systemToken!.symbol,
+            );
+            setPrice(priceQuantity);
+        } catch (e) {
+            console.error("Failed to validate account name");
+            console.error(e);
+            return "Failed to validate account name. Please try again.";
+        } finally {
+            setIsLoadingFreshPrice(false);
+        }
+    };
+
+    const priceLabel = isLoadingFreshPrice ? (
+        <Spinner className="size-3.5 shrink-0" />
+    ) : price ? (
+        <Label className="text-green-500">
+            Available for {price.format({ includeLabel: true })}
+        </Label>
+    ) : undefined;
 
     return (
         <GlowingCard>
             <CardHeader>
-                <CardTitle>Buy a name</CardTitle>
+                <CardTitle>Buy a premium account name</CardTitle>
                 <CardDescription>
-                    Purchase a premium account name.
+                    Account names can be up to {MAX_ACCOUNT_NAME_LENGTH}{" "}
+                    characters long, must start with a letter, and can only
+                    contain letters, numbers, and underscores.
                 </CardDescription>
             </CardHeader>
             <form.AppForm>
@@ -141,7 +227,7 @@ export function BuyForm() {
                         void form.handleSubmit();
                     }}
                 >
-                    {isLoadingForm ? (
+                    {isPendingToken || isPendingPrices ? (
                         <CardContent className="space-y-4">
                             <div className="space-y-4">
                                 <div className="space-y-2">
@@ -157,105 +243,60 @@ export function BuyForm() {
                             </div>
                         </CardContent>
                     ) : (
-                        <CardContent className="@container space-y-4">
-                            <div className="@xl:flex-row flex w-full flex-col gap-4">
-                                <div className="flex-1">
-                                    <form.AppField
-                                        name="accountName"
-                                        children={(field) => (
-                                            <field.TextField
-                                                label="Desired account name"
-                                                placeholder={`e.g. my-name (${MIN_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} chars)`}
-                                                autoComplete="off"
-                                                autoCorrect="off"
-                                                spellCheck={false}
-                                            />
-                                        )}
-                                    />
-                                </div>
-                                <div className="min-w-56">
-                                    <form.AppField
-                                        name="maxCost"
-                                        children={(field) => (
-                                            <field.TextField
-                                                label={`Max cost (${maxCostLabel})`}
-                                                placeholder={
-                                                    hasSystemToken &&
-                                                    systemToken
-                                                        ? unitTokenDecimal(
-                                                              systemToken.precision,
-                                                          )
-                                                        : "1.0000"
-                                                }
-                                            />
-                                        )}
-                                    />
-                                </div>
-                            </div>
-                            <div className="min-h-6 text-sm">
-                                {nameValidationMessage && (
-                                    <p className="text-destructive">
-                                        {nameValidationMessage}
-                                    </p>
-                                )}
-                                {!nameValidationMessage &&
-                                    trimmedAccount.length > 0 &&
-                                    nameZodResult?.success && (
-                                        <>
-                                            {availability === "taken" && (
-                                                <p className="text-destructive">
-                                                    Account name already exists
-                                                </p>
+                        <div className="flex flex-col gap-6">
+                            <CardContent className="@container space-y-4">
+                                <div className="@xl:flex-row flex w-full flex-col gap-4">
+                                    <div className="flex-1">
+                                        <form.AppField
+                                            name="accountName"
+                                            validators={{
+                                                onChange:
+                                                    validateAccountOnChange,
+                                                onChangeAsyncDebounceMs: 500,
+                                                onChangeAsync:
+                                                    validateAccountOnChangeAsync,
+                                            }}
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label="Desired account name"
+                                                    placeholder="Account name"
+                                                    autoComplete="off"
+                                                    autoCorrect="off"
+                                                    spellCheck={false}
+                                                    rightLabel={priceLabel}
+                                                />
                                             )}
-                                            {availability === "available" &&
-                                                price !== null &&
-                                                hasSystemToken &&
-                                                systemToken &&
-                                                tokenId !== undefined && (
-                                                    <p className="text-green-600">
-                                                        Buy for{" "}
-                                                        {formatCanonicalPrice(
-                                                            price,
-                                                            systemToken.precision,
-                                                            tokenId,
-                                                            systemToken.symbol,
-                                                        )}
-                                                    </p>
-                                                )}
-                                            {availability === "available" &&
-                                                price === null &&
-                                                !hasLoadedPrices && (
-                                                    <p className="text-muted-foreground">
-                                                        Loading price...
-                                                    </p>
-                                                )}
-                                            {noMarketForNameLength && (
-                                                <p className="text-muted-foreground">
-                                                    {trimmedAccount} is not a
-                                                    premium name.
-                                                </p>
+                                        />
+                                    </div>
+                                    <div className="min-w-56">
+                                        <form.AppField
+                                            name="maxCost"
+                                            children={(field) => (
+                                                <field.TextField
+                                                    label={`Max cost (${systemToken?.symbol ?? "SysToken"})`}
+                                                    placeholder={
+                                                        systemToken
+                                                            ? unitTokenDecimal(
+                                                                  systemToken.precision,
+                                                              )
+                                                            : "1.0000"
+                                                    }
+                                                />
                                             )}
-                                        </>
-                                    )}
-                                {maxCost.trim().length > 0 &&
-                                    !isPendingMaxCostValidation &&
-                                    validatedMaxCostU64 === undefined &&
-                                    hasSystemToken && (
-                                        <p className="text-destructive">
-                                            Enter a valid max cost amount.
-                                        </p>
-                                    )}
-                            </div>
-                        </CardContent>
+                                        />
+                                    </div>
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                <CardAction className="flex w-full justify-end">
+                                    <form.SubmitButton
+                                        labels={["Buy", "Processing"]}
+                                        disabled={!canBuy}
+                                    />
+                                </CardAction>
+                            </CardFooter>
+                        </div>
                     )}
-                    <CardFooter>
-                        <CardAction className="flex w-full justify-end">
-                            <form.SubmitButton
-                                labels={["Buy", "Processing..."]}
-                                disabled={!canBuy}
-                            />
-                        </CardAction>
-                    </CardFooter>
                 </form>
             </form.AppForm>
         </GlowingCard>
