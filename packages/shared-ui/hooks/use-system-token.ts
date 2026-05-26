@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { graphql, GraphQLUrlOptions } from "@shared/lib/graphql";
+import { GraphQLUrlOptions, graphql } from "@shared/lib/graphql";
 import QueryKey from "@shared/lib/query-keys";
 
 export interface SystemTokenInfo {
     id: string;
     /** Display label: token symbol, or "ID: {id}" when no symbol is set */
     symbol: string;
-    /** Decimal places for the system token (0 when no system token is configured). */
+    /** Decimal places for the system token. */
     precision: number;
 }
 
@@ -26,14 +26,11 @@ interface TokenResponse {
     } | null;
 }
 
-const NO_SYSTEM_TOKEN: SystemTokenInfo = { id: "", symbol: "", precision: 0 };
-
 export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
-    return useQuery<SystemTokenInfo>({
+    return useQuery<SystemTokenInfo | null>({
         queryKey: QueryKey.systemToken(),
-        queryFn: async (): Promise<SystemTokenInfo> => {
-            try {
-                const configQuery = `
+        queryFn: async (): Promise<SystemTokenInfo | null> => {
+            const configQuery = `
                     query {
                         config {
                             sysTid
@@ -41,17 +38,17 @@ export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
                     }
                 `;
 
-                const configRes = await graphql<ConfigResponse>(configQuery, {
-                    service: "tokens",
-                    ...opts,
-                });
+            const configRes = await graphql<ConfigResponse>(configQuery, {
+                service: "tokens",
+                ...opts,
+            });
 
-                if (!configRes.config?.sysTid) {
-                    return NO_SYSTEM_TOKEN;
-                }
+            if (!configRes.config?.sysTid) {
+                return null;
+            }
 
-                const sysTid = configRes.config.sysTid;
-                const tokenQuery = `
+            const sysTid = configRes.config.sysTid;
+            const tokenQuery = `
                     query {
                         token(tokenId: "${sysTid}") {
                             id
@@ -61,28 +58,23 @@ export const useSystemToken = (opts: GraphQLUrlOptions = {}) => {
                     }
                 `;
 
-                const tokenRes = await graphql<TokenResponse>(tokenQuery, {
-                    service: "tokens",
-                    ...opts,
-                });
+            const tokenRes = await graphql<TokenResponse>(tokenQuery, {
+                service: "tokens",
+                ...opts,
+            });
 
-                if (!tokenRes.token) {
-                    return NO_SYSTEM_TOKEN;
-                }
-
-                const idStr = tokenRes.token.id.toString();
-                const symbol =
-                    tokenRes.token.symbol?.trim() ?? `ID: ${idStr}`;
-
-                return {
-                    id: idStr,
-                    symbol,
-                    precision: tokenRes.token.precision,
-                };
-            } catch (error) {
-                console.error("Error fetching system token:", error);
-                return NO_SYSTEM_TOKEN;
+            if (!tokenRes.token) {
+                return null;
             }
+
+            const idStr = tokenRes.token.id.toString();
+            const symbol = tokenRes.token.symbol?.trim() ?? `ID: ${idStr}`;
+
+            return {
+                id: idStr,
+                symbol,
+                precision: tokenRes.token.precision,
+            };
         },
     });
 };

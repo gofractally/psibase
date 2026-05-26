@@ -20,7 +20,7 @@ export const Resources = () => {
             <div className="space-y-6">
                 <VirtualServer />
                 <Billing
-                    systemToken={systemToken ?? null}
+                    systemToken={systemToken}
                     systemTokenLoading={systemTokenLoading}
                 />
             </div>
