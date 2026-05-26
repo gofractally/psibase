@@ -68,9 +68,16 @@ export function BuyForm() {
             } catch (error) {
                 const errorMessage =
                     error instanceof Error ? error.message : "Unknown error";
+
                 if (errorMessage.includes("has insufficient balance")) {
                     form.fieldInfo.accountName.instance?.setErrorMap({
                         onSubmit: "Insufficient balance",
+                    });
+                }
+
+                if (errorMessage.includes("Max cost below current ask")) {
+                    form.fieldInfo.maxCost.instance?.setErrorMap({
+                        onSubmit: "Max cost below current ask",
                     });
                 }
             }
