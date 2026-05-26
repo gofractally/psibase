@@ -37,6 +37,7 @@ import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { CopyButton } from "./components/copy-button";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
@@ -61,29 +62,39 @@ export const CreatePrompt = () => {
     const [acknowledged, setAcknowledged] = useState(false);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
     const [price, setPrice] = useState<Quantity | null>(null);
+
     const { data: networkName } = useBranding();
+    const { data: systemToken, isPending: isPendingSystemToken } =
+        useSystemToken();
+    const {
+        data: isPremAccountsInstalled,
+        isPending: isPendingPremAccountsInstalled,
+    } = useIsPackageInstalled("PremAccounts");
+
+    const isLoading = isPendingSystemToken || isPendingPremAccountsInstalled;
+    const isBuyEnabled = isPremAccountsInstalled && systemToken;
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
     const purchaseAccountMutation = usePurchaseAccount();
     const connectAccountMutation = useConnectAccount();
 
-    const { data: systemToken } = useSystemToken();
-    const { data: isPremAccountsInstalled } =
-        useIsPackageInstalled("PremAccounts");
+    const lengthValidator = isBuyEnabled
+        ? zAccount
+        : zAccount.refine(
+              (val) => val.length > DEFAULT_MAX_PREMIUM_NAME_LENGTH,
+              {
+                  message: `Account must be at least ${DEFAULT_MAX_PREMIUM_NAME_LENGTH + 1} characters.`,
+              },
+          );
 
     const createForm = useAppForm({
         defaultValues: {
             account: "",
         },
         validators: {
-            onChange: z.object({
-                account: zAccount.refine(
-                    (val) => val.length <= MAX_ACCOUNT_NAME_LENGTH,
-                    {
-                        message: `Account name cannot be longer than ${MAX_ACCOUNT_NAME_LENGTH} characters`,
-                    },
-                ),
+            onSubmit: z.object({
+                account: lengthValidator,
             }),
             onSubmitAsync: async ({ value }) => {
                 const account = await getAccount(value.account);
@@ -212,6 +223,24 @@ export const CreatePrompt = () => {
         }
     };
 
+    if (isLoading) {
+        return (
+            <BrandedGlowingCard>
+                <div className="-mt-6 px-6">
+                    <Progress value={33} />
+                </div>
+                <CardContent className="flex flex-col">
+                    <Skeleton className="mb-6 h-8 w-[280px]" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-full max-w-[400px]" />
+                        <Skeleton className="h-4 w-full max-w-[350px]" />
+                    </div>
+                    <Skeleton className="mt-6 h-10 w-full" />
+                </CardContent>
+            </BrandedGlowingCard>
+        );
+    }
+
     return (
         <BrandedGlowingCard>
             <div className="-mt-6 px-6">
@@ -237,10 +266,9 @@ export const CreatePrompt = () => {
                                     Create a {networkName} account
                                 </CardTitle>
                                 <CardDescription>
-                                    Account names can be up to{" "}
-                                    {MAX_ACCOUNT_NAME_LENGTH} characters long,
-                                    must start with a letter, and can only
-                                    contain letters, numbers, and underscores.
+                                    {isBuyEnabled
+                                        ? `Account names can be up to ${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`
+                                        : `Account names can be ${DEFAULT_MAX_PREMIUM_NAME_LENGTH + 1}-${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`}
                                 </CardDescription>
                             </div>
                             <createForm.AppField
@@ -266,7 +294,7 @@ export const CreatePrompt = () => {
                                 )}
                                 validators={{
                                     onChange: () => {
-                                        if (isPremAccountsInstalled) {
+                                        if (isBuyEnabled) {
                                             setPrice(null);
                                         }
                                     },
@@ -278,6 +306,9 @@ export const CreatePrompt = () => {
                                         );
                                         if (exists) {
                                             return "Account name is already taken";
+                                        }
+                                        if (!isBuyEnabled) {
+                                            return;
                                         }
                                         if (
                                             value.length >=
@@ -292,8 +323,11 @@ export const CreatePrompt = () => {
                                             if (!price) {
                                                 return `${value.length} character account names are not available`;
                                             }
+                                            if (!systemToken) {
+                                                return;
+                                            }
                                             const { id, precision, symbol } =
-                                                systemToken!;
+                                                systemToken;
                                             const priceQuantity = new Quantity(
                                                 price,
                                                 precision,
