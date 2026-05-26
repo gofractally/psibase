@@ -8,6 +8,7 @@ import {
 } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { GlowingCard } from "@shared/components/glowing-card";
+import { PageContainer } from "@shared/components/page-container";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { CardContent } from "@shared/shadcn/ui/card";
 
@@ -63,39 +64,35 @@ export const TokensLayout = () => {
     }
 
     return (
-        <div className="p-4">
-            <div className="mx-auto max-w-3xl">
-                {isNoTokens ? (
-                    <NoTokensWarning />
-                ) : (
-                    <div className="space-y-4">
-                        <AutoDebitSwitch currentUser={currentUser} />
-                        <GlowingCard>
-                            <CardContent className="@container space-y-2">
-                                {!isLoading && (
-                                    <>
-                                        <TokenSelector
-                                            tokens={tokens}
-                                            selectedToken={selectedToken}
-                                            onChange={handleTokenSelect}
-                                            onClickAvailableBalance={
-                                                handleSetMaxAmount ?? undefined
-                                            }
-                                        />
-                                        {selectedToken?.isTransferable ===
-                                            false && (
-                                            <UntransferableTokenWarning />
-                                        )}
-                                    </>
-                                )}
-                            </CardContent>
-                        </GlowingCard>
-                        <Outlet
-                            context={{ selectedToken, currentUser, isLoading }}
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
+        <PageContainer className="space-y-6">
+            {isNoTokens ? (
+                <NoTokensWarning />
+            ) : (
+                <>
+                    <AutoDebitSwitch currentUser={currentUser} />
+                    <GlowingCard>
+                        <CardContent className="@container space-y-2">
+                            {!isLoading && (
+                                <>
+                                    <TokenSelector
+                                        tokens={tokens}
+                                        selectedToken={selectedToken}
+                                        onChange={handleTokenSelect}
+                                        onClickAvailableBalance={
+                                            handleSetMaxAmount ?? undefined
+                                        }
+                                    />
+                                    {selectedToken?.isTransferable ===
+                                        false && <UntransferableTokenWarning />}
+                                </>
+                            )}
+                        </CardContent>
+                    </GlowingCard>
+                    <Outlet
+                        context={{ selectedToken, currentUser, isLoading }}
+                    />
+                </>
+            )}
+        </PageContainer>
     );
 };
