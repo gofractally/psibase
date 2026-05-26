@@ -31,7 +31,7 @@ namespace
       auto end  = packages.rend();
       for (; iter != end; ++iter)
       {
-         for (auto account : iter->accounts())
+         for (auto account : iter->meta.services)
          {
             if (std::ranges::contains(essentialServices, account))
             {

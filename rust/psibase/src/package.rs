@@ -1,7 +1,7 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
 use crate::services::{
-    accounts, brotli_svc::brotli_impl, http_server, packages, producers, setcode, sites, transact,
+    brotli_svc::brotli_impl, dyn_ld, http_server, packages, producers, setcode, sites, transact,
     x_sites,
 };
 use crate::{
@@ -14,9 +14,9 @@ use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use custom_error::custom_error;
 use flate2::write::GzEncoder;
-use fracpack::CompiledSchema;
+use fracpack::{CompiledSchema, UnpackOwned};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::ffi::OsString;
@@ -103,6 +103,15 @@ pub struct PackageRef {
     pub version: String,
 }
 
+#[derive(
+    Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq, Pack, Unpack, ToSchema, Hash,
+)]
+#[fracpack(fracpack_mod = "fracpack")]
+pub struct PackageExport {
+    pub name: String,
+    pub service: AccountNumber,
+}
+
 fn network_scope() -> String {
     "network".to_string()
 }
@@ -122,6 +131,7 @@ pub struct Meta {
     pub accounts: Vec<AccountNumber>,
     #[serde(default)]
     pub services: Vec<AccountNumber>,
+    pub exports: Vec<PackageExport>,
 }
 
 impl Meta {
@@ -134,6 +144,7 @@ impl Meta {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
             sha256,
             file,
         };
@@ -155,6 +166,8 @@ pub struct PackageInfo {
     #[serde(default)]
     pub services: Vec<AccountNumber>,
     #[serde(default)]
+    pub exports: Vec<PackageExport>,
+    #[serde(default)]
     pub sha256: Checksum256,
     #[serde(default)]
     pub file: String,
@@ -170,6 +183,7 @@ impl PackageInfo {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
         }
     }
     pub fn is_local(&self) -> Option<bool> {
@@ -193,6 +207,7 @@ impl InstalledPackageInfo {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
         }
     }
 }
@@ -205,6 +220,7 @@ pub struct LocalPackageInfo {
     pub depends: Vec<PackageRef>,
     pub accounts: Vec<AccountNumber>,
     pub services: Vec<AccountNumber>,
+    pub exports: Vec<PackageExport>,
     pub sha256: Checksum256,
 }
 
@@ -218,6 +234,7 @@ impl LocalPackageInfo {
             depends: self.depends.clone(),
             accounts: self.accounts.clone(),
             services: self.services.clone(),
+            exports: self.exports.clone(),
         }
     }
 }
@@ -325,6 +342,15 @@ impl PrettyAction {
             method: self.method,
             rawData: raw_data,
         })
+    }
+    pub fn parse_data_as<T: UnpackOwned + DeserializeOwned>(&self) -> Result<T, anyhow::Error> {
+        if let Some(raw_data) = &self.raw_data {
+            Ok(T::unpacked(&raw_data.0)?)
+        } else if let Some(data) = &self.data {
+            Ok(serde_json::from_value(data.clone())?)
+        } else {
+            Err(anyhow!("Missing action data"))
+        }
     }
 }
 
@@ -557,6 +583,9 @@ impl<R: Read + Seek> PackagedService<R> {
     pub fn get_accounts(&self) -> &[AccountNumber] {
         &self.meta.accounts
     }
+    pub fn get_services(&self) -> &[AccountNumber] {
+        &self.meta.services
+    }
     pub fn read_postinstall(&mut self) -> Result<Vec<PrettyAction>, anyhow::Error> {
         Ok(self.postinstall.clone())
     }
@@ -697,11 +726,14 @@ impl<R: Read + Seek> PackagedService<R> {
         install_ui: bool,
         compression_level: u32,
         schemas: &SchemaMap,
+        packages: &PackageList,
     ) -> Result<(), anyhow::Error> {
         if install_ui {
             self.reg_server(actions)?;
             self.store_data(actions, uploader, compression_level)?;
         }
+
+        self.link(packages, actions)?;
 
         self.postinstall(schemas, actions)?;
         self.commit_install(sender, actions)?;
@@ -718,18 +750,6 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut services = vec![];
 
         let local = &self.meta.scope == "local";
-
-        for account in self.get_accounts() {
-            if !self.has_service(*account) {
-                if !local {
-                    services.push(accounts::SERVICE)
-                } else {
-                    Err(anyhow!(
-                        "Local packages do not support non-service accounts"
-                    ))?
-                }
-            }
-        }
 
         if !self.data.is_empty() {
             if !local {
@@ -752,6 +772,13 @@ impl<R: Read + Seek> PackagedService<R> {
         for act in &self.postinstall {
             accounts.push(act.sender);
             services.push(act.service);
+            if act.service == transact::SERVICE
+                && act.method == MethodNumber::from(transact::action_structs::runAs::ACTION_NAME)
+            {
+                let nested = act.parse_data_as::<transact::action_structs::runAs>()?;
+                accounts.push(nested.action.sender);
+                services.push(nested.action.service);
+            }
         }
 
         accounts.sort_unstable_by(|a, b| a.value.cmp(&b.value));
@@ -829,6 +856,72 @@ impl<R: Read + Seek> PackagedService<R> {
                     .await?,
                 );
             }
+        }
+        Ok(())
+    }
+
+    // Returns services in this package that should have
+    // dependencies linked using dyn-ld
+    fn linked_services(&self) -> Vec<AccountNumber> {
+        let mut visited = HashSet::new();
+        let mut services = Vec::new();
+
+        for (service, _, _) in &self.services {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        for (service, _) in &self.data {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        services
+    }
+
+    // packages must contain
+    // - all packages being installed
+    // - installed packages that are not being updated, and that
+    //   the packages being installed depend on
+    pub fn link<A: ActionSink>(
+        &self,
+        packages: &PackageList,
+        actions: &mut A,
+    ) -> Result<(), anyhow::Error> {
+        let mut visited_imports = HashMap::new();
+        let mut imports = Vec::new();
+        for export in &self.meta.exports {
+            imports.push(dyn_ld::DynDep {
+                name: export.name.clone(),
+                service: export.service.clone(),
+            });
+        }
+        for dep in &self.meta.depends {
+            let Some((meta, _)) = packages.get_by_ref(dep)? else {
+                Err(anyhow!(
+                    "Package list does not contain {}-{}",
+                    dep.name,
+                    dep.version
+                ))?
+            };
+            for export in &meta.exports {
+                if let Some(old) = visited_imports.insert(&export.name, export.service) {
+                    if old != export.service {
+                        Err(anyhow!("Ambiguous import for {}", export.name))?
+                    }
+                } else {
+                    imports.push(dyn_ld::DynDep {
+                        name: export.name.clone(),
+                        service: export.service.clone(),
+                    })
+                }
+            }
+        }
+
+        for service in self.linked_services() {
+            actions.push_action(
+                dyn_ld::Wrapper::pack_from(service).link(self.meta.name.clone(), imports.clone()),
+            )?
         }
         Ok(())
     }
@@ -999,8 +1092,10 @@ impl PackageManifest {
     pub fn upgrade<T: ActionSink>(
         &self,
         other: PackageManifest,
+        package_name: &str,
         out: &mut T,
     ) -> Result<(), anyhow::Error> {
+        let new_linked_services = other.linked_services_set();
         let new_files: HashSet<_> = other.data.into_iter().collect();
         for file in &self.data {
             if !new_files.contains(file) {
@@ -1021,9 +1116,16 @@ impl PackageManifest {
                 out.push_action(set_code_action(*service, vec![]))?;
             }
         }
+        for service in self.linked_services(new_linked_services) {
+            out.push_action(dyn_ld::Wrapper::pack_from(service).unlink(package_name.to_string()))?;
+        }
         Ok(())
     }
-    pub fn remove<T: ActionSink>(&self, out: &mut T) -> Result<(), anyhow::Error> {
+    pub fn remove<T: ActionSink>(
+        &self,
+        package_name: &str,
+        out: &mut T,
+    ) -> Result<(), anyhow::Error> {
         for file in &self.data {
             out.push_action(sites::Wrapper::pack_from(file.account).remove(file.filename.clone()))?;
         }
@@ -1036,7 +1138,34 @@ impl PackageManifest {
             }
             out.push_action(set_code_action(*service, vec![]))?;
         }
+        for service in self.linked_services(HashSet::new()) {
+            out.push_action(dyn_ld::Wrapper::pack_from(service).unlink(package_name.to_string()))?;
+        }
         Ok(())
+    }
+    fn linked_services_set(&self) -> HashSet<AccountNumber> {
+        let mut visited = HashSet::new();
+        for file in &self.data {
+            visited.insert(file.account);
+        }
+        for (service, _) in &self.services {
+            visited.insert(*service);
+        }
+        visited
+    }
+    fn linked_services(&self, mut visited: HashSet<AccountNumber>) -> Vec<AccountNumber> {
+        let mut services = Vec::new();
+        for file in &self.data {
+            if visited.insert(file.account) {
+                services.push(file.account)
+            }
+        }
+        for (service, _) in &self.services {
+            if visited.insert(*service) {
+                services.push(*service)
+            }
+        }
+        services
     }
 }
 
@@ -1246,8 +1375,6 @@ fn build_package_order_graph<R: Read + Seek>(
 ) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let mut result: HashMap<String, Vec<String>> = HashMap::new();
     let mut provides_service: HashMap<AccountNumber, &Meta> = HashMap::new();
-    let mut has_postinstall = HashSet::new();
-    let empty_deps = Vec::new();
     let mut service_deps = HashMap::new();
     // Build the graph of service dependencies. Service dependencies
     // can be cyclic as long as nothing calls any of the services in
@@ -1266,19 +1393,11 @@ fn build_package_order_graph<R: Read + Seek>(
                         })?
                     }
                 }
-                if !package.postinstall.is_empty() {
-                    has_postinstall.insert(package.name());
-                }
                 if !package.services.is_empty() {
                     // If a package provides any services, direct dependents can
                     // assume they are installed. This transitively requires all
                     // services that this package might use to be installed.
                     service_deps.insert(package.name().to_string(), &package.meta().depends);
-                } else if !package.postinstall.is_empty() {
-                    // If a package provides a postinstall script, direct dependents
-                    // can assume that it has been run. Dependencies only need to
-                    // be installed first if they are required to install this package
-                    service_deps.insert(package.name().to_string(), &empty_deps);
                 }
             }
             PackageOpFull::Remove(_) => {}
@@ -1321,9 +1440,6 @@ fn build_package_order_graph<R: Read + Seek>(
                 if !meta.services.is_empty() {
                     service_deps.insert(name.clone(), &meta.depends);
                 }
-                // We don't know whether this package has a postinstall
-                // script, and it doesn't matter, because it's already
-                // been executed and won't be executed again.
             }
         }
     }
@@ -1354,16 +1470,6 @@ fn build_package_order_graph<R: Read + Seek>(
                             &mut visited,
                             &mut all_required_packages,
                         )?;
-                    }
-                }
-                // The postinstall script can rely on direct dependencies'
-                // postinstall scripts having run first.
-                if has_postinstall.contains(&package.name()) {
-                    for dep in &package.meta().depends {
-                        if has_postinstall.contains(&dep.name.as_str()) && visited.insert(&dep.name)
-                        {
-                            all_required_packages.push(dep.name.clone());
-                        }
                     }
                 }
                 // Drop packages that are not being modified
@@ -1716,7 +1822,7 @@ impl HTTPRegistry {
                 &mut client,
                 packages::SERVICE,
                 format!(
-                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services sha256 file }} }} }} }}",
+                    "query {{ packages(owner: {}, first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version scope description depends {{ name version }} accounts services exports {{ name service }} sha256 file }} }} }} }}",
                     serde_json::to_string(&owner)?,
                     serde_json::to_string(&end_cursor)?,
                 ))
@@ -2064,7 +2170,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<InstalledQuery>(base_url, client, packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                                          format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts services exports {{ name service }} owner }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_installed(edge.node);
@@ -2085,7 +2191,7 @@ impl PackageList {
         let mut result = PackageList::new();
         loop {
             let data = crate::gql_query::<LocalPackageQuery>(base_url, client, x_packages::SERVICE,
-                                        format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
+                                                             format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }} accounts services exports {{ name service }} sha256 }} }} }} }}", serde_json::to_string(&end_cursor)?))
                 .await.with_context(|| "Failed to list installed packages")?;
             for edge in data.installed.edges {
                 result.insert_local(edge.node);
@@ -2131,6 +2237,9 @@ impl PackageList {
                 sha256: info.sha256,
             },
         )
+    }
+    pub fn remove_all_versions(&mut self, name: &str) {
+        self.packages.remove(name);
     }
 
     pub fn contains_package(&self, name: &str) -> bool {
@@ -2205,6 +2314,29 @@ impl PackageList {
             (&lhs.0.name, &lhs.0.version).cmp(&(&rhs.0.name, &rhs.0.version))
         });
         result
+    }
+    // If self is the current set of installed packages, returns the
+    // set of installed packages after ops are applied.
+    pub fn into_updated<R: Read + Seek>(
+        mut self,
+        ops: &Vec<PackageOpFull<R>>,
+        owner: AccountNumber,
+    ) -> Self {
+        for op in ops {
+            match op {
+                PackageOpFull::Install(package) => {
+                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
+                }
+                PackageOpFull::Replace(old, package) => {
+                    self.packages.remove(&old.name);
+                    self.insert(package.meta().clone(), PackageOrigin::Installed { owner });
+                }
+                PackageOpFull::Remove(meta) => {
+                    self.packages.remove(&meta.name);
+                }
+            }
+        }
+        self
     }
     pub fn get_by_ref(
         &self,
