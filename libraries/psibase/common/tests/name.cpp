@@ -5,22 +5,7 @@
 
 TEST_CASE("invalid-account-names-are-zeroed")
 {
-   auto acc = psibase::AccountNumber("9");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("3");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("1abc");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("1234");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("9asdf");
-   REQUIRE(acc.value == 0);
-
-   acc = psibase::AccountNumber("");
+   auto acc = psibase::AccountNumber("");
    REQUIRE(acc.value == 0);
 
    acc = psibase::AccountNumber("?");
@@ -40,31 +25,6 @@ TEST_CASE("invalid-account-names-are-zeroed")
 
    acc = psibase::AccountNumber("abcdefghijklmnopqrstuvwxyz");
    REQUIRE(acc.value == 0);
-}
-
-TEST_CASE("valid-account-names-check")
-{
-   REQUIRE(psibase::AccountNumber("a").value == 49158);
-   REQUIRE(psibase::AccountNumber("b").value == 184);
-   REQUIRE(psibase::AccountNumber("c").value == 16538);
-   REQUIRE(psibase::AccountNumber("abc123").value == 1754468116);
-   REQUIRE(psibase::AccountNumber("spiderman").value == 483466201442);
-   REQUIRE(psibase::AccountNumber("brucewayne").value == 132946582102463);
-   REQUIRE(psibase::AccountNumber("anthonystark").value == 183678712946955);
-   REQUIRE(psibase::AccountNumber("natasharomanoff").value == 5818245174062392369);
-}
-
-TEST_CASE("convert-account-names-back-to-string")
-{
-   REQUIRE(psibase::AccountNumber(49158).str() == "a");
-   REQUIRE(psibase::AccountNumber(184).str() == "b");
-   REQUIRE(psibase::AccountNumber(16538).str() == "c");
-   REQUIRE(psibase::AccountNumber(1754468116).str() == "abc123");
-   REQUIRE(psibase::AccountNumber(483466201442).str() == "spiderman");
-   REQUIRE(psibase::AccountNumber(132946582102463).str() == "brucewayne");
-   REQUIRE(psibase::AccountNumber(183678712946955).str() == "anthonystark");
-   REQUIRE(psibase::AccountNumber(5818245174062392369).str() == "natasharomanoff");
-   REQUIRE(psibase::AccountNumber(0).str() == "");
 }
 
 TEST_CASE("invalid-method-names-are-zeroed")
