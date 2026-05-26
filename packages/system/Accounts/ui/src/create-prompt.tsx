@@ -15,6 +15,16 @@ import { getAccount } from "@shared/lib/get-account";
 import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     CardAction,
@@ -49,6 +59,7 @@ export const CreatePrompt = () => {
     );
     const [showPassword, setShowPassword] = useState(false);
     const [acknowledged, setAcknowledged] = useState(false);
+    const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
     const [price, setPrice] = useState<Quantity | null>(null);
     const { data: networkName } = useBranding();
 
@@ -86,6 +97,10 @@ export const CreatePrompt = () => {
             },
         },
         onSubmit: async (data) => {
+            if (price) {
+                setBuyConfirmOpen(true);
+                return;
+            }
             await handleCreateOrBuy(data.value.account);
         },
     });
@@ -104,8 +119,10 @@ export const CreatePrompt = () => {
                 privateKey = await createAccountMutation.mutateAsync(name);
             }
             setKey(pemToB64(privateKey));
+            setBuyConfirmOpen(false);
             setStep("2_SAVE");
         } catch (error) {
+            setBuyConfirmOpen(false);
             console.error("Failed to secure account:");
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
@@ -300,10 +317,53 @@ export const CreatePrompt = () => {
                                             ? ["Buy now", "Buying..."]
                                             : ["Create", "Creating..."]
                                     }
+                                    disabled={
+                                        price
+                                            ? purchaseAccountMutation.isPending
+                                            : false
+                                    }
                                 />
                             </CardAction>
                         </CardFooter>
                     </form>
+                    <AlertDialog
+                        open={buyConfirmOpen}
+                        onOpenChange={setBuyConfirmOpen}
+                    >
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                    Buy account name?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    You are about to buy and claim{" "}
+                                    <span className="text-primary font-medium">
+                                        {createdAccount.trim()}
+                                    </span>{" "}
+                                    for {price?.format({ includeLabel: true })}.
+                                    Do you want to continue?
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel
+                                    disabled={purchaseAccountMutation.isPending}
+                                >
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                    disabled={purchaseAccountMutation.isPending}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        void handleCreateOrBuy(createdAccount);
+                                    }}
+                                >
+                                    {purchaseAccountMutation.isPending
+                                        ? "Buying..."
+                                        : "Buy"}
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </createForm.AppForm>
             )}
 
