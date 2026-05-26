@@ -3,6 +3,7 @@ import { type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import { premAccounts } from "@shared/lib/plugins";
 import {
     SidebarGroup,
@@ -19,6 +20,7 @@ export interface App {
 }
 
 export function NavApps() {
+    const { data: systemToken } = useSystemToken();
     const { data: isPremAccountsInstalled } =
         useIsPackageInstalled("PremAccounts");
 
@@ -31,7 +33,7 @@ export function NavApps() {
                     .filter(
                         (app) =>
                             app.service !== premAccounts.service ||
-                            isPremAccountsInstalled === true,
+                            Boolean(isPremAccountsInstalled && systemToken),
                     )
                     .map((item) => (
                         <SidebarMenuItem key={item.service}>
