@@ -10,7 +10,7 @@ export function PremAccountsLayout() {
     }, []);
 
     return (
-        <PageContainer className="space-y-6 pb-8">
+        <PageContainer className="space-y-6">
             <Outlet />
         </PageContainer>
     );
