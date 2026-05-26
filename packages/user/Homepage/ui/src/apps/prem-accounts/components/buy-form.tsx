@@ -5,10 +5,6 @@ import z from "zod";
 import { useAccountAvailability } from "@/apps/prem-accounts/hooks/use-account-availability";
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
 import { useValidatedMaxCost } from "@/apps/prem-accounts/hooks/use-validated-max-cost";
-import {
-    defaultBuyFormValues,
-    zBuyForm,
-} from "@/apps/prem-accounts/lib/buy-form-schema";
 import { unitTokenDecimal } from "@/apps/prem-accounts/lib/format-token";
 
 import { ErrorCard } from "@shared/components/error-card";
@@ -54,12 +50,14 @@ export function BuyForm() {
     const { mutateAsync: buyName, isPending: isBuying } = useBuyName();
 
     const form = useAppForm({
-        defaultValues: defaultBuyFormValues,
+        defaultValues: {
+            accountName: "",
+            maxCost: "",
+        },
         onSubmit: async ({ value }) => {
-            const parsed = zBuyForm.parse(value);
             await buyName({
-                accountName: parsed.accountName,
-                maxCost: parsed.maxCost,
+                accountName: value.accountName,
+                maxCost: value.maxCost,
             });
             form.reset();
             if (systemToken) {
