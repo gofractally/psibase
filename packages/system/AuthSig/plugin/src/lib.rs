@@ -123,7 +123,7 @@ impl KeyVault for AuthSig {
 
 impl Actions for AuthSig {
     fn set_key(public_key: Pem) -> Result<(), HostTypes::Error> {
-        assert_authorized(FunctionName::set_key)?;
+        assert_authorized_with_whitelist(FunctionName::set_key, vec!["accounts".into()])?;
 
         Transact::add_action_to_transaction(
             MyService::setKey::ACTION_NAME,
