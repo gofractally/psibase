@@ -9,11 +9,11 @@ import { useDisablePremiumNameMarket } from "@/hooks/premium-name-markets/use-di
 import { useEnablePremiumNameMarket } from "@/hooks/premium-name-markets/use-enable-market";
 
 import { PageContainer } from "@shared/components/page-container";
+import { useSystemToken } from "@shared/hooks/use-system-token";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
-} from "@shared/constants";
-import { useSystemToken } from "@shared/hooks/use-system-token";
+} from "@shared/lib/schemas/account";
 import { cn } from "@shared/lib/utils";
 import {
     Accordion,
@@ -31,11 +31,10 @@ import { NameMarketRowPanel } from "./premium-name-market/name-market-row-panel"
 export const PremiumNameMarketConfig = () => {
     const { data: systemToken, isLoading: systemTokenLoading } =
         useSystemToken();
-    const hasSystemToken = Boolean(systemToken?.id);
     /** Rows / dialog fields: wait for token so toggles do not fire blind. */
-    const rowActionsDisabled = systemTokenLoading || !hasSystemToken;
+    const rowActionsDisabled = !systemToken;
     /** Add-market entry points: only block once we know the token is missing. */
-    const tokenMissingConfirmed = !systemTokenLoading && !hasSystemToken;
+    const tokenMissingConfirmed = systemToken === null;
 
     const {
         data: rows,
@@ -131,7 +130,7 @@ export const PremiumNameMarketConfig = () => {
                 </p>
             ) : null}
 
-            {!systemTokenLoading && !hasSystemToken ? (
+            {tokenMissingConfirmed ? (
                 <Alert variant="warning" className="max-w-2xl">
                     <AlertCircle />
                     <AlertTitle variant="warning">
