@@ -72,7 +72,7 @@ export const CreatePrompt = () => {
     } = useIsPackageInstalled("PremAccounts");
 
     const isLoading = isPendingSystemToken || isPendingPremAccountsInstalled;
-    const isBuyEnabled = isPremAccountsInstalled && systemToken;
+    const isBuyEnabled = Boolean(isPremAccountsInstalled && systemToken);
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();

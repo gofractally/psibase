@@ -24,6 +24,8 @@ export function NavApps() {
     const { data: isPremAccountsInstalled } =
         useIsPackageInstalled("PremAccounts");
 
+    const isBuyEnabled = Boolean(isPremAccountsInstalled && systemToken);
+
     return (
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
             <SidebarGroupLabel>Native Apps</SidebarGroupLabel>
@@ -33,7 +35,7 @@ export function NavApps() {
                     .filter(
                         (app) =>
                             app.service !== premAccounts.service ||
-                            Boolean(isPremAccountsInstalled && systemToken),
+                            isBuyEnabled,
                     )
                     .map((item) => (
                         <SidebarMenuItem key={item.service}>
