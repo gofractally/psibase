@@ -8,7 +8,7 @@ namespace SystemService
    {
       static constexpr psibase::AccountNumber service = psibase::AccountNumber("auth-any");
 
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,

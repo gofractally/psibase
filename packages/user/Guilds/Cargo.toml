@@ -1,0 +1,26 @@
+[package]
+name = "guilds-pkg"                      # Crate name
+description = "Guild management strategy for Fractals service"
+version.workspace = true
+rust-version.workspace = true
+edition.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+
+[package.metadata.psibase]
+package-name = "Guilds"
+services = ["guilds"]
+
+[package.metadata.psibase.dependencies]
+HttpServer = "0.23.0"
+Sites = "0.23.0"
+Permissions = "0.23.0"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+guilds = { path = "service", version = "0.23.0" }
+r-guilds = { path = "query-service", version = "0.23.0" }
+guilds-plugin = { path = "plugin", version = "0.23.0" }

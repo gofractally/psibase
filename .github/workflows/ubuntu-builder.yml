@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404"]' || '["2204"]') }}
+        ubuntu-version: ${{ fromJSON(inputs.all-platforms && '["2204","2404","2604"]' || '["2204"]') }}
     steps:
       - name: Timestamp
         id: ccache_cache_timestamp
@@ -47,6 +47,7 @@ jobs:
         env:
           BUILDER_IMAGE_2204: f8d833ccdd03cbaaa2e6319c9c01a93168b82f37
           BUILDER_IMAGE_2404: 69a0c8fa35ac92723a85000d2775aca292e71e54
+          BUILDER_IMAGE_2604: 0e7d7985d10cfa0b4182fcc9c804abd30bfeb849
         run: |
           BUILDER_IMAGE="ghcr.io/${{ github.repository_owner }}/psibase-builder-ubuntu-${{ matrix.ubuntu-version }}:$BUILDER_IMAGE_${{ matrix.ubuntu-version }}"
           echo $BUILDER_IMAGE

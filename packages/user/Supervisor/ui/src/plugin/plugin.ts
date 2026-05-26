@@ -7,7 +7,11 @@ import {
 
 import { kebabToCamel, kebabToPascal } from "../case";
 import { CompiledPlugin } from "../component-loading";
-import { compilePlugin } from "../component-loading/loader";
+import { 
+    ServiceMap,
+    getPluginService,
+    compilePlugin
+} from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
 import { parser, wasmFromUrl } from "../utils";
@@ -26,6 +30,8 @@ export class Plugin {
     fetched: Promise<Uint8Array>;
 
     parsed: Promise<ComponentAPI>;
+
+    services: Promise<ServiceMap | null>;
 
     // Resolves when the plugin is compiled (cheap — no Memory allocated).
     // After this, instantiate() can be called to allocate Memory.
@@ -85,14 +91,22 @@ export class Plugin {
         let api: ComponentAPI | undefined;
         try {
             api = await this.parsed;
-            return api.importedFuncs.interfaces.map((intf) => ({
-                service: intf.namespace,
-                plugin: intf.package,
-            }));
+            let services = await this.services;
+            return api.importedFuncs.interfaces
+                .filter(
+                    (intf) =>
+                        intf.namespace !== "wasi" &&
+                        intf.namespace !== "supervisor",
+                )
+                .map((intf) => ({
+                    service: getPluginService(services, intf.namespace),
+                    plugin: intf.package,
+                }));
         } catch (e: any) {
             if (e instanceof PluginDownloadFailed) {
                 return [];
             } else {
+                console.error(`Error fetching dependencies of plugin: ${pluginString(this.id)}`);
                 throw e;
             }
         }
@@ -100,6 +114,7 @@ export class Plugin {
 
     private async doReady(): Promise<void> {
         const api = await this.parsed;
+        const services = await this.services;
         const privileged = this.id.service === "host";
         this.compiledPlugin = await compilePlugin(
             this.id.service,
@@ -107,6 +122,7 @@ export class Plugin {
             this.bytes!,
             this.host,
             api,
+            services,
         );
     }
 
@@ -114,10 +130,15 @@ export class Plugin {
         return this.pluginModule !== undefined;
     }
 
-    constructor(id: QualifiedPluginId, host: HostInterface) {
+    constructor(
+        id: QualifiedPluginId,
+        host: HostInterface,
+        services: Promise<ServiceMap | null>,
+    ) {
         this.id = id;
         this.host = host;
         this.bytes = undefined;
+        this.services = services;
         this.fetched = this.doFetchPlugin();
         this.parsed = this.doParse();
         this.ready = this.doReady();

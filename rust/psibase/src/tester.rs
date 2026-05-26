@@ -678,6 +678,7 @@ impl Chain {
         packages: &[String],
     ) -> Result<(), anyhow::Error> {
         use crate::Table;
+        let sender = services::producers::ROOT;
         let installed_table = self.open::<services::packages::InstalledPackage, services::packages::InstalledPackageTable>();
         let mut installed = PackageList::new();
         for p in &installed_table.get_index_pk() {
@@ -685,9 +686,9 @@ impl Chain {
         }
         let packages = block_on(installed.resolve_changes(reg, packages, false, false))?;
         let packages = block_on(fetch_packages(reg, packages, &installed))?;
+        let updated_packages = installed.into_updated(&packages, sender);
 
         let mut schemas = SchemaMap::new();
-        let sender = services::producers::ROOT;
         const TARGET_SIZE: usize = 1024 * 1024;
         const COMPRESSION_LEVEL: u32 = 4;
         for op in packages {
@@ -701,7 +702,7 @@ impl Chain {
                         package.version()
                     ));
                     let mut account_actions = vec![];
-                    package.install_accounts(&mut account_actions, None, sender, &None)?;
+                    package.install_accounts(&mut account_actions, None, sender)?;
                     builder.push_all(account_actions)?;
                     let mut actions = vec![];
                     package.install(
@@ -711,6 +712,7 @@ impl Chain {
                         true,
                         COMPRESSION_LEVEL,
                         &mut schemas,
+                        &updated_packages,
                     )?;
                     builder.push_all(actions)?;
 
@@ -970,33 +972,28 @@ impl<T: fracpack::UnpackOwned> ChainResult<T> {
             return Err(anyhow!("{}", e));
         }
         if let Some(transact) = self.trace.action_traces.last() {
-            let ret = transact
+            let at = transact
                 .inner_traces
                 .iter()
                 // TODO: improve this filter.. we need to return whatever is the name of the action somehow if possible...
                 .filter_map(|inner| {
                     if let InnerTraceEnum::ActionTrace(at) = &inner.inner {
-                        if !Self::is_user_action(&at.action) {
-                            return None;
+                        if Self::is_user_action(&at.action) {
+                            return Some(at);
                         }
-                        if debug {
-                            println!(
-                                ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
-                                at.action.method, at.raw_retval
-                            );
-                        }
-                        if at.raw_retval.is_empty() {
-                            return None;
-                        } else {
-                            Some(&at.raw_retval)
-                        }
-                    } else {
-                        None
                     }
+                    return None;
                 })
+                .skip(1)
                 .next();
-            if let Some(ret) = ret {
+
+            if let Some(at) = at {
+                let ret = &at.raw_retval;
                 if debug {
+                    println!(
+                        ">>> ChainResult::get - Inner action trace: {} (raw_retval={})",
+                        at.action.method, at.raw_retval
+                    );
                     println!(">>> ChainResult::get - Unpacking ret: `{}`", ret);
                 }
                 let unpacked_ret = T::unpacked(ret)?;

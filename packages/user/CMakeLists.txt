@@ -5,7 +5,7 @@ function(add_user_service suffix name)
     )
     target_link_libraries(${name}${suffix} PUBLIC services_system${suffix} services_user${suffix} psibase-service-simple-malloc${suffix})
     set_target_properties(${name}${suffix} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
-    psibase_schema(${name}${suffix})
+    psibase_schema(${name}${suffix} OUTPUT_DIRECTORY ${ROOT_BINARY_DIR})
 endfunction(add_user_service)
 
 function(add_user_test_impl suffix name)
@@ -40,6 +40,7 @@ function(add suffix)
     add_library(services_user${suffix} INTERFACE)
     target_include_directories(services_user${suffix} INTERFACE
         CommonApi/include
+        DynLd/include
         Events/include
         Invite/include
         Nft/include
@@ -56,6 +57,7 @@ add("-debug")
 
 if(DEFINED IS_WASM)
     add_subdirectory(CommonApi)
+    add_subdirectory(DynLd)
     add_subdirectory(Events)
     add_subdirectory(Explorer)
     add_subdirectory(Invite)

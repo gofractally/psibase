@@ -131,18 +131,6 @@ namespace psibase
          {
             bool local = package.meta.scope == "local";
 
-            for (auto account : package.meta.accounts)
-            {
-               if (!hasService(package, account))
-               {
-                  if (!local)
-                     services.push_back(Accounts::service);
-                  else
-                     abortMessage("Local packages do not support non-service accounts");
-                  break;
-               }
-            }
-
             if (!package.data.empty())
             {
                if (!local)
@@ -680,13 +668,6 @@ namespace psibase
             // services that this package might use to be installed.
             service_deps.insert({package.meta.name, &package.meta.depends});
          }
-         else if (postinstall)
-         {
-            // If a package provides a postinstall script, direct dependents
-            // can assume that it has been run. Dependencies only need to
-            // be installed first if they are required to install this package
-            service_deps.insert({package.meta.name, &empty_deps});
-         }
       }
 
       // Construct a graph describing constraints on install order
@@ -715,19 +696,6 @@ namespace psibase
             for (const PackageRef& dep : required_package->meta.depends)
             {
                get_transitive_services(dep.name, service_deps, visited, all_required_packages);
-            }
-         }
-         // The postinstall script can rely on direct dependencies'
-         // postinstall scripts having run first.
-         if (has_postinstall.find(package.meta.name) != has_postinstall.end())
-         {
-            for (const PackageRef& dep : package.meta.depends)
-            {
-               if (has_postinstall.find(dep.name) != has_postinstall.end() &&
-                   visited.insert(dep.name).second)
-               {
-                  all_required_packages.push_back(dep.name);
-               }
             }
          }
          graph.insert({package.meta.name, std::move(all_required_packages)});
