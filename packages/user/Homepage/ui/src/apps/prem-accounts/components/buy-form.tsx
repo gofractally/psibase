@@ -55,16 +55,24 @@ export function BuyForm() {
             maxCost: "",
         },
         onSubmit: async ({ value }) => {
-            await buyName({
-                accountName: value.accountName,
-                maxCost: value.maxCost,
-            });
-            form.reset();
-            if (systemToken) {
+            try {
+                await buyName({
+                    accountName: value.accountName,
+                    maxCost: value.maxCost,
+                });
+                form.reset();
                 form.setFieldValue(
                     "maxCost",
-                    unitTokenDecimal(systemToken.precision),
+                    unitTokenDecimal(systemToken!.precision),
                 );
+            } catch (error) {
+                const errorMessage =
+                    error instanceof Error ? error.message : "Unknown error";
+                if (errorMessage.includes("has insufficient balance")) {
+                    form.fieldInfo.accountName.instance?.setErrorMap({
+                        onSubmit: "Insufficient balance",
+                    });
+                }
             }
         },
         validators: {

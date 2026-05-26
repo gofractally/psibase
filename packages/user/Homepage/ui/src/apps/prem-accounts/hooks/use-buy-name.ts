@@ -43,7 +43,11 @@ export const useBuyName = () => {
             });
         },
         onError: (error, _, context) => {
-            toast.error(error.message, { id: context?.toastId });
+            let message = error.message;
+            if (message.includes("has insufficient balance")) {
+                message = "Insufficient balance";
+            }
+            toast.error(message, { id: context?.toastId });
         },
     });
 };
