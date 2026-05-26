@@ -31,7 +31,7 @@ import {
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 import { useCanCreateAccount } from "./hooks/use-can-create-account";
-import { useConnectAccount } from "./hooks/use-connect-account";
+import { useLogin } from "./hooks/use-connect-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { AuthServices } from "./types";
 
@@ -52,7 +52,7 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
 
     // mutations
     const importExistingMutation = useImportExisting(); // this will take a private key and it will validate it belongs to the account
-    const connectAccountMutation = useConnectAccount();
+    const loginAccountMutation = useLogin();
 
     const handleImportAndLogin = async (account: string, b64: string) => {
         const pemFormatted = b64ToPem(b64);
@@ -63,7 +63,7 @@ export const ImportPrompt = ({ isPrompt }: { isPrompt?: boolean }) => {
                 key: pemFormatted,
             });
             if (isPrompt) {
-                await connectAccountMutation.mutateAsync(account);
+                await loginAccountMutation.mutateAsync(account);
                 prompt.finished();
             } else {
                 navigate(-1);
