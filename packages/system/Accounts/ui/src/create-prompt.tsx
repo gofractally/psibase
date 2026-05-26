@@ -289,21 +289,15 @@ export const CreatePrompt = () => {
                                             if (!price) {
                                                 return `${value.length} character account names are not available`;
                                             }
-                                            if (price) {
-                                                const {
-                                                    id,
-                                                    precision,
-                                                    symbol,
-                                                } = systemToken!;
-                                                const priceQuantity =
-                                                    new Quantity(
-                                                        price,
-                                                        precision,
-                                                        Number(id),
-                                                        symbol,
-                                                    );
-                                                setPrice(priceQuantity);
-                                            }
+                                            const { id, precision, symbol } =
+                                                systemToken!;
+                                            const priceQuantity = new Quantity(
+                                                price,
+                                                precision,
+                                                Number(id),
+                                                symbol,
+                                            );
+                                            setPrice(priceQuantity);
                                         }
                                     },
                                 }}
