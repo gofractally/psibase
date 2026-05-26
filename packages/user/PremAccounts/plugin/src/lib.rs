@@ -197,7 +197,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
 }
 
 impl Authorized for PremAccountsPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }
