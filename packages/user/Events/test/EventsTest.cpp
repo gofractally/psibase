@@ -215,7 +215,7 @@ TEST_CASE("events")
    CHECK(query<Acct>(
              chain,
              R"""(SELECT * FROM "history.test-svc.account" WHERE a >= 't1201' ORDER BY ROWID)""") ==
-         std::vector<Acct>{{AccountNumber{"t1201"}}, {AccountNumber{"s"}}});
+         std::vector<Acct>{{AccountNumber{"tkucanun"}}, {AccountNumber{"t1201"}}});
    // repeat the query using an index
    expect(testService.to<Events>()
               .addIndex(DbId::historyEvent, TestService::service, MethodNumber{"account"}, 0)
@@ -223,7 +223,7 @@ TEST_CASE("events")
    CHECK(query<Acct>(
              chain,
              R"""(SELECT * FROM "history.test-svc.account" WHERE a >= 't1201' ORDER BY ROWID)""") ==
-         std::vector<Acct>{{AccountNumber{"t1201"}}, {AccountNumber{"s"}}});
+         std::vector<Acct>{{AccountNumber{"tkucanun"}}, {AccountNumber{"t1201"}}});
    // Verify that an explicit collate on the comparison works
    CHECK(
        query<Acct>(
