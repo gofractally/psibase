@@ -207,6 +207,8 @@ pub mod service {
 
         check_market_length(length);
 
+        // check(systemToken exists (inline action on Tokens service))
+
         let auctions_table = AuctionsTable::new();
         check_none(
             auctions_table.get_index_pk().get(&length),

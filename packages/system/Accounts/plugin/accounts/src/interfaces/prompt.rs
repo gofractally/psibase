@@ -30,6 +30,23 @@ impl Prompt for AccountsPlugin {
         false
     }
 
+    fn can_create_premium_account() -> bool {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+
+        if Self::is_logged_in() {
+            return true;
+        }
+
+        // assert(systemToken exists)
+        // assert(PremAccounts installed)
+
+        if let Some(can_create_account) = Invites::get_active_invite() {
+            return can_create_account;
+        }
+
+        false
+    }
+
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
