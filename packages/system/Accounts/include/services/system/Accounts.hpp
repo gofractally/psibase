@@ -26,8 +26,16 @@ namespace SystemService
    {
       psibase::AccountNumber accountNum;
       psibase::AccountNumber authService;
+      /// authSequence is used to prevent authorization for actions
+      /// from carrying over when an account's authorization is changed.
+      /// Services such as staged-tx that remember approvals should
+      /// also record the current authSequence when the approval was
+      /// given and invalidate the approval if the authSequence
+      /// has changed. The sequence is 64 bits, to make cycling it
+      /// infeasible.
+      std::uint64_t authSequence;
    };
-   PSIO_REFLECT(Account, accountNum, authService)
+   PSIO_REFLECT(Account, accountNum, authService, authSequence)
    using AccountTable = psibase::Table<Account, &Account::accountNum>;
    PSIO_REFLECT_TYPENAME(AccountTable)
 
@@ -86,6 +94,11 @@ namespace SystemService
 
       /// Return value indicates whether the account `name` exists
       bool exists(psibase::AccountNumber name);
+
+      /// An auth service should call this whenever an account's
+      /// auth rules change. Has no effect if the sender is not
+      /// the account's auth service.
+      void incAuthSeq(psibase::AccountNumber name);
    };
 
    PSIO_REFLECT(Accounts,
@@ -96,6 +109,7 @@ namespace SystemService
                 method(getAccount, name),
                 method(getAuthOf, account),
                 method(exists, name),
+                method(incAuthSeq, name),
                 //
    )
 

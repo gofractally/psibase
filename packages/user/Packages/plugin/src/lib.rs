@@ -54,6 +54,24 @@ impl From<psibase::PackageRef> for types::PackageRef {
     }
 }
 
+impl From<types::PackageExport> for psibase::PackageExport {
+    fn from(value: types::PackageExport) -> psibase::PackageExport {
+        psibase::PackageExport {
+            name: value.name,
+            service: value.service.as_str().into(),
+        }
+    }
+}
+
+impl From<psibase::PackageExport> for types::PackageExport {
+    fn from(value: psibase::PackageExport) -> types::PackageExport {
+        types::PackageExport {
+            name: value.name,
+            service: value.service.to_string(),
+        }
+    }
+}
+
 impl From<types::PackageInfo> for psibase::PackageInfo {
     fn from(value: types::PackageInfo) -> Self {
         psibase::PackageInfo {
@@ -72,6 +90,7 @@ impl From<types::PackageInfo> for psibase::PackageInfo {
                 .into_iter()
                 .map(|a| a.as_str().into())
                 .collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
             sha256: value.sha256.parse().unwrap(),
             file: value.file,
         }
@@ -88,6 +107,7 @@ impl From<psibase::PackageInfo> for types::PackageInfo {
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
             services: value.services.into_iter().map(|a| a.to_string()).collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
             sha256: value.sha256.to_string(),
             file: value.file,
         }
@@ -114,6 +134,7 @@ impl From<psibase::Meta> for types::Meta {
             depends: value.depends.into_iter().map(|d| d.into()).collect(),
             accounts: value.accounts.into_iter().map(|a| a.to_string()).collect(),
             services: value.services.into_iter().map(|a| a.to_string()).collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
         }
     }
 }
@@ -136,6 +157,7 @@ impl From<types::Meta> for psibase::Meta {
                 .into_iter()
                 .map(|a| a.parse().unwrap())
                 .collect(),
+            exports: value.exports.into_iter().map(|e| e.into()).collect(),
         }
     }
 }
@@ -227,7 +249,7 @@ fn get_installed_packages() -> Result<Vec<psibase::InstalledPackageInfo>, HostTy
     let mut result = Vec::new();
     loop {
         let json = Server::post_graphql_get_json(
-            &format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts services owner }} }} }} }}", serde_json::to_string(&end_cursor).unwrap())).map_err(|e| ErrorType::QueryError(e.message))?;
+            &format!("query {{ installed(first: 100, after: {}) {{ pageInfo {{ hasNextPage endCursor }} edges {{ node {{ name version description depends {{ name version }}  accounts services exports {{ name service }}  owner }} }} }} }}", serde_json::to_string(&end_cursor).unwrap())).map_err(|e| ErrorType::QueryError(e.message))?;
         let root: InstalledRoot =
             serde_json::from_str(&json).map_err(|e| ErrorType::QueryError(e.to_string()))?;
         for edge in root.data.installed.edges {
@@ -331,8 +353,10 @@ fn apply_packages<
     files: &mut TransactionBuilder<R, G>,
     sender: AccountNumber,
     compression_level: u32,
+    installed: PackageList,
 ) -> Result<(), HostTypes::Error> {
     let mut schemas = SchemaMap::new();
+    let updated_packages = installed.into_updated(&ops, sender);
     for mut op in ops {
         match &op {
             psibase::PackageOpFull::Install(package) => {
@@ -351,12 +375,14 @@ fn apply_packages<
                     package.version()
                 ));
                 let old_manifest = get_installed_manifest(&old.name, sender)?;
-                old_manifest.upgrade(package.manifest(), out).unwrap();
+                old_manifest
+                    .upgrade(package.manifest(), &old.name, out)
+                    .unwrap();
             }
             psibase::PackageOpFull::Remove(old) => {
                 out.set_label(format!("Removing {}", old.name));
                 let old_manifest = get_installed_manifest(&old.name, sender)?;
-                old_manifest.remove(out).unwrap();
+                old_manifest.remove(&old.name, out).unwrap();
             }
         }
         if let Some(package) = op.new() {
@@ -380,6 +406,7 @@ fn apply_packages<
                     true,
                     compression_level,
                     &mut schemas,
+                    &updated_packages,
                 )
                 .map_err(|e| ErrorType::PackageFormatError(e.to_string()))?;
             out.push_all(actions).unwrap();
@@ -450,6 +477,12 @@ impl PrivateApi for PackagesPlugin {
 
         let sender: AccountNumber = owner.parse().unwrap();
 
+        // TODO: Use the list that we fetched in resolve
+        let mut installed = PackageList::new();
+        for package in get_installed_packages()? {
+            installed.insert_installed(package);
+        }
+
         let build_transaction = |mut actions: Vec<Action>| -> Result<Vec<u8>, anyhow::Error> {
             let index = index_cell.get();
             index_cell.set(index + 1);
@@ -489,6 +522,7 @@ impl PrivateApi for PackagesPlugin {
             &mut upload_builder,
             sender,
             compression_level.into(),
+            installed,
         )?;
 
         if trx_builder.num_transactions() != 0 {

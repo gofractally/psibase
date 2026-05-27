@@ -12,6 +12,13 @@ namespace UserService
    };
    PSIO_REFLECT(PackageRef, name, version)
 
+   struct PackageExport
+   {
+      std::string            name;
+      psibase::AccountNumber service;
+   };
+   PSIO_REFLECT(PackageExport, name, service)
+
    struct PackageMeta
    {
       std::string                         name;
@@ -21,8 +28,9 @@ namespace UserService
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
       std::vector<psibase::AccountNumber> services;
+      std::vector<PackageExport>          exports;
    };
-   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts, services)
+   PSIO_REFLECT(PackageMeta, name, version, scope, description, depends, accounts, services, exports)
 
    struct PublishedPackage
    {
@@ -34,6 +42,7 @@ namespace UserService
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
       std::vector<psibase::AccountNumber> services;
+      std::vector<PackageExport>          exports;
       psibase::Checksum256                sha256;
       std::string                         file;
 
@@ -50,6 +59,7 @@ namespace UserService
                 depends,
                 accounts,
                 services,
+                exports,
                 sha256,
                 file)
 
@@ -82,11 +92,12 @@ namespace UserService
       std::vector<PackageRef>             depends;
       std::vector<psibase::AccountNumber> accounts;
       std::vector<psibase::AccountNumber> services;
+      std::vector<PackageExport>          exports;
       psibase::AccountNumber              owner;
 
       using ByName = psibase::CompositeKey<&InstalledPackage::name, &InstalledPackage::owner>;
    };
-   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, services, owner)
+   PSIO_REFLECT(InstalledPackage, name, version, description, depends, accounts, services, exports, owner)
 
    struct PackageDataFile
    {
