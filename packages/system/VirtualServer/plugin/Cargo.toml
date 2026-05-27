@@ -30,7 +30,9 @@ package = "virtual-server:plugin"
 world = "impl"
 
 [package.metadata.component.target.dependencies]
+"host:common" = { path = "../../../user/Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../../user/Host/plugin/types/wit/world.wit" }
+"transact:plugin" = { path = "../../Transact/plugin/wit/world.wit" }
 "tokens:plugin" = { path = "../../../user/Tokens/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../Accounts/plugin/accounts/wit/world.wit" }
 

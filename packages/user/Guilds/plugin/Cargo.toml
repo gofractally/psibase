@@ -28,7 +28,10 @@ world = "impl"
 "host:types/types" = "psibase_plugin::types"
 
 [package.metadata.component.target.dependencies]
+"host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
+"permissions:plugin" = { path = "../../Permissions/plugin/wit/world.wit" }
+"transact:plugin" = { path = "../../../system/Transact/plugin/wit/world.wit" }
 "invite:plugin" = { path = "../../Invite/plugin/wit/world.wit" }
 "evaluations:plugin" = { path = "../../Evaluations/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
