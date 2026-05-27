@@ -1,5 +1,4 @@
-import { pluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
-import { premAccounts } from "@shared/lib/plugins";
+import { callPluginFunction, premAccounts } from "@shared/lib/plugins";
 
 import {
     zNameEvent,
@@ -10,7 +9,7 @@ import {
 const FETCH_BATCH_SIZE = 50;
 
 async function premAccountsAuthorizedGraphql<T>(query: string): Promise<T> {
-    const result = await pluginFunctionQuery(premAccounts.authorized.graphql, [
+    const result = await callPluginFunction(premAccounts.authorized.graphql, [
         query,
     ]);
 

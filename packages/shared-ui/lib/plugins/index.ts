@@ -2,6 +2,7 @@ import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plu
 import { usePluginFunctionQuery } from "@shared/hooks/plugin-function/use-plugin-function-query";
 
 import { Plugin as Accounts } from "./accounts";
+import { callPluginFunction } from "./lib/call-plugin-function";
 import { Plugin as Packages } from "./packages";
 import { Plugin as PremAccounts } from "./prem-accounts";
 import { Plugin as Profiles } from "./profiles";
@@ -22,6 +23,7 @@ export {
     tokenSwap,
     tokens,
     profiles,
+    callPluginFunction,
     usePluginFunctionMutation,
     usePluginFunctionQuery,
 };
