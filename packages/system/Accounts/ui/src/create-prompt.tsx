@@ -8,13 +8,18 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
-import { useIsPackageInstalled } from "@shared/hooks/use-is-package-installed";
+import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
 import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
 import { Quantity } from "@shared/lib/quantity";
-import { zAccount } from "@shared/lib/schemas/account";
+import {
+    MAX_ACCOUNT_NAME_LENGTH,
+    MIN_FREE_ACCOUNT_NAME_LENGTH,
+    zAccount,
+    zAccountFree,
+} from "@shared/lib/schemas/account";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -38,6 +43,7 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
+import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { CopyButton } from "./components/copy-button";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
@@ -46,12 +52,8 @@ import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
-import {
-    DEFAULT_MAX_PREMIUM_NAME_LENGTH,
-    DEFAULT_NAME_PURCHASE_SLIPPAGE,
-    MAX_ACCOUNT_NAME_LENGTH,
-    MIN_ACCOUNT_NAME_LENGTH,
-} from "./lib/constants";
+
+const DEFAULT_NAME_PURCHASE_SLIPPAGE = 5;
 
 export const CreatePrompt = () => {
     const [key, setKey] = useState<string>("");
@@ -66,27 +68,18 @@ export const CreatePrompt = () => {
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
         useSystemToken();
-    const {
-        data: isPremAccountsInstalled,
-        isPending: isPendingPremAccountsInstalled,
-    } = useIsPackageInstalled("PremAccounts");
+    const { data: premPrices, isPending: isPendingPremPrices } =
+        usePremPrices();
 
-    const isLoading = isPendingSystemToken || isPendingPremAccountsInstalled;
-    const isBuyEnabled = Boolean(isPremAccountsInstalled && systemToken);
+    const isLoading = isPendingSystemToken || isPendingPremPrices;
+    const isBuyEnabled = Boolean(premPrices?.size);
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
     const purchaseAccountMutation = usePurchaseAccount();
     const connectAccountMutation = useConnectAccount();
 
-    const lengthValidator = isBuyEnabled
-        ? zAccount
-        : zAccount.refine(
-              (val) => val.length > DEFAULT_MAX_PREMIUM_NAME_LENGTH,
-              {
-                  message: `Account must be at least ${DEFAULT_MAX_PREMIUM_NAME_LENGTH + 1} characters.`,
-              },
-          );
+    const accountValidator = isBuyEnabled ? zAccount : zAccountFree;
 
     const createForm = useAppForm({
         defaultValues: {
@@ -94,7 +87,7 @@ export const CreatePrompt = () => {
         },
         validators: {
             onSubmit: z.object({
-                account: lengthValidator,
+                account: accountValidator,
             }),
             onSubmitAsync: async ({ value }) => {
                 const account = await getAccount(value.account);
@@ -138,11 +131,23 @@ export const CreatePrompt = () => {
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
             );
-            const message =
+            let message = "An unknown error occurred";
+            if (
                 error instanceof Error &&
                 error.message.includes("Invalid account name")
-                    ? "This account name is not available"
-                    : "An unknown error occurred";
+            ) {
+                message = "This account name is not available";
+            } else if (
+                error instanceof Error &&
+                error.message.includes("has insufficient balance")
+            ) {
+                message = "Insufficient balance";
+            } else if (
+                error instanceof Error &&
+                error.message.includes("Max cost below current ask")
+            ) {
+                message = "Max cost below current ask";
+            }
             createForm.setFieldMeta("account", (prev) => ({
                 ...prev,
                 isTouched: true,
@@ -241,6 +246,59 @@ export const CreatePrompt = () => {
         );
     }
 
+    const validateAccountOnChangeAsync = async ({
+        value: rawValue,
+    }: {
+        value: string;
+    }) => {
+        try {
+            const value = accountValidator.parse(rawValue);
+
+            const account = await getAccount(value);
+            const exists = Boolean(account?.accountNum);
+            if (exists) return "Account name is already taken";
+
+            if (isBuyEnabled && value.length < MIN_FREE_ACCOUNT_NAME_LENGTH) {
+                console.log("CHECKING PREMIUM PRICE - REMOVE ME");
+                const freshPrice = await fetchCurrentPriceForLength(
+                    value.length,
+                );
+                if (!freshPrice) {
+                    return `${value.length} character account names are not available`;
+                }
+
+                if (!systemToken) throw new Error("System token not found");
+
+                const priceQuantity = new Quantity(
+                    freshPrice,
+                    systemToken.precision,
+                    Number(systemToken.id),
+                    systemToken.symbol,
+                );
+                setPrice(priceQuantity);
+            }
+        } catch (e) {
+            if (e instanceof z.ZodError) return;
+            console.error("Failed to validate account name");
+            console.error(e);
+            return "Failed to validate account name. Please try again.";
+        }
+    };
+
+    const priceLabel = () => (
+        <createForm.Subscribe selector={(state) => [state.isFieldsValidating]}>
+            {([isFieldsValidating]) =>
+                isFieldsValidating ? (
+                    <Spinner className="size-3.5 shrink-0" />
+                ) : price ? (
+                    <Label className="text-green-500">
+                        Available for {price.format({ includeLabel: true })}
+                    </Label>
+                ) : undefined
+            }
+        </createForm.Subscribe>
+    );
+
     return (
         <BrandedGlowingCard>
             <div className="-mt-6 px-6">
@@ -268,7 +326,7 @@ export const CreatePrompt = () => {
                                 <CardDescription>
                                     {isBuyEnabled
                                         ? `Account names can be up to ${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`
-                                        : `Account names can be ${DEFAULT_MAX_PREMIUM_NAME_LENGTH + 1}-${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`}
+                                        : `Account names can be ${MIN_FREE_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`}
                                 </CardDescription>
                             </div>
                             <createForm.AppField
@@ -280,63 +338,15 @@ export const CreatePrompt = () => {
                                         autoComplete="off"
                                         autoCorrect="off"
                                         spellCheck={false}
-                                        rightLabel={
-                                            price ? (
-                                                <Label className="text-green-500">
-                                                    Available for{" "}
-                                                    {price.format({
-                                                        includeLabel: true,
-                                                    })}
-                                                </Label>
-                                            ) : undefined
-                                        }
+                                        rightLabel={priceLabel()}
                                     />
                                 )}
+                                asyncDebounceMs={500}
                                 validators={{
                                     onChange: () => {
-                                        if (isBuyEnabled) {
-                                            setPrice(null);
-                                        }
+                                        if (isBuyEnabled) setPrice(null);
                                     },
-                                    onChangeAsyncDebounceMs: 500,
-                                    onChangeAsync: async ({ value }) => {
-                                        const account = await getAccount(value);
-                                        const exists = Boolean(
-                                            account?.accountNum,
-                                        );
-                                        if (exists) {
-                                            return "Account name is already taken";
-                                        }
-                                        if (!isBuyEnabled) {
-                                            return;
-                                        }
-                                        if (
-                                            value.length >=
-                                                MIN_ACCOUNT_NAME_LENGTH &&
-                                            value.length <=
-                                                DEFAULT_MAX_PREMIUM_NAME_LENGTH
-                                        ) {
-                                            const price =
-                                                await fetchCurrentPriceForLength(
-                                                    value.length,
-                                                );
-                                            if (!price) {
-                                                return `${value.length} character account names are not available`;
-                                            }
-                                            if (!systemToken) {
-                                                return;
-                                            }
-                                            const { id, precision, symbol } =
-                                                systemToken;
-                                            const priceQuantity = new Quantity(
-                                                price,
-                                                precision,
-                                                Number(id),
-                                                symbol,
-                                            );
-                                            setPrice(priceQuantity);
-                                        }
-                                    },
+                                    onChangeAsync: validateAccountOnChangeAsync,
                                 }}
                             />
                         </CardContent>
