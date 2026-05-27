@@ -1,6 +1,7 @@
-import { AppConfigType } from "@/configured-apps";
+import { type SidebarVisibility, defineAppConfig } from "@/app-config";
 import { History, Package, ShoppingCart, Store } from "lucide-react";
 
+import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { premAccounts } from "@shared/lib/plugins";
 
 import { BuyPage } from "./buy-page";
@@ -8,7 +9,13 @@ import { ClaimPage } from "./claim-page";
 import { HistoryPage } from "./history-page";
 import { PremAccountsLayout } from "./layout";
 
-export const premAccountsConfig: AppConfigType = {
+function usePremAccountsSidebarVisibility(): SidebarVisibility {
+    const { data: premPrices, isPending } = usePremPrices();
+    if (isPending) return { visible: false, isLoading: true };
+    return { visible: Boolean(premPrices?.size), isLoading: false };
+}
+
+export const premAccountsConfig = defineAppConfig({
     service: premAccounts.service,
     name: "Accounts Marketplace",
     description: "Buy and claim premium account names.",
@@ -16,6 +23,7 @@ export const premAccountsConfig: AppConfigType = {
     isMore: false,
     isLoginRequired: true,
     showLoginLoadingSpinner: true,
+    useSidebarVisibility: usePremAccountsSidebarVisibility,
     element: <PremAccountsLayout />,
     children: [
         {
@@ -37,4 +45,4 @@ export const premAccountsConfig: AppConfigType = {
             icon: <History className="h-6 w-6" />,
         },
     ],
-};
+});
