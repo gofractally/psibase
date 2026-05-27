@@ -15,6 +15,7 @@ services = ["prem-accounts"]
 [package.metadata.psibase.dependencies]
 HttpServer = "0.23.0"
 Sites = "0.23.0"
+Accounts = "0.23.0"
 Permissions = "0.23.0"
 Tokens = "0.23.0"
 Nft = "0.23.0"

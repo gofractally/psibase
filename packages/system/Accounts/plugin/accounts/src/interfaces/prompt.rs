@@ -40,10 +40,6 @@ impl Prompt for AccountsPlugin {
         // assert(systemToken exists)
         // assert(PremAccounts installed)
 
-        if let Some(can_create_account) = Invites::get_active_invite() {
-            return can_create_account;
-        }
-
         false
     }
 
