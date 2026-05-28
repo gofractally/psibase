@@ -171,15 +171,13 @@ impl Prompt for AccountsPlugin {
         Ok(private_key)
     }
 
-    fn create_premium(account_name: String, slippage_pct: u8) -> Result<String, Error> {
+    fn create_premium(account_name: String, max_cost: String) -> Result<String, Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
         if account_name.len() >= 10 {
             return Self::create_account(account_name);
         }
 
-        let ask = premium_market_ask(&account_name)?;
-        let max_cost = max_cost_with_slippage(&ask, slippage_pct)?;
         PremAccounts::buy(&account_name, &max_cost)?;
         PremAccounts::claim(&account_name)?;
 
