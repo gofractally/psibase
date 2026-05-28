@@ -8,7 +8,7 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
-import { usePremPrices } from "@shared/hooks/use-prem-prices";
+import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
@@ -59,18 +59,19 @@ export const CreatePrompt = () => {
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
         useSystemToken();
-    const { data: premPrices, isPending: isPendingPremPrices } =
-        usePremPrices();
 
-    const isLoading = isPendingSystemToken || isPendingPremPrices;
-    const isBuyEnabled = Boolean(premPrices?.size);
+    const {
+        data: canCreatePremiumAccount,
+        isPending: isPendingCanCreatePremiumAccount,
+    } = useCanCreatePremiumAccount();
+    const isLoading = isPendingSystemToken || isPendingCanCreatePremiumAccount;
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
     const purchaseAccountMutation = usePurchaseAccount();
     const connectAccountMutation = useConnectAccount();
 
-    const accountValidator = isBuyEnabled ? zAccount : zAccountFree;
+    const accountValidator = canCreatePremiumAccount ? zAccount : zAccountFree;
 
     const createForm = useAppForm({
         defaultValues: {
@@ -235,7 +236,10 @@ export const CreatePrompt = () => {
             const exists = Boolean(account?.accountNum);
             if (exists) return "Account name is already taken";
 
-            if (isBuyEnabled && value.length < MIN_FREE_ACCOUNT_NAME_LENGTH) {
+            if (
+                canCreatePremiumAccount &&
+                value.length < MIN_FREE_ACCOUNT_NAME_LENGTH
+            ) {
                 const freshPrice = await fetchCurrentPriceForLength(
                     value.length,
                 );
@@ -300,7 +304,7 @@ export const CreatePrompt = () => {
                                     Create a {networkName} account
                                 </CardTitle>
                                 <CardDescription>
-                                    {isBuyEnabled
+                                    {canCreatePremiumAccount
                                         ? `Account names can be up to ${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`
                                         : `Account names can be ${MIN_FREE_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} characters long, must start with a letter, and can only contain letters, numbers, and underscores.`}
                                 </CardDescription>
@@ -320,7 +324,8 @@ export const CreatePrompt = () => {
                                 asyncDebounceMs={500}
                                 validators={{
                                     onChange: () => {
-                                        if (isBuyEnabled) setPrice(null);
+                                        if (canCreatePremiumAccount)
+                                            setPrice(null);
                                     },
                                     onChangeAsync: validateAccountOnChangeAsync,
                                 }}
