@@ -20,16 +20,6 @@ import {
     zAccount,
     zAccountFree,
 } from "@shared/lib/schemas/account";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@shared/shadcn/ui/alert-dialog";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     CardAction,
@@ -40,14 +30,13 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
-import { Item, ItemContent } from "@shared/shadcn/ui/item";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
-import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { CopyButton } from "./components/copy-button";
+import { BuyNameConfirmationDialog } from "./components/create-prompt/buy-name-confirmation-dialog";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
 import { useConnectAccount } from "./hooks/use-connect-account";
@@ -56,16 +45,6 @@ import { useImportExisting } from "./hooks/use-import-existing";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
 
 const DEFAULT_NAME_PURCHASE_SLIPPAGE = 5;
-
-const maxCostWithSlippage = (
-    price: Quantity | null,
-    slippagePercent: number,
-): Quantity | null => {
-    if (!price) return null;
-
-    const slippageAmount = (price.amount * slippagePercent) / 100;
-    return price.add(slippageAmount);
-};
 
 export const CreatePrompt = () => {
     const [key, setKey] = useState<string>("");
@@ -383,89 +362,19 @@ export const CreatePrompt = () => {
                             </CardAction>
                         </CardFooter>
                     </form>
-                    <AlertDialog
-                        open={buyConfirmOpen}
-                        onOpenChange={setBuyConfirmOpen}
-                    >
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                    Buy account name?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription className="mt-1 w-full space-y-2.5">
-                                    <p>
-                                        You are about to buy and claim{" "}
-                                        <span className="text-primary font-medium">
-                                            {createdAccount.trim()}
-                                        </span>
-                                        .
-                                    </p>
-                                    <Item
-                                        variant="muted"
-                                        className="flex-col items-stretch"
-                                    >
-                                        <ItemContent className="gap-3">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-muted-foreground text-sm font-light">
-                                                    Market price
-                                                </span>
-                                                <span className="text-primary text-sm font-medium tabular-nums">
-                                                    {price?.format({
-                                                        includeLabel: true,
-                                                    })}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-muted-foreground text-sm font-light">
-                                                    Slippage
-                                                </span>
-                                                <span className="text-primary text-sm font-medium tabular-nums">
-                                                    Up to{" "}
-                                                    {
-                                                        DEFAULT_NAME_PURCHASE_SLIPPAGE
-                                                    }
-                                                    %
-                                                </span>
-                                            </div>
-                                            <Separator />
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-muted-foreground text-sm font-light">
-                                                    Maximum cost
-                                                </span>
-                                                <span className="text-primary text-sm font-semibold tabular-nums">
-                                                    {maxCostWithSlippage(
-                                                        price,
-                                                        DEFAULT_NAME_PURCHASE_SLIPPAGE,
-                                                    )?.format({
-                                                        includeLabel: true,
-                                                    })}
-                                                </span>
-                                            </div>
-                                        </ItemContent>
-                                    </Item>
-                                    <p>Do you want to continue?</p>
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel
-                                    disabled={purchaseAccountMutation.isPending}
-                                >
-                                    Cancel
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                    disabled={purchaseAccountMutation.isPending}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        void handleCreateOrBuy(createdAccount);
-                                    }}
-                                >
-                                    {purchaseAccountMutation.isPending
-                                        ? "Buying..."
-                                        : "Buy"}
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                    {price ? (
+                        <BuyNameConfirmationDialog
+                            open={buyConfirmOpen}
+                            setOpen={setBuyConfirmOpen}
+                            account={createdAccount}
+                            price={price}
+                            slippage={DEFAULT_NAME_PURCHASE_SLIPPAGE}
+                            isLoading={purchaseAccountMutation.isPending}
+                            onConfirm={() =>
+                                void handleCreateOrBuy(createdAccount)
+                            }
+                        />
+                    ) : null}
                 </createForm.AppForm>
             )}
 
