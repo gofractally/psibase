@@ -2,7 +2,6 @@ import { BuyForm } from "@/apps/prem-accounts/components/buy-form";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
-import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
 import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
@@ -16,17 +15,16 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const BuyPage = () => {
     const { data: systemToken, isPending: isPendingToken } = useSystemToken();
-    const { data: prices, isPending: isPendingPrices } = usePremPrices();
 
     const {
-        data: canCreatePremiumAccount,
-        isPending: isPendingCanCreatePremiumAccount,
-    } = useCanCreatePremiumAccount();
+        data: prices,
+        isSuccess: hasLoadedPrices,
+        isPending: isPendingPrices,
+    } = usePremPrices();
 
-    const isLoading =
-        isPendingToken || isPendingPrices || isPendingCanCreatePremiumAccount;
+    const isLoading = isPendingToken || isPendingPrices;
 
-    if (!canCreatePremiumAccount) {
+    if (hasLoadedPrices && !prices.size) {
         return (
             <ErrorCard
                 title="Not available"
@@ -64,7 +62,7 @@ export const BuyPage = () => {
                         <Skeleton className="h-10 w-full" />
                     </div>
                 </CardContent>
-            ) : canCreatePremiumAccount && systemToken && prices ? (
+            ) : systemToken && prices ? (
                 <BuyForm systemToken={systemToken} prices={prices} />
             ) : null}
         </GlowingCard>

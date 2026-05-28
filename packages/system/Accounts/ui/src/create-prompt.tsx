@@ -8,7 +8,6 @@ import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
-import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
@@ -39,6 +38,7 @@ import { BuyNameConfirmationDialog } from "./components/create-prompt/buy-name-c
 import { Loader } from "./components/create-prompt/loader";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
+import { useCanCreatePremiumAccount } from "./hooks/use-can-create-premium-account";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
