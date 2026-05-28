@@ -70,8 +70,8 @@ impl Prompt for AccountsPlugin {
     fn can_create_premium_account() -> bool {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if Self::is_logged_in() {
-            return true;
+        if !Self::is_logged_in() {
+            return false;
         }
 
         // Failure to get a query response from prem-accounts/plugin/authorized::graphql implies
