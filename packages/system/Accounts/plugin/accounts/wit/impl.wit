@@ -10,6 +10,7 @@ world impl {
     include permissions:plugin/imports;
     include auth-sig:plugin/imports;
     include prem-accounts:plugin/imports;
+    include tokens:plugin/imports;
     include host:crypto/imports;
 
     import invite:plugin/redemption;

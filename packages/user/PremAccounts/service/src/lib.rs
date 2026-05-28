@@ -38,15 +38,13 @@ pub mod tables {
     }
 }
 
-pub mod constants;
-
 #[psibase::service(name = "prem-accounts", tables = "tables")]
 pub mod service {
-    use crate::constants::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use psibase::services::accounts as Accounts;
+    use psibase::services::accounts::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::events;
@@ -210,10 +208,12 @@ pub mod service {
         // check(systemToken exists (inline action on Tokens service))
 
         let auctions_table = AuctionsTable::new();
-        check_none(
-            auctions_table.get_index_pk().get(&length),
-            "market already exists",
-        );
+        if auctions_table.get_index_pk().get(&length).is_some() {
+            // market already exists; return (success)
+            // idempotent for postinstall
+            return;
+        }
+
         let nft_id = DiffAdjust::call().create(
             initial_price.value,
             MARKET_WINDOW_SECONDS,

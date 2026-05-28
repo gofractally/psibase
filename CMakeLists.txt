@@ -371,7 +371,7 @@ psibase_package(
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall-ui.json
     DEPENDS ${Accounts_js_DEP}
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "ClientData(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "PremAccounts(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Invite(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
 )
 
 psibase_package(
@@ -981,6 +981,7 @@ psibase_package(
         "Registry(^${PSIBASE_VERSION})" 
         "StagedTx(^${PSIBASE_VERSION})" 
         "Packages(^${PSIBASE_VERSION})"
+        "PremAccounts(^${PSIBASE_VERSION})"
         "Producers(^${PSIBASE_VERSION})"
         "StagedTx(^${PSIBASE_VERSION})"
         "Transact(^${PSIBASE_VERSION})"

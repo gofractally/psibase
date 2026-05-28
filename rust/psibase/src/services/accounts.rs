@@ -3,13 +3,17 @@
 use crate::AccountNumber;
 use crate::{Pack, ToSchema, Unpack};
 use serde::{Deserialize, Serialize};
+use serde_aux::field_attributes::deserialize_number_from_string;
 
+pub const MIN_ACCOUNT_NAME_LENGTH: u8 = 1;
+pub const MAX_ACCOUNT_NAME_LENGTH: u8 = 18;
 // TODO: tables
 #[derive(Debug, Clone, Serialize, Deserialize, Pack, Unpack, ToSchema)]
 #[fracpack(fracpack_mod = "fracpack")]
 pub struct Account {
     pub accountNum: AccountNumber,
     pub authService: AccountNumber,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub authSequence: u64,
 }
 

@@ -5,12 +5,8 @@ mod tests {
     /// Matches Config UI default `PREMIUM_MARKET_DEFAULT_PPM` for `create` actions.
     const DEFAULT_CREATE_PPM: u32 = 50_000;
 
-    use crate::constants::{
-        DEFAULT_MAX_PREMIUM_NAME_LENGTH, MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH,
-    };
     use crate::Wrapper as PremAccounts;
-    use psibase::services::auth_sig::SubjectPublicKeyInfo;
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::accounts::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 
@@ -75,7 +71,7 @@ mod tests {
         const INITIAL: u64 = 1000;
         const FLOOR: u64 = 100;
         const TARGET: u32 = 10;
-        for len in 1u8..=DEFAULT_MAX_PREMIUM_NAME_LENGTH {
+        for len in 1u8..=MAX_ACCOUNT_NAME_LENGTH {
             PremAccounts::push_from(chain, admin)
                 .create(
                     len,
