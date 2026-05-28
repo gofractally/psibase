@@ -13,9 +13,13 @@ package-name = "Guilds"
 services = ["guilds"]
 
 [package.metadata.psibase.dependencies]
+Accounts = "0.23.0"
+Evaluations = "0.23.0"
+Host = "0.23.0"
 HttpServer = "0.23.0"
 Sites = "0.23.0"
 Permissions = "0.23.0"
+Invite = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
