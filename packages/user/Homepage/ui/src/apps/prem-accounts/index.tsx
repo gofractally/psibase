@@ -1,6 +1,9 @@
 import { type SidebarVisibility, defineAppConfig } from "@/app-config";
 import { History, Package, ShoppingCart, Store } from "lucide-react";
 
+import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
+
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { premAccounts } from "@shared/lib/plugins";
 
@@ -10,9 +13,31 @@ import { HistoryPage } from "./history-page";
 import { PremAccountsLayout } from "./layout";
 
 function usePremAccountsSidebarVisibility(): SidebarVisibility {
-    const { data: premPrices, isPending } = usePremPrices();
-    if (isPending) return { visible: false, isLoading: true };
-    return { visible: Boolean(premPrices?.size), isLoading: false };
+    const { data: currentUser } = useCurrentUser();
+    const { data: markets, isPending: isPendingMarkets } = usePremPrices();
+    const { data: history, isLoading: isLoadingHistory } =
+        useNameEvents(currentUser);
+
+    if (isPendingMarkets) {
+        return { visible: false, isLoading: true }; // loading
+    }
+
+    const isMarketEnabled = Boolean(markets?.size);
+
+    if (isMarketEnabled) {
+        return { visible: true, isLoading: false }; // At least one market is enabled; good enough!
+    }
+
+    if (isLoadingHistory) {
+        // actively fetching history for the first time (will be false if there's no current user)
+        return { visible: false, isLoading: true }; // No markets are enabled and we are waiting for name events to load
+    }
+
+    if (!isMarketEnabled && history?.length) {
+        return { visible: true, isLoading: false }; // The user has account market history, so we should show it even though no markets are enabled
+    }
+
+    return { visible: false, isLoading: false };
 }
 
 export const premAccountsConfig = defineAppConfig({
