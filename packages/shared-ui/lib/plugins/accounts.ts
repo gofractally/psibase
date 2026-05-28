@@ -5,7 +5,7 @@ class Prompt extends PluginInterface {
     protected override readonly _intf = "prompt" as const;
 
     get createPremium() {
-        return this._call<[accountName: string, slippagePct: number], string>(
+        return this._call<[accountName: string, maxCost: string], string>(
             "createPremium",
         );
     }

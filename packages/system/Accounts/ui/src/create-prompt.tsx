@@ -109,7 +109,13 @@ export const CreatePrompt = () => {
             if (price) {
                 privateKey = await purchaseAccountMutation.mutateAsync([
                     name,
-                    DEFAULT_NAME_PURCHASE_SLIPPAGE,
+                    price
+                        .multiply(1 + DEFAULT_NAME_PURCHASE_SLIPPAGE / 100)
+                        .format({
+                            includeLabel: false,
+                            fullPrecision: true,
+                            showThousandsSeparator: false,
+                        }),
                 ]);
             } else {
                 privateKey = await createAccountMutation.mutateAsync(name);
