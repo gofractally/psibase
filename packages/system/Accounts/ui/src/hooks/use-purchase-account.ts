@@ -3,5 +3,5 @@ import { usePluginFunctionMutation } from "@shared/hooks/plugin-function/use-plu
 import { accounts } from "@shared/lib/plugins";
 
 export const usePurchaseAccount = (
-    options: MutationOptions<[string, number], string> = {},
+    options: MutationOptions<[string, string], string> = {},
 ) => usePluginFunctionMutation(accounts.prompt.createPremium, options);
