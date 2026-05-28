@@ -13,7 +13,7 @@ import { HistoryPage } from "./history-page";
 import { PremAccountsLayout } from "./layout";
 
 function usePremAccountsSidebarVisibility(): SidebarVisibility {
-    const { data: currentUser } = useCurrentUser();
+    const { data: currentUser, isPending: isPendingUser } = useCurrentUser();
     const { data: markets, isPending: isPendingMarkets } = usePremPrices();
     const { data: history, isLoading: isLoadingHistory } =
         useNameEvents(currentUser);
@@ -28,8 +28,9 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
         return { visible: true, isLoading: false }; // At least one market is enabled; good enough!
     }
 
-    if (isLoadingHistory) {
-        // actively fetching history for the first time (will be false if there's no current user)
+    if (isPendingUser || isLoadingHistory) {
+        // actively fetching history for the first time (isLoadingHistory will be false if there's no current user)
+        // do not use isPendingHistory here because it will be perpetually true if there's no user logged in
         return { visible: false, isLoading: true }; // No markets are enabled and we are waiting for name events to load
     }
 

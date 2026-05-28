@@ -240,7 +240,6 @@ export const CreatePrompt = () => {
             if (exists) return "Account name is already taken";
 
             if (isBuyEnabled && value.length < MIN_FREE_ACCOUNT_NAME_LENGTH) {
-                console.log("CHECKING PREMIUM PRICE - REMOVE ME");
                 const freshPrice = await fetchCurrentPriceForLength(
                     value.length,
                 );
