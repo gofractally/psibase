@@ -40,8 +40,10 @@ import {
 } from "@shared/shadcn/ui/card";
 import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
+import { Item, ItemContent } from "@shared/shadcn/ui/item";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
+import { Separator } from "@shared/shadcn/ui/separator";
 import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
@@ -54,6 +56,16 @@ import { useImportExisting } from "./hooks/use-import-existing";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
 
 const DEFAULT_NAME_PURCHASE_SLIPPAGE = 5;
+
+const maxCostWithSlippage = (
+    price: Quantity | null,
+    slippagePercent: number,
+): Quantity | null => {
+    if (!price) return null;
+
+    const slippageAmount = (price.amount * slippagePercent) / 100;
+    return price.add(slippageAmount);
+};
 
 export const CreatePrompt = () => {
     const [key, setKey] = useState<string>("");
@@ -131,29 +143,33 @@ export const CreatePrompt = () => {
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
             );
-            let message = "An unknown error occurred";
             if (
                 error instanceof Error &&
                 error.message.includes("Invalid account name")
             ) {
-                message = "This account name is not available";
+                createForm.fieldInfo.account.instance?.setErrorMap({
+                    onSubmit: "This account name is not available",
+                });
             } else if (
                 error instanceof Error &&
                 error.message.includes("has insufficient balance")
             ) {
-                message = "Insufficient balance";
+                createForm.fieldInfo.account.instance?.setErrorMap({
+                    onSubmit: "Insufficient balance",
+                });
             } else if (
                 error instanceof Error &&
                 error.message.includes("Max cost below current ask")
             ) {
-                message = "Max cost below current ask";
+                createForm.fieldInfo.account.instance?.setErrorMap({
+                    onSubmit:
+                        "Market price changed; check new price and try again",
+                });
+            } else {
+                createForm.fieldInfo.account.instance?.setErrorMap({
+                    onSubmit: "An unknown error occurred",
+                });
             }
-            createForm.setFieldMeta("account", (prev) => ({
-                ...prev,
-                isTouched: true,
-                errors: [message],
-                errorMap: { onSubmit: message },
-            }));
         }
     };
 
@@ -292,7 +308,7 @@ export const CreatePrompt = () => {
                     <Spinner className="size-3.5 shrink-0" />
                 ) : price ? (
                     <Label className="text-green-500">
-                        Available for {price.format({ includeLabel: true })}
+                        Market price: {price.format({ includeLabel: true })}
                     </Label>
                 ) : undefined
             }
@@ -376,13 +392,58 @@ export const CreatePrompt = () => {
                                 <AlertDialogTitle>
                                     Buy account name?
                                 </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    You are about to buy and claim{" "}
-                                    <span className="text-primary font-medium">
-                                        {createdAccount.trim()}
-                                    </span>{" "}
-                                    for {price?.format({ includeLabel: true })}.
-                                    Do you want to continue?
+                                <AlertDialogDescription className="mt-1 w-full space-y-2.5">
+                                    <p>
+                                        You are about to buy and claim{" "}
+                                        <span className="text-primary font-medium">
+                                            {createdAccount.trim()}
+                                        </span>
+                                        .
+                                    </p>
+                                    <Item
+                                        variant="muted"
+                                        className="flex-col items-stretch"
+                                    >
+                                        <ItemContent className="gap-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-muted-foreground text-sm font-light">
+                                                    Market price
+                                                </span>
+                                                <span className="text-primary text-sm font-medium tabular-nums">
+                                                    {price?.format({
+                                                        includeLabel: true,
+                                                    })}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-muted-foreground text-sm font-light">
+                                                    Slippage
+                                                </span>
+                                                <span className="text-primary text-sm font-medium tabular-nums">
+                                                    Up to{" "}
+                                                    {
+                                                        DEFAULT_NAME_PURCHASE_SLIPPAGE
+                                                    }
+                                                    %
+                                                </span>
+                                            </div>
+                                            <Separator />
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-muted-foreground text-sm font-light">
+                                                    Maximum cost
+                                                </span>
+                                                <span className="text-primary text-sm font-semibold tabular-nums">
+                                                    {maxCostWithSlippage(
+                                                        price,
+                                                        DEFAULT_NAME_PURCHASE_SLIPPAGE,
+                                                    )?.format({
+                                                        includeLabel: true,
+                                                    })}
+                                                </span>
+                                            </div>
+                                        </ItemContent>
+                                    </Item>
+                                    <p>Do you want to continue?</p>
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
