@@ -3,11 +3,11 @@ import { defaultMarketConfigForLength } from "@/lib/name-market-config";
 import QueryKey from "@/lib/query-keys";
 import { CONFIG } from "@/lib/services";
 
+import { queryClient } from "@shared/lib/query-client";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
-} from "@shared/constants";
-import { queryClient } from "@shared/lib/query-client";
+} from "@shared/lib/schemas/account";
 import { supervisor } from "@shared/lib/supervisor";
 
 export const useBootstrapDefaultPremiumNameMarkets = () => {
