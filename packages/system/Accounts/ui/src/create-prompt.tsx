@@ -32,11 +32,11 @@ import { Checkbox } from "@shared/shadcn/ui/checkbox";
 import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
-import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 import { CopyButton } from "./components/copy-button";
 import { BuyNameConfirmationDialog } from "./components/create-prompt/buy-name-confirmation-dialog";
+import { Loader } from "./components/create-prompt/loader";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
 import { useConnectAccount } from "./hooks/use-connect-account";
@@ -224,21 +224,7 @@ export const CreatePrompt = () => {
     };
 
     if (isLoading) {
-        return (
-            <BrandedGlowingCard>
-                <div className="-mt-6 px-6">
-                    <Progress value={33} />
-                </div>
-                <CardContent className="flex flex-col">
-                    <Skeleton className="mb-6 h-8 w-[280px]" />
-                    <div className="space-y-2">
-                        <Skeleton className="h-4 w-full max-w-[400px]" />
-                        <Skeleton className="h-4 w-full max-w-[350px]" />
-                    </div>
-                    <Skeleton className="mt-6 h-10 w-full" />
-                </CardContent>
-            </BrandedGlowingCard>
-        );
+        return <Loader />;
     }
 
     const validateAccountOnChangeAsync = async ({
@@ -370,9 +356,7 @@ export const CreatePrompt = () => {
                             price={price}
                             slippage={DEFAULT_NAME_PURCHASE_SLIPPAGE}
                             isLoading={purchaseAccountMutation.isPending}
-                            onConfirm={() =>
-                                void handleCreateOrBuy(createdAccount)
-                            }
+                            onConfirm={() => handleCreateOrBuy(createdAccount)}
                         />
                     ) : null}
                 </createForm.AppForm>
