@@ -2,6 +2,7 @@ import { BuyForm } from "@/apps/prem-accounts/components/buy-form";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
+import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
 import { usePremPrices } from "@shared/hooks/use-prem-prices";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
@@ -15,16 +16,17 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const BuyPage = () => {
     const { data: systemToken, isPending: isPendingToken } = useSystemToken();
+    const { data: prices, isPending: isPendingPrices } = usePremPrices();
 
     const {
-        data: prices,
-        isSuccess: hasLoadedPrices,
-        isPending: isPendingPrices,
-    } = usePremPrices();
+        data: canCreatePremiumAccount,
+        isPending: isPendingCanCreatePremiumAccount,
+    } = useCanCreatePremiumAccount();
 
-    const isLoading = isPendingToken || isPendingPrices;
+    const isLoading =
+        isPendingToken || isPendingPrices || isPendingCanCreatePremiumAccount;
 
-    if (hasLoadedPrices && !prices.size) {
+    if (canCreatePremiumAccount === false) {
         return (
             <ErrorCard
                 title="Not available"
@@ -48,23 +50,29 @@ export const BuyPage = () => {
                 </CardDescription>
             </CardHeader>
             {isLoading ? (
-                <CardContent className="space-y-4">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-40" />
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                        <Skeleton className="h-6 w-48" />
-                        <Skeleton className="h-10 w-full" />
-                    </div>
-                </CardContent>
-            ) : systemToken && prices ? (
+                <Loader />
+            ) : canCreatePremiumAccount && systemToken && prices ? (
                 <BuyForm systemToken={systemToken} prices={prices} />
             ) : null}
         </GlowingCard>
+    );
+};
+
+const Loader = () => {
+    return (
+        <CardContent className="space-y-4">
+            <div className="space-y-4">
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+        </CardContent>
     );
 };

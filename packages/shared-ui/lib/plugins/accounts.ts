@@ -9,10 +9,6 @@ class Prompt extends PluginInterface {
             "createPremium",
         );
     }
-
-    get canCreatePremiumAccount() {
-        return this._call<[], boolean>("canCreatePremiumAccount");
-    }
 }
 
 export class Plugin {
