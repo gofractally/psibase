@@ -357,7 +357,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "AuthDelegate(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -664,21 +664,30 @@ psibase_package(
 )
 
 psibase_package(
-    OUTPUT ${SERVICE_DIR}/AuthDelegate.psi
-    NAME AuthDelegate
+    OUTPUT ${SERVICE_DIR}/AuthDelegateService.psi
+    NAME AuthDelegateService
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service that delegates authorization to another account"
     SERVICE auth-delegate
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate-schema.json
-        DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
         SERVER r-auth-dlg
     SERVICE r-auth-dlg
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate-schema.json
     DEPENDS wasm
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
+)
+
+psibase_package(
+    OUTPUT ${SERVICE_DIR}/AuthDelegate.psi
+    NAME AuthDelegate
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Auth service that delegates authorization to another account"
+    SERVICE auth-delegate
+        DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -1270,7 +1279,7 @@ function(write_package_index target dir)
 endfunction()
 
 write_package_index(package-index ${SERVICE_DIR}
-    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
+    Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthDelegateService AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
     Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
@@ -1283,6 +1292,7 @@ install(
           ${SERVICE_DIR}/AuthAny.psi
           ${SERVICE_DIR}/AuthDyn.psi
           ${SERVICE_DIR}/AuthDelegate.psi
+          ${SERVICE_DIR}/AuthDelegateService.psi
           ${SERVICE_DIR}/AuthSig.psi
           ${SERVICE_DIR}/AuthSigService.psi
           ${SERVICE_DIR}/Base64.psi
