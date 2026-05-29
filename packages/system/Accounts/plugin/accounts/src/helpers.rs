@@ -128,12 +128,12 @@ pub fn premium_market_ask(account_name: &str) -> Result<String, CommonTypes::Err
         .find(|s| s.length == length);
 
     let Some(st) = status else {
-        return Err(PremiumNameLengthNotOffered().into());
+        return Err(NameLengthUnavailable().into());
     };
 
     if !st.enabled {
-        return Err(PremiumNameMarketDisabled().into());
-    }
+        return Err(NameLengthUnavailable().into());
+    };
 
     let row = response
         .data

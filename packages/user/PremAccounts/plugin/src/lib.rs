@@ -171,11 +171,11 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
         .find(|s| s.length == length);
 
     let Some(st) = status else {
-        return Err(ErrorType::PremiumNameLengthNotOffered.into());
+        return Err(ErrorType::NameLengthUnavailable.into());
     };
 
     if !st.enabled {
-        return Err(ErrorType::PremiumNameMarketDisabled.into());
+        return Err(ErrorType::NameLengthUnavailable.into());
     }
 
     let row = response

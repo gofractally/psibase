@@ -9,8 +9,6 @@ pub enum ErrorType {
     MaxCostBelowCurrentAsk,
     #[error("Invalid account name: {0}")]
     InvalidAccountName(String),
-    #[error("Premium name length not offered")]
-    PremiumNameLengthNotOffered,
-    #[error("Premium name market disabled")]
-    PremiumNameMarketDisabled,
+    #[error("Account names of this length are not currently available")]
+    NameLengthUnavailable,
 }
