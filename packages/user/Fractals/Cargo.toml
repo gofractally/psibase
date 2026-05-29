@@ -13,8 +13,13 @@ package-name = "Fractals"
 services = ["fractals", "de-facto"]
 
 [package.metadata.psibase.dependencies]
+Accounts = "0.23.0"
+Base64 = "0.23.0"
+Guilds = "0.23.0"
+Host = "0.23.0"
 HttpServer = "0.23.0"
 Sites = "0.23.0"
+Transact = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]

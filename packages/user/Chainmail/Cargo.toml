@@ -13,6 +13,7 @@ package-name = "Chainmail"
 services = ["chainmail"]
 
 [package.metadata.psibase.dependencies]
+Host = "0.23.0"
 HttpServer = "0.23.0"
 Supervisor = "0.23.0"
 Events = "0.23.0"
@@ -20,6 +21,8 @@ SetCode = "0.23.0"
 Accounts = "0.23.0"
 CommonApi = "0.23.0"
 Sites = "0.23.0"
+Transact = "0.23.0"
+Permissions = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
