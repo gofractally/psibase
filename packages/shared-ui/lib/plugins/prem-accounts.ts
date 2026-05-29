@@ -9,11 +9,26 @@ class Authorized extends PluginInterface {
     }
 }
 
+class Api extends PluginInterface {
+    protected override readonly _intf = "api" as const;
+
+    get canCreatePremiumAccount() {
+        return this._call<[], boolean>("canCreatePremiumAccount");
+    }
+}
+
 export class Plugin {
     readonly authorized: Authorized;
+    readonly api: Api;
 
     constructor(readonly service: Account) {
         this.authorized = new Authorized();
-        Object.assign(this.authorized, { _service: service });
+        this.api = new Api();
+
+        const instances = [this.authorized, this.api] as PluginInterface[];
+
+        for (const instance of instances) {
+            Object.assign(instance, { _service: service });
+        }
     }
 }
