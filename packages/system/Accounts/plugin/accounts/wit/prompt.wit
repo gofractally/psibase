@@ -17,13 +17,6 @@ interface prompt {
     /// * The user is responding to an invite that can be redeemed to create an account
     can-create-account: func() -> bool;
 
-    /// Returns whether or not a premiumaccount can currently be created.
-    ///
-    /// A premium account can be created if either of the following is true:
-    /// * The user is already logged into the top-level app with an account
-    /// * The user is responding to an invite that can be redeemed to create an account
-    can-create-premium-account: func() -> bool;
-
     /// Import a pre-existing account(s) to this device.
     ///
     /// Importing an account requires both the name of the account and its corresponding private

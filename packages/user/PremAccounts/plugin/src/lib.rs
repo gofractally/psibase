@@ -1,6 +1,7 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::accounts::plugin::api as AccountsApi;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
@@ -89,6 +90,37 @@ impl MarketAdmin for PremAccountsPlugin {
 }
 
 impl Api for PremAccountsPlugin {
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
+    fn can_create_premium_account() -> bool {
+        if !AccountsApi::is_logged_in() {
+            return false;
+        }
+
+        let Ok(overview) = markets_overview() else {
+            return false;
+        };
+
+        if TokensHelpers::fetch_network_token()
+            .ok()
+            .flatten()
+            .is_none()
+        {
+            return false;
+        }
+
+        if overview.market_params.is_empty() && overview.current_prices.is_empty() {
+            return false;
+        }
+
+        overview.market_params.iter().any(|market| {
+            market.enabled
+                && overview
+                    .current_prices
+                    .iter()
+                    .any(|price| price.length == market.length)
+        })
+    }
+
     #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)
@@ -156,19 +188,20 @@ struct MarketsOverviewResponse {
     data: MarketsOverviewData,
 }
 
-/// Resolves sparse configured markets: missing row → not offered; disabled → unavailable; else current ask
-fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
+fn markets_overview() -> Result<MarketsOverviewData, Error> {
     let graphql_str = "query { marketParams { length enabled } currentPrices { length price } }";
-    let response = serde_json::from_str::<MarketsOverviewResponse>(
-        &CommonServer::post_graphql_get_json(graphql_str)?,
-    );
-    let response = response.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+    serde_json::from_str::<MarketsOverviewResponse>(&CommonServer::post_graphql_get_json(
+        graphql_str,
+    )?)
+    .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
+    .map(|response| response.data)
+}
 
-    let status = response
-        .data
-        .market_params
-        .iter()
-        .find(|s| s.length == length);
+/// Resolves sparse configured markets: missing row means not offered; disabled means unavailable; else current ask
+fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
+    let overview = markets_overview()?;
+
+    let status = overview.market_params.iter().find(|s| s.length == length);
 
     let Some(st) = status else {
         return Err(ErrorType::NameLengthUnavailable.into());
@@ -178,11 +211,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
         return Err(ErrorType::NameLengthUnavailable.into());
     }
 
-    let row = response
-        .data
-        .current_prices
-        .iter()
-        .find(|p| p.length == length);
+    let row = overview.current_prices.iter().find(|p| p.length == length);
 
     let Some(row) = row else {
         return Err(ErrorType::QueryResponseParseError(

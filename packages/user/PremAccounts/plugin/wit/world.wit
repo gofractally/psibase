@@ -34,6 +34,13 @@ interface market-admin {
 
 interface api {
     use host:types/types.{error};
+
+    /// Returns whether a premium account can currently be created.
+    ///
+    /// Returns true when the user is logged in, the network token is defined,
+    /// and at least one premium name market is enabled with a live price row.
+    can-create-premium-account: func() -> bool;
+
     /// Purchase a premium name
     /// * `account`: the account to purchase the name for
     /// * `max-cost`: maximum payment in network token (Quantity string)

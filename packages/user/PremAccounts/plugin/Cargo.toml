@@ -29,6 +29,7 @@ world = "impl"
 "host:types/types" = "psibase_plugin::types"
 
 [package.metadata.component.target.dependencies]
+"accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:common" = { path = "../../Host/plugin/common/wit/world.wit" }
 "host:crypto" = { path = "../../Host/plugin/crypto/wit/world.wit" }
