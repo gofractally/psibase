@@ -163,14 +163,14 @@ impl Api for PremAccountsPlugin {
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct MarketPriceDto {
+struct MarketPrice {
     length: u8,
     price: psibase::services::tokens::Decimal,
 }
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct MarketConfigLiteDto {
+struct MarketConfigLite {
     length: u8,
     enabled: bool,
 }
@@ -178,8 +178,8 @@ struct MarketConfigLiteDto {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct MarketsOverviewData {
-    market_params: Vec<MarketConfigLiteDto>,
-    current_prices: Vec<MarketPriceDto>,
+    market_params: Vec<MarketConfigLite>,
+    current_prices: Vec<MarketPrice>,
 }
 
 #[derive(serde::Deserialize)]
