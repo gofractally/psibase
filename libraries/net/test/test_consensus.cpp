@@ -245,11 +245,11 @@ TEST_CASE("fork at commit consensus change", "[combined]")
    };
    auto boot_block = nodes.nodes[0]->head();
 
-   auto transition = makeBlock(boot_block, "d", 2, setProducers(cft("e", "f", "g")));
-   auto block1     = makeBlock(transition, "b", 4);
+   auto transition = makeBlock(boot_block, "d", 3, setProducers(cft("e", "f", "g")));
+   auto block1     = makeBlock(transition, "b", 5);
    auto block2 =
-       makeBlock(transition, "c", 5, makeBlockConfirm(transition, {"b", "c", "d"}, {"e", "f"}));
-   auto block3 = makeBlock(block2, "e", 6, block2);
+       makeBlock(transition, "c", 6, makeBlockConfirm(transition, {"b", "c", "d"}, {"e", "f"}));
+   auto block3 = makeBlock(block2, "e", 7, block2);
    send(transition.block);
    send(block1.block);
 
