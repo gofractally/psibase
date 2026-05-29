@@ -13,9 +13,12 @@ package-name = "StagedTx"
 services = ["staged-tx"]
 
 [package.metadata.psibase.dependencies]
+Host = "0.23.0"
 Supervisor = "0.23.0"
 Sites = "0.23.0"
 HttpServer = "0.23.0"
+Transact = "0.23.0"
+Permissions = "0.23.0"
 
 [lib]
 crate-type = ["rlib"]
