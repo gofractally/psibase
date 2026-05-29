@@ -80,7 +80,7 @@ Inside the `nix develop` shell:
 ./nix/scripts/setup_prereqs.sh
 ```
 
-#### 2.2 Run .vscode/setup_env.sh
+#### 2.2 For VS Code and forks: run .vscode/scripts/env-setup.sh
 This will ensure your build and dev envs can find everything they need
 
 #### 2.3 Initializing/Configuring the Environment (using direnv,

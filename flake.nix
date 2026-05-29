@@ -182,6 +182,9 @@
           shellHook = ''
             export NIX_SHELL_DEPTH=$(("''${NIX_SHELL_DEPTH:-0}" + 1))
             export IN_NIX_SHELL=1
+            # nix develop may run this hook under non-interactive bash (no progcomp/complete).
+            # Point SHELL at bashInteractive so subshells and IDE terminals get a usable bash.
+            export SHELL="${pkgs.bashInteractive}/bin/bash"
 
             export CC="${llvmPackages.clang}/bin/clang"
             export CXX="${llvmPackages.clang}/bin/clang++"
@@ -219,7 +222,7 @@
             export PS1="🔧 \[\033[01;32m\]psibase-nix\[\033[00m\]:\[\033[01;34m\]\w\[\033[32m\]\$(parse_git_branch)\[\033[00m\]\$ "
 
             if [ -n "$BASH_VERSION" ]; then
-              if [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]]; then
+              if shopt -s progcomp 2>/dev/null && [[ -r ${pkgs.bash-completion}/share/bash-completion/bash_completion ]]; then
                 source ${pkgs.bash-completion}/share/bash-completion/bash_completion
               fi
               # Init file for inner bash (e.g. Cursor terminal) so vi mode and completions
@@ -270,7 +273,7 @@
               _check_cargo_tools
               echo "To build psibase (clean build required on first run):"
               echo "  rm -rf build && mkdir build && cd build"
-              echo "  cmake .. -DCMAKE_BUILD_TYPE=Release"
+              echo "cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_DEBUG_WASM=ON -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_INSTALL_PREFIX="psidk" .."
               echo "  cmake --build . -j\$(nproc)"
               echo ""
             fi
