@@ -174,8 +174,12 @@ impl Prompt for AccountsPlugin {
     fn create_premium(account_name: String, max_cost: String) -> Result<String, Error> {
         assert_eq!(Client::get_sender(), Client::get_receiver());
 
-        if account_name.len() >= 10 {
+        if account_name.len() >= AccountsService::MIN_FREE_ACCOUNT_NAME_LENGTH {
             return Self::create_account(account_name);
+        }
+
+        if !Self::can_create_premium_account() {
+            return Err(ErrorType::CannotCreatePremiumAccount().into());
         }
 
         PremAccounts::buy(&account_name, &max_cost)?;
