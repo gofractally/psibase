@@ -390,7 +390,7 @@ psibase_package(
     NAME BrotliCodec
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Brotli compression/decompression plugin"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE brotli-codec
         DATA ${Plugins_OUTPUT_FILE_brotli_codec} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -412,7 +412,7 @@ psibase_package(
     NAME Kvtests
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "KvStore tests"
-    PACKAGE_DEPENDS "Sites(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Chainmail(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)"
     SERVICE kvtests
         DATA ${Plugins_OUTPUT_FILE_kvtests} /plugin.wasm
     DEPENDS ${Plugins_DEP}
@@ -632,7 +632,7 @@ psibase_package(
     SERVICE auth-sig
         DATA ${Plugins_OUTPUT_FILE_auth_sig} /plugin.wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "AuthSigService(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "AuthSigService(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 set(COMMON_API ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/CommonApi)
@@ -678,7 +678,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate-schema.json
     DEPENDS wasm
     DEPENDS ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -754,7 +754,7 @@ psibase_package(
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
 )
 
@@ -870,7 +870,7 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
     DEPENDS wasm
-    PACKAGE_DEPENDS "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "Transact(^${PSIBASE_VERSION}.0)" "TransactService(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
@@ -948,6 +948,8 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "A dashboard for developers to create and manage apps"
     PACKAGE_DEPENDS 
+        "AuthDelegate(^${PSIBASE_VERSION}.0)"
+        "Host(^${PSIBASE_VERSION}.0)"
         "HttpServer(^${PSIBASE_VERSION}.0)" 
         "Sites(^${PSIBASE_VERSION}.0)" 
         "Accounts(^${PSIBASE_VERSION}.0)" 
@@ -958,6 +960,7 @@ psibase_package(
         "SetCode(^${PSIBASE_VERSION}.0)"
         "Chainmail(^${PSIBASE_VERSION}.0)"
         "ClientData(^${PSIBASE_VERSION}.0)"
+        "Permissions(^${PSIBASE_VERSION}.0)"
     SERVICE workshop
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Workshop/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_workshop} /plugin.wasm
@@ -991,6 +994,7 @@ psibase_package(
         "VirtualServer(^${PSIBASE_VERSION})"
         "Chainmail(^${PSIBASE_VERSION})"
         "ClientData(^${PSIBASE_VERSION})"
+        "PremAccounts(^${PSIBASE_VERSION})"
     SERVICE config
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Config/ui/dist/* /
         DATA ${Plugins_OUTPUT_FILE_config} /plugin.wasm
@@ -1005,10 +1009,13 @@ psibase_package(
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Vanilla fractal instance deployment"
     PACKAGE_DEPENDS 
+        "Guilds(^${PSIBASE_VERSION})"
+        "Host(^${PSIBASE_VERSION})"
         "HttpServer(^${PSIBASE_VERSION})" 
         "Sites(^${PSIBASE_VERSION})" 
         "Accounts(^${PSIBASE_VERSION})" 
         "CommonApi(^${PSIBASE_VERSION})" 
+        "Permissions(^${PSIBASE_VERSION})"
         "StagedTx(^${PSIBASE_VERSION})" 
         "Transact(^${PSIBASE_VERSION})"
         "Fractals(^${PSIBASE_VERSION})"
@@ -1043,7 +1050,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
     DEPENDS wasm ${Plugins_DEP}
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Nop(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "SetCode(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "StagedTx(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Nop(^${PSIBASE_VERSION}.0)"
 )
 
 psibase_package(
