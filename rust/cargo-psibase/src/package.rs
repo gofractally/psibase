@@ -368,11 +368,11 @@ impl<'a> PackageBuilder<'a> {
             .map(|(p, (service, _, _))| (p.name.as_str(), *service))
             .collect();
 
-        let exports = service_wasms
+        let exports: Vec<_> = service_crates
             .iter()
-            .map(|(service, _, _)| PackageExport {
-                name: service.to_string(),
-                service: *service,
+            .map(|p| PackageExport {
+                name: p.name.clone(),
+                service: crate_to_account[p.name.as_str()],
             })
             .collect();
 

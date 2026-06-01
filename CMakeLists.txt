@@ -936,6 +936,7 @@ psibase_package(
     SERVICE perms
         DATA ${Plugins_OUTPUT_FILE_permissions} /plugin.wasm
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Permissions/ui/dist/* /
+        EXPORT permissions
     DEPENDS ${Permissions_js_DEP}
     DEPENDS ${Plugins_DEP}
 )
