@@ -34,55 +34,54 @@ export const BuyNameConfirmationDialog = ({
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Buy account name?</AlertDialogTitle>
-                    <AlertDialogDescription className="mt-1 w-full space-y-2.5">
-                        <p>
-                            You are about to buy and claim{" "}
-                            <span className="text-primary font-medium">
-                                {account.trim()}
-                            </span>
-                            .
-                        </p>
-                        <Item
-                            variant="muted"
-                            className="flex-col items-stretch"
-                        >
-                            <ItemContent className="gap-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground text-sm font-light">
-                                        Market price
-                                    </span>
-                                    <span className="text-primary text-sm font-medium tabular-nums">
-                                        {price.format({
-                                            includeLabel: true,
-                                        })}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground text-sm font-light">
-                                        Slippage
-                                    </span>
-                                    <span className="text-primary text-sm font-medium tabular-nums">
-                                        Up to {slippage}%
-                                    </span>
-                                </div>
-                                <Separator />
-                                <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground text-sm font-light">
-                                        Maximum cost
-                                    </span>
-                                    <span className="text-primary text-sm font-semibold tabular-nums">
-                                        {price
-                                            ?.multiply(1 + slippage / 100)
-                                            .format({
-                                                includeLabel: true,
-                                            })}
-                                    </span>
-                                </div>
-                            </ItemContent>
-                        </Item>
-                        <p>Do you want to continue?</p>
+                    <AlertDialogDescription>
+                        You are about to buy and claim{" "}
+                        <span className="text-primary font-medium">
+                            {account.trim()}
+                        </span>
+                        .
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="mt-1 w-full space-y-2.5">
+                    <Item variant="muted" className="flex-col items-stretch">
+                        <ItemContent className="gap-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground text-sm font-light">
+                                    Market price
+                                </span>
+                                <span className="text-primary text-sm font-medium tabular-nums">
+                                    {price.format({
+                                        includeLabel: true,
+                                    })}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground text-sm font-light">
+                                    Slippage
+                                </span>
+                                <span className="text-primary text-sm font-medium tabular-nums">
+                                    Up to {slippage}%
+                                </span>
+                            </div>
+                            <Separator />
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground text-sm font-light">
+                                    Maximum cost
+                                </span>
+                                <span className="text-primary text-sm font-semibold tabular-nums">
+                                    {price
+                                        ?.multiply(1 + slippage / 100)
+                                        .format({
+                                            includeLabel: true,
+                                        })}
+                                </span>
+                            </div>
+                        </ItemContent>
+                    </Item>
+                    <AlertDialogDescription>
+                        Do you want to continue?
+                    </AlertDialogDescription>
+                </div>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isLoading}>
                         Cancel
