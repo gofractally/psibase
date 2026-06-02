@@ -34,8 +34,9 @@ import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
+import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
+
 import { CopyButton } from "./components/copy-button";
-import { BuyNameConfirmationDialog } from "./components/create-prompt/buy-name-confirmation-dialog";
 import { Loader } from "./components/create-prompt/loader";
 import { DownloadKeyFileButton } from "./components/download-key-file-button";
 import { PasswordVisibilityButton } from "./components/password-visibility-button";
@@ -55,6 +56,7 @@ export const CreatePrompt = () => {
     const [acknowledged, setAcknowledged] = useState(false);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
     const [price, setPrice] = useState<Quantity | null>(null);
+    const [quotedPrice, setQuotedPrice] = useState<Quantity | null>(null);
 
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
@@ -300,6 +302,9 @@ export const CreatePrompt = () => {
                         id="create-account-form"
                         onSubmit={(e) => {
                             e.preventDefault();
+                            if (price) {
+                                setQuotedPrice(price);
+                            }
                             createForm.handleSubmit();
                         }}
                         className="flex flex-col gap-6"
@@ -357,9 +362,16 @@ export const CreatePrompt = () => {
                     {price ? (
                         <BuyNameConfirmationDialog
                             open={buyConfirmOpen}
-                            setOpen={setBuyConfirmOpen}
+                            setOpen={(open) => {
+                                setBuyConfirmOpen(open);
+                                if (!open) {
+                                    setQuotedPrice(null);
+                                }
+                            }}
+                            mode="buy-and-claim"
                             account={createdAccount}
                             price={price}
+                            previousPrice={quotedPrice}
                             slippage={DEFAULT_NAME_PURCHASE_SLIPPAGE}
                             isLoading={purchaseAccountMutation.isPending}
                             onConfirm={() => handleCreateOrBuy(createdAccount)}

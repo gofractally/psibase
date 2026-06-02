@@ -1,4 +1,9 @@
+import type { ReactNode } from "react";
+
+import { TriangleAlert } from "lucide-react";
+
 import { Quantity } from "@shared/lib/quantity";
+import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -12,37 +17,86 @@ import {
 import { Item, ItemContent } from "@shared/shadcn/ui/item";
 import { Separator } from "@shared/shadcn/ui/separator";
 
+export type BuyNameConfirmationMode = "buy-and-claim" | "buy-only";
+
+const DESCRIPTION_BY_MODE: Record<
+    BuyNameConfirmationMode,
+    (account: string) => ReactNode
+> = {
+    "buy-and-claim": (account) => (
+        <>
+            You are about to buy and claim{" "}
+            <span className="text-primary font-medium">{account}</span>.
+        </>
+    ),
+    "buy-only": (account) => (
+        <>
+            You are about to buy{" "}
+            <span className="text-primary font-medium">{account}</span>.
+        </>
+    ),
+};
+
 export const BuyNameConfirmationDialog = ({
     open,
     setOpen,
+    mode,
     account,
     price,
+    previousPrice,
     slippage,
     isLoading,
     onConfirm,
 }: {
     open: boolean;
     setOpen: (open: boolean) => void;
+    mode: BuyNameConfirmationMode;
     account: string;
     price: Quantity;
+    /** Price shown before submit re-validation; used to warn if the ask increased. */
+    previousPrice?: Quantity | null;
     slippage: number;
     isLoading: boolean;
     onConfirm: () => void;
 }) => {
+    const trimmedAccount = account.trim();
+    const priceIncreased =
+        previousPrice != null && price.isGreaterThan(previousPrice);
+
     return (
         <AlertDialog open={open} onOpenChange={setOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Buy account name?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        You are about to buy and claim{" "}
-                        <span className="text-primary font-medium">
-                            {account.trim()}
-                        </span>
-                        .
+                        {DESCRIPTION_BY_MODE[mode](trimmedAccount)}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="mt-1 w-full space-y-2.5">
+                    {priceIncreased ? (
+                        <Alert variant="warning">
+                            <TriangleAlert />
+                            <AlertTitle variant="warning">
+                                Price increased
+                            </AlertTitle>
+                            <AlertDescription variant="warning">
+                                <p>
+                                    The market price rose from{" "}
+                                    <span className="font-medium tabular-nums">
+                                        {previousPrice.format({
+                                            includeLabel: true,
+                                        })}
+                                    </span>{" "}
+                                    to{" "}
+                                    <span className="font-medium tabular-nums">
+                                        {price.format({ includeLabel: true })}
+                                    </span>{" "}
+                                    since you last saw it. The amounts below
+                                    use the current price.
+                                </p>
+                            </AlertDescription>
+                        </Alert>
+                    ) : null}
                     <Item variant="muted" className="flex-col items-stretch">
                         <ItemContent className="gap-3">
                             <div className="flex items-center justify-between">
@@ -70,7 +124,7 @@ export const BuyNameConfirmationDialog = ({
                                 </span>
                                 <span className="text-primary text-sm font-semibold tabular-nums">
                                     {price
-                                        ?.multiply(1 + slippage / 100)
+                                        .multiply(1 + slippage / 100)
                                         .format({
                                             includeLabel: true,
                                         })}
