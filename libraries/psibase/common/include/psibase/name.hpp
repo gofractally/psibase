@@ -1,5 +1,6 @@
 #pragma once
 
+#include <charconv>
 #include <cstdint>
 #include <psibase/NameEncoder.hpp>
 #include <ranges>
@@ -8,9 +9,47 @@
 
 namespace psibase
 {
+   namespace detail
+   {
+      inline constexpr std::string_view subaccountSeparator = "☺";
+
+      // removes and encodes the trailing subaccount
+      constexpr std::uint8_t subaccount_from_str(std::string_view& s)
+      {
+         auto pos = s.find(subaccountSeparator);
+         if (pos == std::string_view::npos)
+         {
+            return 0;
+         }
+         std::uint8_t sub;
+         const char*  start = s.data() + pos + subaccountSeparator.size();
+         const char*  end   = s.data() + s.size();
+         auto         res   = std::from_chars(start, end, sub);
+         if (res.ec == std::errc{} && res.ptr == end)
+         {
+            s = s.substr(0, pos);
+            return sub;
+         }
+         else
+         {
+            return 0;
+         }
+      }
+
+      constexpr void subaccount_to_str(std::uint8_t sub, std::string& out)
+      {
+         if (sub != 0)
+         {
+            out += subaccountSeparator;
+            out += std::to_string(sub);
+         }
+      }
+   }  // namespace detail
+
    inline constexpr NameEncoder<std::uint64_t, 10> accountEncoder{36};
    inline constexpr uint64_t                       name_to_number(std::string_view m_input)
    {
+      auto sub    = detail::subaccount_from_str(m_input);
       auto result = accountEncoder.encode(m_input | std::views::transform(
                                                         [](char ch) -> std::uint64_t
                                                         {
@@ -35,14 +74,16 @@ namespace psibase
                                           0);
       if (result == -1)
          return 0;
-      return result;
+      return (result << 8) + sub;
    }  // name_to_number
 
    inline std::string number_to_name(uint64_t input)
    {
+      auto        sub = input & 0xffu;
       std::string result;
-      accountEncoder.decode(input, 0, [&](std::size_t idx)
+      accountEncoder.decode(input >> 8, 0, [&](std::size_t idx)
                             { result.push_back("-0123456789abcdefghijklmnopqrstuvwxyz"[idx]); });
+      detail::subaccount_to_str(sub, result);
       return result;
    }
 }  // namespace psibase
