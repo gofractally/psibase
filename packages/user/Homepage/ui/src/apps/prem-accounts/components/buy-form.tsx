@@ -1,20 +1,45 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
-import { unitTokenDecimal } from "@/apps/prem-accounts/lib/format-token";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { getAccount } from "@shared/lib/get-account";
 import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
-import { tokenDecimalToBigInt } from "@shared/lib/token-decimal-to-bigint";
 import { CardAction, CardContent, CardFooter } from "@shared/shadcn/ui/card";
 import { Label } from "@shared/shadcn/ui/label";
 import { Spinner } from "@shared/shadcn/ui/spinner";
+
+const DEFAULT_NAME_PURCHASE_SLIPPAGE = "5";
+
+function parseSlippagePercent(raw: string): number | null {
+    const trimmed = raw.trim();
+    if (trimmed === "" || !/^\d*\.?\d+$/.test(trimmed)) {
+        return null;
+    }
+    const value = Number(trimmed);
+    if (!Number.isFinite(value) || value < 0) {
+        return null;
+    }
+    return value;
+}
+
+function maxCostFromPriceAndSlippage(
+    price: Quantity,
+    slippagePercent: number,
+): string {
+    return price
+        .multiply(1 + slippagePercent / 100)
+        .format({
+            includeLabel: false,
+            fullPrecision: true,
+            showThousandsSeparator: false,
+        });
+}
 
 export function BuyForm({
     systemToken,
@@ -30,19 +55,32 @@ export function BuyForm({
     const form = useAppForm({
         defaultValues: {
             accountName: "",
-            maxCost: "",
+            slippage: DEFAULT_NAME_PURCHASE_SLIPPAGE,
         },
         onSubmit: async ({ value }) => {
+            const slippagePercent = parseSlippagePercent(value.slippage);
+            if (slippagePercent === null) {
+                form.fieldInfo.slippage.instance?.setErrorMap({
+                    onSubmit: "Enter a valid slippage percentage.",
+                });
+                return;
+            }
+
+            if (!price) {
+                form.fieldInfo.accountName.instance?.setErrorMap({
+                    onSubmit:
+                        "Market price is not available. Check the account name and try again.",
+                });
+                return;
+            }
+
             try {
                 await buyName({
                     accountName: value.accountName,
-                    maxCost: value.maxCost,
+                    maxCost: maxCostFromPriceAndSlippage(price, slippagePercent),
                 });
                 form.reset();
-                form.setFieldValue(
-                    "maxCost",
-                    unitTokenDecimal(systemToken.precision),
-                );
+                form.setFieldValue("slippage", DEFAULT_NAME_PURCHASE_SLIPPAGE);
             } catch (error) {
                 const errorMessage =
                     error instanceof Error ? error.message : "Unknown error";
@@ -56,8 +94,9 @@ export function BuyForm({
 
                 // plugin error: max cost
                 if (errorMessage.includes("Max cost below current ask")) {
-                    form.fieldInfo.maxCost.instance?.setErrorMap({
-                        onSubmit: "Max cost below current ask",
+                    form.fieldInfo.accountName.instance?.setErrorMap({
+                        onSubmit:
+                            "Market price changed; check new price and try again",
                     });
                 }
 
@@ -72,20 +111,15 @@ export function BuyForm({
         validators: {
             onChange: z.object({
                 accountName: zAccount.or(z.literal("")),
-                maxCost: z.string(),
+                slippage: z.string(),
             }),
             onSubmitAsync: async ({ value }) => {
-                // TODO: Make sure the max cost validation stuff is working
                 let taken = false;
-                let validatedMaxCost: bigint | undefined;
+                const slippagePercent = parseSlippagePercent(value.slippage);
 
                 try {
                     const account = await getAccount(value.accountName);
                     taken = Boolean(account?.accountNum);
-                    validatedMaxCost = await tokenDecimalToBigInt(
-                        Number(systemToken.id),
-                        value.maxCost.trim(),
-                    );
                 } catch (error) {
                     console.error("Error validating on submit:", error);
                     return {
@@ -98,26 +132,20 @@ export function BuyForm({
 
                 return {
                     fields: {
-                        account: taken
+                        accountName: taken
                             ? "This account name is not available"
                             : undefined,
-                        maxCost: !validatedMaxCost
-                            ? "Enter a valid max cost amount."
-                            : undefined,
+                        slippage:
+                            slippagePercent === null
+                                ? "Enter a valid slippage percentage."
+                                : !price
+                                  ? "Market price is not available for this name."
+                                  : undefined,
                     },
                 };
             },
         },
     });
-
-    useEffect(() => {
-        if (form.state.values.maxCost === "") {
-            form.setFieldValue(
-                "maxCost",
-                unitTokenDecimal(systemToken.precision),
-            );
-        }
-    }, [form, systemToken]);
 
     const validateAccountOnChange = ({
         value: rawValue,
@@ -169,6 +197,18 @@ export function BuyForm({
         }
     };
 
+    const validateSlippageOnChange = ({ value }: { value: string }) => {
+        const trimmed = value.trim();
+        if (trimmed === "") return;
+        if (!/^\d*\.?\d*$/.test(trimmed)) {
+            return "Enter a valid slippage percentage.";
+        }
+        const num = Number(trimmed);
+        if (!Number.isFinite(num) || num < 0) {
+            return "Enter a valid slippage percentage.";
+        }
+    };
+
     const priceLabel = () => (
         <form.Subscribe selector={(state) => [state.isFieldsValidating]}>
             {([isFieldsValidating]) =>
@@ -217,13 +257,23 @@ export function BuyForm({
                             </div>
                             <div className="min-w-56">
                                 <form.AppField
-                                    name="maxCost"
+                                    name="slippage"
+                                    validators={{
+                                        onChange: validateSlippageOnChange,
+                                    }}
                                     children={(field) => (
                                         <field.TextField
-                                            label={`Max cost (${systemToken.symbol ?? "SysToken"})`}
-                                            placeholder={unitTokenDecimal(
-                                                systemToken.precision,
-                                            )}
+                                            label="Slippage"
+                                            placeholder={
+                                                DEFAULT_NAME_PURCHASE_SLIPPAGE
+                                            }
+                                            autoComplete="off"
+                                            inputMode="decimal"
+                                            endContent={
+                                                <span className="pr-3 text-sm">
+                                                    %
+                                                </span>
+                                            }
                                         />
                                     )}
                                 />
