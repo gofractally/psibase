@@ -1,11 +1,13 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 
+import { useStore } from "@tanstack/react-form";
 import { useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { getAccount } from "@shared/lib/get-account";
 import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
 import { Quantity } from "@shared/lib/quantity";
@@ -32,13 +34,11 @@ function maxCostFromPriceAndSlippage(
     price: Quantity,
     slippagePercent: number,
 ): string {
-    return price
-        .multiply(1 + slippagePercent / 100)
-        .format({
-            includeLabel: false,
-            fullPrecision: true,
-            showThousandsSeparator: false,
-        });
+    return price.multiply(1 + slippagePercent / 100).format({
+        includeLabel: false,
+        fullPrecision: true,
+        showThousandsSeparator: false,
+    });
 }
 
 export function BuyForm({
@@ -49,6 +49,8 @@ export function BuyForm({
     prices: Map<number, string>;
 }) {
     const [price, setPrice] = useState<Quantity | null>(null);
+    const [quotedPrice, setQuotedPrice] = useState<Quantity | null>(null);
+    const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
 
     const { mutateAsync: buyName, isPending: isBuying } = useBuyName();
 
@@ -74,39 +76,7 @@ export function BuyForm({
                 return;
             }
 
-            try {
-                await buyName({
-                    accountName: value.accountName,
-                    maxCost: maxCostFromPriceAndSlippage(price, slippagePercent),
-                });
-                form.reset();
-                form.setFieldValue("slippage", DEFAULT_NAME_PURCHASE_SLIPPAGE);
-            } catch (error) {
-                const errorMessage =
-                    error instanceof Error ? error.message : "Unknown error";
-
-                // transaction error: insufficient balance
-                if (errorMessage.includes("has insufficient balance")) {
-                    form.fieldInfo.accountName.instance?.setErrorMap({
-                        onSubmit: "Insufficient balance",
-                    });
-                }
-
-                // plugin error: max cost
-                if (errorMessage.includes("Max cost below current ask")) {
-                    form.fieldInfo.accountName.instance?.setErrorMap({
-                        onSubmit:
-                            "Market price changed; check new price and try again",
-                    });
-                }
-
-                // all other plugin errors (non-transaction errors)
-                if (!errorMessage.includes("Transaction error:")) {
-                    form.fieldInfo.accountName.instance?.setErrorMap({
-                        onSubmit: errorMessage,
-                    });
-                }
-            }
+            setBuyConfirmOpen(true);
         },
         validators: {
             onChange: z.object({
@@ -146,6 +116,52 @@ export function BuyForm({
             },
         },
     });
+
+    const accountName = useStore(
+        form.store,
+        (state) => state.values.accountName,
+    );
+    const slippageInput = useStore(
+        form.store,
+        (state) => state.values.slippage,
+    );
+    const slippagePercent = parseSlippagePercent(slippageInput);
+
+    const handleBuy = async () => {
+        if (!price || slippagePercent === null) return;
+
+        const name = accountName.trim();
+        if (!name) return;
+
+        try {
+            await buyName({
+                accountName: name,
+                maxCost: maxCostFromPriceAndSlippage(price, slippagePercent),
+            });
+            setBuyConfirmOpen(false);
+            form.reset();
+            form.setFieldValue("slippage", DEFAULT_NAME_PURCHASE_SLIPPAGE);
+        } catch (error) {
+            setBuyConfirmOpen(false);
+            const errorMessage =
+                error instanceof Error ? error.message : "Unknown error";
+
+            if (errorMessage.includes("has insufficient balance")) {
+                form.fieldInfo.accountName.instance?.setErrorMap({
+                    onSubmit: "Insufficient balance",
+                });
+            } else if (errorMessage.includes("Max cost below current ask")) {
+                form.fieldInfo.accountName.instance?.setErrorMap({
+                    onSubmit:
+                        "Market price changed; check new price and try again",
+                });
+            } else if (!errorMessage.includes("Transaction error:")) {
+                form.fieldInfo.accountName.instance?.setErrorMap({
+                    onSubmit: errorMessage,
+                });
+            }
+        }
+    };
 
     const validateAccountOnChange = ({
         value: rawValue,
@@ -228,6 +244,9 @@ export function BuyForm({
             <form
                 onSubmit={(event) => {
                     event.preventDefault();
+                    if (price) {
+                        setQuotedPrice(price);
+                    }
                     void form.handleSubmit();
                 }}
             >
@@ -290,6 +309,24 @@ export function BuyForm({
                     </CardFooter>
                 </div>
             </form>
+            {price && slippagePercent !== null ? (
+                <BuyNameConfirmationDialog
+                    open={buyConfirmOpen}
+                    setOpen={(open) => {
+                        setBuyConfirmOpen(open);
+                        if (!open) {
+                            setQuotedPrice(null);
+                        }
+                    }}
+                    mode="buy-only"
+                    account={accountName}
+                    price={price}
+                    previousPrice={quotedPrice}
+                    slippage={slippagePercent}
+                    isLoading={isBuying}
+                    onConfirm={() => void handleBuy()}
+                />
+            ) : null}
         </form.AppForm>
     );
 }
