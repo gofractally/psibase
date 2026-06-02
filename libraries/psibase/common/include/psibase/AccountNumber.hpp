@@ -16,6 +16,9 @@ namespace psibase
    /// The empty name `""` is value 0.
    struct AccountNumber
    {
+      using Subaccount                              = std::uint8_t;
+      static constexpr std::uint64_t subaccountMask = 0xffu;
+
       /// Number form
       uint64_t value = 0;
 
@@ -35,6 +38,16 @@ namespace psibase
       /// [str] will return a string which doesn't match `s`.
       /// Many, but not all, invalid names produce value `0`.
       constexpr explicit AccountNumber(std::string_view s) : value(name_to_number(s)) {}
+
+      /// Construct a subaccount
+      constexpr explicit AccountNumber(AccountNumber base, Subaccount sub)
+          : value((base.value & ~subaccountMask) | sub)
+      {
+      }
+
+      constexpr Subaccount subaccount() const { return value & subaccountMask; }
+
+      constexpr AccountNumber base() const { return AccountNumber{value & ~subaccountMask}; }
 
       /// Get string (name)
       std::string str() const { return number_to_name(value); }

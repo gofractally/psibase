@@ -390,15 +390,26 @@ class InvalidName(Exception):
 
 ACCOUNT_ENCODER = NameEncoder(10, 36)
 CHARS = "-0123456789abcdefghijklmnopqrstuvwxyz"
+SUBACCOUNT_SEPARATOR = "☺"
 
 def account_to_number(s):
+    parts = s.split(SUBACCOUNT_SEPARATOR, 1)
+    if len(parts) == 1:
+        sub = 0
+    else:
+        s = parts[0]
+        sub = int(parts[1])
     result = ACCOUNT_ENCODER.encode((CHARS.find(ch) for ch in s), 0)
     if result == -1:
         raise InvalidName(s)
-    return result
+    return (result << 8) + sub
 
 def number_to_account(n):
-    return "".join(CHARS[idx] for idx in ACCOUNT_ENCODER.decode(n, 0))
+    if n & 0xff:
+        sub = SUBACCOUNT_SEPARATOR + str(n & 0xff)
+    else:
+        sub = ""
+    return "".join(CHARS[idx] for idx in ACCOUNT_ENCODER.decode(n >> 8, 0)) + sub
 
 def is_hash_name(h):
     return (h & (0x01 << (64 - 8))) > 0

@@ -34,6 +34,8 @@ pub struct AccountNumber {
 
 serialize_as_str!(AccountNumber, "account number");
 
+pub struct Subaccount(u8);
+
 impl AccountNumber {
     pub const MIN: Self = AccountNumber { value: 0 };
     pub const MAX: Self = AccountNumber { value: u64::MAX };
@@ -48,6 +50,26 @@ impl AccountNumber {
             return Err(AccountNumberError::Invalid { s: s.into() });
         }
         Ok(result)
+    }
+
+    pub fn with_subaccount(&self, sub: Subaccount) -> AccountNumber {
+        AccountNumber::new(self.base().value + sub.0 as u64)
+    }
+
+    pub fn subaccount(&self) -> Subaccount {
+        Subaccount((self.value & 0xff) as u8)
+    }
+
+    pub fn is_subaccount(&self) -> bool {
+        self.subaccount().0 != 0
+    }
+
+    pub fn base(&self) -> AccountNumber {
+        AccountNumber::new(self.value & !0xff)
+    }
+
+    pub fn split(&self) -> (AccountNumber, Subaccount) {
+        (self.base(), self.subaccount())
     }
 }
 
