@@ -175,57 +175,87 @@ mod tests {
     fn returns_proper_numbers_from_str() {
         assert_eq!(
             AccountNumber::from_str("a").unwrap(),
-            AccountNumber::new(1293158331562331)
+            AccountNumber::new(331048532879956736)
         );
         assert_eq!(
             AccountNumber::from_str("b").unwrap(),
-            AccountNumber::new(1422474164718564)
+            AccountNumber::new(364153386167952384)
         );
         assert_eq!(
             AccountNumber::from_str("c").unwrap(),
-            AccountNumber::new(1551789997874797)
+            AccountNumber::new(397258239455948032)
         );
         assert_eq!(
             AccountNumber::from_str("abc123").unwrap(),
-            AccountNumber::new(1336268871977337)
+            AccountNumber::new(342084831226198272)
         );
         assert_eq!(
             AccountNumber::from_str("spiderman").unwrap(),
-            AccountNumber::new(3713518179737361)
+            AccountNumber::new(950660654012764416)
         );
         assert_eq!(
             AccountNumber::from_str("brucewayne").unwrap(),
-            AccountNumber::new(1523276626103893)
+            AccountNumber::new(389958816282596608)
+        );
+        assert_eq!(
+            AccountNumber::from_str("a☺0").unwrap(),
+            AccountNumber::new(331048532879956736)
+        );
+        assert_eq!(
+            AccountNumber::from_str("a☺42").unwrap(),
+            AccountNumber::new(331048532879956736 + 42)
+        );
+        assert_eq!(
+            AccountNumber::from_str("a☺9").unwrap(),
+            AccountNumber::new(331048532879956736 + 9)
+        );
+        assert_eq!(
+            AccountNumber::from_str("a☺90").unwrap(),
+            AccountNumber::new(331048532879956736 + 90)
+        );
+        assert_eq!(
+            AccountNumber::from_str("spiderman☺255").unwrap(),
+            AccountNumber::new(950660654012764416 + 255)
         );
     }
 
     #[test]
     fn name_number_value_to_string_is_converted_successfully() {
         let name = AccountNumber::from_str("a").unwrap();
-        assert_eq!(name.value, 1293158331562331);
+        assert_eq!(name.value, 331048532879956736);
         assert_eq!(name.to_string(), "a");
 
         let name = AccountNumber::from_str("b").unwrap();
         assert_eq!(name.to_string(), "b");
-        let name = AccountNumber::from(1422474164718564);
+        let name = AccountNumber::from(364153386167952384);
         assert_eq!(name.to_string(), "b");
 
         let name = AccountNumber::from_str("c").unwrap();
         assert_eq!(name.to_string(), "c");
-        let name = AccountNumber::from(1551789997874797);
+        let name = AccountNumber::from(397258239455948032);
         assert_eq!(name.to_string(), "c");
 
         let name = AccountNumber::from_str("abc123").unwrap();
         assert_eq!(name.to_string(), "abc123");
-        let name = AccountNumber::from(1336268871977337);
+        let name = AccountNumber::from(342084831226198272);
         assert_eq!(name.to_string(), "abc123");
 
         let name = AccountNumber::from_str("spiderman").unwrap();
         assert_eq!(name.to_string(), "spiderman");
-        let name = AccountNumber::from(3713518179737361);
+        let name = AccountNumber::from(950660654012764416);
         assert_eq!(name.to_string(), "spiderman");
 
         let name = AccountNumber::from(0);
         assert_eq!(name.to_string(), "");
+
+        let name = AccountNumber::from(331048532879956736 + 42);
+        assert_eq!(name.to_string(), "a☺42");
+
+        let name = AccountNumber::from(331048532879956736 + 9);
+        assert_eq!(name.to_string(), "a☺9");
+        let name = AccountNumber::from(331048532879956736 + 90);
+        assert_eq!(name.to_string(), "a☺90");
+        let name = AccountNumber::from(950660654012764416 + 255);
+        assert_eq!(name.to_string(), "spiderman☺255");
     }
 }

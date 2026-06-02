@@ -4,6 +4,8 @@ const ACCOUNT_ENCODER: NameEncoder<10> = NameEncoder::new(36);
 
 const CHARS: &'static str = "-0123456789abcdefghijklmnopqrstuvwxyz";
 
+const SUBACCOUNT_SEPARATOR: &'static str = "☺";
+
 fn char_index(ch: u8) -> u64 {
     let ch = ch as char;
     let offset_from = |base: char| ch as u64 - base as u64;
@@ -37,10 +39,13 @@ fn account_number_has_valid_format(s: &str) -> bool {
 ///
 /// The empty name `""` is value 0.
 pub fn account_number_from_str(s: &str) -> u64 {
+    if let Some((base, sub)) = s.split_once(SUBACCOUNT_SEPARATOR) {
+        return account_number_from_str(base) + (sub.parse::<u8>().unwrap() as u64);
+    }
     if s.is_empty() || s.len() > 10 || !account_number_has_valid_format(s) {
         0
     } else {
-        ACCOUNT_ENCODER.encode(s.bytes().map(|b| char_index(b)), 0)
+        ACCOUNT_ENCODER.encode(s.bytes().map(|b| char_index(b)), 0) << 8
     }
 }
 
@@ -50,8 +55,13 @@ pub fn account_number_from_str(s: &str) -> u64 {
 /// this will return a string which doesn't round-trip back to
 /// `value`.
 pub fn account_number_to_string(value: u64) -> String {
+    if (value & 0xff) != 0 {
+        return account_number_to_string(value & !0xff)
+            + SUBACCOUNT_SEPARATOR
+            + &(value & 0xff).to_string();
+    }
     ACCOUNT_ENCODER
-        .decode(value, 0)
+        .decode(value >> 8, 0)
         .map(|idx| CHARS.as_bytes()[idx as usize] as char)
         .collect()
 }
