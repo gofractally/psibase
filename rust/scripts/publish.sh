@@ -13,10 +13,12 @@
 #                               |--->---------------'--> psibase-macros -->--|
 #                               |                                            |
 #                               '--->-----------------------------------------'--> psibase-names
+#
+#   psibase_plugin --> psibase
 ######
 
 # Dependencies above imply the following publish order:
-dirs=(psibase_names psibase_macros/psibase-macros-lib psibase_macros/psibase-macros-derive psibase_macros fracpack psibase cargo-psibase)
+dirs=(psibase_names psibase_macros/psibase-macros-lib psibase_macros/psibase-macros-derive psibase_macros fracpack psibase psibase_plugin cargo-psibase)
 
 cd "$(dirname "$0")/../"
 

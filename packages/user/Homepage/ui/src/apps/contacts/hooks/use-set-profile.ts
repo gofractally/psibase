@@ -1,13 +1,10 @@
-import { queryClient } from "@/main";
 import { useMutation } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { supervisor } from "@/supervisor";
-
-import QueryKey from "@/lib/queryKeys";
-import { zAccount } from "@/lib/zod/Account";
-
 import { ProfileResponse } from "@shared/hooks/use-profile";
+import SharedQueryKey from "@shared/lib/query-keys";
+import { zAccount } from "@shared/lib/schemas/account";
+import { supervisor } from "@shared/lib/supervisor";
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const zParams = z.object({
@@ -24,16 +21,16 @@ export const useSetProfile = () =>
                 service: "profiles",
                 intf: "api",
             }),
-        onSuccess: async (_, params) => {
+        onSuccess: async (_, params, _id, context) => {
             toast.success("Profile updated");
 
             const currentUser = zAccount.parse(
-                await queryClient.getQueryData(QueryKey.currentUser()),
+                await context.client.getQueryData(SharedQueryKey.currentUser()),
             );
             if (!currentUser) throw new Error("No current user");
 
-            queryClient.setQueryData(
-                QueryKey.profile(currentUser),
+            context.client.setQueryData(
+                SharedQueryKey.profile(currentUser),
                 (): z.infer<typeof ProfileResponse> => ({
                     profile: {
                         account: currentUser,
@@ -43,8 +40,8 @@ export const useSetProfile = () =>
                 }),
             );
 
-            queryClient.invalidateQueries({
-                queryKey: QueryKey.profile(currentUser),
+            context.client.invalidateQueries({
+                queryKey: SharedQueryKey.profile(currentUser),
             });
         },
         onError: () => {

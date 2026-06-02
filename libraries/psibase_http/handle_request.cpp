@@ -335,8 +335,10 @@ namespace psibase::http
              });
       }
       void onLock(CloseLock&&) override { assert(!"Incoming HttpSocket should not call onLock"); }
-      void send(Writer& writer, std::span<const char> data) override
+      void send(Writer& writer, std::span<const char> data, std::uint32_t flags) override
       {
+         if (flags != 0)
+            abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          if (replySent.exchange(true))
             return;
          auto result = psio::from_frac<HttpReply>(data);

@@ -1,10 +1,11 @@
 import { createBrowserRouter } from "react-router-dom";
 
-import { configuredApps } from "./configuredApps";
+import { configuredApps } from "./configured-apps";
 import { Layout } from "./layout";
-import Dashboard from "./pages/Dashboard";
-import { Invite } from "./pages/Invite";
-import { InviteResponse } from "./pages/InviteResponse";
+import Dashboard from "./pages/dashboard";
+import { Invite } from "./pages/invite";
+import { InviteResponse } from "./pages/invite-response";
+import { SettingsPage } from "./apps/settings/page";
 
 export default createBrowserRouter([
     {
@@ -30,6 +31,10 @@ export default createBrowserRouter([
             {
                 path: "invite-response",
                 element: <InviteResponse />,
+            },
+            {
+                path: "settings",
+                element: <SettingsPage />,
             },
         ],
     },

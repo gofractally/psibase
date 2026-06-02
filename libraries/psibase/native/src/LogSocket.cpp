@@ -14,7 +14,7 @@ namespace
       {
          logger.add_attribute("Channel", boost::log::attributes::constant(std::string("service")));
       }
-      void send(Writer&, std::span<const char> data)
+      void send(Writer&, std::span<const char> data, std::uint32_t flags) override
       {
          auto record = psio::from_frac<LogMessage>(data);
          check(record.severity <= LogMessage::Severity::critical, "Unknown severity");
@@ -24,7 +24,7 @@ namespace
                       : std::nullopt;
          BOOST_LOG_SEV(logger, static_cast<loggers::level>(record.severity)) << record.message;
       }
-      SocketInfo             info() const { return LogSocketInfo{}; }
+      SocketInfo             info() const override { return LogSocketInfo{}; }
       loggers::common_logger logger;
    };
 }  // namespace

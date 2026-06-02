@@ -166,30 +166,34 @@ pub struct KvHandle(native_raw::KvHandle);
 
 pub use native_raw::KvMode;
 
+// The tester needs a different implementation from services
+extern "C" {
+    pub fn psibase_proxy_kv_open(
+        db: DbId,
+        prefix: *const u8,
+        prefix_len: u32,
+        mode: KvMode,
+    ) -> native_raw::KvHandle;
+}
+
 impl KvHandle {
     pub fn new(db: DbId, prefix: &[u8], mode: KvMode) -> KvHandle {
-        match db {
-            DbId::Service | DbId::WriteOnly | DbId::BlockLog | DbId::Native => Self::import(
-                crate::services::db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
-            ),
-            DbId::Subjective | DbId::Session | DbId::Temporary => Self::import(
-                crate::services::x_db::Wrapper::call().open(db, prefix.to_vec().into(), mode as u8),
-            ),
-            _ => KvHandle(unsafe {
-                native_raw::kvOpen(db, prefix.as_ptr(), prefix.len() as u32, mode)
-            }),
-        }
+        KvHandle(unsafe { psibase_proxy_kv_open(db, prefix.as_ptr(), prefix.len() as u32, mode) })
+    }
+    pub unsafe fn from_raw(handle: native_raw::KvHandle) -> KvHandle {
+        KvHandle(handle)
     }
     pub fn subtree(&self, prefix: &[u8], mode: KvMode) -> KvHandle {
         KvHandle(unsafe {
             native_raw::kvOpenAt(self.0, prefix.as_ptr(), prefix.len() as u32, mode)
         })
     }
+    pub unsafe fn import_raw(index: u32) -> native_raw::KvHandle {
+        let handles = Vec::<u32>::unpacked(&get_result_bytes(native_raw::importHandles())).unwrap();
+        native_raw::KvHandle(handles[index as usize])
+    }
     pub fn import(index: u32) -> KvHandle {
-        let handles =
-            Vec::<u32>::unpacked(&get_result_bytes(unsafe { native_raw::importHandles() }))
-                .unwrap();
-        KvHandle(native_raw::KvHandle(handles[index as usize]))
+        KvHandle(unsafe { Self::import_raw(index) })
     }
 }
 
@@ -410,8 +414,8 @@ pub fn socket_open(
 }
 
 /// Send a message to a socket
-pub fn socket_send(fd: i32, data: &[u8]) -> Result<(), anyhow::Error> {
-    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len()) };
+pub fn socket_send(fd: i32, data: &[u8], flags: u32) -> Result<(), anyhow::Error> {
+    let err = unsafe { native_raw::socketSend(fd, data.as_ptr(), data.len(), flags) };
     if err == 0 {
         Ok(())
     } else {

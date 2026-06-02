@@ -1,5 +1,6 @@
 #include <services/system/Accounts.hpp>
 
+#include <psibase/AccountNumber.hpp>
 #include <psibase/Table.hpp>
 #include <psibase/dispatch.hpp>
 #include <psibase/nativeTables.hpp>
@@ -18,7 +19,9 @@ namespace SystemService
       auto   statusTable  = tables.open<AccountsStatusTable>();
       auto   statusIndex  = statusTable.getIndex<0>();
       auto   accountTable = tables.open<AccountTable>();
-      check(!statusIndex.get(std::tuple{}), "already started");
+
+      if (statusIndex.get(std::tuple{}))
+         return;
 
       uint32_t totalAccounts = 0;
       auto     codeTable     = Native::tables(KvMode::read).open<CodeTable>();
@@ -41,7 +44,20 @@ namespace SystemService
       statusTable.put({.totalAccounts = totalAccounts});
    }
 
-   void Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireNew)
+   namespace
+   {
+      std::vector<psibase::AccountNumber> preapprovedAccounts = {};
+   }
+
+   void Accounts::preapproveAcc(AccountNumber name)
+   {
+      check(getSender() == getReceiver() || getSender() == AccountNumber("prem-accounts"),
+            "unauthorized");
+
+      preapprovedAccounts.push_back(name);
+   }
+
+   bool Accounts::newAccount(AccountNumber name, AccountNumber authService, bool requireMatch)
    {
       Tables tables{getReceiver()};
       auto   statusTable  = tables.open<AccountsStatusTable>();
@@ -63,7 +79,7 @@ namespace SystemService
 
       check(name.value, "invalid account name");
       check(strName.back() != '-', "account name must not end in a hyphen");
-      if (getSender() != service)
+      if (getSender() != service && !std::ranges::contains(preapprovedAccounts, name))
       {
          check(!strName.starts_with("x-"),
                "The 'x-' account prefix is reserved for infrastructure providers");
@@ -73,22 +89,24 @@ namespace SystemService
       // Check compression roundtrip
       check(AccountNumber{strName}.value, "invalid account name");
 
-      if (accountIndex.get(name))
+      if (auto existing = accountIndex.get(name))
       {
-         if (requireNew)
+         if (requireMatch && existing->authService != authService)
             abortMessage("account already exists");
-         return;
+         return false;
       }
       check(accountIndex.get(authService) != std::nullopt, "unknown auth service");
 
       Account account{
-          .accountNum  = name,
-          .authService = authService,
+          .accountNum   = name,
+          .authService  = authService,
+          .authSequence = 0,
       };
       accountTable.put(account);
 
       ++status->totalAccounts;
       statusTable.put(*status);
+      return true;
    }
 
    void Accounts::setAuthServ(psibase::AccountNumber authService)
@@ -102,6 +120,7 @@ namespace SystemService
       to<AuthInterface>(authService).canAuthUserSys(getSender());
 
       account->authService = authService;
+      ++account->authSequence;
       accountTable.put(*account);
    }
 
@@ -118,6 +137,17 @@ namespace SystemService
       auto accountRow = getAccount(account);
       check(accountRow.has_value(), "account " + account.str() + " does not exist");
       return accountRow->authService;
+   }
+
+   void Accounts::incAuthSeq(psibase::AccountNumber name)
+   {
+      auto accountTable = open<AccountTable>();
+      auto accountRow   = accountTable.getIndex<0>().get(name);
+      if (accountRow && accountRow->authService == getSender())
+      {
+         ++accountRow->authSequence;
+         accountTable.put(*accountRow);
+      }
    }
 
    bool Accounts::exists(AccountNumber name)

@@ -178,6 +178,11 @@ impl Caller for ActionPacker {
     }
 }
 
+pub trait ServiceWrapper {
+    type Actions<T: Caller>;
+    fn with_caller<T: Caller>(caller: T) -> Self::Actions<T>;
+}
+
 #[derive(Clone, Default)]
 pub struct RunAsCaller {
     pub sender: AccountNumber,

@@ -93,12 +93,14 @@ namespace SystemService
       // verify TAPoS on transactions.
       tables.open<BlockSummaryTable>().put(getBlockSummary());
 
+      const auto& stat = getStatus();
+      emit().history().blockStart(stat.current.blockNum, stat.current.time);
+
       // Remove expired transaction IDs. The iteration limit on the loop helps to
       // mitigate a potential attack.
-      const auto& stat          = getStatus();
-      auto        includedTable = tables.open<IncludedTrxTable>();
-      auto        includedIndex = includedTable.getIndex<0>();
-      auto        includedEnd   = includedIndex.end();
+      auto includedTable = tables.open<IncludedTrxTable>();
+      auto includedIndex = includedTable.getIndex<0>();
+      auto includedEnd   = includedIndex.end();
       for (int i = 0; i < 20; ++i)
       {
          auto it = includedIndex.begin();
@@ -367,9 +369,12 @@ namespace SystemService
             }
 
             Actor<AuthInterface> auth(Transact::service, account->authService);
-            auth.checkAuthSys(flags, requester, action.sender,
-                              ServiceMethod{action.service, action.method}, allowedActions,
-                              std::vector<Claim>{});
+            if (!auth.checkAuthSys(flags, requester, action.sender,
+                                   ServiceMethod{action.service, action.method}, allowedActions,
+                                   std::vector<Claim>{}))
+            {
+               abortMessage("Not authorized");
+            }
          }  // if (requester != account->authService)
       }  // if(enforceAuth)
 
@@ -517,9 +522,14 @@ namespace SystemService
          if (readOnly)
             flags |= AuthInterface::readOnlyFlag;
          // This can execute user defined code, so we must set the timer first
-         auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
-                           ServiceMethod{act.service(), act.method()}, std::vector<ServiceMethod>{},
-                           claims);
+         if (!auth.checkAuthSys(flags, psibase::AccountNumber{}, act.sender(),
+                                ServiceMethod{act.service(), act.method()},
+                                std::vector<ServiceMethod>{}, claims))
+         {
+            abortMessage(std::format("Authorization for {} -> {}::{} failed",
+                                     act.sender().unpack().str(), act.service().unpack().str(),
+                                     act.method().unpack().str()));
+         }
       }
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)

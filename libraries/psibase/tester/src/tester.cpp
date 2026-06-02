@@ -146,7 +146,7 @@ namespace
    void loadLocalServices(psibase::TestChain& self)
    {
       using namespace psibase;
-      using LocalService::XPackages;
+      using namespace LocalService;
       auto prefix = psio::convert_to_key(codePrefix());
       if (self.kvGreaterEqualRaw(DbId::nativeSubjective, prefix, prefix.size()))
          return;
@@ -155,12 +155,13 @@ namespace
       auto                     packagesDir = std::string{serviceRoot} + "/packages";
       DirectoryRegistry        registry{packagesDir};
       std::vector<std::string> packageNames{"XDefault"};
-      auto                     packages = registry.resolve(packageNames);
+      auto                     packages = registry.resolve(packageNames, {});
       std::vector<HttpRequest> requests;
+      std::vector<HttpRequest> early_requests;
+      const std::string        rootHost("", 1);
       tester::raw::checkoutSubjective(self.nativeHandle());
-      for (const auto& info : packages)
+      for (auto& package : packages)
       {
-         auto package = registry.get(info);
          for (const auto& [account, header, serviceInfo] : package.services)
          {
             auto file = package.archive.getEntry(header);
@@ -180,9 +181,21 @@ namespace
                 .code     = std::move(code),
             };
             self.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
-         }
 
-         std::string rootHost("", 1);
+            if (serviceInfo.server)
+            {
+               HttpRequest         req{.host        = XHttp::service.str() + "." + rootHost,
+                                       .method      = "POST",
+                                       .target      = "/register_server",
+                                       .contentType = "application/json"};
+               psio::vector_stream stream{req.body};
+               to_json(RegisteredServiceRow{account, *serviceInfo.server}, stream);
+               if (account == XPackages::service)
+                  early_requests.push_back(std::move(req));
+               else
+                  requests.push_back(std::move(req));
+            }
+         }
 
          for (const auto& [account, header] : package.data)
          {
@@ -201,7 +214,7 @@ namespace
          requests.push_back(HttpRequest{
              .host        = XPackages::service.str() + "." + rootHost,
              .method      = "PUT",
-             .target      = "/manifest/" + psio::hex(info.sha256.begin(), info.sha256.end()),
+             .target      = "/manifest/" + psio::hex(package.sha256.begin(), package.sha256.end()),
              .contentType = "application/json",
              .body        = package.manifest(),
          });
@@ -212,18 +225,27 @@ namespace
              .contentType = "application/json",
          };
          psio::vector_stream stream(postinstall.body);
-         to_json(info, stream);
+         to_json(
+             LocalPackage{
+                 .name        = package.meta.name,
+                 .version     = package.meta.version,
+                 .description = package.meta.description,
+                 .depends     = package.meta.depends,
+                 .accounts    = package.meta.accounts,
+                 .services    = package.meta.services,
+                 .sha256      = package.sha256,
+             },
+             stream);
          requests.push_back(std::move(postinstall));
       }
       psibase::check(tester::raw::commitSubjective(self.nativeHandle()),
                      "Failed to commit changes");
 
-      for (const auto& request : requests)
+      auto checkReply = [](const auto& request, const auto& reply)
       {
-         auto reply = self.http(request);
          if (reply.status != HttpStatus::ok)
          {
-            auto message = std::format("PUT {} returned {}", request.target,
+            auto message = std::format("{} {} returned {}", request.method, request.target,
                                        static_cast<std::uint16_t>(reply.status));
             if (reply.contentType.starts_with("text/"))
             {
@@ -232,6 +254,15 @@ namespace
             }
             abortMessage(message);
          }
+      };
+
+      for (const auto& request : early_requests)
+      {
+         checkReply(request, self.http(request));
+      }
+      for (const auto& request : requests)
+      {
+         checkReply(request, self.http(request));
       }
    }
 
@@ -707,6 +738,15 @@ std::optional<psibase::HttpReply> psibase::AsyncHttpReply::poll()
 psibase::HttpReply psibase::TestChain::http(const HttpRequest& request)
 {
    return asyncHttp(request).get();
+}
+
+psibase::HttpClient psibase::TestChain::http(AccountNumber account, std::vector<HttpHeader> headers)
+{
+   return {*this, account, std::move(headers)};
+}
+psibase::HttpClient psibase::TestChain::http(std::vector<HttpHeader> headers)
+{
+   return {*this, {}, std::move(headers)};
 }
 
 namespace

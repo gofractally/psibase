@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
-import { useServerKeys } from "@/hooks/useKeyDevices";
-import { useMyProducer } from "@/hooks/useProducers";
+import { useServerKeys } from "@/hooks/use-key-devices";
+import { useMyProducer } from "@/hooks/use-producers";
 
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
 

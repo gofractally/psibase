@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
-import { getNft } from "@/lib/getNft";
-import QueryKey, { OptionalString } from "@/lib/queryKeys";
+import { getNft } from "@/lib/get-nft";
+import QueryKey, { OptionalString } from "@/lib/query-keys";
 
 export const useNft = (id: OptionalString) =>
     useQuery({

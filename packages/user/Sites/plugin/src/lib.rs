@@ -60,7 +60,10 @@ fn validate_compression_quality(quality: u8) -> Result<(), Error> {
 
 impl Sites for SitesPlugin {
     fn upload(file: File, compression_quality: u8) -> Result<(), Error> {
-        assert_authorized_with_whitelist(FunctionName::upload, vec!["workshop".into()])?;
+        assert_authorized_with_whitelist(
+            FunctionName::upload,
+            vec!["workshop".into(), "profiles".into()],
+        )?;
 
         validate_compression_quality(compression_quality)?;
 
@@ -198,6 +201,7 @@ impl Sites for SitesPlugin {
         Transact::add_action_to_transaction("clearProxy", &Actions::clearProxy {}.packed())
             .unwrap();
     }
+
 }
 
 bindings::export!(SitesPlugin with_types_in bindings);

@@ -1,5 +1,6 @@
 #include <catch2/catch_all.hpp>
 #include <psibase/DefaultTestChain.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/system/HttpServer.hpp>
 #include <services/system/SetCode.hpp>
 #include <services/test/AsRpc.hpp>
@@ -81,6 +82,13 @@ void addLocalService(TestChain&       t,
    }
 }
 
+void registerLocalServer(TestChain& t, AccountNumber service)
+{
+   auto reply = t.post(LocalService::XHttp::service, "/register_server",
+                       JsonBody{RegisteredServiceRow{.service = service, .server = service}});
+   REQUIRE((int)reply.status == 200);
+}
+
 TEST_CASE("local service sudo")
 {
    DefaultTestChain t;
@@ -111,6 +119,7 @@ TEST_CASE("local service sudo")
    t.addAccount(XSudo::service);
    t.from(XSudo::service).to<HttpServer>().registerServer(XSudo::service);
    addLocalService(t, XSudo::service, "XSudo.wasm", XSudo::flags);
+   registerLocalServer(t, XSudo::service);
    {
       auto reply =
           t.post(XSudo::service, "/", FracPackBody{Action{.sender = callee, .service = callee}});

@@ -143,7 +143,7 @@ pub fn serve_graphql<Query: async_graphql::ObjectType + 'static>(
     }
     block_on(async move {
         let schema = async_graphql::Schema::new(query, EmptyMutation, EmptySubscription);
-        if let Some(request) = args.strip_prefix("?query=") {
+        if let Some(request) = args.strip_prefix("query=") {
             let res = schema.execute(request).await;
             Some(HttpReply {
                 status: 200,

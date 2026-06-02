@@ -44,8 +44,8 @@ namespace psibase
       {
          std::string                name;
          std::string                hostPath;
-         Dir*                       parent;
-         bool                       isMountpoint;
+         Dir*                       parent       = nullptr;
+         bool                       isMountpoint = false;
          std::map<std::string, Dir> children;
       };
       Dir               root;

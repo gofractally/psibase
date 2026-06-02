@@ -13,6 +13,7 @@ package-name = "FaucetTok"
 services = ["faucet-tok"]
 
 [package.metadata.psibase.dependencies]
+Host = "0.23.0"
 Sites = "0.23.0"
 HttpServer = "0.23.0"
 

@@ -47,10 +47,10 @@ class TestWebSocket(unittest.TestCase):
     async def test_fast_recv(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         async with websockets.serve(send_some, host='127.0.0.1', port=0) as server:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
                 reply.raise_for_status()
 
             url = websocket_url(a, '/', service='x-proxy')
@@ -62,11 +62,11 @@ class TestWebSocket(unittest.TestCase):
     async def test_proxy(self, cluster):
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
         XAdmin(a).install(os.path.join(testutil.test_packages(), "XSocketList.psi"))
 
         async with websockets.serve(echo, host='127.0.0.1', port=0) as server:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
                 reply.raise_for_status()
 
             url = websocket_url(a, '/', service='x-proxy')
@@ -108,10 +108,10 @@ class TestWebSocket(unittest.TestCase):
         '''
         (a,) = cluster.complete(*testutil.generate_names(1))
 
-        XAdmin(a).install(os.path.join(testutil.test_packages(), "XProxy.psi"))
+        a.install_local(['XProxy'])
 
         async with websockets.serve(echo, host='127.0.0.1', port=0) as server:
-            with a.post('/set_origin_server', service='x-proxy', json={"host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
+            with a.post('/set_origin_server', service='x-proxy', json={"subdomain":"x-proxy", "host":"localhost:%d" % server.sockets[0].getsockname()[1]}) as reply:
                 reply.raise_for_status()
 
             url = websocket_url(a, '/', service='x-proxy')

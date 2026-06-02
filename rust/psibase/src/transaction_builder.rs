@@ -108,6 +108,7 @@ mod tests {
             .packed()
             .into(),
             proofs: Vec::new(),
+            subjectiveData: None,
         })
     }
 

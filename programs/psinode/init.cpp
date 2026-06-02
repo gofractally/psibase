@@ -7,6 +7,7 @@
 #include <psibase/package.hpp>
 #include <psibase/serviceEntry.hpp>
 #include <psio/finally.hpp>
+#include <services/local/XHttp.hpp>
 #include <services/local/XPackages.hpp>
 
 using namespace psibase;
@@ -22,8 +23,10 @@ namespace
       // to an executor in onClose, the creator is responsible for
       // calling remove.
       void onClose(const std::optional<std::string>&) noexcept override {}
-      void send(Writer&, std::span<const char> data) override
+      void send(Writer&, std::span<const char> data, std::uint32_t flags) override
       {
+         if (flags != 0)
+            abortMessage("Invalid flags for HttpSocket: " + std::to_string(flags));
          auto reply = psio::from_frac<HttpReply>(data);
          if (reply.status == HttpStatus::ok)
          {
@@ -42,17 +45,29 @@ namespace
       SocketInfo info() const override { return HttpSocketInfo{LocalEndpoint{}}; }
       bool       okay = false;
    };
+
+   HttpRequest registerServer(LocalService::RegisteredServiceRow server)
+   {
+      std::string         rootHost("", 1);
+      HttpRequest         req{.host        = XHttp::service.str() + "." + rootHost,
+                              .method      = "POST",
+                              .target      = "/register_server",
+                              .contentType = "application/json"};
+      psio::vector_stream stream{req.body};
+      to_json(server, stream);
+      return req;
+   }
 }  // namespace
 
-void load_local_packages(TransactionContext&             tc,
-                         const DirectoryRegistry&        registry,
-                         const std::vector<PackageInfo>& packages)
+void load_local_packages(TransactionContext&           tc,
+                         const DirectoryRegistry&      registry,
+                         std::vector<PackagedService>& packages)
 {
-   std::vector<HttpRequest> requests;
+   std::vector<HttpRequest>          requests;
+   std::vector<RegisteredServiceRow> servers;
 
-   for (const auto& info : packages)
+   for (auto& package : packages)
    {
-      auto package = registry.get(info);
       PSIBASE_LOG(psibase::loggers::generic::get(), info) << "Loading " << package.meta.name;
 
       for (auto [account, header, serviceInfo] : package.services)
@@ -74,6 +89,15 @@ void load_local_packages(TransactionContext&             tc,
              .code     = std::move(code),
          };
          tc.blockContext.db.kvPut(DbId::nativeSubjective, codeByHashRow.key(), codeByHashRow);
+
+         if (serviceInfo.server)
+         {
+            auto server = LocalService::RegisteredServiceRow{account, *serviceInfo.server};
+            if (account == XPackages::service)
+               servers.push_back(server);
+            else
+               requests.push_back(registerServer(server));
+         }
       }
 
       std::string rootHost("", 1);
@@ -95,7 +119,7 @@ void load_local_packages(TransactionContext&             tc,
       requests.push_back(HttpRequest{
           .host        = XPackages::service.str() + "." + rootHost,
           .method      = "PUT",
-          .target      = "/manifest/" + loggers::to_string(info.sha256),
+          .target      = "/manifest/" + loggers::to_string(package.sha256),
           .contentType = "application/json",
           .body        = package.manifest(),
       });
@@ -106,8 +130,24 @@ void load_local_packages(TransactionContext&             tc,
           .contentType = "application/json",
       };
       psio::vector_stream stream(postinstall.body);
-      to_json(info, stream);
+      to_json(
+          LocalPackage{
+              .name        = package.meta.name,
+              .version     = package.meta.version,
+              .description = package.meta.description,
+              .depends     = package.meta.depends,
+              .accounts    = package.meta.accounts,
+              .services    = package.meta.services,
+              .sha256      = package.sha256,
+          },
+          stream);
       requests.push_back(std::move(postinstall));
+   }
+
+   // Set up HTTP servers that we use directly, first
+   {
+      auto serverReqs = servers | std::views::transform(registerServer);
+      requests.insert(requests.begin(), serverReqs.begin(), serverReqs.end());
    }
 
    auto socket = std::make_shared<TempSocket>();
@@ -170,7 +210,7 @@ void initialize_database(SystemContext& context, const std::string& template_)
    if (!bc.db.kvGreaterEqualRaw(DbId::nativeSubjective, key, key.size()))
    {
       DirectoryRegistry registry{package_path().string()};
-      auto              packages = registry.resolve({&template_, 1});
+      auto              packages = registry.resolve({&template_, 1}, {});
       bc.start();
       load_local_packages(tc, registry, packages);
    }

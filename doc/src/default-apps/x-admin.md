@@ -7,7 +7,8 @@ The adminstrator service provides tools for monitoring and controlling the serve
 Access to `x-admin` is allowed only if
 - The client and all proxies are either running over the loopback interface (localhost) or have IP addresses listed in the environmental variable `PSIBASE_ADMIN_IP`, which holds a comma separated list of IP addresses, or
 - The user is logged in as an authorized on-chain account, or
-- The proxy that is directly connected to psinode is authorized and the request includes the header configured in the environmental variable `PSIBASE_USERNAME_FIELD`
+- The proxy that is directly connected to psinode is authorized and the request includes the header configured in the environmental variable `PSIBASE_USERNAME_FIELD`, or
+- [HTTP Basic Authentication](x-basic.md) is configured, and the request included valid credentials
 
 ## Configuration Options
 

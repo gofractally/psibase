@@ -10,8 +10,10 @@ function(add suffix)
     target_link_libraries(psibase${suffix} PUBLIC psio boost OpenSSL::Crypto ZLIB::ZLIB services_system${suffix} services_user${suffix} services_local)
     target_sources(psibase${suffix} PRIVATE
         common/src/api.cpp
+        common/src/base64.cpp
         common/src/block.cpp
         common/src/crypto.cpp
+        common/src/db.cpp
         common/src/KvMerkle.cpp
         common/src/nativeTables.cpp
         common/src/Rpc.cpp

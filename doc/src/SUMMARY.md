@@ -108,6 +108,8 @@
   - [transact](default-apps/transact.md)
   - [verify-sig]()
   - [x-admin](default-apps/x-admin.md)
+  - [x-basic](default-apps/x-basic.md)
+  - [x-http](default-apps/x-http.md)
   - [x-peers](default-apps/x-peers.md)
 
 - [Contributing guide](contribute/README.md)

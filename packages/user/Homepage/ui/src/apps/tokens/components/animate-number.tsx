@@ -1,7 +1,7 @@
 import { useSpring } from "@react-spring/web";
 import React, { useMemo, useRef } from "react";
 
-import { formatThousands } from "@/apps/tokens/lib/format-number";
+import { formatThousands } from "@shared/lib/format-number";
 
 export const AnimateNumber = ({
     n,

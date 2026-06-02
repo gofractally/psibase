@@ -32,18 +32,34 @@ abstract class PluginInterface {
 class AdminFractal extends PluginInterface {
     protected override readonly _intf = "adminFractal" as const;
 
+    get setRoleOccupation() {
+        return this._call<[roleId: number, occupation: string]>("setRoleOccupation")
+    }
+
+
+
+    get migrateGuilds() {
+        return this._call<[guild: string]>("migrateGuilds")
+    }
+
+
+    get setRoleMapping() {
+        return this._call<[roleId: number, guild: string]>("setRoleMapping")
+    }
+
     get exileMember() {
         return this._call<[member: Account]>("exileMember");
     }
+
+
+    get initToken() {
+        return this._call<[]>("initToken");
+    }
+
     get setDistInterval() {
         return this._call<[interval: number]>("setDistInterval");
     }
-    get setRankedGuildSlots() {
-        return this._call<[slots: number]>("setRankedGuildSlots");
-    }
-    get setTokenThreshold() {
-        return this._call<[threshold: number]>("setTokenThreshold");
-    }
+
     get setRankedGuilds() {
         return this._call<[guilds: Account[]]>("setRankedGuilds");
     }
@@ -58,6 +74,10 @@ class UserFractal extends PluginInterface {
 
     get distToken() {
         return this._call<[]>("distToken");
+    }
+
+    get claimRewards() {
+        return this._call<[]>("claimRewards");
     }
 }
 
@@ -137,6 +157,7 @@ class AdminGuild extends PluginInterface {
     get removeGuildRep() {
         return this._call<[guildAccount: Account]>("removeGuildRep");
     }
+
 }
 
 class UserGuild extends PluginInterface {
@@ -145,6 +166,11 @@ class UserGuild extends PluginInterface {
     get applyGuild() {
         return this._call<[guildAccount: Account, app: string]>("applyGuild");
     }
+
+    get createGuildInvite() {
+        return this._call<[guildAccount: Account, numSeats: number, preAttest: boolean]>("inviteMember");
+    }
+
     get attestMembershipApp() {
         return this._call<
             [
@@ -160,6 +186,14 @@ class UserGuild extends PluginInterface {
         return this._call<[guildAccount: Account, active: boolean]>(
             "registerCandidacy",
         );
+    }
+
+    get draftApplication() {
+        return this._call<[guildAccount: Account, description: string]>("draftApplication");
+    }
+
+    get pushApplication() {
+        return this._call<[guildAccount: Account]>("pushApplication");
     }
 }
 

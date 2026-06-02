@@ -394,7 +394,7 @@ mod service {
     }
 
     #[event(history)]
-    fn consumed(account: AccountNumber, resource: u8, amount: u64, cost: u64) {}
+    fn consumed(account: AccountNumber, resource: u8, amount: i64, cost: i64) {}
 
     #[event(history)]
     fn subsidized(
@@ -406,7 +406,7 @@ mod service {
     }
 
     #[event(history)]
-    fn block_summary(block_num: BlockNum, net_usage_ppm: u32, cpu_usage_ppm: u32) {}
+    fn block_summary(net_usage_ppm: u32, cpu_usage_ppm: u32) {}
 }
 
 #[test]

@@ -7,11 +7,13 @@ publish.workspace = true
 
 [dependencies]
 psibase.workspace = true
+psibase_plugin.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wit-bindgen-rt.workspace = true
 chrono = "0.4"
 psibase-plugin-workspace-hack.workspace = true
+thiserror.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -28,3 +30,7 @@ world = "impl"
 "host:types" = { path = "../../Host/plugin/types/wit/world.wit" }
 "host:prompt" = { path = "../../Host/plugin/prompt/wit/world.wit" }
 "accounts:plugin" = { path = "../../../system/Accounts/plugin/accounts/wit/world.wit" }
+
+[package.metadata.component.bindings.with]
+"host:types/types" = "psibase_plugin::types"
+"host:db/store" = "psibase_plugin::host::store"

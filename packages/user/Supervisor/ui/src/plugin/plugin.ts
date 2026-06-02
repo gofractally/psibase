@@ -5,11 +5,17 @@ import {
     siblingUrl,
 } from "@psibase/common-lib";
 
-import { loadPlugin } from "../component-loading/loader";
+import { kebabToCamel, kebabToPascal } from "../case";
+import { CompiledPlugin } from "../component-loading";
+import { 
+    ServiceMap,
+    getPluginService,
+    compilePlugin
+} from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
-import { HostInterface } from "../hostInterface";
+import { HostInterface } from "../host-interface";
 import { parser, wasmFromUrl } from "../utils";
-import { ComponentAPI } from "../witExtraction";
+import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
 export class Plugin {
@@ -25,9 +31,13 @@ export class Plugin {
 
     parsed: Promise<ComponentAPI>;
 
+    services: Promise<ServiceMap | null>;
+
+    // Resolves when the plugin is compiled (cheap — no Memory allocated).
+    // After this, instantiate() can be called to allocate Memory.
     ready: Promise<void>;
 
-    // A module dynamically generated from a bundle including: transpiled component, wasi shims, and imports
+    private compiledPlugin: CompiledPlugin | undefined;
     private pluginModule: any;
 
     private resources: Map<number, any> = new Map();
@@ -81,14 +91,22 @@ export class Plugin {
         let api: ComponentAPI | undefined;
         try {
             api = await this.parsed;
-            return api.importedFuncs.interfaces.map((intf) => ({
-                service: intf.namespace,
-                plugin: intf.package,
-            }));
+            let services = await this.services;
+            return api.importedFuncs.interfaces
+                .filter(
+                    (intf) =>
+                        intf.namespace !== "wasi" &&
+                        intf.namespace !== "supervisor",
+                )
+                .map((intf) => ({
+                    service: getPluginService(services, intf.namespace),
+                    plugin: intf.package,
+                }));
         } catch (e: any) {
             if (e instanceof PluginDownloadFailed) {
                 return [];
             } else {
+                console.error(`Error fetching dependencies of plugin: ${pluginString(this.id)}`);
                 throw e;
             }
         }
@@ -96,26 +114,52 @@ export class Plugin {
 
     private async doReady(): Promise<void> {
         const api = await this.parsed;
+        const services = await this.services;
         const privileged = this.id.service === "host";
-        this.pluginModule = await loadPlugin(
+        this.compiledPlugin = await compilePlugin(
             this.id.service,
             privileged,
             this.bytes!,
             this.host,
             api,
+            services,
         );
     }
 
-    constructor(id: QualifiedPluginId, host: HostInterface) {
+    private get isInstantiated(): boolean {
+        return this.pluginModule !== undefined;
+    }
+
+    constructor(
+        id: QualifiedPluginId,
+        host: HostInterface,
+        services: Promise<ServiceMap | null>,
+    ) {
         this.id = id;
         this.host = host;
         this.bytes = undefined;
+        this.services = services;
         this.fetched = this.doFetchPlugin();
         this.parsed = this.doParse();
         this.ready = this.doReady();
     }
 
-    // Called by the supervisor to call into a plugin wasm
+    async instantiate(): Promise<void> {
+        if (this.pluginModule) return;
+        if (!this.compiledPlugin) throw new PluginInvalid(this.id);
+        const { exports } = await this.compiledPlugin.instantiate();
+        this.pluginModule = exports;
+    }
+
+    dispose(): boolean {
+        if (!this.isInstantiated) return false;
+
+        this.pluginModule = undefined;
+        this.resources.clear();
+        this.nextResourceHandle = 1;
+        return true;
+    }
+
     call(intf: string | undefined, method: string, params: any[]) {
         if (!this.methodExists(intf, method)) {
             assertTruthy(this.componentAPI, "Component API undefined");
@@ -126,14 +170,15 @@ export class Plugin {
             throw new InvalidCall(this.id, intf, method);
         }
 
-        if (this.bytes === undefined || this.pluginModule === undefined) {
+        if (!this.isInstantiated) {
             throw new PluginInvalid(this.id);
         }
 
+        const jsMethod = kebabToCamel(method);
         const func =
             typeof intf === "undefined" || intf === ""
-                ? this.pluginModule[method]
-                : this.pluginModule[intf][method];
+                ? this.pluginModule[jsMethod]
+                : this.pluginModule[kebabToCamel(intf)][jsMethod];
 
         return func(...params);
     }
@@ -145,9 +190,12 @@ export class Plugin {
         method: string,
         params: any[],
     ) {
-        if (this.bytes === undefined || this.pluginModule === undefined) {
+        if (!this.isInstantiated) {
             throw new PluginInvalid(this.id);
         }
+
+        const jsType = kebabToPascal(type);
+        const jsMethod = kebabToCamel(method);
 
         if (method === "constructor") {
             if (handle !== undefined) {
@@ -157,8 +205,10 @@ export class Plugin {
                     `Handle is not allowed for ${type}.constructor`,
                 );
             }
-            const module = intf ? this.pluginModule[intf] : this.pluginModule;
-            const resourceClass = module?.[type];
+            const module = intf
+                ? this.pluginModule[kebabToCamel(intf)]
+                : this.pluginModule;
+            const resourceClass = module?.[jsType];
             if (!resourceClass) {
                 throw new InvalidCall(this.id, intf, `${type}.constructor`);
             }
@@ -187,7 +237,7 @@ export class Plugin {
             );
         }
 
-        if (typeof resource[method] !== "function") {
+        if (typeof resource[jsMethod] !== "function") {
             throw new InvalidCall(
                 this.id,
                 intf,
@@ -195,10 +245,9 @@ export class Plugin {
             );
         }
 
-        return resource[method](...params);
+        return resource[jsMethod](...params);
     }
 
-    // Gets the JSON interface for a plugin
     getJson(): string {
         assertTruthy(this.componentAPI, "Component API undefined");
         return this.componentAPI.debug;

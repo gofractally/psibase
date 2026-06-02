@@ -797,21 +797,22 @@ namespace psibase
              const auto& bucket = buckets[static_cast<KvHandle>(handle)];
              if (!bucket.isWrite())
                 abortMessage("Cannot write to this db handle " + bucket.to_string());
-             auto fullKey = bucket.key(key);
+             auto fullKey  = bucket.key(key);
+             auto bucketDb = bucket.db;
              check(fullKey.size() <= transactionContext.config.maxKeySize, "key is too big");
              check(value.size() <= transactionContext.config.maxValueSize, "value is too big");
-             auto w = getDbWrite(*this, bucket.db, fullKey);
+             auto w = getDbWrite(*this, bucketDb, fullKey);
              if (w.chargeable)
              {
                 auto& delta =
                     getDelta(transactionContext.kvResourceDeltas,
-                             KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucket.db)});
+                             KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucketDb)});
                 delta.records += 1;
                 delta.keyBytes += fullKey.size();
                 delta.valueBytes += value.size();
                 if (w.refundable)
                 {
-                   auto existing = database.kvGetRaw(bucket.db, fullKey);
+                   auto existing = database.kvGetRaw(bucketDb, fullKey);
                    if (existing)
                    {
                       delta.records -= 1;
@@ -819,28 +820,28 @@ namespace psibase
                       delta.valueBytes -= existing->remaining();
                    }
                    // nativeConstrained is both refundable and chargeable
-                   if (bucket.db == DbId::native)
+                   if (bucketDb == DbId::native)
                    {
                       verifyWriteConstrained(transactionContext, fullKey,
                                              {value.data(), value.size()}, existing);
                    }
-                   notifyKvMut(*this, bucket.db, fullKey.size(),
+                   notifyKvMut(*this, bucketDb, fullKey.size(),
                                existing ? existing->remaining() : -1, value.size());
                 }
                 else
                 {
-                   notifyKvMut(*this, bucket.db, fullKey.size(), -1, value.size());
+                   notifyKvMut(*this, bucketDb, fullKey.size(), -1, value.size());
                 }
              }
-             else if (bucket.db == DbId::nativeSubjective)
+             else if (bucketDb == DbId::nativeSubjective)
              {
                 verifyWriteSubjective(database, fullKey, {value.data(), value.size()});
              }
-             else if (bucket.db == DbId::nativeSession)
+             else if (bucketDb == DbId::nativeSession)
              {
                 verifyWriteSession(transactionContext, fullKey, {value.data(), value.size()});
              }
-             database.kvPutRaw(bucket.db, {fullKey.data(), fullKey.size()},
+             database.kvPutRaw(bucketDb, {fullKey.data(), fullKey.size()},
                                {value.data(), value.size()});
           });
    }
@@ -892,26 +893,27 @@ namespace psibase
                     const auto& bucket = buckets[static_cast<KvHandle>(handle)];
                     if (!bucket.isWrite())
                        abortMessage("Cannot write to this db handle " + bucket.to_string());
-                    auto fullKey = bucket.key(key);
-                    auto w       = getDbWrite(*this, bucket.db, fullKey);
+                    auto fullKey  = bucket.key(key);
+                    auto bucketDb = bucket.db;
+                    auto w        = getDbWrite(*this, bucketDb, fullKey);
                     if (w.refundable)
                     {
-                       if (auto existing = database.kvGetRaw(bucket.db, fullKey))
+                       if (auto existing = database.kvGetRaw(bucketDb, fullKey))
                        {
                           auto& delta = getDelta(
                               transactionContext.kvResourceDeltas,
-                              KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucket.db)});
+                              KvResourceKey{code.codeNum, static_cast<std::uint32_t>(bucketDb)});
                           delta.records -= 1;
                           delta.keyBytes -= fullKey.size();
                           delta.valueBytes -= existing->remaining();
-                          if (bucket.db == DbId::native)
+                          if (bucketDb == DbId::native)
                           {
                              verifyRemoveConstrained(transactionContext, fullKey, *existing);
                           }
-                          notifyKvMut(*this, bucket.db, fullKey.size(), existing->remaining(), -1);
+                          notifyKvMut(*this, bucketDb, fullKey.size(), existing->remaining(), -1);
                        }
                     }
-                    database.kvRemoveRaw(bucket.db, fullKey);
+                    database.kvRemoveRaw(bucketDb, fullKey);
                  });
    }
 
@@ -1054,14 +1056,16 @@ namespace psibase
       return -static_cast<std::int32_t>(wasi_errno_nosys);
    }
 
-   int32_t NativeFunctions::socketSend(int32_t fd, eosio::vm::span<const char> msg)
+   int32_t NativeFunctions::socketSend(int32_t                     fd,
+                                       eosio::vm::span<const char> msg,
+                                       std::uint32_t               flags)
    {
       check(isSubjectiveContext(*this), "Sockets are only available during subjective execution");
       check(code.flags & CodeRow::isPrivileged, "Service is not allowed to write to socket");
       check(code.flags & ExecutionContext::isLocal, "Service is not allowed to write to socket");
       check(dbMode.sockets, "Sockets disabled during speculative execution");
       return transactionContext.blockContext.systemContext.sockets->send(
-          *transactionContext.blockContext.writer, fd, msg);
+          *transactionContext.blockContext.writer, fd, msg, flags);
    }
 
    int32_t NativeFunctions::socketSetFlags(int32_t fd, std::uint32_t mask, std::uint32_t value)

@@ -98,7 +98,7 @@ Currently psibase hosts multiple JavaScript modules in the `/common/` service ta
 | Function                                       |       | Description                                                              |
 |------------------------------------------------|-------|--------------------------------------------------------------------------|
 | `getRootDomain`                                | async | returns the root domain for the queried node (e.g. `psibase.localhost`). |
-| `siblingUrlsiblingUrl(baseUrl, service, path)` | async | Sign, pack, and push transaction.                                        |
+| `siblingUrl(baseUrl, service, path)`           | async | returns another service subdomain                                        |
 
 
 `getRootDomain` calls the `/common/rootdomain/` endpoint, and the result is cached so subsequent calls will not make additional queries to the node.

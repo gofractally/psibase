@@ -292,7 +292,7 @@ namespace psibase
       return host;
    }
 
-   std::vector<HttpHeader> allowCors(std::string_view origin)
+   std::vector<HttpHeader> allowCors(std::string_view origin /* = "*" */)
    {
       return {
           {"Access-Control-Allow-Origin", std::string(origin)},
@@ -309,6 +309,19 @@ namespace psibase
           origin && Origin(*origin).isService(rootHost(req, hostIsSubdomain), account))
       {
          return allowCors(*origin);
+      }
+      return {};
+   }
+
+   std::vector<HttpHeader> allowCors(const HttpRequest&                req,
+                                     const std::vector<AccountNumber>& accounts,
+                                     bool                              hostIsSubdomain)
+   {
+      for (auto account : accounts)
+      {
+         auto headers = allowCors(req, account, hostIsSubdomain);
+         if (!headers.empty())
+            return headers;
       }
       return {};
    }

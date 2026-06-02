@@ -31,7 +31,7 @@ namespace
       auto end  = packages.rend();
       for (; iter != end; ++iter)
       {
-         for (auto account : iter->accounts())
+         for (auto account : iter->meta.services)
          {
             if (std::ranges::contains(essentialServices, account))
             {
@@ -101,7 +101,7 @@ namespace
 
          s.regServer(actions);
 
-         if (installUI)
+         if (installUI || s.needsUI())
          {
             s.storeData(actions);
          }
@@ -193,11 +193,7 @@ std::string TestChain::defaultPackageDir()
 void TestChain::boot(const std::vector<std::string>& names, bool installUI)
 {
    auto registry = DirectoryRegistry(defaultPackageDir());
-   std::vector<PackagedService> packages;
-   for (auto info : registry.resolve(names, essentialServices))
-   {
-      packages.push_back(registry.get(info));
-   }
+   auto packages = registry.resolve(names, essentialServices);
    setAutoBlockStart(false);
    startBlock();
    auto numEssential = countEssentialPackages(packages);

@@ -11,16 +11,15 @@ import {
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { EditProfileDialogContent } from "@/apps/contacts/components/edit-profile-dialog";
 import { GenerateInviteDialogContent } from "@/apps/contacts/components/generate-invite-dialog";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useGenerateInvite } from "@/hooks/use-generate-invite";
-import { useLogout } from "@/hooks/use-logout";
 
 import { Avatar } from "@shared/components/avatar";
 import { useTheme } from "@shared/components/theme-provider";
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useLogout } from "@shared/hooks/use-logout";
 import { useProfile } from "@shared/hooks/use-profile";
 import { Dialog } from "@shared/shadcn/ui/dialog";
 import {
@@ -51,9 +50,7 @@ export function NavUser() {
     const { setTheme } = useTheme();
 
     const { data: user, isPending: isPendingUser } = useCurrentUser();
-    const { data: profile } = useProfile(user, true, {
-        baseUrlIncludesSibling: false,
-    });
+    const { data: profile } = useProfile(user, true);
 
     const { mutateAsync: logout } = useLogout();
     const { mutateAsync: login } = useConnectAccount({
@@ -72,19 +69,14 @@ export function NavUser() {
     };
 
     const [showModal, setShowModal] = useState(false);
-    const [modalType, setModalType] = useState<
-        "editProfile" | "generateInvite"
-    >("editProfile");
 
-    const onEditProfile = () => {
-        setModalType("editProfile");
-        setShowModal(true);
+    const onUserSettings = () => {
+        navigate("/settings");
     };
 
     const generateInvite = useGenerateInvite();
     const onGenerateInvite = () => {
         generateInvite.mutate();
-        setModalType("generateInvite");
         setShowModal(true);
     };
 
@@ -93,18 +85,7 @@ export function NavUser() {
     return (
         <>
             <Dialog open={showModal} onOpenChange={setShowModal}>
-                {modalType == "generateInvite" && (
-                    <GenerateInviteDialogContent
-                        generateInvite={generateInvite}
-                    />
-                )}
-                {modalType == "editProfile" && (
-                    <EditProfileDialogContent
-                        onClose={() => {
-                            setShowModal(false);
-                        }}
-                    />
-                )}
+                <GenerateInviteDialogContent generateInvite={generateInvite} />
             </Dialog>
             <SidebarMenu>
                 <SidebarMenuItem>
@@ -212,11 +193,11 @@ export function NavUser() {
                             <DropdownMenuItem
                                 disabled={!user}
                                 onClick={() => {
-                                    onEditProfile();
+                                    onUserSettings();
                                 }}
                             >
                                 <Contact className="mr-2 h-4 w-4" />
-                                Edit profile
+                                User Settings
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
 

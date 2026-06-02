@@ -37,11 +37,12 @@ WebSocket::WebSocket(server_state& server, SocketInfo&& info)
    }
 }
 
-void WebSocket::handleMessage(CloseLock&& l)
+void WebSocket::handleMessage(CloseLock&& l, bool binary)
 {
    auto inbuffer    = input.cdata();
    auto data        = std::span{static_cast<const char*>(inbuffer.data()), inbuffer.size()};
    auto clearBuffer = psio::finally{[this] { input.consume(input.size()); }};
+   auto flags       = binary ? WebSocketFlags::binary : WebSocketFlags::text;
 
    auto system = server.sharedState->getSystemContext();
 
@@ -60,7 +61,7 @@ void WebSocket::handleMessage(CloseLock&& l)
    Action action{
        .sender  = AccountNumber(),
        .service = proxyServiceNum,
-       .rawData = psio::convert_to_frac(std::tuple(this->Socket::id, data)),
+       .rawData = psio::convert_to_frac(std::tuple(this->Socket::id, data, flags)),
    };
 
    try

@@ -268,7 +268,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, ConfigureEvent>> {
+        ) -> async_graphql::Result<EventConnection<ConfigureEvent>> {
             EventQuery::new("history.tokens.configured")
                 .condition(format!("token_id = {}", token_id))
                 .first(first)
@@ -288,7 +288,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, SupplyEvent>> {
+        ) -> async_graphql::Result<EventConnection<SupplyEvent>> {
             EventQuery::new("history.tokens.supplyChanged")
                 .condition(format!("token_id = {}", token_id))
                 .first(first)
@@ -317,7 +317,7 @@ mod service {
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
-        ) -> async_graphql::Result<Connection<u64, BalanceEvent>> {
+        ) -> async_graphql::Result<EventConnection<BalanceEvent>> {
             self.check_user_auth(account)?;
 
             let precision = TokenTable::with_service(tokens::SERVICE)

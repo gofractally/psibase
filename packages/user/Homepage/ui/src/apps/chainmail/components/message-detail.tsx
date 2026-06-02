@@ -1,5 +1,7 @@
 import type { DraftMessage, Mailbox, Message } from "@/apps/chainmail/types";
 
+import { ArrowLeft, Trash2 } from "lucide-react";
+
 // import { AwaitTime } from "@/globals";
 // import { wait } from "@/lib/wait";
 
@@ -9,9 +11,8 @@ import {
     // useIncomingMessages,
     // useInvalidateMailboxQueries,
     // useSaveMessage,
-} from "@/apps/chainmail/hooks";
+} from "@/apps/chainmail/hooks/use-mail";
 import { formatDate } from "@/apps/chainmail/utils";
-import { ArrowLeft, Trash2 } from "lucide-react";
 
 import { Avatar } from "@shared/shadcn/ui/avatar";
 import { Button } from "@shared/shadcn/ui/button";

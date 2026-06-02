@@ -147,7 +147,7 @@ pub mod auth_interface {
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
         claims: Vec<crate::Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
@@ -392,6 +392,12 @@ mod service {
     /// TODO: remove
     #[action]
     fn headBlockTime() -> crate::TimePointSec {
+        unimplemented!()
+    }
+
+    /// Emitted at the start of each block
+    #[event(history)]
+    fn blockStart(blockNum: crate::BlockNum, blockTime: crate::BlockTime) {
         unimplemented!()
     }
 }
