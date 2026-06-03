@@ -21,19 +21,21 @@ namespace psibase
          {
             return 0;
          }
-         std::uint8_t sub;
-         const char*  start = s.data() + pos + subaccountSeparator.size();
-         const char*  end   = s.data() + s.size();
-         auto         res   = std::from_chars(start, end, sub);
-         if (res.ec == std::errc{} && res.ptr == end)
+         std::uint32_t sub   = 0;
+         const char*   start = s.data() + pos + subaccountSeparator.size();
+         const char*   end   = s.data() + s.size();
+         for (; start != end; ++start)
          {
-            s = s.substr(0, pos);
-            return sub;
+            std::uint32_t digit =
+                static_cast<unsigned char>(*start) - static_cast<unsigned char>('0');
+            if (digit >= 10)
+               return 0;
+            sub = sub * 10 + digit;
+            if (sub > 255)
+               return 0;
          }
-         else
-         {
-            return 0;
-         }
+         s = s.substr(0, pos);
+         return sub;
       }
 
       constexpr void subaccount_to_str(std::uint8_t sub, std::string& out)
