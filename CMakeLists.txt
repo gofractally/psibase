@@ -684,7 +684,7 @@ psibase_package(
     NAME AuthDelegate
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Auth service that delegates authorization to another account"
-    SERVICE auth-delegate
+    SERVICE auth-delg
         DATA ${Plugins_OUTPUT_FILE_auth_delegate} /plugin.wasm
     DEPENDS ${Plugins_DEP}
     PACKAGE_DEPENDS "AuthDelegateService(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)" "HttpServer(^${PSIBASE_VERSION}.0)" "Permissions(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)"
