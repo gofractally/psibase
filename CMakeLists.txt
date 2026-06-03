@@ -322,8 +322,8 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Transact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Transact-schema.json
         FLAGS isPrivileged
-        SERVER r-transact
-    SERVICE r-transact
+        SERVER transact☺1
+    SERVICE transact☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RTransact.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RTransact-schema.json
         FLAGS isPrivileged

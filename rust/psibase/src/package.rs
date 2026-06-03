@@ -389,7 +389,7 @@ impl<R: Read + Seek> PackagedService<R> {
         let mut service_files: Vec<(AccountNumber, usize)> = vec![];
         let mut data = vec![];
         let mut meta_index = None;
-        let service_re = Regex::new(r"^service/([-a-zA-Z0-9]*)\.(wasm|json)$")?;
+        let service_re = Regex::new(r"^service/([-a-zA-Z0-9]*(?:☺\d+)?)\.(wasm|json)$")?;
         let data_re = Regex::new(r"^data/([-a-zA-Z0-9]*)/.*$")?;
         for index in 0..archive.len() {
             let raw_file = archive.by_index_raw(index)?;
