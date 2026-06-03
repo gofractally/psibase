@@ -17,6 +17,7 @@ const QueryKey = {
     currentUser: () => ["currentUser"] as const,
     billingConfig: () => ["billingConfig"] as const,
     premPrices: () => ["premPrices"] as const,
+    premMarkets: () => ["premMarkets"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;

@@ -20,3 +20,60 @@ export const zCurrentPricesData = z.object({
         .nullable()
         .transform((rows) => rows ?? []),
 });
+
+export const zMarketParamRow = z.object({
+    length: z
+        .number()
+        .int()
+        .min(MIN_ACCOUNT_NAME_LENGTH)
+        .max(MAX_ACCOUNT_NAME_LENGTH),
+    enabled: z.boolean(),
+});
+
+export const zPremiumMarketsOverviewData = z.object({
+    marketParams: z
+        .array(zMarketParamRow)
+        .nullable()
+        .transform((rows) => rows ?? []),
+    currentPrices: z
+        .array(zCurrentPriceRow)
+        .nullable()
+        .transform((rows) => rows ?? []),
+});
+
+export type PremiumMarketOverviewRow = {
+    length: number;
+    /** Whether a market exists for this name length. */
+    configured: boolean;
+    enabled: boolean;
+    /** Current market price when enabled; otherwise null. */
+    price: string | null;
+};
+
+export function buildPremiumMarketOverviewRows(
+    marketParams: z.infer<typeof zMarketParamRow>[],
+    currentPrices: z.infer<typeof zCurrentPriceRow>[],
+): PremiumMarketOverviewRow[] {
+    const paramsByLength = new Map(
+        marketParams.map((row) => [row.length, row]),
+    );
+    const pricesByLength = new Map(
+        currentPrices.map((row) => [row.length, row.price]),
+    );
+
+    const rows: PremiumMarketOverviewRow[] = [];
+    for (
+        let length = MIN_ACCOUNT_NAME_LENGTH;
+        length <= MAX_ACCOUNT_NAME_LENGTH;
+        length++
+    ) {
+        const param = paramsByLength.get(length);
+        rows.push({
+            length,
+            configured: param !== undefined,
+            enabled: param?.enabled ?? false,
+            price: pricesByLength.get(length) ?? null,
+        });
+    }
+    return rows;
+}

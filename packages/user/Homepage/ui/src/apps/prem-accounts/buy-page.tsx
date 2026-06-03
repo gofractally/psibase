@@ -1,4 +1,5 @@
 import { BuyForm } from "@/apps/prem-accounts/components/buy-form";
+import { PremiumMarketsCard } from "@/apps/prem-accounts/components/premium-markets-card";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
@@ -40,21 +41,24 @@ export const BuyPage = () => {
     }
 
     return (
-        <GlowingCard>
-            <CardHeader>
-                <CardTitle>Buy a premium account name</CardTitle>
-                <CardDescription>
-                    Account names can be up to {MAX_ACCOUNT_NAME_LENGTH}{" "}
-                    characters long, must start with a letter, and can only
-                    contain letters, numbers, and underscores.
-                </CardDescription>
-            </CardHeader>
-            {isLoading ? (
-                <Loader />
-            ) : canCreatePremiumAccount && systemToken && prices ? (
-                <BuyForm systemToken={systemToken} prices={prices} />
-            ) : null}
-        </GlowingCard>
+        <div className="space-y-6">
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Buy a premium account name</CardTitle>
+                    <CardDescription>
+                        Account names can be up to {MAX_ACCOUNT_NAME_LENGTH}{" "}
+                        characters long, must start with a letter, and can only
+                        contain letters, numbers, and underscores.
+                    </CardDescription>
+                </CardHeader>
+                {isLoading ? (
+                    <Loader />
+                ) : canCreatePremiumAccount && systemToken && prices ? (
+                    <BuyForm systemToken={systemToken} prices={prices} />
+                ) : null}
+            </GlowingCard>
+            <PremiumMarketsCard />
+        </div>
     );
 };
 

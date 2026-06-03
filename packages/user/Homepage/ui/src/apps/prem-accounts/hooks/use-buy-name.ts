@@ -36,6 +36,9 @@ export const useBuyName = () => {
                 queryKey: SharedQueryKey.premPrices(),
             });
             void queryClient.invalidateQueries({
+                queryKey: SharedQueryKey.premMarkets(),
+            });
+            void queryClient.invalidateQueries({
                 queryKey: QueryKey.premUnclaimedNames(currentUser),
             });
             void queryClient.invalidateQueries({
