@@ -5,8 +5,8 @@ import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { usePremMarkets } from "@shared/hooks/use-prem-markets";
-import { hasActivePremMarket } from "@shared/lib/schemas/prem-accounts";
 import { premAccounts } from "@shared/lib/plugins";
+import { hasActivePremMarket } from "@shared/lib/schemas/prem-accounts";
 
 import { BuyPage } from "./buy-page";
 import { ClaimPage } from "./claim-page";

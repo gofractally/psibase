@@ -7,12 +7,13 @@ export const PREM_MARKETS_REFETCH_INTERVAL_MS = 1000;
 
 export type UsePremMarketsOptions = {
     refetchInterval?: number | false;
+    enabled?: boolean;
 };
 
 export const usePremMarkets = (options?: UsePremMarketsOptions) =>
     useQuery({
         queryKey: QueryKey.premMarkets(),
         queryFn: fetchPremiumMarketsOverview,
-        refetchInterval:
-            options?.refetchInterval ?? false,
+        refetchInterval: options?.refetchInterval ?? false,
+        enabled: options?.enabled ?? true,
     });
