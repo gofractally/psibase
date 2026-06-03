@@ -14,15 +14,21 @@ import { PremAccountsLayout } from "./layout";
 
 function usePremAccountsSidebarVisibility(): SidebarVisibility {
     const { data: currentUser, isPending: isPendingUser } = useCurrentUser();
-    const { data: markets, isPending: isPendingMarkets } = usePremPrices();
-    const { data: history, isLoading: isLoadingHistory } =
-        useNameEvents(currentUser);
+    const {
+        data: markets,
+        isPending: isPendingMarkets,
+        isSuccess: isSuccessMarkets,
+    } = usePremPrices();
+    const isMarketEnabled = Boolean(markets?.size);
+
+    const { data: history, isLoading: isLoadingHistory } = useNameEvents(
+        currentUser,
+        { enabled: isSuccessMarkets && !isMarketEnabled },
+    );
 
     if (isPendingMarkets) {
         return { visible: false, isLoading: true }; // loading
     }
-
-    const isMarketEnabled = Boolean(markets?.size);
 
     if (isMarketEnabled) {
         return { visible: true, isLoading: false }; // At least one market is enabled; good enough!
