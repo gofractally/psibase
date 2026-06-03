@@ -390,6 +390,7 @@ function(psibase_package)
         COMMAND ${CMAKE_COMMAND} -E remove -f ${_OUTPUT}
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${outdir}/data
         ${copy-contents}
+        COMMAND ls -R ${outdir}
         COMMAND cd ${outdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
     )
     add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
