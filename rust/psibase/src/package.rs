@@ -771,6 +771,12 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
 
+        for account in &self.meta.accounts {
+            if account.is_subaccount() {
+                accounts.push(account.base());
+            }
+        }
+
         for act in &self.postinstall {
             let service = act.service.parse()?;
             accounts.push(act.sender);
