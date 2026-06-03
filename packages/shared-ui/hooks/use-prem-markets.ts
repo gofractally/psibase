@@ -5,9 +5,14 @@ import QueryKey from "@shared/lib/query-keys";
 
 export const PREM_MARKETS_REFETCH_INTERVAL_MS = 1000;
 
-export const usePremMarkets = () =>
+export type UsePremMarketsOptions = {
+    refetchInterval?: number | false;
+};
+
+export const usePremMarkets = (options?: UsePremMarketsOptions) =>
     useQuery({
         queryKey: QueryKey.premMarkets(),
         queryFn: fetchPremiumMarketsOverview,
-        refetchInterval: PREM_MARKETS_REFETCH_INTERVAL_MS,
+        refetchInterval:
+            options?.refetchInterval ?? false,
     });

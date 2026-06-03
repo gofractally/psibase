@@ -1,7 +1,7 @@
 import type { SystemTokenInfo } from "@shared/hooks/use-system-token";
 
 import { useStore } from "@tanstack/react-form";
-import { useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
@@ -9,7 +9,6 @@ import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
 import { useAppForm } from "@shared/components/form/app-form";
 import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { getAccount } from "@shared/lib/get-account";
-import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardAction, CardContent, CardFooter } from "@shared/shadcn/ui/card";
@@ -48,9 +47,34 @@ export function BuyForm({
     systemToken: SystemTokenInfo;
     prices: Map<number, string>;
 }) {
-    const [price, setPrice] = useState<Quantity | null>(null);
-    const [quotedPrice, setQuotedPrice] = useState<Quantity | null>(null);
+    const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
+    const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
+
+    const pricesRef = useRef(prices);
+    pricesRef.current = prices;
+    const isAccountTakenRef = useRef(isAccountTaken);
+    isAccountTakenRef.current = isAccountTaken;
+
+    const resolveLivePrice = useCallback(
+        (rawAccountName: string): Quantity | null => {
+            const parsed = zAccount.safeParse(rawAccountName.trim());
+            if (!parsed.success || isAccountTakenRef.current !== false) {
+                return null;
+            }
+            const canonical = pricesRef.current.get(parsed.data.length);
+            if (!canonical) {
+                return null;
+            }
+            return new Quantity(
+                canonical,
+                systemToken.precision,
+                Number(systemToken.id),
+                systemToken.symbol,
+            );
+        },
+        [systemToken],
+    );
 
     const { mutateAsync: buyName, isPending: isBuying } = useBuyName();
 
@@ -68,7 +92,8 @@ export function BuyForm({
                 return;
             }
 
-            if (!price) {
+            const priceAtSubmit = resolveLivePrice(value.accountName);
+            if (!priceAtSubmit) {
                 form.fieldInfo.accountName.instance?.setErrorMap({
                     onSubmit:
                         "Market price is not available. Check the account name and try again.",
@@ -76,6 +101,7 @@ export function BuyForm({
                 return;
             }
 
+            setConfirmPrice(priceAtSubmit);
             setBuyConfirmOpen(true);
         },
         validators: {
@@ -90,6 +116,8 @@ export function BuyForm({
                 try {
                     const account = await getAccount(value.accountName);
                     taken = Boolean(account?.accountNum);
+                    setIsAccountTaken(taken);
+                    isAccountTakenRef.current = taken;
                 } catch (error) {
                     console.error("Error validating on submit:", error);
                     return {
@@ -100,17 +128,21 @@ export function BuyForm({
                     };
                 }
 
+                const priceAtSubmit = taken
+                    ? null
+                    : resolveLivePrice(value.accountName);
+
                 return {
                     fields: {
                         accountName: taken
                             ? "This account name is not available"
-                            : undefined,
+                            : !priceAtSubmit
+                              ? "Market price is not available for this name."
+                              : undefined,
                         slippage:
                             slippagePercent === null
                                 ? "Enter a valid slippage percentage."
-                                : !price
-                                  ? "Market price is not available for this name."
-                                  : undefined,
+                                : undefined,
                     },
                 };
             },
@@ -127,8 +159,15 @@ export function BuyForm({
     );
     const slippagePercent = parseSlippagePercent(slippageInput);
 
+    const livePrice = useMemo(
+        () => resolveLivePrice(accountName),
+        // Re-run when polled prices or availability change (resolveLivePrice reads refs).
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- prices, isAccountTaken
+        [accountName, prices, isAccountTaken, resolveLivePrice],
+    );
+
     const handleBuy = async () => {
-        if (!price || slippagePercent === null) return;
+        if (!confirmPrice || slippagePercent === null) return;
 
         const name = accountName.trim();
         if (!name) return;
@@ -136,13 +175,18 @@ export function BuyForm({
         try {
             await buyName({
                 accountName: name,
-                maxCost: maxCostFromPriceAndSlippage(price, slippagePercent),
+                maxCost: maxCostFromPriceAndSlippage(
+                    confirmPrice,
+                    slippagePercent,
+                ),
             });
             setBuyConfirmOpen(false);
+            setConfirmPrice(null);
             form.reset();
             form.setFieldValue("slippage", DEFAULT_NAME_PURCHASE_SLIPPAGE);
         } catch (error) {
             setBuyConfirmOpen(false);
+            setConfirmPrice(null);
             const errorMessage =
                 error instanceof Error ? error.message : "Unknown error";
 
@@ -169,9 +213,9 @@ export function BuyForm({
         value: string;
     }) => {
         try {
-            setPrice(null);
+            setIsAccountTaken(null);
             const value = zAccount.parse(rawValue);
-            const isMarketAvailable = prices.has(value.length);
+            const isMarketAvailable = pricesRef.current.has(value.length);
             if (!isMarketAvailable) {
                 throw `${value.length} character account names are not available`;
             }
@@ -190,21 +234,13 @@ export function BuyForm({
         try {
             const value = zAccount.parse(rawValue);
             const account = await getAccount(value);
-            const exists = Boolean(account?.accountNum);
-            if (exists) return "Account name is already taken";
+            const taken = Boolean(account?.accountNum);
+            setIsAccountTaken(taken);
+            if (taken) return "Account name is already taken";
 
-            const freshPrice = await fetchCurrentPriceForLength(value.length);
-            if (!freshPrice) {
+            if (!pricesRef.current.has(value.length)) {
                 return `${value.length} character account names are not available`;
             }
-
-            const priceQuantity = new Quantity(
-                freshPrice,
-                systemToken.precision,
-                Number(systemToken.id),
-                systemToken.symbol,
-            );
-            setPrice(priceQuantity);
         } catch (e) {
             if (e instanceof z.ZodError) return;
             console.error("Failed to validate account name");
@@ -230,9 +266,9 @@ export function BuyForm({
             {([isFieldsValidating]) =>
                 isFieldsValidating ? (
                     <Spinner className="size-3.5 shrink-0" />
-                ) : price ? (
+                ) : livePrice ? (
                     <Label className="text-green-500">
-                        Available for {price.format({ includeLabel: true })}
+                        Available for {livePrice.format({ includeLabel: true })}
                     </Label>
                 ) : undefined
             }
@@ -244,9 +280,6 @@ export function BuyForm({
             <form
                 onSubmit={(event) => {
                     event.preventDefault();
-                    if (price) {
-                        setQuotedPrice(price);
-                    }
                     void form.handleSubmit();
                 }}
             >
@@ -309,19 +342,18 @@ export function BuyForm({
                     </CardFooter>
                 </div>
             </form>
-            {price && slippagePercent !== null ? (
+            {confirmPrice && slippagePercent !== null ? (
                 <BuyNameConfirmationDialog
                     open={buyConfirmOpen}
                     setOpen={(open) => {
                         setBuyConfirmOpen(open);
                         if (!open) {
-                            setQuotedPrice(null);
+                            setConfirmPrice(null);
                         }
                     }}
                     mode="buy-only"
                     account={accountName}
-                    price={price}
-                    previousPrice={quotedPrice}
+                    price={confirmPrice}
                     slippage={slippagePercent}
                     isLoading={isBuying}
                     onConfirm={() => void handleBuy()}

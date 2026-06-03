@@ -1,12 +1,18 @@
+import { useMemo } from "react";
+
 import { BuyForm } from "@/apps/prem-accounts/components/buy-form";
 import { PremiumMarketsCard } from "@/apps/prem-accounts/components/premium-markets-card";
 
 import { ErrorCard } from "@shared/components/error-card";
 import { GlowingCard } from "@shared/components/glowing-card";
 import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
-import { usePremPrices } from "@shared/hooks/use-prem-prices";
+import {
+    PREM_MARKETS_REFETCH_INTERVAL_MS,
+    usePremMarkets,
+} from "@shared/hooks/use-prem-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@shared/lib/schemas/account";
+import { premMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
 import {
     CardContent,
     CardDescription,
@@ -17,7 +23,19 @@ import { Skeleton } from "@shared/shadcn/ui/skeleton";
 
 export const BuyPage = () => {
     const { data: systemToken, isPending: isPendingToken } = useSystemToken();
-    const { data: prices, isPending: isPendingPrices } = usePremPrices();
+    const {
+        data: markets,
+        isPending: isPendingMarkets,
+        isError: isMarketsError,
+        error: marketsError,
+    } = usePremMarkets({
+        refetchInterval: PREM_MARKETS_REFETCH_INTERVAL_MS,
+    });
+
+    const prices = useMemo(
+        () => (markets ? premMarketPricesFromOverview(markets) : undefined),
+        [markets],
+    );
 
     const {
         data: canCreatePremiumAccount,
@@ -25,7 +43,9 @@ export const BuyPage = () => {
     } = useCanCreatePremiumAccount();
 
     const isLoading =
-        isPendingToken || isPendingPrices || isPendingCanCreatePremiumAccount;
+        isPendingToken ||
+        isPendingMarkets ||
+        isPendingCanCreatePremiumAccount;
 
     if (canCreatePremiumAccount === false) {
         return (
@@ -57,7 +77,13 @@ export const BuyPage = () => {
                     <BuyForm systemToken={systemToken} prices={prices} />
                 ) : null}
             </GlowingCard>
-            <PremiumMarketsCard />
+            <PremiumMarketsCard
+                markets={markets}
+                systemToken={systemToken}
+                isPending={isPendingToken || isPendingMarkets}
+                isError={isMarketsError}
+                error={marketsError}
+            />
         </div>
     );
 };
