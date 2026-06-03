@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "tpack☺1")]
 #[allow(non_snake_case)]
 mod service {
     use psibase::*;

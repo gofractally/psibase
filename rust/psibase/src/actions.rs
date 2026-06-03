@@ -11,7 +11,9 @@ macro_rules! account {
 }
 
 pub fn preapprove_action(sender: AccountNumber, account: AccountNumber) -> Option<Action> {
-    if sender == producers::ROOT {
+    if account.is_subaccount() {
+        Some(accounts::Wrapper::pack_from(account.base()).preapproveAcc(account))
+    } else if sender == producers::ROOT {
         Some(accounts::Wrapper::pack().preapproveAcc(account))
     } else {
         None
