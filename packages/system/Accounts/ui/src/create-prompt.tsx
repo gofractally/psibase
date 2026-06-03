@@ -1,5 +1,5 @@
 import { useStore } from "@tanstack/react-form";
-import { useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
 import { prompt } from "@psibase/common-lib";
@@ -9,11 +9,15 @@ import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { useBranding } from "@shared/hooks/use-branding";
 import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
+import {
+    PREM_MARKETS_REFETCH_INTERVAL_MS,
+    usePremMarkets,
+} from "@shared/hooks/use-prem-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
-import { fetchCurrentPriceForLength } from "@shared/lib/graphql/prem-accounts";
 import { Quantity } from "@shared/lib/quantity";
+import { premMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_FREE_ACCOUNT_NAME_LENGTH,
@@ -55,8 +59,8 @@ export const CreatePrompt = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [acknowledged, setAcknowledged] = useState(false);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
-    const [price, setPrice] = useState<Quantity | null>(null);
-    const [quotedPrice, setQuotedPrice] = useState<Quantity | null>(null);
+    const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
+    const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
 
     const { data: networkName } = useBranding();
     const { data: systemToken, isPending: isPendingSystemToken } =
@@ -66,7 +70,56 @@ export const CreatePrompt = () => {
         data: canCreatePremiumAccount,
         isPending: isPendingCanCreatePremiumAccount,
     } = useCanCreatePremiumAccount();
-    const isLoading = isPendingSystemToken || isPendingCanCreatePremiumAccount;
+
+    const { data: markets, isPending: isPendingMarkets } = usePremMarkets({
+        enabled: Boolean(canCreatePremiumAccount),
+        refetchInterval: canCreatePremiumAccount
+            ? PREM_MARKETS_REFETCH_INTERVAL_MS
+            : false,
+    });
+
+    const prices = useMemo(
+        () =>
+            markets ? premMarketPricesFromOverview(markets) : new Map<number, string>(),
+        [markets],
+    );
+
+    const pricesRef = useRef(prices);
+    pricesRef.current = prices;
+    const isAccountTakenRef = useRef(isAccountTaken);
+    isAccountTakenRef.current = isAccountTaken;
+
+    const resolveLivePrice = useCallback(
+        (rawAccountName: string): Quantity | null => {
+            if (!canCreatePremiumAccount || !systemToken) {
+                return null;
+            }
+            const parsed = zAccount.safeParse(rawAccountName.trim());
+            if (
+                !parsed.success ||
+                isAccountTakenRef.current !== false ||
+                parsed.data.length >= MIN_FREE_ACCOUNT_NAME_LENGTH
+            ) {
+                return null;
+            }
+            const canonical = pricesRef.current.get(parsed.data.length);
+            if (!canonical) {
+                return null;
+            }
+            return new Quantity(
+                canonical,
+                systemToken.precision,
+                Number(systemToken.id),
+                systemToken.symbol,
+            );
+        },
+        [canCreatePremiumAccount, systemToken],
+    );
+
+    const isLoading =
+        isPendingSystemToken ||
+        isPendingCanCreatePremiumAccount ||
+        (canCreatePremiumAccount && isPendingMarkets);
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
@@ -85,17 +138,33 @@ export const CreatePrompt = () => {
             }),
             onSubmitAsync: async ({ value }) => {
                 const account = await getAccount(value.account);
+                const taken = Boolean(account?.accountNum);
+                setIsAccountTaken(taken);
+                isAccountTakenRef.current = taken;
+
+                const priceAtSubmit = taken
+                    ? null
+                    : resolveLivePrice(value.account);
+
                 return {
                     fields: {
-                        account: account
+                        account: taken
                             ? "This account name is not available"
-                            : undefined,
+                            : canCreatePremiumAccount &&
+                                zAccount.safeParse(value.account.trim()).success &&
+                                value.account.trim().length <
+                                    MIN_FREE_ACCOUNT_NAME_LENGTH &&
+                                !priceAtSubmit
+                              ? "Market price is not available for this name."
+                              : undefined,
                     },
                 };
             },
         },
         onSubmit: async (data) => {
-            if (price) {
+            const priceAtSubmit = resolveLivePrice(data.value.account);
+            if (priceAtSubmit) {
+                setConfirmPrice(priceAtSubmit);
                 setBuyConfirmOpen(true);
                 return;
             }
@@ -106,12 +175,13 @@ export const CreatePrompt = () => {
     const handleCreateOrBuy = async (account: string) => {
         const name = account.trim();
         if (!name) return;
+        const purchasePrice = confirmPrice;
         try {
             let privateKey: string;
-            if (price) {
+            if (purchasePrice) {
                 privateKey = await purchaseAccountMutation.mutateAsync([
                     name,
-                    price
+                    purchasePrice
                         .multiply(1 + DEFAULT_NAME_PURCHASE_SLIPPAGE / 100)
                         .format({
                             includeLabel: false,
@@ -124,9 +194,11 @@ export const CreatePrompt = () => {
             }
             setKey(pemToB64(privateKey));
             setBuyConfirmOpen(false);
+            setConfirmPrice(null);
             setStep("2_SAVE");
         } catch (error) {
             setBuyConfirmOpen(false);
+            setConfirmPrice(null);
             console.error("Failed to secure account:");
             console.error(
                 error instanceof Error ? error.message : "Unknown error",
@@ -164,6 +236,12 @@ export const CreatePrompt = () => {
     const createdAccount = useStore(
         createForm.store,
         (state) => state.values.account,
+    );
+
+    const livePrice = useMemo(
+        () => resolveLivePrice(createdAccount),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- prices, isAccountTaken
+        [createdAccount, prices, isAccountTaken, resolveLivePrice],
     );
 
     const importForm = useAppForm({
@@ -232,6 +310,30 @@ export const CreatePrompt = () => {
         return <Loader />;
     }
 
+    const validateAccountOnChange = ({
+        value: rawValue,
+    }: {
+        value: string;
+    }) => {
+        if (!canCreatePremiumAccount) {
+            return;
+        }
+        try {
+            setIsAccountTaken(null);
+            const value = zAccount.parse(rawValue);
+            if (value.length >= MIN_FREE_ACCOUNT_NAME_LENGTH) {
+                return;
+            }
+            if (!pricesRef.current.has(value.length)) {
+                return `${value.length} character account names are not available`;
+            }
+        } catch (e) {
+            if (e instanceof z.ZodError) return;
+            if (typeof e === "string") return e;
+            console.error("Failed to validate account name:", e);
+        }
+    };
+
     const validateAccountOnChangeAsync = async ({
         value: rawValue,
     }: {
@@ -241,29 +343,18 @@ export const CreatePrompt = () => {
             const value = accountValidator.parse(rawValue);
 
             const account = await getAccount(value);
-            const exists = Boolean(account?.accountNum);
-            if (exists) return "Account name is already taken";
+            const taken = Boolean(account?.accountNum);
+            setIsAccountTaken(taken);
+            isAccountTakenRef.current = taken;
+            if (taken) return "Account name is already taken";
 
             if (
                 canCreatePremiumAccount &&
                 value.length < MIN_FREE_ACCOUNT_NAME_LENGTH
             ) {
-                const freshPrice = await fetchCurrentPriceForLength(
-                    value.length,
-                );
-                if (!freshPrice) {
+                if (!pricesRef.current.has(value.length)) {
                     return `${value.length} character account names are not available`;
                 }
-
-                if (!systemToken) throw new Error("System token not found");
-
-                const priceQuantity = new Quantity(
-                    freshPrice,
-                    systemToken.precision,
-                    Number(systemToken.id),
-                    systemToken.symbol,
-                );
-                setPrice(priceQuantity);
             }
         } catch (e) {
             if (e instanceof z.ZodError) return;
@@ -278,9 +369,9 @@ export const CreatePrompt = () => {
             {([isFieldsValidating]) =>
                 isFieldsValidating ? (
                     <Spinner className="size-3.5 shrink-0" />
-                ) : price ? (
+                ) : livePrice ? (
                     <Label className="text-green-500">
-                        Market price: {price.format({ includeLabel: true })}
+                        Available for {livePrice.format({ includeLabel: true })}
                     </Label>
                 ) : undefined
             }
@@ -302,10 +393,7 @@ export const CreatePrompt = () => {
                         id="create-account-form"
                         onSubmit={(e) => {
                             e.preventDefault();
-                            if (price) {
-                                setQuotedPrice(price);
-                            }
-                            createForm.handleSubmit();
+                            void createForm.handleSubmit();
                         }}
                         className="flex flex-col gap-6"
                     >
@@ -334,10 +422,7 @@ export const CreatePrompt = () => {
                                 )}
                                 asyncDebounceMs={500}
                                 validators={{
-                                    onChange: () => {
-                                        if (canCreatePremiumAccount)
-                                            setPrice(null);
-                                    },
+                                    onChange: validateAccountOnChange,
                                     onChangeAsync: validateAccountOnChangeAsync,
                                 }}
                             />
@@ -346,12 +431,12 @@ export const CreatePrompt = () => {
                             <CardAction>
                                 <createForm.SubmitButton
                                     labels={
-                                        price
+                                        livePrice
                                             ? ["Buy now", "Buying..."]
                                             : ["Create", "Creating..."]
                                     }
                                     disabled={
-                                        price
+                                        livePrice
                                             ? purchaseAccountMutation.isPending
                                             : false
                                     }
@@ -359,22 +444,21 @@ export const CreatePrompt = () => {
                             </CardAction>
                         </CardFooter>
                     </form>
-                    {price ? (
+                    {confirmPrice ? (
                         <BuyNameConfirmationDialog
                             open={buyConfirmOpen}
                             setOpen={(open) => {
                                 setBuyConfirmOpen(open);
                                 if (!open) {
-                                    setQuotedPrice(null);
+                                    setConfirmPrice(null);
                                 }
                             }}
                             mode="buy-and-claim"
                             account={createdAccount}
-                            price={price}
-                            previousPrice={quotedPrice}
+                            price={confirmPrice}
                             slippage={DEFAULT_NAME_PURCHASE_SLIPPAGE}
                             isLoading={purchaseAccountMutation.isPending}
-                            onConfirm={() => handleCreateOrBuy(createdAccount)}
+                            onConfirm={() => void handleCreateOrBuy(createdAccount)}
                         />
                     ) : null}
                 </createForm.AppForm>
