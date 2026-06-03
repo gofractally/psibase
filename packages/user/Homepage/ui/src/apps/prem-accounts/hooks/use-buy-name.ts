@@ -33,9 +33,6 @@ export const useBuyName = () => {
                 id: context.toastId,
             });
             void queryClient.invalidateQueries({
-                queryKey: SharedQueryKey.premPrices(),
-            });
-            void queryClient.invalidateQueries({
                 queryKey: SharedQueryKey.premMarkets(),
             });
             void queryClient.invalidateQueries({

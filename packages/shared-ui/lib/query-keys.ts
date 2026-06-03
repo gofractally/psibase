@@ -16,7 +16,6 @@ const QueryKey = {
     contacts: (user: string | undefined | null) => ["contacts", user] as const,
     currentUser: () => ["currentUser"] as const,
     billingConfig: () => ["billingConfig"] as const,
-    premPrices: () => ["premPrices"] as const,
     premMarkets: () => ["premMarkets"] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 

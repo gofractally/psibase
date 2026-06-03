@@ -6,8 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { formatCanonicalPrice } from "@/apps/prem-accounts/lib/format-token";
 
 import { GlowingCard } from "@shared/components/glowing-card";
-import { usePremMarkets } from "@shared/hooks/use-prem-markets";
-import { useSystemToken } from "@shared/hooks/use-system-token";
 import { Quantity } from "@shared/lib/quantity";
 import { cn } from "@shared/lib/utils";
 import { Badge } from "@shared/shadcn/ui/badge";
@@ -121,17 +119,21 @@ function PriceCell({
     );
 }
 
-export function PremiumMarketsCard() {
-    const { data: systemToken, isPending: isPendingToken } = useSystemToken();
-    const {
-        data: markets,
-        isPending: isPendingMarkets,
-        isError,
-        error,
-    } = usePremMarkets();
+type PremiumMarketsCardProps = {
+    markets: PremiumMarketOverviewRow[] | undefined;
+    systemToken: SystemTokenInfo | null | undefined;
+    isPending: boolean;
+    isError: boolean;
+    error: Error | null;
+};
 
-    const isLoading = isPendingToken || isPendingMarkets;
-
+export function PremiumMarketsCard({
+    markets,
+    systemToken,
+    isPending,
+    isError,
+    error,
+}: PremiumMarketsCardProps) {
     return (
         <GlowingCard>
             <CardHeader>
@@ -139,7 +141,7 @@ export function PremiumMarketsCard() {
                 <CardDescription>Live prices by name length.</CardDescription>
             </CardHeader>
             <CardContent>
-                {isLoading ? (
+                {isPending ? (
                     <MarketsTableSkeleton />
                 ) : isError ? (
                     <p className="text-destructive text-sm">

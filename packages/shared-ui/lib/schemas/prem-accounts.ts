@@ -77,3 +77,22 @@ export function buildPremiumMarketOverviewRows(
     }
     return rows;
 }
+
+/** Sparse map of name length → current ask (enabled markets only). */
+export function premMarketPricesFromOverview(
+    markets: PremiumMarketOverviewRow[],
+): Map<number, string> {
+    const prices = new Map<number, string>();
+    for (const row of markets) {
+        if (row.price !== null) {
+            prices.set(row.length, row.price);
+        }
+    }
+    return prices;
+}
+
+export function hasActivePremMarket(
+    markets: PremiumMarketOverviewRow[] | undefined,
+): boolean {
+    return markets?.some((row) => row.price !== null) ?? false;
+}

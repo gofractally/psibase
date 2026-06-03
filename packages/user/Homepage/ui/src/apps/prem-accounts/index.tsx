@@ -4,7 +4,8 @@ import { History, Package, ShoppingCart, Store } from "lucide-react";
 import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
-import { usePremPrices } from "@shared/hooks/use-prem-prices";
+import { usePremMarkets } from "@shared/hooks/use-prem-markets";
+import { hasActivePremMarket } from "@shared/lib/schemas/prem-accounts";
 import { premAccounts } from "@shared/lib/plugins";
 
 import { BuyPage } from "./buy-page";
@@ -18,8 +19,8 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
         data: markets,
         isPending: isPendingMarkets,
         isSuccess: isSuccessMarkets,
-    } = usePremPrices();
-    const isMarketEnabled = Boolean(markets?.size);
+    } = usePremMarkets();
+    const isMarketEnabled = hasActivePremMarket(markets);
 
     const { data: history, isLoading: isLoadingHistory } = useNameEvents(
         currentUser,
