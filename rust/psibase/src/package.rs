@@ -667,14 +667,18 @@ impl<R: Read + Seek> PackagedService<R> {
         Ok(())
     }
 
-    pub fn install_accounts(
+    pub fn install_account_group(
         &mut self,
         actions: &mut Vec<Vec<Action>>,
-        mut uploader: Option<&mut StagedUpload>,
+        mut uploader: &mut Option<&mut StagedUpload>,
         sender: AccountNumber,
+        subaccounts: bool,
     ) -> Result<(), anyhow::Error> {
         // service accounts
         for (account, index, info) in &self.services {
+            if account.is_subaccount() != subaccounts {
+                continue;
+            }
             let mut group = vec![];
             self.create_account(*account, sender, &mut group)?;
             let code = read(&mut self.archive.by_index(*index)?)?;
@@ -710,6 +714,9 @@ impl<R: Read + Seek> PackagedService<R> {
         }
         // extra accounts
         for account in self.get_accounts() {
+            if account.is_subaccount() != subaccounts {
+                continue;
+            }
             if !self.has_service(*account) {
                 let mut group = vec![];
                 self.create_account(*account, sender, &mut group)?;
@@ -717,6 +724,16 @@ impl<R: Read + Seek> PackagedService<R> {
             }
         }
         Ok(())
+    }
+
+    pub fn install_accounts(
+        &mut self,
+        actions: &mut Vec<Vec<Action>>,
+        mut uploader: Option<&mut StagedUpload>,
+        sender: AccountNumber,
+    ) -> Result<(), anyhow::Error> {
+        self.install_account_group(actions, &mut uploader, sender, false)?;
+        self.install_account_group(actions, &mut uploader, sender, true)
     }
 
     // TODO: handle recovery from partial install
