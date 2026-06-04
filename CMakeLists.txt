@@ -351,9 +351,9 @@ psibase_package(
     SERVICE accounts
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Accounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Accounts-schema.json
-        SERVER r-accounts
+        SERVER accounts☺1
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Accounts/postinstall.json
-    SERVICE r-accounts
+    SERVICE accounts☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAccounts.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAccounts-schema.json
     DEPENDS wasm
@@ -612,8 +612,8 @@ psibase_package(
     SERVICE auth-sig
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthSig-schema.json
-        SERVER r-auth-sig
-    SERVICE r-auth-sig
+        SERVER auth-sig☺1
+    SERVICE auth-sig☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthSig-schema.json
     SERVICE verify-sig
@@ -671,8 +671,8 @@ psibase_package(
     SERVICE auth-delg
         WASM ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/AuthDelegate-schema.json
-        SERVER r-auth-dlg
-    SERVICE r-auth-dlg
+        SERVER auth-delg☺1
+    SERVICE auth-delg☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RAuthDelegate-schema.json
     DEPENDS wasm
@@ -747,8 +747,8 @@ psibase_package(
     SERVICE dyn-ld
         WASM ${CMAKE_CURRENT_BINARY_DIR}/DynLd.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/DynLd-schema.json
-        SERVER r-dyn-ld
-    SERVICE r-dyn-ld
+        SERVER dyn-ld☺1
+    SERVICE dyn-ld☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RDynLd.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RDynLd-schema.json
     PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)"
@@ -817,8 +817,8 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Producers-schema.json
         DATA ${Plugins_OUTPUT_FILE_producers} /plugin.wasm
         FLAGS isPrivileged
-        SERVER r-prods
-    SERVICE r-prods
+        SERVER producers☺1
+    SERVICE producers☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RProducers.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RProducers-schema.json
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/system/Producers/src/postinstall.json
@@ -834,9 +834,9 @@ psibase_package(
     SERVICE http
         WASM ${CMAKE_CURRENT_BINARY_DIR}/HttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/HttpServer-schema.json
-        SERVER r-http
+        SERVER http☺1
         FLAGS isPrivileged
-    SERVICE r-http
+    SERVICE http☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RHttpServer-schema.json
     DEPENDS wasm
@@ -852,9 +852,9 @@ psibase_package(
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/SetCode-schema.json
         DATA ${Plugins_OUTPUT_FILE_setcode} /plugin.wasm
         FLAGS isPrivileged
-        SERVER r-setcode
+        SERVER setcode☺1
         INIT
-    SERVICE r-setcode
+    SERVICE setcode☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RSetCode.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RSetCode-schema.json
     DEPENDS wasm
@@ -870,11 +870,11 @@ psibase_package(
     SERVICE events
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Events-schema.json
-        SERVER r-events
+        SERVER events☺1
     SERVICE event-idx
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
-    SERVICE r-events
+    SERVICE events☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/REvents.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/REvents-schema.json
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Events/src/postinstall.json
@@ -906,9 +906,9 @@ psibase_package(
     SERVICE invite
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Invite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Invite-schema.json
-        SERVER r-invite
+        SERVER invite☺1
         INIT
-    SERVICE r-invite
+    SERVICE invite☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RInvite.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RInvite-schema.json
     DEPENDS wasm
@@ -1053,9 +1053,9 @@ psibase_package(
     SERVICE packages
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Packages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Packages-schema.json
-        SERVER r-packages
+        SERVER packages☺1
         DATA ${Plugins_OUTPUT_FILE_packages} /plugin.wasm
-    SERVICE r-packages
+    SERVICE packages☺1
         WASM ${CMAKE_CURRENT_BINARY_DIR}/RPackages.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/RPackages-schema.json
     DEPENDS wasm ${Plugins_DEP}

@@ -387,7 +387,7 @@ mod tests {
         initial_setup(&chain)?;
 
         http_server::Wrapper::push_from(&chain, invite)
-            .registerServer(account!("r-invite"))
+            .registerServer(account!("invite☺1"))
             .get()?;
         chain.finish_block();
 

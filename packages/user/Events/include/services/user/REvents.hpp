@@ -10,7 +10,7 @@ namespace UserService
 {
    struct REvents : psibase::Service
    {
-      static constexpr psibase::AccountNumber service{"r-events"};
+      static constexpr psibase::AccountNumber service{"events☺1"};
 
       // Synchronous calls between other services
       std::vector<char> sqlQuery(const std::string& query, const std::vector<std::string>& params);

@@ -9,7 +9,7 @@ namespace SystemService
       class RAuthSig : public psibase::Service
       {
         public:
-         static constexpr auto service = psibase::AccountNumber("r-auth-sig");
+         static constexpr auto service = psibase::AccountNumber("auth-sig☺1");
 
          auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
       };

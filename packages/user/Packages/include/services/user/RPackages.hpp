@@ -8,7 +8,7 @@ namespace UserService
    class RPackages : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("r-packages");
+      static constexpr auto service = psibase::AccountNumber("packages☺1");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };

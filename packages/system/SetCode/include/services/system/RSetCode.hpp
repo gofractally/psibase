@@ -7,7 +7,7 @@ namespace SystemService
 {
    struct RSetCode : psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber("r-setcode");
+      static constexpr auto service = psibase::AccountNumber("setcode☺1");
 
       /// Sets the flags that a particular service must be run with
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest req);

@@ -991,7 +991,7 @@ namespace psibase
             printf("]\n");
          }
 
-         auto json_str = to<EventQueryInterface>("r-events"_a).sqlQuery(query, params);
+         auto json_str = to<EventQueryInterface>("events☺1"_a).sqlQuery(query, params);
 
          if (debug)
          {
