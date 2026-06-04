@@ -1,4 +1,4 @@
-#[psibase::service(name = "r-tok-strm")]
+#[psibase::service(name = "tok-stream☺1")]
 #[allow(non_snake_case)]
 mod service {
     use ::token_stream::tables::{Stream, StreamTable};

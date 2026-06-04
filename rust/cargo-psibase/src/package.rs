@@ -428,9 +428,15 @@ impl<'a> PackageBuilder<'a> {
                 out.start_file("meta.json", options)?;
                 write!(out, "{}", &serde_json::to_string(&meta)?)?;
                 for (service, info, path) in service_wasms {
-                    out.start_file(format!("service/{}.wasm", service), options)?;
+                    out.start_file(
+                        format!("service/{}.wasm", service).replace("☺", "/"),
+                        options,
+                    )?;
                     std::io::copy(&mut File::open(path)?, &mut out)?;
-                    out.start_file(format!("service/{}.json", service), options)?;
+                    out.start_file(
+                        format!("service/{}.json", service).replace("☺", "/"),
+                        options,
+                    )?;
                     write!(out, "{}", &serde_json::to_string(&info)?)?;
                 }
                 for (service, dest, src) in data_files {
