@@ -5,14 +5,16 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
+import { useUserTokenBalances } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
-import { CardAction, CardContent, CardFooter } from "@shared/shadcn/ui/card";
-import { Label } from "@shared/shadcn/ui/label";
+import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
+import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 const DEFAULT_NAME_PURCHASE_SLIPPAGE = "5";
@@ -47,6 +49,16 @@ export function BuyForm({
     systemToken: SystemTokenInfo;
     prices: Map<number, string>;
 }) {
+    const { data: currentUser } = useCurrentUser();
+    const { data: tokenBalances, isPending: isPendingBalances } =
+        useUserTokenBalances(currentUser);
+
+    const availableBalance = useMemo(() => {
+        return tokenBalances?.find(
+            (token) => token.id === Number(systemToken.id),
+        )?.balance;
+    }, [tokenBalances, systemToken.id]);
+
     const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
     const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
@@ -166,6 +178,16 @@ export function BuyForm({
         [accountName, prices, isAccountTaken, resolveLivePrice],
     );
 
+    const hasInsufficientFunds = useMemo(() => {
+        if (!livePrice || isPendingBalances) {
+            return false;
+        }
+        if (!availableBalance) {
+            return true;
+        }
+        return availableBalance.isLessThan(livePrice);
+    }, [livePrice, availableBalance, isPendingBalances]);
+
     const handleBuy = async () => {
         if (!confirmPrice || slippagePercent === null) return;
 
@@ -261,16 +283,18 @@ export function BuyForm({
         }
     };
 
-    const priceLabel = () => (
+    const priceEndContent = () => (
         <form.Subscribe selector={(state) => [state.isFieldsValidating]}>
             {([isFieldsValidating]) =>
                 isFieldsValidating ? (
-                    <Spinner className="size-3.5 shrink-0" />
+                    <span className="shrink-0 pr-3 text-green-500">
+                        <Spinner className="size-3.5 shrink-0" />
+                    </span>
                 ) : livePrice ? (
-                    <Label className="text-green-500">
-                        Available for {livePrice.format({ includeLabel: true })}
-                    </Label>
-                ) : undefined
+                    <span className="shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums text-green-500">
+                        Costs {livePrice.format({ includeLabel: true })}
+                    </span>
+                ) : null
             }
         </form.Subscribe>
     );
@@ -302,7 +326,7 @@ export function BuyForm({
                                             autoComplete="off"
                                             autoCorrect="off"
                                             spellCheck={false}
-                                            rightLabel={priceLabel()}
+                                            endContent={priceEndContent()}
                                         />
                                     )}
                                 />
@@ -322,7 +346,7 @@ export function BuyForm({
                                             autoComplete="off"
                                             inputMode="decimal"
                                             endContent={
-                                                <span className="pr-3 text-sm">
+                                                <span className="text-muted-foreground pr-3 text-sm">
                                                     %
                                                 </span>
                                             }
@@ -332,13 +356,20 @@ export function BuyForm({
                             </div>
                         </div>
                     </CardContent>
-                    <CardFooter>
-                        <CardAction className="flex w-full justify-end">
-                            <form.SubmitButton
-                                labels={["Buy", "Processing"]}
-                                disabled={isBuying}
-                            />
-                        </CardAction>
+                    <CardFooter className="flex w-full items-center justify-between gap-4">
+                        <AvailableBalanceLabel
+                            systemToken={systemToken}
+                            balance={availableBalance}
+                            isPending={isPendingBalances}
+                        />
+                        <form.SubmitButton
+                            labels={
+                                hasInsufficientFunds
+                                    ? ["Insufficient funds", "Processing"]
+                                    : ["Buy", "Processing"]
+                            }
+                            disabled={isBuying || hasInsufficientFunds}
+                        />
                     </CardFooter>
                 </div>
             </form>
@@ -360,5 +391,31 @@ export function BuyForm({
                 />
             ) : null}
         </form.AppForm>
+    );
+}
+
+function AvailableBalanceLabel({
+    systemToken,
+    balance,
+    isPending,
+}: {
+    systemToken: SystemTokenInfo;
+    balance: Quantity | undefined;
+    isPending: boolean;
+}) {
+    if (isPending) {
+        return <Skeleton className="h-4 w-40" />;
+    }
+
+    const formattedBalance =
+        balance?.format({ includeLabel: true }) ?? `0 ${systemToken.symbol}`;
+
+    return (
+        <p className="text-muted-foreground text-sm tabular-nums">
+            Available balance:{" "}
+            <span className="text-foreground/90 font-medium">
+                {formattedBalance}
+            </span>
+        </p>
     );
 }
