@@ -280,12 +280,12 @@ namespace psibase
             if (name.ends_with(".wasm"))
             {
                name.remove_suffix(5);
-               service_files.push_back({AccountNumber{name}, file});
+               service_files.push_back({AccountNumber::withSeparator(name, "/"), file});
             }
             else if (name.ends_with(".json"))
             {
                name.remove_suffix(5);
-               info_files.insert({AccountNumber{name}, file});
+               info_files.insert({AccountNumber::withSeparator(name, "/"), file});
             }
          }
          else if (file.filename.starts_with("data/") && file.isFile())

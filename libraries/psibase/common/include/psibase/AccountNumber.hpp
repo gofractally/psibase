@@ -45,6 +45,11 @@ namespace psibase
       {
       }
 
+      static constexpr AccountNumber withSeparator(std::string_view s, std::string_view sep)
+      {
+         return AccountNumber{name_to_number(s, sep)};
+      }
+
       constexpr Subaccount subaccount() const { return value & subaccountMask; }
 
       constexpr AccountNumber base() const { return AccountNumber{value & ~subaccountMask}; }

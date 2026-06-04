@@ -269,14 +269,15 @@ function(psibase_package)
             if (_SERVER_${service})
                 check_account_names(${_SERVER_${service}})
             endif()
+            string(REPLACE "☺" "/" service-basename ${service})
             write_service_info(
-                OUTPUT ${outdir}/service/${service}.json
+                OUTPUT ${outdir}/service/${service-basename}.json
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
                 SCHEMA ${_SCHEMA_${service}}
                 DEPENDS ${schema-target}
             )
-            list(APPEND zip-deps ${outdir}/service/${service}.json)
+            list(APPEND zip-deps ${outdir}/service/${service-basename}.json)
             if(_INIT_${service})
                 list(APPEND init-services ${service})
             endif()
@@ -287,8 +288,8 @@ function(psibase_package)
                 set(wasm ${_WASM_${service}})
                 list(APPEND zip-deps ${wasm})
             endif()
-            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service}.wasm)
-            list(APPEND contents service/${service}.wasm service/${service}.json)
+            list(APPEND copy-contents COMMAND ln -f ${wasm} ${outdir}/service/${service-basename}.wasm)
+            list(APPEND contents service/${service-basename}.wasm service/${service-basename}.json)
         endif()
         if(_DATA_${service})
             set(commands)
@@ -390,7 +391,6 @@ function(psibase_package)
         COMMAND ${CMAKE_COMMAND} -E remove -f ${_OUTPUT}
         COMMAND ${CMAKE_COMMAND} -E remove_directory ${outdir}/data
         ${copy-contents}
-        COMMAND ls -R ${outdir}
         COMMAND cd ${outdir} && ${CMAKE_COMMAND} -E tar cf ${_OUTPUT} --format=zip ${contents}
     )
     add_custom_target(${_NAME} ALL DEPENDS ${_OUTPUT})
