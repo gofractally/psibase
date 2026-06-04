@@ -7,6 +7,7 @@ import { prompt } from "@psibase/common-lib";
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { useBranding } from "@shared/hooks/use-branding";
 import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
 import {
@@ -17,13 +18,13 @@ import { useSystemToken } from "@shared/hooks/use-system-token";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
-import { premMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_FREE_ACCOUNT_NAME_LENGTH,
     zAccount,
     zAccountFree,
 } from "@shared/lib/schemas/account";
+import { premMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
 import { Button } from "@shared/shadcn/ui/button";
 import {
     CardAction,
@@ -37,8 +38,6 @@ import { Input } from "@shared/shadcn/ui/input";
 import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 import { Spinner } from "@shared/shadcn/ui/spinner";
-
-import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 
 import { CopyButton } from "./components/copy-button";
 import { Loader } from "./components/create-prompt/loader";
@@ -80,7 +79,9 @@ export const CreatePrompt = () => {
 
     const prices = useMemo(
         () =>
-            markets ? premMarketPricesFromOverview(markets) : new Map<number, string>(),
+            markets
+                ? premMarketPricesFromOverview(markets)
+                : new Map<number, string>(),
         [markets],
     );
 
@@ -151,7 +152,8 @@ export const CreatePrompt = () => {
                         account: taken
                             ? "This account name is not available"
                             : canCreatePremiumAccount &&
-                                zAccount.safeParse(value.account.trim()).success &&
+                                zAccount.safeParse(value.account.trim())
+                                    .success &&
                                 value.account.trim().length <
                                     MIN_FREE_ACCOUNT_NAME_LENGTH &&
                                 !priceAtSubmit
@@ -368,16 +370,18 @@ export const CreatePrompt = () => {
         }
     };
 
-    const priceLabel = () => (
+    const priceEndContent = () => (
         <createForm.Subscribe selector={(state) => [state.isFieldsValidating]}>
             {([isFieldsValidating]) =>
                 isFieldsValidating ? (
-                    <Spinner className="size-3.5 shrink-0" />
+                    <span className="shrink-0 pr-3 text-green-500">
+                        <Spinner className="size-3.5 shrink-0" />
+                    </span>
                 ) : livePrice ? (
-                    <Label className="text-green-500">
-                        Available for {livePrice.format({ includeLabel: true })}
-                    </Label>
-                ) : undefined
+                    <span className="shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums text-green-500">
+                        Costs {livePrice.format({ includeLabel: true })}
+                    </span>
+                ) : null
             }
         </createForm.Subscribe>
     );
@@ -421,7 +425,7 @@ export const CreatePrompt = () => {
                                         autoComplete="off"
                                         autoCorrect="off"
                                         spellCheck={false}
-                                        rightLabel={priceLabel()}
+                                        endContent={priceEndContent()}
                                     />
                                 )}
                                 asyncDebounceMs={500}
@@ -462,7 +466,9 @@ export const CreatePrompt = () => {
                             price={confirmPrice}
                             slippage={DEFAULT_NAME_PURCHASE_SLIPPAGE}
                             isLoading={purchaseAccountMutation.isPending}
-                            onConfirm={() => void handleCreateOrBuy(createdAccount)}
+                            onConfirm={() =>
+                                void handleCreateOrBuy(createdAccount)
+                            }
                         />
                     ) : null}
                 </createForm.AppForm>

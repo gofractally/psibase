@@ -41,6 +41,9 @@ export const useBuyName = () => {
             void queryClient.invalidateQueries({
                 queryKey: QueryKey.premNameEvents(currentUser),
             });
+            void queryClient.invalidateQueries({
+                queryKey: QueryKey.userTokenBalances(currentUser),
+            });
         },
         onError: (error, _, context) => {
             let message = error.message;
