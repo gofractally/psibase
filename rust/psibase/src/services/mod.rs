@@ -12,6 +12,7 @@ pub mod cpu_limit;
 pub mod credentials;
 pub mod db;
 pub mod diff_adjust;
+pub mod dyn_ld;
 pub mod evaluations;
 pub mod events;
 pub mod fractals;

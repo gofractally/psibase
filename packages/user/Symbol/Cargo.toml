@@ -13,9 +13,12 @@ package-name = "Symbol"
 services = ["symbol"]
 
 [package.metadata.psibase.dependencies]
+Host = "0.23.0"
 HttpServer = "0.23.0"
+Permissions = "0.23.0"
 Sites = "0.23.0"
 Tokens = "0.23.0"
+Transact = "0.23.0"
 Nft = "0.23.0"
 DiffAdjust = "0.23.0"
 

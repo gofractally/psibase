@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <psio/check.hpp>
 #include <span>
