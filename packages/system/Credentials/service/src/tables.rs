@@ -1,7 +1,11 @@
 #[psibase::service_tables]
 pub mod tables {
     use psibase::fracpack::{Pack, Unpack};
-    use psibase::services::transact::Wrapper as Transact;
+    use psibase::services::{
+        nft::{NftHolderFlags, Wrapper as Nft},
+        tokens::{BalanceFlags, Wrapper as Tokens},
+        transact::Wrapper as Transact,
+    };
     use psibase::{Checksum256, *};
     use serde::{Deserialize, Serialize};
 
@@ -20,6 +24,12 @@ pub mod tables {
                 return;
             }
             table.put(&InitRow {}).unwrap();
+
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+
+            Nft::call_as(crate::CRED_SYS).setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
+            Tokens::call_as(crate::CRED_SYS).setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
         }
     }
 

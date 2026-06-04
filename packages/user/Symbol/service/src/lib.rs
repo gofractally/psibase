@@ -283,11 +283,12 @@ pub mod tables {
 pub mod service {
     use crate::tables::{InitRow, InitTable, Mapping, Symbol, SymbolLength};
     use psibase::services::symbol::SID;
-    use psibase::services::tokens::{Quantity, TID};
+    use psibase::services::tokens::{BalanceFlags, Quantity, TID};
     use psibase::*;
 
     use psibase::services::events;
 
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nft};
     use psibase::services::tokens::Wrapper as Tokens;
 
     #[action]
@@ -296,6 +297,9 @@ pub mod service {
 
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table.put(&InitRow {}).unwrap();
+
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(
