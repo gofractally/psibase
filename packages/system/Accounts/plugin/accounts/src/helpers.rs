@@ -121,48 +121,19 @@ pub fn premium_market_ask(account_name: &str) -> Result<String, CommonTypes::Err
         serde_json::from_str::<MarketsOverviewResponse>(&PremAccountsAuth::graphql(query)?)
             .map_err(|e| QueryError(e.to_string()))?;
 
-    let status = response
+    response
         .data
         .market_params
         .iter()
-        .find(|s| s.length == length);
+        .find(|s| s.length == length)
+        .filter(|s| s.enabled)
+        .ok_or(NameLengthUnavailable())?;
 
-    let Some(st) = status else {
-        return Err(NameLengthUnavailable().into());
-    };
-
-    if !st.enabled {
-        return Err(NameLengthUnavailable().into());
-    };
-
-    let row = response
+    response
         .data
         .current_prices
         .iter()
-        .find(|p| p.length == length);
-
-    let Some(row) = row else {
-        return Err(
-            QueryError("missing price row for configured premium name market".into()).into(),
-        );
-    };
-
-    Ok(row.price.to_string())
-}
-
-/// Max payment = ask * (100 + slippage_pct) / 100, rounded up (canonical units).
-pub fn max_cost_with_slippage(ask: &str, slippage_pct: u8) -> Result<String, CommonTypes::Error> {
-    use std::str::FromStr;
-
-    let ask_dec =
-        Decimal::from_str(ask).map_err(|e| QueryError(format!("invalid ask price: {e}")))?;
-    let ask_u64 = ask_dec.quantity.value;
-    let factor = 100u64 + slippage_pct as u64;
-    let max_u64 = ask_u64
-        .checked_mul(factor)
-        // ensure rounding always goes *up* so calculated amount is always *at least* as much as if calculated as a float.
-        .and_then(|v| v.checked_add(99))
-        .map(|v| v / 100)
-        .ok_or_else(|| QueryError("max cost overflow".into()))?;
-    Ok(Decimal::new(max_u64.into(), ask_dec.precision).to_string())
+        .find(|p| p.length == length)
+        .map(|row| row.price.to_string())
+        .ok_or(QueryError("missing price row for configured premium name market".into()).into())
 }
