@@ -51,9 +51,6 @@ test.describe("First DM message before space exists", () => {
             await ensureContact(alicePage, chain.baseUrl, bobAccount.name);
             await ensureContact(bobPage, chain.baseUrl, aliceAccount.name);
 
-            await openChat(bobPage, chain.baseUrl);
-            await waitForChatConnected(bobPage);
-
             const firstBody = "first message before dm space existed";
             await sendFirstDmBeforeSpaceReady(
                 alicePage,
@@ -63,6 +60,9 @@ test.describe("First DM message before space exists", () => {
             );
 
             await expectPendingOutboundMessage(alicePage, firstBody);
+
+            await openChat(bobPage, chain.baseUrl);
+            await waitForChatConnected(bobPage);
             await startDmWithContact(
                 bobPage,
                 chain.baseUrl,

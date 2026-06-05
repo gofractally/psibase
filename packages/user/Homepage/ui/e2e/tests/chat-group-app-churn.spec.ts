@@ -23,9 +23,9 @@ test.describe("Chat group app exit/re-entry churn", () => {
         attachDiagnostics(alicePage, "alice");
 
         const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "churnalice",
-            bob: "churnbobbb",
-            carol: "churncarol",
+            alice: "grpaliceaa",
+            bob: "grpbobbbbb",
+            carol: "grpcarolcc",
         });
 
         try {

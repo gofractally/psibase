@@ -32,6 +32,29 @@ export function spaceUuidFromPslackConversationId(
     return conversationId;
 }
 
+/** Canonical member order matches objective Chat (sort by account string). */
+export function canonicalSpaceMembers(
+    members: readonly string[],
+): string[] {
+    return [...new Set(members)].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Deterministic objective space id — mirrors Chat service
+ * `space_uuid_for_members` (JSON canonical member list → sha256 hex).
+ */
+export async function deriveSpaceUuidForCanonicalMembers(
+    members: readonly string[],
+): Promise<string> {
+    const canonical = canonicalSpaceMembers(members);
+    const bytes = new TextEncoder().encode(JSON.stringify(canonical));
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const hex = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+    return `${SPACE_UUID_PREFIX}${hex}`;
+}
+
 export type GraphqlSpaceEntry = {
     space_uuid: string;
     members: string[];

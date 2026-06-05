@@ -228,33 +228,51 @@ export async function createAccountViaInviteUrl(
     await openImportFromConnect(frame);
     await frame.getByRole("button", { name: "Create account" }).click();
 
-    await frame.getByPlaceholder("Account name").fill(accountName);
-    if (accountName.length < MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH) {
+    const externallyManaged =
+        process.env.PSIBASE_E2E_EXTERNAL_CHAIN === "1";
+
+    let finalName = accountName;
+    if (finalName.length < MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH) {
         throw new Error(
-            `Account name "${accountName}" must be at least ${MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH} characters (Accounts create-prompt validation).`,
+            `Account name "${finalName}" must be at least ${MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH} characters (Accounts create-prompt validation).`,
         );
     }
-    await expect(
-        frame.getByRole("button", { name: "Create", exact: true }),
-    ).toBeEnabled({ timeout: 30_000 });
-    await frame.getByRole("button", { name: "Create", exact: true }).click();
 
     const validationError = frame.getByText(
         /Account must be at least|This account name is not available|An unknown error occurred/i,
     );
-    try {
-        await expect(frame.getByText("Secure your")).toBeVisible({
-            timeout: 60_000,
-        });
-    } catch (e) {
-        if (await validationError.isVisible().catch(() => false)) {
-            const detail = (await validationError.textContent())?.trim();
-            throw new Error(
-                `Account create validation failed for "${accountName}": ${detail ?? "unknown"}`,
-            );
+
+    for (let attempt = 0; attempt < (externallyManaged ? 6 : 1); attempt += 1) {
+        await frame.getByPlaceholder("Account name").fill(finalName);
+        await expect(
+            frame.getByRole("button", { name: "Create", exact: true }),
+        ).toBeEnabled({ timeout: 30_000 });
+        await frame.getByRole("button", { name: "Create", exact: true }).click();
+
+        try {
+            await expect(frame.getByText("Secure your")).toBeVisible({
+                timeout: 60_000,
+            });
+            break;
+        } catch (e) {
+            const detail = (await validationError.textContent())?.trim() ?? "";
+            const isNameTaken = /not available/i.test(detail);
+            if (externallyManaged && isNameTaken && attempt < 5) {
+                const suffix = Math.random().toString(36).slice(2, 4);
+                finalName = `${accountName.slice(
+                    0,
+                    Math.max(MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH - 2, 0),
+                )}${suffix}`;
+                continue;
+            }
+            if (await validationError.isVisible().catch(() => false)) {
+                throw new Error(
+                    `Account create validation failed for "${finalName}": ${detail || "unknown"}`,
+                );
+            }
+            await snapshotStep(page, `auth-${finalName}-after-create-click`);
+            throw e;
         }
-        await snapshotStep(page, `auth-${accountName}-after-create-click`);
-        throw e;
     }
     const readonlyInputs = frame.locator("input[readonly]");
     await expect(readonlyInputs).toHaveCount(2, { timeout: 10_000 });
@@ -264,7 +282,7 @@ export async function createAccountViaInviteUrl(
     await frame.getByRole("checkbox").click();
     await frame.getByRole("button", { name: "Continue" }).click();
 
-    await frame.getByPlaceholder("Account name").last().fill(accountName);
+    await frame.getByPlaceholder("Account name").last().fill(finalName);
     await frame.getByPlaceholder("Private key").fill(privateKeyB64);
     await frame.getByRole("button", { name: "Confirm" }).click();
 
@@ -277,9 +295,9 @@ export async function createAccountViaInviteUrl(
         waitUntil: "domcontentloaded",
         timeout: 60_000,
     });
-    await waitForLoggedInShell(page, accountName);
+    await waitForLoggedInShell(page, finalName);
 
-    return { name: accountName, privateKeyB64 };
+    return { name: finalName, privateKeyB64 };
 }
 
 /**

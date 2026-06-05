@@ -689,31 +689,81 @@ export async function waitForDmDataChannelReady(
     options?: { timeout?: number },
 ): Promise<void> {
     const timeout = options?.timeout ?? 180_000;
-    await expect
-        .poll(
-            async () => {
+    try {
+        await expect
+            .poll(
+                async () => {
                 return page.evaluate((peer) => {
-                    const snap = (
+                    const v2 = (
                         window as unknown as {
-                            __chatDataDebug?: {
-                                snapshot?: () => {
-                                    peers?: {
-                                        peerAccount: string;
-                                        pc: { connectionState?: string } | null;
-                                    }[];
-                                };
+                            __chatTransportV2Debug?: {
+                                peerState?: (remote: string) => string;
+                                started?: () => boolean;
                             };
                         }
-                    ).__chatDataDebug?.snapshot?.();
-                    const leg = snap?.peers?.find(
-                        (p) => p.peerAccount === peer,
-                    );
-                    return leg?.pc?.connectionState === "connected";
-                }, peerAccount);
-            },
-            { timeout, intervals: [500, 1000, 2000] },
-        )
-        .toBe(true);
+                    ).__chatTransportV2Debug;
+                    if (v2?.peerState) {
+                        return v2.peerState(peer) === "usable";
+                    }
+
+                    const snap = (
+                            window as unknown as {
+                                __chatDataDebug?: {
+                                    snapshot?: () => {
+                                        peers?: {
+                                            peerAccount: string;
+                                            pc: {
+                                                connectionState?: string;
+                                            } | null;
+                                        }[];
+                                    };
+                                };
+                            }
+                        ).__chatDataDebug?.snapshot?.();
+                        const leg = snap?.peers?.find(
+                            (p) => p.peerAccount === peer,
+                        );
+                        return leg?.pc?.connectionState === "connected";
+                    }, peerAccount);
+                },
+                { timeout, intervals: [500, 1000, 2000] },
+            )
+            .toBe(true);
+    } catch (e) {
+        const diag = await page.evaluate((peer) => {
+            const v2 = (
+                window as unknown as {
+                    __chatTransportV2Debug?: {
+                        peerState?: (remote: string) => string;
+                    };
+                }
+            ).__chatTransportV2Debug;
+            const v2State = v2?.peerState?.(peer) ?? null;
+            const snap = (
+                window as unknown as {
+                    __chatDataDebug?: {
+                        snapshot?: () => unknown;
+                        events?: () => unknown;
+                    };
+                }
+            ).__chatDataDebug;
+            return {
+                peer,
+                v2State,
+                chatDataSnapshot: snap?.snapshot?.() ?? null,
+                chatDataEvents: snap?.events?.() ?? null,
+                hasV2Debug: Boolean(v2),
+            };
+        }, peerAccount);
+        throw new Error(
+            `waitForDmDataChannelReady timed out for "${peerAccount}".\n\nDiagnostics:\n${JSON.stringify(
+                diag,
+                null,
+                2,
+            )}`,
+            { cause: e as Error },
+        );
+    }
 }
 
 /** Wait until outbound WebRTC mesh legs to every peer show `connected`. */
@@ -727,6 +777,19 @@ export async function waitForGroupMeshReady(
         .poll(
             async () => {
                 return page.evaluate((peers) => {
+                    const v2 = (
+                        window as unknown as {
+                            __chatTransportV2Debug?: {
+                                peerState?: (remote: string) => string;
+                            };
+                        }
+                    ).__chatTransportV2Debug;
+                    if (v2?.peerState) {
+                        return peers.every(
+                            (p: string) => v2.peerState?.(p) === "usable",
+                        );
+                    }
+
                     const snap = (
                         window as unknown as {
                             __chatDataDebug?: {
@@ -839,7 +902,11 @@ export async function sendFirstDmBeforeSpaceReady(
     await contactButton.click();
     const composer = await activeMessageComposer(page, 30_000);
     await composer.fill(body);
-    await clickSendBesideComposer(composer);
+    const sendButton = composer
+        .locator('xpath=ancestor::div[contains(@class,"items-end")][1]')
+        .getByRole("button", { name: "Send" });
+    await expect(sendButton).toBeEnabled({ timeout: 5_000 });
+    await sendButton.click();
 }
 
 export async function sendChatMessage(
@@ -850,7 +917,11 @@ export async function sendChatMessage(
     const timeoutMs = options?.composerTimeout ?? 60_000;
     const composer = await activeMessageComposer(page, timeoutMs);
     await composer.fill(body);
-    await clickSendBesideComposer(composer);
+    const sendButton = composer
+        .locator('xpath=ancestor::div[contains(@class,"items-end")][1]')
+        .getByRole("button", { name: "Send" });
+    await expect(sendButton).toBeEnabled({ timeout: timeoutMs });
+    await sendButton.click();
 }
 
 export async function expectThreadMessage(
@@ -868,7 +939,61 @@ export async function expectThreadMessage(
             await unreadDm.click();
         }
     }
-    await expect(message).toBeVisible({ timeout });
+    try {
+        await expect(message).toBeVisible({ timeout });
+    } catch (e) {
+        const diag = await dumpChatTransportDebug(page);
+        throw new Error(
+            `expectThreadMessage failed for "${body}".\n\nDiagnostics:\n${JSON.stringify(
+                diag,
+                null,
+                2,
+            )}`,
+            { cause: e as Error },
+        );
+    }
+}
+
+async function dumpChatTransportDebug(page: Page): Promise<unknown> {
+    return page.evaluate(() => {
+        const v2 = (
+            window as unknown as {
+                __chatTransportV2Debug?: Record<string, unknown>;
+            }
+        ).__chatTransportV2Debug;
+        const msg = (
+            window as unknown as {
+                __chatMessagingDebug?: Record<string, unknown>;
+            }
+        ).__chatMessagingDebug;
+        const legacy = (
+            window as unknown as {
+                __chatDataDebug?: { snapshot?: () => unknown; events?: () => unknown };
+            }
+        ).__chatDataDebug;
+        return {
+            v2: v2
+                ? {
+                      started: v2.started,
+                      events: typeof v2.events === "function" ? v2.events() : null,
+                      outbox:
+                          typeof v2.getOutbox === "function"
+                              ? v2.getOutbox()
+                              : null,
+                  }
+                : null,
+            messaging: msg
+                ? {
+                      events: typeof msg.events === "function" ? msg.events() : null,
+                      outbox:
+                          typeof msg.getOutbox === "function"
+                              ? msg.getOutbox()
+                              : null,
+                  }
+                : null,
+            chatDataSnapshot: legacy?.snapshot?.() ?? null,
+        };
+    });
 }
 
 export async function expectPendingOutboundMessage(

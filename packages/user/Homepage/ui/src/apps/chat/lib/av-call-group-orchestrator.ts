@@ -6,7 +6,10 @@ import {
 } from "./av-call-debug";
 import { normalizeAvCallTerminalReason } from "./av-call-terminal";
 import { commitAvCallJoin } from "./av-call-timeline-commit";
-import { MeetWebRtcPeer } from "./meet-webrtc-peer";
+import {
+    createMeetPeerForRemote,
+    shouldReuseMeetPeer,
+} from "./av-call-meet-peer-factory";
 import { acquireMeetLocalMedia } from "./local-media";
 import {
     avCallConnectivityErrorMessage,
@@ -209,18 +212,17 @@ export function startMeshAvCallPeer(
     remoteAccount: string,
 ): void {
     const signaling = host.getSignaling();
-    if (!signaling || !run.localStream) return;
+    if ((!signaling && !host.usesSharedTransport?.()) || !run.localStream) {
+        return;
+    }
 
     const existing = run.meshPeers.get(remoteAccount);
-    if (
-        existing &&
-        existing.sessionId === sessionId &&
-        !existing.isDisposed
-    ) {
+    if (shouldReuseMeetPeer(host, existing, sessionId)) {
         avCallLog("startMeshAvCallPeer: reuse existing peer", {
             remote: remoteAccount,
             sessionId: shortSessionId(sessionId),
-            mediaConnected: existing.isMediaConnected,
+            mediaConnected: existing!.isMediaConnected,
+            sharedPc: host.usesSharedTransport?.() ?? false,
         });
         return;
     }
@@ -228,12 +230,11 @@ export function startMeshAvCallPeer(
     run.meshPeers.delete(remoteAccount);
 
     const isInitiator = shouldInitiateOffer(self, remoteAccount);
-    const peer = new MeetWebRtcPeer({
-        sessionId,
+    const peer = createMeetPeerForRemote({
+        host,
+        remoteAccount,
+        avCallSessionId: sessionId,
         selfAccount: self,
-        peerAccount: remoteAccount,
-        iceServers: host.getIceServers(),
-        signaling,
         isInitiator,
         wantVideo: run.wantVideo,
         wantAudio: run.wantAudio,

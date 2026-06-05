@@ -3,8 +3,6 @@ import rootConfig from "../../../eslint.config.mjs";
 const PHASE_GUARD_FILES = ["src/apps/chat/lib/**/*.ts"];
 
 const PHASE_GUARD_IGNORES = [
-    "src/apps/chat/lib/chat-data-run-state-machine.ts",
-    "src/apps/chat/lib/chat-data-run-actor.ts",
     "src/apps/chat/lib/av-call-run-state-machine.ts",
     "src/apps/chat/lib/av-call-run-actor.ts",
     "src/apps/chat/lib/**/*.test.ts",
@@ -42,7 +40,7 @@ export default [
                     selector:
                         "Property[key.name='snapshot'][value.type='ObjectExpression'] > ObjectExpression > Property[key.name='phase']",
                     message:
-                        "Construct snapshots via initialRunSnapshot (chat-data-run-state-machine.ts), not by writing a phase literal.",
+                        "Construct snapshots via initialRunSnapshot (av-call-run-state-machine.ts), not by writing a phase literal.",
                 },
             ],
         },

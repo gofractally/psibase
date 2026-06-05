@@ -6,7 +6,10 @@ import {
 } from "./av-call-debug";
 import { normalizeAvCallTerminalReason } from "./av-call-terminal";
 import { commitAvCallJoin } from "./av-call-timeline-commit";
-import { MeetWebRtcPeer } from "./meet-webrtc-peer";
+import {
+    createMeetPeerForRemote,
+    shouldReuseMeetPeer,
+} from "./av-call-meet-peer-factory";
 import {
     avCallConnectivityErrorMessage,
     dmPeerAccount,
@@ -140,29 +143,25 @@ export function startDmAvCallPeer(
     isInitiator: boolean,
 ): void {
     const signaling = host.getSignaling();
-    if (!signaling) return;
+    if (!signaling && !host.usesSharedTransport?.()) return;
 
     const existing = run.peer;
-    if (
-        existing &&
-        existing.sessionId === sessionId &&
-        !existing.isDisposed
-    ) {
+    if (shouldReuseMeetPeer(host, existing, sessionId)) {
         avCallLog("startDmAvCallPeer: reuse existing peer", {
             sessionId: shortSessionId(sessionId),
-            mediaConnected: existing.isMediaConnected,
+            mediaConnected: existing!.isMediaConnected,
             isInitiator,
+            sharedPc: host.usesSharedTransport?.() ?? false,
         });
         return;
     }
     host.tearDownDmPeer(run, "replacing peer");
 
-    run.peer = new MeetWebRtcPeer({
-        sessionId,
+    run.peer = createMeetPeerForRemote({
+        host,
+        remoteAccount: run.peerAccount,
+        avCallSessionId: sessionId,
         selfAccount: self,
-        peerAccount: run.peerAccount,
-        iceServers: host.getIceServers(),
-        signaling,
         isInitiator,
         wantVideo: run.wantVideo,
         wantAudio: run.wantAudio,

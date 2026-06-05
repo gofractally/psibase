@@ -6,7 +6,7 @@ Design direction for post–delivery-gate work on `mm/webrtc-refactor`. Living d
 
 **Today:** transport is organized **per Space** (DM Space or group Space). The same two accounts in a DM Space and in a group Space negotiate **separate** `RTCPeerConnection`s and **separate** x-webrtcsig `wrtc:*` sessions.
 
-**Proposed:** transport is organized **per remote account**. The app keeps a map **`remoteAccount → PeerConnection`** (keyed by Contacts / account name). Outbound chat-data is sent on the PC for that contact; every frame carries **space/thread metadata** so the receiver routes into the correct UI thread.
+**Proposed:** transport is organized **per remote account**. The app keeps a map `**remoteAccount → PeerConnection`** (keyed by Contacts / account name). Outbound chat-data is sent on the PC for that contact; every frame carries **space/thread metadata** so the receiver routes into the correct UI thread.
 
 **Group example (you + UserB + UserC):** two entries in the map → two PCs. A group message is sent **once per remote peer** (lookup B’s PC, lookup C’s PC), not once per group Space leg duplicated by session.
 
@@ -16,24 +16,25 @@ This **does not** reduce group to a single connection total (mesh still needs N�
 
 ## Locked decisions (2026-06-04)
 
-| Parameter | Value |
-|-----------|--------|
-| **PC idle TTL** | **5 minutes** since last use (send, receive, focus on any Space with that contact) |
-| **Max warm PCs** | **10**; LRU prune when adding 11th |
-| **Signaling session** | **Pair-only** (`wrtc:pair(…)`), not per-Space |
-| **Initiator (pair)** | **Lexicographic account order** (stable for life of pair) |
-| **ACK** | Per **`(clientMsgId, recipientAccount)`** |
-| **In-flight → outbox** | **~2.5s** (5 × 500ms) without app-level ACK |
-| **autoRetry** | **5 valid attempts** max per `(clientMsgId, recipient)` — see [Valid attempt](#valid-attempt-counting) |
-| **`expireAfter`** | **None** — no time-based give-up on pending messages |
-| **History / catch-up** | Send **only when recipient is `presence: online`** (same gate as valid attempt) |
-| **Group pending UI** | **`Pending (k/n)`** — *k* remote members not yet `DELIVERED`, *n* = **remote member count only** (excludes self) |
-| **PC health** | **No periodic timers**; assume good while `usable`. On send/ACK failure → **ping-pong** on data channel; if bad → `suspected_dead`, messaging returns affected msgs to outbox |
-| **Pending flush** | **Event-driven only** (peer `usable`, recipient `presenceOnline`, outbox enqueue, WS `ready`) — **no** `ensureDm` / 3s background throttle |
-| **Meet** | **In scope:** migrate Meet to **same PC per remote** as chat (`addTrack` / remove tracks); see [Meet migration](#meet-migration-in-scope) |
-| **Fast churn** | **50 steps** per run; **3 fixed seeds** after first seed passes — see [Test execution order](#test-execution-order) |
-| **Migration** | **No interim** Space-run patches (P1/P2/P3); build v2 stack |
-| **Multi-tab** | **One peer map per tab** (see [Multi-tab](#multi-tab-one-map-per-tab)) |
+
+| Parameter              | Value                                                                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PC idle TTL**        | **5 minutes** since last use (send, receive, focus on any Space with that contact)                                                                                                       |
+| **Max warm PCs**       | **10**; LRU prune when adding 11th                                                                                                                                                       |
+| **Signaling session**  | **Pair-only** (`wrtc:pair(…)`), not per-Space                                                                                                                                            |
+| **Initiator (pair)**   | **Lexicographic account order** (stable for life of pair)                                                                                                                                |
+| **ACK**                | Per `**(clientMsgId, recipientAccount)`**                                                                                                                                                |
+| **In-flight → outbox** | **~2.5s** (5 × 500ms) without app-level ACK                                                                                                                                              |
+| **autoRetry**          | **5 valid attempts** max per `(clientMsgId, recipient)` — see [Valid attempt](#valid-attempt-counting)                                                                                   |
+| `**expireAfter`**      | **None** — no time-based give-up on pending messages                                                                                                                                     |
+| **History / catch-up** | Send **only when recipient is `presence: online`** (same gate as valid attempt)                                                                                                          |
+| **Group pending UI**   | Per-recipient ACK; show `**Pending (k/n)`** — *k* recipients not yet `DELIVERED`, *n* = group size (incl. self) or recipient count — see [Group pending display](#group-pending-display) |
+| **PC health**          | **No periodic timers**; assume good while `usable`. On send/ACK failure → **ping-pong** on data channel; if bad → `suspected_dead`, messaging returns affected msgs to outbox            |
+| **Pending flush**      | **Event-driven only** (peer `usable`, recipient `presenceOnline`, outbox enqueue, WS `ready`) — **no** `ensureDm` / 3s background throttle                                               |
+| **Meet**               | **Same PC per remote** as chat; media = `addTrack` on that PC (see [Meet](#meet-same-pc-recommendation))                                                                                 |
+| **Migration**          | **No interim** Space-run patches (P1/P2/P3); build v2 stack                                                                                                                              |
+| **Multi-tab**          | **One peer map per tab** (see [Multi-tab](#multi-tab-one-map-per-tab))                                                                                                                   |
+
 
 ---
 
@@ -90,7 +91,9 @@ flowchart TB
     P_fsm -.->|ws ready?| W_welcome
 ```
 
-**Anti-pattern we are removing:** `executePendingFlushPlan` → **`ensureDm`** with **3s throttle** while a group is focused. That used **time** to guess when background work was safe. **Replacement:** L4 subscribes to **events** — `peerBecameUsable(B)`, `presenceOnline(B)`, `messageEnqueued(B)`, `wsReady` — and calls `peerMap.ensure(B)`; no throttle.
+
+
+**Anti-pattern we are removing:** `executePendingFlushPlan` → `**ensureDm`** with **3s throttle** while a group is focused. That used **time** to guess when background work was safe. **Replacement:** L4 subscribes to **events** — `peerBecameUsable(B)`, `presenceOnline(B)`, `messageEnqueued(B)`, `wsReady` — and calls `peerMap.ensure(B)`; no throttle.
 
 ---
 
@@ -140,19 +143,23 @@ stateDiagram-v2
     }
 ```
 
+
+
 **Cross-layer triggers (event table)**
 
-| Event | Source | Target action |
-|-------|--------|----------------|
-| `ws:ready` | L1 | L2: re-`joinSession` all active pairs; L3: resume `waiting_ws` → `negotiating` |
-| `ws:welcome(reconnect)` | L1 | L2: re-join pairs; L3: **keep** `usable` PCs, refresh signaling only |
-| `signaling:joined(pair)` | L2 | L3: continue negotiation for that remote |
-| `peer:usable(remote)` | L3 | L4: **flush `outbox[remote]`** (no timer) |
-| `presence:online(remote)` | L1 | L3: `ensure(remote)`; L4: attempt flush if outbox non-empty |
-| `message:enqueued(remote)` | L4 | L3: `ensure(remote)` |
-| `message:ack(clientMsgId, remote)` | L4 (inbound wire) | L4: mark delivered |
-| `peer:suspected_dead(remote)` | L3 | L4: move that remote’s `in_flight` → `outbox` |
-| `send:no_ack(remote, msg)` | L4 | L3: **ping-pong**; on fail → `suspected_dead` |
+
+| Event                              | Source            | Target action                                                                  |
+| ---------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
+| `ws:ready`                         | L1                | L2: re-`joinSession` all active pairs; L3: resume `waiting_ws` → `negotiating` |
+| `ws:welcome(reconnect)`            | L1                | L2: re-join pairs; L3: **keep** `usable` PCs, refresh signaling only           |
+| `signaling:joined(pair)`           | L2                | L3: continue negotiation for that remote                                       |
+| `peer:usable(remote)`              | L3                | L4: **flush `outbox[remote]`** (no timer)                                      |
+| `presence:online(remote)`          | L1                | L3: `ensure(remote)`; L4: attempt flush if outbox non-empty                    |
+| `message:enqueued(remote)`         | L4                | L3: `ensure(remote)`                                                           |
+| `message:ack(clientMsgId, remote)` | L4 (inbound wire) | L4: mark delivered                                                             |
+| `peer:suspected_dead(remote)`      | L3                | L4: move that remote’s `in_flight` → `outbox`                                  |
+| `send:no_ack(remote, msg)`         | L4                | L3: **ping-pong**; on fail → `suspected_dead`                                  |
+
 
 **L3 gate on L1 (WS check)** — explicit in the PC FSM:
 
@@ -165,6 +172,8 @@ stateDiagram-v2
         check_ws --> negotiating: WS ready
     }
 ```
+
+
 
 While `waiting_ws`, L3 does **not** poll on an interval; it holds the transition until L1 emits `ws:ready` (or the `ensure` is cancelled if the message is deleted).
 
@@ -217,14 +226,16 @@ interface PeerTransportRegistry {
 
 **Design note:** Your sketch (`send(recipient, payload)`, `getStatus`) is the right *shape*. Suggested refinements:
 
-| Topic | Suggestion |
-|-------|------------|
-| **Payload** | Structured `SendRequest`, not opaque `string` — must include **`spaceUuid`** (thread), **`body`**, optional **`clientMsgId`** for idempotency |
-| **Status** | **`PENDING`** \| **`DELIVERED`** \| **`FAILED`** — see [Message status](#message-status-pending-delivered-failed) |
-| **`spaceUuid`** | **L4 / app thread id** (objective Space UUID) — not L1; see [spaceUuid](#spaceuuid-thread-id-not-transport) |
-| **Group send** | One `send()` with `recipients: string[]` → L4 fans out to N outboxes internally |
-| **autoRetry** | Default **true**; event-driven retries — see [autoRetry](#autoretry-event-driven-not-polling) |
-| **Subscriptions** | `onStatusChange(msgId)` and/or `watchPending(spaceUuid)` so UI does not poll `getStatus` |
+
+| Topic             | Suggestion                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Payload**       | Structured `SendRequest`, not opaque `string` — must include `**spaceUuid`** (thread), `**body**`, optional `**clientMsgId**` for idempotency |
+| **Status**        | `**PENDING`** | `**DELIVERED**` | `**FAILED**` — see [Message status](#message-status-pending-delivered-failed)                               |
+| `**spaceUuid**`   | **L4 / app thread id** (objective Space UUID) — not L1; see [spaceUuid](#spaceuuid-thread-id-not-transport)                                   |
+| **Group send**    | One `send()` with `recipients: string[]` → L4 fans out to N outboxes internally                                                               |
+| **autoRetry**     | Default **true**; event-driven retries — see [autoRetry](#autoretry-event-driven-not-polling)                                                 |
+| **Subscriptions** | `onStatusChange(msgId)` and/or `watchPending(spaceUuid)` so UI does not poll `getStatus`                                                      |
+
 
 ```typescript
 type MessageStatus = "PENDING" | "DELIVERED" | "FAILED";
@@ -252,37 +263,155 @@ interface MessagingService {
 
 **Internal L4 (not public):** `outbox[remote]`, `inFlight[(msgId, remote)]`, ACK handler, in-flight ACK wait (~2.5s), membership check on `spaceUuid`, durable store (see [Persistence](#persistence-unified-outbox)).
 
+### Composition — `stack` and `bridge`
+
+L1–L4 are **library modules** under `transport-v2/`. Two higher-level pieces wire them for Chat:
+
+| Piece | File | Role |
+| ----- | ---- | ---- |
+| **Stack** | `transport-v2/stack.ts` | **Composition root** — constructs L1–L4, connects cross-layer events, routes pair `sessionSnapshot` / `signal` frames to the correct peer PC |
+| **Bridge** | `transport-v2/chat-transport-bridge.ts` | **Chat adapter** — replaces `ChatDataSessionOrchestrator`; owned by `use-chat-socket.ts` via `createChatTransportBridge()` |
+
+```text
+use-chat-socket.ts
+       │
+       ▼
+ ChatTransportBridge          ← callbacks: inbound message, history sync, ACK, peer usable
+       │
+       ▼
+ createChatTransportStack()  ← messaging + peerRegistry + pairSignaling + realtime + signaling
+       │
+       ├── L4 MessagingService
+       ├── L3 PeerTransportRegistry
+       ├── L2 PairSignaling
+       └── L1 RealtimeTransport  →  RealtimeClient (shared-ui)
+```
+
+#### `createChatTransportStack` — stack
+
+Factory that returns a **`ChatTransportStack`** handle:
+
+```typescript
+type ChatTransportStack = {
+  messaging: MessagingService;
+  pairSignaling: PairSignaling;
+  peerRegistry: PeerTransportRegistry;
+  realtime: RealtimeTransport;
+  signaling: WebRtcSignalingClient;
+  wireRealtimeHandlers(handlers): void;
+};
+
+createChatTransportStack(opts: {
+  localAccount: string;
+  chainId: string;
+  realtimeClient: RealtimeClient;
+  iceServers: IceServerConfig[] | null;
+  isSpaceMember?: (spaceUuid, account) => boolean;
+  onInboundBytes?: (remote, bytes) => void;  // optional; default → L4 ACK path
+}): ChatTransportStack;
+```
+
+**Responsibilities:**
+
+- Wrap the shared `RealtimeClient` in L1 `RealtimeTransport`.
+- Create `WebRtcSignalingClient` with **deferred-SDP gate** (`bindSessionJoinedGate`): outbound signals wait until server `sessionSnapshot` confirms self in `joinedParticipants`.
+- Track **pair join state** per `wrtc:pair:*` session id; on `sessionSnapshot`, set joined + `flushDeferredSignals`.
+- Route inbound **`signal`** frames for pair sessions → `peerRegistry.handleRemoteSignal(remote, frame)`.
+- Wire **L3 `onInboundBytes`** → L4 `handleWireFromRemote` (chat messages + ACKs) unless `onInboundBytes` override is supplied (bridge uses override for history sync).
+- Expose **`wireRealtimeHandlers()`** so the hook can register on the same `RealtimeClient` without duplicating handler tables.
+
+**Not responsible for:** React state, timeline UI, objective Space loading. **Meet** adds A/V tracks on the same pair PC via {@link SharedMeetPeer} (see [Meet](#meet-same-pc-recommendation)).
+
+#### `ChatTransportBridge` — bridge
+
+Class constructed with **`ChatTransportBridgeDeps`** (getter refs for realtime, self, chainId, iceServers + inbound/ACK callbacks). Replaces the deleted Space-run orchestrator.
+
+```typescript
+class ChatTransportBridge {
+  start(): void;                    // create stack, wire callbacks, hydrate outbox
+  dispose(): void;
+  suspendForNavigation(): void;
+  resumeAfterNavigation(): void;
+  setFocusedSpace(spaceUuid): void;
+
+  /** Maps members → ensurePeer for each remote (legacy ensureChatDataSession name). */
+  ensureChatDataSession(spaceUuid, members): void;
+  ensurePeer(remote, reason?): void;
+  onPeerOnline(account): void;
+
+  sendHistorySync(spaceUuid, peerAccount, envelope): boolean;
+  sendGroupHistorySync(spaceUuid, peerAccount, envelope): boolean;
+
+  invalidateJoinStateForWelcomeReconnect(): void;  // no-op; L2 re-joins pairs
+  reconcileAfterReconnect(): void;                 // hydrate outbox only
+
+  installDebugGlobal(): void;   // window.__chatMessagingDebug
+  readonly messaging: MessagingService | null;
+  readonly peerRegistry: PeerTransportRegistry | null;
+}
+```
+
+**Responsibilities:**
+
+- **`start()`** — call `createChatTransportStack`, subscribe L4 `onInbound` / `onRecipientDelivered`, L3 `usable` → `onPeerUsable` (history push), `messaging.hydrateFromStorage()` on load.
+- **`handleInboundWire`** — demux data-channel payloads: `chatHistorySync` → app callback; `chatMessage` / `messageAck` → L4.
+- **Send path in Chat** — `use-chat-socket` calls `messaging.send()` / `sendGroup()` directly (not `bridge.sendChatMessage`).
+- **Legacy seam** — `ensureChatDataSession(spaceUuid, members)` ensures **one PC per remote member** (not per Space); no objective `createSession` for transport.
+- **Navigation** — `suspendForNavigation` blocks new `ensurePeer`; `resumeAfterNavigation` re-hydrates outbox.
+- **Debug** — exposes `window.__chatMessagingDebug` (`getOutbox`, `getPeerMap`, `getMessaging`) for e2e.
+
+**Hook entry:** `hooks/chat/use-chat-orchestrator.ts` exports `createChatTransportBridge()` (alias `createChatDataOrchestratorBridge` for transitional imports).
+
+#### `transport-v2/` module map
+
+| File | Layer |
+| ---- | ----- |
+| `types.ts` | Shared constants (`PEER_IDLE_TTL_MS`, `MAX_VALID_ATTEMPTS`, …) |
+| `pair-id.ts` | `pairSessionId`, lex initiator helpers |
+| `event-bus.ts` | Internal pub/sub |
+| `l1-realtime-transport.ts` | L1 |
+| `l2-pair-signaling.ts` | L2 |
+| `l3-peer-registry.ts` | L3 |
+| `l4-messaging-service.ts` | L4 |
+| `stack.ts` | Composition |
+| `chat-transport-bridge.ts` | Chat adapter |
+| `index.ts` | Barrel exports |
+
 ### Message status: `PENDING`, `DELIVERED`, `FAILED`
 
-| Status | Meaning |
-|--------|---------|
-| **`PENDING`** | Message is still ours to deliver: in **durable outbox** (not yet sent or waiting for retry), in **`in_flight`** (sent on wire, awaiting peer ACK), or blocked because **WS / PC not ready** (still `PENDING` — not a separate public state). |
-| **`DELIVERED`** | Recipient returned an **app-level ACK** for this `(clientMsgId, recipient)` (group: per-recipient ACK; message may be `DELIVERED` to Bob but still `PENDING` for Carol until her ACK). |
-| **`FAILED`** | We **gave up** for that recipient. Set when **`autoRetry: false`** and a send error occurs, when **`validAttempts >= 5`** (see below), or **hard reject** (invalid `spaceUuid` / not a member). No `expireAfter`. UI shows failed + `errorReason`; user may retry manually. |
 
-`FAILED` is **not** “in-flight for 2.5s” — that returns the row to **outbox** and stays **`PENDING`**.
+| Status          | Meaning                                                                                                                                                                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `**PENDING`**   | Message is still ours to deliver: in **durable outbox** (not yet sent or waiting for retry), in `**in_flight`** (sent on wire, awaiting peer ACK), or blocked because **WS / PC not ready** (still `PENDING` — not a separate public state).                                |
+| `**DELIVERED`** | Recipient returned an **app-level ACK** for this `(clientMsgId, recipient)` (group: per-recipient ACK; message may be `DELIVERED` to Bob but still `PENDING` for Carol until her ACK).                                                                                      |
+| `**FAILED`**    | We **gave up** for that recipient. Set when `**autoRetry: false`** and a send error occurs, when `**validAttempts >= 5**` (see below), or **hard reject** (invalid `spaceUuid` / not a member). No `expireAfter`. UI shows failed + `errorReason`; user may retry manually. |
+
+
+`FAILED` is **not** “in-flight for 2.5s” — that returns the row to **outbox** and stays `**PENDING`**.
 
 ### `spaceUuid`: thread id, not transport
 
-**`spaceUuid` is an L4 (Messaging) / Chat app concept** — the objective **Space** id for a DM or group **thread** the UI renders. Chat already has this from the `chat` objective service.
+`**spaceUuid` is an L4 (Messaging) / Chat app concept** — the objective **Space** id for a DM or group **thread** the UI renders. Chat already has this from the `chat` objective service.
 
-| Layer | Knows `spaceUuid`? |
-|-------|-------------------|
-| **L4 Messaging** | **Yes** — routes UI, indexes pending per thread, puts it on the wire envelope |
-| **L3 Peer / L2 Signaling / L1 WS** | **No** — they move opaque bytes between accounts; envelope is inside the data channel payload |
-| **Node (objective)** | **Yes** for **authorization** (who may post to a Space) — separate from transport; L4 checks membership **client-side** on inbound (decided: client-only) |
+
+| Layer                              | Knows `spaceUuid`?                                                                                                                                        |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **L4 Messaging**                   | **Yes** — routes UI, indexes pending per thread, puts it on the wire envelope                                                                             |
+| **L3 Peer / L2 Signaling / L1 WS** | **No** — they move opaque bytes between accounts; envelope is inside the data channel payload                                                             |
+| **Node (objective)**               | **Yes** for **authorization** (who may post to a Space) — separate from transport; L4 checks membership **client-side** on inbound (decided: client-only) |
+
 
 Third-party apps using `MessagingService` must obtain `spaceUuid` from the same Space APIs Chat uses; the messaging layer does not invent threads.
 
 ### Valid attempt counting
 
-A **valid attempt** is a send try where **`presence[recipient] === "online"`** at attempt start (and PC/WS ready). Attempts while recipient is offline **do not increment** `validAttempts` — the row waits in outbox until `presence:online`.
+A **valid attempt** is a send try where `**presence[recipient] === "online"`** at attempt start (and PC/WS ready). Attempts while recipient is offline **do not increment** `validAttempts` — the row waits in outbox until `presence:online`.
 
 **History sync** (catch-up to a late joiner) uses the same rule: **do not push history** until that recipient is online.
 
 ### `autoRetry`: event-driven, not polling
 
-**`autoRetry: true` (default)** means: keep the row in the **durable outbox** until `DELIVERED` or **`validAttempts >= 5`**. Retries are **event-triggered**, not polled.
+`**autoRetry: true` (default)** means: keep the row in the **durable outbox** until `DELIVERED` or `**validAttempts >= 5`**. Retries are **event-triggered**, not polled.
 
 **Retry attempt flow**
 
@@ -290,58 +419,49 @@ A **valid attempt** is a send try where **`presence[recipient] === "online"`** a
 2. **Event** fires (esp. `presence:online` + `peer:usable`) → if recipient **online**, try send.
 3. Success on wire → **in_flight**; start **ACK wait** (~2.5s).
 4. **ACK received** → `DELIVERED` for that recipient.
-5. **No ACK in ~2.5s** → increment **`validAttempts`**, row back to **outbox** (still `PENDING`), optional L3 **ping-pong**.
-6. **Another event** (recipient still/again online) → step 2, until 5 valid attempts → **`FAILED`**.
+5. **No ACK in ~2.5s** → increment `**validAttempts`**, row back to **outbox** (still `PENDING`), optional L3 **ping-pong**.
+6. **Another event** (recipient still/again online) → step 2, until 5 valid attempts → `**FAILED`**.
 
 **Events that trigger a send attempt** (same list as flush):
 
-| Event | Why |
-|-------|-----|
-| `message:enqueued` | User just sent |
-| `peer:usable(remote)` | Pipe ready |
-| `presence:online(remote)` | Recipient may ACK |
-| `ws:ready` | Signaling path restored |
-| `signaling:joined(pair)` | SDP path cleared |
-| `peer:recovered` | After `suspected_dead` → `usable` |
 
-**`autoRetry: false`:** one **valid** attempt when recipient online; on failure → **`FAILED`**.
+| Event                     | Why                               |
+| ------------------------- | --------------------------------- |
+| `message:enqueued`        | User just sent                    |
+| `peer:usable(remote)`     | Pipe ready                        |
+| `presence:online(remote)` | Recipient may ACK                 |
+| `ws:ready`                | Signaling path restored           |
+| `signaling:joined(pair)`  | SDP path cleared                  |
+| `peer:recovered`          | After `suspected_dead` → `usable` |
+
+
+`**autoRetry: false`:** one **valid** attempt when recipient online; on failure → `**FAILED`**.
 
 The **2.5s** timer only detects missing ACK for the current flight; the **next** valid attempt waits for an **event** above.
 
 ### Group pending display
 
-For a group message from A to remote members `{B, C}`:
+For a group message with recipients `{B, C}` (sender self = A, *n* = 3 participants):
 
-- Track **`DELIVERED`** per `(clientMsgId, recipient)`.
-- UI badge: **`Pending (k/n)`** where **n** = number of **remote** members (here **2**), **k** = remotes not yet `DELIVERED`. Example: B acked, C not → **`Pending (1/2)`**.
+- Track `**DELIVERED`** per `(clientMsgId, recipient)`.
+- UI badge: `**Pending (k/n)**` where **k** = count of recipients (excluding self) not yet `DELIVERED`. Example: B acked, C not → `**Pending (1/3)`** if *n* counts all participants including self, or `**Pending (1/2)*`* if *n* counts only outbound targets — **pick one convention in Chat UI** (recommend: **k/total targets**, e.g. `Pending (1/2)` for 2 remote members; show full thread context in tooltip).
 
-`MessagingService` exposes `getPendingCount(msgId): { pending: number; total: number }` where **`total`** = remote recipient count only.
+`MessagingService` should expose `getPendingCount(msgId): { delivered: number; total: number }` for the composer badge.
 
 ---
 
-## Meet migration (in scope)
+## Meet: same PC recommendation
 
-**One `RTCPeerConnection` per remote** for **chat-data and Meet** — required v2 work, not a follow-up.
+**Recommendation: one `RTCPeerConnection` per remote for both chat-data and Meet.**
 
-| Approach | Verdict |
-|----------|---------|
-| **Same PC, data channel + media tracks** | **Ship this.** Data channel for chat envelopes; `addTrack` / `removeTrack` for A/V when a call starts or ends. |
-| **Separate Meet PC** | **Remove** — duplicate ICE and the bug class we are eliminating. |
 
-**Rules**
+| Approach                                 | Verdict                                                                                                                                                                                                          |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Same PC, data channel + media tracks** | **Preferred.** WebRTC allows one PC with a labeled data channel (chat envelopes) plus `addTrack` for A/V when a call starts. No second ICE for the same human.                                                   |
+| **Separate PC for Meet**                 | Duplicate ICE, glare risk, and the exact bug class we are eliminating. Only justified if browsers or our stack cannot renegotiate tracks without killing the data channel — **verify during impl**, not assumed. |
 
-- Start Meet → **`peerMap.ensure(remote)`** (or group: each remote), then **add tracks** on existing pair PC(s); no second map entry.
-- End Meet → remove media tracks; **data channel stays** if PC still `usable`.
-- Chat send during / after Meet must pass **O10** (delivery gate).
 
-**Implementation checklist**
-
-1. Refactor `av-call` orchestration to use **L3 `PeerTransportRegistry`** (not separate Space-run PCs).
-2. Meet offer/answer reuses pair signaling session (or purpose tag on pair session until server merges).
-3. Unit tests: start Meet → chat `send()` still succeeds; hang up → chat still succeeds.
-4. E2e: `v2-meet-chat-smoke.spec.ts` in delivery gate (**required**, not optional).
-
-**Verify during impl:** renegotiation for tracks must not close the chat data channel; if a browser build cannot do that, document and fix at PC layer (still one PC).
+**Rules:** Starting Meet **upgrades** the existing pair PC (add tracks), does not create a parallel map entry. Ending Meet removes tracks; **chat data channel stays** if still `usable`. Meet signaling can remain a distinct *purpose* on the pair session until server merges purposes.
 
 ---
 
@@ -373,6 +493,8 @@ flowchart LR
     W[ws:ready] --> E
 ```
 
+
+
 No `setInterval`, no `lastMeshNudgeMs` throttle for “background DM while group focused.”
 
 ---
@@ -381,34 +503,34 @@ No `setInterval`, no `lastMeshNudgeMs` throttle for “background DM while group
 
 ### `welcome` (WS layer — L1)
 
-First (and every subsequent) **`{ t: "welcome" }`** frame on the open websocket after connect/reconnect. Carries ICE servers, server time, your account. Client increments **`welcomeGeneration`** (`welcomeCount` in `RealtimeClient`). **`isReconnectWelcome()`** is true when generation > 1.
+First (and every subsequent) `**{ t: "welcome" }**` frame on the open websocket after connect/reconnect. Carries ICE servers, server time, your account. Client increments `**welcomeGeneration**` (`welcomeCount` in `RealtimeClient`). `**isReconnectWelcome()**` is true when generation > 1.
 
 **Not** the same as a Space snapshot. Triggers `invalidateJoinStateForWelcomeReconnect()` in Chat today because **server `joinSession` rows are per socket** — stale joins must not authorize outbound SDP on a dead socket.
 
 ### `sessionSnapshot` (signaling server frame — L2)
 
-Server broadcast **`{ t: "sessionSnapshot", sessionId, epoch, joinedParticipants, pendingParticipants }`** for one **x-webrtcsig session** (`wrtc:…` tied to a Space). Ground truth for who has **joined that session on the server** vs who is authorized but still **pending**.
+Server broadcast `**{ t: "sessionSnapshot", sessionId, epoch, joinedParticipants, pendingParticipants }`** for one **x-webrtcsig session** (`wrtc:…` tied to a Space). Ground truth for who has **joined that session on the server** vs who is authorized but still **pending**.
 
-- **`joinedParticipants`:** accounts with a live `joinSession` on some socket for this session.
-- **`pendingParticipants`:** in session auth list but not joined on any socket.
-- **`epoch`:** server sets to `joined_participants.len()` so clients detect roster **changes** monotonically (`signaling.rs`). Used with client-side **`sessionSnapshotEpoch`** to ignore stale/out-of-order frames (H12).
+- `**joinedParticipants`:** accounts with a live `joinSession` on some socket for this session.
+- `**pendingParticipants`:** in session auth list but not joined on any socket.
+- `**epoch`:** server sets to `joined_participants.len()` so clients detect roster **changes** monotonically (`signaling.rs`). Used with client-side `**sessionSnapshotEpoch`** to ignore stale/out-of-order frames (H12).
 
 ### `sessionSnapshotEpoch` (client per Space run — L2)
 
-On each **Space run** (`DmSpaceRun` / `GroupSpaceRun`): last applied **`sessionSnapshot.epoch`**. If a frame arrives with `epoch <= sessionSnapshotEpoch` (with a narrow exception for departures — H17), it is ignored so roster does not regress.
+On each **Space run** (`DmSpaceRun` / `GroupSpaceRun`): last applied `**sessionSnapshot.epoch`**. If a frame arrives with `epoch <= sessionSnapshotEpoch` (with a narrow exception for departures — H17), it is ignored so roster does not regress.
 
-**`invalidateJoinStateForWelcomeReconnect` sets this to `0`**, which temporarily makes the next snapshot look “new” and can reorder roster processing — part of the matrix failure mode.
+`**invalidateJoinStateForWelcomeReconnect` sets this to `0**`, which temporarily makes the next snapshot look “new” and can reorder roster processing — part of the matrix failure mode.
 
 ### `ChatDataSessionSnapshot` (client UI snapshot — not the server frame)
 
-Per-Space **`run.snapshot`**: `{ phase, sessionId, dataChannelReady, meshPeerReady?, lastError }` for React/UI. Phases: `idle | ensuring | creating | joining | waiting-peer | signaling | ready | failed`.
+Per-Space `**run.snapshot**`: `{ phase, sessionId, dataChannelReady, meshPeerReady?, lastError }` for React/UI. Phases: `idle | ensuring | creating | joining | waiting-peer | signaling | ready | failed`.
 
 **Do not confuse** with server `sessionSnapshot` frames.
 
 ### `hasJoined` / `joinSession` (L2, today on Space run)
 
-- **`joinSession`:** client→server “attach this **socket** to this **sessionId**.”
-- **`hasJoined`:** client believes server roster includes **self** in `joinedParticipants` (from server `sessionSnapshot`, **not** merely after sending `joinSession`).
+- `**joinSession`:** client→server “attach this **socket** to this **sessionId**.”
+- `**hasJoined`:** client believes server roster includes **self** in `joinedParticipants` (from server `sessionSnapshot`, **not** merely after sending `joinSession`).
 
 Outbound SDP is **deferred** until `hasJoined` (see `WebRtcSignalingClient` gate + `flushDeferredSignals`).
 
@@ -416,14 +538,14 @@ Outbound SDP is **deferred** until `hasJoined` (see `WebRtcSignalingClient` gate
 
 Not a transport primitive. A **pending-flush plan action** from `planPendingFlush` → `executePendingFlushPlan`:
 
-- **`ensureDm`:** calls `ensureDmChatDataSession(spaceUuid, members)` → creates Space run if missing → dispatches FSM **`ensure`** → may pipeline, **`beginSignaling`**, **`joinSession`**, create PC.
-- **`ensureGroup`:** same via `ensureGroupChatDataSession`.
+- `**ensureDm`:** calls `ensureDmChatDataSession(spaceUuid, members)` → creates Space run if missing → dispatches FSM `**ensure`** → may pipeline, `**beginSignaling**`, `**joinSession**`, create PC.
+- `**ensureGroup`:** same via `ensureGroupChatDataSession`.
 
-So “ensureDm” really means **“nudge the whole Space stack so maybe the data channel becomes ready.”** In the target design this becomes **`peerMap.ensure(recipient)`** + **outbox flush**, not Space FSM negotiation.
+So “ensureDm” really means **“nudge the whole Space stack so maybe the data channel becomes ready.”** In the target design this becomes `**peerMap.ensure(recipient)`** + **outbox flush**, not Space FSM negotiation.
 
 ### Background DM **throttling** (H28) — **deprecated in v2**
 
-When the **focused** conversation is a **group**, `shouldThrottleBackgroundDmEnsure` blocks **`ensureDm`** for **other** DM Spaces unless forced — at most one nudge per **`lastMeshNudgeMs`** (default **3s**). This is **timer-based policy** replacing what should be **events** (`peer:usable`, `presence:online`). **Not carried forward.**
+When the **focused** conversation is a **group**, `shouldThrottleBackgroundDmEnsure` blocks `**ensureDm`** for **other** DM Spaces unless forced — at most one nudge per `**lastMeshNudgeMs`** (default **3s**). This is **timer-based policy** replacing what should be **events** (`peer:usable`, `presence:online`). **Not carried forward.**
 
 ---
 
@@ -465,6 +587,8 @@ stateDiagram-v2
     ws_ready --> RUN: reconcile:\nif DC live → joinSession only\nelse → beginSignaling
 ```
 
+
+
 **Signaling session (L2) parallel track** (per Space, not shown as separate FSM today):
 
 ```mermaid
@@ -487,6 +611,8 @@ sequenceDiagram
     Run->>Run: RTCPeerConnection (per Space today)
 ```
 
+
+
 ### Target — separated layers (L1–L4)
 
 **L1 — WebSocket**
@@ -502,6 +628,8 @@ stateDiagram-v2
     refreshing --> ready: clientReady ack
 ```
 
+
+
 **L2 — Pair signaling** (was missing in this subsection; see also [cross-layer diagram](#layer-fsms-and-cross-layer-wiring))
 
 ```mermaid
@@ -512,6 +640,8 @@ stateDiagram-v2
     joined --> join_pending: ws welcome\nre-join same pair
     joined --> idle: leavePair
 ```
+
+
 
 On `welcome` while L1 `ready`: L2 re-`joinSession` for all active pairs; L3 keeps `usable` PCs; L4 flushes outboxes when L3 emits `usable`.
 
@@ -536,6 +666,8 @@ stateDiagram-v2
     disposing --> absent
 ```
 
+
+
 **L4 — Messaging (per message × recipient)**
 
 ```mermaid
@@ -549,18 +681,22 @@ stateDiagram-v2
     failed --> [*]
 ```
 
+
+
 **Cross-layer:** `PeerMap` **requested → usable** emits `peer:usable` → L4 drains `outbox[remote]`. L4 never calls `joinSession`.
 
 ### Is there an FSM per PC today?
 
 **Partially, but not as a clean public layer.**
 
-| What exists | Role |
-|-------------|------|
-| **`transitionRun` / Space run FSM** (`chat-data-run-state-machine.ts`) | Per **Space**, not per PC. States: `idle…ready`. Commands: `beginSignaling`, `joinSession`, `disposeAllPeers`. |
-| **`PeerSlotState`** in run FSM | Logical `absent \| connecting \| ready` per remote in **group** — not the WebRTC object. |
-| **`ChatDataWebRtcPeer`** | ICE/SDP/data channel; callbacks `onDataChannelOpen`, `transportLost`. **No** exported FSM; orchestrator pokes it from run commands. |
-| **No global “wait your turn”** | Competing `beginSignaling` / `ensure` / welcome invalidate causes races; fixes are ad-hoc ignores (`run event ignored`, H15, H34). |
+
+| What exists                                                            | Role                                                                                                                                |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `**transitionRun` / Space run FSM** (`chat-data-run-state-machine.ts`) | Per **Space**, not per PC. States: `idle…ready`. Commands: `beginSignaling`, `joinSession`, `disposeAllPeers`.                      |
+| `**PeerSlotState`** in run FSM                                         | Logical `absent | connecting | ready` per remote in **group** — not the WebRTC object.                                              |
+| `**ChatDataWebRtcPeer`**                                               | ICE/SDP/data channel; callbacks `onDataChannelOpen`, `transportLost`. **No** exported FSM; orchestrator pokes it from run commands. |
+| **No global “wait your turn”**                                         | Competing `beginSignaling` / `ensure` / welcome invalidate causes races; fixes are ad-hoc ignores (`run event ignored`, H15, H34).  |
+
 
 **Target:** L3 PC FSM is **authoritative** for whether L4 may send. L2 join registry is authoritative for whether L3 may emit SDP. Queued work **waits** or **cancels** via layer APIs, not by mutating unrelated Space runs.
 
@@ -586,12 +722,14 @@ Plugin KV / IndexedDB upgrade can replace localStorage behind the same store int
 
 Browser WebRTC and WebSocket APIs are **main-thread-bound**, but **work must not block the UI**.
 
-| Layer | Execution model |
-|-------|------------------|
+
+| Layer            | Execution model                                                                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **L4 Messaging** | `send()` **returns quickly** after durable write (`Promise<{ msgId }>`). Delivery runs via internal async queue + event handlers. UI subscribes to `onStatusChange`, never awaits transport in render. |
-| **L3 Peer map** | `ensure(remote)` returns **`Promise<void>`** (resolves when `usable` or terminal failure). ICE/SDP callbacks on main thread; state updates debounced to microtasks. |
-| **L2 Signaling** | Frame handlers async; `joinPair` / `signal` no-op or queue if `!ws.isReady`. |
-| **L1 WS** | Single connection; `connect()` → `Promise` when first `ready`. Reconnect backoff internal to L1. |
+| **L3 Peer map**  | `ensure(remote)` returns `**Promise<void>`** (resolves when `usable` or terminal failure). ICE/SDP callbacks on main thread; state updates debounced to microtasks.                                    |
+| **L2 Signaling** | Frame handlers async; `joinPair` / `signal` no-op or queue if `!ws.isReady`.                                                                                                                           |
+| **L1 WS**        | Single connection; `connect()` → `Promise` when first `ready`. Reconnect backoff internal to L1.                                                                                                       |
+
 
 **Pattern:** Chat calls `await messaging.send({...})` only for “accepted into outbox,” not for “peer received.” Long work = **Promises + events**, not synchronous ladders in React effects.
 
@@ -605,20 +743,22 @@ On new `welcome` / new socket generation:
 
 1. **L1** completes `clientReady`; increments generation.
 2. **L2** re-issues `joinSession` for every session that still needs server-side join (pair or Space scoped per migration phase).
-3. **L3** for each map entry: if PC **`usable`**, keep PC, refresh signaling binding only; if **`negotiating`**, continue or resendOffer; if **`suspected_dead`**, enter recovery — **do not** reset unrelated Space epochs.
+3. **L3** for each map entry: if PC `**usable`**, keep PC, refresh signaling binding only; if `**negotiating**`, continue or resendOffer; if `**suspected_dead**`, enter recovery — **do not** reset unrelated Space epochs.
 4. **L4** for any remote with non-empty outbox: `peerMap.ensure(remote)` and flush when usable (**pending-first**, no H28 throttle on that path).
 
 ---
 
 ## Why this is the better default (aligned)
 
-| Benefit | Explanation |
-|---------|-------------|
-| **Fewer connections** | No second ICE/DTLS/data-channel stack to the same peer because the UI opened another Space type. |
-| **Simpler mental model** | “I have a pipe to Bob” + “messages are labeled by thread” vs “every Space has its own parallel pipe to Bob.” |
-| **Faster thread switching** | Reuse warm PC when returning to a DM (pairs well with **idle TTL** — see README *Future transport*). |
-| **Less signaling churn** | One negotiation lifecycle per peer pair per tab, not per Space. |
-| **Initiator stability** | Polite/impolite is per peer pair, not re-derived per Space roster snapshot → fewer cross-space glare bugs (see H34-class issues in `webrtc-debugging.md`). |
+
+| Benefit                     | Explanation                                                                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fewer connections**       | No second ICE/DTLS/data-channel stack to the same peer because the UI opened another Space type.                                                           |
+| **Simpler mental model**    | “I have a pipe to Bob” + “messages are labeled by thread” vs “every Space has its own parallel pipe to Bob.”                                               |
+| **Faster thread switching** | Reuse warm PC when returning to a DM (pairs well with **idle TTL** — see README *Future transport*).                                                       |
+| **Less signaling churn**    | One negotiation lifecycle per peer pair per tab, not per Space.                                                                                            |
+| **Initiator stability**     | Polite/impolite is per peer pair, not re-derived per Space roster snapshot → fewer cross-space glare bugs (see H34-class issues in `webrtc-debugging.md`). |
+
 
 For chat-data on a Contacts-centric app (DMs + groups with the same people), **this is a superior design** for the transport layer. The UI already thinks in contacts; the stack should match.
 
@@ -656,16 +796,18 @@ Space / thread           →  routing metadata on every wire message (spaceUuid,
 
 **Peer map as source of truth**
 
-The **`contacts → PeerTransport`** map is the authoritative set of open peer connections in this tab. UI and orchestration ask the registry (“do we have a live PC to Bob?”), not per-Space run objects. Spaces only carry **pending outbound**, **history**, and **routing metadata**; they do not own duplicate PCs.
+The `**contacts → PeerTransport`** map is the authoritative set of open peer connections in this tab. UI and orchestration ask the registry (“do we have a live PC to Bob?”), not per-Space run objects. Spaces only carry **pending outbound**, **history**, and **routing metadata**; they do not own duplicate PCs.
 
 **Lifecycle + idle expiry (planned)**
 
-| State | Rule |
-|-------|------|
-| **Create** | First need to talk to R: pending message to any Space with member R, user opens a thread with R, or explicit prefetch policy. |
-| **Keep warm** | Entry stays in map for **`IDLE_TTL`** (e.g. 2–5 minutes, TBD) after last successful send/receive **or** last thread focus involving R — allows switching DM ↔ group ↔ DM without full ICE restart. |
-| **Refresh TTL** | Any outbound/inbound chat-data on that PC; optionally bump when user focuses any Space that includes R. |
-| **Dispose** | TTL elapsed **and** no pending for any Space that needs R **and** not in active Meet with R; or hard close (logout, leave Chat, unrecoverable `failed`). |
+
+| State           | Rule                                                                                                                                                                                               |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Create**      | First need to talk to R: pending message to any Space with member R, user opens a thread with R, or explicit prefetch policy.                                                                      |
+| **Keep warm**   | Entry stays in map for `**IDLE_TTL`** (e.g. 2–5 minutes, TBD) after last successful send/receive **or** last thread focus involving R — allows switching DM ↔ group ↔ DM without full ICE restart. |
+| **Refresh TTL** | Any outbound/inbound chat-data on that PC; optionally bump when user focuses any Space that includes R.                                                                                            |
+| **Dispose**     | TTL elapsed **and** no pending for any Space that needs R **and** not in active Meet with R; or hard close (logout, leave Chat, unrecoverable `failed`).                                           |
+
 
 While an entry exists, the same PC serves **all** Spaces that need that contact. Expiry removes the map entry and disposes the PC; next send recreates it.
 
@@ -681,8 +823,7 @@ Welcome reconnect and multi-thread churn hurt most when join/PC state is **per S
 
 **Decision:** do **not** patch the Space-run stack. Matrix / delivery-gate green comes from **v2** (this doc). The analysis below remains useful for **welcome** behavior in v2.
 
-<details>
-<summary>Old matrix / welcome analysis (reference)</summary>
+Old matrix / welcome analysis (reference)
 
 The delivery-gate **matrix** spec failed when alice had a **background DM** (pending to bob) while **focused on group**, a **new websocket welcome** arrived (`welcomeGeneration` N→N+1), and the background DM never reached `dataChannelReady` within 240s.
 
@@ -692,14 +833,14 @@ The delivery-gate **matrix** spec failed when alice had a **background DM** (pen
 
 ### Why welcome matters at all (constraint)
 
-x-webrtcsig **`joinSession` is per websocket socket**. A new `welcome` on a new socket means server-side joins on the old socket are dead. The client **must** call `joinSession` again on the new socket before the server accepts outbound signals. Some “invalidate join” step is required.
+x-webrtcsig `**joinSession` is per websocket socket**. A new `welcome` on a new socket means server-side joins on the old socket are dead. The client **must** call `joinSession` again on the new socket before the server accepts outbound signals. Some “invalidate join” step is required.
 
 The bug class is not “re-join is wrong” — it is **how aggressively** we tear down *client* state (hasJoined, snapshot epoch, PCs, background scheduling) while doing that.
 
 ### Current behavior (today)
 
-1. **`invalidateJoinStateForWelcomeReconnect()`** (on reconnect welcome): for **every** Space run, if `joinedWelcomeGeneration !== welcomeGeneration` → `hasJoined = false`, `joinSessionRequested = false`, **`sessionSnapshotEpoch = 0`**.
-2. **`reconcileAfterReconnectNow()`**: repeats the same clears, then per run: if **data channel already open** → `joinSession` only, skip peer dispose (H20); else if peer online → `beginSignaling`; else `signalingDeferred`.
+1. `**invalidateJoinStateForWelcomeReconnect()`** (on reconnect welcome): for **every** Space run, if `joinedWelcomeGeneration !== welcomeGeneration` → `hasJoined = false`, `joinSessionRequested = false`, `**sessionSnapshotEpoch = 0`**.
+2. `**reconcileAfterReconnectNow()**`: repeats the same clears, then per run: if **data channel already open** → `joinSession` only, skip peer dispose (H20); else if peer online → `beginSignaling`; else `signalingDeferred`.
 3. **Group** `beginSignalingGroup` has an extra branch: **live mesh DC** → re-`joinSession` without tearing down mesh (H21 “welcome refresh”).
 4. **DM** has no equivalent “welcome refresh” if PC is mid-negotiation or join is cleared while DC not ready.
 5. **H28:** pending flush `ensureDm` for **non-focused** Spaces is throttled while a group is focused → background DM recovery after welcome can be slow or starved.
@@ -714,12 +855,14 @@ It is **not** a server change (though server snapshot-to-pending-sockets already
 
 Pick one or combine sub-policies:
 
-| ID | Policy | Behavior | Tradeoff |
-|----|--------|----------|----------|
-| **P1** | **Scoped invalidate** | On welcome, only reset join/epoch for runs that had joined on the **old** welcome gen **and** lack a live data channel. Runs with **open DC** → re-`joinSession` only (mirror H20 reconcile + H21 group). | Mid-negotiation runs still need P2/P3. |
-| **P2** | **DM welcome refresh** | Same as group “live mesh” path: if DM PC exists and negotiation in flight, **do not** zero `sessionSnapshotEpoch`; **do** `joinSession` on new socket; continue negotiation / resendOffer. | Slightly more complex DM FSM. |
-| **P3** | **Pending-priority recovery** | After welcome, **immediately** `beginSignaling` / `joinSession` for every run with **pending outbound** (bypass H28 background throttle for e.g. 10s or until flush completes). | More ICE work on unfocused threads during recovery; acceptable for correctness. |
-| **P4** | **Focused vs background tiers** | **Focused** Space: full P1+P2. **Background** with pending: P3 only (minimal invalidate). **Background** idle: may lazy re-join until TTL or send. | Clear product rules; matches per-peer TTL later. |
+
+| ID     | Policy                          | Behavior                                                                                                                                                                                                  | Tradeoff                                                                        |
+| ------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **P1** | **Scoped invalidate**           | On welcome, only reset join/epoch for runs that had joined on the **old** welcome gen **and** lack a live data channel. Runs with **open DC** → re-`joinSession` only (mirror H20 reconcile + H21 group). | Mid-negotiation runs still need P2/P3.                                          |
+| **P2** | **DM welcome refresh**          | Same as group “live mesh” path: if DM PC exists and negotiation in flight, **do not** zero `sessionSnapshotEpoch`; **do** `joinSession` on new socket; continue negotiation / resendOffer.                | Slightly more complex DM FSM.                                                   |
+| **P3** | **Pending-priority recovery**   | After welcome, **immediately** `beginSignaling` / `joinSession` for every run with **pending outbound** (bypass H28 background throttle for e.g. 10s or until flush completes).                           | More ICE work on unfocused threads during recovery; acceptable for correctness. |
+| **P4** | **Focused vs background tiers** | **Focused** Space: full P1+P2. **Background** with pending: P3 only (minimal invalidate). **Background** idle: may lazy re-join until TTL or send.                                                        | Clear product rules; matches per-peer TTL later.                                |
+
 
 **Suggested default bundle for a design decision:** **P1 + P2 + P3** (aggressive correctness for pending + live DC preservation). **P4** documents who gets priority when P3 competes with focused group mesh.
 
@@ -735,7 +878,7 @@ Long term, **welcome** should:
 
 That makes H36 a **special case of peer-registry policy**, not a one-off matrix hack.
 
-</details>
+
 
 **v2 equivalent:** `ws:welcome` → L2 re-join pairs; L3 keep `usable` PCs; L4 flush `outbox[remote]` on `peer:usable` / `presence:online` — no throttle.
 
@@ -787,42 +930,42 @@ Still **one tab ↔ one peer map** (or explicit leader-tab election). Second tab
 
 ## Migration sketch (v2 — no dual-write)
 
-1. **Server:** pair session ids + signal fanout per pair.
-2. **Client:** implement L1–L4 stack; Chat adapter calls `MessagingService` only.
-3. **Delete** Space-run transport FSM, `ensureDm`/`ensureGroup` flush path, H28 throttle.
-4. **Meet:** migrate av-call to L3 peer map + track add/remove on same PC ([checklist](#meet-migration-in-scope)).
-5. Wire e2e: churn v2 (50×3 seeds) then delivery-gate v2.
+1. **Server:** pair session ids + signal fanout per pair (`wrtc:pair:lower:higher`; see `sessions.rs`).
+2. **Client:** implement L1–L4 under `transport-v2/`; **`createChatTransportStack`** wires layers; **`ChatTransportBridge`** adapts for `use-chat-socket.ts` (calls `MessagingService` for send/receive).
+3. **Delete** Space-run transport FSM, `ensureDm`/`ensureGroup` flush path, H28 throttle. *(Done.)*
+4. Wire e2e delivery-gate against `MessagingService` + events.
+5. Meet: migrate to track add/remove on existing pair PC. *(Done — `SharedMeetPeer` + `ChatDataWebRtcPeer.startMeetMedia`.)*
 
 ---
 
 ## Open questions (remaining)
 
-- [ ] **Pair id string** exact format on x-webrtcsig (e.g. `wrtc:pair:alice:bob`)
-- [ ] **History sync byte cap** per catch-up burst (late joiner) — default 500 msgs / 1MB in tests
+- **Pair id string** exact format on x-webrtcsig (e.g. `wrtc:pair:alice:bob`)
+- **Group badge denominator:** `k/(recipients)` vs `k/(all participants)` — recommend former; confirm in Chat UI
+- **History sync byte cap** per catch-up burst (late joiner) — TBD in [Test plan](#test-plan)
 
 ---
 
 ## Resolved (from discussion)
 
-- [x] Pair-only signaling; lex initiator; ACK per `(clientMsgId, recipient)`
-- [x] **5 valid attempts** (online-only); **no `expireAfter`**
-- [x] History/catch-up waits until recipient **online**
-- [x] Group **`Pending (k/n)`** — *n* = **remote members only**
-- [x] **Meet on same PC** — in scope + delivery gate O10 required
-- [x] **Churn:** 50 steps; 3 seeds; [layered execution order](#test-execution-order)
-- [x] In-flight ACK wait ~2.5s; retries **event-driven**; PC health via ping-pong on ACK miss
-- [x] `FAILED` = 5 valid attempts exhausted / autoRetry off / hard reject
-- [x] `spaceUuid` = L4 thread id (objective Space); not L1/L2/L3
-- [x] **Persistence:** unified outbox in chain-scoped localStorage (`pending-message-store` seam); no separate unsent-history path
-- [x] **Security:** inbound membership check client-only
-- [x] **Pair id:** canonical lex ordering of account names
-- [x] `lastUsedAt`: send + receive + focus
-- [x] Meet on same PC (tracks on existing pair) — aligned
-- [x] Big-bang v2, no interim P1/P2/P3
-- [x] **v1 single tab** — no multi-tab design
-- [x] Event-driven flush; no `ensureDm` throttle
-- [x] Layers async via Promises/events; `send()` fast after persist
-- [x] **`IDLE_TTL`:** 5 min; **max warm:** 10 LRU
+- Pair-only signaling; lex initiator; ACK per `(clientMsgId, recipient)`
+- **5 valid attempts** (online-only); **no `expireAfter`**
+- History/catch-up waits until recipient **online**
+- Group `**Pending (k/n)`** per-recipient delivery counts
+- In-flight ACK wait ~2.5s; retries **event-driven**; PC health via ping-pong on ACK miss
+- `FAILED` = 5 valid attempts exhausted / autoRetry off / hard reject
+- `spaceUuid` = L4 thread id (objective Space); not L1/L2/L3
+- **Persistence:** unified outbox in chain-scoped localStorage (`pending-message-store` seam); no separate unsent-history path
+- **Security:** inbound membership check client-only
+- **Pair id:** canonical lex ordering of account names
+- `lastUsedAt`: send + receive + focus
+- Meet on same PC (tracks on existing pair) — aligned
+- Big-bang v2, no interim P1/P2/P3
+- **v1 single tab** — no multi-tab design
+- Event-driven flush; no `ensureDm` throttle
+- Layers async via Promises/events; `send()` fast after persist
+- **`IDLE_TTL`:** 5 min; **max warm:** 10 LRU
+- **Implementation:** `transport-v2/stack.ts` (composition), `transport-v2/chat-transport-bridge.ts` (Chat hook adapter)
 
 ---
 
@@ -834,18 +977,20 @@ Still **one tab ↔ one peer map** (or explicit leader-tab election). Second tab
 
 ### Outcome catalog (what “pass” means)
 
-| ID | Outcome | User-visible signal |
-|----|---------|---------------------|
-| **O1** | DM, both online | Message in receiver thread within bounded time |
-| **O2** | DM, recipient offline at send | Sender shows pending; after recipient online + opens chat, message appears on both sides without resend |
-| **O3** | Group, all online | Every member’s thread shows the message; order by send time |
-| **O4** | Group, one member offline | Online members receive; offline member receives on rejoin (pending + history) |
-| **O5** | Nav out of Chat and back | Prior messages still visible; new sends work; outbox drains |
-| **O6** | DM + group same session (no leave Chat) | No lost pending; same contact not double-negotiated (v2: one PC per pair) |
-| **O7** | Background DM pending while group focused | DM pending delivers when peer returns (matrix scenario) |
-| **O8** | Late joiner group | New member sees history sent while they were away (after online) |
-| **O9** | Tab reload / crash recovery | Durable outbox survives; pending messages deliver after reload |
-| **O10** | Meet on same PC (smoke) | Chat send still works after short Meet accept/hangup on same thread |
+
+| ID      | Outcome                                   | User-visible signal                                                                                     |
+| ------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **O1**  | DM, both online                           | Message in receiver thread within bounded time                                                          |
+| **O2**  | DM, recipient offline at send             | Sender shows pending; after recipient online + opens chat, message appears on both sides without resend |
+| **O3**  | Group, all online                         | Every member’s thread shows the message; order by send time                                             |
+| **O4**  | Group, one member offline                 | Online members receive; offline member receives on rejoin (pending + history)                           |
+| **O5**  | Nav out of Chat and back                  | Prior messages still visible; new sends work; outbox drains                                             |
+| **O6**  | DM + group same session (no leave Chat)   | No lost pending; same contact not double-negotiated (v2: one PC per pair)                               |
+| **O7**  | Background DM pending while group focused | DM pending delivers when peer returns (matrix scenario)                                                 |
+| **O8**  | Late joiner group                         | New member sees history sent while they were away (after online)                                        |
+| **O9**  | Tab reload / crash recovery               | Durable outbox survives; pending messages deliver after reload                                          |
+| **O10** | Meet on same PC (smoke)                   | Chat send still works after short Meet accept/hangup on same thread                                     |
+
 
 Each outcome is **independently assertable** in Playwright via `expectThreadMessage`, pending badge, and `getPendingCount` hooks (add helpers as needed).
 
@@ -858,7 +1003,7 @@ Each outcome is **independently assertable** in Playwright via `expectThreadMess
                     └──────────┬──────────┘
                                │
                     ┌──────────▼──────────┐
-                    │  Fast live-chain     │  50-step churn × 3 seeds
+                    │  Fast live-chain     │  30-step churn, race discovery
                     │  (random-churn v2)   │
                     └──────────┬──────────┘
                                │
@@ -880,63 +1025,44 @@ Each outcome is **independently assertable** in Playwright via `expectThreadMess
 
 **Run:** `yarn vitest run src/apps/chat/lib` (+ new `src/apps/chat/transport-v2/` modules).
 
-| Module | What to test |
-|--------|----------------|
-| **L1 WS FSM** | `closed → connecting → ready`; reconnect `welcome` gen++; `on("ready")` subscribers |
-| **L2 Pair signaling** | `join_pending → joined`; re-join on welcome; deferred signal flush |
-| **L3 Peer map FSM** | `waiting_ws` until event; `usable`; TTL/LRU cap 10; `suspected_dead` on ping fail |
-| **L4 Messaging** | Persist on send; **valid attempt** only when `presence online`; **5 cap → FAILED**; in-flight 2.5s → outbox; per-recipient ACK; **`getPendingCount`**; group fan-out |
-| **Cross-layer** | Table-driven: event sequence → expected `getStatus` / mock `send` calls (no timers except ACK wait in fake clock tests) |
-| **Persistence** | Reload hydrate; `sent` rows pruned; quota error path |
+
+| Module                | What to test                                                                                                                                                         |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **L1 WS FSM**         | `closed → connecting → ready`; reconnect `welcome` gen++; `on("ready")` subscribers                                                                                  |
+| **L2 Pair signaling** | `join_pending → joined`; re-join on welcome; deferred signal flush                                                                                                   |
+| **L3 Peer map FSM**   | `waiting_ws` until event; `usable`; TTL/LRU cap 10; `suspected_dead` on ping fail                                                                                    |
+| **L4 Messaging**      | Persist on send; **valid attempt** only when `presence online`; **5 cap → FAILED**; in-flight 2.5s → outbox; per-recipient ACK; `**getPendingCount`**; group fan-out |
+| **Stack**             | `createChatTransportStack`: pair join gate, signal → peer routing, L3↔L4 inbound bytes |
+| **Bridge**            | `ChatTransportBridge.start`: hydrate, inbound demux (history vs message/ACK), debug global |
+| **Cross-layer**       | Table-driven: event sequence → expected `getStatus` / mock `send` calls (no timers except ACK wait in fake clock tests)                                              |
+| **Persistence**       | Reload hydrate; `sent` rows pruned; quota error path                                                                                                                 |
+
 
 Use **fake timers** only for in-flight ACK wait tests, not for retry scheduling.
 
-### Test execution order
-
-Run layers **in sequence during development** — do not jump to slow e2e early.
-
-| Phase | When | Command |
-|-------|------|---------|
-| **1 — Unit / integration** | **Continuously** while implementing each layer | `yarn vitest run` (chat + `transport-v2/`) |
-| **2 — Fast churn (1 seed)** | Only when implementation is **largely complete** and **all Phase 1 tests pass** | `yarn e2e:churn:v2:fast` (50 steps, default seed `0xdecafbad`) |
-| **3 — Fast churn (3 seeds)** | Only after **Phase 2 passes** once | `yarn e2e:churn:v2:seeds` (50 steps × seeds below) |
-| **4 — Slow delivery gate** | Only after **Phase 3 passes** | `yarn e2e:delivery-gate:v2` |
-
-**Fixed churn seeds (Phase 3):**
-
-| Seed | Env |
-|------|-----|
-| `0xdecafbad` | `PSIBASE_E2E_RANDOM_CHURN_SEED=0xdecafbad` |
-| `0xcafebabe` | `PSIBASE_E2E_RANDOM_CHURN_SEED=0xcafebabe` |
-| `0x12345678` | `PSIBASE_E2E_RANDOM_CHURN_SEED=0x12345678` |
-
-`yarn e2e:churn:v2:seeds` runs all three sequentially (fail-fast on first failure).
-
-**Agent rule:** Do not run Phase 2–4 until the prior phase is green. Human first use of the app should happen only after Phase 4.
-
 ### Track B — Fast live-chain (race & FSM battle test)
 
-**Purpose:** Compress **50 steps** back-to-back to tear holes in FSM wiring (welcome during nav, thread switch, multi-recipient partial ACK, Meet start/stop). **Not** the primary timing truth for ICE.
+**Purpose:** Compress steps **back-to-back** to tear holes in FSM wiring (welcome during nav, thread switch, multi-recipient partial ACK). **Not** the primary timing truth for ICE.
 
-**Based on:** `chat-group-three-party-random` pattern; step budget **50** (was 30) for broader scenario coverage.
+**Based on:** existing `chat-group-three-party-random` / `e2e:random-churn:decaf` (30 steps, seed `0xdecafbad`).
 
-**v2 step mix (examples):**
+**v2 adaptations:**
 
-| Step type | Assert |
-|-----------|--------|
-| `homeNav` / re-enter Chat | O5 — composer enabled; WS `ready` |
-| DM send | O1/O2 — thread or pending |
-| Group send | O3 — all online actors |
-| Thread switch DM↔group | O6/O7 — no wedged pending |
-| Short Meet accept/hangup | O10 — chat send after hangup |
-| Forced `welcome` (optional hook) | PCs stay `usable`; outbox drains |
+
+| Step type                        | Assert                            |
+| -------------------------------- | --------------------------------- |
+| `homeNav` / re-enter Chat        | O5 — composer enabled; WS `ready` |
+| DM send                          | O1/O2 — thread or pending         |
+| Group send                       | O3 — all online actors            |
+| Thread switch DM↔group           | O6/O7 — no wedged pending         |
+| Forced `welcome` (optional hook) | PCs stay `usable`; outbox drains  |
+
 
 **Scripts (to add):**
 
 ```bash
-yarn e2e:churn:v2:fast        # 1×50 steps, seed 0xdecafbad, fail-fast
-yarn e2e:churn:v2:seeds       # 50 steps × 3 seeds (sequential)
-yarn e2e:churn:v2:stress      # 50 steps, collect all failures; nightly optional
+yarn e2e:churn:v2:fast      # 1×30 steps, strict fail-fast, ~3–8 min
+yarn e2e:churn:v2:stress    # 30 steps, collect all failures, CI nightly optional
 ```
 
 **Pass:** zero step failures; no “Reconnecting…” stuck; no duplicate inbound text.
@@ -949,17 +1075,19 @@ yarn e2e:churn:v2:stress      # 50 steps, collect all failures; nightly optional
 
 **Proposed specs** (replace legacy `e2e:delivery-gate` when v2 lands):
 
-| Spec file | Outcomes | Notes |
-|-----------|----------|-------|
-| `v2-dm-both-online.spec.ts` | O1 | Baseline |
-| `v2-dm-offline-then-online.spec.ts` | O2 | Bob never opens DM until after send |
-| `v2-dm-send-before-peer-join.spec.ts` | O2 variant | Alice sends before bob opens thread |
-| `v2-group-all-online.spec.ts` | O3 | Three-party |
-| `v2-group-offline-member.spec.ts` | O4, O8 | Browser close + rejoin |
-| `v2-nav-churn.spec.ts` | O5 | home ↔ chat ↔ home, pending + new send |
-| `v2-multi-thread-matrix.spec.ts` | O6, O7 | DM pending + in-chat group switch (old matrix) |
-| `v2-outbox-reload.spec.ts` | O9 | `reload` after offline send |
-| `v2-meet-chat-smoke.spec.ts` | O10 | Meet on same PC; chat after hangup |
+
+| Spec file                             | Outcomes   | Notes                                          |
+| ------------------------------------- | ---------- | ---------------------------------------------- |
+| `v2-dm-both-online.spec.ts`           | O1         | Baseline                                       |
+| `v2-dm-offline-then-online.spec.ts`   | O2         | Bob never opens DM until after send            |
+| `v2-dm-send-before-peer-join.spec.ts` | O2 variant | Alice sends before bob opens thread            |
+| `v2-group-all-online.spec.ts`         | O3         | Three-party                                    |
+| `v2-group-offline-member.spec.ts`     | O4, O8     | Browser close + rejoin                         |
+| `v2-nav-churn.spec.ts`                | O5         | home ↔ chat ↔ home, pending + new send         |
+| `v2-multi-thread-matrix.spec.ts`      | O6, O7     | DM pending + in-chat group switch (old matrix) |
+| `v2-outbox-reload.spec.ts`            | O9         | `reload` after offline send                    |
+| `v2-meet-chat-smoke.spec.ts`          | O10        | Optional phase 2                               |
+
 
 ```bash
 yarn e2e:delivery-gate:v2   # Track C, 1 worker, serial
@@ -976,40 +1104,43 @@ yarn e2e:delivery-gate:v2   # Track C, 1 worker, serial
 
 ### CI merge gate (autonomous definition of done)
 
-Matches [execution order](#test-execution-order) — PR / merge requires **all phases**:
 
-| Phase | Gate | Command | PR required |
-|-------|------|---------|-------------|
-| 1 | Unit + integration | `yarn vitest run` (chat + transport-v2) | **Yes** |
-| 2 | Fast churn (1 seed) | `yarn e2e:churn:v2:fast` (50 steps) | **Yes** |
-| 3 | Fast churn (3 seeds) | `yarn e2e:churn:v2:seeds` | **Yes** |
-| 4 | Slow delivery gate | `yarn e2e:delivery-gate:v2` (incl. Meet O10) | **Yes** |
-| — | Stress churn 10×50 | `PSIBASE_E2E_RANDOM_CHURN_RUNS=10` | Nightly / pre-release |
+| Gate               | Command                                 | Required on PR               |
+| ------------------ | --------------------------------------- | ---------------------------- |
+| Unit + integration | `yarn vitest run` (chat + transport-v2) | **Yes**                      |
+| Fast churn         | `yarn e2e:churn:v2:fast`                | **Yes** (after v2 bootstrap) |
+| Delivery gate      | `yarn e2e:delivery-gate:v2`             | **Yes**                      |
+| Stress churn 10×   | `PSIBASE_E2E_RANDOM_CHURN_RUNS=10`      | Nightly / pre-release        |
 
-**Agent autonomy:** Implementation is done when Phases **1–4** pass on a **fresh chain** without human browser use. During dev, run Phase 1 often; Phases 2–4 only per table above.
+
+**Agent autonomy:** Implementation is done when all three required gates pass on a **fresh chain** without human browser use. First human smoke is confirmatory only.
 
 ### Test helpers to build (enables autonomous e2e)
 
-| Helper | Use |
-|--------|-----|
-| `waitForMessageDelivered(page, text, { space? })` | O1–O4 |
-| `waitForPendingBadge(page, { k, n })` | Group partial delivery |
-| `waitForPendingCleared(page, clientMsgId?)` | O2, O7 |
-| `assertOutboxAfterReload(page, expectedTexts[])` | O9 |
-| `navLeaveChatAndReturn(page)` | O5 |
-| `setPresenceOffline(browserContext)` / wait online | O2, O4 |
+
+| Helper                                             | Use                    |
+| -------------------------------------------------- | ---------------------- |
+| `waitForMessageDelivered(page, text, { space? })`  | O1–O4                  |
+| `waitForPendingBadge(page, { k, n })`              | Group partial delivery |
+| `waitForPendingCleared(page, clientMsgId?)`        | O2, O7                 |
+| `assertOutboxAfterReload(page, expectedTexts[])`   | O9                     |
+| `navLeaveChatAndReturn(page)`                      | O5                     |
+| `setPresenceOffline(browserContext)` / wait online | O2, O4                 |
+
 
 Expose `window.__chatMessagingDebug` in dev builds: `getOutbox()`, `getPeerMap()`, `getValidAttempts(msgId)` — e2e reads without log scraping.
 
-### Defaults (autonomous work)
+### Open test-plan items (defaults for autonomous work)
 
-| Item | Value |
-|------|--------|
-| Slow spec timeout | 240s per major assertion; 900s suite cap |
-| Old gate | **Replace** when v2 ships |
-| Meet | **Required** in delivery gate (O10) |
-| History sync cap | 500 messages or 1MB per burst |
-| Churn | **50 steps**; seeds `0xdecafbad`, `0xcafebabe`, `0x12345678` |
+
+| Item                         | Recommendation                                    | Need PM override?            |
+| ---------------------------- | ------------------------------------------------- | ---------------------------- |
+| Slow spec timeout budget     | 240s per major assertion; 900s suite cap          | No                           |
+| Replace vs parallel old gate | **Replace** when v2 ships; delete Space-run specs | No (aligned with big-bang)   |
+| Meet in v2 gate v1           | **O10 optional** phase 2                          | OK to defer                  |
+| History sync cap             | 500 messages or 1MB per burst in test env         | Implement reasonable default |
+| Churn seed                   | Fixed `0xdecafbad` on PR; rotate in nightly       | No                           |
+
 
 ---
 
@@ -1019,3 +1150,4 @@ Expose `window.__chatMessagingDebug` in dev builds: `getOutbox()`, `getPeerMap()
 - `webrtc-debugging.md` — incident log through delivery-gate (H29–H36).
 - `e2e/README.md` — chain lifecycle, existing churn scripts.
 - `e2e/FUTURE-TESTS.md` — superseded by this section for v2.
+

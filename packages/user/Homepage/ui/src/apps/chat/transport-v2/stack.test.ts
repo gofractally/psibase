@@ -1,0 +1,401 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+    serializeChatDataMessage,
+    type ChatDataMessageEnvelope,
+} from "../lib/chat-data-envelope";
+import type { ChatDataPeerHandlers } from "../lib/chat-data-webrtc-peer";
+import {
+    createTwoPartyHub,
+    createTwoPartyStacks,
+    createThreePartyStacks,
+    createStackFixture,
+    establishPair,
+    FakeRealtimeClient,
+    pairIdFor,
+} from "./stack-test-harness";
+import { createChatTransportStack } from "./stack";
+import { IN_FLIGHT_ACK_WAIT_MS, MAX_VALID_ATTEMPTS } from "./types";
+
+vi.mock("../lib/chat-data-debug", () => ({
+    chatDataRecord: () => {},
+    chatDataLog: () => {},
+    logIceCandidate: () => {},
+    registerChatDataPeer: () => {},
+    unregisterChatDataPeer: () => {},
+    summarizePeerConnection: async () => ({}),
+    shortSessionId: (id: string) => id,
+    iceServerSummary: () => "none",
+    installChatDataDebugGlobal: () => {},
+}));
+
+const peerMock = vi.hoisted(() => {
+    const mockPeers: MockChatDataWebRtcPeer[] = [];
+
+    class MockChatDataWebRtcPeer {
+        readonly sessionId: string;
+
+        readonly selfAccount: string;
+
+        readonly peerAccount: string;
+
+        dataChannelReady = false;
+
+        private disposed = false;
+
+        private readonly handlers: ChatDataPeerHandlers;
+
+        private readonly pendingOutbound: ChatDataMessageEnvelope[] = [];
+
+        constructor(params: {
+            sessionId: string;
+            selfAccount: string;
+            peerAccount: string;
+            iceServers: unknown;
+            signaling: unknown;
+            isInitiator: boolean;
+            impolite?: boolean;
+            handlers?: ChatDataPeerHandlers;
+        }) {
+            this.sessionId = params.sessionId;
+            this.selfAccount = params.selfAccount;
+            this.peerAccount = params.peerAccount;
+            this.handlers = params.handlers ?? {};
+            mockPeers.push(this);
+            queueMicrotask(() => {
+                if (this.disposed) return;
+                this.dataChannelReady = true;
+                this.handlers.onDataChannelOpen?.();
+            });
+        }
+
+        get isDisposed(): boolean {
+            return this.disposed;
+        }
+
+        sendChatMessage(envelope: ChatDataMessageEnvelope): boolean {
+            if (!this.dataChannelReady) return false;
+            this.pendingOutbound.push(envelope);
+            return true;
+        }
+
+        sendHistorySync(): boolean {
+            return this.dataChannelReady;
+        }
+
+        sendMessageAck(): boolean {
+            return this.dataChannelReady;
+        }
+
+        resendOffer(): void {}
+
+        restartIce(): void {}
+
+        stopMeetMedia(): void {}
+
+        dispose(): void {
+            this.disposed = true;
+            this.dataChannelReady = false;
+        }
+
+        async handleRemoteSignal(): Promise<void> {}
+
+        drainPendingOutbound(): ChatDataMessageEnvelope[] {
+            return this.pendingOutbound.splice(0);
+        }
+    }
+
+    return { mockPeers, MockChatDataWebRtcPeer };
+});
+
+vi.mock("../lib/chat-data-webrtc-peer", () => ({
+    ChatDataWebRtcPeer: peerMock.MockChatDataWebRtcPeer,
+}));
+
+const { mockPeers } = peerMock;
+
+describe("createChatTransportStack integration", () => {
+    beforeEach(() => {
+        mockPeers.length = 0;
+        localStorage.clear();
+        vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it("joinPair sends joinSession and sessionSnapshot creates usable peer", async () => {
+        const hub = createTwoPartyHub();
+        const alice = createStackFixture(hub, "alice");
+
+        const pairId = pairIdFor("alice", "bob");
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("absent");
+
+        hub.setPresence("bob", true);
+        await alice.stack.peerRegistry.ensure("bob", "message_enqueued");
+
+        expect(
+            alice.rt.sentFrames.some(
+                (f) => f.t === "joinSession" && f.sessionId === pairId,
+            ),
+        ).toBe(true);
+        expect(hub.joinCount(pairId)).toBe(1);
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+    });
+
+    it("sessionSnapshot for both participants establishes pair on each side", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+
+        await establishPair(hub, alice, bob);
+
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+        expect(bob.stack.peerRegistry.getState("alice")).toBe("usable");
+        expect(hub.joinCount(pairIdFor("alice", "bob"))).toBe(2);
+    });
+
+    it("messaging.send delivers over usable peer after pair join", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+
+        hub.setPresence("bob", true);
+        const { msgId } = await alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "hello stack",
+        });
+        await Promise.resolve();
+
+        expect(alice.stack.messaging.getStatus(msgId)).toBe("PENDING");
+        const alicePeer = mockPeers.find(
+            (p) => p.selfAccount === "alice" && p.peerAccount === "bob",
+        );
+        expect(alicePeer?.drainPendingOutbound()).toEqual([
+            expect.objectContaining({
+                t: "chatMessage",
+                body: "hello stack",
+                clientMsgId: msgId,
+            }),
+        ]);
+        void bob;
+    });
+
+    it("routes inbound bytes from peer registry to messaging ACK handler", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        hub.setPresence("bob", true);
+
+        const { msgId } = await alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "ack me",
+        });
+        await Promise.resolve();
+
+        const svc = alice.stack.messaging as typeof alice.stack.messaging & {
+            handleWireFromRemote: (remote: string, raw: string) => void;
+        };
+        svc.handleWireFromRemote(
+            "bob",
+            JSON.stringify({
+                t: "messageAck",
+                spaceUuid: "space:dm",
+                clientMsgId: msgId,
+                from: "bob",
+            }),
+        );
+
+        expect(alice.stack.messaging.getStatus(msgId)).toBe("DELIVERED");
+    });
+
+    it("defers outbound signal until sessionSnapshot confirms join", async () => {
+        const hub = createTwoPartyHub();
+        const rt = new FakeRealtimeClient("alice");
+        hub.register("alice", rt);
+        const stack = createChatTransportStack({
+            localAccount: "alice",
+            chainId: "test",
+            realtimeClient: rt,
+            iceServers: null,
+        });
+        stack.wireRealtimeHandlers({});
+        rt.connect();
+
+        const pairId = pairIdFor("alice", "bob");
+        stack.signaling.signal({
+            sessionId: pairId,
+            to: "bob",
+            kind: "offer",
+            sdp: "v=0 deferred-offer",
+        });
+        expect(rt.sentFrames.filter((f) => f.t === "signal")).toHaveLength(0);
+
+        stack.signaling.joinSession(pairId);
+
+        expect(
+            rt.sentFrames.some(
+                (f) =>
+                    f.t === "signal" &&
+                    f.kind === "offer" &&
+                    f.sdp === "v=0 deferred-offer",
+            ),
+        ).toBe(true);
+    });
+
+    it("re-joins pair sessions after welcome reconnect", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+
+        const pairId = pairIdFor("alice", "bob");
+        const joinsBefore = alice.rt.sentFrames.filter(
+            (f) => f.t === "joinSession" && f.sessionId === pairId,
+        ).length;
+
+        alice.rt.simulateReconnectWelcome();
+        await Promise.resolve();
+
+        const joinsAfter = alice.rt.sentFrames.filter(
+            (f) => f.t === "joinSession" && f.sessionId === pairId,
+        ).length;
+        expect(joinsAfter).toBeGreaterThan(joinsBefore);
+    });
+
+    it("routes pair signal frames to peerRegistry.handleRemoteSignal", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+
+        const handleSpy = vi.spyOn(bob.stack.peerRegistry, "handleRemoteSignal");
+
+        bob.rt.dispatch({
+            t: "signal",
+            sessionId: pairIdFor("alice", "bob"),
+            from: "alice",
+            to: "bob",
+            kind: "offer",
+            sdp: "v=0 test-offer",
+        });
+
+        expect(handleSpy).toHaveBeenCalledWith(
+            "alice",
+            expect.objectContaining({ kind: "offer", sdp: "v=0 test-offer" }),
+        );
+    });
+
+    it("ignores non-pair sessionSnapshot and signal frames", async () => {
+        const hub = createTwoPartyHub();
+        const alice = createStackFixture(hub, "alice");
+        const snapHandler = vi.fn();
+        const signalHandler = vi.fn();
+        alice.stack.wireRealtimeHandlers({
+            sessionSnapshot: snapHandler,
+            signal: signalHandler,
+        });
+
+        alice.rt.dispatch({
+            t: "sessionSnapshot",
+            sessionId: "wrtc:space-old",
+            joinedParticipants: ["alice"],
+            pendingParticipants: [],
+            epoch: 1,
+        });
+        alice.rt.dispatch({
+            t: "signal",
+            sessionId: "wrtc:space-old",
+            from: "bob",
+            to: "alice",
+            kind: "offer",
+            sdp: "ignored",
+        });
+
+        expect(snapHandler).not.toHaveBeenCalled();
+        expect(signalHandler).not.toHaveBeenCalled();
+    });
+
+    it("fails message after max valid ack attempts (full stack path)", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        hub.setPresence("bob", true);
+
+        const { msgId } = await alice.stack.messaging.send({
+            spaceUuid: "space:dm",
+            recipient: "bob",
+            body: "timeout",
+            autoRetry: true,
+        });
+        await Promise.resolve();
+        void bob;
+
+        for (let i = 0; i < MAX_VALID_ATTEMPTS; i++) {
+            await vi.advanceTimersByTimeAsync(IN_FLIGHT_ACK_WAIT_MS + 1);
+            await Promise.resolve();
+        }
+
+        expect(alice.stack.messaging.getStatus(msgId)).toBe("FAILED");
+    });
+
+    it("delivers inbound chatMessage through default L4 wire path", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+
+        const inbound: ChatDataMessageEnvelope[] = [];
+        bob.stack.messaging.onInbound((envelope) => {
+            inbound.push({
+                t: "chatMessage",
+                spaceUuid: envelope.spaceUuid,
+                from: envelope.from,
+                body: envelope.body,
+                sendTimestamp: envelope.sendTimestamp,
+                clientMsgId: envelope.clientMsgId,
+            });
+        });
+
+        const svc = bob.stack.messaging as typeof bob.stack.messaging & {
+            handleWireFromRemote: (remote: string, raw: string) => void;
+        };
+        svc.handleWireFromRemote(
+            "alice",
+            serializeChatDataMessage({
+                t: "chatMessage",
+                spaceUuid: "space:dm",
+                from: "alice",
+                body: "inbound hi",
+                sendTimestamp: 42,
+                clientMsgId: "msg-in-1",
+            }),
+        );
+
+        expect(inbound).toEqual([
+            expect.objectContaining({ body: "inbound hi", from: "alice" }),
+        ]);
+        void alice;
+    });
+
+    it("supports two independent remotes (alice pairs with bob and charlie)", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob, charlie } = createThreePartyStacks(hub);
+
+        hub.setPresence("bob", true);
+        hub.setPresence("charlie", true);
+
+        await alice.stack.peerRegistry.ensure("bob", "peer_focus");
+        await alice.stack.peerRegistry.ensure("charlie", "peer_focus");
+
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+        expect(alice.stack.peerRegistry.getState("charlie")).toBe("usable");
+
+        const bobPairId = pairIdFor("alice", "bob");
+        const charliePairId = pairIdFor("alice", "charlie");
+
+        expect(hub.joinCount(bobPairId)).toBe(1);
+        expect(hub.joinCount(charliePairId)).toBe(1);
+        void bob;
+        void charlie;
+    });
+});

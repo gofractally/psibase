@@ -9,6 +9,7 @@
         "preview": "vite preview",
         "test": "vitest run",
         "test:watch": "vitest",
+        "test:transport-v2": "vitest run src/apps/chat/transport-v2",
         "e2e": "playwright test --config e2e/playwright.config.ts",
         "e2e:headed": "playwright test --config e2e/playwright.config.ts --headed",
         "e2e:random-churn": "PSIBASE_E2E_RANDOM_CHURN_RUNS=${PSIBASE_E2E_RANDOM_CHURN_RUNS:-10} playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",

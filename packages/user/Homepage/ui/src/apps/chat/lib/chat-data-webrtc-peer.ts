@@ -14,10 +14,8 @@ import {
     summarizePeerConnection,
     unregisterChatDataPeer,
 } from "./chat-data-debug";
-import {
-    buildRtcPeerConnectionConfig,
-    iceServerSummary,
-} from "./ice-config";
+import { buildRtcPeerConnectionConfig, iceServerSummary } from "./ice-config";
+import { acquireMeetLocalMedia } from "./local-media";
 import type { IceServerConfig } from "./protocol";
 import type { SignalKind, WebRtcSignalingClient } from "./webrtc-signaling-client";
 import {
@@ -41,6 +39,12 @@ export type ChatDataPeerHandlers = {
     onFailed?: (detail: string) => void;
     /** Peer or datachannel lost but session may resume (peer navigated away, ICE drop, etc.). */
     onTransportLost?: (detail: string) => void;
+    /** Meet media connected on the shared pair PC. */
+    onMeetMediaConnected?: () => void;
+    onMeetLocalStream?: (stream: MediaStream | null) => void;
+    onMeetRemoteStream?: (stream: MediaStream | null) => void;
+    onMeetFailed?: (detail: string) => void;
+    onMeetTransportLost?: (detail: string) => void;
 };
 
 /**
@@ -114,6 +118,28 @@ export class ChatDataWebRtcPeer {
     private remoteIceApplied = 0;
 
     private transportLostReported = false;
+
+    private meetActive = false;
+
+    private meetMediaConnected = false;
+
+    private meetLocalStream: MediaStream | null = null;
+
+    private meetRemoteStream: MediaStream | null = null;
+
+    private meetVideoActuallyDisabled = false;
+
+    private meetOwnsLocalStream = false;
+
+    private meetStartPromise: Promise<void> | null = null;
+
+    private meetHandlers: {
+        onMediaConnected?: () => void;
+        onLocalStream?: (stream: MediaStream | null) => void;
+        onRemoteStream?: (stream: MediaStream | null) => void;
+        onFailed?: (detail: string) => void;
+        onTransportLost?: (detail: string) => void;
+    } = {};
 
     /**
      * True while `createOffer` → `setLocalDescription` is in flight. Used
@@ -263,6 +289,9 @@ export class ChatDataWebRtcPeer {
             if (state === "connected" && this.dataChannelReady) {
                 this.handlers.onDataChannelOpen?.();
             }
+            if (state === "connected" && this.meetActive) {
+                this.markMeetMediaConnected();
+            }
             if (state === "failed" || state === "closed") {
                 void this.logFailureSnapshot(`connectionState=${state}`);
                 this.reportTransportLost(`WebRTC connection ${state}`);
@@ -276,6 +305,17 @@ export class ChatDataWebRtcPeer {
                 label: ev.channel.label,
             });
             this.attachDataChannel(ev.channel);
+        };
+
+        pc.ontrack = (ev) => {
+            if (this.disposed) return;
+            const remote = ev.streams[0] ?? null;
+            this.meetRemoteStream = remote;
+            this.handlers.onMeetRemoteStream?.(remote);
+            this.meetHandlers.onRemoteStream?.(remote);
+            if (this.meetActive && remote) {
+                this.markMeetMediaConnected();
+            }
         };
 
         chatDataRecord("peer created", {
@@ -355,6 +395,184 @@ export class ChatDataWebRtcPeer {
 
     get isDisposed(): boolean {
         return this.disposed;
+    }
+
+    /** True once Meet A/V is flowing on this shared pair PC. */
+    get isMediaConnected(): boolean {
+        return this.meetMediaConnected;
+    }
+
+    getMeetLocalStream(): MediaStream | null {
+        return this.meetLocalStream;
+    }
+
+    getMeetRemoteStream(): MediaStream | null {
+        return this.meetRemoteStream;
+    }
+
+    getMeetVideoActuallyDisabled(): boolean {
+        return this.meetVideoActuallyDisabled;
+    }
+
+    setMeetAudioEnabled(on: boolean): void {
+        this.meetLocalStream
+            ?.getAudioTracks()
+            .forEach((t) => {
+                t.enabled = on;
+            });
+    }
+
+    setMeetVideoEnabled(on: boolean): void {
+        this.meetLocalStream
+            ?.getVideoTracks()
+            .forEach((t) => {
+                t.enabled = on;
+            });
+    }
+
+    /**
+     * Add local A/V tracks to the existing pair PC and renegotiate.
+     * Chat data channel stays open across Meet start/stop.
+     */
+    async startMeetMedia(params: {
+        wantVideo: boolean;
+        wantAudio: boolean;
+        sharedLocalStream?: MediaStream | null;
+        onMediaConnected?: () => void;
+        onLocalStream?: (stream: MediaStream | null) => void;
+        onRemoteStream?: (stream: MediaStream | null) => void;
+        onFailed?: (detail: string) => void;
+        onTransportLost?: (detail: string) => void;
+    }): Promise<void> {
+        if (this.meetStartPromise) return this.meetStartPromise;
+        this.meetHandlers = {
+            onMediaConnected: params.onMediaConnected,
+            onLocalStream: params.onLocalStream,
+            onRemoteStream: params.onRemoteStream,
+            onFailed: params.onFailed,
+            onTransportLost: params.onTransportLost,
+        };
+        this.meetStartPromise = this.doStartMeetMedia(params);
+        return this.meetStartPromise;
+    }
+
+    /** Remove Meet tracks without closing the chat data channel or PC. */
+    stopMeetMedia(): void {
+        if (!this.meetActive && !this.meetLocalStream) {
+            this.meetStartPromise = null;
+            this.meetHandlers = {};
+            return;
+        }
+        this.meetActive = false;
+        this.meetMediaConnected = false;
+        this.meetStartPromise = null;
+        const pc = this.pc;
+        if (pc) {
+            for (const sender of pc.getSenders()) {
+                if (sender.track) {
+                    try {
+                        pc.removeTrack(sender);
+                    } catch {
+                        /* ignore */
+                    }
+                }
+            }
+        }
+        if (this.meetLocalStream && this.meetOwnsLocalStream) {
+            for (const t of this.meetLocalStream.getTracks()) {
+                t.stop();
+            }
+        }
+        this.meetLocalStream = null;
+        this.meetRemoteStream = null;
+        this.meetOwnsLocalStream = false;
+        this.handlers.onMeetLocalStream?.(null);
+        this.handlers.onMeetRemoteStream?.(null);
+        this.meetHandlers.onLocalStream?.(null);
+        this.meetHandlers.onRemoteStream?.(null);
+        this.meetHandlers = {};
+        chatDataRecord("meet media stopped", {
+            sessionId: shortSessionId(this.sessionId),
+        });
+    }
+
+    private async doStartMeetMedia(params: {
+        wantVideo: boolean;
+        wantAudio: boolean;
+        sharedLocalStream?: MediaStream | null;
+    }): Promise<void> {
+        if (this.disposed || !this.pc) return;
+        if (this.meetActive && this.meetLocalStream) return;
+
+        try {
+            let stream: MediaStream;
+            let videoDisabled: boolean;
+            if (params.sharedLocalStream) {
+                stream = params.sharedLocalStream;
+                videoDisabled = !params.wantVideo;
+                this.meetOwnsLocalStream = false;
+            } else {
+                const acquired = await acquireMeetLocalMedia(
+                    params.wantVideo,
+                    params.wantAudio,
+                );
+                stream = acquired.stream;
+                videoDisabled = acquired.videoDisabled;
+                this.meetOwnsLocalStream = true;
+            }
+            if (this.disposed || !this.pc) {
+                if (this.meetOwnsLocalStream) {
+                    for (const t of stream.getTracks()) {
+                        t.stop();
+                    }
+                }
+                return;
+            }
+
+            this.meetVideoActuallyDisabled = videoDisabled;
+            this.meetLocalStream = stream;
+            this.meetActive = true;
+            this.handlers.onMeetLocalStream?.(stream);
+            this.meetHandlers.onLocalStream?.(stream);
+
+            for (const t of stream.getTracks()) {
+                this.pc.addTrack(t, stream);
+            }
+
+            chatDataRecord("meet media tracks added", {
+                sessionId: shortSessionId(this.sessionId),
+                audio: stream.getAudioTracks().length,
+                video: stream.getVideoTracks().length,
+            });
+
+            if (
+                this.pc.connectionState === "connected" &&
+                (this.meetRemoteStream || this.meetLocalStream)
+            ) {
+                this.markMeetMediaConnected();
+            }
+            if (this.meetRemoteStream) {
+                this.markMeetMediaConnected();
+            }
+        } catch (e) {
+            this.meetActive = false;
+            this.meetStartPromise = null;
+            const detail =
+                e instanceof Error ? e.message : "Could not start Meet media";
+            this.handlers.onMeetFailed?.(detail);
+            this.meetHandlers.onFailed?.(detail);
+            throw e;
+        }
+    }
+
+    private markMeetMediaConnected(): void {
+        if (this.disposed || this.meetMediaConnected || !this.meetActive) return;
+        this.meetMediaConnected = true;
+        chatDataRecord("meet media connected", {
+            sessionId: shortSessionId(this.sessionId),
+        });
+        this.handlers.onMeetMediaConnected?.();
+        this.meetHandlers.onMediaConnected?.();
     }
 
     /**
@@ -470,6 +688,7 @@ export class ChatDataWebRtcPeer {
     }
 
     dispose(): void {
+        this.stopMeetMedia();
         this.disposed = true;
         unregisterChatDataPeer(this.debugPeerId);
         try {
@@ -573,9 +792,10 @@ export class ChatDataWebRtcPeer {
         if (frame.kind === "offer" && frame.sdp) {
             if (
                 pc.signalingState === "stable" &&
-                pc.remoteDescription?.type === "offer"
+                pc.remoteDescription?.type === "offer" &&
+                pc.remoteDescription.sdp === frame.sdp
             ) {
-                chatDataRecord("applyRemote offer dropped (already negotiated)", {
+                chatDataRecord("applyRemote offer dropped (duplicate)", {
                     sessionId: shortSessionId(this.sessionId),
                     sdpBytes: frame.sdp.length,
                 });

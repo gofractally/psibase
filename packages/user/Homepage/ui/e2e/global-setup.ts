@@ -16,7 +16,6 @@ import {
  */
 async function globalSetup(): Promise<void> {
     assertNoConcurrentE2eRun();
-    await forceReleaseE2eChainPort();
 
     const externallyManaged =
         process.env.PSIBASE_E2E_EXTERNAL_CHAIN === "1";
@@ -47,6 +46,8 @@ async function globalSetup(): Promise<void> {
         });
         return;
     }
+
+    await forceReleaseE2eChainPort();
 
     const handle = await bootFreshChain();
     writeFileSync(

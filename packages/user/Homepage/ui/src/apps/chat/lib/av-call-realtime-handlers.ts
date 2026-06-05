@@ -140,6 +140,14 @@ function onSignal(
     const self = host.getSelf();
     if (!self || frame.to !== self) return;
 
+    if (host.usesSharedTransport?.()) {
+        avCallLog("onSignal skipped (pair PC handles WebRTC SDP)", {
+            sessionId: shortSessionId(frame.sessionId),
+            kind: frame.kind,
+        });
+        return;
+    }
+
     let run = host.findRunBySessionId(frame.sessionId);
     if (!run) {
         avCallLog("onSignal: no run for session (dropped)", {
@@ -173,7 +181,7 @@ function onSignal(
                 avCallLog("onSignal: waiting for group mesh peer", { from });
                 return;
             }
-            await meshPeer.handleRemoteSignal({
+            await meshPeer.handleRemoteSignal?.({
                 from,
                 kind: frame.kind,
                 sdp: frame.sdp,
@@ -192,7 +200,7 @@ function onSignal(
             avCallLog("onSignal: waiting for dm peer after beginSignaling");
             return;
         }
-        await dmRun.peer.handleRemoteSignal({
+        await dmRun.peer.handleRemoteSignal?.({
             from: frame.from,
             kind: frame.kind,
             sdp: frame.sdp,
@@ -225,11 +233,12 @@ function onSessionEnded(
 
 export function wireAvCallRealtimeHandlers(
     host: AvCallOrchestratorHost,
+    existingSignaling?: WebRtcSignalingClient | null,
 ): boolean {
     const rt = host.getRealtime();
     if (!rt) return false;
 
-    host.setSignaling(new WebRtcSignalingClient(rt));
+    host.setSignaling(existingSignaling ?? new WebRtcSignalingClient(rt));
     rt.registerHandlers({
         sessionInvite: (frame) => onSessionInvite(host, frame),
         participantJoined: (frame) => {

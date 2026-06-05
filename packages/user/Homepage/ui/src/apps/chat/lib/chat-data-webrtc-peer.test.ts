@@ -470,7 +470,7 @@ describe("ChatDataWebRtcPeer stale-offer guard", () => {
         await peer.handleRemoteSignal({
             from: "alicealice",
             kind: "offer",
-            sdp: "v=0 duplicate-offer",
+            sdp: "v=0 first-offer",
         });
 
         const answersAfter = (

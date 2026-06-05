@@ -1,7 +1,8 @@
-import type { MeetWebRtcPeer } from "./meet-webrtc-peer";
+import type { MeetPeerHandle } from "./meet-peer-handle";
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
+import type { PeerTransportRegistry } from "../transport-v2/l3-peer-registry";
 
 /** Transport-recovery tunables (A4). Mirror of chat-data values; can be
  * tuned independently if av-call needs different backoff. */
@@ -70,13 +71,13 @@ export type DmAvCallRun = AvCallSpaceRunBase & {
     peerAccount: string;
     wantVideo: boolean;
     wantAudio: boolean;
-    peer: MeetWebRtcPeer | null;
+    peer: MeetPeerHandle | null;
 };
 
 export type GroupAvCallRun = AvCallSpaceRunBase & {
     kind: "group";
     /** One WebRTC A/V peer connection per online remote member (§5.3 mesh). */
-    meshPeers: Map<string, MeetWebRtcPeer>;
+    meshPeers: Map<string, MeetPeerHandle>;
     wantVideo: boolean;
     wantAudio: boolean;
     /** Shared camera/mic stream across all mesh peer connections. */
@@ -117,6 +118,10 @@ export interface AvCallOrchestratorHost {
     getPeerPresence(): Record<string, string>;
     getSignaling(): WebRtcSignalingClient | null;
     setSignaling(signaling: WebRtcSignalingClient): void;
+
+    /** v2 transport: one pair PC per remote for chat + Meet. */
+    getSharedPeerRegistry?(): PeerTransportRegistry | null;
+    usesSharedTransport?(): boolean;
 
     getRun(spaceUuid: string): AvCallSpaceRun | undefined;
     setRun(spaceUuid: string, run: AvCallSpaceRun): void;

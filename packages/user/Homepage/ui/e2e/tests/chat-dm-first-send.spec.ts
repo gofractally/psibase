@@ -1,4 +1,4 @@
-import { test } from "../fixtures/chain";
+import { expect, test } from "../fixtures/chain";
 
 import {
     createAccountViaInviteUrl,
@@ -50,6 +50,49 @@ test.describe("Chat DM first-send", () => {
             await waitForDmDataChannelReady(alicePage, bob.name);
             await waitForDmDataChannelReady(bobPage, ALICE);
             await sendChatMessage(alicePage, "hello bob");
+
+            // Sender-side sanity: message entered outbox / left wire.
+            await expect
+                .poll(
+                    async () =>
+                        alicePage.evaluate(() => {
+                            const dbg = (
+                                window as unknown as {
+                                    __chatMessagingDebug?: {
+                                        getOutbox?: () => unknown[];
+                                        events?: () => Array<{
+                                            kind: string;
+                                        }>;
+                                    };
+                                    __chatTransportV2Debug?: {
+                                        started?: () => boolean;
+                                        peerState?: (remote: string) => string;
+                                    };
+                                }
+                            ).__chatMessagingDebug;
+                            const v2 = (
+                                window as unknown as {
+                                    __chatTransportV2Debug?: {
+                                        started?: () => boolean;
+                                        peerState?: (remote: string) => string;
+                                        getOutbox?: () => unknown[];
+                                    };
+                                }
+                            ).__chatTransportV2Debug;
+                            const outbox = dbg?.getOutbox?.() ?? [];
+                            const events = dbg?.events?.() ?? [];
+                            const hasTimeline = Boolean(
+                                document.body.textContent?.includes("hello bob"),
+                            );
+                            return (
+                                outbox.length > 0 ||
+                                events.some((e) => e.kind === "message-status") ||
+                                hasTimeline
+                            );
+                        }),
+                    { timeout: 30_000 },
+                )
+                .toBe(true);
 
             await expectThreadMessage(bobPage, "hello bob", {
                 timeout: 180_000,

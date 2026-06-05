@@ -55,6 +55,7 @@ import {
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
+import type { PeerTransportRegistry } from "../transport-v2/l3-peer-registry";
 
 export type {
     AvCallIncomingInvite,
@@ -126,6 +127,8 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 videoMuted?: boolean;
             },
         ) => void,
+        private readonly getSharedPeerRegistryFn?: () => PeerTransportRegistry | null,
+        private readonly getSharedSignalingFn?: () => WebRtcSignalingClient | null,
     ) {}
 
     start(): void {
@@ -600,6 +603,14 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         return this.getPeerPresenceFn();
     }
 
+    getSharedPeerRegistry(): PeerTransportRegistry | null {
+        return this.getSharedPeerRegistryFn?.() ?? null;
+    }
+
+    usesSharedTransport(): boolean {
+        return !!this.getSharedPeerRegistryFn?.();
+    }
+
     getSignaling(): WebRtcSignalingClient | null {
         return this.signaling;
     }
@@ -834,7 +845,14 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
 
     private wireRealtime(): void {
         if (this.realtimeHandlersInstalled) return;
-        if (!wireAvCallRealtimeHandlers(this)) return;
+        if (
+            !wireAvCallRealtimeHandlers(
+                this,
+                this.getSharedSignalingFn?.() ?? null,
+            )
+        ) {
+            return;
+        }
         this.realtimeHandlersInstalled = true;
     }
 

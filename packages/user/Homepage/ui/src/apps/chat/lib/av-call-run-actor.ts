@@ -251,7 +251,7 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
                     : run.meshPeers.get(command.remoteAccount);
         }
         if (!peer) return;
-        await peer.handleRemoteSignal({
+        await peer.handleRemoteSignal?.({
             from: command.remoteAccount,
             ...command.signal,
         });

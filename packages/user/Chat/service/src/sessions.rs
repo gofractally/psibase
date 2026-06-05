@@ -12,6 +12,8 @@ use crate::tables::{
 
 pub const PURPOSE_CHAT_DATA: &str = "chat-data";
 pub const PURPOSE_AV_CALL: &str = "av-call";
+/// Pair-only transport sessions (`wrtc:pair:lower:higher`) — no objective Space row.
+pub const PAIR_SESSION_PREFIX: &str = "wrtc:pair:";
 
 pub const SESSION_LIFECYCLE_ACTIVE: u8 = 1;
 pub const SESSION_LIFECYCLE_ENDED: u8 = 2;
@@ -147,6 +149,59 @@ pub fn validate_session_participants(
         }
     }
     Ok(participants)
+}
+
+/// Canonical lex order for a two-account pair (stable initiator / pair id).
+pub fn canonical_pair_accounts(
+    a: AccountNumber,
+    b: AccountNumber,
+) -> (AccountNumber, AccountNumber) {
+    if a.value <= b.value {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+/// Deterministic pair transport session id (v2 chat-data transport).
+pub fn allocate_pair_session_id(a: AccountNumber, b: AccountNumber) -> String {
+    let (lower, higher) = canonical_pair_accounts(a, b);
+    format!("{PAIR_SESSION_PREFIX}{lower}:{higher}")
+}
+
+/// Parse `wrtc:pair:lower:higher` into the two participant accounts.
+pub fn parse_pair_session_id(session_id: &str) -> Option<Vec<AccountNumber>> {
+    let rest = session_id.strip_prefix(PAIR_SESSION_PREFIX)?;
+    let (lower, higher) = rest.split_once(':')?;
+    if lower.is_empty() || higher.is_empty() {
+        return None;
+    }
+    Some(vec![
+        AccountNumber::from(lower),
+        AccountNumber::from(higher),
+    ])
+}
+
+pub fn is_pair_session_id(session_id: &str) -> bool {
+    parse_pair_session_id(session_id).is_some()
+}
+
+fn authorize_pair_session_join(
+    session_id: &str,
+    account: AccountNumber,
+) -> Option<SessionJoinAuth> {
+    let participants = parse_pair_session_id(session_id)?;
+    let authorized = participants.iter().any(|p| *p == account);
+    Some(SessionJoinAuth {
+        session_id: session_id.to_owned(),
+        authorized,
+        purpose: PURPOSE_CHAT_DATA.to_owned(),
+        space_uuid: String::new(),
+        participants,
+        lifecycle: SESSION_LIFECYCLE_ACTIVE,
+        expires_at: 0,
+        expired: false,
+    })
 }
 
 pub fn allocate_session_id(
@@ -286,6 +341,10 @@ pub fn is_session_participant(session_id: &str, account: AccountNumber) -> bool 
 }
 
 pub fn authorize_session_join(session_id: &str, account: AccountNumber, now: i64) -> SessionJoinAuth {
+    if let Some(pair_auth) = authorize_pair_session_join(session_id, account) {
+        return pair_auth;
+    }
+
     let Some(row) = session_row(session_id) else {
         return SessionJoinAuth {
             session_id: session_id.to_owned(),
@@ -548,6 +607,44 @@ mod unit_tests {
 
         let err = validate_session_participants(alice, &members, &[alice, carol]).unwrap_err();
         assert!(err.message().contains("not a member of the space"));
+    }
+
+    #[test]
+    fn allocate_pair_session_id_is_lex_ordered() {
+        let alice = AccountNumber::from("alice");
+        let bob = AccountNumber::from("bob");
+        let id = allocate_pair_session_id(bob, alice);
+        assert_eq!(id, "wrtc:pair:alice:bob");
+        assert_eq!(allocate_pair_session_id(alice, bob), id);
+    }
+
+    #[test]
+    fn parse_pair_session_id_round_trip() {
+        let alice = AccountNumber::from("alice");
+        let bob = AccountNumber::from("bob");
+        let id = allocate_pair_session_id(alice, bob);
+        let parsed = parse_pair_session_id(&id).unwrap();
+        assert_eq!(parsed, vec![alice, bob]);
+    }
+
+    #[test]
+    fn authorize_pair_session_join_allows_participants_only() {
+        let alice = AccountNumber::from("alice");
+        let bob = AccountNumber::from("bob");
+        let carol = AccountNumber::from("carol");
+        let id = allocate_pair_session_id(alice, bob);
+
+        let alice_auth = authorize_session_join(&id, alice, 0);
+        assert!(alice_auth.authorized);
+        assert_eq!(alice_auth.purpose, PURPOSE_CHAT_DATA);
+        assert_eq!(alice_auth.participants, vec![alice, bob]);
+        assert_eq!(alice_auth.lifecycle, SESSION_LIFECYCLE_ACTIVE);
+
+        let bob_auth = authorize_session_join(&id, bob, 0);
+        assert!(bob_auth.authorized);
+
+        let carol_auth = authorize_session_join(&id, carol, 0);
+        assert!(!carol_auth.authorized);
     }
 
     #[test]

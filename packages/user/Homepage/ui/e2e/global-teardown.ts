@@ -5,6 +5,9 @@ import {
 
 async function globalTeardown(): Promise<void> {
     removeE2eRunLock();
+    if (process.env.PSIBASE_E2E_EXTERNAL_CHAIN === "1") {
+        return;
+    }
     await forceReleaseE2eChainPort();
 }
 
