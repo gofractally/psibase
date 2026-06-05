@@ -1,4 +1,5 @@
 import { useStore } from "@tanstack/react-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -7,17 +8,24 @@ import { prompt } from "@psibase/common-lib";
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
 import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
+import { AvailableBalanceLabel } from "@shared/components/premium-accounts/available-balance-label";
 import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { useBranding } from "@shared/hooks/use-branding";
 import { useCanCreatePremiumAccount } from "@shared/hooks/use-can-create-premium-account";
+import { useCurrentUser } from "@shared/hooks/use-current-user";
 import {
     PREM_MARKETS_REFETCH_INTERVAL_MS,
     usePremMarkets,
 } from "@shared/hooks/use-prem-markets";
 import { useSystemToken } from "@shared/hooks/use-system-token";
+import {
+    getSystemTokenBalance,
+    useUserTokenBalances,
+} from "@shared/hooks/use-user-token-balances";
 import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
+import QueryKey from "@shared/lib/query-keys";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_FREE_ACCOUNT_NAME_LENGTH,
@@ -51,6 +59,8 @@ import { usePurchaseAccount } from "./hooks/use-purchase-account";
 const DEFAULT_NAME_PURCHASE_SLIPPAGE = 5;
 
 export const CreatePrompt = () => {
+    const queryClient = useQueryClient();
+    const { data: currentUser } = useCurrentUser();
     const [key, setKey] = useState<string>("");
     const [step, setStep] = useState<"1_CREATE" | "2_SAVE" | "3_CONFIRM">(
         "1_CREATE",
@@ -69,6 +79,19 @@ export const CreatePrompt = () => {
         data: canCreatePremiumAccount,
         isPending: isPendingCanCreatePremiumAccount,
     } = useCanCreatePremiumAccount();
+
+    const { data: tokenBalances, isPending: isPendingBalances } =
+        useUserTokenBalances(currentUser, {
+            enabled: Boolean(currentUser && canCreatePremiumAccount),
+        });
+
+    const availableBalance = useMemo(
+        () =>
+            systemToken
+                ? getSystemTokenBalance(tokenBalances, systemToken.id)
+                : undefined,
+        [tokenBalances, systemToken],
+    );
 
     const { data: markets, isPending: isPendingMarkets } = usePremMarkets({
         enabled: Boolean(canCreatePremiumAccount),
@@ -124,7 +147,13 @@ export const CreatePrompt = () => {
 
     const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
-    const purchaseAccountMutation = usePurchaseAccount();
+    const purchaseAccountMutation = usePurchaseAccount({
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: QueryKey.userTokenBalances(currentUser),
+            });
+        },
+    });
     const connectAccountMutation = useConnectAccount();
 
     const accountValidator = canCreatePremiumAccount ? zAccount : zAccountFree;
@@ -245,6 +274,16 @@ export const CreatePrompt = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- prices, isAccountTaken
         [createdAccount, prices, isAccountTaken, resolveLivePrice],
     );
+
+    const hasInsufficientFunds = useMemo(() => {
+        if (!livePrice || isPendingBalances) {
+            return false;
+        }
+        if (!availableBalance) {
+            return true;
+        }
+        return availableBalance.isLessThan(livePrice);
+    }, [livePrice, availableBalance, isPendingBalances]);
 
     const importForm = useAppForm({
         defaultValues: {
@@ -431,21 +470,35 @@ export const CreatePrompt = () => {
                                 }}
                             />
                         </CardContent>
-                        <CardFooter className="flex flex-1 justify-end">
-                            <CardAction>
-                                <createForm.SubmitButton
-                                    labels={
-                                        livePrice
-                                            ? ["Buy now", "Buying..."]
-                                            : ["Create", "Creating..."]
-                                    }
-                                    disabled={
-                                        livePrice
-                                            ? purchaseAccountMutation.isPending
-                                            : false
-                                    }
+                        <CardFooter
+                            className={
+                                livePrice
+                                    ? "flex w-full items-center justify-between gap-4"
+                                    : "flex flex-1 justify-end"
+                            }
+                        >
+                            {livePrice && systemToken ? (
+                                <AvailableBalanceLabel
+                                    systemToken={systemToken}
+                                    balance={availableBalance}
+                                    isPending={isPendingBalances}
                                 />
-                            </CardAction>
+                            ) : null}
+                            <createForm.SubmitButton
+                                labels={
+                                    hasInsufficientFunds
+                                        ? ["Insufficient funds", "Buying..."]
+                                        : livePrice
+                                          ? ["Buy now", "Buying..."]
+                                          : ["Create", "Creating..."]
+                                }
+                                disabled={
+                                    hasInsufficientFunds ||
+                                    (livePrice
+                                        ? purchaseAccountMutation.isPending
+                                        : false)
+                                }
+                            />
                         </CardFooter>
                     </form>
                     {confirmPrice ? (

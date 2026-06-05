@@ -5,16 +5,16 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
-import { useUserTokenBalances } from "@/apps/tokens/hooks/tokens-plugin/use-user-token-balances";
 
 import { useAppForm } from "@shared/components/form/app-form";
+import { AvailableBalanceLabel } from "@shared/components/premium-accounts/available-balance-label";
 import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { useCurrentUser } from "@shared/hooks/use-current-user";
+import { useUserTokenBalances, getSystemTokenBalance } from "@shared/hooks/use-user-token-balances";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
-import { Skeleton } from "@shared/shadcn/ui/skeleton";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
 const DEFAULT_NAME_PURCHASE_SLIPPAGE = "5";
@@ -53,11 +53,10 @@ export function BuyForm({
     const { data: tokenBalances, isPending: isPendingBalances } =
         useUserTokenBalances(currentUser);
 
-    const availableBalance = useMemo(() => {
-        return tokenBalances?.find(
-            (token) => token.id === Number(systemToken.id),
-        )?.balance;
-    }, [tokenBalances, systemToken.id]);
+    const availableBalance = useMemo(
+        () => getSystemTokenBalance(tokenBalances, systemToken.id),
+        [tokenBalances, systemToken.id],
+    );
 
     const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
     const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
@@ -391,31 +390,5 @@ export function BuyForm({
                 />
             ) : null}
         </form.AppForm>
-    );
-}
-
-function AvailableBalanceLabel({
-    systemToken,
-    balance,
-    isPending,
-}: {
-    systemToken: SystemTokenInfo;
-    balance: Quantity | undefined;
-    isPending: boolean;
-}) {
-    if (isPending) {
-        return <Skeleton className="h-4 w-40" />;
-    }
-
-    const formattedBalance =
-        balance?.format({ includeLabel: true }) ?? `0 ${systemToken.symbol}`;
-
-    return (
-        <p className="text-muted-foreground text-sm tabular-nums">
-            Available balance:{" "}
-            <span className="text-foreground/90 font-medium">
-                {formattedBalance}
-            </span>
-        </p>
     );
 }
