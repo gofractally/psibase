@@ -453,26 +453,29 @@ function(psibase_schema target)
         target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(Psibase::service).*>" Psibase::test)
     endif()
 
-    if(ARGC GREATER_EQUAL 2)
+    if (_OUTPUT)
+        # OUTPUT keyword (e.g. from psibase_package) — already a concrete path.
+        set(_OUTFILE "${_OUTPUT}")
+        set(_EXTRA_OUTPUTS "${_OUTPUT}")
+    elseif(ARGC GREATER_EQUAL 2)
         set(_OUTFILE ${ARGV1})
         set(_EXTRA_OUTPUTS ${_OUTFILE})
     else()
         set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
         set(_EXTRA_OUTPUTS "")
-    endif()
-
-    if (NOT _OUTPUT)
-        set(_OUTPUT "${target}-schema.json")
-    endif()
-    if (NOT _OUTPUT_DIRECTORY)
-        set(_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    endif()
-    if (CMAKE_VERSION VERSION_LESS 3.20)
-        if (_OUTPUT MATCHES "^[^/]")
-            set(_OUTFILE "${_OUTPUT_DIRECTORY}/${_OUTPUT}")
+        if (NOT _OUTPUT)
+            set(_OUTPUT "${target}-schema.json")
         endif()
-    else()
-        cmake_path(APPEND _OUTFILE "${_OUTPUT_DIRECTORY}" "${_OUTPUT}")
+        if (NOT _OUTPUT_DIRECTORY)
+            set(_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+        endif()
+        if (CMAKE_VERSION VERSION_LESS 3.20)
+            if (_OUTPUT MATCHES "^[^/]")
+                set(_OUTFILE "${_OUTPUT_DIRECTORY}/${_OUTPUT}")
+            endif()
+        else()
+            cmake_path(APPEND _OUTFILE "${_OUTPUT_DIRECTORY}" "${_OUTPUT}")
+        endif()
     endif()
 
     # Stamp file is always an OUTPUT because _OUTFILE may contain a generator expression
@@ -480,7 +483,6 @@ function(psibase_schema target)
     # OUTPUT so the Makefile generator creates a rule for it and downstream DEPENDS are satisfied.
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp ${_EXTRA_OUTPUTS}
-        BYPRODUCTS ${_OUTFILE}
         DEPENDS ${target}-schema-gen
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
         COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp

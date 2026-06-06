@@ -2,8 +2,9 @@
   description = "Psibase dev environment";
 
   inputs = {
-    # Pin to nixos-24.05 for GCC 13 compatibility (GCC 15 in unstable has libstdc++ issues with Catch2)
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    # nixos-25.05 provides Boost 1.88 (matches psibase-contributor). Was previously
+    # pinned to 24.05 for GCC 13 / libstdc++ compatibility with Catch2.
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     flake-utils.url = "github:numtide/flake-utils";
 
     fenix = {
@@ -69,9 +70,23 @@
 
         llvmPackages = pkgs.llvmPackages_18;
 
-        boost = pkgs.boost183.override {
+        # nixos-25.05 ships GCC 14 libstdc++; Catch2 + clang need GCC 13 headers.
+        gcc13 = pkgs.gcc13;
+        gccTriple =
+          if system == "aarch64-linux" then "aarch64-unknown-linux-gnu"
+          else "x86_64-unknown-linux-gnu";
+
+        boost = pkgs.boost188.override {
           enableStatic = true;
           enableShared = true;
+        };
+
+        # Nix splits Boost static libs (out) from CMake config (dev). CMake's
+        # imported targets point at dev/lib, which has no .a files. Merge both
+        # outputs so find_package(Boost CONFIG) resolves libraries correctly.
+        boostForCMake = pkgs.symlinkJoin {
+          name = "boost188-cmake";
+          paths = [ boost boost.dev ];
         };
 
         yarnBerry = pkgs.stdenv.mkDerivation rec {
@@ -115,7 +130,8 @@
           llvmPackages.lld
           llvmPackages.libclang
           llvmPackages.clang-tools
-          boost
+          gcc13
+          boostForCMake
           openssl
           zlib
           zstd
@@ -175,6 +191,7 @@
 
           LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
           ICU_ROOT = "${pkgs.icu}";
+          ICU_LIBRARY_DIR = "${pkgs.icu}/lib";
           CMAKE_IGNORE_PATH = "/usr/lib:/usr/lib64";
           CMAKE_SYSTEM_IGNORE_PATH = "/usr/lib:/usr/lib64";
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
@@ -194,7 +211,12 @@
             unset NIX_LDFLAGS_BEFORE
             unset NIX_CFLAGS_LINK
             unset LD_LIBRARY_PATH
-            export NIX_LDFLAGS="-L${pkgs.icu}/lib"
+            export ICU_LIBRARY_DIR="${pkgs.icu}/lib"
+            export CMAKE_PREFIX_PATH="${boostForCMake}''${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+            export BOOST_LIBRARYDIR="${boost}/lib"
+            export BOOST_INCLUDEDIR="${boost.dev}/include"
+            export NIX_CFLAGS_COMPILE="-nostdinc++ -isystem ${gcc13.cc}/include/c++/${gcc13.cc.version} -isystem ${gcc13.cc}/include/c++/${gcc13.cc.version}/${gccTriple} -isystem ${pkgs.openssl.dev}/include"
+            export NIX_LDFLAGS="-L${pkgs.icu}/lib -L${pkgs.openssl.out}/lib"
             export LIBRARY_PATH="${pkgs.icu}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
             export CMAKE_LIBRARY_PATH="${pkgs.icu}/lib''${CMAKE_LIBRARY_PATH:+:$CMAKE_LIBRARY_PATH}"
 
