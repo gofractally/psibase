@@ -254,12 +254,16 @@ function(psibase_package)
                     message(FATAL_ERROR "Missing schema for ${service}")
                 endif()
             endif()
+            set(service-info-deps ${schema-target})
+            if(_WASM_${service})
+                list(APPEND service-info-deps ${_DEPENDS})
+            endif()
             write_service_info(
                 OUTPUT ${outdir}/service/${service}.json
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
                 SCHEMA ${_SCHEMA_${service}}
-                DEPENDS ${schema-target}
+                DEPENDS ${service-info-deps}
             )
             list(APPEND zip-deps ${outdir}/service/${service}.json)
             if(_INIT_${service})
@@ -457,25 +461,17 @@ function(psibase_schema target)
         # OUTPUT keyword (e.g. from psibase_package) — already a concrete path.
         set(_OUTFILE "${_OUTPUT}")
         set(_EXTRA_OUTPUTS "${_OUTPUT}")
+    elseif(_OUTPUT_DIRECTORY)
+        # OUTPUT_DIRECTORY keyword (e.g. from add_system_service).
+        set(_OUTFILE "${_OUTPUT_DIRECTORY}/${target}-schema.json")
+        set(_EXTRA_OUTPUTS "${_OUTFILE}")
     elseif(ARGC GREATER_EQUAL 2)
+        # Legacy positional output path.
         set(_OUTFILE ${ARGV1})
         set(_EXTRA_OUTPUTS ${_OUTFILE})
     else()
         set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
         set(_EXTRA_OUTPUTS "")
-        if (NOT _OUTPUT)
-            set(_OUTPUT "${target}-schema.json")
-        endif()
-        if (NOT _OUTPUT_DIRECTORY)
-            set(_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-        endif()
-        if (CMAKE_VERSION VERSION_LESS 3.20)
-            if (_OUTPUT MATCHES "^[^/]")
-                set(_OUTFILE "${_OUTPUT_DIRECTORY}/${_OUTPUT}")
-            endif()
-        else()
-            cmake_path(APPEND _OUTFILE "${_OUTPUT_DIRECTORY}" "${_OUTPUT}")
-        endif()
     endif()
 
     # Stamp file is always an OUTPUT because _OUTFILE may contain a generator expression
