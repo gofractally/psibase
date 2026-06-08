@@ -628,6 +628,22 @@ mod unit_tests {
     }
 
     #[test]
+    fn authorize_pair_session_join_allows_e2e_group_pair_names() {
+        let alice = AccountNumber::from("e2ealicegc");
+        let carol = AccountNumber::from("e2ecarolgc");
+        let id = "wrtc:pair:e2ealicegc:e2ecarolgc";
+        let parsed = parse_pair_session_id(id).unwrap();
+        assert_eq!(parsed, vec![alice, carol]);
+
+        let alice_auth = authorize_session_join(id, alice, 0);
+        assert!(alice_auth.authorized, "alice auth: {:?}", alice_auth);
+        assert_eq!(alice_auth.purpose, PURPOSE_CHAT_DATA);
+
+        let carol_auth = authorize_session_join(id, carol, 0);
+        assert!(carol_auth.authorized);
+    }
+
+    #[test]
     fn authorize_pair_session_join_allows_participants_only() {
         let alice = AccountNumber::from("alice");
         let bob = AccountNumber::from("bob");

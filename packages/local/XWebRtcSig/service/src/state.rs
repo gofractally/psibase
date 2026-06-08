@@ -131,11 +131,28 @@ pub mod tables {
             (self.session_id.clone(), self.seq)
         }
     }
+
+    /// Server frames queued for a socket when inline `send` would abort the
+    /// active recv action (dead peer socket during join/signal fanout).
+    #[table(name = "SigPendingOutboundTable", index = 6, db = "Subjective")]
+    #[derive(Debug, Clone, PartialEq, Eq, Fracpack, Serialize, Deserialize, ToSchema)]
+    pub struct SigPendingOutboundRow {
+        pub target_socket: i32,
+        pub seq: i64,
+        pub payload: String,
+    }
+
+    impl SigPendingOutboundRow {
+        #[primary_key]
+        fn pk(&self) -> (i32, i64) {
+            (self.target_socket, self.seq)
+        }
+    }
 }
 
 use tables::{
-    SigPendingSignalRow, SigPendingSignalTable, SigPendingWebRtcEventRow,
-    SigPendingWebRtcEventTable, SigSessionJoinRow, SigSessionJoinTable,
+    SigPendingOutboundRow, SigPendingOutboundTable, SigPendingSignalRow, SigPendingSignalTable,
+    SigPendingWebRtcEventRow, SigPendingWebRtcEventTable, SigSessionJoinRow, SigSessionJoinTable,
     SigSessionTrackRow, SigSessionTrackTable, SocketSessionRow, UserSessionTable,
 };
 
@@ -247,16 +264,58 @@ pub fn take_pending_signal_payloads(session_id: &str, to: AccountNumber) -> Vec<
     let read = SigPendingSignalTable::read();
     let lo = (session_id.to_owned(), to, i64::MIN);
     let hi = (session_id.to_owned(), to, i64::MAX);
-    let rows: Vec<SigPendingSignalRow> = read
-        .get_index_pk()
-        .range(lo..=hi)
-        .collect();
-    let mut payloads = Vec::with_capacity(rows.len());
+    let rows: Vec<SigPendingSignalRow> = read.get_index_pk().range(lo..=hi).collect();
+    let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         table.erase(&(row.session_id, row.to, row.seq));
-        payloads.push(row.payload);
+        out.push(row.payload);
     }
-    payloads
+    out
+}
+
+pub fn enqueue_pending_outbound(target_socket: i32, seq: i64, payload: String) {
+    let lo = (target_socket, i64::MIN);
+    let hi = (target_socket, i64::MAX);
+    let max_existing = SigPendingOutboundTable::read()
+        .get_index_pk()
+        .range(lo..=hi)
+        .map(|row| row.seq)
+        .max();
+    let next_seq = next_pending_signal_seq(max_existing, seq);
+    SigPendingOutboundTable::new()
+        .put(&SigPendingOutboundRow {
+            target_socket,
+            seq: next_seq,
+            payload,
+        })
+        .unwrap();
+}
+
+pub fn take_pending_outbound_payloads(target_socket: i32) -> Vec<String> {
+    let table = SigPendingOutboundTable::new();
+    let read = SigPendingOutboundTable::read();
+    let lo = (target_socket, i64::MIN);
+    let hi = (target_socket, i64::MAX);
+    let rows: Vec<SigPendingOutboundRow> = read.get_index_pk().range(lo..=hi).collect();
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        table.erase(&(row.target_socket, row.seq));
+        out.push(row.payload);
+    }
+    out
+}
+
+pub fn erase_pending_outbound_for_socket(target_socket: i32) {
+    let table = SigPendingOutboundTable::new();
+    let lo = (target_socket, i64::MIN);
+    let hi = (target_socket, i64::MAX);
+    for row in SigPendingOutboundTable::read()
+        .get_index_pk()
+        .range(lo..=hi)
+        .collect::<Vec<_>>()
+    {
+        table.erase(&(row.target_socket, row.seq));
+    }
 }
 
 /// Other accounts with at least one live websocket (excluding `user`).
@@ -417,6 +476,7 @@ pub fn active_sig_session_ids() -> Vec<String> {
 
 pub fn remove_socket_session(socket: i32) -> Option<RemovedSocket> {
     erase_sig_joins_for_socket(socket);
+    erase_pending_outbound_for_socket(socket);
 
     let socket_table = tables::SocketSessionTable::new();
     let row = socket_table.get_index_pk().get(&socket)?;

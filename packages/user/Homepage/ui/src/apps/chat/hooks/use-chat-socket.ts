@@ -13,6 +13,9 @@ import type {
 } from "../lib/protocol";
 
 import { recordChurnTrace } from "../lib/churn-trace";
+import { chatDataRecord } from "../lib/chat-data-debug";
+import { RealtimeClient } from "../lib/realtime-client";
+import { getHomepageQueryToken } from "../lib/ws-auth";
 import { ChatTransportBridge } from "../transport-v2/chat-transport-bridge";
 import {
     AvCallSessionOrchestrator,
@@ -39,7 +42,6 @@ import {
     shortSpaceId,
 } from "../lib/chat-data-debug";
 import type { ChatDataMessageEnvelope, ChatHistorySyncEnvelope } from "../lib/chat-data-envelope";
-import type { RealtimeClient } from "../lib/realtime-client";
 
 import { ensureDm, ensureGroup, fetchSpaceCallEvents } from "../lib/chat-api";
 
@@ -82,6 +84,12 @@ import {
 } from "../lib/group-history-sync";
 import { dmComposerDisabledReason } from "../lib/dm-compose-ux";
 import { composeTimingLog } from "../lib/dm-compose-timing";
+import {
+    installThreadLifecycleGlobal,
+    peerStatesForRemotes,
+    recordThreadLifecycle,
+    threadLifecycleSnapshot,
+} from "../lib/thread-lifecycle";
 import {
     dmMembersForPendingPeer,
     findDmConversationWithPeer,
@@ -2407,10 +2415,18 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         });
 
         installChatDataDebugGlobal();
+        installThreadLifecycleGlobal();
 
         if (!chatDataOrchestratorRef.current) {
             chatDataOrchestratorRef.current = createChatTransportBridge({
             getRealtime: () => realtimeClientRef.current,
+            createAuxiliaryRealtime: () =>
+                new RealtimeClient({
+                    authTokenProvider: getHomepageQueryToken,
+                    reconnect: { initialDelayMs: 500, maxDelayMs: 30_000 },
+                    debugLog: (event, detail) =>
+                        chatDataRecord(`aux-${event}`, detail),
+                }),
             getSelf: () => selfRef.current,
             getChainId: () => chainIdRef.current,
             getIceServers: () => iceServersRef.current,
@@ -2586,14 +2602,6 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         registerHandlers,
         markSignalingTeardown,
     ]);
-
-    // chainId resolves async from GraphQL; retry stack start once it is available.
-    useEffect(() => {
-        const bridge = chatDataOrchestratorRef.current;
-        if (!bridge || !chainId || !selfAccount) return;
-        bridge.start();
-        bridge.installDebugGlobal();
-    }, [chainId, selfAccount, connectionState]);
 
     const pendingDeliveryCount = useMemo(
         () =>
@@ -2774,6 +2782,15 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const onChatRoute =
         location.pathname === "/chat" ||
         location.pathname.startsWith("/chat/");
+
+    // chainId resolves async from GraphQL; retry stack start once it is available.
+    useEffect(() => {
+        const bridge = chatDataOrchestratorRef.current;
+        if (!bridge || !chainId || !selfAccount || !onChatRoute) return;
+        bridge.start();
+        bridge.installDebugGlobal();
+    }, [chainId, selfAccount, connectionState, onChatRoute, location.pathname]);
+
     const churnLagRef = useRef({
         lastTickAt: Date.now(),
         maxLagMs: 0,
@@ -2822,22 +2839,6 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             lag: churnLagRef.current,
         });
         chatDataOrchestratorRef.current?.suspendForNavigation();
-        const realtimeToClose = webrtcClient;
-        if (realtimeToClose) {
-            recordChurnTrace("navigation-suspend-close-realtime-scheduled", {
-                state: realtimeToClose.state,
-                ready: realtimeToClose.isSessionReady,
-                lastError: realtimeToClose.lastError,
-            });
-            globalThis.setTimeout(() => {
-                recordChurnTrace("navigation-suspend-close-realtime", {
-                    state: realtimeToClose.state,
-                    ready: realtimeToClose.isSessionReady,
-                });
-                realtimeToClose.close();
-                recordChurnTrace("navigation-suspend-close-realtime-done", {});
-            }, 0);
-        }
         recordChurnTrace("navigation-suspend-return", {
             elapsedMs: Date.now() - startedAt,
             churnState: {
@@ -2848,7 +2849,28 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     false,
             },
         });
-    }, [location.pathname, selectedConversationIdRef, webrtcClient]);
+    }, [location.pathname, selectedConversationIdRef]);
+
+    /** Drop transport stack + aux WS while staying on Chat (e2e prepare-nav). */
+    const dropChatTransportForNavigation = useCallback(() => {
+        if (flushDebounceRef.current != null) {
+            globalThis.clearTimeout(flushDebounceRef.current);
+            flushDebounceRef.current = null;
+        }
+        recordChurnTrace("transport-drop-start", {
+            chatDataOrchestrator: Boolean(chatDataOrchestratorRef.current),
+            avCallOrchestrator: Boolean(avCallOrchestratorRef.current),
+            selectedConversationId: selectedConversationId ?? null,
+            pathname: location.pathname,
+            onChatRoute,
+        });
+        chatDataOrchestratorRef.current?.dropTransportStack();
+        avCallOrchestratorRef.current?.dispose();
+        avCallOrchestratorRef.current = null;
+        recordChurnTrace("transport-drop-done", {
+            chatDataOrchestrator: Boolean(chatDataOrchestratorRef.current),
+        });
+    }, [selectedConversationId, location.pathname, onChatRoute]);
 
     const teardownChatRealtime = useCallback(() => {
         leavingChatRef.current = true;
@@ -2900,52 +2922,6 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     ]);
 
     useEffect(() => {
-        if (typeof window === "undefined") return;
-        const w = window as Window & {
-            __chatChurnTeardown?: () => void;
-            __chatChurnSuspend?: () => void;
-            __chatChurnState?: () => Record<string, unknown>;
-        };
-        w.__chatChurnTeardown = teardownChatRealtime;
-        w.__chatChurnSuspend = suspendChatNavigation;
-        const snapshotChurnState = () => ({
-            leavingChat: leavingChatRef.current,
-            wasOnChatRoute: wasOnChatRouteRef.current,
-            onChatRoute,
-            pathname: location.pathname,
-            selectedConversationId: selectedConversationId ?? null,
-            hasChatOrchestrator: Boolean(chatDataOrchestratorRef.current),
-            hasAvOrchestrator: Boolean(avCallOrchestratorRef.current),
-            navigationSuspended:
-                chatDataOrchestratorRef.current?.isNavigationSuspended() ??
-                false,
-            realtimeState: realtimeClientRef.current?.state ?? null,
-            realtimeReady: realtimeClientRef.current?.isSessionReady ?? null,
-            realtimeLastError: realtimeClientRef.current?.lastError ?? null,
-            eventLoopLag: churnLagRef.current,
-        });
-        w.__chatChurnState = snapshotChurnState;
-        w.__chatChurnProbe = () => ({
-            at: Date.now(),
-            href: window.location.href,
-            state: snapshotChurnState(),
-            traceTail: window.__chatChurnTrace?.events?.().slice(-20) ?? [],
-        });
-        return () => {
-            delete w.__chatChurnTeardown;
-            delete w.__chatChurnSuspend;
-            delete w.__chatChurnState;
-            delete w.__chatChurnProbe;
-        };
-    }, [
-        teardownChatRealtime,
-        suspendChatNavigation,
-        onChatRoute,
-        location.pathname,
-        selectedConversationId,
-    ]);
-
-    useEffect(() => {
         if (!contactsLoaded) return;
         chatDataOrchestratorRef.current?.setFocusedSpace(
             selectedConversationId,
@@ -2984,10 +2960,19 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         if (existing) {
             pendingDmMemberRef.current = null;
             setComposePendingDmPeer(null);
+            recordThreadLifecycle("compose-wake", {
+                mode: "existing-dm",
+                peer: otherAccount,
+                spaceId: shortSpaceId(existing.conversationId),
+            });
             setSelectedConversationId(existing.conversationId, "openOrFocusDm-existing");
         } else {
             pendingDmMemberRef.current = otherAccount;
             setComposePendingDmPeer(otherAccount);
+            recordThreadLifecycle("compose-wake", {
+                mode: "pending-peer",
+                peer: otherAccount,
+            });
             composeTimingLog("openOrFocusDm-pending-peer", { peer: otherAccount });
         }
 
@@ -3015,7 +3000,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             );
 
             if (refreshed) {
-                if (pendingDmMemberRef.current === otherAccount) {
+                if (pendingDmMemberRef.current !== otherAccount) {
                     return;
                 }
                 pendingDmMemberRef.current = null;
@@ -3074,6 +3059,20 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             dmMembers: [string, string] | null,
             conversation: ConversationSnapshot | undefined,
         ) => {
+            composeTimingLog("enqueue-outbound", {
+                spaceId: shortSpaceId(convId),
+                recipientCount: recipients.length,
+                dmMembers: dmMembers !== null,
+                conversationKind: conversation?.kind,
+            });
+            if (dmMembers && conversation?.kind === "group") {
+                composeTimingLog("enqueue-outbound-routing-warn", {
+                    spaceId: shortSpaceId(convId),
+                    recipientCount: recipients.length,
+                    note: "DM members with group conversation snapshot",
+                });
+            }
+
             if (dmMembers) {
                 scheduleDmChatDataSession(convId, dmMembers);
             } else if (
@@ -3174,7 +3173,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 selectedConversationIdRef.current ?? selectedConversationId;
             const from = selfRef.current;
             const pendingPeer =
-                composePendingDmPeerRef.current ?? composePendingDmPeer;
+                composePendingDmPeerRef.current ??
+                composePendingDmPeer ??
+                pendingDmMemberRef.current;
             if ((!convId && !pendingPeer) || !from) return;
 
             const trimmed = body.trim();
@@ -3242,7 +3243,29 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 return;
             }
 
-            if (shouldQueueFirstDmUntilSpace(convId, pendingPeer) && dmMembers) {
+            const dmSendIntent =
+                dmMembers !== null && recipients.length === 1;
+            const selectedIsDm =
+                conversation?.kind === "dm" &&
+                conversation.members.length === 2;
+
+            composeTimingLog("sendChatMessage-routing", {
+                convId: convId ? shortSpaceId(convId) : undefined,
+                pendingPeer,
+                dmSendIntent,
+                selectedIsDm,
+                conversationKind: conversation?.kind,
+                recipientCount: recipients.length,
+            });
+
+            if (
+                shouldQueueFirstDmUntilSpace(
+                    convId,
+                    pendingPeer,
+                    conversation?.kind,
+                ) &&
+                dmMembers
+            ) {
                 const bodyToSend = trimmed;
                 const peerAccount = pendingPeer!;
                 composeTimingLog("send-compose-first-dm", {
@@ -3289,20 +3312,10 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 return;
             }
 
-            let outboundSpaceId =
-                convId ??
-                conversation?.conversationId ??
-                (pendingPeer
-                    ? findVisibleDmWithPeer(
-                          pendingPeer,
-                          from,
-                          objectiveSpacesRef.current,
-                          contactAccountsRef.current,
-                          contactsLoadedRef.current,
-                      )?.conversationId
-                    : undefined);
+            const needsDerivedDmSpace =
+                dmSendIntent && (!selectedIsDm || !convId);
 
-            if (!outboundSpaceId && dmMembers) {
+            if (needsDerivedDmSpace && dmMembers) {
                 const bodyToSend = trimmed;
                 const sendRecipients = recipients;
                 const sendDmMembers = dmMembers;
@@ -3310,6 +3323,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 composeTimingLog("send-derived-dm-space", {
                     pendingPeer,
                     recipientCount: sendRecipients.length,
+                    reason: selectedIsDm ? "missing-conv-id" : "selected-non-dm",
+                    selectedKind: conversation?.kind,
+                    selectedConvId: convId ? shortSpaceId(convId) : undefined,
                 });
                 void (async () => {
                     if (pendingPeer) {
@@ -3357,6 +3373,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 })();
                 return;
             }
+
+            const outboundSpaceId =
+                convId ?? conversation?.conversationId ?? undefined;
 
             if (!outboundSpaceId || recipients.length === 0) {
                 composeTimingLog("sendChatMessage-abort", {
@@ -3795,6 +3814,109 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         spacesLoadError,
     ]);
 
+    const threadRemoteRecipients = useMemo(() => {
+        const self = selfAccount;
+        if (!self) return [];
+        if (composePendingDmPeer) return [composePendingDmPeer];
+        if (!selectedConversation) return [];
+        return selectedConversation.members.filter((member) => member !== self);
+    }, [composePendingDmPeer, selectedConversation, selfAccount]);
+
+    const [threadPeersUsable, setThreadPeersUsable] = useState(false);
+    const prevPeerStatesRef = useRef<Map<string, string>>(new Map());
+    const prevEstablishingRef = useRef(false);
+    const prevPeersUsableRef = useRef(false);
+
+    useEffect(() => {
+        if (threadRemoteRecipients.length === 0) {
+            setThreadPeersUsable(false);
+            prevPeerStatesRef.current.clear();
+            return;
+        }
+        const readPeerUsability = () => {
+            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            if (!registry) {
+                setThreadPeersUsable(false);
+                return;
+            }
+            const rows = peerStatesForRemotes(
+                threadRemoteRecipients,
+                (remote) => registry.getState(remote),
+            );
+            for (const row of rows) {
+                const prev = prevPeerStatesRef.current.get(row.remote);
+                if (prev !== row.state) {
+                    prevPeerStatesRef.current.set(row.remote, row.state);
+                    recordThreadLifecycle("peer-state", {
+                        remote: row.remote,
+                        state: row.state,
+                        prev: prev ?? null,
+                    });
+                }
+            }
+            setThreadPeersUsable(
+                rows.every((row) => row.state === "usable"),
+            );
+        };
+        readPeerUsability();
+        const id = window.setInterval(readPeerUsability, 400);
+        return () => window.clearInterval(id);
+    }, [threadRemoteRecipients]);
+
+    const threadEstablishingConnection =
+        (isDmComposeSurface || isGroupComposeSurface) &&
+        composerDisabledReason === null &&
+        connectionState === "connected" &&
+        presenceReady &&
+        threadRemoteRecipients.length > 0 &&
+        !threadPeersUsable;
+
+    useEffect(() => {
+        const establishing = threadEstablishingConnection;
+        const was = prevEstablishingRef.current;
+        if (establishing && !was) {
+            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            recordThreadLifecycle("establishing-start", {
+                recipients: threadRemoteRecipients,
+                peerStates: registry
+                    ? peerStatesForRemotes(
+                          threadRemoteRecipients,
+                          (remote) => registry.getState(remote),
+                      )
+                    : [],
+            });
+        } else if (!establishing && was) {
+            recordThreadLifecycle("establishing-end", {
+                threadPeersUsable,
+                recipients: threadRemoteRecipients,
+            });
+        }
+        prevEstablishingRef.current = establishing;
+    }, [
+        threadEstablishingConnection,
+        threadPeersUsable,
+        threadRemoteRecipients,
+    ]);
+
+    useEffect(() => {
+        if (threadPeersUsable && !prevPeersUsableRef.current) {
+            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            recordThreadLifecycle("mesh-live", {
+                recipients: threadRemoteRecipients,
+                peerStates: registry
+                    ? peerStatesForRemotes(
+                          threadRemoteRecipients,
+                          (remote) => registry.getState(remote),
+                      )
+                    : [],
+            });
+        }
+        prevPeersUsableRef.current = threadPeersUsable;
+    }, [threadPeersUsable, threadRemoteRecipients]);
+
+    const composeSurfaceFocusKey =
+        composePendingDmPeer ?? selectedConversationId ?? "no-thread";
+
     useEffect(() => {
         if (composerDisabledReason !== null) return;
         composeTimingLog("composer-enabled", {
@@ -3804,11 +3926,20 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             composePendingDmPeer,
             hasConversationRow: !!selectedConversation,
         });
+        recordThreadLifecycle("composer-ready", {
+            selectedSpaceId: selectedConversationId
+                ? shortSpaceId(selectedConversationId)
+                : null,
+            composePendingDmPeer,
+            kind: selectedConversation?.kind ?? null,
+            threadPeersUsable,
+        });
     }, [
         composerDisabledReason,
         composePendingDmPeer,
         selectedConversation,
         selectedConversationId,
+        threadPeersUsable,
     ]);
 
     const undeliveredByConversation = useMemo(() => {
@@ -3845,6 +3976,104 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 participantCount > 2 ? participantCount : undefined,
         };
     }, [incomingCall, incomingAvCallInvite, selfAccount]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const w = window as Window & {
+            __chatChurnTeardown?: () => void;
+            __chatChurnSuspend?: () => void;
+            __chatChurnState?: () => Record<string, unknown>;
+        };
+        w.__chatChurnTeardown = dropChatTransportForNavigation;
+        w.__chatChurnSuspend = suspendChatNavigation;
+        const snapshotChurnState = () => {
+            const selected = selectedConversationId ?? null;
+            const listed = selected
+                ? conversationsRef.current.find(
+                      (row) => row.conversationId === selected,
+                  )
+                : undefined;
+            const resolved =
+                listed ??
+                (selected ? resolveConversationSync(selected) : undefined);
+            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            const peerStates = registry
+                ? peerStatesForRemotes(
+                      threadRemoteRecipients,
+                      (remote) => registry.getState(remote),
+                  )
+                : [];
+            const thread = threadLifecycleSnapshot({
+                selectedConversationId: selected,
+                composePendingDmPeer: composePendingDmPeerRef.current,
+                conversationKind: resolved?.kind ?? null,
+                composerDisabledReason,
+                threadEstablishingConnection,
+                threadPeersUsable,
+                threadRemoteRecipients,
+                connectionState,
+                presenceReady,
+                peerStates,
+            });
+            return {
+                leavingChat: leavingChatRef.current,
+                wasOnChatRoute: wasOnChatRouteRef.current,
+                onChatRoute,
+                pathname: location.pathname,
+                selectedConversationId: selected,
+                composePendingDmPeer: composePendingDmPeerRef.current,
+                pendingDmMember: pendingDmMemberRef.current,
+                selectedConversationKind: resolved?.kind ?? null,
+                selectedMemberCount: resolved?.members.length ?? null,
+                conversationListSummary: {
+                    total: conversationsRef.current.length,
+                    dm: conversationsRef.current.filter((c) => c.kind === "dm")
+                        .length,
+                    group: conversationsRef.current.filter(
+                        (c) => c.kind === "group",
+                    ).length,
+                    objectiveSpacesCount: objectiveSpacesRef.current.length,
+                },
+                hasChatOrchestrator: Boolean(chatDataOrchestratorRef.current),
+                hasAvOrchestrator: Boolean(avCallOrchestratorRef.current),
+                navigationSuspended:
+                    chatDataOrchestratorRef.current?.isNavigationSuspended() ??
+                    false,
+                realtimeState: realtimeClientRef.current?.state ?? null,
+                realtimeReady: realtimeClientRef.current?.isSessionReady ?? null,
+                realtimeLastError: realtimeClientRef.current?.lastError ?? null,
+                eventLoopLag: churnLagRef.current,
+                thread,
+            };
+        };
+        w.__chatChurnState = snapshotChurnState;
+        w.__chatChurnProbe = () => ({
+            at: Date.now(),
+            href: window.location.href,
+            state: snapshotChurnState(),
+            traceTail: window.__chatChurnTrace?.events?.().slice(-20) ?? [],
+            threadLifecycleTail:
+                window.__chatThreadLifecycle?.events?.().slice(-24) ?? [],
+        });
+        return () => {
+            delete w.__chatChurnTeardown;
+            delete w.__chatChurnSuspend;
+            delete w.__chatChurnState;
+            delete w.__chatChurnProbe;
+        };
+    }, [
+        dropChatTransportForNavigation,
+        suspendChatNavigation,
+        onChatRoute,
+        location.pathname,
+        selectedConversationId,
+        composerDisabledReason,
+        threadEstablishingConnection,
+        threadPeersUsable,
+        threadRemoteRecipients,
+        connectionState,
+        presenceReady,
+    ]);
 
     return {
         connectionState,
@@ -3893,5 +4122,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
         chatTransportReady,
         composerDisabledReason,
+        threadEstablishingConnection,
+        composeSurfaceFocusKey,
     };
 }

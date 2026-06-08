@@ -601,6 +601,34 @@ mod tests {
     }
 
     #[test]
+    fn serializes_pair_session_invite_with_e2e_style_accounts() {
+        let frame = ServerFrame::SessionInvite {
+            session_id: "wrtc:pair:e2ealicegc:e2ecarolgc".into(),
+            app_service: "chat".into(),
+            app_session_id: String::new(),
+            purpose: "chat-data".into(),
+            from: "e2ealicegc".parse().unwrap(),
+            participants: vec![
+                "e2ealicegc".parse().unwrap(),
+                "e2ecarolgc".parse().unwrap(),
+            ],
+            transports: vec![],
+            data_channels: vec![DataChannelSpec {
+                label: "chat".into(),
+                ordered: true,
+            }],
+            expires_at: 0,
+            app_metadata: ChatAppMetadata {
+                space_uuid: String::new(),
+            },
+        };
+        let json = encode_server_frame(&frame).unwrap();
+        assert!(json.contains(r#""sessionId":"wrtc:pair:e2ealicegc:e2ecarolgc""#));
+        assert!(json.contains(r#""e2ealicegc""#));
+        assert!(json.contains(r#""e2ecarolgc""#));
+    }
+
+    #[test]
     fn rejects_chat_say_frame_as_unknown() {
         assert!(matches!(
             parse_client_frame(br#"{"t":"say","body":"secret"}"#),

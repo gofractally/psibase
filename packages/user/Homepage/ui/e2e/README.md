@@ -66,9 +66,18 @@ yarn workspace @psibase/homepage-ui e2e:headed   # watch the UI login flow
 
 Manual PR stress (`chat-group-three-party-random`, skipped unless env is set):
 
-- **10 iterations** (`PSIBASE_E2E_RANDOM_CHURN_RUNS`, wired by `e2e:random-churn`)
-- **30 steps per iteration** (29 random middle steps + mandatory final group send)
-- Step mix: **group send**, **2-party DM send** (any actor → any other), **home ↔ chat**; optional **offline rejoin** with `PSIBASE_E2E_RANDOM_CHURN_OFFLINE=1`
+- **2 iterations** by default (`PSIBASE_E2E_RANDOM_CHURN_RUNS`, wired by `e2e:random-churn`)
+- **Fresh chain per iteration** (kill psinode, boot new db, new accounts)
+- **Alice browser reset each iteration** (`resetPageForFreshChain`: clear cookies/storage — chain wipe alone does not reset Playwright session)
+- **30 steps per iteration** — phased offline-first by default:
+  - steps 0–7: Alice solo (Bob/Carol contexts closed)
+  - step 8: Bob rejoin + pending flush
+  - steps 9–15: Alice + Bob (Carol offline)
+  - step 16: Carol rejoin + pending flush
+  - steps 17–28: full three-party random mix
+  - step 29: mandatory final group send
+- Pending delivery: `expectPendingOutboundMessage` on send-to-offline; flush on rejoin via `assertPendingDeliveredForPair` / `expectThreadMessage`
+- Legacy pure-random plan: `PSIBASE_E2E_RANDOM_CHURN_LEGACY_PLAN=1` (decaf / wedge scripts)
 - Default seed `0xdecafbad` (`PSIBASE_E2E_RANDOM_CHURN_SEED` to override)
 
 ```bash
@@ -85,7 +94,7 @@ yarn workspace @psibase/homepage-ui e2e:random-churn:watch:mesh
 # PSIBASE_E2E_CHURN_MESH_SETTLE_MS — after group/home/DM/offline steps (mesh default 3000)
 # PSIBASE_E2E_CHURN_INTER_STEP_MS — gap between planner steps (mesh default 400)
 # PSIBASE_E2E_RANDOM_CHURN_STRICT=1 — fail on first step error (mesh default on)
-# Hard wall clock: PSIBASE_E2E_RANDOM_CHURN_TIMEOUT_SEC (stress 600s, mesh watch 1200s).
+# Hard wall clock: PSIBASE_E2E_RANDOM_CHURN_TIMEOUT_SEC (stress 1800s, mesh watch 1200s).
 # Pause after leaving Chat before re-open: PSIBASE_E2E_CHURN_HOME_DELAY_MS (mesh 1500, stress 1000).
 
 Wedge diagnosis on decaf (steps 0–10 mesh speed, 11–13 human-paced, no browser recycle):
@@ -98,12 +107,12 @@ yarn workspace @psibase/homepage-ui e2e:random-churn:diag:wedge
 # PSIBASE_E2E_RANDOM_CHURN_HUMAN_MS=3000
 ```
 
-On failure, logs include `[churn-trace]` (product) and `[random-churn-diag] dump` (trace + chat-data snapshot per tab).
+On failure, logs include `[churn-trace]` (product), `[random-churn-diag] dump`, and `[random-churn] transport-snapshot` (v2 peer states + pending outbox via `__chatTransportV2Debug.snapshot` / `deliverySnapshot`). Product ring buffer also records `peer-registry-state`, `pending-flush-skip`, and `pending-flush-remote` in `[chat-data]`.
 # Stall kill: no completed step for PSIBASE_E2E_RANDOM_CHURN_STALL_SEC (default 120s).
 # After a step FAIL, kills if log idle PSIBASE_E2E_RANDOM_CHURN_FAIL_IDLE_SEC (default 60s).
 # Per-step budget: PSIBASE_E2E_RANDOM_CHURN_STEP_MS (default 90000).
 yarn workspace @psibase/homepage-ui e2e:random-churn
-# or: PSIBASE_E2E_RANDOM_CHURN_RUNS=10 PSIBASE_E2E_RANDOM_CHURN_SEED=42 yarn workspace @psibase/homepage-ui e2e e2e/tests/chat-group-three-party-random.spec.ts
+# or: PSIBASE_E2E_RANDOM_CHURN_RUNS=2 PSIBASE_E2E_RANDOM_CHURN_SEED=42 yarn workspace @psibase/homepage-ui e2e e2e/tests/chat-group-three-party-random.spec.ts
 ```
 
 Reuse an already-running chain:

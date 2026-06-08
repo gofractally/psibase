@@ -5,10 +5,17 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
     type TestAccount,
 } from "./auth-ui";
 import { ensureContact } from "./chat-ui";
 import { attachDiagnostics } from "./diagnostics";
+
+export type ThreePartyNames = {
+    alice: string;
+    bob: string;
+    carol: string;
+};
 
 export type ThreePartySetup = {
     aliceAccount: TestAccount;
@@ -19,13 +26,32 @@ export type ThreePartySetup = {
     cleanup: () => Promise<void>;
 };
 
+/** Unique alice/bob/carol names for one spec (shared chain, serial workers). */
+export function uniqueThreePartyNames(testPrefix: string): ThreePartyNames {
+    return {
+        alice: uniqueE2eAccountName(`${testPrefix}a`),
+        bob: uniqueE2eAccountName(`${testPrefix}b`),
+        carol: uniqueE2eAccountName(`${testPrefix}c`),
+    };
+}
+
+function resolveThreePartyNames(
+    namesOrPrefix: ThreePartyNames | string,
+): ThreePartyNames {
+    return typeof namesOrPrefix === "string"
+        ? uniqueThreePartyNames(namesOrPrefix)
+        : namesOrPrefix;
+}
+
 /** Shared 3-party account + contact graph setup for group chat e2e specs. */
 export async function setupThreePartyAccounts(
     chain: { baseUrl: string },
     alicePage: Page,
     browser: Browser,
-    names: { alice: string; bob: string; carol: string },
+    namesOrPrefix: ThreePartyNames | string,
 ): Promise<ThreePartySetup> {
+    const names = resolveThreePartyNames(namesOrPrefix);
+
     await loginProducerViaUi(alicePage, PRODUCER_ACCOUNT, chain.baseUrl);
     const aliceInvite = await createInviteUrl(alicePage, PRODUCER_ACCOUNT);
     const bobInvite = await createInviteUrl(alicePage, PRODUCER_ACCOUNT);

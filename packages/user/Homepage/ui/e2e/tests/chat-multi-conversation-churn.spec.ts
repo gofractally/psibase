@@ -5,11 +5,13 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
     createGroupChat,
     ensureContact,
     expectThreadMessage,
+    leaveChatToHome,
     openChat,
     sendChatMessage,
     startDmWithContact,
@@ -19,20 +21,17 @@ import {
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
 
-const ALICE = "e2emcaaaaa";
-const BOB = "e2emcbbbbbb";
-const CAROL = "e2emcccccc";
-
-/**
- * Mirrors manual multi-tab churn: DM with A, DM with B, then 3-party group
- * without leaving Chat — the path that used to wedge on reconnect + H18.
- */
+/** Mirrors manual multi-tab churn: DM with A, DM with B, then 3-party group. */
 test.describe("Chat multi-conversation churn", () => {
     test("DM alice, DM carol, then group message delivers to both", async ({
         chain,
         alicePage,
         browser,
     }) => {
+        const ALICE = uniqueE2eAccountName("mconv");
+        const BOB = uniqueE2eAccountName("mconv");
+        const CAROL = uniqueE2eAccountName("mconv");
+
         attachDiagnostics(alicePage, "alice");
 
         await loginProducerViaUi(alicePage, PRODUCER_ACCOUNT, chain.baseUrl);
@@ -72,17 +71,27 @@ test.describe("Chat multi-conversation churn", () => {
                 }
             }
 
+            // L1: peers need an active signaling WS before presence or L3 negotiation.
+            await startDmWithContact(bobPage, chain.baseUrl, alice.name);
             await startDmWithContact(alicePage, chain.baseUrl, bob.name);
             await waitForPeerOnline(alicePage, bob.name);
+            await waitForPeerOnline(bobPage, alice.name);
             await waitForDmDataChannelReady(alicePage, bob.name);
+            await waitForDmDataChannelReady(bobPage, alice.name);
             await sendChatMessage(alicePage, "dm to bob");
             await expectThreadMessage(bobPage, "dm to bob", {
                 timeout: 180_000,
             });
 
+            // App layer: reset chat mount before a second DM pair (H18 — dual WS
+            // pair routing + objective space focus).
+            await leaveChatToHome(alicePage, chain.baseUrl);
             await startDmWithContact(alicePage, chain.baseUrl, carol.name);
+            await startDmWithContact(carolPage, chain.baseUrl, alice.name);
             await waitForPeerOnline(alicePage, carol.name);
+            await waitForPeerOnline(carolPage, alice.name);
             await waitForDmDataChannelReady(alicePage, carol.name);
+            await waitForDmDataChannelReady(carolPage, alice.name);
             await sendChatMessage(alicePage, "dm to carol");
             await expectThreadMessage(carolPage, "dm to carol", {
                 timeout: 180_000,

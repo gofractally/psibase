@@ -57,6 +57,8 @@ describe("buildRtcPeerConnectionConfig", () => {
  * and the stale-answer-in-stable-state guard.
  */
 class FakePeerConnection {
+    static instances: FakePeerConnection[] = [];
+
     iceConnectionState = "new";
 
     connectionState = "new";
@@ -78,9 +80,12 @@ class FakePeerConnection {
     static reset() {
         FakePeerConnection.pendingSetLocal = [];
         FakePeerConnection.pendingSetRemote = [];
+        FakePeerConnection.instances = [];
     }
 
-    constructor(_config?: RTCConfiguration) {}
+    constructor(_config?: RTCConfiguration) {
+        FakePeerConnection.instances.push(this);
+    }
 
     addTrack = vi.fn();
 
@@ -478,6 +483,60 @@ describe("ChatDataWebRtcPeer stale-offer guard", () => {
         ).mock.calls.filter((c) => c[0].kind === "answer").length;
         expect(answersAfter).toBe(1);
         expect(onFailed).not.toHaveBeenCalled();
+        peer.dispose();
+    });
+});
+
+describe("ChatDataWebRtcPeer needsReconnect", () => {
+    function createTestPeer(isInitiator: boolean) {
+        return new ChatDataWebRtcPeer({
+            sessionId: "sess-reconnect",
+            selfAccount: "alice",
+            peerAccount: "bob",
+            iceServers: null,
+            signaling: mockSignaling(),
+            isInitiator,
+            handlers: {},
+        });
+    }
+
+    function pc(): FakePeerConnection {
+        return FakePeerConnection.instances.at(-1)!;
+    }
+
+    it("is false while ICE is checking after stable SDP", () => {
+        const peer = createTestPeer(true);
+        pc().signalingState = "stable";
+        pc().connectionState = "connecting";
+        pc().iceConnectionState = "checking";
+        expect(peer.needsReconnect).toBe(false);
+        peer.dispose();
+    });
+
+    it("is false at stable/new/new before any remote offer (polite wedge pre-timeout)", () => {
+        const peer = createTestPeer(false);
+        pc().signalingState = "stable";
+        pc().connectionState = "new";
+        pc().iceConnectionState = "new";
+        expect(peer.needsReconnect).toBe(false);
+        peer.dispose();
+    });
+
+    it("is true when stable with no ICE progress after handshake", () => {
+        const peer = createTestPeer(false);
+        pc().signalingState = "stable";
+        pc().connectionState = "connected";
+        pc().iceConnectionState = "connected";
+        expect(peer.needsReconnect).toBe(true);
+        peer.dispose();
+    });
+
+    it("is true when transport failed", () => {
+        const peer = createTestPeer(true);
+        pc().signalingState = "stable";
+        pc().connectionState = "failed";
+        pc().iceConnectionState = "failed";
+        expect(peer.needsReconnect).toBe(true);
         peer.dispose();
     });
 });

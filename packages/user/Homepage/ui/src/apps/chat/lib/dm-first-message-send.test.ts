@@ -15,9 +15,15 @@ describe("shouldQueueFirstDmUntilSpace", () => {
         );
     });
 
-    it("does not queue when space is selected", () => {
+    it("queues when pending peer is set while group thread stays selected", () => {
         expect(
-            shouldQueueFirstDmUntilSpace("space:abc", "alicealice"),
+            shouldQueueFirstDmUntilSpace("space:group", "alicealice", "group"),
+        ).toBe(true);
+    });
+
+    it("does not queue when a DM space is selected", () => {
+        expect(
+            shouldQueueFirstDmUntilSpace("space:abc", "alicealice", "dm"),
         ).toBe(false);
     });
 

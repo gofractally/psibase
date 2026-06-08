@@ -7,7 +7,8 @@ use crate::protocol::ClientSupports;
 use crate::cleanup;
 use crate::signaling;
 use crate::state::{
-    remove_socket_session, socket_session, store_client_ready, upsert_socket_session, RemovedSocket,
+    enqueue_pending_outbound, remove_socket_session, socket_session, store_client_ready,
+    take_pending_outbound_payloads, upsert_socket_session, RemovedSocket,
 };
 use crate::state::tables::SocketSessionRow;
 
@@ -77,4 +78,24 @@ pub fn tear_down_signaling_for_dead_socket_tx(
 
 pub fn sweep_stale_sessions_tx(now: i64) -> Vec<(i32, crate::protocol::ServerFrame)> {
     cleanup::sweep_stale_sessions(now)
+}
+
+pub fn take_pending_outbound_payloads_tx(target_socket: i32) -> Vec<String> {
+    ::psibase::subjective_tx! {
+        take_pending_outbound_payloads(target_socket)
+    }
+}
+
+pub fn enqueue_pending_outbound_frames_tx(
+    frames: Vec<(i32, crate::protocol::ServerFrame)>,
+    now: i64,
+) {
+    use crate::protocol::encode_server_frame;
+    ::psibase::subjective_tx! {
+        for (target_socket, frame) in &frames {
+            if let Ok(payload) = encode_server_frame(frame) {
+                enqueue_pending_outbound(*target_socket, now, payload);
+            }
+        }
+    }
 }

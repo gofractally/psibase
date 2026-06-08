@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { composeTimingLog } from "../../lib/dm-compose-timing";
 import { shortSpaceId } from "../../lib/chat-data-debug";
+import { recordThreadLifecycle } from "../../lib/thread-lifecycle";
 import {
     readLastOpenChatId,
     writeLastOpenChatId,
@@ -77,9 +78,31 @@ export function useConversationSelection(
 
     const setSelectedConversationId = useCallback(
         (id: string | undefined, source = "unknown") => {
+            if (
+                source === "url-space" &&
+                (composePendingDmPeerRef.current ||
+                    pendingDmMemberRef.current)
+            ) {
+                composeTimingLog("selectConversation-blocked", {
+                    source,
+                    reason: "compose-pending-dm",
+                    pendingPeer:
+                        composePendingDmPeerRef.current ??
+                        pendingDmMemberRef.current,
+                    urlSpace: id ? shortSpaceId(id) : undefined,
+                });
+                return;
+            }
             composeTimingLog("selectConversation", {
                 source,
                 id: id ? shortSpaceId(id) : undefined,
+            });
+            const listed = conversations.find((row) => row.conversationId === id);
+            recordThreadLifecycle("selected", {
+                source,
+                spaceId: id ? shortSpaceId(id) : null,
+                kind: listed?.kind ?? null,
+                memberCount: listed?.members.length ?? null,
             });
             setComposePendingDmPeer(null);
             setSelectedConversationIdState(id);
@@ -87,8 +110,18 @@ export function useConversationSelection(
                 writeLastOpenChatId(chainId, selfAccount, id);
             }
         },
-        [chainId, selfAccount],
+        [chainId, selfAccount, conversations],
     );
+
+    useEffect(() => {
+        if (!composePendingDmPeer) return;
+        recordThreadLifecycle("pending-peer", {
+            peer: composePendingDmPeer,
+            selectedSpaceId: selectedConversationId
+                ? shortSpaceId(selectedConversationId)
+                : null,
+        });
+    }, [composePendingDmPeer, selectedConversationId]);
 
     const selectConversation = useCallback(
         (id: string, source: string) => {

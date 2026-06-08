@@ -5,6 +5,7 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
     createGroupChat,
@@ -33,7 +34,7 @@ test.describe("Group visibility with partial contacts", () => {
         const aliceAccount = await createAccountViaInviteUrl(
             alicePage,
             aliceInvite,
-            "nancynancy",
+            uniqueE2eAccountName("gpca"),
         );
 
         const bobContext = await browser.newContext();
@@ -47,12 +48,12 @@ test.describe("Group visibility with partial contacts", () => {
             const bobAccount = await createAccountViaInviteUrl(
                 bobPage,
                 bobInvite,
-                "oscaroscar",
+                uniqueE2eAccountName("gpcb"),
             );
             const carolAccount = await createAccountViaInviteUrl(
                 carolPage,
                 carolInvite,
-                "paulpaulpa",
+                uniqueE2eAccountName("gpcc"),
             );
 
             for (const [page, peer] of [

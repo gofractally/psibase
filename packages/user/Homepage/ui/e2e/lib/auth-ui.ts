@@ -1,4 +1,7 @@
 import { expect, type Page } from "@playwright/test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { chatUrlWithSpace } from "./chat-ui";
 import { gotoReliable } from "./churn-navigation";
@@ -204,6 +207,51 @@ export async function createInviteUrl(
 /** Accounts create-prompt requires >= 10 characters (see create-prompt.tsx). */
 export const MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH = 10;
 
+/** Pre-verified via `e2e/scripts/generate-verified-account-names.sh` (round-trip compression). */
+const VERIFIED_E2E_ACCOUNT_NAMES: readonly string[] = JSON.parse(
+    readFileSync(
+        join(process.cwd(), "e2e/lib/verified-e2e-account-names.json"),
+        "utf8",
+    ),
+) as string[];
+
+export const e2eAccountNameIndexFile = (): string =>
+    process.env.PSIBASE_E2E_NAME_INDEX_FILE ??
+    join(tmpdir(), "psibase-e2e-account-name-index");
+
+function readE2eNameIndex(): number {
+    try {
+        const n = parseInt(readFileSync(e2eAccountNameIndexFile(), "utf8"), 10);
+        return Number.isFinite(n) && n >= 0 ? n : 0;
+    } catch {
+        return 0;
+    }
+}
+
+/** Reset at global-setup so each suite run starts from the first verified name. */
+export function resetE2eAccountNameIndex(): void {
+    writeFileSync(e2eAccountNameIndexFile(), "0");
+}
+
+/**
+ * Next Psibase account name (10 chars, compressible on-chain), unique within this test run.
+ * Names come from verified-e2e-account-names.json; call from test bodies, not module scope.
+ * Index is file-backed so it survives Playwright per-file module reloads and worker respawns.
+ */
+export function uniqueE2eAccountName(prefix: string): string {
+    void prefix;
+    const idx = readE2eNameIndex();
+    if (idx >= VERIFIED_E2E_ACCOUNT_NAMES.length) {
+        throw new Error(
+            `Ran out of verified e2e account names (${VERIFIED_E2E_ACCOUNT_NAMES.length}). ` +
+                "Regenerate with e2e/scripts/generate-verified-account-names.sh",
+        );
+    }
+    const name = VERIFIED_E2E_ACCOUNT_NAMES[idx]!;
+    writeFileSync(e2eAccountNameIndexFile(), String(idx + 1));
+    return name;
+}
+
 /**
  * Create a new account by opening an invite link in a fresh browser context.
  * Returns credentials for later re-login (rejoin scenarios).
@@ -228,9 +276,6 @@ export async function createAccountViaInviteUrl(
     await openImportFromConnect(frame);
     await frame.getByRole("button", { name: "Create account" }).click();
 
-    const externallyManaged =
-        process.env.PSIBASE_E2E_EXTERNAL_CHAIN === "1";
-
     let finalName = accountName;
     if (finalName.length < MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH) {
         throw new Error(
@@ -242,7 +287,7 @@ export async function createAccountViaInviteUrl(
         /Account must be at least|This account name is not available|An unknown error occurred/i,
     );
 
-    for (let attempt = 0; attempt < (externallyManaged ? 6 : 1); attempt += 1) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
         await frame.getByPlaceholder("Account name").fill(finalName);
         await expect(
             frame.getByRole("button", { name: "Create", exact: true }),
@@ -257,12 +302,10 @@ export async function createAccountViaInviteUrl(
         } catch (e) {
             const detail = (await validationError.textContent())?.trim() ?? "";
             const isNameTaken = /not available/i.test(detail);
-            if (externallyManaged && isNameTaken && attempt < 5) {
-                const suffix = Math.random().toString(36).slice(2, 4);
-                finalName = `${accountName.slice(
-                    0,
-                    Math.max(MIN_E2E_CREATE_ACCOUNT_NAME_LENGTH - 2, 0),
-                )}${suffix}`;
+            const isInvalidName =
+                /invalid account name|unknown error occurred/i.test(detail);
+            if ((isNameTaken || isInvalidName) && attempt < 5) {
+                finalName = uniqueE2eAccountName(accountName);
                 continue;
             }
             if (await validationError.isVisible().catch(() => false)) {

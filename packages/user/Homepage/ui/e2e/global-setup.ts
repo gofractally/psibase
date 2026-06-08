@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 
+import { resetE2eAccountNameIndex } from "./lib/auth-ui";
 import {
     assertNoConcurrentE2eRun,
     bootFreshChain,
@@ -16,6 +17,7 @@ import {
  */
 async function globalSetup(): Promise<void> {
     assertNoConcurrentE2eRun();
+    resetE2eAccountNameIndex();
 
     const externallyManaged =
         process.env.PSIBASE_E2E_EXTERNAL_CHAIN === "1";

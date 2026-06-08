@@ -20,11 +20,7 @@ test.describe("Chat group offline member catch-up", () => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "occalicegc",
-            bob: "occbobbbgc",
-            carol: "occcarolgc",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "ocatch");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [
@@ -115,11 +111,7 @@ test.describe("Chat group offline member catch-up", () => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "navalicegc",
-            bob: "navbobbbgc",
-            carol: "navcarolgc",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "navcat");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [

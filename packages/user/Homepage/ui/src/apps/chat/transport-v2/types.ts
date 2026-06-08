@@ -5,15 +5,25 @@ export type MessageStatus = "PENDING" | "DELIVERED" | "FAILED";
 export type PeerState =
     | "absent"
     | "waiting_ws"
+    /** L2 joinSession sent; awaiting roster snapshot before PC creation. */
+    | "joining_pair"
     | "negotiating"
     | "usable"
     | "suspected_dead"
     | "disposing";
 
+/** Re-drive L2 join when stuck in `joining_pair`. */
+export const PEER_JOIN_STUCK_MS = 20_000;
+/** Recover PC when stable with no data channel or `needsReconnect`. */
+export const PEER_NEGOTIATION_STUCK_MS = 15_000;
+export const PEER_STUCK_CHECK_MS = 2_000;
+
 export type EnsureReason =
     | "message_enqueued"
     | "presence_online"
     | "peer_focus"
+    | "peer_joined"
+    | "roster_kick"
     | "ws_ready"
     | "manual"
     | "meet_start";

@@ -260,4 +260,96 @@ describe("RealtimeClient reconnect", () => {
         expect(ws.url).toBe("wss://x-webrtcsig.psibase.localhost:8080/ws");
         expect(ws.url).not.toContain("x-webrtc-sig");
     });
+
+    it("does not open a second websocket when connect() is called while already ready", async () => {
+        const client = makeClient();
+        await connectThroughWelcome(client);
+        expect(MockWebSocket.instances).toHaveLength(1);
+
+        client.connect();
+        await flushAsync();
+        vi.advanceTimersByTime(500);
+
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(client.state).toBe("connected");
+    });
+
+    it("coalesces overlapping connect() calls while a connect is in flight", async () => {
+        let resolveToken!: (value: string) => void;
+        const client = makeClient({
+            authTokenProvider: () =>
+                new Promise((resolve) => {
+                    resolveToken = resolve;
+                }),
+        });
+
+        client.connect();
+        client.connect();
+        await flushAsync();
+        expect(MockWebSocket.instances).toHaveLength(0);
+
+        resolveToken("test-token");
+        await flushAsync();
+        expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    it("applies circuit-breaker backoff after rapid close following welcome", async () => {
+        const client = makeClient({
+            reconnect: { initialDelayMs: 100, maxDelayMs: 100 },
+        });
+        const ws = await connectThroughWelcome(client);
+        expect(client.state).toBe("connected");
+
+        ws.emitClose();
+        expect(client.state).toBe("reconnecting");
+
+        await vi.advanceTimersByTimeAsync(50);
+        await flushAsync();
+        expect(MockWebSocket.instances).toHaveLength(1);
+
+        await vi.advanceTimersByTimeAsync(100);
+        await flushAsync();
+        expect(MockWebSocket.instances.length).toBeGreaterThan(1);
+    });
+
+    it("does not reconnect in a tight loop after repeated rapid closes", async () => {
+        const client = makeClient({
+            reconnect: { initialDelayMs: 100, maxDelayMs: 800 },
+        });
+
+        for (let i = 0; i < 4; i++) {
+            if (i === 0) {
+                client.connect();
+                await flushAsync();
+            } else {
+                await vi.advanceTimersByTimeAsync(100);
+                await flushAsync();
+            }
+            const ws = MockWebSocket.instances.at(-1)!;
+            ws.open();
+            ws.message(WELCOME);
+            expect(client.state).toBe("connected");
+            ws.emitClose();
+            expect(client.state).toBe("reconnecting");
+        }
+
+        expect(MockWebSocket.instances.length).toBeLessThanOrEqual(5);
+    });
+
+    it("unregisterHandlers stops delivering to removed layers", async () => {
+        const client = makeClient();
+        const welcomeA = vi.fn();
+        const welcomeB = vi.fn();
+        const unregisterA = client.registerHandlers({ welcome: welcomeA });
+        client.registerHandlers({ welcome: welcomeB });
+        await connectThroughWelcome(client);
+
+        expect(welcomeA).toHaveBeenCalledTimes(1);
+        expect(welcomeB).toHaveBeenCalledTimes(1);
+
+        unregisterA();
+        MockWebSocket.instances.at(-1)!.message(WELCOME);
+        expect(welcomeA).toHaveBeenCalledTimes(1);
+        expect(welcomeB).toHaveBeenCalledTimes(2);
+    });
 });

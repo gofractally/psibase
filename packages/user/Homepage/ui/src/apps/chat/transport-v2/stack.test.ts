@@ -245,23 +245,77 @@ describe("createChatTransportStack integration", () => {
         ).toBe(true);
     });
 
+    it("ignores stale sessionSnapshot epoch on dual-ws pair roster", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        hub.setPresence("carol", true);
+        await establishPair(hub, alice, bob);
+        void alice.stack.peerRegistry.ensure("carol", "peer_focus");
+        await Promise.resolve();
+
+        const carolPairId = pairIdFor("alice", "carol");
+        const carolChannel = alice.stack.pairSignaling.sessionChannel(carolPairId);
+        expect(carolChannel).toBeDefined();
+        const carolRt =
+            carolChannel === "auxiliary" ? alice.auxRt : alice.rt;
+
+        carolRt.dispatch({
+            t: "sessionSnapshot",
+            sessionId: carolPairId,
+            joinedParticipants: ["alice", "carol"],
+            pendingParticipants: [],
+            epoch: 2,
+        });
+        expect(alice.stack.pairSignaling.isJoined(carolPairId)).toBe(true);
+
+        carolRt.dispatch({
+            t: "sessionSnapshot",
+            sessionId: carolPairId,
+            joinedParticipants: ["carol"],
+            pendingParticipants: ["alice"],
+            epoch: 1,
+        });
+        expect(alice.stack.pairSignaling.isJoined(carolPairId)).toBe(true);
+
+        const signalRt = carolChannel === "auxiliary" ? alice.auxRt : alice.rt;
+        const signalFramesBefore = signalRt.sentFrames.filter(
+            (f) => f.t === "signal",
+        ).length;
+        alice.stack.pairSignaling.signal(carolPairId, {
+            sessionId: carolPairId,
+            to: "carol",
+            kind: "offer",
+            sdp: "v=0 post-stale-offer",
+        });
+        expect(
+            signalRt.sentFrames.filter((f) => f.t === "signal").length,
+        ).toBeGreaterThan(signalFramesBefore);
+    });
+
     it("re-joins pair sessions after welcome reconnect", async () => {
         const hub = createTwoPartyHub();
         const { alice, bob } = createTwoPartyStacks(hub);
         await establishPair(hub, alice, bob);
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
 
         const pairId = pairIdFor("alice", "bob");
-        const joinsBefore = alice.rt.sentFrames.filter(
-            (f) => f.t === "joinSession" && f.sessionId === pairId,
-        ).length;
+        const countPairJoins = (rt: FakeRealtimeClient) =>
+            rt.sentFrames.filter(
+                (f) => f.t === "joinSession" && f.sessionId === pairId,
+            ).length;
+        const joinsBefore =
+            countPairJoins(alice.rt) + countPairJoins(alice.auxRt);
+        expect(joinsBefore).toBeGreaterThan(0);
 
         alice.rt.simulateReconnectWelcome();
+        alice.auxRt.simulateReconnectWelcome();
+        await vi.advanceTimersByTimeAsync(0);
         await Promise.resolve();
 
-        const joinsAfter = alice.rt.sentFrames.filter(
-            (f) => f.t === "joinSession" && f.sessionId === pairId,
-        ).length;
+        const joinsAfter =
+            countPairJoins(alice.rt) + countPairJoins(alice.auxRt);
         expect(joinsAfter).toBeGreaterThan(joinsBefore);
+        void bob;
     });
 
     it("routes pair signal frames to peerRegistry.handleRemoteSignal", async () => {
@@ -319,8 +373,11 @@ describe("createChatTransportStack integration", () => {
     it("fails message after max valid ack attempts (full stack path)", async () => {
         const hub = createTwoPartyHub();
         const { alice, bob } = createTwoPartyStacks(hub);
-        await establishPair(hub, alice, bob);
         hub.setPresence("bob", true);
+        await establishPair(hub, alice, bob);
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+        await vi.advanceTimersByTimeAsync(0);
+        await Promise.resolve();
 
         const { msgId } = await alice.stack.messaging.send({
             spaceUuid: "space:dm",
@@ -328,15 +385,17 @@ describe("createChatTransportStack integration", () => {
             body: "timeout",
             autoRetry: true,
         });
+        await vi.advanceTimersByTimeAsync(0);
         await Promise.resolve();
-        void bob;
 
         for (let i = 0; i < MAX_VALID_ATTEMPTS; i++) {
             await vi.advanceTimersByTimeAsync(IN_FLIGHT_ACK_WAIT_MS + 1);
+            void alice.stack.peerRegistry.ensure("bob", "message_enqueued");
             await Promise.resolve();
         }
 
         expect(alice.stack.messaging.getStatus(msgId)).toBe("FAILED");
+        void bob;
     });
 
     it("delivers inbound chatMessage through default L4 wire path", async () => {
@@ -397,5 +456,41 @@ describe("createChatTransportStack integration", () => {
         expect(hub.joinCount(charliePairId)).toBe(1);
         void bob;
         void charlie;
+    });
+
+    it("dispose removes stack handlers so welcome does not accumulate", () => {
+        const rt = new FakeRealtimeClient("alice");
+        let transportWelcomeCalls = 0;
+        rt.registerHandlers({
+            welcome: () => {
+                transportWelcomeCalls += 1;
+            },
+        });
+
+        const makeStack = () =>
+            createChatTransportStack({
+                localAccount: "alice",
+                chainId: "chain-a",
+                realtimeClient: rt,
+                iceServers: null,
+                pairJoinStaggerMs: 0,
+                pairJoinRetryMs: 0,
+            });
+
+        const stack1 = makeStack();
+        stack1.wireRealtimeHandlers({});
+        stack1.dispose();
+
+        transportWelcomeCalls = 0;
+        rt.simulateReconnectWelcome();
+        expect(transportWelcomeCalls).toBe(1);
+
+        const stack2 = makeStack();
+        stack2.wireRealtimeHandlers({});
+        stack2.dispose();
+
+        transportWelcomeCalls = 0;
+        rt.simulateReconnectWelcome();
+        expect(transportWelcomeCalls).toBe(1);
     });
 });

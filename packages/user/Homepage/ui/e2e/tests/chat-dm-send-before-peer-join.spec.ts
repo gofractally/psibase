@@ -5,6 +5,7 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
     ensureContact,
@@ -15,9 +16,6 @@ import {
     waitForChatConnected,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
-
-const ALICE = "e2edmsend1";
-const BOB = "e2edmsend2";
 
 test.describe("Chat DM send before peer joins session", () => {
     /**
@@ -30,6 +28,9 @@ test.describe("Chat DM send before peer joins session", () => {
         alicePage,
         browser,
     }) => {
+        const ALICE = uniqueE2eAccountName("dmsj");
+        const BOB = uniqueE2eAccountName("dmsj");
+
         attachDiagnostics(alicePage, "alice");
 
         await loginProducerViaUi(alicePage, PRODUCER_ACCOUNT, chain.baseUrl);

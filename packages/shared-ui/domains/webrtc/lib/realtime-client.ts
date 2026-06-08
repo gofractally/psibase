@@ -83,6 +83,9 @@ function nextReconnectDelayMs(
     return Math.floor(Math.random() * (cap + 1));
 }
 
+/** Closes sooner than this after welcome count as rapid failure (storm guard). */
+const RAPID_CLOSE_AFTER_WELCOME_MS = 500;
+
 function churnDisablesHealthReconnect(): boolean {
     try {
         return (
@@ -139,7 +142,12 @@ export class RealtimeClient {
 
     private readonly onStateCb?: (state: RealtimeConnectionState) => void;
 
-    private handlers: RealtimeHandlers;
+    private handlers: RealtimeHandlers = {};
+
+    /** Incremental handler layers; {@link registerHandlers} adds, unsubscribe removes. */
+    private readonly handlerLayers = new Map<number, RealtimeHandlers>();
+
+    private nextHandlerLayerId = 1;
 
     private readonly authTokenProvider?: () => Promise<string | null | undefined>;
 
@@ -188,11 +196,25 @@ export class RealtimeClient {
     /** Increments on each server `welcome`; used to distinguish first connect vs reconnect. */
     private welcomeCount = 0;
 
+    /** Bumped to supersede in-flight {@link runConnect} attempts. */
+    private connectGeneration = 0;
+
+    private connectInFlight = false;
+
+    /** Timestamp of the latest welcome on the active socket. */
+    private welcomeAt = 0;
+
+    /** Consecutive closes shortly after welcome — drives circuit-breaker backoff. */
+    private rapidCloseStreak = 0;
+
     constructor(opts: RealtimeClientOptions = {}) {
         this.baseUrl = opts.baseUrl;
         this.onFrameCb = opts.onFrame;
         this.onStateCb = opts.onState;
-        this.handlers = opts.handlers ?? {};
+        if (opts.handlers && Object.keys(opts.handlers).length > 0) {
+            this.handlerLayers.set(0, opts.handlers);
+        }
+        this.rebuildHandlersFromLayers();
         this.authTokenProvider = opts.authTokenProvider;
         this.authRequiredMessage =
             opts.authRequiredMessage ??
@@ -236,14 +258,33 @@ export class RealtimeClient {
         this.sendJson(frame as unknown as Record<string, unknown>);
     }
 
-    /** Merge additional server-frame handlers; chains when the same frame type is registered twice. */
-    registerHandlers(extra: RealtimeHandlers): void {
-        this.handlers = chainHandlers(this.handlers, extra);
+    /** Merge additional server-frame handlers; returns unsubscribe. */
+    registerHandlers(extra: RealtimeHandlers): () => void {
+        const id = this.nextHandlerLayerId;
+        this.nextHandlerLayerId += 1;
+        this.handlerLayers.set(id, extra);
+        this.rebuildHandlersFromLayers();
+        return () => {
+            if (!this.handlerLayers.delete(id)) return;
+            this.rebuildHandlersFromLayers();
+        };
     }
 
     /** Replace all server-frame handlers (used by {@link WebRtcSessionProvider}). */
     setHandlers(next: RealtimeHandlers): void {
-        this.handlers = next;
+        this.handlerLayers.clear();
+        if (Object.keys(next).length > 0) {
+            this.handlerLayers.set(0, next);
+        }
+        this.rebuildHandlersFromLayers();
+    }
+
+    private rebuildHandlersFromLayers(): void {
+        let merged: RealtimeHandlers = {};
+        for (const layer of this.handlerLayers.values()) {
+            merged = chainHandlers(merged, layer);
+        }
+        this.handlers = merged;
     }
 
     private setState(next: RealtimeConnectionState) {
@@ -260,7 +301,7 @@ export class RealtimeClient {
     connect(): void {
         this.userClosed = false;
         this.cancelReconnectTimer();
-        void this.runConnect();
+        void this.runConnect(false);
     }
 
     close(): void {
@@ -268,6 +309,8 @@ export class RealtimeClient {
             instanceId: this.clientInstanceId,
         });
         this.userClosed = true;
+        this.connectGeneration += 1;
+        this.connectInFlight = false;
         this.cancelReconnectTimer();
         this.stopHealthWatchdog();
 
@@ -276,6 +319,8 @@ export class RealtimeClient {
         this.sessionReady = false;
         this.reconnectAttempt = 0;
         this.welcomeCount = 0;
+        this.welcomeAt = 0;
+        this.rapidCloseStreak = 0;
         this.setLastError(null);
         try {
             w?.close();
@@ -293,7 +338,7 @@ export class RealtimeClient {
         if (this.userClosed) return;
         this.cancelReconnectTimer();
         this.reconnectAttempt = 0;
-        void this.runConnect();
+        void this.runConnect(true);
     }
 
     receive(rawText: string): void {
@@ -321,6 +366,8 @@ export class RealtimeClient {
         switch (frame.t) {
             case "welcome":
                 this.reconnectAttempt = 0;
+                this.rapidCloseStreak = 0;
+                this.welcomeAt = Date.now();
                 this.welcomeCount += 1;
                 this.sessionReady = true;
                 this.setState("connected");
@@ -493,11 +540,14 @@ export class RealtimeClient {
     private scheduleReconnect() {
         if (this.userClosed) return;
 
-        const delay = nextReconnectDelayMs(
-            this.reconnectAttempt,
-            this.initialDelayMs,
-            this.maxDelayMs,
-        );
+        const delay =
+            this.rapidCloseStreak > 0
+                ? this.rapidFailureReconnectDelayMs()
+                : nextReconnectDelayMs(
+                      this.reconnectAttempt,
+                      this.initialDelayMs,
+                      this.maxDelayMs,
+                  );
         this.reconnectAttempt += 1;
 
         this.setState("reconnecting");
@@ -505,8 +555,46 @@ export class RealtimeClient {
         this.reconnectTimer = globalThis.setTimeout(() => {
             this.reconnectTimer = null;
             if (this.userClosed) return;
-            void this.runConnect();
+            void this.runConnect(false);
         }, delay);
+    }
+
+    private rapidFailureReconnectDelayMs(): number {
+        const exponent = Math.min(this.rapidCloseStreak - 1, 8);
+        return Math.min(
+            this.maxDelayMs,
+            Math.max(
+                this.initialDelayMs,
+                this.initialDelayMs * 2 ** exponent,
+            ),
+        );
+    }
+
+    private noteSessionClosed(sessionWasReady: boolean, connectStartedAt: number) {
+        if (!sessionWasReady) return;
+        const ageMs =
+            this.welcomeAt > 0
+                ? Date.now() - this.welcomeAt
+                : Date.now() - connectStartedAt;
+        if (ageMs < RAPID_CLOSE_AFTER_WELCOME_MS) {
+            this.rapidCloseStreak += 1;
+            this.debugLog?.("ws rapid close streak", {
+                instanceId: this.clientInstanceId,
+                streak: this.rapidCloseStreak,
+                sessionAgeMs: ageMs,
+            });
+        } else {
+            this.rapidCloseStreak = 0;
+        }
+        this.welcomeAt = 0;
+    }
+
+    private isStableReady(): boolean {
+        return (
+            this.sessionReady &&
+            this.ws != null &&
+            this.ws.readyState === WebSocket.OPEN
+        );
     }
 
     private sendJson(payload: Record<string, unknown>): void {
@@ -522,8 +610,19 @@ export class RealtimeClient {
         }
     }
 
-    private async runConnect(): Promise<void> {
+    private async runConnect(force: boolean): Promise<void> {
         if (this.userClosed) return;
+
+        if (!force && this.isStableReady()) {
+            return;
+        }
+
+        if (!force && this.connectInFlight) {
+            return;
+        }
+
+        const generation = ++this.connectGeneration;
+        this.connectInFlight = true;
 
         try {
             this.setState("reconnecting");
@@ -543,7 +642,9 @@ export class RealtimeClient {
             }
 
             const token = await this.authTokenProvider?.();
-            if (this.userClosed) return;
+            if (this.userClosed || generation !== this.connectGeneration) {
+                return;
+            }
             if (!token) {
                 this._lastError = this.authRequiredMessage;
                 this.scheduleReconnect();
@@ -594,7 +695,13 @@ export class RealtimeClient {
             };
 
             ws.onopen = () => {
-                if (this.userClosed || this.ws !== ws) return;
+                if (
+                    this.userClosed ||
+                    this.ws !== ws ||
+                    generation !== this.connectGeneration
+                ) {
+                    return;
+                }
                 this.setLastError(null);
                 this.debugLog?.("ws open", {
                     instanceId: this.clientInstanceId,
@@ -603,7 +710,13 @@ export class RealtimeClient {
             };
 
             ws.onmessage = (ev: MessageEvent<string | ArrayBuffer>): void => {
-                if (this.userClosed || this.ws !== ws) return;
+                if (
+                    this.userClosed ||
+                    this.ws !== ws ||
+                    generation !== this.connectGeneration
+                ) {
+                    return;
+                }
                 if (typeof ev.data !== "string") {
                     this._lastError =
                         "x-webrtcsig websocket message was not UTF-16 text";
@@ -616,7 +729,13 @@ export class RealtimeClient {
             };
 
             ws.onerror = () => {
-                if (this.userClosed || this.ws !== ws) return;
+                if (
+                    this.userClosed ||
+                    this.ws !== ws ||
+                    generation !== this.connectGeneration
+                ) {
+                    return;
+                }
                 clearConnectReadyTimer();
                 this.debugLog?.("ws error", {
                     instanceId: this.clientInstanceId,
@@ -639,9 +758,10 @@ export class RealtimeClient {
                 if (this.ws !== ws) {
                     return;
                 }
+                const sessionWasReady = this.sessionReady;
                 this.debugLog?.("ws close", {
                     instanceId: this.clientInstanceId,
-                    sessionReady: this.sessionReady,
+                    sessionReady: sessionWasReady,
                     elapsedMs: Date.now() - connectStartedAt,
                     code: ev?.code,
                     reason: ev?.reason,
@@ -654,18 +774,30 @@ export class RealtimeClient {
 
                 if (this.userClosed) return;
 
+                this.noteSessionClosed(sessionWasReady, connectStartedAt);
                 this.setLastError(
                     this._lastError ?? "realtime websocket closed unexpectedly",
                 );
                 this.scheduleReconnect();
             };
 
+            if (this.userClosed || generation !== this.connectGeneration) {
+                try {
+                    ws.close();
+                } catch {
+                    /* ignore */
+                }
+                return;
+            }
+
             this.ws = ws;
             realtimeTraceLog("ws assigned", {
                 instanceId: this.clientInstanceId,
             });
         } catch (e) {
-            if (this.userClosed) return;
+            if (this.userClosed || generation !== this.connectGeneration) {
+                return;
+            }
 
             const msg =
                 e instanceof Error
@@ -676,6 +808,10 @@ export class RealtimeClient {
 
             this.setLastError(msg);
             this.scheduleReconnect();
+        } finally {
+            if (generation === this.connectGeneration) {
+                this.connectInFlight = false;
+            }
         }
     }
 }

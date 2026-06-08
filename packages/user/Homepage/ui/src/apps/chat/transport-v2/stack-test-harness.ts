@@ -27,8 +27,35 @@ export class FakeRealtimeClient {
         this.instanceId = instanceId ?? `rt-${user}`;
     }
 
-    registerHandlers(extra: RealtimeHandlers): void {
-        this.handlers = { ...this.handlers, ...extra };
+    registerHandlers(extra: RealtimeHandlers): () => void {
+        type HandlerFn = (frame: ServerRealtimeFrame) => void;
+        const added: Array<[keyof RealtimeHandlers, HandlerFn]> = [];
+        for (const key of Object.keys(extra) as (keyof RealtimeHandlers)[]) {
+            const next = extra[key] as HandlerFn | undefined;
+            if (!next) continue;
+            const existing = this.handlers[key as keyof RealtimeHandlers] as
+                | HandlerFn
+                | undefined;
+            if (existing) {
+                this.handlers[key as keyof RealtimeHandlers] = ((frame) => {
+                    existing(frame);
+                    next(frame);
+                }) as never;
+            } else {
+                this.handlers[key as keyof RealtimeHandlers] = next as never;
+            }
+            added.push([key, next]);
+        }
+        return () => {
+            for (const [key, removed] of added) {
+                const current = this.handlers[key as keyof RealtimeHandlers] as
+                    | HandlerFn
+                    | undefined;
+                if (current === removed) {
+                    delete this.handlers[key as keyof RealtimeHandlers];
+                }
+            }
+        };
     }
 
     sendClientFrame(frame: ClientRealtimeFrame): void {
@@ -68,26 +95,41 @@ export class FakeRealtimeClient {
 
 /** In-memory pair-session roster + signal relay (no chain). */
 export class PairSessionHub {
-    private readonly clients = new Map<string, FakeRealtimeClient>();
+    private readonly clientsByAccount = new Map<string, FakeRealtimeClient[]>();
+
+    /** Which client instance joined each pair session for an account. */
+    private readonly joinClient = new Map<string, FakeRealtimeClient>();
 
     private readonly pairRoster = new Map<string, Set<string>>();
 
     register(account: string, client: FakeRealtimeClient): void {
-        client.onSend = (frame) => this.handleSend(account, frame);
-        this.clients.set(account, client);
+        client.onSend = (frame) => this.handleSend(account, client, frame);
+        const list = this.clientsByAccount.get(account) ?? [];
+        list.push(client);
+        this.clientsByAccount.set(account, list);
     }
 
     setPresence(account: string, online: boolean): void {
-        for (const client of this.clients.values()) {
-            client.dispatch({
-                t: "presence",
-                account,
-                status: online ? "online" : "offline",
-            });
+        for (const clients of this.clientsByAccount.values()) {
+            for (const client of clients) {
+                client.dispatch({
+                    t: "presence",
+                    account,
+                    status: online ? "online" : "offline",
+                });
+            }
         }
     }
 
-    private handleSend(from: string, frame: ClientRealtimeFrame): void {
+    private joinKey(sessionId: string, account: string): string {
+        return `${sessionId}\0${account}`;
+    }
+
+    private handleSend(
+        from: string,
+        client: FakeRealtimeClient,
+        frame: ClientRealtimeFrame,
+    ): void {
         if (
             frame.t === "joinSession" &&
             frame.sessionId.startsWith("wrtc:pair:")
@@ -96,14 +138,20 @@ export class PairSessionHub {
                 this.pairRoster.get(frame.sessionId) ?? new Set<string>();
             roster.add(from);
             this.pairRoster.set(frame.sessionId, roster);
+            this.joinClient.set(
+                this.joinKey(frame.sessionId, from),
+                client,
+            );
             this.broadcastSnapshot(frame.sessionId);
             return;
         }
 
         if (frame.t === "signal") {
-            const target = this.clients.get(frame.to);
-            if (!target) return;
-            target.dispatch({
+            const targetClient = this.joinClient.get(
+                this.joinKey(frame.sessionId, frame.to),
+            );
+            if (!targetClient) return;
+            targetClient.dispatch({
                 t: "signal",
                 sessionId: frame.sessionId,
                 from,
@@ -121,7 +169,8 @@ export class PairSessionHub {
         const joined = [...(this.pairRoster.get(pairId) ?? [])].sort();
         const epoch = joined.length;
         for (const account of joined) {
-            this.clients.get(account)?.dispatch({
+            const client = this.joinClient.get(this.joinKey(pairId, account));
+            client?.dispatch({
                 t: "sessionSnapshot",
                 sessionId: pairId,
                 joinedParticipants: joined,
@@ -139,6 +188,7 @@ export class PairSessionHub {
 export type StackFixture = {
     account: string;
     rt: FakeRealtimeClient;
+    auxRt: FakeRealtimeClient;
     stack: ChatTransportStack;
 };
 
@@ -148,18 +198,24 @@ export function createStackFixture(
     chainId = "test-chain",
     onInboundBytes?: (remote: string, bytes: Uint8Array) => void,
 ): StackFixture {
-    const rt = new FakeRealtimeClient(account);
+    const rt = new FakeRealtimeClient(account, `${account}-primary`);
+    const auxRt = new FakeRealtimeClient(account, `${account}-aux`);
     hub.register(account, rt);
+    hub.register(account, auxRt);
     const stack = createChatTransportStack({
         localAccount: account,
         chainId,
         realtimeClient: rt,
+        auxiliaryRealtimeClient: auxRt,
         iceServers: null,
         onInboundBytes,
+        pairJoinStaggerMs: 0,
+        pairJoinRetryMs: 0,
     });
     stack.wireRealtimeHandlers({});
     rt.connect();
-    return { account, rt, stack };
+    auxRt.connect();
+    return { account, rt, auxRt, stack };
 }
 
 export function pairIdFor(a: string, b: string): string {
@@ -174,8 +230,11 @@ export async function establishPair(
 ): Promise<void> {
     hub.setPresence(alice.account, true);
     hub.setPresence(bob.account, true);
-    await alice.stack.peerRegistry.ensure(bob.account, "peer_focus");
-    await bob.stack.peerRegistry.ensure(alice.account, "peer_focus");
+    await Promise.all([
+        alice.stack.peerRegistry.ensure(bob.account, "peer_focus"),
+        bob.stack.peerRegistry.ensure(alice.account, "peer_focus"),
+    ]);
+    await Promise.resolve();
 }
 
 export function createTwoPartyHub(): PairSessionHub {

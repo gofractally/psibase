@@ -67,14 +67,15 @@ mod r_transact {
 mod service {
     use crate::ice_config::merged_ice_servers;
     use crate::protocol::{
-        encode_server_frame, parse_client_frame, validate_client_frame, ClientFrame,
-        ProtocolError, ServerFrame, WEBSOCKET_TEXT, REALTIME_SUBPROTOCOL_V1,
+        decode_server_frame_json, encode_server_frame, parse_client_frame, validate_client_frame,
+        ClientFrame, ProtocolError, ServerFrame, WEBSOCKET_TEXT, REALTIME_SUBPROTOCOL_V1,
     };
     use crate::signaling::dispatch_signaling_client_frame;
     use crate::r_transact::Wrapper as RTransact;
     use crate::state::subjective::{
-        connect_presence_fanout_tx, disconnect_presence_fanout_tx, remove_socket_session_tx,
-        socket_session_tx, store_client_ready_tx, sweep_stale_sessions_tx,
+        connect_presence_fanout_tx, disconnect_presence_fanout_tx,
+        enqueue_pending_outbound_frames_tx, remove_socket_session_tx, socket_session_tx,
+        store_client_ready_tx, sweep_stale_sessions_tx, take_pending_outbound_payloads_tx,
         tear_down_signaling_for_dead_socket_tx, upsert_session_tx,
     };
     use crate::trace::xrtcsig_trace;
@@ -304,9 +305,40 @@ mod service {
     }
 
     fn send_sweep_frames(now: i64) {
-        for (peer_socket, frame) in sweep_stale_sessions_tx(now) {
-            send_frame(peer_socket, &frame);
+        let frames = sweep_stale_sessions_tx(now);
+        enqueue_peer_outbound_frames(now, frames);
+    }
+
+    /// Deliver any server frames queued for this socket on a prior recv where
+    /// inline peer fanout would have aborted the action.
+    fn flush_pending_outbound_for_socket(socket: i32) {
+        for payload in take_pending_outbound_payloads_tx(socket) {
+            let Ok(frame) = decode_server_frame_json(&payload) else {
+                continue;
+            };
+            send_frame(socket, &frame);
         }
+    }
+
+    /// Send frames for the requesting socket immediately; queue peer targets so
+    /// a dead peer socket cannot abort before the joiner receives its response.
+    fn deliver_signaling_frames(requesting_socket: i32, frames: Vec<(i32, ServerFrame)>, now: i64) {
+        let mut to_peers = Vec::new();
+        for (target_socket, frame) in frames {
+            if target_socket == requesting_socket {
+                send_frame(requesting_socket, &frame);
+            } else {
+                to_peers.push((target_socket, frame));
+            }
+        }
+        enqueue_peer_outbound_frames(now, to_peers);
+    }
+
+    fn enqueue_peer_outbound_frames(now: i64, frames: Vec<(i32, ServerFrame)>) {
+        if frames.is_empty() {
+            return;
+        }
+        enqueue_pending_outbound_frames_tx(frames, now);
     }
 
     fn handle_socket_cleanup(socket: i32) {
@@ -398,7 +430,6 @@ mod service {
         let now = Transact::call().currentBlock().time.microseconds;
         upsert_session_tx(socket, user, now);
         send_welcome(socket, user, now);
-        send_sweep_frames(now);
         let fanout = connect_presence_fanout_tx(user);
         #[cfg(feature = "rt-trace")]
         {
@@ -412,9 +443,11 @@ mod service {
             );
         }
         send_frame(socket, &fanout.snapshot);
-        for (peer_socket, frame) in fanout.peer_deltas {
-            send_frame(peer_socket, &frame);
-        }
+        enqueue_peer_outbound_frames(now, fanout.peer_deltas);
+        // Sweep after responding to the new connection so a dead peer socket
+        // cannot abort before welcome / presence delivery.
+        send_sweep_frames(now);
+        flush_pending_outbound_for_socket(socket);
         None
     }
 
@@ -458,7 +491,6 @@ mod service {
         }
 
         let now = Transact::call().currentBlock().time.microseconds;
-        send_sweep_frames(now);
         let user = session.user;
 
         #[cfg(feature = "rt-trace")]
@@ -499,9 +531,16 @@ mod service {
                             "socket is not an active x-webrtcsig session".into(),
                         ),
                     );
+                } else {
+                    send_sweep_frames(now);
+                    flush_pending_outbound_for_socket(socket);
                 }
             }
-            ClientFrame::Ping => send_frame(socket, &ServerFrame::Pong),
+            ClientFrame::Ping => {
+                send_frame(socket, &ServerFrame::Pong);
+                send_sweep_frames(now);
+                flush_pending_outbound_for_socket(socket);
+            }
             session_frame => {
                 let dispatch =
                     dispatch_signaling_client_frame(socket, user, now, session_frame);
@@ -517,9 +556,11 @@ mod service {
                         dispatch_targets,
                     );
                 }
-                for (peer_socket, out_frame) in dispatch.frames {
-                    send_frame(peer_socket, &out_frame);
-                }
+                deliver_signaling_frames(socket, dispatch.frames, now);
+                // Run stale-session sweep after the requesting socket has been
+                // answered — same ordering contract as handle_socket_cleanup.
+                send_sweep_frames(now);
+                flush_pending_outbound_for_socket(socket);
             }
         }
     }

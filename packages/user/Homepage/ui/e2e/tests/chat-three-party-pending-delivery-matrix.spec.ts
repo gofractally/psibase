@@ -16,6 +16,8 @@ import {
     sendFirstDmBeforeSpaceReady,
     startDmWithContact,
     waitForChatConnected,
+    waitForGroupInSidebar,
+    waitForGroupMeshReady,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
@@ -36,11 +38,7 @@ test.describe("Chat three-party pending delivery matrix", () => {
         test.setTimeout(900_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "mtxalice01",
-            bob: "mtxbobbb01",
-            carol: "mtxcarol01",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "pdmtx");
 
         const bobAccount = party.bobAccount;
         await party.bobPage.context().close();
@@ -99,6 +97,11 @@ test.describe("Chat three-party pending delivery matrix", () => {
                     chain.baseUrl,
                     party.aliceAccount.name,
                 );
+                await ensureContact(
+                    bobPage2,
+                    chain.baseUrl,
+                    party.carolAccount.name,
+                );
                 await openChat(bobPage2, chain.baseUrl);
                 await waitForChatConnected(bobPage2);
                 await startDmWithContact(
@@ -118,11 +121,32 @@ test.describe("Chat three-party pending delivery matrix", () => {
                     party.aliceAccount.name,
                     bobAccount.name,
                     DM_PENDING,
-                    { kind: "dm", timeout: 240_000 },
+                    { kind: "dm", timeout: 240_000, baseUrl: chain.baseUrl },
                 );
 
+                // App layer: objective spaces + contacts-policy before group thread.
+                await waitForGroupInSidebar(
+                    bobPage2,
+                    chain.baseUrl,
+                    [party.aliceAccount.name, party.carolAccount.name],
+                    { timeout: 120_000 },
+                );
                 await openExistingGroupChat(bobPage2, chain.baseUrl, [
                     party.aliceAccount.name,
+                    party.carolAccount.name,
+                ]);
+                await waitForGroupMeshReady(
+                    bobPage2,
+                    [party.aliceAccount.name, party.carolAccount.name],
+                    { timeout: 240_000 },
+                );
+                await waitForGroupMeshReady(
+                    alicePage,
+                    [bobAccount.name],
+                    { timeout: 240_000 },
+                );
+                await openExistingGroupChat(alicePage, chain.baseUrl, [
+                    bobAccount.name,
                     party.carolAccount.name,
                 ]);
                 await assertPendingDeliveredForPair(
@@ -131,7 +155,7 @@ test.describe("Chat three-party pending delivery matrix", () => {
                     party.aliceAccount.name,
                     bobAccount.name,
                     GROUP_PENDING,
-                    { kind: "group", timeout: 240_000 },
+                    { kind: "group", timeout: 240_000, baseUrl: chain.baseUrl },
                 );
 
                 await assertChatDataHealthy(alicePage);

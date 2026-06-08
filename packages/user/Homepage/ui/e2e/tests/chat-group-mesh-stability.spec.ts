@@ -5,15 +5,17 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
+    bootstrapGroupMeshPeers,
     createGroupChat,
     ensureContact,
     expectOutboundMessageDelivered,
     expectThreadMessage,
     openExistingGroupChat,
     sendChatMessage,
-    waitForGroupInSidebar,
+    waitForGroupMeshReady,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
 
@@ -34,7 +36,7 @@ test.describe("Group mesh stability", () => {
         const aliceAccount = await createAccountViaInviteUrl(
             alicePage,
             aliceInvite,
-            "quinnquinn",
+            uniqueE2eAccountName("mesh"),
         );
 
         const bobContext = await browser.newContext();
@@ -48,12 +50,12 @@ test.describe("Group mesh stability", () => {
             const bobAccount = await createAccountViaInviteUrl(
                 bobPage,
                 bobInvite,
-                "ruthruthru",
+                uniqueE2eAccountName("meshb"),
             );
             const carolAccount = await createAccountViaInviteUrl(
                 carolPage,
                 carolInvite,
-                "samsamsamx",
+                uniqueE2eAccountName("meshc"),
             );
 
             for (const [page, peer] of [
@@ -80,6 +82,23 @@ test.describe("Group mesh stability", () => {
                 bobAccount.name,
             ]);
 
+            const meshPeers = {
+                alice: [bobAccount.name, carolAccount.name],
+                bob: [aliceAccount.name, carolAccount.name],
+                carol: [aliceAccount.name, bobAccount.name],
+            } as const;
+
+            for (const [page, who] of [
+                [alicePage, "alice"],
+                [bobPage, "bob"],
+                [carolPage, "carol"],
+            ] as const) {
+                await bootstrapGroupMeshPeers(page, meshPeers[who]);
+                await waitForGroupMeshReady(page, meshPeers[who], {
+                    timeout: 180_000,
+                });
+            }
+
             await sendChatMessage(alicePage, "first group ping");
             await expectThreadMessage(bobPage, "first group ping", {
                 timeout: 180_000,
@@ -94,6 +113,11 @@ test.describe("Group mesh stability", () => {
                 bobAccount.name,
                 carolAccount.name,
             ]);
+
+            await bootstrapGroupMeshPeers(alicePage, meshPeers.alice);
+            await waitForGroupMeshReady(alicePage, meshPeers.alice, {
+                timeout: 180_000,
+            });
 
             await sendChatMessage(alicePage, "after re-select group");
             await expectThreadMessage(bobPage, "after re-select group", {

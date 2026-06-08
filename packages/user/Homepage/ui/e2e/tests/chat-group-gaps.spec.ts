@@ -20,13 +20,10 @@ test.describe("Chat group coverage gaps", () => {
         alicePage,
         browser,
     }) => {
+        test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "alicealice",
-            bob: "daviddavid",
-            carol: "carolcarol",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "ggap1");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [
@@ -55,11 +52,7 @@ test.describe("Chat group coverage gaps", () => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "stevesteve",
-            bob: "frankfrank",
-            carol: "gracegrace",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "ggap2");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [
@@ -109,11 +102,7 @@ test.describe("Chat group coverage gaps", () => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "henryhenry",
-            bob: "janejanejj",
-            carol: "katekatekk",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "ggap3");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [

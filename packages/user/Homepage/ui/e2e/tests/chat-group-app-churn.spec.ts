@@ -3,6 +3,7 @@ import { test } from "../fixtures/chain";
 import { attachDiagnostics } from "../lib/diagnostics";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
 import {
+    bootstrapGroupMeshPeers,
     createGroupChat,
     expectOutboundMessageDelivered,
     expectThreadMessage,
@@ -10,7 +11,6 @@ import {
     openExistingGroupChat,
     sendChatMessage,
     waitForGroupMeshReady,
-    waitForPeerOnline,
 } from "../lib/chat-ui";
 
 test.describe("Chat group app exit/re-entry churn", () => {
@@ -22,11 +22,7 @@ test.describe("Chat group app exit/re-entry churn", () => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "grpaliceaa",
-            bob: "grpbobbbbb",
-            carol: "grpcarolcc",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "gchurn");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [
@@ -53,9 +49,7 @@ test.describe("Chat group app exit/re-entry churn", () => {
                 [party.bobPage, "bob"],
                 [party.carolPage, "carol"],
             ] as const) {
-                for (const peer of meshPeers[who]) {
-                    await waitForPeerOnline(page, peer, { timeout: 120_000 });
-                }
+                await bootstrapGroupMeshPeers(page, meshPeers[who]);
                 await waitForGroupMeshReady(page, meshPeers[who], {
                     timeout: 180_000,
                 });
@@ -96,6 +90,7 @@ test.describe("Chat group app exit/re-entry churn", () => {
                     [party.bobPage, "bob"],
                     [party.carolPage, "carol"],
                 ] as const) {
+                    await bootstrapGroupMeshPeers(page, meshPeers[who]);
                     await waitForGroupMeshReady(page, meshPeers[who], {
                         timeout: 180_000,
                     });
@@ -144,6 +139,15 @@ test.describe("Chat group app exit/re-entry churn", () => {
                     party.aliceAccount.name,
                     party.carolAccount.name,
                 ]);
+                await bootstrapGroupMeshPeers(bobPage2, [
+                    party.aliceAccount.name,
+                    party.carolAccount.name,
+                ]);
+                await waitForGroupMeshReady(
+                    bobPage2,
+                    [party.aliceAccount.name, party.carolAccount.name],
+                    { timeout: 180_000 },
+                );
                 await expectThreadMessage(bobPage2, awayMsg, {
                     timeout: 180_000,
                 });

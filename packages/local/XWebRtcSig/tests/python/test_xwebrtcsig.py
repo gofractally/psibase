@@ -679,6 +679,89 @@ class TestXWebRtcSig(unittest.TestCase):
         asyncio.run(body())
 
     @testutil.psinode_test
+    def test_pair_session_join_and_signal_relay(self, cluster):
+        """Pair-only wrtc:pair:* sessions join and relay signals (e2e-style names)."""
+        a = self._boot_with_chat_and_sig(cluster)
+        _ensure_test_accounts(a, 'e2ealicegc', 'e2ecarolgc', 'daviddavid')
+        ta = Transact(a).login('e2ealicegc')
+        tb = Transact(a).login('e2ecarolgc')
+        pair_alice_carol = 'wrtc:pair:e2ealicegc:e2ecarolgc'
+        pair_david_alice = 'wrtc:pair:daviddavid:e2ealicegc'
+        url = websocket_url(a, '/ws', service='x-webrtcsig')
+
+        async def body():
+            async with _unix_connect(
+                a, url, [('Authorization', 'Bearer ' + ta)]
+            ) as ws_a, _unix_connect(
+                a, url, [('Authorization', 'Bearer ' + tb)]
+            ) as ws_c:
+                await _welcome_and_presence(ws_a)
+                await _welcome_and_presence(ws_c)
+                await _client_ready(ws_a, 'alice-tab-1')
+                await _client_ready(ws_c, 'carol-tab-1')
+
+                # Alice joins david pair first, then carol pair (same socket).
+                await ws_a.send(
+                    json.dumps(
+                        {
+                            't': 'joinSession',
+                            'sessionId': pair_david_alice,
+                            'clientInstanceId': 'alice-tab-1',
+                        }
+                    )
+                )
+                david_invite = await _read_until(ws_a, 'sessionInvite')
+                self.assertEqual(david_invite['sessionId'], pair_david_alice)
+                await _read_until(ws_a, 'sessionSnapshot')
+
+                await ws_a.send(
+                    json.dumps(
+                        {
+                            't': 'joinSession',
+                            'sessionId': pair_alice_carol,
+                            'clientInstanceId': 'alice-tab-1',
+                        }
+                    )
+                )
+                carol_invite = await _read_until(ws_a, 'sessionInvite')
+                self.assertEqual(carol_invite['sessionId'], pair_alice_carol)
+                alice_snap = await _read_until(ws_a, 'sessionSnapshot')
+                self.assertEqual(alice_snap['sessionId'], pair_alice_carol)
+                self.assertIn('e2ealicegc', alice_snap['joinedParticipants'])
+
+                await ws_c.send(
+                    json.dumps(
+                        {
+                            't': 'joinSession',
+                            'sessionId': pair_alice_carol,
+                            'clientInstanceId': 'carol-tab-1',
+                        }
+                    )
+                )
+                await _read_until(ws_c, 'sessionInvite')
+                carol_snap = await _read_until(ws_c, 'sessionSnapshot')
+                self.assertIn('e2ecarolgc', carol_snap['joinedParticipants'])
+                self.assertIn('e2ealicegc', carol_snap['joinedParticipants'])
+
+                await ws_a.send(
+                    json.dumps(
+                        {
+                            't': 'signal',
+                            'sessionId': pair_alice_carol,
+                            'to': 'e2ecarolgc',
+                            'kind': 'offer',
+                            'sdp': 'v=0',
+                        }
+                    )
+                )
+                signal_c = await _read_until(ws_c, 'signal')
+                self.assertEqual(signal_c['from'], 'e2ealicegc')
+                self.assertEqual(signal_c['to'], 'e2ecarolgc')
+
+        import asyncio
+        asyncio.run(body())
+
+    @testutil.psinode_test
     def test_group_chat_data_join_three_party_invite(self, cluster):
         """N-party group joinSession returns sessionInvite with all participants."""
         a = self._boot_with_chat_and_sig(cluster)

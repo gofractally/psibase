@@ -836,3 +836,59 @@ export async function bootFreshChain(
         stop,
     };
 }
+
+export type E2eChainInfo = {
+    host: string;
+    port: number;
+    baseUrl: string;
+};
+
+/**
+ * Tear down any managed chain on disk/port and boot a fresh one, updating the
+ * e2e state file so worker cleanup handlers target the new psinode pid.
+ */
+export async function restartE2eChain(
+    opts: ChainBootOptions = {},
+): Promise<E2eChainInfo & { handle: ChainHandle }> {
+    await forceReleaseE2eChainPort(
+        opts.port ??
+            (process.env.PSIBASE_E2E_PORT
+                ? Number(process.env.PSIBASE_E2E_PORT)
+                : DEFAULT_PORT),
+        { ignoreRunLock: true },
+    );
+
+    const handle = await bootFreshChain(opts);
+    writeFileSync(
+        chainStateFile(),
+        JSON.stringify(
+            {
+                external: false,
+                host: handle.host,
+                port: handle.port,
+                baseUrl: handle.baseUrl,
+                dbDir: handle.dbDir,
+                psinodePid: handle.psinodePid,
+                psinodeLog: handle.psinodeLog,
+            },
+            null,
+            2,
+        ),
+    );
+
+    const lock = readRunLock();
+    if (lock) {
+        writeE2eRunLock({
+            ...lock,
+            psinodePid: handle.psinodePid,
+            psinodeLog: handle.psinodeLog,
+        });
+    }
+
+    return {
+        host: handle.host,
+        port: handle.port,
+        baseUrl: handle.baseUrl,
+        handle,
+    };
+}

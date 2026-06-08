@@ -6,22 +6,24 @@ import {
     loginExistingAccountViaUi,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
     type TestAccount,
 } from "../lib/auth-ui";
 import {
+    bootstrapDmPeer,
     ensureContact,
     expectOutboundMessageDelivered,
     expectPendingOutboundMessage,
     expectThreadMessage,
     leaveChatToHome,
     openChat,
+    openDmThread,
     sendChatMessage,
     startDmWithContact,
+    waitForChatConnected,
+    waitForDmPeerReady,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
-
-const ALICE = "churnalice";
-const BOB = "churnbobdm";
 
 test.describe("Chat DM pending with app churn", () => {
     test("pending DM delivers after peer reopens chat following home ↔ chat churn", async ({
@@ -30,6 +32,9 @@ test.describe("Chat DM pending with app churn", () => {
         browser,
     }) => {
         test.setTimeout(600_000);
+        const ALICE = uniqueE2eAccountName("dmch");
+        const BOB = uniqueE2eAccountName("dmch");
+
         attachDiagnostics(alicePage, "alice");
 
         await loginProducerViaUi(alicePage, PRODUCER_ACCOUNT, chain.baseUrl);
@@ -67,11 +72,13 @@ test.describe("Chat DM pending with app churn", () => {
         await sendChatMessage(alicePage, pendingMsg);
         await expectPendingOutboundMessage(alicePage, pendingMsg);
 
-        // Alice churns in/out of Chat while Bob is still offline.
+        // Alice churns in/out of Chat while Bob is still offline. Use openDmThread
+        // (not full startDmWithContact) to avoid WS/composer reconnect storms.
         for (let i = 0; i < 2; i++) {
             await leaveChatToHome(alicePage, chain.baseUrl);
             await openChat(alicePage, chain.baseUrl);
-            await startDmWithContact(alicePage, chain.baseUrl, bobAccount.name);
+            await waitForChatConnected(alicePage);
+            await openDmThread(alicePage, chain.baseUrl, bobAccount.name);
         }
 
         const bobCtx2 = await browser!.newContext();
@@ -90,6 +97,11 @@ test.describe("Chat DM pending with app churn", () => {
             );
             await leaveChatToHome(bobPage2, chain.baseUrl);
             await startDmWithContact(bobPage2, chain.baseUrl, aliceAccount.name);
+            await bootstrapDmPeer(bobPage2, aliceAccount.name);
+            await bootstrapDmPeer(alicePage, bobAccount.name);
+            await waitForDmPeerReady(bobPage2, aliceAccount.name, {
+                timeout: 180_000,
+            });
 
             await expectThreadMessage(bobPage2, pendingMsg, {
                 timeout: 180_000,

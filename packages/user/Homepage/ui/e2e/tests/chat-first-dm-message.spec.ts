@@ -5,6 +5,7 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
     ensureContact,
@@ -34,7 +35,7 @@ test.describe("First DM message before space exists", () => {
         const aliceAccount = await createAccountViaInviteUrl(
             alicePage,
             aliceInvite,
-            "lucylucylu",
+            uniqueE2eAccountName("fdma"),
         );
 
         const bobContext = await browser.newContext();
@@ -45,7 +46,7 @@ test.describe("First DM message before space exists", () => {
             const bobAccount = await createAccountViaInviteUrl(
                 bobPage,
                 bobInvite,
-                "mikemikemi",
+                uniqueE2eAccountName("fdmb"),
             );
 
             await ensureContact(alicePage, chain.baseUrl, bobAccount.name);

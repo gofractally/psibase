@@ -17,11 +17,6 @@ import {
     waitForPeerOnline,
 } from "../lib/chat-ui";
 
-/** Fixed names (≥10 chars) for a fresh chain boot. */
-const ALICE = "oofalice01";
-const BOB = "oofbobbb01";
-const CAROL = "oofcarol01";
-
 const DM_OFFLINE = "dm-a-to-b-while-b-offline";
 const GROUP_FROM_A = "group-a-first";
 const GROUP_FROM_B = "group-b-reply";
@@ -39,11 +34,7 @@ test.describe("Chat three-party online/offline flow", () => {
         test.setTimeout(900_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: ALICE,
-            bob: BOB,
-            carol: CAROL,
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "oofflow");
 
         const groupPeers = (who: "alice" | "bob" | "carol") => {
             if (who === "alice") {

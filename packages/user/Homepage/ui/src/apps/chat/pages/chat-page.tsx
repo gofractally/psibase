@@ -22,6 +22,7 @@ import { TwoColumnSelect } from "@/apps/chat/components/two-column-select";
 import { NewContactDialog } from "@/apps/chat/contacts/components/new-contact-dialog";
 import { formatNames } from "@/apps/chat/contacts/utils/format-names";
 import { useChatSocket } from "@/apps/chat/hooks/use-chat-socket";
+import { useChatUrlSpaceSync } from "@/apps/chat/hooks/chat/use-chat-url-space-sync";
 
 import { Avatar } from "@shared/components/avatar";
 import { useContacts } from "@shared/hooks/use-contacts";
@@ -151,7 +152,7 @@ export const ChatPage = () => {
     const { data: currentUser } = useCurrentUser();
     const { data: contactsData, isLoading: isLoadingContacts } =
         useContacts(currentUser);
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const spaceFromUrl = searchParams.get("space") ?? undefined;
 
     const {
@@ -195,14 +196,18 @@ export const ChatPage = () => {
         toggleCallAudioMuted,
         toggleCallVideoMuted,
         composerDisabledReason,
+        threadEstablishingConnection,
+        composeSurfaceFocusKey,
     } = useChatSocket({ urlConversationId: spaceFromUrl });
 
-    // Apply ?space= immediately so compose shell renders while objective rows load.
-    useEffect(() => {
-        if (!spaceFromUrl) return;
-        if (selectedConversationId === spaceFromUrl) return;
-        setSelectedConversationId(spaceFromUrl, "url-space");
-    }, [spaceFromUrl, selectedConversationId, setSelectedConversationId]);
+    useChatUrlSpaceSync({
+        spaceFromUrl,
+        selectedConversationId,
+        composePendingDmPeer,
+        setSelectedConversationId,
+        searchParams,
+        setSearchParams,
+    });
 
     const [sidebarKey, setSidebarKey] = useState<string | undefined>();
 
@@ -210,7 +215,7 @@ export const ChatPage = () => {
         () => new Set(),
     );
     const [groupPickMode, setGroupPickMode] = useState(false);
-    const [contactsExpanded, setContactsExpanded] = useState(true);
+    const [contactsExpanded, setContactsExpanded] = useState(false);
     const [addContactAccount, setAddContactAccount] = useState<string>();
 
     const isDesktop = useMediaQuery("(min-width: 1024px)");
@@ -320,6 +325,7 @@ export const ChatPage = () => {
         void openGroupChat([...groupCandidates]);
         setGroupPickMode(false);
         setGroupCandidates(new Set());
+        setContactsExpanded(false);
     };
 
     return (
@@ -409,6 +415,7 @@ export const ChatPage = () => {
                                                         new Set(),
                                                     );
                                                     setGroupPickMode(false);
+                                                    setContactsExpanded(false);
                                                 }}
                                             >
                                                 Cancel group pick
@@ -666,6 +673,16 @@ export const ChatPage = () => {
                                     timeline={selectedTimeline}
                                     selfAccount={selfAccount}
                                 />
+                                {threadEstablishingConnection ? (
+                                    <div
+                                        role="status"
+                                        aria-live="polite"
+                                        aria-label="Establishing connection"
+                                        className="text-muted-foreground border-t px-4 py-2 text-xs"
+                                    >
+                                        Establishing connection…
+                                    </div>
+                                ) : null}
                                 {selectedHasPendingMessages ? (
                                     <div className="text-muted-foreground border-t px-4 py-2 text-xs">
                                         {selectedConversation?.kind === "dm"
@@ -676,6 +693,7 @@ export const ChatPage = () => {
                                 <ChatComposer
                                     disabledReason={composerDisabledReason}
                                     onSend={sendChatMessage}
+                                    focusKey={composeSurfaceFocusKey}
                                 />
                             </>
                         ) : (
@@ -683,7 +701,7 @@ export const ChatPage = () => {
                                 <p>
                                     {groupPickMode
                                         ? "Choose at least two contacts below, then Start group."
-                                        : "Pick a conversation on the left or open a DM from Contacts below."}
+                                        : "Pick a conversation on the left."}
                                 </p>
                             </div>
                         )}

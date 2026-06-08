@@ -4,8 +4,11 @@ import type { ConversationSnapshot } from "./protocol";
 export function shouldQueueFirstDmUntilSpace(
     conversationId: string | undefined,
     pendingPeerAccount: string | null | undefined,
+    conversationKind?: string | null,
 ): boolean {
-    return !conversationId && !!pendingPeerAccount;
+    if (!pendingPeerAccount) return false;
+    if (!conversationId) return true;
+    return conversationKind === "group";
 }
 
 export function findDmConversationWithPeer(

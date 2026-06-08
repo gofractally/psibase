@@ -12,8 +12,12 @@ const peerMock = vi.hoisted(() => {
         readonly selfAccount: string;
         readonly peerAccount: string;
         readonly handlers: ChatDataPeerHandlers;
+        readonly isInitiator: boolean;
 
         disposed = false;
+        needsReconnectFlag = false;
+        negotiationInProgressFlag = false;
+        dataChannelReadyFlag = false;
 
         constructor(params: {
             sessionId: string;
@@ -28,8 +32,36 @@ const peerMock = vi.hoisted(() => {
             this.sessionId = params.sessionId;
             this.selfAccount = params.selfAccount;
             this.peerAccount = params.peerAccount;
+            this.isInitiator = params.isInitiator;
             this.handlers = params.handlers ?? {};
             MockChatDataWebRtcPeer.created.push(this);
+        }
+
+        get dataChannelReady(): boolean {
+            return this.dataChannelReadyFlag;
+        }
+
+        get sendsInitialOffer(): boolean {
+            return this.isInitiator;
+        }
+
+        get negotiationInProgress(): boolean {
+            return this.negotiationInProgressFlag;
+        }
+
+        get needsReconnect(): boolean {
+            return this.needsReconnectFlag;
+        }
+
+        get transportSnapshot() {
+            return {
+                signalingState: "stable" as const,
+                connectionState: "new" as const,
+                iceConnectionState: "new" as const,
+                dataChannelReady: this.dataChannelReadyFlag,
+                negotiationInProgress: this.negotiationInProgressFlag,
+                needsReconnect: this.needsReconnectFlag,
+            };
         }
 
         stopMeetMedia(): void {}
@@ -41,6 +73,7 @@ const peerMock = vi.hoisted(() => {
         async handleRemoteSignal(): Promise<void> {}
 
         fireDataChannelOpen(): void {
+            this.dataChannelReadyFlag = true;
             this.handlers.onDataChannelOpen?.();
         }
 
@@ -51,6 +84,8 @@ const peerMock = vi.hoisted(() => {
         fireFailed(): void {
             this.handlers.onFailed?.("failed");
         }
+
+        resendOffer(): void {}
     }
 
     return { MockChatDataWebRtcPeer };
@@ -58,6 +93,10 @@ const peerMock = vi.hoisted(() => {
 
 vi.mock("../lib/chat-data-webrtc-peer", () => ({
     ChatDataWebRtcPeer: peerMock.MockChatDataWebRtcPeer,
+}));
+
+vi.mock("../lib/thread-lifecycle", () => ({
+    recordTransportLifecycle: vi.fn(),
 }));
 
 function createRealtimeHarness(isReadyInitially: boolean) {
@@ -82,13 +121,23 @@ function createRealtimeHarness(isReadyInitially: boolean) {
     };
 }
 
-function createPairSignalingHarness() {
+function createPairSignalingHarness(
+    realtime?: { isReady: boolean } | (() => boolean),
+) {
     const joined = new Set<string>();
     const handlers = new Set<(pairId: string) => void>();
+    const isReadyFn =
+        typeof realtime === "function"
+            ? realtime
+            : () => realtime?.isReady ?? true;
     return {
         joinPair: vi.fn(),
+        ensureActivePair: vi.fn(),
         leavePair: vi.fn(),
+        signal: vi.fn(),
         isJoined: (pairId: string) => joined.has(pairId),
+        hasPendingJoins: () => false,
+        isRealtimeReady: (_pairId: string) => isReadyFn(),
         markJoined(pairId: string) {
             joined.add(pairId);
             for (const h of handlers) h(pairId);
@@ -105,7 +154,7 @@ describe("l3-peer-registry", () => {
     it("ensure enters waiting_ws when ws not ready, then negotiates on ready", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(false);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
 
         const registry = createPeerTransportRegistry({
             localAccount: "alice",
@@ -121,7 +170,7 @@ describe("l3-peer-registry", () => {
 
         realtime.setReady(true);
         expect(pairSignaling.joinPair).toHaveBeenCalledWith("alice", "bob");
-        expect(registry.getState("bob")).toBe("negotiating");
+        expect(registry.getState("bob")).toBe("joining_pair");
 
         pairSignaling.markJoined("wrtc:pair:alice:bob");
         const created = peerMock.MockChatDataWebRtcPeer.created.at(-1);
@@ -132,10 +181,36 @@ describe("l3-peer-registry", () => {
         expect(registry.getState("bob")).toBe("usable");
     });
 
+    it("ensure retries on auxiliary realtime ready when pair is aux-routed", async () => {
+        peerMock.MockChatDataWebRtcPeer.created.length = 0;
+        const realtime = createRealtimeHarness(true);
+        const auxiliaryRealtime = createRealtimeHarness(false);
+        let auxChannelReady = false;
+        const pairSignaling = createPairSignalingHarness(() => auxChannelReady);
+
+        const registry = createPeerTransportRegistry({
+            localAccount: "carol",
+            realtime: realtime as never,
+            auxiliaryRealtime: auxiliaryRealtime as never,
+            pairSignaling: pairSignaling as never,
+            signaling: {} as never,
+            iceServers: null,
+        });
+
+        void registry.ensure("alice", "peer_focus");
+        expect(registry.getState("alice")).toBe("waiting_ws");
+        expect(pairSignaling.joinPair).not.toHaveBeenCalled();
+
+        auxChannelReady = true;
+        auxiliaryRealtime.setReady(true);
+        expect(pairSignaling.joinPair).toHaveBeenCalledWith("carol", "alice");
+        expect(registry.getState("alice")).toBe("joining_pair");
+    });
+
     it("pairJoined triggers peer creation and resolves ensure waiters", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
 
         const registry = createPeerTransportRegistry({
             localAccount: "alice",
@@ -146,7 +221,7 @@ describe("l3-peer-registry", () => {
         });
 
         const ensureP = registry.ensure("bob", "message_enqueued");
-        expect(registry.getState("bob")).toBe("negotiating");
+        expect(registry.getState("bob")).toBe("joining_pair");
         expect(peerMock.MockChatDataWebRtcPeer.created).toHaveLength(0);
 
         pairSignaling.markJoined("wrtc:pair:alice:bob");
@@ -159,7 +234,7 @@ describe("l3-peer-registry", () => {
     it("onTransportLost transitions to suspected_dead and drops peer", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
         pairSignaling.markJoined("wrtc:pair:alice:bob");
 
         const registry = createPeerTransportRegistry({
@@ -185,7 +260,7 @@ describe("l3-peer-registry", () => {
     it("dispose removes entry and calls leavePair", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
         pairSignaling.markJoined("wrtc:pair:alice:bob");
 
         const registry = createPeerTransportRegistry({
@@ -215,7 +290,7 @@ describe("l3-peer-registry", () => {
         vi.setSystemTime(0);
 
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
         pairSignaling.markJoined("wrtc:pair:alice:bob");
         pairSignaling.markJoined("wrtc:pair:alice:charlie");
 
@@ -249,7 +324,7 @@ describe("l3-peer-registry", () => {
     it("handleRemoteSignal creates entry and forwards to peer when possible", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
         pairSignaling.markJoined("wrtc:pair:alice:bob");
 
         const registry = createPeerTransportRegistry({
@@ -277,7 +352,7 @@ describe("l3-peer-registry", () => {
     it("buffers inbound signals until pair join creates the peer", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
 
         const registry = createPeerTransportRegistry({
             localAccount: "bob",
@@ -312,7 +387,7 @@ describe("l3-peer-registry", () => {
     it("forwards signals directly when peer already exists", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
         pairSignaling.markJoined("wrtc:pair:alice:bob");
 
         const registry = createPeerTransportRegistry({
@@ -347,7 +422,7 @@ describe("l3-peer-registry", () => {
 
     it("ensure state remains stable for unknown remote", () => {
         const realtime = createRealtimeHarness(true);
-        const pairSignaling = createPairSignalingHarness();
+        const pairSignaling = createPairSignalingHarness(realtime);
         const registry = createPeerTransportRegistry({
             localAccount: "alice",
             realtime: realtime as never,
@@ -358,6 +433,64 @@ describe("l3-peer-registry", () => {
 
         const state: PeerState = registry.getState("nobody");
         expect(state).toBe("absent");
+    });
+
+    it("recovers polite peer stuck at stable with no data channel", async () => {
+        peerMock.MockChatDataWebRtcPeer.created.length = 0;
+        vi.useFakeTimers();
+        vi.setSystemTime(0);
+
+        const realtime = createRealtimeHarness(true);
+        const pairSignaling = createPairSignalingHarness(realtime);
+        pairSignaling.markJoined("wrtc:pair:alice:bob");
+
+        const registry = createPeerTransportRegistry({
+            localAccount: "bob",
+            realtime: realtime as never,
+            pairSignaling: pairSignaling as never,
+            signaling: {} as never,
+            iceServers: null,
+        });
+
+        void registry.ensure("alice", "peer_focus");
+        const peer = peerMock.MockChatDataWebRtcPeer.created[0]!;
+        expect(registry.getState("alice")).toBe("negotiating");
+        expect(peer.isInitiator).toBe(false);
+        peer.needsReconnectFlag = true;
+
+        vi.advanceTimersByTime(15_000);
+        expect(peer.disposed).toBe(true);
+        expect(peerMock.MockChatDataWebRtcPeer.created).toHaveLength(2);
+        expect(registry.getState("alice")).toBe("negotiating");
+
+        const recreated = peerMock.MockChatDataWebRtcPeer.created[1]!;
+        recreated.fireDataChannelOpen();
+        expect(registry.getState("alice")).toBe("usable");
+
+        vi.useRealTimers();
+    });
+
+    it("kickNegotiation does not dispose peer when needsReconnect during kick", async () => {
+        peerMock.MockChatDataWebRtcPeer.created.length = 0;
+        const realtime = createRealtimeHarness(true);
+        const pairSignaling = createPairSignalingHarness(realtime);
+        pairSignaling.markJoined("wrtc:pair:alice:bob");
+
+        const registry = createPeerTransportRegistry({
+            localAccount: "bob",
+            realtime: realtime as never,
+            pairSignaling: pairSignaling as never,
+            signaling: {} as never,
+            iceServers: null,
+        });
+
+        void registry.ensure("alice", "peer_focus");
+        const peer = peerMock.MockChatDataWebRtcPeer.created[0]!;
+        peer.needsReconnectFlag = true;
+
+        registry.kickNegotiation("alice");
+        expect(peer.disposed).toBe(false);
+        expect(pairSignaling.joinPair).toHaveBeenCalledWith("bob", "alice");
     });
 });
 

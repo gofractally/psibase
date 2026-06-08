@@ -12,12 +12,17 @@ import type {
     WebRtcSignalingClient,
 } from "../lib/webrtc-signaling-client";
 import { EventBus } from "./event-bus";
+import { chatDataRecord } from "../lib/chat-data-debug";
+import { recordTransportLifecycle } from "../lib/thread-lifecycle";
 import { isLexInitiator, pairSessionId } from "./pair-id";
 import type { RealtimeTransport } from "./l1-realtime-transport";
 import type { PairSignaling } from "./l2-pair-signaling";
 import {
     PEER_IDLE_TTL_MS,
+    PEER_JOIN_STUCK_MS,
     PEER_MAX_WARM,
+    PEER_NEGOTIATION_STUCK_MS,
+    PEER_STUCK_CHECK_MS,
     type EnsureReason,
     type PeerState,
     type SendResult,
@@ -32,6 +37,8 @@ type PeerRegistryEvents = {
 
 export interface PeerTransportRegistry {
     ensure(remoteAccount: string, reason: EnsureReason): Promise<void>;
+    /** Re-drive join/negotiation when roster shows a remote is reachable. */
+    kickNegotiation(remoteAccount: string): void;
     getState(remoteAccount: string): PeerState;
     send(remoteAccount: string, bytes: Uint8Array): SendResult;
     on(
@@ -64,6 +71,8 @@ type PeerEntry = {
     pairId: string;
     state: PeerState;
     lastUsedAt: number;
+    joinRequestedAt: number;
+    negotiationStartedAt: number | null;
     peer: ChatDataWebRtcPeer | null;
     ensureWaiters: Array<() => void>;
     dataChannelReady: boolean;
@@ -81,6 +90,8 @@ type PeerEntry = {
 export type PeerTransportRegistryOptions = {
     localAccount: string;
     realtime: RealtimeTransport;
+    /** Second websocket — peers routed here must retry when it becomes ready. */
+    auxiliaryRealtime?: RealtimeTransport;
     pairSignaling: PairSignaling;
     signaling: WebRtcSignalingClient;
     iceServers: IceServerConfig[] | null;
@@ -118,7 +129,23 @@ export function createPeerTransportRegistry(
         }
     };
 
-    const setState = (entry: PeerEntry, state: PeerState) => {
+    const setState = (
+        entry: PeerEntry,
+        state: PeerState,
+        negotiationPhase?: string,
+    ) => {
+        if (entry.state === state) return;
+        const detail = {
+            remote: entry.remote,
+            pairId: entry.pairId,
+            from: entry.state,
+            to: state,
+            negotiationPhase: negotiationPhase ?? state,
+            dataChannelReady: entry.dataChannelReady,
+            hasPeer: entry.peer != null,
+        };
+        chatDataRecord("peer-registry-state", detail);
+        recordTransportLifecycle("l3", "state", detail);
         entry.state = state;
     };
 
@@ -132,7 +159,7 @@ export function createPeerTransportRegistry(
         const entry = entries.get(remote);
         if (!entry || entry.state === "disposing") return;
         if (entry.meetHoldCount > 0 && reason !== "force") return;
-        setState(entry, "disposing");
+        setState(entry, "disposing", "dispose");
         entry.peer?.stopMeetMedia();
         entry.peer?.dispose();
         entry.peer = null;
@@ -141,32 +168,53 @@ export function createPeerTransportRegistry(
         bus.emit("disposed", remote);
     };
 
-    const beginNegotiation = (entry: PeerEntry) => {
-        if (entry.peer) return;
-        if (!opts.realtime.isReady) {
-            setState(entry, "waiting_ws");
-            return;
-        }
-        if (!opts.pairSignaling.isJoined(entry.pairId)) {
-            opts.pairSignaling.joinPair(opts.localAccount, entry.remote);
-            setState(entry, "negotiating");
-            return;
-        }
+    const recoverStuckPeer = (entry: PeerEntry, reason: string) => {
+        const peer = entry.peer;
+        chatDataRecord("peer-registry-recover", {
+            remote: entry.remote,
+            pairId: entry.pairId,
+            reason,
+            polite: peer ? !peer.sendsInitialOffer : undefined,
+            needsReconnect: peer?.needsReconnect ?? null,
+            transport: peer?.transportSnapshot ?? null,
+        });
+        recordTransportLifecycle("l3", "recover", {
+            remote: entry.remote,
+            pairId: entry.pairId,
+            reason,
+            polite: peer ? !peer.sendsInitialOffer : undefined,
+            transport: peer?.transportSnapshot ?? null,
+        });
+        peer?.dispose();
+        entry.peer = null;
+        entry.dataChannelReady = false;
+        entry.negotiationStartedAt = null;
+        setState(entry, "suspected_dead", reason);
+        bus.emit("suspected_dead", entry.remote);
+        beginNegotiation(entry);
+    };
 
-        setState(entry, "negotiating");
+    const createPeerForEntry = (entry: PeerEntry) => {
         const impolite = isLexInitiator(opts.localAccount, entry.remote);
+        const pairSignaling = opts.pairSignaling;
+        const routedSignaling = {
+            signal: (payload: Parameters<WebRtcSignalingClient["signal"]>[0]) => {
+                pairSignaling.signal(entry.pairId, payload);
+            },
+        } as WebRtcSignalingClient;
+        entry.negotiationStartedAt = Date.now();
         entry.peer = new ChatDataWebRtcPeer({
             sessionId: entry.pairId,
             selfAccount: opts.localAccount,
             peerAccount: entry.remote,
             iceServers: opts.iceServers,
-            signaling: opts.signaling,
+            signaling: routedSignaling,
             isInitiator: impolite,
             impolite,
             handlers: {
                 onDataChannelOpen: () => {
                     entry.dataChannelReady = true;
-                    setState(entry, "usable");
+                    setState(entry, "usable", "dc_open");
                     touchEntry(entry);
                     resolveEnsureWaiters(entry);
                     bus.emit("usable", entry.remote);
@@ -194,20 +242,41 @@ export function createPeerTransportRegistry(
                 },
                 onTransportLost: () => {
                     entry.dataChannelReady = false;
-                    setState(entry, "suspected_dead");
                     entry.peer?.dispose();
                     entry.peer = null;
+                    entry.negotiationStartedAt = null;
+                    setState(entry, "suspected_dead", "transport_lost");
                     bus.emit("suspected_dead", entry.remote);
                 },
                 onFailed: () => {
                     entry.dataChannelReady = false;
-                    setState(entry, "suspected_dead");
                     entry.peer?.dispose();
                     entry.peer = null;
+                    entry.negotiationStartedAt = null;
+                    setState(entry, "suspected_dead", "pc_failed");
                     bus.emit("suspected_dead", entry.remote);
                 },
             },
         });
+    };
+
+    const beginNegotiation = (entry: PeerEntry) => {
+        if (entry.peer) return;
+        if (!opts.pairSignaling.isRealtimeReady(entry.pairId)) {
+            setState(entry, "waiting_ws", "awaiting_l1_ready");
+            return;
+        }
+        if (entry.remote === opts.localAccount) return;
+        opts.pairSignaling.ensureActivePair(opts.localAccount, entry.remote);
+        if (!opts.pairSignaling.isJoined(entry.pairId)) {
+            opts.pairSignaling.joinPair(opts.localAccount, entry.remote);
+            entry.joinRequestedAt = Date.now();
+            setState(entry, "joining_pair", "awaiting_l2_join");
+            return;
+        }
+
+        setState(entry, "negotiating", "pc_handshake");
+        createPeerForEntry(entry);
         void flushPendingRemoteSignals(entry);
     };
 
@@ -223,11 +292,14 @@ export function createPeerTransportRegistry(
     const getOrCreateEntry = (remote: string): PeerEntry => {
         let entry = entries.get(remote);
         if (!entry) {
+            const now = Date.now();
             entry = {
                 remote,
                 pairId: pairSessionId(opts.localAccount, remote),
                 state: "absent",
-                lastUsedAt: Date.now(),
+                lastUsedAt: now,
+                joinRequestedAt: now,
+                negotiationStartedAt: null,
                 peer: null,
                 ensureWaiters: [],
                 dataChannelReady: false,
@@ -240,43 +312,144 @@ export function createPeerTransportRegistry(
         return entry;
     };
 
-    opts.realtime.on("ready", () => {
+    const checkStuckPeers = () => {
+        const now = Date.now();
+        for (const entry of entries.values()) {
+            if (entry.state === "usable" || entry.state === "disposing") {
+                continue;
+            }
+
+            if (entry.state === "joining_pair" && !entry.peer) {
+                if (now - entry.joinRequestedAt >= PEER_JOIN_STUCK_MS) {
+                    chatDataRecord("peer-registry-stuck", {
+                        remote: entry.remote,
+                        reason: "joining_pair_timeout",
+                        ageMs: now - entry.joinRequestedAt,
+                    });
+                    beginNegotiation(entry);
+                }
+                continue;
+            }
+
+            if (entry.state !== "negotiating" || !entry.peer) continue;
+            if (entry.dataChannelReady) continue;
+
+            const peer = entry.peer;
+            if (peer.negotiationInProgress) {
+                entry.negotiationStartedAt = now;
+                continue;
+            }
+
+            const startedAt =
+                entry.negotiationStartedAt ?? entry.lastUsedAt;
+            const ageMs = now - startedAt;
+            if (peer.needsReconnect || ageMs >= PEER_NEGOTIATION_STUCK_MS) {
+                recoverStuckPeer(
+                    entry,
+                    peer.needsReconnect
+                        ? "needs-reconnect"
+                        : "negotiation-timeout",
+                );
+            }
+        }
+    };
+
+    const stuckCheckId =
+        typeof setInterval !== "undefined"
+            ? setInterval(checkStuckPeers, PEER_STUCK_CHECK_MS)
+            : null;
+    void stuckCheckId;
+
+    const retryNegotiationOnRealtimeReady = () => {
         for (const entry of entries.values()) {
             if (
                 entry.state === "waiting_ws" ||
+                entry.state === "joining_pair" ||
                 entry.state === "negotiating" ||
                 entry.state === "suspected_dead"
             ) {
                 beginNegotiation(entry);
             }
         }
-    });
+    };
+
+    opts.realtime.on("ready", retryNegotiationOnRealtimeReady);
+    opts.auxiliaryRealtime?.on("ready", retryNegotiationOnRealtimeReady);
+
+    const kickNegotiation = (remoteAccount: string) => {
+        const entry = entries.get(remoteAccount);
+        if (!entry) {
+            void registryEnsure(remoteAccount, "roster_kick");
+            return;
+        }
+        touchEntry(entry);
+        if (entry.state === "usable") return;
+        if (!entry.peer) {
+            beginNegotiation(entry);
+            return;
+        }
+
+        const peer = entry.peer;
+        const transport = peer.transportSnapshot;
+        chatDataRecord("peer-registry-kick", {
+            remote: entry.remote,
+            pairId: entry.pairId,
+            state: entry.state,
+            transport,
+        });
+        recordTransportLifecycle("l3", "kick", {
+            remote: entry.remote,
+            pairId: entry.pairId,
+            state: entry.state,
+            transport,
+        });
+
+        // Never tear down an in-progress handshake from a roster kick — the
+        // stuck watchdog owns recovery once PEER_NEGOTIATION_STUCK_MS elapses.
+        if (peer.sendsInitialOffer) {
+            peer.resendOffer();
+            return;
+        }
+        // Polite side: cannot send offers — re-drive L2 join so the initiator
+        // gets another roster kick when they come online.
+        opts.pairSignaling.joinPair(opts.localAccount, entry.remote);
+        touchEntry(entry);
+    };
+
+    const registryEnsure = (
+        remoteAccount: string,
+        _reason: EnsureReason,
+    ): Promise<void> => {
+        const entry = getOrCreateEntry(remoteAccount);
+        touchEntry(entry);
+        if (entry.state === "usable") {
+            return Promise.resolve();
+        }
+        if (entry.state === "absent" || entry.state === "suspected_dead") {
+            beginNegotiation(entry);
+        }
+        if (entries.get(remoteAccount)?.state === "usable") {
+            return Promise.resolve();
+        }
+        return new Promise<void>((resolve) => {
+            entry.ensureWaiters.push(resolve);
+        });
+    };
 
     opts.pairSignaling.on("pairJoined", (pairId: string) => {
         for (const entry of entries.values()) {
-            if (entry.pairId === pairId && entry.state !== "usable") {
-                beginNegotiation(entry);
-            }
+            if (entry.pairId !== pairId || entry.state === "usable") continue;
+            beginNegotiation(entry);
         }
     });
 
     return {
-        ensure(remoteAccount, _reason) {
-            const entry = getOrCreateEntry(remoteAccount);
-            touchEntry(entry);
-            if (entry.state === "usable") {
-                return Promise.resolve();
-            }
-            if (entry.state === "absent" || entry.state === "suspected_dead") {
-                setState(entry, "negotiating");
-                beginNegotiation(entry);
-            }
-            if (entries.get(remoteAccount)?.state === "usable") {
-                return Promise.resolve();
-            }
-            return new Promise<void>((resolve) => {
-                entry.ensureWaiters.push(resolve);
-            });
+        ensure(remoteAccount, reason) {
+            return registryEnsure(remoteAccount, reason);
+        },
+
+        kickNegotiation(remoteAccount) {
+            kickNegotiation(remoteAccount);
         },
 
         getState(remoteAccount) {
@@ -284,11 +457,14 @@ export function createPeerTransportRegistry(
         },
 
         send(remoteAccount, bytes) {
-            if (!opts.realtime.isReady) {
+            const entry = entries.get(remoteAccount);
+            if (
+                !entry ||
+                !opts.pairSignaling.isRealtimeReady(entry.pairId)
+            ) {
                 return { ok: false, reason: "ws_not_ready" };
             }
-            const entry = entries.get(remoteAccount);
-            if (!entry || entry.state !== "usable" || !entry.peer) {
+            if (entry.state !== "usable" || !entry.peer) {
                 return { ok: false, reason: "peer_not_ready" };
             }
             const text = new TextDecoder().decode(bytes);

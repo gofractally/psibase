@@ -6,8 +6,9 @@ import {
     type ChatHistorySyncEnvelope,
 } from "../lib/chat-data-envelope";
 import { chatDataLog, shortSpaceId } from "../lib/chat-data-debug";
+import { recordThreadLifecycle } from "../lib/thread-lifecycle";
 import type { IceServerConfig } from "../lib/protocol";
-import type { RealtimeClient } from "../lib/realtime-client";
+import { RealtimeClient } from "../lib/realtime-client";
 import { loadPendingMessages } from "../lib/pending-message-store";
 import { spaceUuidFromPslackConversationId } from "../lib/space-bridge";
 import {
@@ -18,6 +19,8 @@ import type { EnsureReason } from "./types";
 
 export type ChatTransportBridgeDeps = {
     getRealtime: () => RealtimeClient | null;
+    /** Opens a dedicated second x-webrtc-sig socket for an extra pair session. */
+    createAuxiliaryRealtime?: () => RealtimeClient;
     getSelf: () => string | null;
     getChainId: () => string | null;
     getIceServers: () => IceServerConfig[] | null;
@@ -37,6 +40,8 @@ export type ChatTransportBridgeDeps = {
  */
 export class ChatTransportBridge {
     private stack: ChatTransportStack | null = null;
+
+    private auxiliaryRealtime: RealtimeClient | null = null;
 
     private suspended = false;
 
@@ -90,6 +95,7 @@ export class ChatTransportBridge {
             localAccount: self,
             chainId,
             realtimeClient: rt,
+            auxiliaryRealtimeClient: this.ensureAuxiliaryRealtime() ?? undefined,
             iceServers: this.deps.getIceServers(),
             onInboundBytes: (remote, bytes) => {
                 this.handleInboundWire(
@@ -135,10 +141,19 @@ export class ChatTransportBridge {
         });
 
         this.stack.peerRegistry.on("usable", (remote) => {
+            recordThreadLifecycle("webrtc-usable", { remote });
             this.deps.onPeerUsable(remote);
             if (!this.pushedHistoryTo.has(remote)) {
                 this.pushedHistoryTo.add(remote);
             }
+        });
+
+        this.stack.peerRegistry.on("suspected_dead", (remote) => {
+            recordThreadLifecycle("webrtc-suspected-dead", { remote });
+        });
+
+        this.stack.peerRegistry.on("disposed", (remote) => {
+            recordThreadLifecycle("webrtc-disposed", { remote });
         });
 
         this.stack.messaging.hydrateFromStorage();
@@ -159,7 +174,7 @@ export class ChatTransportBridge {
     }
 
     dispose(): void {
-        this.stack = null;
+        this.disposeStack();
         this.pushedHistoryTo.clear();
         this.startRetryCount = 0;
         if (this.startRetryTimer) {
@@ -168,10 +183,35 @@ export class ChatTransportBridge {
         }
     }
 
+    private disposeStack(): void {
+        this.stack?.dispose();
+        this.stack = null;
+        this.closeAuxiliaryRealtime();
+    }
+
+    /** Drop stack + aux without blocking future ensures (in-chat e2e prep). */
+    dropTransportStack(): void {
+        this.disposeStack();
+    }
+
     /** Drop the live stack on shell navigation without losing bridge/outbox wiring. */
     dropStackForNavigation(): void {
         this.suspended = true;
-        this.stack = null;
+        this.dropTransportStack();
+    }
+
+    private ensureAuxiliaryRealtime(): RealtimeClient | null {
+        if (!this.deps.createAuxiliaryRealtime) return null;
+        if (!this.auxiliaryRealtime) {
+            this.auxiliaryRealtime = this.deps.createAuxiliaryRealtime();
+            this.auxiliaryRealtime.connect();
+        }
+        return this.auxiliaryRealtime;
+    }
+
+    private closeAuxiliaryRealtime(): void {
+        this.auxiliaryRealtime?.close();
+        this.auxiliaryRealtime = null;
     }
 
     suspendForNavigation(): void {
@@ -195,6 +235,7 @@ export class ChatTransportBridge {
 
     resumeAfterNavigation(): void {
         this.suspended = false;
+        this.start();
         this.rehydratePendingOutbox();
     }
 
@@ -340,16 +381,98 @@ export class ChatTransportBridge {
         ).__chatTransportV2Debug = {
             peerState: (remote: string) =>
                 bridge.stack?.peerRegistry.getState(remote) ?? "absent",
+            snapshot: (remotes: string[]) => {
+                const churn =
+                    typeof window !== "undefined"
+                        ? (
+                              window as Window & {
+                                  __chatChurnState?: () => Record<
+                                      string,
+                                      unknown
+                                  >;
+                              }
+                          ).__chatChurnState?.()
+                        : null;
+                const peers = remotes.map((remote) => ({
+                    remote,
+                    state: bridge.stack?.peerRegistry.getState(remote) ?? "absent",
+                }));
+                return {
+                    started: bridge.stack != null,
+                    suspended: bridge.suspended,
+                    focusedSpace: bridge.focusedSpace,
+                    churn,
+                    peers,
+                };
+            },
+            deliverySnapshot: () => {
+                const chainId = bridge.deps.getChainId();
+                const self = bridge.deps.getSelf();
+                if (!chainId || !self) return [];
+                return loadPendingMessages(chainId, self).map((row) => ({
+                    clientMsgId: row.clientMsgId,
+                    bodyPreview: row.body.slice(0, 48),
+                    recipients: row.recipients,
+                    deliveredTo: row.deliveredTo,
+                    status: bridge.stack?.messaging.getStatus(row.clientMsgId),
+                    pendingCount: bridge.stack?.messaging.getPendingCount(
+                        row.clientMsgId,
+                    ),
+                }));
+            },
             getOutbox: () => {
                 const chainId = bridge.deps.getChainId();
                 const self = bridge.deps.getSelf();
                 if (!chainId || !self) return [];
                 return loadPendingMessages(chainId, self);
             },
+            routingSnapshot: () => {
+                const chainId = bridge.deps.getChainId();
+                const self = bridge.deps.getSelf();
+                if (!chainId || !self) return null;
+                const churn =
+                    typeof window !== "undefined"
+                        ? (
+                              window as Window & {
+                                  __chatChurnState?: () => Record<
+                                      string,
+                                      unknown
+                                  >;
+                              }
+                          ).__chatChurnState?.()
+                        : null;
+                const rows = loadPendingMessages(chainId, self).map((row) => ({
+                    clientMsgId: row.clientMsgId,
+                    bodyPreview: row.body.slice(0, 48),
+                    conversationId: row.conversationId,
+                    recipientCount: row.recipients.length,
+                    recipients: row.recipients,
+                    status: row.status,
+                }));
+                return {
+                    selectedConversationId:
+                        churn?.selectedConversationId ?? null,
+                    selectedConversationKind:
+                        churn?.selectedConversationKind ?? null,
+                    composePendingDmPeer: churn?.composePendingDmPeer ?? null,
+                    pendingRows: rows,
+                };
+            },
             getMessageStatus: (msgId: string) =>
                 bridge.stack?.messaging.getStatus(msgId) ?? "UNKNOWN",
             events: () => [...bridge.debugEvents],
             started: () => bridge.stack != null,
+            ensurePeers: (remotes: string[]) => {
+                for (const remote of remotes) {
+                    bridge.ensurePeer(remote, "peer_focus");
+                    bridge.stack?.peerRegistry.kickNegotiation(remote);
+                }
+            },
+            kickPeers: (remotes: string[]) => {
+                for (const remote of remotes) {
+                    bridge.stack?.peerRegistry.kickNegotiation(remote);
+                }
+            },
         };
     }
 

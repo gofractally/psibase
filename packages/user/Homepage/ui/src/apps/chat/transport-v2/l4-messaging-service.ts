@@ -9,6 +9,8 @@ import {
     savePendingMessagesWithQuotaRecovery,
     type PendingChatMessage,
 } from "../lib/pending-message-store";
+import { chatDataRecord, shortSpaceId } from "../lib/chat-data-debug";
+import { composeTimingLog } from "../lib/dm-compose-timing";
 import {
     pslackConversationIdFromSpaceUuid,
     spaceUuidFromPslackConversationId,
@@ -217,13 +219,28 @@ export function createMessagingService(
 
     const trySendToRecipient = (row: PendingChatMessage, recipient: string) => {
         if (row.deliveredTo.includes(recipient)) return;
-        const peerUsable = opts.peerRegistry.getState(recipient) === "usable";
-        if (!opts.realtime.isRecipientOnline(recipient) && !peerUsable) {
+        const peerState = opts.peerRegistry.getState(recipient);
+        const peerUsable = peerState === "usable";
+        const recipientOnline = opts.realtime.isRecipientOnline(recipient);
+        if (!recipientOnline && !peerUsable) {
+            chatDataRecord("pending-flush-skip", {
+                msgId: row.clientMsgId,
+                recipient,
+                peerState,
+                recipientOnline,
+                bodyPreview: row.body.slice(0, 48),
+            });
             return;
         }
 
         const key = inFlightKey(row.clientMsgId, recipient);
-        if (inFlight.has(key)) return;
+        if (inFlight.has(key)) {
+            chatDataRecord("pending-flush-in-flight", {
+                msgId: row.clientMsgId,
+                recipient,
+            });
+            return;
+        }
 
         const spaceUuid = spaceUuidFromPslackConversationId(row.conversationId);
         if (opts.isSpaceMember && !opts.isSpaceMember(spaceUuid, recipient)) {
@@ -254,6 +271,11 @@ export function createMessagingService(
     };
 
     const flushRemote = async (remote: string) => {
+        chatDataRecord("pending-flush-remote", {
+            remote,
+            peerState: opts.peerRegistry.getState(remote),
+            queued: (outboxByRemote().get(remote) ?? []).length,
+        });
         await opts.peerRegistry.ensure(remote, "message_enqueued");
         const pending = outboxByRemote().get(remote) ?? [];
         for (const row of pending) {
@@ -302,6 +324,11 @@ export function createMessagingService(
 
     return {
         async send(req) {
+            composeTimingLog("l4-send", {
+                kind: "dm",
+                spaceId: shortSpaceId(req.spaceUuid),
+                recipient: req.recipient,
+            });
             // Keep in sync with hook-level pending writes before enqueue.
             rows = loadPendingMessages(opts.chainId, opts.localAccount);
             const msgId = req.clientMsgId ?? newClientMsgId(now());
@@ -324,6 +351,11 @@ export function createMessagingService(
         },
 
         async sendGroup(req) {
+            composeTimingLog("l4-send", {
+                kind: "group",
+                spaceId: shortSpaceId(req.spaceUuid),
+                recipientCount: req.recipients.length,
+            });
             rows = loadPendingMessages(opts.chainId, opts.localAccount);
             const msgId = req.clientMsgId ?? newClientMsgId(now());
             const row: PendingChatMessage = {

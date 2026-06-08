@@ -51,7 +51,10 @@ export function planSendChatMessage(
         return { kind: "noop" };
     }
 
-    if (shouldQueueFirstDmUntilSpace(convId, pendingPeer) && dmMembers) {
+    if (
+        shouldQueueFirstDmUntilSpace(convId, pendingPeer, conversation?.kind) &&
+        dmMembers
+    ) {
         return {
             kind: "queue-first-dm",
             peerAccount: pendingPeer!,

@@ -17,6 +17,7 @@ function createMockRealtime(
     return {
         connect: vi.fn(),
         close: vi.fn(),
+        dispose: vi.fn(),
         get isReady() {
             return true;
         },

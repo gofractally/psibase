@@ -5,6 +5,7 @@ import {
     createInviteUrl,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
 } from "../lib/auth-ui";
 import {
     ensureContact,
@@ -15,15 +16,15 @@ import {
     waitForPeerOnline,
 } from "../lib/chat-ui";
 
-const ALICE = "e2ealiceaa";
-const BOB = "e2ebobbbbb";
-
 test.describe("Chat DM first-send", () => {
     test("alice's first DM reaches bob via WebRTC", async ({
         chain,
         alicePage,
         browser,
     }) => {
+        const ALICE = uniqueE2eAccountName("dmfs");
+        const BOB = uniqueE2eAccountName("dmfs");
+
         await loginProducerViaUi(alicePage, PRODUCER_ACCOUNT, chain.baseUrl);
         const aliceInvite = await createInviteUrl(alicePage, PRODUCER_ACCOUNT);
         const bobInvite = await createInviteUrl(alicePage, PRODUCER_ACCOUNT);

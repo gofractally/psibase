@@ -3,12 +3,13 @@ import { test } from "../fixtures/chain";
 import { attachDiagnostics } from "../lib/diagnostics";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
 import {
+    bootstrapGroupMeshPeers,
     createGroupChat,
     expectOutboundMessageDelivered,
     expectThreadMessage,
     openExistingGroupChat,
     sendChatMessage,
-    waitForPeerOnline,
+    waitForGroupMeshReady,
 } from "../lib/chat-ui";
 
 test.describe("Chat group roundtrip three-party", () => {
@@ -20,11 +21,7 @@ test.describe("Chat group roundtrip three-party", () => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
 
-        const party = await setupThreePartyAccounts(chain, alicePage, browser!, {
-            alice: "rtalicegc0",
-            bob: "rtbobbbgc0",
-            carol: "rtcarolgc0",
-        });
+        const party = await setupThreePartyAccounts(chain, alicePage, browser!, "grtrip");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [
@@ -40,15 +37,33 @@ test.describe("Chat group roundtrip three-party", () => {
                 party.bobAccount.name,
             ]);
 
-            for (const [page, peers] of [
-                [alicePage, [party.bobAccount.name, party.carolAccount.name]],
-                [party.bobPage, [party.aliceAccount.name, party.carolAccount.name]],
-                [party.carolPage, [party.aliceAccount.name, party.bobAccount.name]],
-            ] as const) {
-                for (const peer of peers) {
-                    await waitForPeerOnline(page, peer, { timeout: 120_000 });
-                }
-            }
+            await bootstrapGroupMeshPeers(alicePage, [
+                party.bobAccount.name,
+                party.carolAccount.name,
+            ]);
+            await bootstrapGroupMeshPeers(party.bobPage, [
+                party.aliceAccount.name,
+                party.carolAccount.name,
+            ]);
+            await bootstrapGroupMeshPeers(party.carolPage, [
+                party.aliceAccount.name,
+                party.bobAccount.name,
+            ]);
+            await waitForGroupMeshReady(
+                alicePage,
+                [party.bobAccount.name, party.carolAccount.name],
+                { timeout: 180_000 },
+            );
+            await waitForGroupMeshReady(
+                party.bobPage,
+                [party.aliceAccount.name, party.carolAccount.name],
+                { timeout: 180_000 },
+            );
+            await waitForGroupMeshReady(
+                party.carolPage,
+                [party.aliceAccount.name, party.bobAccount.name],
+                { timeout: 180_000 },
+            );
 
             const aliceMsg = "roundtrip-from-alice";
             const bobMsg = "roundtrip-from-bob";

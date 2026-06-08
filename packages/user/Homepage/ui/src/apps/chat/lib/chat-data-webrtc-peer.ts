@@ -14,6 +14,7 @@ import {
     summarizePeerConnection,
     unregisterChatDataPeer,
 } from "./chat-data-debug";
+import { recordTransportLifecycle } from "./thread-lifecycle";
 import { buildRtcPeerConnectionConfig, iceServerSummary } from "./ice-config";
 import { acquireMeetLocalMedia } from "./local-media";
 import type { IceServerConfig } from "./protocol";
@@ -255,15 +256,23 @@ export class ChatDataWebRtcPeer {
 
         pc.onsignalingstatechange = () => {
             if (this.disposed || !this.pc) return;
+            const state = this.pc.signalingState;
             chatDataRecord("pc signalingState", {
                 sessionId: shortSessionId(this.sessionId),
-                state: this.pc.signalingState,
+                state,
+            });
+            recordTransportLifecycle("pc", "signaling-state", {
+                sessionId: shortSessionId(this.sessionId),
+                peer: this.peerAccount,
+                state,
+                polite: !this.impolite,
+                isInitiator: this.isInitiator,
             });
             // Clear the "ignoreOffer" latch once we're back to a state
             // where new offers are welcome. Without this, the impolite
             // side could stay deaf to a legitimate later offer because
             // it set ignoreOffer during an earlier collision.
-            if (this.pc.signalingState === "stable") {
+            if (state === "stable") {
                 this.ignoreOffer = false;
             }
         };
@@ -285,6 +294,13 @@ export class ChatDataWebRtcPeer {
                 state,
                 iceConnectionState: this.pc.iceConnectionState,
                 dataChannelState: this.dataChannel?.readyState ?? "none",
+            });
+            recordTransportLifecycle("pc", "connection-state", {
+                sessionId: shortSessionId(this.sessionId),
+                peer: this.peerAccount,
+                state,
+                iceConnectionState: this.pc.iceConnectionState,
+                dataChannelReady: this.dataChannelReady,
             });
             if (state === "connected" && this.dataChannelReady) {
                 this.handlers.onDataChannelOpen?.();
@@ -383,14 +399,45 @@ export class ChatDataWebRtcPeer {
         );
     }
 
-    /** Failed transport or SDP stable with no open data channel (H23). */
+    /**
+     * Failed transport or SDP stable with no progress toward a data channel
+     * (H23). Does not fire while ICE/DTLS is still establishing after a
+     * completed offer/answer — that window is normal, not stuck.
+     */
     get needsReconnect(): boolean {
         if (this.dataChannelReady) return false;
         if (this.transportUnhealthy) return true;
-        return (
-            !this.negotiationInProgress &&
-            this.pc?.signalingState === "stable"
-        );
+        const pc = this.pc;
+        if (!pc || this.negotiationInProgress) return false;
+        if (pc.signalingState !== "stable") return false;
+
+        const cs = pc.connectionState;
+        const ice = pc.iceConnectionState;
+        // Offer/answer done; ICE or DTLS still in flight.
+        if (cs === "new" || cs === "connecting") return false;
+        if (ice === "new" || ice === "checking") return false;
+        if (ice === "connected" && cs !== "connected") return false;
+
+        return true;
+    }
+
+    /** PC snapshot for L3 recovery / kick diagnostics. */
+    get transportSnapshot(): {
+        signalingState: RTCSignalingState;
+        connectionState: RTCPeerConnectionState;
+        iceConnectionState: RTCIceConnectionState;
+        dataChannelReady: boolean;
+        negotiationInProgress: boolean;
+        needsReconnect: boolean;
+    } {
+        return {
+            signalingState: this.pc?.signalingState ?? "closed",
+            connectionState: this.pc?.connectionState ?? "closed",
+            iceConnectionState: this.pc?.iceConnectionState ?? "closed",
+            dataChannelReady: this.dataChannelReady,
+            negotiationInProgress: this.negotiationInProgress,
+            needsReconnect: this.needsReconnect,
+        };
     }
 
     get isDisposed(): boolean {

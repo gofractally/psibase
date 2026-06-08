@@ -11,6 +11,8 @@ import { ChatTransportBridge } from "../../transport-v2/chat-transport-bridge";
 
 export type ChatTransportBridgeDeps = {
     getRealtime: () => RealtimeClient | null;
+    /** Opens a dedicated second x-webrtc-sig socket for an extra pair session. */
+    createAuxiliaryRealtime?: () => RealtimeClient;
     getSelf: () => string | null;
     getChainId: () => string | null;
     getIceServers: () => IceServerConfig[] | null;

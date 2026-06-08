@@ -140,12 +140,13 @@ export async function readPageChurnProbe(page: Page): Promise<unknown> {
 }
 
 export async function dumpChurnDiagTraces(
-    pages: { alice: Page; bob: Page; carol: Page },
+    pages: { alice: Page; bob: Page | null; carol: Page | null },
     actors: readonly ("alice" | "bob" | "carol")[],
     label: string,
 ): Promise<void> {
     for (const who of actors) {
         const page = pages[who];
+        if (!page) continue;
         try {
             const payload = await Promise.race([
                 page.evaluate(() => {
@@ -169,11 +170,20 @@ export async function dumpChurnDiagTraces(
                             __chatChurnState?: () => Record<string, unknown>;
                         }
                     ).__chatChurnState?.();
+                    const threadLifecycle = (
+                        window as Window & {
+                            __chatThreadLifecycle?: {
+                                events: () => unknown;
+                                dump: () => string;
+                            };
+                        }
+                    ).__chatThreadLifecycle;
                     return {
                         url: location.href,
                         pathname: location.pathname,
                         trace: trace?.events?.() ?? [],
                         churnState: churnState ?? null,
+                        threadLifecycle: threadLifecycle?.events?.().slice(-40) ?? [],
                         chatData: dbg?.snapshot?.() ?? null,
                     };
                 }),

@@ -16,6 +16,7 @@ type RealtimeTransportEvents = {
 export interface RealtimeTransport {
     connect(): void;
     close(): void;
+    dispose(): void;
     readonly isReady: boolean;
     readonly welcomeGeneration: number;
     on(
@@ -40,7 +41,7 @@ export function createRealtimeTransport(
         bus.emit("presence", account, online);
     };
 
-    client.registerHandlers({
+    const unregisterClientHandlers = client.registerHandlers({
         welcome: () => {
             const reconnect = client.isReconnectWelcome();
             lastWelcomeGen = client.welcomeGeneration;
@@ -69,6 +70,9 @@ export function createRealtimeTransport(
     return {
         connect: () => client.connect(),
         close: () => client.close(),
+        dispose: () => {
+            unregisterClientHandlers();
+        },
         get isReady() {
             return client.isSessionReady;
         },

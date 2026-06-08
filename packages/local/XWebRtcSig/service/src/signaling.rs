@@ -27,7 +27,7 @@ use crate::protocol::{
 };
 use crate::state::{
     enqueue_pending_signal, erase_sig_session_join, live_sockets_for_user, put_sig_session_join,
-    sig_join_row, sig_joins_for_session, take_pending_signal_payloads,
+    sig_join_row, sig_joins_for_session, sig_joins_for_socket, take_pending_signal_payloads,
 };
 #[cfg(feature = "rt-trace")]
 use crate::trace::xrtcsig_trace;
@@ -340,60 +340,67 @@ fn record_join(
     });
 }
 
+fn join_session_auth_errors(
+    socket: i32,
+    session_id: &str,
+    auth: &chat::SessionJoinAuth,
+) -> Option<Vec<(i32, ServerFrame)>> {
+    if auth.purpose.is_empty() {
+        return Some(vec![session_err(
+            socket,
+            "unknown-session",
+            "unknown session",
+            Some(session_id.to_owned()),
+        )]);
+    }
+
+    if auth.expired {
+        return Some(vec![session_err(
+            socket,
+            "session-expired",
+            "session has expired",
+            Some(session_id.to_owned()),
+        )]);
+    }
+
+    if auth.lifecycle != 1 {
+        return Some(vec![session_err(
+            socket,
+            "session-not-active",
+            "session is not active",
+            Some(session_id.to_owned()),
+        )]);
+    }
+
+    if !auth.authorized {
+        return Some(vec![session_err(
+            socket,
+            "not-participant",
+            "account is not a participant in this session",
+            Some(session_id.to_owned()),
+        )]);
+    }
+
+    if !is_supported_signaling_purpose(&auth.purpose) {
+        return Some(vec![session_err(
+            socket,
+            "unsupported-purpose",
+            "unsupported session purpose for signaling",
+            Some(session_id.to_owned()),
+        )]);
+    }
+
+    None
+}
+
 fn join_session_subjective(
     socket: i32,
     user: AccountNumber,
     session_id: String,
     client_instance_id: String,
     now: i64,
+    auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
-    let auth = query_session_auth(&session_id, user);
-
-    if auth.purpose.is_empty() {
-        return vec![session_err(
-            socket,
-            "unknown-session",
-            "unknown session",
-            Some(session_id),
-        )];
-    }
-
-    if auth.expired {
-        return vec![session_err(
-            socket,
-            "session-expired",
-            "session has expired",
-            Some(session_id),
-        )];
-    }
-
-    if auth.lifecycle != 1 {
-        return vec![session_err(
-            socket,
-            "session-not-active",
-            "session is not active",
-            Some(session_id),
-        )];
-    }
-
-    if !auth.authorized {
-        return vec![session_err(
-            socket,
-            "not-participant",
-            "account is not a participant in this session",
-            Some(session_id),
-        )];
-    }
-
-    if !is_supported_signaling_purpose(&auth.purpose) {
-        return vec![session_err(
-            socket,
-            "unsupported-purpose",
-            "unsupported session purpose for signaling",
-            Some(session_id),
-        )];
-    }
-
     let prior = sig_join_row(&session_id, user);
     let duplicate_same_socket =
         prior.as_ref().is_some_and(|row| row.socket == socket);
@@ -424,6 +431,18 @@ fn join_session_subjective(
     let mut out = vec![(socket, invite.clone())];
     out.extend(flushed);
 
+    // Multi-pair mesh: one browser tab joins several pair sessions on the same
+    // websocket. Full peer fanout during the second join was aborting the recv
+    // action (no frames reached the client). Deliver self invite + snapshot;
+    // peers learn roster from their own joinSession or later snapshots.
+    let socket_has_other_sessions = sig_joins_for_socket(socket)
+        .iter()
+        .any(|row| row.session_id != session_id);
+    if socket_has_other_sessions {
+        out.push((socket, build_session_snapshot(&session_id, &auth.participants)));
+        return out;
+    }
+
     out.extend(fanout_participant_joined(
         &session_id,
         user,
@@ -449,6 +468,7 @@ fn join_session_subjective_frames(
     session_id: String,
     client_instance_id: String,
     now: i64,
+    auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
     join_session_subjective(
         socket,
@@ -456,6 +476,7 @@ fn join_session_subjective_frames(
         session_id,
         client_instance_id,
         now,
+        auth,
     )
 }
 
@@ -465,6 +486,7 @@ fn join_session_subjective_tx_subjective(
     session_id: String,
     client_instance_id: String,
     now: i64,
+    auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
     ::psibase::subjective_tx! {
         join_session_subjective_frames(
@@ -473,6 +495,7 @@ fn join_session_subjective_tx_subjective(
             session_id.clone(),
             client_instance_id.clone(),
             now,
+            auth.clone(),
         )
     }
 }
@@ -483,6 +506,7 @@ fn join_session_subjective_tx(
     session_id: String,
     client_instance_id: String,
     now: i64,
+    auth: chat::SessionJoinAuth,
 ) -> Vec<(i32, ServerFrame)> {
     join_session_subjective_tx_subjective(
         socket,
@@ -490,6 +514,7 @@ fn join_session_subjective_tx(
         session_id,
         client_instance_id,
         now,
+        auth,
     )
 }
 
@@ -500,7 +525,18 @@ pub fn handle_join_session(
     client_instance_id: String,
     now: i64,
 ) -> Vec<(i32, ServerFrame)> {
-    join_session_subjective_tx(socket, user, session_id, client_instance_id, now)
+    let auth = query_session_auth(&session_id, user);
+    if let Some(err) = join_session_auth_errors(socket, &session_id, &auth) {
+        return err;
+    }
+    join_session_subjective_tx(
+        socket,
+        user,
+        session_id,
+        client_instance_id,
+        now,
+        auth,
+    )
 }
 
 fn validate_signal_in_tx(

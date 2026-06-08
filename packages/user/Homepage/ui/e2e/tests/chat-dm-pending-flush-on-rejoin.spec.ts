@@ -7,10 +7,12 @@ import {
     loginExistingAccountViaUi,
     loginProducerViaUi,
     PRODUCER_ACCOUNT,
+    uniqueE2eAccountName,
     type TestAccount,
 } from "../lib/auth-ui";
 import {
     assertChatDataHealthy,
+    bootstrapDmPeer,
     ensureContact,
     expectOutboundMessageDelivered,
     expectPendingOutboundMessage,
@@ -18,32 +20,20 @@ import {
     openChat,
     sendChatMessage,
     startDmWithContact,
-    waitForDmDataChannelReady,
+    waitForDmPeerReady,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
 
-const ALICE = "e2ealicerj";
-const BOB = "e2ebobbbrj";
-
 test.describe("Chat DM pending flush on rejoin", () => {
-    /**
-     * Pure rejoin / pending-flush test.
-     *
-     * The basic two-way DM path is covered by chat-dm-first-send.spec.ts.
-     * Here we deliberately skip the baseline send so the test focuses on:
-     *
-     *   1. Bob1 opens the DM (so a chat-data session exists on chain) and leaves.
-     *   2. Alice sends a message while Bob is offline → it sits in the
-     *      pending-outbound queue.
-     *   3. Bob2 logs in on a fresh context and opens the DM → the queued DM must
-     *      be delivered to him (and Alice's pending status must clear) without
-     *      a "Reconnecting…" storm.
-     */
     test("queued DM arrives after peer reopens chat", async ({
         chain,
         alicePage,
         browser,
     }) => {
+        test.setTimeout(600_000);
+        const ALICE = uniqueE2eAccountName("dmrj");
+        const BOB = uniqueE2eAccountName("dmrj");
+
         attachDiagnostics(alicePage, "alice");
 
         await loginProducerViaUi(alicePage, PRODUCER_ACCOUNT, chain.baseUrl);
@@ -75,11 +65,13 @@ test.describe("Chat DM pending flush on rejoin", () => {
             // No baseline message exchange — that path is covered separately.
             await startDmWithContact(bobPage, chain.baseUrl, aliceAccount.name);
             await startDmWithContact(alicePage, chain.baseUrl, bobAccount.name);
-            await waitForDmDataChannelReady(bobPage, aliceAccount.name, {
-                timeout: 180_000,
+            await bootstrapDmPeer(bobPage, aliceAccount.name);
+            await bootstrapDmPeer(alicePage, bobAccount.name);
+            await waitForDmPeerReady(bobPage, aliceAccount.name, {
+                timeout: 120_000,
             });
-            await waitForDmDataChannelReady(alicePage, bobAccount.name, {
-                timeout: 180_000,
+            await waitForDmPeerReady(alicePage, bobAccount.name, {
+                timeout: 120_000,
             });
         } finally {
             console.log("[bob1] closing context");
@@ -102,6 +94,11 @@ test.describe("Chat DM pending flush on rejoin", () => {
             );
             await ensureContact(bobPage2, chain.baseUrl, aliceAccount.name);
             await startDmWithContact(bobPage2, chain.baseUrl, aliceAccount.name);
+            await bootstrapDmPeer(bobPage2, aliceAccount.name);
+            await bootstrapDmPeer(alicePage, bobAccount!.name);
+            await waitForDmPeerReady(bobPage2, aliceAccount.name, {
+                timeout: 180_000,
+            });
 
             await expectThreadMessage(bobPage2, "queued while bob was away", {
                 timeout: 180_000,
