@@ -106,7 +106,7 @@ namespace
 
 }  // namespace
 
-// Tx can be staged on behalf of prods-str and prods-weak
+// Tx can be staged on behalf of prods-strong and prods-weak
 // Set the producers, verify they can be retrieved
 // Tx is executed/rejected only once the threshold is reached in both CFT and BFT
 SCENARIO("Producers")
@@ -132,8 +132,8 @@ SCENARIO("Producers")
 
       // Other accounts
       auto producers = t.from("producers"_a);
-      auto weak      = "prods-weak"_a;
-      auto strong    = "prods-str"_a;
+      auto weak      = Producers::producerAccountWeak;
+      auto strong    = Producers::producerAccountStrong;
       auto rando     = t.from(t.addAccount("rando"_a));
 
       // Alice requires prods-str

@@ -38,23 +38,23 @@ namespace SystemService
 
       using Tables = psibase::ServiceTables<CandidateInfoTable, ProdsConfigTable>;
 
-      /// `prods-weak` and `prods-str` are accounts that represent authorization
+      /// `prods-weak` and `prods-strong` are accounts that represent authorization
       /// by the current block producers.  `prods-weak` is a quorum that is sufficient
       /// to guarantee inclusion of at least one honest producer.  i.e, it is one more
       /// than the maximum number of dishonest producers that the current consensus
       /// settings can tolerate. This is useful for actions that cannot conflict or
       /// for which conflicts are resolved by an off-chain process.
       ///
-      /// `prods-str` provides the additional guarantee that if two actions are
-      /// both authorized by `prods-str`, there is at least one honest producer
+      /// `prods-strong` provides the additional guarantee that if two actions are
+      /// both authorized by `prods-strong`, there is at least one honest producer
       /// that authorized both actions. It should generally be preferred over `prods-weak`.
       ///
       /// |        | cft       | bft        |
       /// |--------|-----------|------------|
       /// | weak   | 1         | ⌈n/3⌉      |
       /// | strong | ⌊n/2⌋ + 1 | ⌊2n/3⌋ + 1 |
-      static constexpr auto producerAccountWeak   = psibase::AccountNumber("prods-weak");
-      static constexpr auto producerAccountStrong = psibase::AccountNumber("prods-str");
+      static constexpr auto producerAccountWeak   = psibase::AccountNumber("producers☺2");
+      static constexpr auto producerAccountStrong = psibase::AccountNumber("producers☺3");
 
       void setConsensus(psibase::ConsensusData consensus);
       void setProducers(std::vector<psibase::Producer> prods);
@@ -70,7 +70,7 @@ namespace SystemService
       uint32_t getThreshold(psibase::AccountNumber account);
       uint32_t antiThreshold(psibase::AccountNumber account);
 
-      // Allows this service to be used as an auth service for `prods-weak` and `prods-str`.
+      // Allows this service to be used as an auth service for `prods-weak` and `prods-strong`.
       bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
