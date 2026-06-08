@@ -369,6 +369,25 @@ fn translate_flags(flags: &[String]) -> Result<u64, Error> {
     Ok(result)
 }
 
+fn translate_local_flags(flags: &[String]) -> Result<String, Error> {
+    let mut result = String::new();
+    for flag in flags {
+        match flag.as_str() {
+            "isPrivileged" => {}
+            "isReplacement" => {}
+            _ => Err(Error::InvalidFlags)?,
+        };
+        if result.is_empty() {
+            result += "?";
+        } else {
+            result += "&";
+        }
+        result += flag;
+        result += "=1";
+    }
+    Ok(result)
+}
+
 fn read<T: Read>(reader: &mut T) -> Result<Vec<u8>, anyhow::Error> {
     let mut result = vec![];
     reader.read_to_end(&mut result)?;
@@ -974,11 +993,11 @@ impl<R: Read + Seek> PackagedService<R> {
             }
             crate::as_text(
                 client
-                    .put(
-                        x_admin::SERVICE
-                            .url(base_url)?
-                            .join(&format!("/services/{}", account))?,
-                    )
+                    .put(x_admin::SERVICE.url(base_url)?.join(&format!(
+                        "/services/{}{}",
+                        account,
+                        translate_local_flags(&info.flags)?
+                    ))?)
                     .body(read(&mut self.archive.by_index(*index)?)?)
                     .header("Content-Type", "application/wasm"),
             )
