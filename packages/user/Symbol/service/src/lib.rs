@@ -298,8 +298,8 @@ pub mod service {
         if InitTable::read().get_index_pk().get(&()).is_none() {
             table.put(&InitRow {}).unwrap();
 
-            Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
-            Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
+            Tokens::call().setUserConf(BalanceFlags::AUTO_DEBIT.index(), false);
+            Nft::call().setUserConf(NftHolderFlags::AUTO_DEBIT.index(), false);
 
             let add_index = |method: &str, column: u8| {
                 events::Wrapper::call().addIndex(

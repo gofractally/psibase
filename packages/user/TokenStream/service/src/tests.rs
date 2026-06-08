@@ -4,7 +4,7 @@
 mod tests {
     use crate::tables::Stream;
     use crate::Wrapper as TokenStream;
-    use psibase::services::nft::Wrapper as Nfts;
+    use psibase::services::nft::{NftHolderFlags, Wrapper as Nfts};
     use psibase::services::tokens::{Quantity, Wrapper as Tokens};
     use psibase::*;
 
@@ -48,9 +48,23 @@ mod tests {
 
     /// Creates alice, bob, charlie, and alice mints a new token with supply 1000_0000.
     fn setup_env(chain: &psibase::Chain) -> u32 {
-        chain.new_account(ALICE).unwrap();
-        chain.new_account(BOB).unwrap();
-        chain.new_account(CHARLIE).unwrap();
+        for account in [ALICE, BOB, CHARLIE] {
+            chain.new_account(account).unwrap();
+            // For NFTs (including token-stream NFTs)
+            Nfts::push_from(&chain, account)
+                .setUserConf(NftHolderFlags::AUTO_DEBIT.index(), true)
+                .get()
+                .unwrap();
+
+            // For token balances
+            Tokens::push_from(&chain, account)
+                .setUserConf(
+                    psibase::services::tokens::BalanceFlags::AUTO_DEBIT.index(),
+                    true,
+                )
+                .get()
+                .unwrap();
+        }
 
         let supply = Quantity::from(1000_0000);
 
@@ -59,11 +73,10 @@ mod tests {
             .get()
             .unwrap();
 
-        Tokens::push_from(&chain, ALICE).mint(
-            token_id,
-            supply,
-            "memo".to_string().try_into().unwrap(),
-        );
+        Tokens::push_from(&chain, ALICE)
+            .mint(token_id, supply, "memo".to_string().try_into().unwrap())
+            .get()
+            .unwrap();
         token_id
     }
 
@@ -79,6 +92,7 @@ mod tests {
             chain.set_auto_block_start(false);
             reset_clock(&chain);
             let token_id = setup_env(&chain);
+
             Self { chain, token_id }
         }
 

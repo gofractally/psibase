@@ -161,8 +161,8 @@ impl User for TokensPlugin {
 
 impl UserConfig for TokensPlugin {
     #[psibase_plugin::authorized(High, whitelist = ["homepage"])]
-    fn enable_user_manual_debit(enable: bool) -> Result<(), Error> {
-        Tokens::add_to_tx().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), enable);
+    fn enable_user_auto_debit(enable: bool) -> Result<(), Error> {
+        Tokens::add_to_tx().setUserConf(BalanceFlags::AUTO_DEBIT.index(), enable);
         Ok(())
     }
 
@@ -173,8 +173,8 @@ impl UserConfig for TokensPlugin {
     }
 
     #[psibase_plugin::authorized(Medium, whitelist = ["homepage"])]
-    fn enable_balance_manual_debit(token_id: u32, enable: bool) -> Result<(), Error> {
-        Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::MANUAL_DEBIT.index(), enable);
+    fn enable_balance_auto_debit(token_id: u32, enable: bool) -> Result<(), Error> {
+        Tokens::add_to_tx().setBalConf(token_id, BalanceFlags::AUTO_DEBIT.index(), enable);
         Ok(())
     }
 

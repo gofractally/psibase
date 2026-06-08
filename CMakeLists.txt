@@ -1040,7 +1040,8 @@ psibase_package(
     NAME TokenUsers
     VERSION ${PSIBASE_VERSION}.0
     DESCRIPTION "Creates accounts alice & bob, and gives each some system tokens. Not for production use."
-    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" 
+    PACKAGE_DEPENDS "AccountsService(^${PSIBASE_VERSION}.0)" "FaucetTok(^${PSIBASE_VERSION}.0)" "Tokens(^${PSIBASE_VERSION}.0)" 
+    ACCOUNTS alice bob
     POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Tokens/src/TokenUsers.json
 )
 
