@@ -1196,7 +1196,6 @@ namespace psibase
                auto claim = validateBlockSignature(prev, state->info, blockPtr->signature());
                ctx.start(Block(blockPtr->block()));
                validateTransactionSignatures(ctx, ctx.current, prev->revision);
-               ctx.callStartBlock();
                ctx.execAllInBlock();
                auto [newRevision, id] = ctx.writeRevision(FixedProver(blockPtr->signature()), claim,
                                                           state->getProdsAuthRevision());
@@ -2030,7 +2029,7 @@ namespace psibase
 
          // TODO: This can run concurrently
          BlockContext     bc{*systemContext, systemContext->sharedDatabase.getHead(),
-                         systemContext->sharedDatabase.createWriter(), true};
+                             systemContext->sharedDatabase.createWriter(), true};
          TransactionTrace trace;
          try
          {
