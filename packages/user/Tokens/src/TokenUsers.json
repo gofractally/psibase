@@ -1,25 +1,5 @@
 [
     {
-        "sender": "accounts",
-        "service": "accounts",
-        "method": "newAccount",
-        "data": {
-            "name": "alice",
-            "authService": "auth-any",
-            "requireMatch": true
-        }
-    },
-    {
-        "sender": "accounts",
-        "service": "accounts",
-        "method": "newAccount",
-        "data": {
-            "name": "bob",
-            "authService": "auth-any",
-            "requireMatch": true
-        }
-    },
-    {
         "sender": "alice",
         "service": "tokens",
         "method": "setUserConf",
