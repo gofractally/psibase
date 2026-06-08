@@ -781,7 +781,6 @@ cargo_psibase_package(
     OUTPUT ${SERVICE_DIR}/PremAccounts.psi
     PATH packages/user/PremAccounts
     TARGET_DIR ${USER_WORKSPACE_TARGET}
-    DEPENDS ${PremAccounts_js_DEP}
 )
 
 psibase_package(
