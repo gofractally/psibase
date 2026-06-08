@@ -44,11 +44,13 @@ import {
     openDmThread,
     openExistingGroupChat,
     openExistingGroupChatMinimal,
+    openChat,
     readChatSelectionState,
     sendChatMessage,
     sendChurnGroupMessage,
     waitForDmThreadWithPeer,
     wakeActorFromChurnNoRealtime,
+    startDmWithContact,
     wakeForDmInteraction,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
@@ -537,12 +539,51 @@ test.describe("Chat group three-party random churn @manual", () => {
                         }
 
                         online.add(who);
-                        console.log(`[random-churn] ${label} phase=open-group`);
-                        await openExistingGroupChatMinimal(
-                            page,
-                            chainInfo!.baseUrl,
-                            groupPeersFor(who, names),
+                        const pendingForWho = ledger.forRecipient(who);
+                        const hasComposeFirstDm = pendingForWho.some(
+                            (e) => e.channel === "dm",
                         );
+                        if (hasComposeFirstDm) {
+                            console.log(
+                                `[random-churn] ${label} phase=open-chat-for-flush`,
+                            );
+                            await openChat(page, chainInfo!.baseUrl);
+                            const firstDm = pendingForWho.find(
+                                (e) => e.channel === "dm",
+                            );
+                            const hasDmSidebar = await page.evaluate(() => {
+                                const churn = (
+                                    window as Window & {
+                                        __chatChurnState?: () => {
+                                            conversationListSummary?: {
+                                                dm?: number;
+                                            };
+                                        };
+                                    }
+                                ).__chatChurnState?.();
+                                return (
+                                    (churn?.conversationListSummary?.dm ??
+                                        0) > 0
+                                );
+                            });
+                            if (firstDm && !hasDmSidebar) {
+                                await startDmWithContact(
+                                    page,
+                                    chainInfo!.baseUrl,
+                                    actorAccount(firstDm.from, names),
+                                    { groupSpaceId },
+                                );
+                            }
+                        } else {
+                            console.log(
+                                `[random-churn] ${label} phase=open-group`,
+                            );
+                            await openExistingGroupChatMinimal(
+                                page,
+                                chainInfo!.baseUrl,
+                                groupPeersFor(who, names),
+                            );
+                        }
                         await flushPendingCatchUp(
                             who,
                             ledger,

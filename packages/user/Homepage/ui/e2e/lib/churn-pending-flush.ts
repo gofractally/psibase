@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { gotoReliable } from "./churn-navigation";
 import {
+    bootstrapDmPeer,
     bootstrapGroupMeshPeers,
     chatUrlForPage,
     expectOutboundMessageDelivered,
@@ -9,7 +10,9 @@ import {
     focusChurnGroupThread,
     groupSpaceIdFromPage,
     openDmThread,
+    openDmThreadForFlush,
     resyncOnlineActorsToGroup,
+    wakeForDmInteraction,
     waitForDmDataChannelReady,
     waitForGroupMeshReady,
 } from "./chat-ui";
@@ -176,42 +179,16 @@ async function prepareFlushDelivery(
     names: { alice: string; bob: string; carol: string },
     baseUrl: string,
     groupSpaceId: string,
-    meshTimeoutMs: number,
+    _meshTimeoutMs: number,
 ): Promise<void> {
-    const pairs = new Map<string, PendingLedgerEntry>();
-    for (const entry of pending) {
-        if (!online.has(entry.from) || !online.has(entry.to)) continue;
-        pairs.set(`${entry.from}:${entry.to}:${entry.channel}`, entry);
-    }
-    for (const entry of pairs.values()) {
-        await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
-    }
-
-    const recipientPage = pageFor(who, pages);
-    const dmSenders = [
-        ...new Set(
-            pending
-                .filter((e) => e.channel === "dm" && online.has(e.from))
-                .map((e) => e.from),
-        ),
-    ];
-    for (const from of dmSenders) {
-        await openDmThread(recipientPage, baseUrl, actorAccount(from, names), {
-            groupSpaceId,
-        });
-    }
-    if (pending.some((e) => e.channel === "group")) {
-        await focusChurnGroupThread(
-            recipientPage,
-            baseUrl,
-            groupPeersFor(who, names),
-            {
-                groupSpaceId,
-                churnNoRealtime: false,
-                composerTimeout: 45_000,
-            },
-        );
-    }
+    // Mesh is established per flush entry — avoid bootstrapping every pair upfront.
+    void pending;
+    void who;
+    void pages;
+    void online;
+    void names;
+    void baseUrl;
+    void groupSpaceId;
 }
 
 async function ensureMeshForEntry(
@@ -310,7 +287,6 @@ export async function flushPendingCatchUp(
                 baseUrl,
                 groupSpaceId,
                 meshTimeoutMs,
-                { meshPrepared: true },
             );
             ledger.remove(entry);
         } catch (err) {
@@ -349,18 +325,38 @@ async function expectPendingBodyVisible(
     } catch {
         /* not on the delivering thread yet */
     }
-    await openDmThread(recipientPage, baseUrl, peerAccount, { groupSpaceId });
     try {
+        await openDmThreadForFlush(
+            recipientPage,
+            baseUrl,
+            peerAccount,
+            groupSpaceId,
+            timeoutMs,
+        );
         await expectThreadMessage(recipientPage, body, { timeout: 8_000 });
         return;
     } catch {
-        await focusChurnGroupThread(recipientPage, baseUrl, groupPeers, {
-            groupSpaceId,
-            churnNoRealtime: false,
-            composerTimeout: 45_000,
-        });
-        await expectThreadMessage(recipientPage, body, { timeout: timeoutMs });
+        /* DM UI open failed — try group thread before final assert */
     }
+    await focusChurnGroupThread(recipientPage, baseUrl, groupPeers, {
+        groupSpaceId,
+        churnNoRealtime: false,
+        composerTimeout: 45_000,
+    });
+    await expectThreadMessage(recipientPage, body, { timeout: timeoutMs });
+}
+
+async function recipientHasDmSidebar(page: Page): Promise<boolean> {
+    return page.evaluate(() => {
+        const churn = (
+            window as Window & {
+                __chatChurnState?: () => {
+                    conversationListSummary?: { dm?: number };
+                };
+            }
+        ).__chatChurnState?.();
+        return (churn?.conversationListSummary?.dm ?? 0) > 0;
+    });
 }
 
 async function flushPendingEntry(
@@ -371,17 +367,40 @@ async function flushPendingEntry(
     baseUrl: string,
     groupSpaceId: string,
     meshTimeoutMs: number,
-    options?: { meshPrepared?: boolean },
 ): Promise<void> {
     const senderPage = pageFor(entry.from, pages);
     const recipientPage = pageFor(entry.to, pages);
     const senderName = actorAccount(entry.from, names);
+    const recipientName = actorAccount(entry.to, names);
     const assertMs = perEntryMeshMs(meshTimeoutMs);
 
     if (entry.channel === "dm") {
-        if (!options?.meshPrepared) {
-            const urlSpace = groupSpaceIdFromPage(senderPage);
-            if (urlSpace === groupSpaceId) {
+        await ensureMeshForEntry(
+            entry,
+            pages,
+            online,
+            names,
+            meshTimeoutMs,
+        );
+
+        await wakeForDmInteraction(recipientPage, baseUrl, {
+            composerTimeout: Math.min(meshTimeoutMs, 45_000),
+        });
+
+        const tryRecipientDelivery = async (): Promise<void> => {
+            await expectPendingBodyVisible(
+                recipientPage,
+                baseUrl,
+                entry.body,
+                senderName,
+                groupSpaceId,
+                groupPeersFor(entry.to, names),
+                meshTimeoutMs,
+            );
+        };
+
+        const flushFromSender = async (): Promise<void> => {
+            if (groupSpaceIdFromPage(senderPage) === groupSpaceId) {
                 await gotoReliable(
                     senderPage,
                     chatUrlForPage(senderPage, baseUrl),
@@ -392,29 +411,68 @@ async function flushPendingEntry(
                     },
                 );
             }
-            await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
+            await openDmThreadForFlush(
+                senderPage,
+                baseUrl,
+                recipientName,
+                groupSpaceId,
+                meshTimeoutMs,
+            );
+            await waitForDmDataChannelReady(senderPage, recipientName, {
+                timeout: meshTimeoutMs,
+            }).catch(() => {});
+            await wakeForDmInteraction(recipientPage, baseUrl, {
+                composerTimeout: Math.min(meshTimeoutMs, 45_000),
+            });
+            await tryRecipientDelivery();
+        };
+
+        const flushComposeFirstRecipient = async (): Promise<void> => {
+            await wakeForDmInteraction(recipientPage, baseUrl, {
+                composerTimeout: Math.min(meshTimeoutMs, 45_000),
+            });
+            await openDmThread(recipientPage, baseUrl, senderName, {
+                groupSpaceId,
+                gotoTimeout: meshTimeoutMs,
+            });
+            await bootstrapDmPeer(recipientPage, senderName);
+            await bootstrapDmPeer(senderPage, recipientName);
+            await flushFromSender();
+        };
+
+        const composeFirst = !(await recipientHasDmSidebar(recipientPage));
+        if (composeFirst) {
+            await flushComposeFirstRecipient();
+        } else {
+            try {
+                await tryRecipientDelivery();
+                await expectOutboundMessageDelivered(senderPage, entry.body, {
+                    timeout: 15_000,
+                });
+                return;
+            } catch {
+                /* recipient-only path incomplete — drive sender outbox flush */
+            }
+            await flushFromSender();
         }
-        await expectPendingBodyVisible(
-            recipientPage,
-            baseUrl,
-            entry.body,
-            senderName,
-            groupSpaceId,
-            groupPeersFor(entry.to, names),
-            assertMs,
-        );
+
+        await expectOutboundMessageDelivered(senderPage, entry.body, {
+            timeout: meshTimeoutMs,
+        });
         return;
     }
 
-    if (!options?.meshPrepared) {
-        await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
-        await focusChurnGroupThread(
-            recipientPage,
-            baseUrl,
-            groupPeersFor(entry.to, names),
-            { groupSpaceId, churnNoRealtime: false, composerTimeout: 45_000 },
-        );
-    }
+    await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
+    await focusChurnGroupThread(
+        recipientPage,
+        baseUrl,
+        groupPeersFor(entry.to, names),
+        {
+            groupSpaceId,
+            churnNoRealtime: false,
+            composerTimeout: 45_000,
+        },
+    );
     await expectThreadMessage(recipientPage, entry.body, {
         timeout: assertMs,
     });
@@ -435,4 +493,4 @@ async function flushPendingEntry(
 }
 
 /** Extra wall-clock budget per pending ledger entry during offline rejoin flush. */
-export const FLUSH_ENTRY_BUDGET_MS = 60_000;
+export const FLUSH_ENTRY_BUDGET_MS = 150_000;

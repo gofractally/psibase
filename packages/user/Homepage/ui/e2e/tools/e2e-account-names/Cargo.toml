@@ -1,0 +1,15 @@
+[package]
+name = "e2e_account_names"
+version = "0.1.0"
+edition = "2021"
+description = "Generate verified Psibase account names for Chat/Homepage e2e tests"
+publish = false
+
+[workspace]
+
+[[bin]]
+name = "generate_e2e_account_names"
+path = "src/main.rs"
+
+[dependencies]
+psibase_names = { path = "../../../../../../../rust/psibase_names" }
