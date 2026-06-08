@@ -65,21 +65,21 @@ test.describe("Chat DM first-send", () => {
                                             kind: string;
                                         }>;
                                     };
-                                    __chatTransportV2Debug?: {
+                                    __chatTransportDebug?: {
                                         started?: () => boolean;
                                         peerState?: (remote: string) => string;
                                     };
                                 }
                             ).__chatMessagingDebug;
-                            const v2 = (
+                            const transport = (
                                 window as unknown as {
-                                    __chatTransportV2Debug?: {
+                                    __chatTransportDebug?: {
                                         started?: () => boolean;
                                         peerState?: (remote: string) => string;
                                         getOutbox?: () => unknown[];
                                     };
                                 }
-                            ).__chatTransportV2Debug;
+                            ).__chatTransportDebug;
                             const outbox = dbg?.getOutbox?.() ?? [];
                             const events = dbg?.events?.() ?? [];
                             const hasTimeline = Boolean(

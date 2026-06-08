@@ -60,10 +60,20 @@ export type ChatDataMessageAckEnvelope = z.infer<
     typeof chatDataMessageAckEnvelopeSchema
 >;
 
+/** Hint peers to reload `mySpaces` after group membership changes on chain. */
+export const spaceMembershipHintEnvelopeSchema = z.object({
+    t: z.literal("spaceMembershipHint"),
+});
+
+export type SpaceMembershipHintEnvelope = z.infer<
+    typeof spaceMembershipHintEnvelopeSchema
+>;
+
 export type ChatDataWireEnvelope =
     | ChatDataMessageEnvelope
     | ChatHistorySyncEnvelope
-    | ChatDataMessageAckEnvelope;
+    | ChatDataMessageAckEnvelope
+    | SpaceMembershipHintEnvelope;
 
 export function serializeChatDataWireEnvelope(
     envelope: ChatDataWireEnvelope,
@@ -87,7 +97,9 @@ export function parseChatDataWireEnvelope(
         const asSync = chatHistorySyncEnvelopeSchema.safeParse(data);
         if (asSync.success) return asSync.data;
         const asAck = chatDataMessageAckEnvelopeSchema.safeParse(data);
-        return asAck.success ? asAck.data : null;
+        if (asAck.success) return asAck.data;
+        const asHint = spaceMembershipHintEnvelopeSchema.safeParse(data);
+        return asHint.success ? asHint.data : null;
     } catch {
         return null;
     }

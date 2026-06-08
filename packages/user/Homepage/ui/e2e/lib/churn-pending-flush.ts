@@ -1,33 +1,36 @@
 import type { Page } from "@playwright/test";
 
-import { gotoReliable } from "./churn-navigation";
 import {
-    bootstrapGroupMeshPeers,
-    chatUrlForPage,
     expectOutboundMessageDelivered,
     expectThreadMessage,
     focusChurnGroupThread,
-    groupSpaceIdFromPage,
-    openDmThread,
     resyncOnlineActorsToGroup,
-    waitForDmDataChannelReady,
-    waitForGroupMeshReady,
 } from "./chat-ui";
 import type {
     PendingLedger,
     PendingLedgerEntry,
 } from "./churn-pending-ledger";
 import {
+    ensureMeshForPendingEntry,
+    expectPendingBodyVisible,
+    flushPendingDmEntry,
+    type PendingFlushPages,
+} from "./pending-dm-delivery-helpers";
+import {
     actorAccount,
     groupPeersFor,
     type PartyActor,
 } from "./random-three-party-churn";
+import { prepareForPendingFlush } from "./pending-flush-prep";
 
-type ChurnPages = {
-    alice: Page;
-    bob: Page | null;
-    carol: Page | null;
-};
+export { FLUSH_ENTRY_BUDGET_MS } from "./pending-flush-constants";
+export {
+    ensureContactsForPendingFlush,
+    openChatForOfflineRejoinPendingFlush,
+    recipientHasDmSidebar,
+} from "./pending-dm-delivery-helpers";
+
+type ChurnPages = PendingFlushPages;
 
 const ACTORS: readonly PartyActor[] = ["alice", "bob", "carol"];
 
@@ -52,7 +55,7 @@ function perEntryMeshMs(totalMeshMs: number): number {
     return Math.min(totalMeshMs, 60_000);
 }
 
-/** Dump v2 transport + pending outbox from every online tab (for flush failures). */
+/** Dump transport + pending outbox from every online tab (for flush failures). */
 export async function dumpTransportDeliverySnapshot(
     pages: ChurnPages,
     online: Set<PartyActor>,
@@ -64,9 +67,9 @@ export async function dumpTransportDeliverySnapshot(
         try {
             const payload = await pageFor(who, pages).evaluate(
                 (peerAccounts) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 snapshot?: (remotes: string[]) => unknown;
                                 deliverySnapshot?: () => unknown;
                                 getOutbox?: () => unknown;
@@ -75,7 +78,7 @@ export async function dumpTransportDeliverySnapshot(
                                 started?: () => boolean;
                             };
                         }
-                    ).__chatTransportV2Debug;
+                    ).__chatTransportDebug;
                     const churn = (
                         window as unknown as {
                             __chatChurnState?: () => Record<string, unknown>;
@@ -93,25 +96,25 @@ export async function dumpTransportDeliverySnapshot(
                         url: location.href,
                         churn,
                         transport:
-                            v2?.snapshot?.(peerAccounts) ??
+                            transport?.snapshot?.(peerAccounts) ??
                             (v2
                                 ? {
-                                      started: v2.started?.(),
+                                      started: transport.started?.(),
                                       peers: peerAccounts.map((remote) => ({
                                           remote,
-                                          state: v2.peerState?.(remote),
+                                          state: transport.peerState?.(remote),
                                       })),
                                   }
                                 : null),
                         delivery:
-                            v2?.deliverySnapshot?.() ?? v2?.getOutbox?.() ?? null,
+                            transport?.deliverySnapshot?.() ?? transport?.getOutbox?.() ?? null,
                         routing:
-                            typeof v2?.routingSnapshot === "function"
-                                ? v2.routingSnapshot()
+                            typeof transport?.routingSnapshot === "function"
+                                ? transport.routingSnapshot()
                                 : null,
                         v2Events:
-                            typeof v2?.events === "function"
-                                ? v2.events()
+                            typeof transport?.events === "function"
+                                ? transport.events()
                                 : null,
                         chatDataEvents:
                             legacy?.events?.()?.slice(-40) ?? null,
@@ -129,125 +132,6 @@ export async function dumpTransportDeliverySnapshot(
             );
         }
     }
-}
-
-/**
- * Re-enable WebRTC on senders parked with `churnNoRealtime=1`. Recipients that
- * just rejoined already have realtime — avoid navigating them again.
- */
-export async function prepareForPendingFlush(
-    pages: ChurnPages,
-    online: Set<PartyActor>,
-    baseUrl: string,
-    names: { alice: string; bob: string; carol: string },
-    groupSpaceId: string,
-    entries: readonly PendingLedgerEntry[],
-): Promise<void> {
-    if (entries.length === 0) return;
-
-    const senders = new Set(entries.map((e) => e.from));
-    for (const who of senders) {
-        if (!online.has(who)) continue;
-        const page = pageFor(who, pages);
-        if (
-            new URL(page.url()).searchParams.get("churnNoRealtime") !== "1"
-        ) {
-            continue;
-        }
-        await focusChurnGroupThread(
-            page,
-            baseUrl,
-            groupPeersFor(who, names),
-            {
-                groupSpaceId,
-                churnNoRealtime: false,
-                composerTimeout: 45_000,
-                gotoTimeout: 25_000,
-            },
-        );
-    }
-}
-
-async function prepareFlushDelivery(
-    pending: readonly PendingLedgerEntry[],
-    who: PartyActor,
-    pages: ChurnPages,
-    online: Set<PartyActor>,
-    names: { alice: string; bob: string; carol: string },
-    baseUrl: string,
-    groupSpaceId: string,
-    meshTimeoutMs: number,
-): Promise<void> {
-    const pairs = new Map<string, PendingLedgerEntry>();
-    for (const entry of pending) {
-        if (!online.has(entry.from) || !online.has(entry.to)) continue;
-        pairs.set(`${entry.from}:${entry.to}:${entry.channel}`, entry);
-    }
-    for (const entry of pairs.values()) {
-        await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
-    }
-
-    const recipientPage = pageFor(who, pages);
-    const dmSenders = [
-        ...new Set(
-            pending
-                .filter((e) => e.channel === "dm" && online.has(e.from))
-                .map((e) => e.from),
-        ),
-    ];
-    for (const from of dmSenders) {
-        await openDmThread(recipientPage, baseUrl, actorAccount(from, names), {
-            groupSpaceId,
-        });
-    }
-    if (pending.some((e) => e.channel === "group")) {
-        await focusChurnGroupThread(
-            recipientPage,
-            baseUrl,
-            groupPeersFor(who, names),
-            {
-                groupSpaceId,
-                churnNoRealtime: false,
-                composerTimeout: 45_000,
-            },
-        );
-    }
-}
-
-async function ensureMeshForEntry(
-    entry: PendingLedgerEntry,
-    pages: ChurnPages,
-    online: Set<PartyActor>,
-    names: { alice: string; bob: string; carol: string },
-    meshTimeoutMs: number,
-): Promise<void> {
-    if (!online.has(entry.from) || !online.has(entry.to)) return;
-
-    const senderPage = pageFor(entry.from, pages);
-    const recipientPage = pageFor(entry.to, pages);
-    const senderName = actorAccount(entry.from, names);
-    const recipientName = actorAccount(entry.to, names);
-    const meshMs = perEntryMeshMs(meshTimeoutMs);
-
-    await bootstrapGroupMeshPeers(senderPage, [recipientName]);
-    await bootstrapGroupMeshPeers(recipientPage, [senderName]);
-
-    if (entry.channel === "dm") {
-        await waitForDmDataChannelReady(senderPage, recipientName, {
-            timeout: meshMs,
-        });
-        await waitForDmDataChannelReady(recipientPage, senderName, {
-            timeout: meshMs,
-        });
-        return;
-    }
-
-    await waitForGroupMeshReady(senderPage, [recipientName], {
-        timeout: meshMs,
-    });
-    await waitForGroupMeshReady(recipientPage, [senderName], {
-        timeout: meshMs,
-    });
 }
 
 export async function flushPendingCatchUp(
@@ -286,17 +170,6 @@ export async function flushPendingCatchUp(
         pending,
     );
 
-    await prepareFlushDelivery(
-        pending,
-        who,
-        pages,
-        online,
-        names,
-        baseUrl,
-        groupSpaceId,
-        meshTimeoutMs,
-    );
-
     for (const entry of pending) {
         console.log(
             `[random-churn] flush entry ${entry.channel} ${entry.from}->${entry.to} body=${entry.body}`,
@@ -310,7 +183,6 @@ export async function flushPendingCatchUp(
                 baseUrl,
                 groupSpaceId,
                 meshTimeoutMs,
-                { meshPrepared: true },
             );
             ledger.remove(entry);
         } catch (err) {
@@ -333,36 +205,6 @@ export async function flushPendingCatchUp(
     );
 }
 
-/** Pending flush may deliver via group outbox while the active thread is DM — try both. */
-async function expectPendingBodyVisible(
-    recipientPage: Page,
-    baseUrl: string,
-    body: string,
-    peerAccount: string,
-    groupSpaceId: string,
-    groupPeers: string[],
-    timeoutMs: number,
-): Promise<void> {
-    try {
-        await expectThreadMessage(recipientPage, body, { timeout: 4_000 });
-        return;
-    } catch {
-        /* not on the delivering thread yet */
-    }
-    await openDmThread(recipientPage, baseUrl, peerAccount, { groupSpaceId });
-    try {
-        await expectThreadMessage(recipientPage, body, { timeout: 8_000 });
-        return;
-    } catch {
-        await focusChurnGroupThread(recipientPage, baseUrl, groupPeers, {
-            groupSpaceId,
-            churnNoRealtime: false,
-            composerTimeout: 45_000,
-        });
-        await expectThreadMessage(recipientPage, body, { timeout: timeoutMs });
-    }
-}
-
 async function flushPendingEntry(
     entry: PendingLedgerEntry,
     pages: ChurnPages,
@@ -371,53 +213,50 @@ async function flushPendingEntry(
     baseUrl: string,
     groupSpaceId: string,
     meshTimeoutMs: number,
-    options?: { meshPrepared?: boolean },
 ): Promise<void> {
     const senderPage = pageFor(entry.from, pages);
-    const recipientPage = pageFor(entry.to, pages);
-    const senderName = actorAccount(entry.from, names);
     const assertMs = perEntryMeshMs(meshTimeoutMs);
 
+    await ensureMeshForPendingEntry(
+        entry,
+        pages,
+        online,
+        names,
+        meshTimeoutMs,
+    );
+
     if (entry.channel === "dm") {
-        if (!options?.meshPrepared) {
-            const urlSpace = groupSpaceIdFromPage(senderPage);
-            if (urlSpace === groupSpaceId) {
-                await gotoReliable(
-                    senderPage,
-                    chatUrlForPage(senderPage, baseUrl),
-                    {
-                        timeout: 25_000,
-                        waitUntil: "domcontentloaded",
-                        maxAttempts: 2,
-                    },
-                );
-            }
-            await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
-        }
-        await expectPendingBodyVisible(
-            recipientPage,
+        await flushPendingDmEntry({
+            entry,
+            pages,
+            names,
             baseUrl,
-            entry.body,
-            senderName,
             groupSpaceId,
-            groupPeersFor(entry.to, names),
-            assertMs,
-        );
+            meshTimeoutMs,
+        });
         return;
     }
 
-    if (!options?.meshPrepared) {
-        await ensureMeshForEntry(entry, pages, online, names, meshTimeoutMs);
-        await focusChurnGroupThread(
-            recipientPage,
-            baseUrl,
-            groupPeersFor(entry.to, names),
-            { groupSpaceId, churnNoRealtime: false, composerTimeout: 45_000 },
-        );
-    }
-    await expectThreadMessage(recipientPage, entry.body, {
-        timeout: assertMs,
-    });
+    const recipientPage = pageFor(entry.to, pages);
+    await focusChurnGroupThread(
+        recipientPage,
+        baseUrl,
+        groupPeersFor(entry.to, names),
+        {
+            groupSpaceId,
+            churnNoRealtime: false,
+            composerTimeout: 45_000,
+        },
+    );
+    await expectPendingBodyVisible(
+        recipientPage,
+        baseUrl,
+        entry.body,
+        actorAccount(entry.from, names),
+        groupSpaceId,
+        groupPeersFor(entry.to, names),
+        assertMs,
+    );
 
     const groupRecipients = ACTORS.filter((a) => a !== entry.from);
     const allRecipientsOnline = groupRecipients.every((a) => online.has(a));
@@ -433,6 +272,3 @@ async function flushPendingEntry(
         });
     }
 }
-
-/** Extra wall-clock budget per pending ledger entry during offline rejoin flush. */
-export const FLUSH_ENTRY_BUDGET_MS = 60_000;

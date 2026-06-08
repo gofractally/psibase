@@ -32,7 +32,7 @@ This **does not** reduce group to a single connection total (mesh still needs N�
 | **PC health**          | **No periodic timers**; assume good while `usable`. On send/ACK failure → **ping-pong** on data channel; if bad → `suspected_dead`, messaging returns affected msgs to outbox            |
 | **Pending flush**      | **Event-driven only** (peer `usable`, recipient `presenceOnline`, outbox enqueue, WS `ready`) — **no** `ensureDm` / 3s background throttle                                               |
 | **Meet**               | **Same PC per remote** as chat; media = `addTrack` on that PC (see [Meet](#meet-same-pc-recommendation))                                                                                 |
-| **Migration**          | **No interim** Space-run patches (P1/P2/P3); build v2 stack                                                                                                                              |
+| **Migration**          | **No interim** Space-run patches (P1/P2/P3); build transport stack                                                                                                                              |
 | **Multi-tab**          | **One peer map per tab** (see [Multi-tab](#multi-tab-one-map-per-tab))                                                                                                                   |
 
 
@@ -209,6 +209,8 @@ interface PairSignaling {
 
 Pair roster replaces per-Space `sessionSnapshot` for **transport**; Space membership for **authorization** stays on objective/Spaces (L4 validates envelopes).
 
+**Roster renegotiation:** `RosterRenegotiationCoordinator` owns roster-driven renegotiation (`presence_online`, `peer_joined`, `roster_kick`, `joinsIdle(completedPairId)`). It debounces per-remote notifications (~150ms), reads L3 roster snapshots, and chooses `ensure`, `resendOffer`, `retriggerHandshake`, or recovery — instead of fanning `kickNegotiation` from multiple stack/bridge call sites. `kickNegotiation` remains an internal L3 escape hatch; polite peers already joined on L2 never re-`joinPair` from a kick.
+
 ### L3 — `PeerTransportRegistry`
 
 ```typescript
@@ -265,12 +267,12 @@ interface MessagingService {
 
 ### Composition — `stack` and `bridge`
 
-L1–L4 are **library modules** under `transport-v2/`. Two higher-level pieces wire them for Chat:
+L1–L4 are **library modules** under `transport/`. Two higher-level pieces wire them for Chat:
 
 | Piece | File | Role |
 | ----- | ---- | ---- |
-| **Stack** | `transport-v2/stack.ts` | **Composition root** — constructs L1–L4, connects cross-layer events, routes pair `sessionSnapshot` / `signal` frames to the correct peer PC |
-| **Bridge** | `transport-v2/chat-transport-bridge.ts` | **Chat adapter** — replaces `ChatDataSessionOrchestrator`; owned by `use-chat-socket.ts` via `createChatTransportBridge()` |
+| **Stack** | `transport/stack.ts` | **Composition root** — constructs L1–L4, connects cross-layer events, routes pair `sessionSnapshot` / `signal` frames to the correct peer PC |
+| **Bridge** | `transport/chat-transport-bridge.ts` | **Chat adapter** — replaces `ChatDataSessionOrchestrator`; owned by `use-chat-socket.ts` via `createChatTransportBridge()` |
 
 ```text
 use-chat-socket.ts
@@ -360,9 +362,9 @@ class ChatTransportBridge {
 - **Navigation** — `suspendForNavigation` blocks new `ensurePeer`; `resumeAfterNavigation` re-hydrates outbox.
 - **Debug** — exposes `window.__chatMessagingDebug` (`getOutbox`, `getPeerMap`, `getMessaging`) for e2e.
 
-**Hook entry:** `hooks/chat/use-chat-orchestrator.ts` exports `createChatTransportBridge()` (alias `createChatDataOrchestratorBridge` for transitional imports).
+**Hook entry:** `hooks/chat/use-chat-orchestrator.ts` exports `createChatTransportBridge()`.
 
-#### `transport-v2/` module map
+#### `transport/` module map
 
 | File | Layer |
 | ---- | ----- |
@@ -543,7 +545,7 @@ Not a transport primitive. A **pending-flush plan action** from `planPendingFlus
 
 So “ensureDm” really means **“nudge the whole Space stack so maybe the data channel becomes ready.”** In the target design this becomes `**peerMap.ensure(recipient)`** + **outbox flush**, not Space FSM negotiation.
 
-### Background DM **throttling** (H28) — **deprecated in v2**
+### Background DM **throttling** (H28) — **removed**
 
 When the **focused** conversation is a **group**, `shouldThrottleBackgroundDmEnsure` blocks `**ensureDm`** for **other** DM Spaces unless forced — at most one nudge per `**lastMeshNudgeMs`** (default **3s**). This is **timer-based policy** replacing what should be **events** (`peer:usable`, `presence:online`). **Not carried forward.**
 
@@ -704,7 +706,14 @@ stateDiagram-v2
 
 ## Persistence: unified outbox
 
-**Decision:** one **durable outbox** in **chain-scoped localStorage** (existing Homepage pattern: `chainScopedStorageKey` in `chat-chain-storage.ts`, same seam as `pending-message-store.ts`). **No separate history-sync persistence step** for unsent messages — the outbox **is** the source of truth across reload, tab crash, and browser kill.
+**Decision:** one **durable client seam** via `chat-durable-store.ts` (`chainScopedStorageKey` + JSON read/write). **No separate history-sync persistence step** for unsent messages — the outbox **is** the source of truth across reload, tab crash, and browser kill.
+
+| Queue / store | Module | Purpose |
+|---------------|--------|---------|
+| Outbound messages | `pending-message-store.ts` | L4 outbox rows (`PENDING` / `FAILED`) |
+| Inbound ack backlog | `pending-ack-store.ts` | Wire `messageAck` targets not yet sent |
+| Inbound acceptance deferral | `inbound-acceptance-queue.ts` | Messages received before contacts load; flushed → `acknowledgeInbound` |
+| History-sync push retry | `history-sync-push-queue.ts` | Failed `chatHistorySync` pushes; drained on `peer:usable` |
 
 **On `send()`:** write row immediately (status `PENDING`, `attempts`, `lastAttemptAt`, optional `expireAfter`, `spaceUuid`, `recipients`, body). UI thread history view reads from the same store (sent + pending rows) or a derived index — avoid a second write path that can diverge.
 
@@ -928,10 +937,10 @@ Still **one tab ↔ one peer map** (or explicit leader-tab election). Second tab
 
 ---
 
-## Migration sketch (v2 — no dual-write)
+## Migration sketch (transport — no dual-write)
 
 1. **Server:** pair session ids + signal fanout per pair (`wrtc:pair:lower:higher`; see `sessions.rs`).
-2. **Client:** implement L1–L4 under `transport-v2/`; **`createChatTransportStack`** wires layers; **`ChatTransportBridge`** adapts for `use-chat-socket.ts` (calls `MessagingService` for send/receive).
+2. **Client:** implement L1–L4 under `transport/`; **`createChatTransportStack`** wires layers; **`ChatTransportBridge`** adapts for `use-chat-socket.ts` (calls `MessagingService` for send/receive).
 3. **Delete** Space-run transport FSM, `ensureDm`/`ensureGroup` flush path, H28 throttle. *(Done.)*
 4. Wire e2e delivery-gate against `MessagingService` + events.
 5. Meet: migrate to track add/remove on existing pair PC. *(Done — `SharedMeetPeer` + `ChatDataWebRtcPeer.startMeetMedia`.)*
@@ -960,12 +969,12 @@ Still **one tab ↔ one peer map** (or explicit leader-tab election). Second tab
 - **Pair id:** canonical lex ordering of account names
 - `lastUsedAt`: send + receive + focus
 - Meet on same PC (tracks on existing pair) — aligned
-- Big-bang v2, no interim P1/P2/P3
+- Big-bang transport, no interim P1/P2/P3
 - **v1 single tab** — no multi-tab design
 - Event-driven flush; no `ensureDm` throttle
 - Layers async via Promises/events; `send()` fast after persist
 - **`IDLE_TTL`:** 5 min; **max warm:** 10 LRU
-- **Implementation:** `transport-v2/stack.ts` (composition), `transport-v2/chat-transport-bridge.ts` (Chat hook adapter)
+- **Implementation:** `transport/stack.ts` (composition), `transport/chat-transport-bridge.ts` (Chat hook adapter)
 
 ---
 
@@ -985,7 +994,7 @@ Still **one tab ↔ one peer map** (or explicit leader-tab election). Second tab
 | **O3**  | Group, all online                         | Every member’s thread shows the message; order by send time                                             |
 | **O4**  | Group, one member offline                 | Online members receive; offline member receives on rejoin (pending + history)                           |
 | **O5**  | Nav out of Chat and back                  | Prior messages still visible; new sends work; outbox drains                                             |
-| **O6**  | DM + group same session (no leave Chat)   | No lost pending; same contact not double-negotiated (v2: one PC per pair)                               |
+| **O6**  | DM + group same session (no leave Chat)   | No lost pending; same contact not double-negotiated (one PC per pair)                               |
 | **O7**  | Background DM pending while group focused | DM pending delivers when peer returns (matrix scenario)                                                 |
 | **O8**  | Late joiner group                         | New member sees history sent while they were away (after online)                                        |
 | **O9**  | Tab reload / crash recovery               | Durable outbox survives; pending messages deliver after reload                                          |
@@ -1023,7 +1032,7 @@ Each outcome is **independently assertable** in Playwright via `expectThreadMess
 
 ### Track A — Unit & integration (Vitest, no chain)
 
-**Run:** `yarn vitest run src/apps/chat/lib` (+ new `src/apps/chat/transport-v2/` modules).
+**Run:** `yarn vitest run src/apps/chat/lib` (+ new `src/apps/chat/transport/` modules).
 
 
 | Module                | What to test                                                                                                                                                         |
@@ -1061,8 +1070,8 @@ Use **fake timers** only for in-flight ACK wait tests, not for retry scheduling.
 **Scripts (to add):**
 
 ```bash
-yarn e2e:churn:v2:fast      # 1×30 steps, strict fail-fast, ~3–8 min
-yarn e2e:churn:v2:stress    # 30 steps, collect all failures, CI nightly optional
+yarn e2e:random-churn:mesh      # 1×30 steps, strict fail-fast, ~3–8 min
+yarn e2e:random-churn:stress    # 30 steps, collect all failures, CI nightly optional
 ```
 
 **Pass:** zero step failures; no “Reconnecting…” stuck; no duplicate inbound text.
@@ -1090,7 +1099,7 @@ yarn e2e:churn:v2:stress    # 30 steps, collect all failures, CI nightly optiona
 
 
 ```bash
-yarn e2e:delivery-gate:v2   # Track C, 1 worker, serial
+yarn e2e:delivery-gate   # Track C, 1 worker, serial
 ```
 
 **Timing:** generous Playwright timeouts (120–240s per assertion where ICE needed); **no** artificial 3s throttle — waits are `expectThreadMessage` / `waitForPendingCleared` predicates.
@@ -1107,9 +1116,9 @@ yarn e2e:delivery-gate:v2   # Track C, 1 worker, serial
 
 | Gate               | Command                                 | Required on PR               |
 | ------------------ | --------------------------------------- | ---------------------------- |
-| Unit + integration | `yarn vitest run` (chat + transport-v2) | **Yes**                      |
-| Fast churn         | `yarn e2e:churn:v2:fast`                | **Yes** (after v2 bootstrap) |
-| Delivery gate      | `yarn e2e:delivery-gate:v2`             | **Yes**                      |
+| Unit + integration | `yarn vitest run` (chat + transport) | **Yes**                      |
+| Fast churn         | `yarn e2e:random-churn:mesh`                | **Yes** (after transport bootstrap) |
+| Delivery gate      | `yarn e2e:delivery-gate`             | **Yes**                      |
 | Stress churn 10×   | `PSIBASE_E2E_RANDOM_CHURN_RUNS=10`      | Nightly / pre-release        |
 
 

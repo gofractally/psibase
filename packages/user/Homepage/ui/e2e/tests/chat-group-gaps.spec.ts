@@ -59,10 +59,12 @@ test.describe("Chat group coverage gaps", () => {
                 party.bobAccount.name,
                 party.carolAccount.name,
             ]);
-            await sendChatMessage(alicePage, "queued before peers opened group");
+            const queuedBody = "queued before peers opened group";
+            await sendChatMessage(alicePage, queuedBody);
+            await expectThreadMessage(alicePage, queuedBody);
             await expectPendingOutboundMessage(
                 alicePage,
-                "queued before peers opened group",
+                queuedBody,
             );
 
             await openExistingGroupChat(party.bobPage, chain.baseUrl, [
@@ -76,19 +78,22 @@ test.describe("Chat group coverage gaps", () => {
 
             await expectThreadMessage(
                 party.bobPage,
-                "queued before peers opened group",
+                queuedBody,
                 { timeout: 180_000 },
             );
+            await expectThreadMessage(alicePage, queuedBody);
             await expectThreadMessage(
                 party.carolPage,
-                "queued before peers opened group",
+                queuedBody,
                 { timeout: 180_000 },
             );
+            await expectThreadMessage(alicePage, queuedBody);
             await expectOutboundMessageDelivered(
                 alicePage,
-                "queued before peers opened group",
+                queuedBody,
                 { timeout: 180_000 },
             );
+            await expectThreadMessage(alicePage, queuedBody);
         } finally {
             await party.cleanup();
         }

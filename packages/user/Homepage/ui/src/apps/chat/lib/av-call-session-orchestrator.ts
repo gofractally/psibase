@@ -55,7 +55,7 @@ import {
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
-import type { PeerTransportRegistry } from "../transport-v2/l3-peer-registry";
+import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 export type {
     AvCallIncomingInvite,

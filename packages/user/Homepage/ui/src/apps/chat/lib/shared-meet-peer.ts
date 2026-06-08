@@ -1,6 +1,6 @@
 import type { ChatDataWebRtcPeer } from "./chat-data-webrtc-peer";
 import type { MeetPeerHandle } from "./meet-peer-handle";
-import type { PeerTransportRegistry } from "../transport-v2/l3-peer-registry";
+import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 export type SharedMeetPeerOptions = {
     remoteAccount: string;

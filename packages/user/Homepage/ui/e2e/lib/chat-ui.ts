@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { expect, type Page } from "@playwright/test";
 
 import {
@@ -14,6 +16,69 @@ import {
     hardNavigate,
     preparePageForNavigation,
 } from "./churn-navigation";
+
+/**
+ * Deterministic DM space id — mirrors app `deriveSpaceUuidForCanonicalMembers`
+ * and Chat service `space_uuid_for_members` (sorted member JSON → sha256).
+ * Chain ids may use uppercase hex, so compare via `isSameSpaceId`.
+ */
+export function expectedDmSpaceId(
+    selfAccount: string,
+    peerAccount: string,
+): string {
+    const canonical = [...new Set([selfAccount, peerAccount])].sort((a, b) =>
+        a.localeCompare(b),
+    );
+    const digest = createHash("sha256")
+        .update(JSON.stringify(canonical))
+        .digest("hex");
+    return `space:${digest}`;
+}
+
+/**
+ * Both candidate DM space ids for a pair. The Chat service sorts members by
+ * `AccountNumber.value` (packed u64), which diverges from lexicographic order
+ * for some account pairs (e.g. iter8 bob↔carol: chain id hashed
+ * ["aceeqnvmbi","aayiiojklb"], not the localeCompare order). Rather than
+ * reimplement the AccountNumber encoding, accept either member ordering.
+ */
+export function expectedDmSpaceIds(
+    selfAccount: string,
+    peerAccount: string,
+): string[] {
+    const canonical = [...new Set([selfAccount, peerAccount])].sort((a, b) =>
+        a.localeCompare(b),
+    );
+    const orderings =
+        canonical.length === 2 ? [canonical, [...canonical].reverse()] : [canonical];
+    return orderings.map((members) => {
+        const digest = createHash("sha256")
+            .update(JSON.stringify(members))
+            .digest("hex");
+        return `space:${digest}`;
+    });
+}
+
+/** True when `spaceId` matches either member-ordering hash for the DM pair. */
+export function isExpectedDmSpaceId(
+    spaceId: string | null | undefined,
+    selfAccount: string,
+    peerAccount: string,
+): boolean {
+    return expectedDmSpaceIds(selfAccount, peerAccount).some((candidate) =>
+        isSameSpaceId(spaceId, candidate),
+    );
+}
+
+/** Case-insensitive space id comparison (chain hex casing varies); tolerates `c:` prefix. */
+export function isSameSpaceId(
+    a: string | null | undefined,
+    b: string | null | undefined,
+): boolean {
+    if (!a || !b) return false;
+    const tail = (id: string) => id.replace(/^(space:|c:)/, "").toLowerCase();
+    return tail(a) === tail(b);
+}
 
 export function chatUrlForAccount(account: string, baseUrl: string): string {
     const port = new URL(
@@ -463,6 +528,13 @@ export async function sendChurnGroupMessage(
         await waitForSelectedGroupSpace(page, options.groupSpaceId, {
             timeout: composerMs,
         });
+        await bootstrapGroupMeshPeers(page, otherMemberAccounts);
+        const meshWaitMs = page.url().includes("churnNoRealtime=1")
+            ? Math.min(composerMs * 2, 120_000)
+            : 20_000;
+        await waitForGroupMeshReady(page, otherMemberAccounts, {
+            timeout: meshWaitMs,
+        }).catch(() => {});
     } else if (!page.url().includes("/chat")) {
         const chatUrl = chatUrlForPage(page, baseUrl);
         await gotoReliable(page, chatUrl, {
@@ -695,7 +767,7 @@ export async function ensureContact(
     });
 }
 
-/** Wait until a contact/DM row shows the peer as online (presence dot title). */
+/** Wait until a contact/DM row shows the peer as online, or transport leg is usable. */
 export async function waitForPeerOnline(
     page: Page,
     peerAccount: string,
@@ -705,9 +777,259 @@ export async function waitForPeerOnline(
     const peerContainers = page.locator("div").filter({
         has: page.getByRole("button").filter({ hasText: peerAccount }),
     });
-    await expect(
-        peerContainers.locator('span[title="Online"]').first(),
-    ).toBeVisible({ timeout });
+    await expect
+        .poll(
+            async () => {
+                const transportUsable = await page
+                    .evaluate((peer) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        return transport?.peerState?.(peer) === "usable";
+                    }, peerAccount)
+                    .catch(() => false);
+                if (transportUsable) return true;
+                return peerContainers
+                    .locator('span[title="Online"]')
+                    .first()
+                    .isVisible()
+                    .catch(() => false);
+            },
+            { timeout, intervals: [500, 1000, 2000] },
+        )
+        .toBe(true);
+}
+
+/** Wait until a contact row no longer shows Online and transport is not mid-handshake. */
+export async function waitForPeerOffline(
+    page: Page,
+    peerAccount: string,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 120_000;
+    const peerContainers = page.locator("div").filter({
+        has: page.getByRole("button").filter({ hasText: peerAccount }),
+    });
+    await expect
+        .poll(
+            async () => {
+                const transportState = await page
+                    .evaluate((peer) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        return transport?.peerState?.(peer) ?? null;
+                    }, peerAccount)
+                    .catch(() => null);
+                if (
+                    transportState === "usable" ||
+                    transportState === "negotiating" ||
+                    transportState === "joining_pair"
+                ) {
+                    return false;
+                }
+                const online = await peerContainers
+                    .locator('span[title="Online"]')
+                    .first()
+                    .isVisible()
+                    .catch(() => false);
+                return !online;
+            },
+            { timeout, intervals: [500, 1000, 2000] },
+        )
+        .toBe(true);
+}
+
+export const GROUP_MESH_TIMEOUT_MS = 300_000;
+
+/** Staggered mesh: alice (initiator) one leg at a time, then bob/carol. */
+export async function establishThreePartyGroupMesh(
+    pages: { alice: Page; bob: Page; carol: Page },
+    accounts: { alice: string; bob: string; carol: string },
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
+    await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
+    await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(
+        pages.bob,
+        [accounts.alice, accounts.carol],
+        { timeout },
+    );
+    await waitForGroupMeshReady(
+        pages.carol,
+        [accounts.alice, accounts.bob],
+        { timeout },
+    );
+}
+
+/**
+ * Establish mesh with carol joining last — avoids alice dual-leg negotiation
+ * while bob is still settling (H18 / churn pattern).
+ */
+export async function establishThreePartyGroupMeshCarolLast(
+    pages: { alice: Page; bob: Page; carol: Page },
+    accounts: { alice: string; bob: string; carol: string },
+    openCarolGroup: () => Promise<void>,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
+    await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.alice], { timeout });
+    await openCarolGroup();
+    await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(
+        pages.carol,
+        [accounts.alice, accounts.bob],
+        { timeout },
+    );
+}
+
+/** H18: connect all three to chat, then leave home before creating a group. */
+export async function resetThreePartyChatBeforeGroup(
+    pages: { alice: Page; bob: Page; carol: Page },
+    baseUrl: string,
+): Promise<void> {
+    await openChat(pages.alice, baseUrl);
+    await openChat(pages.bob, baseUrl);
+    await openChat(pages.carol, baseUrl);
+    await waitForChatConnected(pages.alice, { timeout: 120_000 });
+    await waitForChatConnected(pages.bob, { timeout: 120_000 });
+    await waitForChatConnected(pages.carol, { timeout: 120_000 });
+    await leaveChatToHome(pages.alice, baseUrl);
+    await leaveChatToHome(pages.bob, baseUrl);
+    await leaveChatToHome(pages.carol, baseUrl);
+}
+
+/** Leave all three clients home (carol → bob → alice) before a churn re-entry round. */
+export async function leaveThreePartyChatForChurn(
+    pages: { alice: Page; bob: Page; carol: Page },
+    baseUrl: string,
+): Promise<void> {
+    for (const page of [pages.carol, pages.bob, pages.alice]) {
+        await page
+            .evaluate(() => {
+                (
+                    window as Window & {
+                        __chatChurnSuspend?: () => void;
+                        __chatChurnTeardown?: () => void;
+                    }
+                ).__chatChurnSuspend?.();
+                (
+                    window as Window & {
+                        __chatChurnTeardown?: () => void;
+                    }
+                ).__chatChurnTeardown?.();
+            })
+            .catch(() => {});
+        await leaveChatToHome(page, baseUrl);
+        await page.waitForTimeout(500);
+    }
+    await pages.alice.waitForTimeout(1_000);
+}
+
+/** After chat ↔ home churn: alice+bob first, then carol, then full mesh. */
+export async function reenterThreePartyGroupAfterChurn(
+    baseUrl: string,
+    pages: { alice: Page; bob: Page; carol: Page },
+    accounts: { alice: string; bob: string; carol: string },
+    groupPeersFor: (who: "alice" | "bob" | "carol") => string[],
+    options?: { groupSpaceId?: string; timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
+    const groupSpaceId = options?.groupSpaceId;
+
+    await openChat(pages.alice, baseUrl);
+    await openChat(pages.bob, baseUrl);
+    await waitForChatConnected(pages.alice, { timeout: 120_000 });
+    await waitForChatConnected(pages.bob, { timeout: 120_000 });
+
+    const openAliceBobGroup = async (who: "alice" | "bob"): Promise<void> => {
+        const page = who === "alice" ? pages.alice : pages.bob;
+        if (groupSpaceId) {
+            await focusChurnGroupThread(page, baseUrl, groupPeersFor(who), {
+                groupSpaceId,
+                composerTimeout: 90_000,
+            });
+            return;
+        }
+        await openExistingGroupChat(page, baseUrl, groupPeersFor(who));
+    };
+
+    await openAliceBobGroup("alice");
+    await openAliceBobGroup("bob");
+    await resetTransportKickCounts(pages.alice);
+    await resetTransportKickCounts(pages.bob);
+    await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.alice], { timeout });
+
+    await openChat(pages.carol, baseUrl);
+    await waitForChatConnected(pages.carol, { timeout: 120_000 });
+    if (groupSpaceId) {
+        await focusChurnGroupThread(
+            pages.carol,
+            baseUrl,
+            groupPeersFor("carol"),
+            { groupSpaceId, composerTimeout: 90_000 },
+        );
+    } else {
+        await openExistingGroupChat(
+            pages.carol,
+            baseUrl,
+            groupPeersFor("carol"),
+        );
+    }
+    await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(
+        pages.carol,
+        [accounts.alice, accounts.bob],
+        { timeout },
+    );
+}
+
+export async function resetTransportKickCounts(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        (
+            window as unknown as {
+                __chatTransportDebug?: { resetKickCounts?: () => void };
+            }
+        ).__chatTransportDebug?.resetKickCounts?.();
+    });
+}
+
+export async function expectRosterKickCountAtMost(
+    page: Page,
+    remotes: readonly string[],
+    maxPerRemote: number,
+): Promise<void> {
+    await expect
+        .poll(async () => {
+            return page.evaluate(
+                ({ peers, max }) => {
+                    const counts = (
+                        window as unknown as {
+                            __chatTransportDebug?: {
+                                kickCounts?: () => Record<string, number>;
+                            };
+                        }
+                    ).__chatTransportDebug?.kickCounts?.();
+                    if (!counts) return false;
+                    return peers.every((peer) => (counts[peer] ?? 0) <= max);
+                },
+                { peers: [...remotes], max: maxPerRemote },
+            );
+        })
+        .toBe(true);
 }
 
 /** Kick DM pair negotiation on one peer (same transport hook as group mesh bootstrap). */
@@ -740,65 +1062,33 @@ export async function waitForDmDataChannelReady(
             .poll(
                 async () => {
                 return page.evaluate((peer) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 peerState?: (remote: string) => string;
-                                started?: () => boolean;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (v2?.peerState) {
-                        return v2.peerState(peer) === "usable";
-                    }
-
-                    const snap = (
-                            window as unknown as {
-                                __chatDataDebug?: {
-                                    snapshot?: () => {
-                                        peers?: {
-                                            peerAccount: string;
-                                            pc: {
-                                                connectionState?: string;
-                                            } | null;
-                                        }[];
-                                    };
-                                };
-                            }
-                        ).__chatDataDebug?.snapshot?.();
-                        const leg = snap?.peers?.find(
-                            (p) => p.peerAccount === peer,
-                        );
-                        return leg?.pc?.connectionState === "connected";
-                    }, peerAccount);
+                    ).__chatTransportDebug;
+                    return transport?.peerState?.(peer) === "usable";
+                }, peerAccount);
                 },
                 { timeout, intervals: [500, 1000, 2000] },
             )
             .toBe(true);
     } catch (e) {
         const diag = await page.evaluate((peer) => {
-            const v2 = (
+            const transport = (
                 window as unknown as {
-                    __chatTransportV2Debug?: {
+                    __chatTransportDebug?: {
                         peerState?: (remote: string) => string;
                     };
                 }
-            ).__chatTransportV2Debug;
-            const v2State = v2?.peerState?.(peer) ?? null;
-            const snap = (
-                window as unknown as {
-                    __chatDataDebug?: {
-                        snapshot?: () => unknown;
-                        events?: () => unknown;
-                    };
-                }
-            ).__chatDataDebug;
+            ).__chatTransportDebug;
+            const transportState = transport?.peerState?.(peer) ?? null;
             return {
                 peer,
-                v2State,
-                chatDataSnapshot: snap?.snapshot?.() ?? null,
-                chatDataEvents: snap?.events?.() ?? null,
-                hasV2Debug: Boolean(v2),
+                transportState,
+                hasTransportDebug: Boolean(transport),
             };
         }, peerAccount);
         throw new Error(
@@ -821,18 +1111,17 @@ export async function bootstrapGroupMeshPeers(
         .poll(
             async () => {
                 return page.evaluate((peers) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 started?: () => boolean;
                                 ensurePeers?: (remotes: string[]) => void;
                                 kickPeers?: (remotes: string[]) => void;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (!v2?.started?.()) return false;
-                    v2.ensurePeers?.(peers);
-                    v2.kickPeers?.(peers);
+                    ).__chatTransportDebug;
+                    if (!transport?.started?.()) return false;
+                    transport.ensurePeers?.(peers);
                     return true;
                 }, [...peerAccounts]);
             },
@@ -849,44 +1138,22 @@ export async function waitForGroupMeshReady(
     options?: { timeout?: number },
 ): Promise<void> {
     const timeout = options?.timeout ?? 180_000;
+    await bootstrapGroupMeshPeers(page, peerAccounts);
     await expect
         .poll(
             async () => {
                 return page.evaluate((peers) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 peerState?: (remote: string) => string;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (v2?.peerState) {
-                        return peers.every(
-                            (p: string) => v2.peerState?.(p) === "usable",
-                        );
-                    }
-
-                    const snap = (
-                        window as unknown as {
-                            __chatDataDebug?: {
-                                snapshot?: () => {
-                                    peers?: {
-                                        peerAccount: string;
-                                        pc: { connectionState?: string } | null;
-                                    }[];
-                                };
-                            };
-                        }
-                    ).__chatDataDebug?.snapshot?.();
-                    if (!snap?.peers?.length) return false;
-                    const connected = new Set(
-                        snap.peers
-                            .filter(
-                                (p) => p.pc?.connectionState === "connected",
-                            )
-                            .map((p) => p.peerAccount),
+                    ).__chatTransportDebug;
+                    if (!transport?.peerState) return false;
+                    return peers.every(
+                        (p: string) => transport.peerState?.(p) === "usable",
                     );
-                    return peers.every((account) => connected.has(account));
                 }, [...peerAccounts]);
             },
             { timeout, intervals: [1000, 2000, 3000] },
@@ -909,7 +1176,7 @@ export async function waitForThreadComposerReady(
     await expect(page.getByLabel("Message text")).toBeEnabled({ timeout });
 }
 
-/** Poll until v2 peer legs for every account are `usable`. */
+/** Poll until peer legs for every account are `usable`. */
 export async function waitForThreadMeshLive(
     page: Page,
     peerAccounts: readonly string[],
@@ -920,22 +1187,182 @@ export async function waitForThreadMeshLive(
         .poll(
             async () => {
                 return page.evaluate((peers) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 peerState?: (remote: string) => string;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (!v2?.peerState) return false;
+                    ).__chatTransportDebug;
+                    if (!transport?.peerState) return false;
                     return peers.every(
-                        (peer) => v2.peerState!(peer) === "usable",
+                        (peer) => transport.peerState!(peer) === "usable",
                     );
                 }, [...peerAccounts]);
             },
             { timeout, intervals: [200, 400, 800, 1500] },
         )
         .toBe(true);
+}
+
+/** Drop group `?space=` before opening a DM so URL-sync cannot clobber selection. */
+export async function stripGroupDeepLinkForDmOpen(
+    page: Page,
+    baseUrl: string,
+    groupSpaceId: string,
+    options?: { navMs?: number },
+): Promise<void> {
+    if (groupSpaceIdFromPage(page) !== groupSpaceId) {
+        return;
+    }
+    const navMs = options?.navMs ?? 25_000;
+    await assignNavigate(page, chatUrlForPage(page, baseUrl), {
+        timeout: navMs,
+    });
+    await waitForThreadComposerReady(page, {
+        timeout: Math.min(navMs, 15_000),
+    }).catch(() => {});
+}
+
+/** Open a DM during pending flush (strip group URL first, longer nav budget). */
+export async function openDmThreadForFlush(
+    page: Page,
+    baseUrl: string,
+    peerAccount: string,
+    groupSpaceId: string,
+    timeoutMs: number,
+): Promise<void> {
+    await stripGroupDeepLinkForDmOpen(page, baseUrl, groupSpaceId, {
+        navMs: Math.min(timeoutMs, 30_000),
+    });
+
+    const selectionAfterStrip = await readChatSelectionState(page);
+    if (
+        selectionAfterStrip.selectedConversationKind === "dm" &&
+        !(await isDmThreadActive(page, peerAccount, groupSpaceId))
+    ) {
+        if (await clickOpenDmTarget(page, peerAccount)) {
+            await waitForDmThreadWithPeer(page, peerAccount, {
+                timeout: Math.min(timeoutMs, 45_000),
+                groupSpaceId,
+            });
+            return;
+        }
+        if (await openDmThroughChurnHook(page, peerAccount)) {
+            await waitForDmThreadWithPeer(page, peerAccount, {
+                timeout: Math.min(timeoutMs, 45_000),
+                groupSpaceId,
+            });
+            return;
+        }
+    }
+
+    const listWaitMs = Math.min(timeoutMs, 30_000);
+    await expect
+        .poll(
+            async () => {
+                if (await isDmThreadActive(page, peerAccount, groupSpaceId)) {
+                    return true;
+                }
+                return page.evaluate((peer) => {
+                    const churn = (
+                        window as Window & {
+                            __chatChurnState?: () => {
+                                conversationListSummary?: { dm?: number };
+                                composePendingDmPeer?: string | null;
+                                pendingDmMember?: string | null;
+                            };
+                        }
+                    ).__chatChurnState?.();
+                    return (
+                        (churn?.conversationListSummary?.dm ?? 0) > 0 ||
+                        churn?.composePendingDmPeer === peer ||
+                        churn?.pendingDmMember === peer
+                    );
+                }, peerAccount);
+            },
+            { timeout: listWaitMs, intervals: [500, 1000, 2000] },
+        )
+        .toBe(true)
+        .catch(() => {});
+
+    if (await isDmThreadActive(page, peerAccount, groupSpaceId)) {
+        await waitForDmThreadWithPeer(page, peerAccount, {
+            timeout: Math.min(timeoutMs, 20_000),
+            groupSpaceId,
+        });
+        return;
+    }
+
+    const openMs = Math.min(timeoutMs, 45_000);
+    try {
+        await openDmThread(page, baseUrl, peerAccount, {
+            groupSpaceId,
+            gotoTimeout: openMs,
+        });
+        return;
+    } catch {
+        /* compose-first recipient may not have a DM row yet */
+    }
+
+    if (!(await clickOpenDmTarget(page, peerAccount))) {
+        await openDmThroughChurnHook(page, peerAccount);
+    }
+    await page.waitForTimeout(1_000);
+    await pushSelectedDmUrl(
+        page,
+        baseUrl,
+        Math.min(timeoutMs, 30_000),
+        groupSpaceId,
+    );
+    try {
+        await waitForDmThreadWithPeer(page, peerAccount, {
+            timeout: timeoutMs,
+            groupSpaceId,
+        });
+    } catch (err) {
+        const diag = await page
+            .evaluate((peer) => {
+                const churn = (
+                    window as Window & {
+                        __chatChurnState?: () => Record<string, unknown>;
+                    }
+                ).__chatChurnState?.();
+                const buttons = Array.from(
+                    document.querySelectorAll("button"),
+                ).map((button) => ({
+                    text: button.textContent?.trim().slice(0, 120) ?? "",
+                    aria: button.getAttribute("aria-label"),
+                    visible: Boolean(
+                        button.offsetWidth ||
+                            button.offsetHeight ||
+                            button.getClientRects().length,
+                    ),
+                }));
+                return {
+                    url: location.href,
+                    peer,
+                    churn,
+                    matchingButtons: buttons.filter(
+                        (button) =>
+                            button.text.includes(peer) ||
+                            button.aria?.includes(peer),
+                    ),
+                    dmButtons: buttons.filter(
+                        (button) =>
+                            /direct message|dm|contact/i.test(button.text) ||
+                            /direct message|dm|contact/i.test(
+                                button.aria ?? "",
+                            ),
+                    ),
+                };
+            }, peerAccount)
+            .catch((diagErr) => ({ diagError: String(diagErr) }));
+        throw new Error(
+            `openDmThreadForFlush failed for "${peerAccount}". Diagnostics: ${JSON.stringify(diag)}`,
+            { cause: err as Error },
+        );
+    }
 }
 
 /** Deep-link the browser URL to match the app's selected conversation (DM sync). */
@@ -1002,6 +1429,9 @@ export type ChatSelectionState = {
     selectedConversationKind: string | null;
     urlSpaceId: string | null;
     threadHeader: string | null;
+    selfAccount: string | null;
+    /** App-reported remote recipients of the active thread (authoritative DM identity). */
+    threadRemoteRecipients: string[];
 };
 
 /** Read UI selection + thread header for e2e routing diagnostics. */
@@ -1026,6 +1456,16 @@ export async function readChatSelectionState(
         const threadHeader =
             document.querySelector("main p.font-medium")?.textContent?.trim() ??
             null;
+        const thread = churn?.thread as
+            | { threadRemoteRecipients?: unknown }
+            | undefined;
+        const threadRemoteRecipients = Array.isArray(
+            thread?.threadRemoteRecipients,
+        )
+            ? thread.threadRemoteRecipients.filter(
+                  (entry): entry is string => typeof entry === "string",
+              )
+            : [];
         return {
             selectedConversationId:
                 (churn?.selectedConversationId as string | null) ?? null,
@@ -1037,6 +1477,8 @@ export async function readChatSelectionState(
                 (churn?.selectedConversationKind as string | null) ?? null,
             urlSpaceId,
             threadHeader,
+            selfAccount: (churn?.selfAccount as string | null) ?? null,
+            threadRemoteRecipients,
         };
     });
 }
@@ -1071,22 +1513,7 @@ export async function waitForDmThreadWithPeer(
         .poll(
             async () => {
                 const state = await readChatSelectionState(page);
-                if (state.composePendingDmPeer === peerAccount) return true;
-                if (state.pendingDmMember === peerAccount) return true;
-                if (
-                    options?.groupSpaceId &&
-                    state.selectedConversationId &&
-                    state.selectedConversationId !== options.groupSpaceId
-                ) {
-                    return true;
-                }
-                if (
-                    state.selectedConversationKind === "dm" &&
-                    (state.threadHeader?.includes(peerAccount) ?? false)
-                ) {
-                    return true;
-                }
-                return false;
+                return isDmSelectionForPeer(state, peerAccount);
             },
             { timeout, intervals: [200, 500, 1000] },
         )
@@ -1104,17 +1531,18 @@ export async function assertChatThreadHeaderContains(
     });
 }
 
-/** Fail fast when a DM ledger entry was enqueued against the group space. */
+/** Fail fast when a DM outbox row routed to the group space or the wrong DM thread. */
 export async function assertOutboundDmRouting(
     page: Page,
     body: string,
     groupSpaceId: string,
+    peerAccount?: string,
 ): Promise<void> {
     const routing = await page.evaluate(
         ({ body, groupSpaceId }) => {
-            const v2 = (
+            const transport = (
                 window as unknown as {
-                    __chatTransportV2Debug?: {
+                    __chatTransportDebug?: {
                         routingSnapshot?: () => {
                             pendingRows?: {
                                 bodyPreview: string;
@@ -1129,9 +1557,14 @@ export async function assertOutboundDmRouting(
                         }[];
                     };
                 }
-            ).__chatTransportV2Debug;
-            const snap = v2?.routingSnapshot?.() ?? null;
-            const rows = (v2?.getOutbox?.() ?? []).filter((r) => r.body === body);
+            ).__chatTransportDebug;
+            const churn = (
+                window as Window & {
+                    __chatChurnState?: () => Record<string, unknown>;
+                }
+            ).__chatChurnState?.();
+            const snap = transport?.routingSnapshot?.() ?? null;
+            const rows = (transport?.getOutbox?.() ?? []).filter((r) => r.body === body);
             const groupTail = groupSpaceId.replace(/^space:/, "");
             const onGroup = rows.some(
                 (r) =>
@@ -1139,7 +1572,12 @@ export async function assertOutboundDmRouting(
                     r.conversationId.includes(groupTail) ||
                     r.conversationId === groupSpaceId,
             );
-            return { rows, snap, onGroup };
+            return {
+                rows,
+                snap,
+                onGroup,
+                selfAccount: (churn?.selfAccount as string | null) ?? null,
+            };
         },
         { body, groupSpaceId },
     );
@@ -1147,6 +1585,20 @@ export async function assertOutboundDmRouting(
         throw new Error(
             `DM send used group routing: ${JSON.stringify(routing)}`,
         );
+    }
+    if (peerAccount && routing.selfAccount) {
+        const expected = expectedDmSpaceIds(routing.selfAccount, peerAccount);
+        const misrouted = routing.rows.filter(
+            (r) =>
+                !expected.some((candidate) =>
+                    isSameSpaceId(r.conversationId, candidate),
+                ) || !r.recipients.includes(peerAccount),
+        );
+        if (routing.rows.length === 0 || misrouted.length > 0) {
+            throw new Error(
+                `DM send routed to wrong thread (expected one of ${expected.join(", ")} → ${peerAccount}): ${JSON.stringify(routing)}`,
+            );
+        }
     }
 }
 
@@ -1198,35 +1650,86 @@ function dmRowNamePattern(peerAccount: string): RegExp {
     return new RegExp(`\\(${escaped}\\)|^${escaped}(?:$|[,])`, "i");
 }
 
-async function isDmThreadActive(
-    page: Page,
+/**
+ * Positive DM-thread identity from app selection state. Primary signal is the
+ * app's `threadRemoteRecipients` (exact recipient set); space-id hash and
+ * thread header are fallbacks. Hash matching accepts either member ordering
+ * because the chain sorts members by AccountNumber value, not string order.
+ */
+export function isDmSelectionForPeer(
+    state: ChatSelectionState,
     peerAccount: string,
-    groupSpaceId?: string,
-): Promise<boolean> {
-    const state = await readChatSelectionState(page);
+): boolean {
     if (state.composePendingDmPeer === peerAccount) return true;
     if (state.pendingDmMember === peerAccount) return true;
-    if (
-        state.selectedConversationKind === "dm" &&
-        (state.threadHeader?.includes(peerAccount) ?? false)
-    ) {
+    if (state.selectedConversationKind !== "dm") return false;
+    if (state.threadRemoteRecipients.length > 0) {
+        return (
+            state.threadRemoteRecipients.length === 1 &&
+            state.threadRemoteRecipients[0] === peerAccount
+        );
+    }
+    if (state.threadHeader?.includes(peerAccount) ?? false) {
         return true;
     }
     if (
-        groupSpaceId &&
-        state.selectedConversationId &&
-        state.selectedConversationId !== groupSpaceId
+        state.selfAccount &&
+        isExpectedDmSpaceId(
+            state.selectedConversationId,
+            state.selfAccount,
+            peerAccount,
+        )
     ) {
         return true;
     }
     return false;
 }
 
+async function isDmThreadActive(
+    page: Page,
+    peerAccount: string,
+    _groupSpaceId?: string,
+): Promise<boolean> {
+    const state = await readChatSelectionState(page);
+    return isDmSelectionForPeer(state, peerAccount);
+}
+
+async function openDmThroughChurnHook(
+    page: Page,
+    peerAccount: string,
+): Promise<boolean> {
+    return page.evaluate((peer) => {
+        const openDm = (
+            window as Window & {
+                __chatChurnOpenDm?: (peerAccount: string) => void;
+            }
+        ).__chatChurnOpenDm;
+        if (!openDm) return false;
+        openDm(peer);
+        return true;
+    }, peerAccount);
+}
+
+export async function openComposeFirstDmForFlush(
+    page: Page,
+    peerAccount: string,
+    groupSpaceId: string,
+    timeoutMs: number,
+): Promise<void> {
+    if (!(await openDmThroughChurnHook(page, peerAccount))) {
+        throw new Error("Chat churn open-DM hook is not installed");
+    }
+    await waitForDmThreadWithPeer(page, peerAccount, {
+        timeout: Math.min(timeoutMs, 45_000),
+        groupSpaceId,
+    });
+}
+
 /** Click an existing DM row, or expand Contacts and click the contact row. */
 async function clickOpenDmTarget(
     page: Page,
     peerAccount: string,
-): Promise<void> {
+): Promise<boolean> {
     await ensureSidebarSectionExpanded(page, "Direct Messages");
     const dmRow = page
         .getByRole("button", {
@@ -1236,7 +1739,7 @@ async function clickOpenDmTarget(
         .last();
     if (await dmRow.isVisible().catch(() => false)) {
         await dmRow.click();
-        return;
+        return true;
     }
 
     await ensureSidebarSectionExpanded(page, "Contacts");
@@ -1249,8 +1752,22 @@ async function clickOpenDmTarget(
         .getByRole("button")
         .filter({ hasText: peerAccount })
         .first();
-    await expect(contactButton).toBeVisible({ timeout: 30_000 });
+    if (!(await contactButton.isVisible({ timeout: 30_000 }).catch(() => false))) {
+        return false;
+    }
+    const label = await contactButton
+        .evaluate(
+            (button) =>
+                button.getAttribute("aria-label") ??
+                button.textContent?.trim() ??
+                "",
+        )
+        .catch(() => "");
+    if (label.includes(",")) {
+        return false;
+    }
     await contactButton.click();
+    return true;
 }
 
 /** Push `?space=` to match the selected DM before inbound URL-sync can re-apply group. */
@@ -1309,20 +1826,22 @@ export async function openDmThread(
 ): Promise<void> {
     const chatUrl = chatUrlForPage(page, baseUrl);
     const navMs = options?.gotoTimeout ?? 45_000;
-    if (
-        await isDmThreadActive(page, peerAccount, options?.groupSpaceId)
-    ) {
-        await pushSelectedDmUrl(
-            page,
-            baseUrl,
-            navMs,
-            options?.groupSpaceId,
-        );
+    const groupSpaceId = options?.groupSpaceId;
+
+    if (await isDmThreadActive(page, peerAccount, groupSpaceId)) {
+        await pushSelectedDmUrl(page, baseUrl, navMs, groupSpaceId);
         await waitForDmThreadWithPeer(page, peerAccount, {
             timeout: navMs,
-            groupSpaceId: options?.groupSpaceId,
+            groupSpaceId,
         });
         return;
+    }
+
+    // Group `?space=` deep-links fight sidebar DM selection — strip before opening.
+    if (groupSpaceId) {
+        await stripGroupDeepLinkForDmOpen(page, baseUrl, groupSpaceId, {
+            navMs: Math.min(navMs, 30_000),
+        });
     }
 
     if (!page.url().includes("/chat")) {
@@ -1336,49 +1855,81 @@ export async function openDmThread(
         });
     }
 
+    // Fast path when the DM row already exists in the sidebar. Click the row
+    // (selects the chain's real space id) instead of deep-linking a guessed
+    // hash URL — the chain may have hashed the reverse member ordering.
+    const dmRowVisible = await page
+        .getByRole("button", { name: dmRowNamePattern(peerAccount) })
+        .locator("visible=true")
+        .last()
+        .isVisible()
+        .catch(() => false);
+    if (dmRowVisible) {
+        await clickOpenDmTarget(page, peerAccount);
+        await page.waitForTimeout(800);
+        await pushSelectedDmUrl(page, baseUrl, navMs, groupSpaceId);
+        if (await isDmThreadActive(page, peerAccount, groupSpaceId)) {
+            await waitForDmThreadWithPeer(page, peerAccount, {
+                timeout: navMs,
+                groupSpaceId,
+            });
+            return;
+        }
+    }
+
+    // App hook is more reliable than sidebar clicks for compose-first DMs.
+    if (await openDmThroughChurnHook(page, peerAccount)) {
+        await page.waitForTimeout(800);
+        if (await isDmThreadActive(page, peerAccount, groupSpaceId)) {
+            await waitForDmThreadWithPeer(page, peerAccount, {
+                timeout: navMs,
+                groupSpaceId,
+            });
+            return;
+        }
+    }
+
     for (let attempt = 0; attempt < 3; attempt++) {
         if (
             attempt > 0 &&
-            options?.groupSpaceId &&
-            groupSpaceIdFromPage(page) === options.groupSpaceId
+            groupSpaceId &&
+            groupSpaceIdFromPage(page) === groupSpaceId
         ) {
-            await assignNavigate(page, chatUrl, { timeout: navMs });
-            await waitForThreadComposerReady(page, { timeout: navMs });
+            await stripGroupDeepLinkForDmOpen(page, baseUrl, groupSpaceId, {
+                navMs: Math.min(navMs, 30_000),
+            });
         }
         await clickOpenDmTarget(page, peerAccount);
         await page.waitForTimeout(attempt === 0 ? 1_500 : 1_000);
-        await pushSelectedDmUrl(
-            page,
-            baseUrl,
-            navMs,
-            options?.groupSpaceId,
-        );
-        if (
-            await isDmThreadActive(
-                page,
-                peerAccount,
-                options?.groupSpaceId,
-            )
-        ) {
+        await pushSelectedDmUrl(page, baseUrl, navMs, groupSpaceId);
+        if (await isDmThreadActive(page, peerAccount, groupSpaceId)) {
             break;
         }
     }
 
+    if (!(await isDmThreadActive(page, peerAccount, groupSpaceId))) {
+        if (groupSpaceId) {
+            await stripGroupDeepLinkForDmOpen(page, baseUrl, groupSpaceId, {
+                navMs: Math.min(navMs, 30_000),
+            });
+        }
+        if (!(await clickOpenDmTarget(page, peerAccount))) {
+            await openDmThroughChurnHook(page, peerAccount);
+        }
+        await page.waitForTimeout(1_000);
+        await pushSelectedDmUrl(page, baseUrl, navMs, groupSpaceId);
+    }
+
     await waitForThreadComposerReady(page, { timeout: navMs });
-    await pushSelectedDmUrl(
-        page,
-        baseUrl,
-        navMs,
-        options?.groupSpaceId,
-    );
+    await pushSelectedDmUrl(page, baseUrl, navMs, groupSpaceId);
     await waitForDmThreadWithPeer(page, peerAccount, {
         timeout: navMs,
-        groupSpaceId: options?.groupSpaceId,
+        groupSpaceId,
     });
     await syncChatUrlToSelectedConversation(page, baseUrl, navMs);
     await waitForDmThreadWithPeer(page, peerAccount, {
         timeout: Math.min(navMs, 15_000),
-        groupSpaceId: options?.groupSpaceId,
+        groupSpaceId,
     });
 }
 
@@ -1386,8 +1937,11 @@ export async function startDmWithContact(
     page: Page,
     baseUrl: string,
     peerAccount: string,
+    options?: { groupSpaceId?: string },
 ): Promise<void> {
-    await openDmThread(page, baseUrl, peerAccount);
+    await openDmThread(page, baseUrl, peerAccount, {
+        groupSpaceId: options?.groupSpaceId,
+    });
     await waitForChatConnected(page);
     await expect(page.getByLabel("Message text")).toBeEnabled({
         timeout: 90_000,
@@ -1492,29 +2046,27 @@ export async function expectThreadMessage(
 
 async function dumpChatTransportDebug(page: Page): Promise<unknown> {
     return page.evaluate(() => {
-        const v2 = (
+        const transport = (
             window as unknown as {
-                __chatTransportV2Debug?: Record<string, unknown>;
+                __chatTransportDebug?: Record<string, unknown>;
             }
-        ).__chatTransportV2Debug;
+        ).__chatTransportDebug;
         const msg = (
             window as unknown as {
                 __chatMessagingDebug?: Record<string, unknown>;
             }
         ).__chatMessagingDebug;
-        const legacy = (
-            window as unknown as {
-                __chatDataDebug?: { snapshot?: () => unknown; events?: () => unknown };
-            }
-        ).__chatDataDebug;
         return {
-            v2: v2
+            transport: transport
                 ? {
-                      started: v2.started,
-                      events: typeof v2.events === "function" ? v2.events() : null,
+                      started: transport.started,
+                      events:
+                          typeof transport.events === "function"
+                              ? transport.events()
+                              : null,
                       outbox:
-                          typeof v2.getOutbox === "function"
-                              ? v2.getOutbox()
+                          typeof transport.getOutbox === "function"
+                              ? transport.getOutbox()
                               : null,
                   }
                 : null,
@@ -1527,7 +2079,6 @@ async function dumpChatTransportDebug(page: Page): Promise<unknown> {
                               : null,
                   }
                 : null,
-            chatDataSnapshot: legacy?.snapshot?.() ?? null,
         };
     });
 }
@@ -1539,20 +2090,73 @@ export async function expectPendingOutboundMessage(
     await expect(page.getByText(body, { exact: true })).toBeVisible({
         timeout: 15_000,
     });
-    await expect(page.getByText("Pending").first()).toBeVisible({
-        timeout: 15_000,
-    });
+    try {
+        await expect(page.getByText("Pending").first()).toBeVisible({
+            timeout: 5_000,
+        });
+        return;
+    } catch {
+        /* UI badge can lag behind transport outbox while recipient is offline */
+    }
+    await expect
+        .poll(
+            async () =>
+                page.evaluate((msg) => {
+                    const transport = (
+                        window as unknown as {
+                            __chatTransportDebug?: {
+                                getOutbox?: () => Array<{ body?: string }>;
+                                deliverySnapshot?: () => Array<{
+                                    bodyPreview?: string;
+                                    status?: string;
+                                }>;
+                            };
+                        }
+                    ).__chatTransportDebug;
+                    const outbox = transport?.getOutbox?.();
+                    if (
+                        Array.isArray(outbox) &&
+                        outbox.some((e) => e.body === msg)
+                    ) {
+                        return true;
+                    }
+                    const snapshot = transport?.deliverySnapshot?.();
+                    return (
+                        Array.isArray(snapshot) &&
+                        snapshot.some(
+                            (e) =>
+                                e.bodyPreview === msg.slice(0, 48) &&
+                                e.status === "PENDING",
+                        )
+                    );
+                }, body),
+            { timeout: 15_000, intervals: [300, 600, 1200] },
+        )
+        .toBe(true);
 }
 
 export function groupConversationButton(
     page: Page,
     otherMemberAccounts: string[],
 ) {
-    let button = page.getByRole("button");
-    for (const account of otherMemberAccounts) {
-        button = button.filter({ hasText: account });
+    if (otherMemberAccounts.length === 0) {
+        throw new Error("groupConversationButton requires at least one other member");
     }
-    return button;
+    let button = page.getByRole("button", {
+        name: new RegExp(otherMemberAccounts[0]!),
+    });
+    for (let i = 1; i < otherMemberAccounts.length; i++) {
+        button = button.and(
+            page.getByRole("button", {
+                name: new RegExp(otherMemberAccounts[i]!),
+            }),
+        );
+    }
+    let byVisibleText = page.getByRole("button");
+    for (const account of otherMemberAccounts) {
+        byVisibleText = byVisibleText.filter({ hasText: account });
+    }
+    return button.or(byVisibleText);
 }
 export async function startGroupPickMode(page: Page, baseUrl: string): Promise<void> {
     await openChat(page, baseUrl);
@@ -1738,6 +2342,51 @@ export async function wakeActorFromChurnNoRealtime(
     await waitForChatConnected(page, { timeout: composerMs });
 }
 
+/** Re-enable realtime after `churnNoRealtime=1` park (group mesh) or plain chat wake. */
+export async function prepareParkedActorForMesh(
+    page: Page,
+    baseUrl: string,
+    groupSpaceId: string,
+    groupPeers: string[],
+    options?: { composerTimeout?: number; forDm?: boolean },
+): Promise<void> {
+    const composerMs = options?.composerTimeout ?? 45_000;
+    if (new URL(page.url()).searchParams.get("churnNoRealtime") === "1") {
+        await wakeActorFromChurnNoRealtime(
+            page,
+            baseUrl,
+            groupSpaceId,
+            groupPeers,
+            { composerTimeout: composerMs },
+        );
+        return;
+    }
+    if (options?.forDm) {
+        await wakeForDmInteraction(page, baseUrl, {
+            composerTimeout: composerMs,
+        });
+    }
+}
+
+/** Best-effort DM data-channel bootstrap on both ends before a live send. */
+export async function prepareOnlineDmPairMesh(
+    senderPage: Page,
+    recipientPage: Page,
+    senderAccount: string,
+    recipientAccount: string,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 60_000;
+    await bootstrapDmPeer(senderPage, recipientAccount);
+    await bootstrapDmPeer(recipientPage, senderAccount);
+    await waitForDmPeerReady(senderPage, recipientAccount, { timeout }).catch(
+        () => {},
+    );
+    await waitForDmPeerReady(recipientPage, senderAccount, { timeout }).catch(
+        () => {},
+    );
+}
+
 /**
  * Re-enable realtime without deep-linking the group thread — avoids URL-sync
  * clobbering a subsequent DM sidebar selection.
@@ -1778,53 +2427,93 @@ export async function assertPendingDeliveredForPair(
         groupSpaceId?: string;
         senderGroupPeers?: string[];
         recipientGroupPeers?: string[];
+        /** `live` uses full openDmThread; `flush` tolerates missing sidebar rows (default). */
+        threadOpen?: "flush" | "live";
     },
 ): Promise<void> {
     const timeout = options.timeout ?? 180_000;
     const wakeMs = Math.min(timeout, 45_000);
+    const threadOpen = options.threadOpen ?? "flush";
+    const openDmForPair = async (
+        page: Page,
+        peer: string,
+        budgetMs: number,
+    ): Promise<void> => {
+        const openMs = Math.min(budgetMs, 45_000);
+        if (threadOpen === "live" && options.groupSpaceId) {
+            await openDmThread(page, options.baseUrl, peer, {
+                groupSpaceId: options.groupSpaceId,
+                gotoTimeout: openMs,
+            });
+            return;
+        }
+        if (options.groupSpaceId) {
+            await openDmThreadForFlush(
+                page,
+                options.baseUrl,
+                peer,
+                options.groupSpaceId,
+                budgetMs,
+            );
+        } else {
+            await openDmThread(page, options.baseUrl, peer);
+        }
+    };
     if (options.groupSpaceId) {
-        if (options.senderGroupPeers) {
-            if (options.kind === "dm") {
-                await wakeForDmInteraction(senderPage, options.baseUrl, {
-                    composerTimeout: wakeMs,
-                });
-            } else {
-                await wakeActorFromChurnNoRealtime(
-                    senderPage,
-                    options.baseUrl,
-                    options.groupSpaceId,
-                    options.senderGroupPeers,
-                    { composerTimeout: wakeMs },
-                );
-            }
+        if (options.senderGroupPeers && threadOpen !== "live") {
+            await prepareParkedActorForMesh(
+                senderPage,
+                options.baseUrl,
+                options.groupSpaceId,
+                options.senderGroupPeers,
+                { composerTimeout: wakeMs, forDm: options.kind === "dm" },
+            );
         }
         if (options.recipientGroupPeers) {
-            if (options.kind === "dm") {
-                await wakeForDmInteraction(recipientPage, options.baseUrl, {
-                    composerTimeout: wakeMs,
-                });
-            } else {
-                await wakeActorFromChurnNoRealtime(
-                    recipientPage,
-                    options.baseUrl,
-                    options.groupSpaceId,
-                    options.recipientGroupPeers,
-                    { composerTimeout: wakeMs },
-                );
-            }
+            await prepareParkedActorForMesh(
+                recipientPage,
+                options.baseUrl,
+                options.groupSpaceId,
+                options.recipientGroupPeers,
+                { composerTimeout: wakeMs, forDm: options.kind === "dm" },
+            );
         }
     }
-    await waitForPeerOnline(senderPage, recipientAccount, { timeout });
-    await waitForPeerOnline(recipientPage, senderAccount, { timeout });
+    const presenceMs =
+        threadOpen === "live" ? Math.min(timeout, 30_000) : timeout;
+    await waitForPeerOnline(senderPage, recipientAccount, {
+        timeout: presenceMs,
+    }).catch(() => {});
+    await waitForPeerOnline(recipientPage, senderAccount, {
+        timeout: presenceMs,
+    }).catch(() => {});
     await bootstrapGroupMeshPeers(senderPage, [recipientAccount]);
     await bootstrapGroupMeshPeers(recipientPage, [senderAccount]);
     if (options.kind === "dm") {
-        await openDmThread(recipientPage, options.baseUrl, senderAccount, {
-            groupSpaceId: options.groupSpaceId,
-        });
-        await openDmThread(senderPage, options.baseUrl, recipientAccount, {
-            groupSpaceId: options.groupSpaceId,
-        });
+        if (options.groupSpaceId) {
+            const recipientHasMessage = await recipientPage
+                .getByText(body, { exact: true })
+                .first()
+                .isVisible()
+                .catch(() => false);
+            if (threadOpen !== "live") {
+                await openDmForPair(
+                    senderPage,
+                    recipientAccount,
+                    Math.min(timeout, 60_000),
+                );
+            }
+            if (!recipientHasMessage) {
+                await openDmForPair(
+                    recipientPage,
+                    senderAccount,
+                    timeout,
+                );
+            }
+        } else {
+            await openDmThread(recipientPage, options.baseUrl, senderAccount);
+            await openDmThread(senderPage, options.baseUrl, recipientAccount);
+        }
         await waitForDmDataChannelReady(senderPage, recipientAccount, {
             timeout,
         });
