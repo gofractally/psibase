@@ -36,8 +36,7 @@ pub mod tables {
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{
-        accounts::Wrapper as Accounts, fractals::Wrapper as Fractals,
-        producers::Wrapper as Producers,
+        accounts::Wrapper as Accounts, guilds::Wrapper as Guilds, producers::Wrapper as Producers,
     };
     use psibase::*;
 
@@ -80,7 +79,7 @@ mod service {
 
         // 2. Apply each account to the system guild
         for &acct in &TEST_ACCOUNTS {
-            Fractals::call_from(acct).apply_guild(SYS_GUILD, String::new());
+            Guilds::call_from(acct).apply_guild(SYS_GUILD, String::new());
         }
 
         // 3. Attest each application as the first producer (who is a guild member)
@@ -88,7 +87,7 @@ mod service {
         let producer = *prods.first().unwrap();
 
         for &acct in &TEST_ACCOUNTS {
-            Fractals::call_from(producer).at_mem_app(SYS_GUILD, acct, String::new(), true);
+            Guilds::call_from(producer).at_mem_app(SYS_GUILD, acct, String::new(), true);
         }
     }
 }

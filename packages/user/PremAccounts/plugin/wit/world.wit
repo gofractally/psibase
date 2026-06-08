@@ -1,0 +1,63 @@
+package prem-accounts:plugin;
+
+interface market-admin {
+    use host:types/types.{error};
+
+    /// Create a new name-length market
+    /// * `length`: market identifier; must be within premium name bounds
+    /// * `initial-price`: the initial price as Quantity string
+    /// * `target`: target number of accounts to sell in 30 day period
+    /// * `floor-price`: the minimum price as Quantity string
+    /// * `increase-ppm` / `decrease-ppm`: DiffAdjust PPM parameters (1..1000000)
+    /// Notes:
+    /// * `initial-price` is fixed for the life of the market.
+    /// * Market starts enabled.
+    create: func(length: u8, initial-price: string, target: u32, floor-price: string, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
+
+    /// Update name market params:
+    /// * `length`: market identifier; must be within premium name bounds
+    /// * `window-seconds`: window length in seconds,
+    /// * `target`: target number of accounts to sell in 30 day period,
+    /// * `floor-price`: the minimum price as Quantity string,
+    /// * `increase-ppm`: PPM for increase,
+    /// * `decrease-ppm`: PPM for decrease,
+    /// Notes:
+    /// * Does not change initial price or enabled status.
+    configure: func(length: u8, window-seconds: u32, target: u32, floor-price: string, increase-ppm: u32, decrease-ppm: u32) -> result<_, error>;
+
+    /// Allow new purchases for a name-length market.
+    enable: func(length: u8) -> result<_, error>;
+
+    /// Disable new purchases for a name-length market.
+    disable: func(length: u8) -> result<_, error>;
+}
+
+interface api {
+    use host:types/types.{error};
+    /// Purchase a premium name
+    /// * `account`: the account to purchase the name for
+    /// * `max-cost`: the maximum cost in the network token as Quantity string
+    buy: func(account: string, max-cost: string) -> result<_, error>;
+
+    /// Claim a premium name
+    /// * `account`: the account to claim the name for
+    claim: func(account: string) -> result<_, error>;
+}
+
+/// Interface that makes authorized queries to this app's http server.
+interface authorized {
+    use host:types/types.{error};
+
+    /// Executes a GraphQL query against this app's http server.
+    ///
+    /// Arguments
+    /// * `query` - GraphQL query to execute
+    ///
+    /// Returns the result of the query as a string.
+    graphql: func(query: string) -> result<string, error>;
+}
+
+world imports {
+    import api;
+    import authorized;
+}

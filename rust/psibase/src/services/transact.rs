@@ -147,7 +147,7 @@ pub mod auth_interface {
         action: crate::Action,
         allowedActions: Vec<crate::services::transact::ServiceMethod>,
         claims: Vec<crate::Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 

@@ -12,7 +12,7 @@ using namespace psibase;
 
 namespace SystemService
 {
-   void AuthAny::checkAuthSys(uint32_t                   flags,
+   bool AuthAny::checkAuthSys(uint32_t                   flags,
                               AccountNumber              requester,
                               AccountNumber              sender,
                               ServiceMethod              action,
@@ -21,6 +21,7 @@ namespace SystemService
    {
       if (enable_print)
          std::printf("checkAuthSys\n");
+      return true;
    }
 
    void AuthAny::canAuthUserSys(AccountNumber user)

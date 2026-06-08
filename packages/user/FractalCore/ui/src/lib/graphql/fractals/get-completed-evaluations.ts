@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import { z } from "zod";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { graphql } from "@shared/lib/graphql";
 import { Account, zAccount } from "@shared/lib/schemas/account";
 
@@ -24,7 +24,7 @@ const getCompletedEvaluationIds = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, { service: FRACTALS_SERVICE });
+    const evaluations = await graphql(gql, { service: GUILDS_SERVICE });
 
     const response = z
         .object({
@@ -54,7 +54,7 @@ const getEvaluationsMetadata = async (guild: Account) => {
         }
     }`;
 
-    const evaluations = await graphql(gql, { service: FRACTALS_SERVICE });
+    const evaluations = await graphql(gql, { service: GUILDS_SERVICE });
 
     const response = z
         .object({

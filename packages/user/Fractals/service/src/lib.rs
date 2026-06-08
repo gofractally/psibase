@@ -1,113 +1,102 @@
+pub mod constants;
 pub mod helpers;
-mod scoring;
 pub mod tables;
 
-pub mod constants {
-    pub const ONE_DAY: u32 = 86400;
-    pub const ONE_WEEK: u32 = ONE_DAY * 7;
-    const ONE_YEAR: u32 = ONE_WEEK * 52;
-
-    pub mod token_distributions {
-        pub const TOKEN_SUPPLY: u64 = 210_000_000_000;
-
-        pub mod consensus_rewards {
-            pub const REWARD_DISTRIBUTION: u64 = super::TOKEN_SUPPLY / 4;
-            pub const INITIAL_REWARD_DISTRIBUTION: u64 = REWARD_DISTRIBUTION / 100;
-            pub const REMAINING_REWARD_DISTRIBUTION: u64 =
-                REWARD_DISTRIBUTION - INITIAL_REWARD_DISTRIBUTION;
-        }
-    }
-
-    pub const MAX_GUILD_INVITES_PER_MEMBER: u8 = 5;
-    pub const TOKEN_PRECISION: u8 = 4;
-    pub const FRACTAL_STREAM_HALF_LIFE: u32 = ONE_YEAR * 25;
-    pub const MEMBER_STREAM_HALF_LIFE: u32 = ONE_WEEK * 13;
-    pub const MIN_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_DAY;
-    pub const MAX_FRACTAL_DISTRIBUTION_INTERVAL_SECONDS: u32 = ONE_WEEK * 8;
-    pub const COUNCIL_SEATS: u8 = 6;
-
-    pub const MIN_GROUP_SIZE: u8 = 4;
-    pub const MAX_GROUP_SIZE: u8 = 10;
-
-    pub const GUILD_EVALUATION_GROUP_SIZE: u8 = 6;
-
-    pub const DEFAULT_RANKED_GUILD_SLOT_COUNT: u8 = 12;
-    pub const DEFAULT_FRACTAL_DISTRIBUTION_INTERVAL: u32 = ONE_WEEK;
-
-    pub const DEFAULT_RANK_ORDERING_THRESHOLD: u8 = 8;
-    pub const MIN_RANK_ORDERING_THRESHOLD: u8 = 4;
-
-    pub const DEFAULT_TOKEN_INIT_THRESHOLD: u8 = 8;
-    pub const MIN_TOKEN_INIT_THRESHOLD: u8 = 4;
-
-    // Simple limitation + also related to fibonacci function limit.
-    pub const MAX_RANKED_GUILDS: u8 = 25;
-
-    // Expected scaling for use of the continuous_fibonacci func
-    pub const SCORE_SCALE: u32 = 10_000;
-
-    // Determine score sensitivity
-    pub const EMA_ALPHA_DENOMINATOR: u32 = 6;
-
-    // Candidacy cool down determines how long a guild member must wait
-    // before he can make himself a candidate again.
-    pub const DEFAULT_CANDIDACY_COOLDOWN: u32 = ONE_WEEK;
-    pub const MAX_CANDIDACY_COOLDOWN: u32 = ONE_YEAR / 4;
-
-    pub const GUILD_APP_ENDORSEMENT_THRESHOLD: u8 = 3;
-    pub const GUILD_APP_REJECT_THRESHOLD: u8 = 3;
+macro_rules! ban {
+    ($svc:ident, $action:ident) => {
+        (&$svc::SERVICE, $svc::action_structs::$action::ACTION_NAME)
+    };
 }
 
 #[psibase::service(tables = "tables::tables", recursive = true)]
 pub mod service {
 
-    use crate::tables::{
-        fractal_member::MemberStatus,
-        tables::{
-            EvaluationInstance, Fractal, FractalMember, Guild, GuildApplication, GuildInvite,
-            GuildMember, RewardConsensus,
-        },
-    };
+    use crate::tables::tables::{Fractal, FractalMember, Occupation, RewardStream, Role};
 
-    use psibase::*;
     use psibase::{
-        get_sender,
         services::{
+            accounts as Accounts,
             auth_dyn::{self, policy::DynamicAuthPolicy},
+            fractals::{action_structs as Actns, occu_wrapper, FractalRole},
+            setcode as SetCode, staged_tx as StagedTx,
             transact::ServiceMethod,
         },
+        *,
     };
+    use FractalRole::*;
+
+    const ROLE_METHODS: &[(FractalRole, &str)] = &[
+        (Recruitment, Actns::add_mem::ACTION_NAME),
+        (Judiciary, Actns::exile_member::ACTION_NAME),
+        (Legislature, Actns::set_r_occ::ACTION_NAME),
+        (Legislature, Actns::set_dist_int::ACTION_NAME),
+        (Legislature, Actns::set_gen_time::ACTION_NAME),
+        (Legislature, Actns::set_dstrat::ACTION_NAME),
+        (Legislature, Actns::set_paid_occ::ACTION_NAME),
+        (Legislature, Actns::init_token::ACTION_NAME),
+    ];
+
+    const BANNED: &[(&AccountNumber, &str)] = &[
+        ban!(Accounts, setAuthServ),
+        ban!(SetCode, setCode),
+        ban!(SetCode, setCodeStaged),
+        ban!(StagedTx, propose),
+        ban!(StagedTx, accept),
+    ];
+
+    fn method_policy(
+        account: AccountNumber,
+        method: Option<ServiceMethod>,
+    ) -> Option<DynamicAuthPolicy> {
+        let method = method?;
+
+        let is_banned = BANNED.iter().any(|&(svc, name)| {
+            *svc == method.service && method.method == MethodNumber::from(name)
+        });
+
+        if is_banned {
+            return Some(DynamicAuthPolicy::impossible());
+        }
+        if method.service == get_service() {
+            let role = ROLE_METHODS
+                .iter()
+                .find(|(_, name)| method.method == MethodNumber::from(*name))
+                .map(|(role, _)| *role);
+            if let Some(role) = role {
+                return Some(Role::get_assert(account, role).auth_policy());
+            }
+        }
+        None
+    }
 
     /// Creates a new account and fractal.
     ///
     /// # Arguments
     /// * `fractal_account` - The account number for the new fractal.
-    /// * `guild_account` - The account number for the associated guild.
+    /// * `legislature` - Legislature role account.
+    /// * `judiciary` - Judiciary role account.
+    /// * `executive` - Executive role account
+    /// * `recruitment` - Recruitment role account.
     /// * `name` - The name of the fractal.
     /// * `mission` - The mission statement of the fractal.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
     #[action]
-    fn create_fractal(
+    fn create_frac(
         fractal_account: AccountNumber,
-        guild_account: AccountNumber,
+        legislature: AccountNumber,
+        judiciary: AccountNumber,
+        executive: AccountNumber,
+        recruitment: AccountNumber,
         name: String,
         mission: String,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
     ) {
-        let sender = get_sender();
-
-        Fractal::add(fractal_account, name, mission, guild_account);
-
-        FractalMember::add(fractal_account, sender, MemberStatus::Citizen);
-        Guild::add(
+        Fractal::add(
             fractal_account,
-            guild_account,
-            sender,
-            "Genesis".to_string().try_into().unwrap(),
-            council_role,
-            rep_role,
+            legislature,
+            judiciary,
+            executive,
+            recruitment,
+            name,
+            mission,
         );
 
         Wrapper::emit().history().created_fractal(fractal_account);
@@ -116,475 +105,126 @@ pub mod service {
     /// Initialise a token for a fractal.
     ///
     /// Called only once per fractal.
-    /// Must be called by legislature.  
+    /// Must be called by legislature.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
     #[action]
-    fn init_token(fractal: AccountNumber) {
-        Fractal::get_assert(fractal).init_token();
-    }
-
-    /// Apply to join a guild
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    /// * `extra_info` - Relevant information to the application.
-    #[action]
-    fn apply_guild(guild_account: AccountNumber, extra_info: String) {
-        let guild = Guild::get_assert(guild_account);
-        let sender = get_sender();
-        GuildApplication::add(guild.account, sender, extra_info);
+    fn init_token() {
+        Fractal::by_sender().init_token();
     }
 
     /// Set Fractal distribution interval
     ///
+    /// Used in conjunction with genesis time to determine when fractal token distribution can be triggered.
+    ///
     /// # Arguments
-    /// * `fractal` - Fractal to update.
     /// * `distribution_interval_secs` - New fractal distribution interval in seconds.
     #[action]
-    fn set_dist_int(fractal: AccountNumber, distribution_interval_secs: u32) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
-
-        RewardConsensus::get_assert(fractal).set_distribution_interval(distribution_interval_secs);
+    fn set_dist_int(distribution_interval_secs: u32) {
+        Fractal::by_sender().set_distribution_interval(distribution_interval_secs);
     }
 
-    /// Set guild display name
+    /// Set genesis time for a fractal
+    ///
+    /// Genesis time sets the starting point of when fractal token rewards can be claimed.
+    /// Subsequent claims are according to the distribution interval set for the fractal.
     ///
     /// # Arguments
-    /// * `display_name` - New display name of the guild.
+    /// * `genesis_time` - New genesis time for the fractal.
     #[action]
-    fn set_g_disp(display_name: Memo) {
-        Guild::by_sender().set_display_name(display_name);
+    fn set_gen_time(genesis_time: u64) {
+        Fractal::by_sender().set_genesis_time(TimePointSec::from(genesis_time as i64));
     }
 
-    /// Set guild bio
+    /// Set distribution strategy
     ///
     /// # Arguments
-    /// * `bio` - New bio of the guild.
+    /// * `distribution_strategy` - Algorithm for weighted distribution.
     #[action]
-    fn set_g_bio(bio: Memo) {
-        Guild::by_sender().set_bio(bio);
-    }
-
-    /// Set guild description
-    ///
-    /// # Arguments
-    /// * `description` - New description of the guild.
-    #[action]
-    fn set_g_desc(description: String) {
-        Guild::by_sender().set_description(description);
-    }
-
-    /// Kick member from guild
-    ///
-    /// # Arguments
-    /// * `member` - Guild member to be kicked.
-    #[action]
-    fn guild_kick(member: AccountNumber) {
-        GuildMember::get_assert(get_sender(), member).kick();
-    }
-
-    /// Attest Guild Membership application
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    /// * `member` - Member to attest.
-    /// * `comment` - Any comment relevant to the application.
-    /// * `endorses` - True if in favour of the application.
-    #[action]
-    fn at_mem_app(
-        guild_account: AccountNumber,
-        applicant: AccountNumber,
-        comment: String,
-        endorses: bool,
-    ) {
-        GuildApplication::get_assert(guild_account, applicant).attest(
-            comment,
-            get_sender(),
-            endorses,
-        );
-    }
-
-    /// Starts an evaluation for the specified guild.
-    ///
-    /// # Arguments
-    /// * `guild_account` - The account number for the guild.
-    #[action]
-    fn start_eval(guild_account: AccountNumber) {
-        let evaluation = check_some(
-            Guild::get_assert(guild_account).evaluation(),
-            "evaluation instance does not exist for guild",
-        );
-        evaluation.open_pending_levels();
-
-        psibase::services::evaluations::Wrapper::call().start(evaluation.evaluation_id);
-    }
-
-    /// Set rank ordering threshold.
-    ///
-    /// Amount of active participants a guild must have prior to auto-enabling rank ordering.  
-    ///
-    /// # Arguments
-    /// * `threshold` - The minimum amount of active members required.
-    #[action]
-    fn set_rnk_thrs(threshold: u8) {
-        Guild::by_sender().set_rank_ordering_threshold(threshold);
-    }
-
-    /// Register candidacy.
-    ///
-    /// Register your candidacy to serve on a Guild council.  
-    ///
-    /// # Arguments
-    /// * `guild` - Guild candidate is member of
-    /// * `active`- True to become a candidate, False to retire
-    #[action]
-    fn reg_can(guild: AccountNumber, active: bool) {
-        GuildMember::get_assert(guild, get_sender()).set_candidacy(active);
-    }
-
-    /// Set the candidacy cooldown period.
-    ///
-    /// This defines how many seconds a guild member must wait after retiring their candidacy
-    /// before they are allowed to become a candidate again.
-    ///
-    /// # Arguments
-    /// * `cooldown_seconds` - The cooldown duration in seconds (0 disables the cooldown).
-    #[action]
-    fn set_can_cool(cooldown_seconds: u32) {
-        Guild::by_sender().set_candidacy_cooldown(cooldown_seconds);
-    }
-
-    /// Set token threshold.
-    ///
-    /// Sets the required amount of active members in the legislature guild before the token can be initialised.  
-    ///
-    /// # Arguments
-    /// * `fractal` - Fractal to update.
-    /// * `threshold` - The minimum amount of active members required.
-    #[action]
-    fn set_tkn_thrs(fractal: AccountNumber, threshold: u8) {
-        let mut fractal = Fractal::get_assert(fractal);
-        fractal.check_sender_is_legislature();
-        fractal.set_token_threshold(threshold);
-    }
-
-    /// Allows a user to join a fractal and immediately become a visa holder.
-    ///
-    /// Cannot be called by a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal to join.
-    #[action]
-    fn join(fractal: AccountNumber) {
-        let sender = get_sender();
-
-        check_none(
-            account_policy(sender),
-            "managed accounts cannot join a fractal",
-        );
-
-        // Give founding members (members joined prior to live token) immediate citizenship
-        // otherwise visa.
-        let is_live_token = RewardConsensus::get(fractal).is_some();
-        let member_status = if is_live_token {
-            MemberStatus::Visa
-        } else {
-            MemberStatus::Citizen
-        };
-
-        FractalMember::add(fractal, sender, member_status);
-
-        Wrapper::emit().history().joined_fractal(fractal, sender);
-    }
-
-    /// Sets the schedule for an evaluation type within a fractal.
-    ///
-    /// # Arguments
-    /// * `registration` - Unix seconds timestamp for the start of the registration phase.
-    /// * `deliberation` - Unix seconds timestamp for the start of the deliberation phase.
-    /// * `submission` - Unix seconds timestamp for the start of the submission phase.
-    /// * `finish_by` - Unix seconds timestamp for the start of the evaluation completion phase.
-    /// * `interval_seconds` - Interval in seconds for recurring evaluations.
-    #[action]
-    fn set_schedule(
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-        interval_seconds: u32,
-    ) {
-        Guild::by_sender().set_schedule(
-            registration,
-            deliberation,
-            submission,
-            finish_by,
-            interval_seconds,
-        );
-    }
-
-    fn check_is_eval() {
-        check(
-            get_sender() == psibase::services::evaluations::SERVICE,
-            "sender must be evaluations",
-        );
-    }
-
-    /// Called when an evaluation in a fractal is finalized.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    #[action]
-    fn on_eval_fin(evaluation_id: u32) {
-        check_is_eval();
-
-        let mut evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
-        evaluation.finish_evaluation();
-
-        Wrapper::emit()
-            .history()
-            .evaluation_finished(evaluation.guild, evaluation.evaluation_id);
-
-        evaluation.schedule_next_evaluation();
-    }
-
-    /// Called when a user registers for an evaluation in a fractal.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `account` - The account number of the registering user.
-    #[action]
-    fn on_ev_reg(evaluation_id: u32, account: AccountNumber) {
-        check_is_eval();
-        let evaluation = EvaluationInstance::get_by_evaluation_id(evaluation_id);
-        check_some(
-            GuildMember::get(evaluation.guild, account),
-            "account must be member of guild",
-        );
-    }
-
-    /// Called when a user unregisters from an evaluation in a fractal.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `account` - The account number of the unregistering user.
-    #[action]
-    fn on_ev_unreg(_evaluation_id: u32, _account: AccountNumber) {}
-
-    /// Called when a user submits an attestation for decrypted proposals in a fractal evaluation.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `group_number` - The group number within the evaluation.
-    /// * `user` - The account number of the user submitting the attestation.
-    /// * `attestation` - The attestation data.
-    #[action]
-    fn on_attest(
-        evaluation_id: u32,
-        group_number: u32,
-        _user: AccountNumber,
-        attestation: Vec<u8>,
-    ) {
-        check_is_eval();
-        let acceptable_numbers = EvaluationInstance::get_by_evaluation_id(evaluation_id)
-            .users(Some(group_number))
-            .len();
-        let is_valid_attestation = attestation
-            .iter()
-            .all(|num| *num as usize <= acceptable_numbers);
-        check(is_valid_attestation, "invalid attestation");
-    }
-
-    /// Called when a group finalizes its result in a fractal evaluation.
-    ///
-    /// # Arguments
-    /// * `evaluation_id` - The ID of the evaluation.
-    /// * `group_number` - The group number within the evaluation.
-    /// * `group_result` - The result data of the group.
-    #[action]
-    fn on_grp_fin(evaluation_id: u32, group_number: u32, group_result: Vec<u8>) {
-        check_is_eval();
-        EvaluationInstance::get_by_evaluation_id(evaluation_id)
-            .award_group_scores(group_number, group_result);
-    }
-
-    /// Creates a guild within a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `guild_account` - The account number for the new guild.
-    /// * `display_name` - The display name of the guild.
-    /// * `council_role` - Council role account.
-    /// * `rep_role` - Representative role account.
-    #[action]
-    fn create_guild(
-        fractal: AccountNumber,
-        guild_account: AccountNumber,
-        display_name: Memo,
-        council_role: AccountNumber,
-        rep_role: AccountNumber,
-    ) {
-        let sender = get_sender();
-        check(
-            FractalMember::get_assert(fractal, sender).is_citizen(),
-            "must be a citizen to create a guild",
-        );
-        Guild::add(
-            fractal,
-            guild_account,
-            sender,
-            display_name,
-            council_role,
-            rep_role,
-        );
-    }
-
-    /// On Invite Accept.
-    ///
-    /// Used by invite hook
-    ///
-    /// # Arguments
-    /// * `invite_id` - Unique ID of invite.
-    /// * `accepter` - Account name which accepted the invite
-    #[action]
-    #[allow(non_snake_case)]
-    fn onInvAccept(invite_id: u32, accepter: AccountNumber) {
-        GuildInvite::get_assert(invite_id).accept(accepter);
-    }
-
-    /// Invite a guild member.
-    ///
-    /// Must be called by pre existing guild member.  
-    ///
-    /// # Arguments
-    /// * `guild` - Guild invitee will join.
-    /// * `invite_id` - Unique ID generated by invite.
-    /// * `invite_payload` - An opaque payload to pass through to the invite service.
-    /// * `num_accounts` - Number of invites to create
-    /// * `pre_attest` - Inviter attests to the application prior to its creation
-    #[action]
-    fn inv_g_member(
-        guild: AccountNumber,
-        invite_id: u32,
-        invite_payload: Vec<u8>,
-        num_accounts: u16,
-        pre_attest: bool,
-    ) {
-        GuildInvite::add(guild, invite_id, invite_payload, num_accounts, pre_attest);
-    }
-
-    /// Delete guild invite.
-    ///
-    ///
-    /// # Arguments
-    /// * `invite_id` - Unique ID generated by invite.
-    #[action]
-    fn del_g_inv(invite_id: u32) {
-        GuildInvite::get_assert(invite_id).delete();
-    }
-
-    /// Set guild application.
-    ///
-    /// # Arguments
-    /// * `guild_account` - Guild being applied for.
-    /// * `extra_info` - Application description
-    #[action]
-    fn set_g_app(guild_account: AccountNumber, extra_info: String) {
-        GuildApplication::get_assert(guild_account, get_sender()).set_extra_info(extra_info);
+    fn set_dstrat(distribution_strategy: u8) {
+        Fractal::by_sender().set_distribution_strategy(distribution_strategy.into());
     }
 
     /// Exile a fractal member.
     ///
-    /// Must be called by judiciary.  
-    ///
     /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     /// * `member` - The fractal member to be exiled.
     #[action]
-    fn exile_member(fractal: AccountNumber, member: AccountNumber) {
-        Fractal::get_assert(fractal).check_sender_is_judiciary();
-        FractalMember::get_assert(fractal, member).exile();
-    }
-
-    /// Set ranked guild slots.
-    ///
-    /// Must be called by legislature.  
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
-    /// * `slots_count` - The number of ranked guild slots.
-    #[action]
-    fn set_rank_g_s(fractal: AccountNumber, slots_count: u8) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
-        RewardConsensus::get_assert(fractal).set_ranked_guild_slot_count(slots_count);
+    fn exile_member(member: AccountNumber) {
+        FractalMember::get_assert(get_sender(), member).exile();
     }
 
     /// Distribute token for a fractal.
-    ///
-    /// # Arguments
-    /// * `fractal` - The account number of the fractal.
     #[action]
     fn dist_token(fractal: AccountNumber) {
-        RewardConsensus::get_assert(fractal).distribute_tokens();
+        Fractal::get_assert(fractal).distribute_tokens();
     }
 
-    /// Rank guilds for a fractal
+    /// Sets the occupation used to authorize the specified fractal role.
     ///
-    /// This action assigns the fractal's consensus reward distribution to the provided
-    /// ordered list of guilds using a **Fibonacci-weighted distribution**, where earlier
-    /// guilds in the vector receive progressively larger shares.
+    /// # Arguments
+    /// * `role_id` - Role ID for fractal
+    /// * `new_occupation` - New occupation to set for role
+    #[action]
+    fn set_r_occ(role_id: u8, new_occupation: AccountNumber) {
+        Role::get_assert(get_sender(), role_id.into()).set_occupation(new_occupation);
+    }
+
+    /// Claim member rewards
     ///
-    /// Must be called by the legislature.  
+    /// Sends any vested token rewards to the fractal member after applying any pending levies.
     ///
     /// # Arguments
     /// * `fractal` - The account number of the fractal.
-    /// * `guilds` - Ranked guilds, from highest rewarded to lowest.
+    /// * `member` - The fractal member claiming rewards.
     #[action]
-    fn rank_guilds(fractal: AccountNumber, guilds: Vec<AccountNumber>) {
-        Fractal::get_assert(fractal).check_sender_is_legislature();
-        RewardConsensus::get_assert(fractal).set_ranked_guilds(guilds);
+    fn claim_rew(fractal: AccountNumber, member: AccountNumber) {
+        let mut reward_stream = RewardStream::get_assert(fractal, member);
+        let (token_id, claimed) = reward_stream.claim();
+
+        if claimed.value > 0 {
+            psibase::services::tokens::Wrapper::call().credit(
+                token_id,
+                member,
+                claimed,
+                "Reward claim".into(),
+            );
+        }
     }
 
-    /// Set a new representative of the Guild.
+    /// Add fractal member
+    ///
+    /// Adds an account to a fractal.
     ///
     /// # Arguments
-    /// * `new_representative` - The account number of the new representative.
+    /// * `member` - Account to be added as a member
+    /// * `recruiter` - Account of the fractal member that recruited this new member, if applicable.
     #[action]
-    fn set_g_rep(new_representative: AccountNumber) {
-        Guild::by_sender().set_representative(new_representative);
+    fn add_mem(member: AccountNumber, recruiter: Option<AccountNumber>) {
+        let fractal = get_sender();
+        FractalMember::add(fractal, member, recruiter);
+
+        Wrapper::emit().history().joined_fractal(fractal, member);
     }
 
-    /// Resign as representative of a guild.
+    /// Set ordered occupations
     ///
-    /// Called by current representative of guild.
-    #[action]
-    fn resign_g_rep() {
-        check_some(
-            Guild::get_by_rep_role(get_sender()),
-            "sender must be representative role account of guild",
-        )
-        .remove_representative();
-    }
-
-    /// Forcibly remove the current representative of the guild.
+    /// Payment for each ordered occupation will be according to the fractals payment strategy.
     ///
-    /// Called by council role account of the guild.
+    /// # Arguments
+    /// * `paid_occupations` - Ordered occupations to set for the fractal
     #[action]
-    fn remove_g_rep() {
-        check_some(
-            Guild::get_by_council_role(get_sender()),
-            "sender must be council role account of guild",
-        )
-        .remove_representative();
+    fn set_paid_occ(paid_occupations: Vec<AccountNumber>) {
+        Occupation::set_ordered_occupations(get_sender(), paid_occupations);
     }
 
     fn account_policy(account: AccountNumber) -> Option<auth_dyn::policy::DynamicAuthPolicy> {
         Fractal::get(account)
             .map(|fractal| fractal.auth_policy())
-            .or(Guild::get(account).map(|guild| guild.guild_auth()))
-            .or(Guild::get_by_rep_role(account).map(|guild| guild.rep_role_auth()))
-            .or(Guild::get_by_council_role(account).map(|guild| guild.council_role_auth()))
+            .or(Role::get_by_role_account(account).map(|role| {
+                occu_wrapper::call_to(role.occupation).role_policy(role.fractal, role.role_id)
+            }))
     }
 
     /// Get policy action used by AuthDyn service.
@@ -597,44 +237,8 @@ pub mod service {
         account: AccountNumber,
         method: Option<ServiceMethod>,
     ) -> auth_dyn::policy::DynamicAuthPolicy {
-        use psibase::services::accounts as Accounts;
-        use psibase::services::setcode as SetCode;
-        use psibase::services::staged_tx as StagedTx;
-
-        let policy = check_some(account_policy(account), "account not supported");
-
-        if method.is_some_and(|method| {
-            let banned_service_methods: Vec<ServiceMethod> = vec![
-                ServiceMethod::new(
-                    Accounts::SERVICE,
-                    Accounts::action_structs::setAuthServ::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    SetCode::SERVICE,
-                    SetCode::action_structs::setCode::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    SetCode::SERVICE,
-                    SetCode::action_structs::setCodeStaged::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    StagedTx::SERVICE,
-                    StagedTx::action_structs::propose::ACTION_NAME.into(),
-                ),
-                ServiceMethod::new(
-                    StagedTx::SERVICE,
-                    StagedTx::action_structs::accept::ACTION_NAME.into(),
-                ),
-            ];
-
-            banned_service_methods
-                .iter()
-                .any(|sm| sm.method == method.method && sm.service == method.service)
-        }) {
-            DynamicAuthPolicy::impossible()
-        } else {
-            policy
-        }
+        let policy = method_policy(account, method).or_else(|| account_policy(account));
+        check_some(policy, "account not supported")
     }
 
     /// Has policy action used by AuthDyn service.
@@ -651,19 +255,7 @@ pub mod service {
 
     #[event(history)]
     pub fn joined_fractal(fractal_account: AccountNumber, account: AccountNumber) {}
-
-    #[event(history)]
-    pub fn evaluation_finished(guild: AccountNumber, evaluation_id: u32) {}
-
-    #[event(history)]
-    pub fn scheduled_evaluation(
-        fractal: AccountNumber,
-        guild: AccountNumber,
-        evaluation_id: u32,
-        registration: u32,
-        deliberation: u32,
-        submission: u32,
-        finish_by: u32,
-    ) {
-    }
 }
+
+#[cfg(test)]
+mod tests;

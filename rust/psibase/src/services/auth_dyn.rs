@@ -99,7 +99,7 @@ mod service {
         action: ServiceMethod,
         allowedActions: Vec<ServiceMethod>,
         claims: Vec<Claim>,
-    ) {
+    ) -> bool {
         unimplemented!()
     }
 
