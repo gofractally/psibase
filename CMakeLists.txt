@@ -871,7 +871,7 @@ psibase_package(
         WASM ${CMAKE_CURRENT_BINARY_DIR}/Events.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/Events-schema.json
         SERVER events☺1
-    SERVICE event-idx
+    SERVICE events☺2
         WASM ${CMAKE_CURRENT_BINARY_DIR}/EventIndex.wasm
         SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/EventIndex-schema.json
     SERVICE events☺1
