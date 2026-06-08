@@ -255,7 +255,7 @@ namespace SystemService
       return ::getNrProds() - getThreshold(account) + 1;
    }
 
-   void Producers::checkAuthSys(uint32_t                    flags,
+   bool Producers::checkAuthSys(uint32_t                    flags,
                                 AccountNumber               requester,
                                 AccountNumber               sender,
                                 ServiceMethod               action,
@@ -268,9 +268,9 @@ namespace SystemService
       // TODO: refactor duplicated code
       auto type = flags & AuthInterface::requestMask;
       if (type == AuthInterface::runAsRequesterReq)
-         return;  // Request is valid
+         return true;  // Request is valid
       else if (type == AuthInterface::runAsMatchedReq)
-         return;  // Request is valid
+         return true;  // Request is valid
       else if (type == AuthInterface::runAsMatchedExpandedReq)
          abortMessage("runAs: caller attempted to expand powers");
       else if (type == AuthInterface::runAsOtherReq)
@@ -288,11 +288,7 @@ namespace SystemService
       });
 
       auto threshold = expectedClaims.empty() ? 0 : getThreshold(sender);
-      if (matching < threshold)
-      {
-         abortMessage("runAs: have " + std::to_string(matching) + "/" + std::to_string(threshold) +
-                      " producers required to authorize");
-      }
+      return matching >= threshold;
    }
 
    void Producers::canAuthUserSys(AccountNumber user)

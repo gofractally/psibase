@@ -267,7 +267,6 @@ export const VirtualServer = () => {
             <form.Subscribe
                 selector={(state) => [state.canSubmit, state.isDirty]}
             >
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {([canSubmit, isDirty]: any) => (
                     <Button type="submit" disabled={!isDirty || !canSubmit}>
                         Update
@@ -352,7 +351,6 @@ export const VirtualServer = () => {
                                                 className="w-36"
                                             />
                                             <form.Field name="storageUnit">
-                                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                                 {(unitField: any) => (
                                                     <div className="mt-2">
                                                         <StorageUnitSelect
@@ -559,7 +557,6 @@ export const VirtualServer = () => {
 
                     {/* Network Resources Display */}
                     <form.Subscribe selector={(state) => state.values}>
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(formValues: any) => {
                             // Helper to format numbers
                             const formatNumber = (

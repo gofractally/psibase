@@ -56,10 +56,18 @@ members = [
     "Nft/service",
     "Nft/plugin",
     "Nft/query-service",
+    "Guilds",
+    "Guilds/service",
+    "Guilds/query-service",
+    "Guilds/plugin",
     "TokenSwap",
     "TokenSwap/service",
     "TokenSwap/query-service",
     "TokenSwap/plugin",
+    "PremAccounts",
+    "PremAccounts/service",
+    "PremAccounts/query-service",
+    "PremAccounts/plugin",
 ]
 
 exclude = [

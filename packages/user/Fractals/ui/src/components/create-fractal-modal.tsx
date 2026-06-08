@@ -34,7 +34,6 @@ export const CreateFractalModal = ({
     const form = useAppForm({
         defaultValues: {
             fractalAccount: "",
-            guildAccount: "",
             mission: "",
             name: "",
         },
@@ -102,6 +101,7 @@ export const CreateFractalModal = ({
                                 />
                             )}
                         />
+
 
                         <form.AppField
                             name="guildAccount"

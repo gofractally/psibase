@@ -71,7 +71,7 @@ namespace SystemService
       uint32_t antiThreshold(psibase::AccountNumber account);
 
       // Allows this service to be used as an auth service for `prods-weak` and `prods-strong`.
-      void checkAuthSys(uint32_t                    flags,
+      bool checkAuthSys(uint32_t                    flags,
                         psibase::AccountNumber      requester,
                         psibase::AccountNumber      sender,
                         ServiceMethod               action,

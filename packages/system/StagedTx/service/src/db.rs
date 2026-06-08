@@ -77,6 +77,9 @@ pub mod tables {
         /// The account that responded to the staged transaction
         pub account: AccountNumber,
 
+        /// The account's authSequence when the response was made
+        pub seq: u64,
+
         /// Whether the response is an acceptance or rejection
         pub accepted: bool,
     }
@@ -211,14 +214,14 @@ pub mod impls {
             let responses = ResponseTable::new();
             responses
                 .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .range((id, AccountNumber::MIN)..=(id, AccountNumber::MAX))
                 .for_each(|r| responses.erase(&(r.id, r.account)));
 
             // Delete all stored parties for this staged tx
             let parties = StagedTxPartyTable::new();
             parties
                 .get_index_pk()
-                .range((id, AccountNumber::new(0))..=(id, AccountNumber::new(u64::MAX)))
+                .range((id, AccountNumber::MIN)..=(id, AccountNumber::MAX))
                 .for_each(|p| parties.erase(&(p.id, p.party)));
 
             // Delete the staged tx itself
@@ -228,8 +231,8 @@ pub mod impls {
         pub fn accepters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .filter(|response| response.accepted)
+                .range((self.id, AccountNumber::MIN)..=(self.id, AccountNumber::MAX))
+                .filter(|response| response.accepted && response.is_valid())
                 .map(|response| response.account)
                 .collect()
         }
@@ -237,8 +240,8 @@ pub mod impls {
         pub fn rejecters(&self) -> Vec<AccountNumber> {
             ResponseTable::new()
                 .get_index_pk()
-                .range((self.id, AccountNumber::new(0))..=(self.id, AccountNumber::new(u64::MAX)))
-                .filter(|response| !response.accepted)
+                .range((self.id, AccountNumber::MIN)..=(self.id, AccountNumber::MAX))
+                .filter(|response| !response.accepted && response.is_valid())
                 .map(|response| response.account)
                 .collect()
         }
@@ -258,20 +261,24 @@ pub mod impls {
     impl Response {
         fn upsert(id: u32, accepted: bool) {
             let table = ResponseTable::new();
-            let response = table
-                .get_index_pk()
-                .get(&(id, get_sender()))
-                .map(|mut response| {
-                    response.accepted = accepted;
-                    response
-                })
-                .unwrap_or_else(|| Response {
-                    id,
-                    account: get_sender(),
-                    accepted,
-                });
+            let account = get_sender();
+            let seq = Accounts::call().getAccount(account).unwrap().authSequence;
 
-            table.put(&response).unwrap();
+            table
+                .put(&Response {
+                    id,
+                    account,
+                    seq,
+                    accepted,
+                })
+                .unwrap();
+        }
+        fn is_valid(&self) -> bool {
+            return Accounts::call()
+                .getAccount(self.account)
+                .unwrap()
+                .authSequence
+                == self.seq;
         }
     }
 
