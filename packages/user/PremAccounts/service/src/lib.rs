@@ -44,7 +44,6 @@ pub mod service {
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use psibase::services::accounts as Accounts;
-    use psibase::services::accounts::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::auth_delegate as AuthDelegate;
     use psibase::services::diff_adjust::Wrapper as DiffAdjust;
     use psibase::services::events;
@@ -53,6 +52,7 @@ pub mod service {
     use psibase::services::tokens::{Quantity, TID};
     use psibase::AccountNumber;
     use psibase::*;
+    use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
     /// DiffAdjust window for target semantics (30-day period).
     const MARKET_WINDOW_SECONDS: u32 = 30 * 86400;

@@ -6,7 +6,7 @@ mod tests {
     const DEFAULT_CREATE_PPM: u32 = 50_000;
 
     use crate::Wrapper as PremAccounts;
-    use psibase::services::accounts::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
+    use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use psibase::services::tokens::{Precision, Quantity, Wrapper as Tokens, TID};
     use psibase::*;
 

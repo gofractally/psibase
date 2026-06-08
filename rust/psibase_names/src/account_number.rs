@@ -2,6 +2,9 @@ use crate::account_to_number_converter::AccountToNumberConverter;
 use crate::constants::*;
 use crate::number_to_string_converter::NumberToStringConverter;
 
+pub const MIN_ACCOUNT_NAME_LENGTH: u8 = 1;
+pub const MAX_ACCOUNT_NAME_LENGTH: u8 = 18;
+
 fn account_number_has_valid_format(s: &str) -> bool {
     let mut chars = s.bytes();
 
@@ -48,7 +51,10 @@ fn account_number_has_valid_format(s: &str) -> bool {
 ///
 /// The empty name `""` is value 0.
 pub fn account_number_from_str(s: &str) -> u64 {
-    if s.is_empty() || s.len() > 18 || !account_number_has_valid_format(s) {
+    if s.is_empty()
+        || s.len() > MAX_ACCOUNT_NAME_LENGTH as usize
+        || !account_number_has_valid_format(s)
+    {
         0
     } else {
         AccountToNumberConverter::convert(s)
