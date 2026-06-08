@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 
 import {
     type ChatSelectionState,
+    isDmSelectionForPeer,
     readChatSelectionState,
 } from "./chat-ui";
 
@@ -136,24 +137,9 @@ export function logSelection(label: string, snap: SelectionSnapshot): void {
 export function isDmWithPeer(
     state: ChatSelectionState,
     peerAccount: string,
-    groupSpaceId: string,
+    _groupSpaceId: string,
 ): boolean {
-    if (state.composePendingDmPeer === peerAccount) return true;
-    if (state.pendingDmMember === peerAccount) return true;
-    if (
-        state.selectedConversationKind === "dm" &&
-        (state.threadHeader?.includes(peerAccount) ?? false)
-    ) {
-        return true;
-    }
-    if (
-        groupSpaceId &&
-        state.selectedConversationId &&
-        state.selectedConversationId !== groupSpaceId
-    ) {
-        return true;
-    }
-    return false;
+    return isDmSelectionForPeer(state, peerAccount);
 }
 
 async function ensureSidebarSectionExpanded(

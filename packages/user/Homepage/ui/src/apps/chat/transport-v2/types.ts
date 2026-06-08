@@ -16,6 +16,8 @@ export type PeerState =
 export const PEER_JOIN_STUCK_MS = 20_000;
 /** Recover PC when stable with no data channel or `needsReconnect`. */
 export const PEER_NEGOTIATION_STUCK_MS = 15_000;
+/** ICE/DTLS/data-channel setup can legitimately exceed negotiation stuck window. */
+export const PEER_ESTABLISHING_STUCK_MS = 45_000;
 export const PEER_STUCK_CHECK_MS = 2_000;
 
 export type EnsureReason =
@@ -50,6 +52,8 @@ export type InboundEnvelope = {
     body: string;
     sendTimestamp: number;
     clientMsgId: string;
+    /** Wire-level peer the message arrived from (ack target). */
+    remote: string;
 };
 
 export type PendingCount = {

@@ -37,12 +37,11 @@ export type ChatTransportStackOptions = {
     localAccount: string;
     chainId: string;
     realtimeClient: RealtimeClient;
-    /** Second websocket for an additional pair session (group mesh). */
-    auxiliaryRealtimeClient?: RealtimeClient;
     iceServers: IceServerConfig[] | null;
     isSpaceMember?: (spaceUuid: string, account: string) => boolean;
     onInboundBytes?: (remote: string, bytes: Uint8Array) => void;
-    /** Delay between consecutive pair joinSession sends on the same channel. */
+    onSpaceMembershipHint?: (remote: string) => void;
+    /** Delay between consecutive pair joinSession sends on the same socket. */
     pairJoinStaggerMs?: number;
     /** Retry pair joinSession until snapshot (default 2000ms; 0 disables). */
     pairJoinRetryMs?: number;
@@ -52,72 +51,42 @@ export function createChatTransportStack(
     opts: ChatTransportStackOptions,
 ): ChatTransportStack {
     const realtime = createRealtimeTransport(opts.realtimeClient);
-    const auxiliaryRealtime = opts.auxiliaryRealtimeClient
-        ? createRealtimeTransport(opts.auxiliaryRealtimeClient)
-        : undefined;
     const signaling = new WebRtcSignalingClient(opts.realtimeClient);
-    const auxiliarySignaling = opts.auxiliaryRealtimeClient
-        ? new WebRtcSignalingClient(opts.auxiliaryRealtimeClient)
-        : undefined;
     const joinedPairs = new Map<string, boolean>();
 
-    const bindSignalingGate = (sig: WebRtcSignalingClient) => {
-        sig.bindSessionJoinedGate(
-            (sessionId) => joinedPairs.get(sessionId) === true,
-        );
-    };
-    bindSignalingGate(signaling);
-    if (auxiliarySignaling) bindSignalingGate(auxiliarySignaling);
+    signaling.bindSessionJoinedGate(
+        (sessionId) => joinedPairs.get(sessionId) === true,
+    );
 
-    /** Latest applied sessionSnapshot epoch per pair (dual WS can deliver out of order). */
+    /** Latest applied sessionSnapshot epoch per pair (out-of-order delivery). */
     const pairSnapshotEpoch = new Map<string, number>();
 
     const pairSignaling = createPairSignaling({
         localAccount: opts.localAccount,
         realtime,
         signaling,
-        auxiliaryRealtime,
-        auxiliarySignaling,
         isJoinedOnServer: (pairId) => joinedPairs.get(pairId) === true,
         onServerJoined: (pairId) => {
             joinedPairs.set(pairId, true);
             signaling.flushDeferredSignals(pairId);
-            auxiliarySignaling?.flushDeferredSignals(pairId);
         },
         joinStaggerMs: opts.pairJoinStaggerMs,
         joinRetryMs: opts.pairJoinRetryMs,
     });
 
-    const resetPairRosterForChannel = (channel: "primary" | "auxiliary") => {
-        for (const pairId of [...pairSnapshotEpoch.keys()]) {
-            const assigned = pairSignaling.sessionChannel(pairId);
-            const onChannel =
-                assigned === channel ||
-                (assigned === undefined && channel === "primary");
-            if (!onChannel) continue;
-            pairSnapshotEpoch.delete(pairId);
-            joinedPairs.delete(pairId);
-        }
+    const resetPairRoster = () => {
+        pairSnapshotEpoch.clear();
+        joinedPairs.clear();
     };
 
     const stackUnsubs: Array<() => void> = [];
-    stackUnsubs.push(
-        realtime.on("welcome", () => resetPairRosterForChannel("primary")),
-    );
-    if (auxiliaryRealtime) {
-        stackUnsubs.push(
-            auxiliaryRealtime.on("welcome", () =>
-                resetPairRosterForChannel("auxiliary"),
-            ),
-        );
-    }
+    stackUnsubs.push(realtime.on("welcome", () => resetPairRoster()));
 
     const messagingRef: { current: MessagingService | null } = { current: null };
 
     const peerRegistry = createPeerTransportRegistry({
         localAccount: opts.localAccount,
         realtime,
-        auxiliaryRealtime,
         pairSignaling,
         signaling,
         iceServers: opts.iceServers,
@@ -132,6 +101,7 @@ export function createChatTransportStack(
             };
             svc.handleWireFromRemote?.(remote, raw);
         },
+        onSpaceMembershipHint: opts.onSpaceMembershipHint,
     });
 
     const messaging = createMessagingService({
@@ -154,6 +124,8 @@ export function createChatTransportStack(
         if (!joined.includes(remote)) return;
         if (joined.includes(opts.localAccount)) {
             if (pairSignaling.hasPendingJoins()) return;
+            const state = peerRegistry.getState(remote);
+            if (state === "joining_pair") return;
             peerRegistry.kickNegotiation(remote);
             return;
         }
@@ -169,25 +141,18 @@ export function createChatTransportStack(
             if (!parsed) continue;
             const remote =
                 parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
+            const state = peerRegistry.getState(remote);
+            if (state === "joining_pair") continue;
             peerRegistry.kickNegotiation(remote);
         }
     };
 
     stackUnsubs.push(pairSignaling.on("joinsIdle", kickAllJoinedPeers));
 
-    const ownsPairSession = (
-        sessionId: string,
-        channel: "primary" | "auxiliary",
-    ): boolean => {
-        if (!sessionId.startsWith("wrtc:pair:")) return false;
-        const assigned = pairSignaling.sessionChannel(sessionId);
-        if (!assigned) return channel === "primary";
-        return assigned === channel;
-    };
+    const isPairSession = (sessionId: string) =>
+        sessionId.startsWith("wrtc:pair:");
 
-    const wirePairRealtimeHandlers = (
-        channel: "primary" | "auxiliary",
-        handlers: {
+    const wirePairRealtimeHandlers = (handlers: {
         sessionSnapshot?: (
             sessionId: string,
             joined: readonly string[],
@@ -200,14 +165,14 @@ export function createChatTransportStack(
             kind: string,
             payload: unknown,
         ) => void;
-        }) => ({
+    }) => ({
         sessionSnapshot: (frame: {
             sessionId: string;
             joinedParticipants: readonly string[];
             pendingParticipants: readonly string[];
             epoch: number;
         }) => {
-            if (!ownsPairSession(frame.sessionId, channel)) return;
+            if (!isPairSession(frame.sessionId)) return;
             const prevEpoch = pairSnapshotEpoch.get(frame.sessionId) ?? 0;
             if (frame.epoch < prevEpoch) {
                 return;
@@ -223,7 +188,6 @@ export function createChatTransportStack(
             );
             if (frame.joinedParticipants.includes(opts.localAccount)) {
                 signaling.flushDeferredSignals(frame.sessionId);
-                auxiliarySignaling?.flushDeferredSignals(frame.sessionId);
             }
             kickFromPairRoster(
                 frame.sessionId,
@@ -240,11 +204,11 @@ export function createChatTransportStack(
             sessionId: string;
             participant: string;
         }) => {
-            if (!ownsPairSession(frame.sessionId, channel)) return;
+            if (!isPairSession(frame.sessionId)) return;
             if (pairSignaling.hasPendingJoins()) return;
             const remote = frame.participant;
             if (remote === opts.localAccount) return;
-            void peerRegistry.ensure(remote, "peer_joined");
+            peerRegistry.kickNegotiation(remote);
         },
         signal: (frame: {
             sessionId: string;
@@ -255,7 +219,7 @@ export function createChatTransportStack(
             sdpMid?: string | null;
             sdpMLineIndex?: number | null;
         }) => {
-            if (!ownsPairSession(frame.sessionId, channel)) return;
+            if (!isPairSession(frame.sessionId)) return;
             const parsed = parsePairSessionId(frame.sessionId);
             if (!parsed) return;
             const remote =
@@ -294,18 +258,9 @@ export function createChatTransportStack(
         ) => void;
     }) => {
         unregisterPairHandlers?.();
-        const unregPrimary = opts.realtimeClient.registerHandlers(
-            wirePairRealtimeHandlers("primary", handlers),
+        unregisterPairHandlers = opts.realtimeClient.registerHandlers(
+            wirePairRealtimeHandlers(handlers),
         );
-        const unregAux = opts.auxiliaryRealtimeClient
-            ? opts.auxiliaryRealtimeClient.registerHandlers(
-                  wirePairRealtimeHandlers("auxiliary", handlers),
-              )
-            : null;
-        unregisterPairHandlers = () => {
-            unregPrimary();
-            unregAux?.();
-        };
     };
 
     return {
@@ -323,7 +278,6 @@ export function createChatTransportStack(
             }
             pairSignaling.dispose();
             realtime.dispose();
-            auxiliaryRealtime?.dispose();
         },
     };
 }

@@ -416,7 +416,31 @@ fn join_session_subjective(
     // Deliver any signals buffered while this user had no joined socket.
     let flushed = flush_pending_signals_to_socket(&session_id, user, socket);
 
+    // Multi-pair mesh: one browser tab joins several pair sessions on the same
+    // websocket. Multiple inline sends during the second join abort the recv
+    // action and can kill the socket (no frames reach the client). Return a
+    // single sessionSnapshot; clients complete join from roster ground truth.
+    let socket_has_other_sessions = sig_joins_for_socket(socket)
+        .iter()
+        .any(|row| row.session_id != session_id);
+    if socket_has_other_sessions {
+        let mut out = vec![(
+            socket,
+            build_session_snapshot(&session_id, &auth.participants),
+        )];
+        out.extend(flushed);
+        return out;
+    }
+
     if duplicate_same_socket {
+        if socket_has_other_sessions {
+            let mut out = vec![(
+                socket,
+                build_session_snapshot(&session_id, &auth.participants),
+            )];
+            out.extend(flushed);
+            return out;
+        }
         // Re-send invite so clients can recover after duplicate joinSession (e.g. UI retries).
         let invite = session_invite_frame(&auth, user);
         let mut out = vec![(socket, invite)];
@@ -430,18 +454,6 @@ fn join_session_subjective(
     let invite = session_invite_frame(&auth, user);
     let mut out = vec![(socket, invite.clone())];
     out.extend(flushed);
-
-    // Multi-pair mesh: one browser tab joins several pair sessions on the same
-    // websocket. Full peer fanout during the second join was aborting the recv
-    // action (no frames reached the client). Deliver self invite + snapshot;
-    // peers learn roster from their own joinSession or later snapshots.
-    let socket_has_other_sessions = sig_joins_for_socket(socket)
-        .iter()
-        .any(|row| row.session_id != session_id);
-    if socket_has_other_sessions {
-        out.push((socket, build_session_snapshot(&session_id, &auth.participants)));
-        return out;
-    }
 
     out.extend(fanout_participant_joined(
         &session_id,

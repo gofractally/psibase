@@ -188,7 +188,6 @@ export class PairSessionHub {
 export type StackFixture = {
     account: string;
     rt: FakeRealtimeClient;
-    auxRt: FakeRealtimeClient;
     stack: ChatTransportStack;
 };
 
@@ -199,14 +198,11 @@ export function createStackFixture(
     onInboundBytes?: (remote: string, bytes: Uint8Array) => void,
 ): StackFixture {
     const rt = new FakeRealtimeClient(account, `${account}-primary`);
-    const auxRt = new FakeRealtimeClient(account, `${account}-aux`);
     hub.register(account, rt);
-    hub.register(account, auxRt);
     const stack = createChatTransportStack({
         localAccount: account,
         chainId,
         realtimeClient: rt,
-        auxiliaryRealtimeClient: auxRt,
         iceServers: null,
         onInboundBytes,
         pairJoinStaggerMs: 0,
@@ -214,8 +210,7 @@ export function createStackFixture(
     });
     stack.wireRealtimeHandlers({});
     rt.connect();
-    auxRt.connect();
-    return { account, rt, auxRt, stack };
+    return { account, rt, stack };
 }
 
 export function pairIdFor(a: string, b: string): string {

@@ -104,7 +104,7 @@ import {
     getGroupMessageHistoryStore,
 } from "../lib/group-message-history-store";
 import {
-    mergeTimelineMessagesBySendTimestamp as mergeGroupTimelineMessagesBySendTimestamp,
+    mergeTimelineMessagesWithGroupHistory,
 } from "../lib/group-message-history-ui";
 import {
     deriveSpaceUuidForCanonicalMembers,
@@ -300,6 +300,22 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         scheduleSpacesReloadOnPresenceOnline,
         spacesReloadOnPresenceTimerRef,
     } = useObjectiveSpaces(selfAccount);
+
+    const reloadSpacesIfMissing = useCallback((spaceUuid: string) => {
+        const self = selfRef.current;
+        if (!self) return;
+        const known = resolveVisibleConversation(
+            spaceUuid,
+            self,
+            objectiveSpacesRef.current,
+            contactAccountsRef.current,
+            contactsLoadedRef.current,
+        );
+        if (!known) {
+            void loadObjectiveSpacesRef.current();
+        }
+    }, []);
+
     const [timelineByConversation, setTimelineByConversation] = useState<
         Record<string, PslackTimelineRow[]>
     >({});
@@ -832,31 +848,16 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         (row): row is PslackTimelineMessageRow =>
                             row.kind === "message",
                     );
-                    const mergedMessages =
-                        mergeGroupTimelineMessagesBySendTimestamp(
-                            existingMessages.filter(
-                                (row) => row.status === "sent",
-                            ),
-                            envelopes,
-                        ).map((row) => {
-                            const pending = existingMessages.find(
-                                (existingRow) =>
-                                    existingRow.clientMsgId &&
-                                    existingRow.clientMsgId ===
-                                        row.clientMsgId &&
-                                    existingRow.status !== "sent",
-                            );
-                            return pending
-                                ? ({
-                                      ...row,
-                                      ...pending,
-                                      kind: "message" as const,
-                                  } satisfies PslackTimelineMessageRow)
-                                : ({
-                                      ...row,
-                                      kind: "message" as const,
-                                  } satisfies PslackTimelineMessageRow);
-                        });
+                    const mergedMessages = mergeTimelineMessagesWithGroupHistory(
+                        existingMessages,
+                        envelopes,
+                    ).map(
+                        (row) =>
+                            ({
+                                ...row,
+                                kind: "message" as const,
+                            }) satisfies PslackTimelineMessageRow,
+                    );
                     next[spaceUuid] = sortTimelineRows([
                         ...callEvents,
                         ...mergedMessages,
@@ -1188,9 +1189,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     applyInboundChatMessageRef.current = applyInboundChatMessage;
 
     const applyInboundDmDataChannelMessage = useCallback(
-        (envelope: ChatDataMessageEnvelope) => {
+        (envelope: ChatDataMessageEnvelope): boolean => {
             const self = selfRef.current;
-            if (!self || envelope.from === self) return;
+            if (!self || envelope.from === self) return false;
 
             if (
                 !isInboundContactPeer(
@@ -1200,7 +1201,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     contactsLoadedRef.current,
                 )
             ) {
-                return;
+                return false;
             }
 
             const chain = chainIdRef.current;
@@ -1217,14 +1218,15 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 clientMsgId: envelope.clientMsgId,
                 clientTime: envelope.sendTimestamp,
             });
+            return true;
         },
         [],
     );
 
     const applyInboundGroupDataChannelMessage = useCallback(
-        (envelope: ChatDataMessageEnvelope) => {
+        (envelope: ChatDataMessageEnvelope): boolean => {
             const self = selfRef.current;
-            if (!self || envelope.from === self) return;
+            if (!self || envelope.from === self) return false;
 
             if (
                 !isInboundContactPeer(
@@ -1234,7 +1236,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     contactsLoadedRef.current,
                 )
             ) {
-                return;
+                return false;
             }
 
             const chain = chainIdRef.current;
@@ -1268,28 +1270,16 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     sendTimestamp: envelope.sendTimestamp,
                     clientMsgId: envelope.clientMsgId,
                 });
-                const mergedMessages =
-                    mergeGroupTimelineMessagesBySendTimestamp(
-                        existingMessages.filter((row) => row.status === "sent"),
-                        [inboundEnvelope],
-                    ).map((row) => {
-                        const pending = existingMessages.find(
-                            (existingRow) =>
-                                existingRow.clientMsgId &&
-                                existingRow.clientMsgId === row.clientMsgId &&
-                                existingRow.status !== "sent",
-                        );
-                        return pending
-                            ? ({
-                                  ...row,
-                                  ...pending,
-                                  kind: "message" as const,
-                              } satisfies PslackTimelineMessageRow)
-                            : ({
-                                  ...row,
-                                  kind: "message" as const,
-                              } satisfies PslackTimelineMessageRow);
-                    });
+                const mergedMessages = mergeTimelineMessagesWithGroupHistory(
+                    existingMessages,
+                    [inboundEnvelope],
+                ).map(
+                    (row) =>
+                        ({
+                            ...row,
+                            kind: "message" as const,
+                        }) satisfies PslackTimelineMessageRow,
+                );
                 return {
                     ...prev,
                     [spaceId]: sortTimelineRows([
@@ -1311,6 +1301,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 () => flushPendingMessagesRef.current(),
                 0,
             );
+            return true;
         },
         [persistGroupHistoryMessage],
     );
@@ -1466,28 +1457,16 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     (row): row is PslackTimelineMessageRow =>
                         row.kind === "message",
                 );
-                const mergedMessages =
-                    mergeGroupTimelineMessagesBySendTimestamp(
-                        existingMessages.filter((row) => row.status === "sent"),
-                        incoming,
-                    ).map((row) => {
-                        const pending = existingMessages.find(
-                            (existingRow) =>
-                                existingRow.clientMsgId &&
-                                existingRow.clientMsgId === row.clientMsgId &&
-                                existingRow.status !== "sent",
-                        );
-                        return pending
-                            ? ({
-                                  ...row,
-                                  ...pending,
-                                  kind: "message" as const,
-                              } satisfies PslackTimelineMessageRow)
-                            : ({
-                                  ...row,
-                                  kind: "message" as const,
-                              } satisfies PslackTimelineMessageRow);
-                    });
+                const mergedMessages = mergeTimelineMessagesWithGroupHistory(
+                    existingMessages,
+                    incoming,
+                ).map(
+                    (row) =>
+                        ({
+                            ...row,
+                            kind: "message" as const,
+                        }) satisfies PslackTimelineMessageRow,
+                );
                 return {
                     ...prev,
                     [spaceUuid]: sortTimelineRows([
@@ -2420,13 +2399,6 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         if (!chatDataOrchestratorRef.current) {
             chatDataOrchestratorRef.current = createChatTransportBridge({
             getRealtime: () => realtimeClientRef.current,
-            createAuxiliaryRealtime: () =>
-                new RealtimeClient({
-                    authTokenProvider: getHomepageQueryToken,
-                    reconnect: { initialDelayMs: 500, maxDelayMs: 30_000 },
-                    debugLog: (event, detail) =>
-                        chatDataRecord(`aux-${event}`, detail),
-                }),
             getSelf: () => selfRef.current,
             getChainId: () => chainIdRef.current,
             getIceServers: () => iceServersRef.current,
@@ -2436,6 +2408,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     (row) => row.conversationId === envelope.spaceUuid,
                 );
                 if (!conversation && self) {
+                    reloadSpacesIfMissing(envelope.spaceUuid);
                     conversation = resolveVisibleConversation(
                         envelope.spaceUuid,
                         self,
@@ -2445,12 +2418,14 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     );
                 }
                 if (conversation?.kind === "group") {
-                    applyInboundGroupDataChannelMessageRef.current(envelope);
-                } else {
-                    applyInboundDmDataChannelMessageRef.current(envelope);
+                    return applyInboundGroupDataChannelMessageRef.current(
+                        envelope,
+                    );
                 }
+                return applyInboundDmDataChannelMessageRef.current(envelope);
             },
             onInboundHistorySync: (envelope) => {
+                reloadSpacesIfMissing(envelope.spaceUuid);
                 const conversation = conversationsRef.current.find(
                     (row) => row.conversationId === envelope.spaceUuid,
                 );
@@ -2501,7 +2476,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     }, 800);
                 });
             },
+            onSpaceMembershipHint: () => {
+                void loadObjectiveSpacesRef.current();
+            },
             onMessageAck: (spaceUuid, envelope) => {
+                reloadSpacesIfMissing(spaceUuid);
                 chatDataLog("message ack received", {
                     space: shortSpaceId(spaceUuid),
                     from: envelope.from,
@@ -3034,6 +3013,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             try {
                 await ensureGroup(uniqueOthers);
                 await loadObjectiveSpaces();
+                chatDataOrchestratorRef.current?.notifySpaceMembershipHint(
+                    uniqueOthers,
+                );
             } catch (e) {
                 pendingGroupKeyRef.current = null;
                 const detail =
@@ -3982,10 +3964,15 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         const w = window as Window & {
             __chatChurnTeardown?: () => void;
             __chatChurnSuspend?: () => void;
+            __chatChurnOpenDm?: (peerAccount: string) => void;
             __chatChurnState?: () => Record<string, unknown>;
         };
         w.__chatChurnTeardown = dropChatTransportForNavigation;
         w.__chatChurnSuspend = suspendChatNavigation;
+        w.__chatChurnOpenDm = (peerAccount: string) => {
+            recordChurnTrace("open-dm-debug", { peer: peerAccount });
+            openOrFocusDm(peerAccount);
+        };
         const snapshotChurnState = () => {
             const selected = selectedConversationId ?? null;
             const listed = selected
@@ -4020,6 +4007,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 wasOnChatRoute: wasOnChatRouteRef.current,
                 onChatRoute,
                 pathname: location.pathname,
+                selfAccount,
                 selectedConversationId: selected,
                 composePendingDmPeer: composePendingDmPeerRef.current,
                 pendingDmMember: pendingDmMemberRef.current,
@@ -4058,14 +4046,17 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         return () => {
             delete w.__chatChurnTeardown;
             delete w.__chatChurnSuspend;
+            delete w.__chatChurnOpenDm;
             delete w.__chatChurnState;
             delete w.__chatChurnProbe;
         };
     }, [
         dropChatTransportForNavigation,
         suspendChatNavigation,
+        openOrFocusDm,
         onChatRoute,
         location.pathname,
+        selfAccount,
         selectedConversationId,
         composerDisabledReason,
         threadEstablishingConnection,

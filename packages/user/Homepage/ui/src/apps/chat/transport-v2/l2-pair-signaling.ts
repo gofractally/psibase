@@ -35,9 +35,7 @@ export interface PairSignaling {
     isJoined(pairId: string): boolean;
     /** True while pair joinSession work is still queued or awaiting snapshot. */
     hasPendingJoins(): boolean;
-    /** Which websocket owns signaling for this pair (undefined until first joinPair). */
-    sessionChannel(pairId: string): PairChannel | undefined;
-    /** True when the websocket assigned to this pair is session-ready. */
+    /** True when the websocket is session-ready. */
     isRealtimeReady(pairId: string): boolean;
     /** Apply server roster — emits `pairJoined` when self joins. */
     applySessionSnapshot(
@@ -51,19 +49,14 @@ export interface PairSignaling {
     dispose(): void;
 }
 
-type PairChannel = "primary" | "auxiliary";
-
 export type PairSignalingOptions = {
     localAccount: string;
     realtime: RealtimeTransport;
     signaling: WebRtcSignalingClient;
-    /** Second websocket — one pair join per socket (server drops 2nd join on same ws). */
-    auxiliaryRealtime?: RealtimeTransport;
-    auxiliarySignaling?: WebRtcSignalingClient;
     /** Server roster gate — defer SDP until self appears in joinedParticipants. */
     isJoinedOnServer?: (pairId: string) => boolean;
     onServerJoined?: (pairId: string) => void;
-    /** Delay between consecutive joinSession sends on the same channel. */
+    /** Delay between consecutive joinSession sends on the same socket. */
     joinStaggerMs?: number;
     /** Retry joinSession until a sessionSnapshot arrives. */
     joinRetryMs?: number;
@@ -80,12 +73,8 @@ export function createPairSignaling(
     const joinQueue: string[] = [];
     let joinDrainTimer: ReturnType<typeof setTimeout> | null = null;
     let joinRetryTimer: ReturnType<typeof setInterval> | null = null;
-    /** Pair id whose joinSession is in flight per websocket channel. */
-    const inFlightByChannel = new Map<PairChannel, string | null>([
-        ["primary", null],
-        ["auxiliary", null],
-    ]);
-    const pairChannel = new Map<string, PairChannel>();
+    /** Pair id whose joinSession is currently in flight. */
+    let inFlightJoin: string | null = null;
 
     const joinStaggerMs = opts.joinStaggerMs ?? 50;
     const joinRetryMs = opts.joinRetryMs ?? 2_000;
@@ -115,6 +104,8 @@ export function createPairSignaling(
         joinRetryTimer = null;
     };
 
+    const isWsReady = () => opts.realtime.isReady;
+
     const ensureJoinRetry = () => {
         if (joinRetryMs <= 0 || joinRetryTimer != null || awaitingSnapshot.size === 0) {
             return;
@@ -129,8 +120,8 @@ export function createPairSignaling(
                         continue;
                     }
                     joinRetryCounts.set(pairId, attempts + 1);
-                    if (!isChannelReady(channelFor(pairId))) continue;
-                    signalingFor(pairId).joinSession(pairId);
+                    if (!isWsReady()) continue;
+                    opts.signaling.joinSession(pairId);
                 }
             }
             if (awaitingSnapshot.size === 0) {
@@ -144,39 +135,12 @@ export function createPairSignaling(
         ensureJoinRetry();
     };
 
-    const hasInFlightJoin = () =>
-        inFlightByChannel.get("primary") != null ||
-        inFlightByChannel.get("auxiliary") != null;
+    const hasInFlightJoin = () => inFlightJoin != null;
 
     const hasPendingJoins = () =>
         joinQueue.length > 0 ||
         hasInFlightJoin() ||
         awaitingSnapshot.size > 0;
-
-    const channelFor = (pairId: string): PairChannel => {
-        const existing = pairChannel.get(pairId);
-        if (existing) return existing;
-        const primaryTaken = [...pairChannel.values()].includes("primary");
-        const useAuxiliary = opts.auxiliarySignaling != null && primaryTaken;
-        const channel: PairChannel = useAuxiliary ? "auxiliary" : "primary";
-        pairChannel.set(pairId, channel);
-        return channel;
-    };
-
-    const signalingFor = (pairId: string): WebRtcSignalingClient =>
-        channelFor(pairId) === "auxiliary" && opts.auxiliarySignaling
-            ? opts.auxiliarySignaling
-            : opts.signaling;
-
-    const realtimeFor = (pairId: string): RealtimeTransport =>
-        channelFor(pairId) === "auxiliary" && opts.auxiliaryRealtime
-            ? opts.auxiliaryRealtime
-            : opts.realtime;
-
-    const isChannelReady = (channel: PairChannel) =>
-        channel === "auxiliary"
-            ? (opts.auxiliaryRealtime?.isReady ?? false)
-            : opts.realtime.isReady;
 
     const maybeEmitJoinsIdle = () => {
         if (!hasPendingJoins()) {
@@ -188,16 +152,13 @@ export function createPairSignaling(
     };
 
     const completeInFlightJoin = (pairId: string) => {
-        const channel = pairChannel.get(pairId);
-        if (!channel || inFlightByChannel.get(channel) !== pairId) return;
-        inFlightByChannel.set(channel, null);
+        if (inFlightJoin !== pairId) return;
+        inFlightJoin = null;
         if (joinQueue.length > 0) {
             scheduleDrain(true);
             return;
         }
-        if (!hasInFlightJoin()) {
-            maybeEmitJoinsIdle();
-        }
+        maybeEmitJoinsIdle();
     };
 
     const scheduleDrain = (afterCompleted = false) => {
@@ -215,26 +176,19 @@ export function createPairSignaling(
     const drainNextJoin = () => {
         joinDrainTimer = null;
         if (joinQueue.length === 0) return;
+        if (inFlightJoin != null) return;
+        if (!isWsReady()) return;
 
-        let dispatched = false;
-        for (let i = 0; i < joinQueue.length; i++) {
-            const pairId = joinQueue[i]!;
-            const channel = channelFor(pairId);
-            if (inFlightByChannel.get(channel) != null) continue;
-            if (!isChannelReady(channel)) continue;
-            joinQueue.splice(i, 1);
-            inFlightByChannel.set(channel, pairId);
-            noteJoinSent(pairId);
-            recordTransportLifecycle("l2", "join-sent", {
-                pairId,
-                channel,
-                localAccount: opts.localAccount,
-            });
-            signalingFor(pairId).joinSession(pairId);
-            dispatched = true;
-            break;
-        }
-        if (dispatched && joinQueue.length > 0) {
+        const pairId = joinQueue.shift()!;
+        inFlightJoin = pairId;
+        noteJoinSent(pairId);
+        recordTransportLifecycle("l2", "join-sent", {
+            pairId,
+            localAccount: opts.localAccount,
+        });
+        opts.signaling.joinSession(pairId);
+
+        if (joinQueue.length > 0) {
             scheduleDrain();
         }
     };
@@ -252,15 +206,14 @@ export function createPairSignaling(
         });
     };
 
-    const rejoinAllForChannel = (channel: PairChannel) => {
+    const rejoinAll = () => {
         if (joinDrainTimer != null) {
             clearTimeout(joinDrainTimer);
             joinDrainTimer = null;
         }
         flushScheduled = false;
+        inFlightJoin = null;
         for (const pairId of activePairs) {
-            if (channelFor(pairId) !== channel) continue;
-            inFlightByChannel.set(channel, null);
             if (!joinQueue.includes(pairId)) {
                 joinQueue.push(pairId);
             }
@@ -270,18 +223,17 @@ export function createPairSignaling(
         }
     };
 
-    const invalidateJoinStateForChannel = (channel: PairChannel) => {
+    const invalidateJoinState = () => {
         for (const pairId of activePairs) {
-            if (channelFor(pairId) !== channel) continue;
             joinedPairs.delete(pairId);
             serverJoined.set(pairId, false);
             awaitingSnapshot.delete(pairId);
             joinRetryCounts.delete(pairId);
-            if (inFlightByChannel.get(channel) === pairId) {
-                inFlightByChannel.set(channel, null);
-            }
             const idx = joinQueue.indexOf(pairId);
             if (idx >= 0) joinQueue.splice(idx, 1);
+        }
+        if (inFlightJoin != null) {
+            inFlightJoin = null;
         }
         if (awaitingSnapshot.size === 0) {
             stopJoinRetry();
@@ -292,25 +244,12 @@ export function createPairSignaling(
         if (local === remote) return;
         const pairId = pairSessionId(local, remote);
         activePairs.add(pairId);
-        channelFor(pairId);
     };
 
     const unsubs: Array<() => void> = [
-        opts.realtime.on("welcome", () =>
-            invalidateJoinStateForChannel("primary"),
-        ),
-        opts.realtime.on("ready", () => rejoinAllForChannel("primary")),
+        opts.realtime.on("welcome", () => invalidateJoinState()),
+        opts.realtime.on("ready", () => rejoinAll()),
     ];
-    if (opts.auxiliaryRealtime) {
-        unsubs.push(
-            opts.auxiliaryRealtime.on("welcome", () =>
-                invalidateJoinStateForChannel("auxiliary"),
-            ),
-            opts.auxiliaryRealtime.on("ready", () =>
-                rejoinAllForChannel("auxiliary"),
-            ),
-        );
-    }
 
     return {
         joinPair(local, remote) {
@@ -325,7 +264,7 @@ export function createPairSignaling(
             if (joinedPairs.has(pairId)) {
                 return;
             }
-            if (isChannelReady(channelFor(pairId))) {
+            if (isWsReady()) {
                 enqueueJoin(pairId);
             }
         },
@@ -337,22 +276,20 @@ export function createPairSignaling(
             joinedPairs.delete(pairId);
             serverJoined.delete(pairId);
             awaitingSnapshot.delete(pairId);
-            const channel = pairChannel.get(pairId);
-            pairChannel.delete(pairId);
             const idx = joinQueue.indexOf(pairId);
             if (idx >= 0) joinQueue.splice(idx, 1);
-            if (channel && inFlightByChannel.get(channel) === pairId) {
-                inFlightByChannel.set(channel, null);
+            if (inFlightJoin === pairId) {
+                inFlightJoin = null;
                 scheduleDrain();
             }
             if (awaitingSnapshot.size === 0) {
                 stopJoinRetry();
             }
-            signalingFor(pairId).leaveSession(pairId, reason);
+            opts.signaling.leaveSession(pairId, reason);
         },
 
         signal(pairId, payload) {
-            signalingFor(pairId).signal(payload);
+            opts.signaling.signal(payload);
         },
 
         isJoined(pairId) {
@@ -364,27 +301,48 @@ export function createPairSignaling(
             return hasPendingJoins();
         },
 
-        sessionChannel(pairId: string) {
-            return pairChannel.get(pairId);
-        },
-
-        isRealtimeReady(pairId: string) {
-            return isChannelReady(channelFor(pairId));
+        isRealtimeReady(_pairId: string) {
+            return isWsReady();
         },
 
         applySessionSnapshot(pairId, joinedParticipants) {
+            const parsed = parsePairSessionId(pairId);
+            const remote = parsed
+                ? parsed[0] === opts.localAccount
+                    ? parsed[1]
+                    : parsed[0]
+                : null;
+            const selfOnRoster = joinedParticipants.includes(opts.localAccount);
+            const remoteOnRoster =
+                remote != null && joinedParticipants.includes(remote);
+
+            if (!selfOnRoster) {
+                joinedPairs.delete(pairId);
+                serverJoined.set(pairId, false);
+            }
+
+            if (selfOnRoster && !serverJoined.get(pairId)) {
+                serverJoined.set(pairId, true);
+                opts.onServerJoined?.(pairId);
+            }
+
+            // Server acknowledged this pair join — drain the next queued pair
+            // join on the same socket even if the remote is still pending.
+            if (selfOnRoster) {
+                completeInFlightJoin(pairId);
+            }
+
+            if (!remoteOnRoster) {
+                if (remote) ensureActivePair(opts.localAccount, remote);
+                return;
+            }
+
             awaitingSnapshot.delete(pairId);
-            completeInFlightJoin(pairId);
             if (awaitingSnapshot.size === 0) {
                 stopJoinRetry();
             }
-            const parsed = parsePairSessionId(pairId);
-            if (parsed) {
-                const remote =
-                    parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
-                ensureActivePair(opts.localAccount, remote);
-            }
-            if (joinedParticipants.includes(opts.localAccount)) {
+            if (remote) ensureActivePair(opts.localAccount, remote);
+            if (selfOnRoster) {
                 markJoined(pairId);
             }
             maybeEmitJoinsIdle();

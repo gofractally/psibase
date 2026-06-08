@@ -64,6 +64,12 @@ describe("chat data channel wire envelopes", () => {
         expect(parseChatDataWireEnvelope(raw)).toEqual(envelope);
     });
 
+    it("round-trips spaceMembershipHint", () => {
+        const envelope = { t: "spaceMembershipHint" as const };
+        const raw = serializeChatDataWireEnvelope(envelope);
+        expect(parseChatDataWireEnvelope(raw)).toEqual(envelope);
+    });
+
     it("rejects messageAck with missing required fields", () => {
         // No clientMsgId.
         expect(

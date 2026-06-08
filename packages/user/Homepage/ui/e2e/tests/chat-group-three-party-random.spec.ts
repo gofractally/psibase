@@ -11,6 +11,7 @@ import {
     flushPendingCatchUp,
     FLUSH_ENTRY_BUDGET_MS,
     dumpTransportDeliverySnapshot,
+    openChatForOfflineRejoinPendingFlush,
 } from "../lib/churn-pending-flush";
 import {
     dumpChurnDiagTraces,
@@ -34,6 +35,7 @@ import {
 import {
     assertOutboundDmRouting,
     assertPendingDeliveredForPair,
+    bootstrapGroupMeshPeers,
     createGroupChat,
     ensureContact,
     expectPendingOutboundMessage,
@@ -44,14 +46,13 @@ import {
     openDmThread,
     openExistingGroupChat,
     openExistingGroupChatMinimal,
-    openChat,
     readChatSelectionState,
     sendChatMessage,
+    prepareOnlineDmPairMesh,
+    prepareParkedActorForMesh,
     sendChurnGroupMessage,
-    waitForDmThreadWithPeer,
-    wakeActorFromChurnNoRealtime,
-    startDmWithContact,
-    wakeForDmInteraction,
+    waitForGroupMeshReady,
+    waitForSelectedGroupSpace,
 } from "../lib/chat-ui";
 import { attachDiagnostics } from "../lib/diagnostics";
 import {
@@ -159,10 +160,25 @@ async function assertGroupLiveDelivery(
     online: Set<PartyActor>,
     from: PartyActor,
     body: string,
+    options: {
+        baseUrl: string;
+        groupSpaceId: string;
+        names: ReturnType<typeof uniqueThreePartyNames>;
+    },
 ): Promise<void> {
     for (const who of ACTORS) {
         if (who === from || !online.has(who)) continue;
-        await expectThreadMessage(pageFor(who, pages), body, {
+        const page = pageFor(who, pages);
+        const peers = groupPeersFor(who, options.names);
+        await focusChurnGroupThread(page, options.baseUrl, peers, {
+            groupSpaceId: options.groupSpaceId,
+            composerTimeout: COMPOSER_MS,
+        });
+        await waitForSelectedGroupSpace(page, options.groupSpaceId, {
+            timeout: 30_000,
+        });
+        await bootstrapGroupMeshPeers(page, peers);
+        await expectThreadMessage(page, body, {
             timeout: MESH_MS,
         });
     }
@@ -322,17 +338,34 @@ test.describe("Chat group three-party random churn @manual", () => {
                         step.kind === "offlineRejoin"
                             ? ledger.forRecipient(step.who).length
                             : 0;
+                    const onlineRecipientCount = ACTORS.filter(
+                        (who) => online.has(who),
+                    ).length;
+                    const groupDeliveryRecipients =
+                        step.kind === "groupSend"
+                            ? ACTORS.filter(
+                                  (who) =>
+                                      online.has(who) &&
+                                      who !== step.from,
+                              ).length
+                            : 0;
                     const defaultBudgetMs =
                         step.kind === "offlineRejoin"
                             ? OFFLINE_STEP_MS +
                               pendingForFlush * FLUSH_ENTRY_BUDGET_MS
                             : timing.mode === "mesh" &&
-                                (step.kind === "homeNav" ||
-                                    step.kind === "dmSend" ||
-                                    step.kind === "groupSend" ||
-                                    step.kind === "reselectGroup")
-                              ? Math.max(STEP_MS, MESH_MS)
-                              : STEP_MS;
+                                step.kind === "groupSend"
+                              ? COMPOSER_MS +
+                                groupDeliveryRecipients *
+                                    (COMPOSER_MS + MESH_MS)
+                              : timing.mode === "mesh" &&
+                                  step.kind === "dmSend"
+                                ? COMPOSER_MS + MESH_MS * 2
+                                : timing.mode === "mesh" &&
+                                  (step.kind === "homeNav" ||
+                                      step.kind === "reselectGroup")
+                                ? Math.max(STEP_MS, MESH_MS)
+                                : STEP_MS;
                     const budgetMs = stepBudgetMsForDiag(
                         stepIndex,
                         defaultBudgetMs,
@@ -373,6 +406,11 @@ test.describe("Chat group three-party random churn @manual", () => {
                                 online,
                                 step.from,
                                 step.body,
+                                {
+                                    baseUrl: chainInfo!.baseUrl,
+                                    groupSpaceId,
+                                    names,
+                                },
                             );
                             if (shouldParkActorNoRealtime(stepIndex, plan)) {
                                 await parkActorNoRealtime(
@@ -387,10 +425,41 @@ test.describe("Chat group three-party random churn @manual", () => {
                         if (step.kind === "dmSend") {
                             const page = pageFor(step.from, pages);
                             const peer = actorAccount(step.to, names);
-                            await wakeForDmInteraction(
+                            const senderAccount = actorAccount(
+                                step.from,
+                                names,
+                            );
+                            if (online.has(step.to)) {
+                                await prepareParkedActorForMesh(
+                                    pageFor(step.to, pages),
+                                    chainInfo!.baseUrl,
+                                    groupSpaceId,
+                                    groupPeersFor(step.to, names),
+                                    {
+                                        composerTimeout: COMPOSER_MS,
+                                        forDm: true,
+                                    },
+                                );
+                            }
+                            await prepareParkedActorForMesh(
                                 page,
                                 chainInfo!.baseUrl,
+                                groupSpaceId,
+                                groupPeersFor(step.from, names),
+                                {
+                                    composerTimeout: COMPOSER_MS,
+                                    forDm: true,
+                                },
                             );
+                            if (online.has(step.to)) {
+                                await prepareOnlineDmPairMesh(
+                                    page,
+                                    pageFor(step.to, pages),
+                                    senderAccount,
+                                    peer,
+                                    { timeout: 60_000 },
+                                );
+                            }
                             await openDmThread(page, chainInfo!.baseUrl, peer, {
                                 groupSpaceId,
                                 gotoTimeout: COMPOSER_MS,
@@ -407,6 +476,7 @@ test.describe("Chat group three-party random churn @manual", () => {
                                     page,
                                     step.body,
                                     groupSpaceId,
+                                    peer,
                                 );
                                 ledger.record({
                                     body: step.body,
@@ -434,6 +504,7 @@ test.describe("Chat group three-party random churn @manual", () => {
                                             step.to,
                                             names,
                                         ),
+                                        threadOpen: "live",
                                     },
                                 );
                             }
@@ -547,33 +618,11 @@ test.describe("Chat group three-party random churn @manual", () => {
                             console.log(
                                 `[random-churn] ${label} phase=open-chat-for-flush`,
                             );
-                            await openChat(page, chainInfo!.baseUrl);
-                            const firstDm = pendingForWho.find(
-                                (e) => e.channel === "dm",
+                            await openChatForOfflineRejoinPendingFlush(
+                                page,
+                                chainInfo!.baseUrl,
+                                pendingForWho,
                             );
-                            const hasDmSidebar = await page.evaluate(() => {
-                                const churn = (
-                                    window as Window & {
-                                        __chatChurnState?: () => {
-                                            conversationListSummary?: {
-                                                dm?: number;
-                                            };
-                                        };
-                                    }
-                                ).__chatChurnState?.();
-                                return (
-                                    (churn?.conversationListSummary?.dm ??
-                                        0) > 0
-                                );
-                            });
-                            if (firstDm && !hasDmSidebar) {
-                                await startDmWithContact(
-                                    page,
-                                    chainInfo!.baseUrl,
-                                    actorAccount(firstDm.from, names),
-                                    { groupSpaceId },
-                                );
-                            }
                         } else {
                             console.log(
                                 `[random-churn] ${label} phase=open-group`,
@@ -601,6 +650,28 @@ test.describe("Chat group three-party random churn @manual", () => {
                 const plan = buildChurnPlan(BASE_SEED, iteration);
                 const baseline = `rand-${iteration}-baseline`;
                 const stepFailures: string[] = [];
+
+                await withChurnStepTimeout(
+                    `iter=${iteration} mesh-ready`,
+                    Math.max(MESH_MS, 180_000),
+                    async () => {
+                        const alicePeers = groupPeersFor("alice", names);
+                        const bobPeers = groupPeersFor("bob", names);
+                        const carolPeers = groupPeersFor("carol", names);
+                        await bootstrapGroupMeshPeers(alicePage, alicePeers);
+                        await bootstrapGroupMeshPeers(bobPage!, bobPeers);
+                        await bootstrapGroupMeshPeers(carolPage!, carolPeers);
+                        await waitForGroupMeshReady(alicePage, alicePeers, {
+                            timeout: Math.max(MESH_MS, 180_000),
+                        });
+                        await waitForGroupMeshReady(bobPage!, bobPeers, {
+                            timeout: Math.max(MESH_MS, 180_000),
+                        });
+                        await waitForGroupMeshReady(carolPage!, carolPeers, {
+                            timeout: Math.max(MESH_MS, 180_000),
+                        });
+                    },
+                );
 
                 await withChurnStepTimeout(
                     `iter=${iteration} baseline-send`,

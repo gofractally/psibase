@@ -5,6 +5,7 @@ import {
     type ChatDataMessageEnvelope,
     type ChatDataWireEnvelope,
     type ChatHistorySyncEnvelope,
+    type SpaceMembershipHintEnvelope,
 } from "./chat-data-envelope";
 import {
     chatDataRecord,
@@ -37,6 +38,8 @@ export type ChatDataPeerHandlers = {
      * channel writes are not reliable on their own).
      */
     onMessageAck?: (envelope: ChatDataMessageAckEnvelope) => void;
+    /** Peer created or joined a group on chain — reload sidebar spaces. */
+    onSpaceMembershipHint?: () => void;
     onFailed?: (detail: string) => void;
     /** Peer or datachannel lost but session may resume (peer navigated away, ICE drop, etc.). */
     onTransportLost?: (detail: string) => void;
@@ -722,6 +725,12 @@ export class ChatDataWebRtcPeer {
         return this.sendWireEnvelope(envelope);
     }
 
+    sendSpaceMembershipHint(
+        envelope: SpaceMembershipHintEnvelope,
+    ): boolean {
+        return this.sendWireEnvelope(envelope);
+    }
+
     private sendWireEnvelope(envelope: ChatDataWireEnvelope): boolean {
         if (this.disposed || !this.dataChannelReady || !this.dataChannel) {
             return false;
@@ -1029,6 +1038,8 @@ export class ChatDataWebRtcPeer {
                 this.handlers.onChatHistorySync?.(envelope);
             } else if (envelope.t === "messageAck") {
                 this.handlers.onMessageAck?.(envelope);
+            } else if (envelope.t === "spaceMembershipHint") {
+                this.handlers.onSpaceMembershipHint?.();
             }
         };
     }

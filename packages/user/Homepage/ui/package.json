@@ -13,6 +13,7 @@
         "e2e": "playwright test --config e2e/playwright.config.ts",
         "e2e:headed": "playwright test --config e2e/playwright.config.ts --headed",
         "e2e:dm-click-debug": "playwright test --config e2e/playwright.config.ts e2e/tests/chat-dm-sidebar-click-debug.spec.ts",
+        "e2e:mesh:three-party": "playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party.spec.ts",
         "e2e:random-churn": "PSIBASE_E2E_RANDOM_CHURN_RUNS=${PSIBASE_E2E_RANDOM_CHURN_RUNS:-2} playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
         "e2e:random-churn:mesh": "PSIBASE_E2E_RANDOM_CHURN_RUNS=${PSIBASE_E2E_RANDOM_CHURN_RUNS:-1} PSIBASE_E2E_RANDOM_CHURN_SPEED=mesh PSIBASE_E2E_RANDOM_CHURN_STRICT=1 playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",
         "e2e:random-churn:decaf": "PSIBASE_E2E_RANDOM_CHURN_RUNS=1 PSIBASE_E2E_RANDOM_CHURN_SEED=0xdecafbad PSIBASE_E2E_RANDOM_CHURN_SPEED=mesh PSIBASE_E2E_RANDOM_CHURN_STRICT=1 PSIBASE_E2E_RANDOM_CHURN_LEGACY_PLAN=1 PSIBASE_E2E_RANDOM_CHURN_OFFLINE=1 PSIBASE_E2E_RANDOM_CHURN_TIMEOUT_SEC=4800 playwright test --config e2e/playwright.config.ts e2e/tests/chat-group-three-party-random.spec.ts",

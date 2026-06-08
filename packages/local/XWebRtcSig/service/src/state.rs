@@ -82,8 +82,8 @@ pub mod tables {
         }
 
         #[secondary_key(1)]
-        fn by_socket(&self) -> i32 {
-            self.socket
+        fn by_socket(&self) -> (i32, String) {
+            (self.socket, self.session_id.clone())
         }
     }
 
@@ -361,8 +361,9 @@ pub fn sig_joins_for_session(session_id: &str) -> Vec<SigSessionJoinRow> {
 
 pub fn sig_joins_for_socket(socket: i32) -> Vec<SigSessionJoinRow> {
     SigSessionJoinTable::read()
-        .get_index_by_socket()
-        .range(socket..=socket)
+        .get_index_pk()
+        .iter()
+        .filter(|row| row.socket == socket)
         .collect()
 }
 

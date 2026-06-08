@@ -54,6 +54,7 @@ function createMockPeerRegistry(): PeerTransportRegistry & {
     return {
         sent,
         ensure: vi.fn(async () => {}),
+        kickNegotiation: vi.fn(),
         getState: vi.fn((remote: string) => states.get(remote) ?? "absent"),
         send(remote, bytes) {
             if (states.get(remote) !== "usable") {
@@ -278,6 +279,98 @@ describe("l4-messaging-service", () => {
         expect(messaging.getPendingCount(msgId)).toEqual({
             delivered: 1,
             total: 2,
+        });
+    });
+
+    it("does not auto-ack inbound chatMessage on wire parse", async () => {
+        const realtime = createMockRealtime({ alice: true });
+        const peerRegistry = createMockPeerRegistry();
+        const messaging = createMessagingService({
+            localAccount: "bob",
+            chainId: "test-chain-inbound",
+            realtime,
+            peerRegistry,
+        }) as ReturnType<typeof createMessagingService> & {
+            handleWireFromRemote: (remote: string, raw: string) => void;
+        };
+        peerRegistry.emitUsable("alice");
+
+        const inbound: Array<{ clientMsgId: string; remote: string }> = [];
+        messaging.onInbound((envelope) => {
+            inbound.push({
+                clientMsgId: envelope.clientMsgId,
+                remote: envelope.remote,
+            });
+        });
+
+        messaging.handleWireFromRemote(
+            "alice",
+            serializeChatDataMessage({
+                t: "chatMessage",
+                spaceUuid: "space:dm",
+                from: "alice",
+                body: "hi",
+                sendTimestamp: 42,
+                clientMsgId: "msg-in-1",
+            }),
+        );
+
+        expect(inbound).toEqual([{ clientMsgId: "msg-in-1", remote: "alice" }]);
+        expect(peerRegistry.sent).toHaveLength(0);
+    });
+
+    it("acknowledgeInbound sends a messageAck to the wire remote", () => {
+        const realtime = createMockRealtime({ alice: true });
+        const peerRegistry = createMockPeerRegistry();
+        const messaging = createMessagingService({
+            localAccount: "bob",
+            chainId: "test-chain-ack",
+            realtime,
+            peerRegistry,
+        });
+        peerRegistry.emitUsable("alice");
+
+        messaging.acknowledgeInbound("alice", "space:dm", "msg-in-1");
+
+        expect(peerRegistry.sent).toHaveLength(1);
+        const { remote, bytes } = peerRegistry.sent[0]!;
+        expect(remote).toBe("alice");
+        expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual({
+            t: "messageAck",
+            spaceUuid: "space:dm",
+            clientMsgId: "msg-in-1",
+            from: "bob",
+        });
+    });
+
+    it("retries accepted inbound acks when the peer becomes usable", () => {
+        const realtime = createMockRealtime({ alice: true });
+        const peerRegistry = createMockPeerRegistry();
+        const messaging = createMessagingService({
+            localAccount: "bob",
+            chainId: "test-chain-ack-retry",
+            realtime,
+            peerRegistry,
+        });
+
+        messaging.acknowledgeInbound("alice", "space:group", "msg-in-1");
+
+        expect(peerRegistry.sent).toHaveLength(0);
+        expect(peerRegistry.ensure).toHaveBeenCalledWith(
+            "alice",
+            "message_enqueued",
+        );
+
+        peerRegistry.emitUsable("alice");
+
+        expect(peerRegistry.sent).toHaveLength(1);
+        const { remote, bytes } = peerRegistry.sent[0]!;
+        expect(remote).toBe("alice");
+        expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual({
+            t: "messageAck",
+            spaceUuid: "space:group",
+            clientMsgId: "msg-in-1",
+            from: "bob",
         });
     });
 });

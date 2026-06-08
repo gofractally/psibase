@@ -25,6 +25,7 @@ vi.mock("../lib/chat-data-debug", () => ({
     unregisterChatDataPeer: () => {},
     summarizePeerConnection: async () => ({}),
     shortSessionId: (id: string) => id,
+    shortSpaceId: (id: string) => id,
     iceServerSummary: () => "none",
     installChatDataDebugGlobal: () => {},
 }));
@@ -39,6 +40,8 @@ const peerMock = vi.hoisted(() => {
 
         readonly peerAccount: string;
 
+        readonly isInitiator: boolean;
+
         dataChannelReady = false;
 
         private disposed = false;
@@ -46,6 +49,8 @@ const peerMock = vi.hoisted(() => {
         private readonly handlers: ChatDataPeerHandlers;
 
         private readonly pendingOutbound: ChatDataMessageEnvelope[] = [];
+
+        resendOfferCalls = 0;
 
         constructor(params: {
             sessionId: string;
@@ -60,6 +65,7 @@ const peerMock = vi.hoisted(() => {
             this.sessionId = params.sessionId;
             this.selfAccount = params.selfAccount;
             this.peerAccount = params.peerAccount;
+            this.isInitiator = params.isInitiator;
             this.handlers = params.handlers ?? {};
             mockPeers.push(this);
             queueMicrotask(() => {
@@ -87,7 +93,13 @@ const peerMock = vi.hoisted(() => {
             return this.dataChannelReady;
         }
 
-        resendOffer(): void {}
+        get sendsInitialOffer(): boolean {
+            return this.isInitiator;
+        }
+
+        resendOffer(): void {
+            this.resendOfferCalls += 1;
+        }
 
         restartIce(): void {}
 
@@ -127,20 +139,20 @@ describe("createChatTransportStack integration", () => {
 
     it("joinPair sends joinSession and sessionSnapshot creates usable peer", async () => {
         const hub = createTwoPartyHub();
-        const alice = createStackFixture(hub, "alice");
+        const { alice, bob } = createTwoPartyStacks(hub);
 
         const pairId = pairIdFor("alice", "bob");
         expect(alice.stack.peerRegistry.getState("bob")).toBe("absent");
 
         hub.setPresence("bob", true);
-        await alice.stack.peerRegistry.ensure("bob", "message_enqueued");
+        await establishPair(hub, alice, bob);
 
         expect(
             alice.rt.sentFrames.some(
                 (f) => f.t === "joinSession" && f.sessionId === pairId,
             ),
         ).toBe(true);
-        expect(hub.joinCount(pairId)).toBe(1);
+        expect(hub.joinCount(pairId)).toBe(2);
         expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
     });
 
@@ -245,7 +257,7 @@ describe("createChatTransportStack integration", () => {
         ).toBe(true);
     });
 
-    it("ignores stale sessionSnapshot epoch on dual-ws pair roster", async () => {
+    it("ignores stale sessionSnapshot epoch on pair roster", async () => {
         const hub = createTwoPartyHub();
         const { alice, bob } = createTwoPartyStacks(hub);
         hub.setPresence("carol", true);
@@ -254,12 +266,8 @@ describe("createChatTransportStack integration", () => {
         await Promise.resolve();
 
         const carolPairId = pairIdFor("alice", "carol");
-        const carolChannel = alice.stack.pairSignaling.sessionChannel(carolPairId);
-        expect(carolChannel).toBeDefined();
-        const carolRt =
-            carolChannel === "auxiliary" ? alice.auxRt : alice.rt;
 
-        carolRt.dispatch({
+        alice.rt.dispatch({
             t: "sessionSnapshot",
             sessionId: carolPairId,
             joinedParticipants: ["alice", "carol"],
@@ -268,7 +276,7 @@ describe("createChatTransportStack integration", () => {
         });
         expect(alice.stack.pairSignaling.isJoined(carolPairId)).toBe(true);
 
-        carolRt.dispatch({
+        alice.rt.dispatch({
             t: "sessionSnapshot",
             sessionId: carolPairId,
             joinedParticipants: ["carol"],
@@ -277,8 +285,7 @@ describe("createChatTransportStack integration", () => {
         });
         expect(alice.stack.pairSignaling.isJoined(carolPairId)).toBe(true);
 
-        const signalRt = carolChannel === "auxiliary" ? alice.auxRt : alice.rt;
-        const signalFramesBefore = signalRt.sentFrames.filter(
+        const signalFramesBefore = alice.rt.sentFrames.filter(
             (f) => f.t === "signal",
         ).length;
         alice.stack.pairSignaling.signal(carolPairId, {
@@ -288,7 +295,7 @@ describe("createChatTransportStack integration", () => {
             sdp: "v=0 post-stale-offer",
         });
         expect(
-            signalRt.sentFrames.filter((f) => f.t === "signal").length,
+            alice.rt.sentFrames.filter((f) => f.t === "signal").length,
         ).toBeGreaterThan(signalFramesBefore);
     });
 
@@ -303,17 +310,14 @@ describe("createChatTransportStack integration", () => {
             rt.sentFrames.filter(
                 (f) => f.t === "joinSession" && f.sessionId === pairId,
             ).length;
-        const joinsBefore =
-            countPairJoins(alice.rt) + countPairJoins(alice.auxRt);
+        const joinsBefore = countPairJoins(alice.rt);
         expect(joinsBefore).toBeGreaterThan(0);
 
         alice.rt.simulateReconnectWelcome();
-        alice.auxRt.simulateReconnectWelcome();
         await vi.advanceTimersByTimeAsync(0);
         await Promise.resolve();
 
-        const joinsAfter =
-            countPairJoins(alice.rt) + countPairJoins(alice.auxRt);
+        const joinsAfter = countPairJoins(alice.rt);
         expect(joinsAfter).toBeGreaterThan(joinsBefore);
         void bob;
     });
@@ -337,6 +341,42 @@ describe("createChatTransportStack integration", () => {
         expect(handleSpy).toHaveBeenCalledWith(
             "alice",
             expect.objectContaining({ kind: "offer", sdp: "v=0 test-offer" }),
+        );
+    });
+
+    it("roster rejoin kicks a negotiating initiator to retransmit its offer", async () => {
+        const hub = createTwoPartyHub();
+        const alice = createStackFixture(hub, "alice");
+        alice.stack.wireRealtimeHandlers({});
+        alice.rt.connect();
+
+        const pairId = pairIdFor("alice", "bob");
+        void alice.stack.peerRegistry.ensure("bob", "presence_online");
+        await Promise.resolve();
+
+        alice.rt.dispatch({
+            t: "sessionSnapshot",
+            sessionId: pairId,
+            joinedParticipants: ["alice", "bob"],
+            pendingParticipants: [],
+            epoch: 2,
+        });
+
+        const alicePeer = mockPeers.find(
+            (p) => p.selfAccount === "alice" && p.peerAccount === "bob",
+        );
+        expect(alicePeer).toBeDefined();
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("negotiating");
+        const resendCallsBeforeRejoin = alicePeer?.resendOfferCalls ?? 0;
+
+        alice.rt.dispatch({
+            t: "participantJoined",
+            sessionId: pairId,
+            participant: "bob",
+        });
+
+        expect(alicePeer?.resendOfferCalls).toBeGreaterThan(
+            resendCallsBeforeRejoin,
         );
     });
 
@@ -443,8 +483,8 @@ describe("createChatTransportStack integration", () => {
         hub.setPresence("bob", true);
         hub.setPresence("charlie", true);
 
-        await alice.stack.peerRegistry.ensure("bob", "peer_focus");
-        await alice.stack.peerRegistry.ensure("charlie", "peer_focus");
+        await establishPair(hub, alice, bob);
+        await establishPair(hub, alice, charlie);
 
         expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
         expect(alice.stack.peerRegistry.getState("charlie")).toBe("usable");
@@ -452,8 +492,8 @@ describe("createChatTransportStack integration", () => {
         const bobPairId = pairIdFor("alice", "bob");
         const charliePairId = pairIdFor("alice", "charlie");
 
-        expect(hub.joinCount(bobPairId)).toBe(1);
-        expect(hub.joinCount(charliePairId)).toBe(1);
+        expect(hub.joinCount(bobPairId)).toBe(2);
+        expect(hub.joinCount(charliePairId)).toBe(2);
         void bob;
         void charlie;
     });

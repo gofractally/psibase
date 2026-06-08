@@ -19,12 +19,11 @@ import type { EnsureReason } from "./types";
 
 export type ChatTransportBridgeDeps = {
     getRealtime: () => RealtimeClient | null;
-    /** Opens a dedicated second x-webrtc-sig socket for an extra pair session. */
-    createAuxiliaryRealtime?: () => RealtimeClient;
     getSelf: () => string | null;
     getChainId: () => string | null;
     getIceServers: () => IceServerConfig[] | null;
-    onInboundMessage: (envelope: ChatDataMessageEnvelope) => void;
+    /** Returns true when the message was accepted (triggers the wire ack). */
+    onInboundMessage: (envelope: ChatDataMessageEnvelope) => boolean;
     onInboundHistorySync: (envelope: ChatHistorySyncEnvelope) => void;
     onMessageAck: (
         spaceUuid: string,
@@ -32,6 +31,7 @@ export type ChatTransportBridgeDeps = {
     ) => void;
     onPeerUsable: (remoteAccount: string) => void;
     onSessionInvite: (spaceUuid: string) => void;
+    onSpaceMembershipHint?: (from: string) => void;
 };
 
 /**
@@ -40,8 +40,6 @@ export type ChatTransportBridgeDeps = {
  */
 export class ChatTransportBridge {
     private stack: ChatTransportStack | null = null;
-
-    private auxiliaryRealtime: RealtimeClient | null = null;
 
     private suspended = false;
 
@@ -95,13 +93,15 @@ export class ChatTransportBridge {
             localAccount: self,
             chainId,
             realtimeClient: rt,
-            auxiliaryRealtimeClient: this.ensureAuxiliaryRealtime() ?? undefined,
             iceServers: this.deps.getIceServers(),
             onInboundBytes: (remote, bytes) => {
                 this.handleInboundWire(
                     remote,
                     new TextDecoder().decode(bytes),
                 );
+            },
+            onSpaceMembershipHint: (remote) => {
+                this.deps.onSpaceMembershipHint?.(remote);
             },
         });
 
@@ -118,7 +118,7 @@ export class ChatTransportBridge {
                 clientMsgId: envelope.clientMsgId,
                 bodyLen: envelope.body.length,
             });
-            this.deps.onInboundMessage({
+            const accepted = this.deps.onInboundMessage({
                 t: "chatMessage",
                 spaceUuid: envelope.spaceUuid,
                 from: envelope.from,
@@ -126,6 +126,20 @@ export class ChatTransportBridge {
                 sendTimestamp: envelope.sendTimestamp,
                 clientMsgId: envelope.clientMsgId,
             });
+            if (accepted) {
+                this.stack?.messaging.acknowledgeInbound(
+                    envelope.remote,
+                    envelope.spaceUuid,
+                    envelope.clientMsgId,
+                );
+            } else {
+                this.recordDebug("inbound-rejected-no-ack", {
+                    from: envelope.from,
+                    remote: envelope.remote,
+                    spaceUuid: envelope.spaceUuid,
+                    clientMsgId: envelope.clientMsgId,
+                });
+            }
         });
 
         this.stack.messaging.onRecipientDelivered((msgId, recipient, conversationId) => {
@@ -142,6 +156,9 @@ export class ChatTransportBridge {
 
         this.stack.peerRegistry.on("usable", (remote) => {
             recordThreadLifecycle("webrtc-usable", { remote });
+            if (this.pendingSpaceHints.delete(remote)) {
+                this.sendSpaceMembershipHint(remote);
+            }
             this.deps.onPeerUsable(remote);
             if (!this.pushedHistoryTo.has(remote)) {
                 this.pushedHistoryTo.add(remote);
@@ -186,10 +203,9 @@ export class ChatTransportBridge {
     private disposeStack(): void {
         this.stack?.dispose();
         this.stack = null;
-        this.closeAuxiliaryRealtime();
     }
 
-    /** Drop stack + aux without blocking future ensures (in-chat e2e prep). */
+    /** Drop stack without blocking future ensures (in-chat e2e prep). */
     dropTransportStack(): void {
         this.disposeStack();
     }
@@ -198,20 +214,6 @@ export class ChatTransportBridge {
     dropStackForNavigation(): void {
         this.suspended = true;
         this.dropTransportStack();
-    }
-
-    private ensureAuxiliaryRealtime(): RealtimeClient | null {
-        if (!this.deps.createAuxiliaryRealtime) return null;
-        if (!this.auxiliaryRealtime) {
-            this.auxiliaryRealtime = this.deps.createAuxiliaryRealtime();
-            this.auxiliaryRealtime.connect();
-        }
-        return this.auxiliaryRealtime;
-    }
-
-    private closeAuxiliaryRealtime(): void {
-        this.auxiliaryRealtime?.close();
-        this.auxiliaryRealtime = null;
     }
 
     suspendForNavigation(): void {
@@ -277,6 +279,7 @@ export class ChatTransportBridge {
 
     onPeerOnline(account: string): void {
         this.ensurePeer(account, "presence_online");
+        this.stack?.peerRegistry.kickNegotiation(account);
     }
 
     onPeerOffline(_account: string): void {
@@ -322,6 +325,30 @@ export class ChatTransportBridge {
         return this.stack.peerRegistry.send(remote, bytes).ok;
     }
 
+    /** Ask online peers to reload sidebar spaces after group membership changes. */
+    sendSpaceMembershipHint(remote: string): boolean {
+        if (!this.stack) return false;
+        const bytes = new TextEncoder().encode(
+            serializeChatDataWireEnvelope({ t: "spaceMembershipHint" }),
+        );
+        return this.stack.peerRegistry.send(remote, bytes).ok;
+    }
+
+    notifySpaceMembershipHint(remoteAccounts: readonly string[]): void {
+        if (this.suspended) return;
+        const self = this.deps.getSelf();
+        if (!self) return;
+        for (const remote of remoteAccounts) {
+            if (remote === self) continue;
+            void this.ensurePeer(remote, "manual");
+            if (!this.sendSpaceMembershipHint(remote)) {
+                this.pendingSpaceHints.add(remote);
+            }
+        }
+    }
+
+    private readonly pendingSpaceHints = new Set<string>();
+
     releaseIdleTransport(_spaceUuid: string): void {
         /* v2: peer TTL + LRU in PeerTransportRegistry; no per-Space release. */
     }
@@ -347,6 +374,10 @@ export class ChatTransportBridge {
         if (!parsed) return;
         if (parsed.t === "chatHistorySync") {
             this.deps.onInboundHistorySync(parsed);
+            return;
+        }
+        if (parsed.t === "spaceMembershipHint") {
+            this.deps.onSpaceMembershipHint?.(remote);
             return;
         }
         const svc = this.stack?.messaging as

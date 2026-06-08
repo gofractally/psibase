@@ -11,12 +11,11 @@ import { ChatTransportBridge } from "../../transport-v2/chat-transport-bridge";
 
 export type ChatTransportBridgeDeps = {
     getRealtime: () => RealtimeClient | null;
-    /** Opens a dedicated second x-webrtc-sig socket for an extra pair session. */
-    createAuxiliaryRealtime?: () => RealtimeClient;
     getSelf: () => string | null;
     getChainId: () => string | null;
     getIceServers: () => IceServerConfig[] | null;
-    onInboundMessage: (envelope: ChatDataMessageEnvelope) => void;
+    /** Returns true when the message was accepted (triggers the wire ack). */
+    onInboundMessage: (envelope: ChatDataMessageEnvelope) => boolean;
     onInboundHistorySync: (envelope: ChatHistorySyncEnvelope) => void;
     onMessageAck: (
         spaceUuid: string,
@@ -24,6 +23,7 @@ export type ChatTransportBridgeDeps = {
     ) => void;
     onPeerUsable: (remoteAccount: string) => void;
     onSessionInvite: (spaceUuid: string) => void;
+    onSpaceMembershipHint?: (from: string) => void;
 };
 
 /** Construct v2 per-peer chat transport for a hook lifetime. */

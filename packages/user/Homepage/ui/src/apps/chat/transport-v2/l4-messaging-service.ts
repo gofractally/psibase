@@ -17,6 +17,7 @@ import {
 } from "../lib/space-bridge";
 import type { RealtimeTransport } from "./l1-realtime-transport";
 import type { PeerTransportRegistry } from "./l3-peer-registry";
+import { createDeliveryCoordinator } from "./delivery-coordinator";
 import { EventBus } from "./event-bus";
 import {
     IN_FLIGHT_ACK_WAIT_MS,
@@ -48,9 +49,20 @@ export interface MessagingService {
         handler: (msgId: string, recipient: string, conversationId: string) => void,
     ): Unsubscribe;
     hydrateFromStorage(): void;
+    /**
+     * Ack an inbound message after the consumer accepted it. Acking on wire
+     * parse would prune the sender's outbox even when the recipient drops
+     * the message (e.g. contact gate), permanently losing it.
+     */
+    acknowledgeInbound(
+        remote: string,
+        spaceUuid: string,
+        clientMsgId: string,
+    ): void;
 }
 
 type InFlightKey = `${string}\0${string}`;
+type PendingAckKey = `${string}\0${string}\0${string}`;
 
 type InFlightRow = {
     msgId: string;
@@ -96,6 +108,13 @@ export function createMessagingService(
         );
     };
     const inFlight = new Map<InFlightKey, InFlightRow>();
+    const pendingAcks = new Map<
+        PendingAckKey,
+        {
+            remote: string;
+            ack: ChatDataMessageAckEnvelope;
+        }
+    >();
     const validAttempts = new Map<InFlightKey, number>();
     const statusByMsg = new Map<string, MessageStatus>();
 
@@ -119,6 +138,33 @@ export function createMessagingService(
 
     const findRow = (msgId: string) =>
         rows.find((r) => r.clientMsgId === msgId) ?? null;
+
+    const pendingAckKey = (
+        remote: string,
+        spaceUuid: string,
+        clientMsgId: string,
+    ): PendingAckKey =>
+        `${remote}\0${spaceUuid}\0${clientMsgId}` as PendingAckKey;
+
+    const sendAck = (
+        remote: string,
+        ack: ChatDataMessageAckEnvelope,
+    ): boolean => {
+        const bytes = new TextEncoder().encode(JSON.stringify(ack));
+        const result = opts.peerRegistry.send(remote, bytes);
+        return result.ok;
+    };
+
+    const flushPendingAcks = (remote: string) => {
+        for (const [key, pending] of [...pendingAcks]) {
+            if (pending.remote !== remote) continue;
+            if (sendAck(remote, pending.ack)) {
+                pendingAcks.delete(key);
+            } else {
+                void opts.peerRegistry.ensure(remote, "message_enqueued");
+            }
+        }
+    };
 
     const outboxByRemote = (): Map<string, PendingChatMessage[]> => {
         const map = new Map<string, PendingChatMessage[]>();
@@ -149,6 +195,7 @@ export function createMessagingService(
         const key = inFlightKey(msgId, recipient);
         clearInFlightTimer(key);
         inFlight.delete(key);
+        deliveryCoordinator.markAcked(msgId, recipient);
         if (row.deliveredTo.length >= row.recipients.length) {
             row.status = "sent";
             rows = rows.filter((r) => r.clientMsgId !== msgId);
@@ -202,6 +249,7 @@ export function createMessagingService(
             opts.peerRegistry.dispose(recipient, "ack_timeout");
         }
 
+        deliveryCoordinator.onAckTimeout(msgId, recipient);
         void flushRemote(recipient);
     };
 
@@ -217,8 +265,13 @@ export function createMessagingService(
         clientMsgId: row.clientMsgId,
     });
 
-    const trySendToRecipient = (row: PendingChatMessage, recipient: string) => {
-        if (row.deliveredTo.includes(recipient)) return;
+    const trySendToRecipient = (
+        row: PendingChatMessage,
+        recipient: string,
+    ): { ok: true } | { ok: false; reason: string; retryable?: boolean } => {
+        if (row.deliveredTo.includes(recipient)) {
+            return { ok: false, reason: "already_delivered", retryable: false };
+        }
         const peerState = opts.peerRegistry.getState(recipient);
         const peerUsable = peerState === "usable";
         const recipientOnline = opts.realtime.isRecipientOnline(recipient);
@@ -230,7 +283,7 @@ export function createMessagingService(
                 recipientOnline,
                 bodyPreview: row.body.slice(0, 48),
             });
-            return;
+            return { ok: false, reason: "recipient_unreachable", retryable: true };
         }
 
         const key = inFlightKey(row.clientMsgId, recipient);
@@ -239,13 +292,16 @@ export function createMessagingService(
                 msgId: row.clientMsgId,
                 recipient,
             });
-            return;
+            return { ok: false, reason: "in_flight", retryable: true };
         }
 
         const spaceUuid = spaceUuidFromPslackConversationId(row.conversationId);
         if (opts.isSpaceMember && !opts.isSpaceMember(spaceUuid, recipient)) {
-            markFailed(row.clientMsgId, recipient, "recipient not a space member");
-            return;
+            return {
+                ok: false,
+                reason: "recipient not a space member",
+                retryable: false,
+            };
         }
 
         const envelope = buildEnvelope(row, recipient);
@@ -255,7 +311,7 @@ export function createMessagingService(
         const result = opts.peerRegistry.send(recipient, bytes);
         if (!result.ok) {
             void opts.peerRegistry.ensure(recipient, "message_enqueued");
-            return;
+            return { ok: false, reason: result.reason, retryable: true };
         }
 
         const validAttempt = opts.realtime.isRecipientOnline(recipient);
@@ -268,19 +324,53 @@ export function createMessagingService(
         };
         inFlight.set(key, flight);
         scheduleAckWait(flight);
+        return { ok: true };
     };
 
+    const deliveryCoordinator = createDeliveryCoordinator({
+        ensurePeer: (remote) =>
+            opts.peerRegistry.ensure(remote, "message_enqueued"),
+        trySend: (msgId, recipient) => {
+            const row = findRow(msgId);
+            if (!row) {
+                return {
+                    ok: false,
+                    reason: "row missing",
+                    retryable: false,
+                };
+            }
+            const memberCheck = opts.isSpaceMember
+                ? opts.isSpaceMember(
+                      spaceUuidFromPslackConversationId(row.conversationId),
+                      recipient,
+                  )
+                : true;
+            if (!memberCheck) {
+                return {
+                    ok: false,
+                    reason: "recipient not a space member",
+                    retryable: false,
+                };
+            }
+            return trySendToRecipient(row, recipient);
+        },
+        onAcked: () => {},
+        onFailed: (msgId, recipient, reason) => {
+            markFailed(msgId, recipient, reason);
+        },
+    });
+
     const flushRemote = async (remote: string) => {
+        const pending = outboxByRemote().get(remote) ?? [];
         chatDataRecord("pending-flush-remote", {
             remote,
             peerState: opts.peerRegistry.getState(remote),
-            queued: (outboxByRemote().get(remote) ?? []).length,
+            queued: pending.length,
         });
-        await opts.peerRegistry.ensure(remote, "message_enqueued");
-        const pending = outboxByRemote().get(remote) ?? [];
         for (const row of pending) {
-            trySendToRecipient(row, remote);
+            deliveryCoordinator.enqueue(row.clientMsgId, remote);
         }
+        await deliveryCoordinator.flushRemote(remote);
     };
 
     const flushAll = () => {
@@ -299,12 +389,14 @@ export function createMessagingService(
         persist();
         syncRowStatus(row);
         for (const recipient of row.recipients) {
-            void opts.peerRegistry.ensure(recipient, "message_enqueued");
+            if (row.deliveredTo.includes(recipient)) continue;
+            deliveryCoordinator.enqueue(row.clientMsgId, recipient);
             void flushRemote(recipient);
         }
     };
 
     opts.peerRegistry.on("usable", (remote) => {
+        flushPendingAcks(remote);
         void flushRemote(remote);
     });
 
@@ -420,6 +512,25 @@ export function createMessagingService(
             flushAll();
         },
 
+        acknowledgeInbound(
+            remote: string,
+            spaceUuid: string,
+            clientMsgId: string,
+        ) {
+            const ack: ChatDataMessageAckEnvelope = {
+                t: "messageAck",
+                spaceUuid,
+                clientMsgId,
+                from: opts.localAccount,
+            };
+            if (sendAck(remote, ack)) return;
+            pendingAcks.set(pendingAckKey(remote, spaceUuid, clientMsgId), {
+                remote,
+                ack,
+            });
+            void opts.peerRegistry.ensure(remote, "message_enqueued");
+        },
+
         /** Wire inbound acks/messages from peer registry bytes path. */
         handleWireFromRemote(remote: string, raw: string) {
             const parsed = parseChatDataWireEnvelope(raw);
@@ -433,21 +544,16 @@ export function createMessagingService(
                 return;
             }
             if (parsed.t === "chatMessage") {
+                // Ack is deferred to acknowledgeInbound() once the consumer
+                // accepts the message (see bridge onInbound handler).
                 bus.emit("inbound", {
                     spaceUuid: parsed.spaceUuid,
                     from: parsed.from,
                     body: parsed.body,
                     sendTimestamp: parsed.sendTimestamp,
                     clientMsgId: parsed.clientMsgId,
+                    remote,
                 });
-                const ack: ChatDataMessageAckEnvelope = {
-                    t: "messageAck",
-                    spaceUuid: parsed.spaceUuid,
-                    clientMsgId: parsed.clientMsgId,
-                    from: opts.localAccount,
-                };
-                const bytes = new TextEncoder().encode(JSON.stringify(ack));
-                opts.peerRegistry.send(remote, bytes);
             }
         },
     } as MessagingService & {

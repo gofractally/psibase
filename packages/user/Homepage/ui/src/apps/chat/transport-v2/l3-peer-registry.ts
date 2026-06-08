@@ -17,10 +17,12 @@ import { recordTransportLifecycle } from "../lib/thread-lifecycle";
 import { isLexInitiator, pairSessionId } from "./pair-id";
 import type { RealtimeTransport } from "./l1-realtime-transport";
 import type { PairSignaling } from "./l2-pair-signaling";
+import { createNegotiationScheduler } from "./negotiation-scheduler";
 import {
     PEER_IDLE_TTL_MS,
     PEER_JOIN_STUCK_MS,
     PEER_MAX_WARM,
+    PEER_ESTABLISHING_STUCK_MS,
     PEER_NEGOTIATION_STUCK_MS,
     PEER_STUCK_CHECK_MS,
     type EnsureReason,
@@ -90,12 +92,11 @@ type PeerEntry = {
 export type PeerTransportRegistryOptions = {
     localAccount: string;
     realtime: RealtimeTransport;
-    /** Second websocket — peers routed here must retry when it becomes ready. */
-    auxiliaryRealtime?: RealtimeTransport;
     pairSignaling: PairSignaling;
     signaling: WebRtcSignalingClient;
     iceServers: IceServerConfig[] | null;
     onInboundBytes?: (remote: string, bytes: Uint8Array) => void;
+    onSpaceMembershipHint?: (remote: string) => void;
 };
 
 export function createPeerTransportRegistry(
@@ -103,6 +104,7 @@ export function createPeerTransportRegistry(
 ): PeerTransportRegistry {
     const bus = new EventBus<PeerRegistryEvents>();
     const entries = new Map<string, PeerEntry>();
+    const negotiationScheduler = createNegotiationScheduler();
 
     const touchEntry = (entry: PeerEntry) => {
         entry.lastUsedAt = Date.now();
@@ -164,6 +166,7 @@ export function createPeerTransportRegistry(
         entry.peer?.dispose();
         entry.peer = null;
         entries.delete(remote);
+        negotiationScheduler.release(remote);
         opts.pairSignaling.leavePair(entry.pairId, reason);
         bus.emit("disposed", remote);
     };
@@ -189,9 +192,10 @@ export function createPeerTransportRegistry(
         entry.peer = null;
         entry.dataChannelReady = false;
         entry.negotiationStartedAt = null;
+        negotiationScheduler.release(entry.remote);
         setState(entry, "suspected_dead", reason);
         bus.emit("suspected_dead", entry.remote);
-        beginNegotiation(entry);
+        requestNegotiation(entry, "manual");
     };
 
     const createPeerForEntry = (entry: PeerEntry) => {
@@ -215,6 +219,7 @@ export function createPeerTransportRegistry(
                 onDataChannelOpen: () => {
                     entry.dataChannelReady = true;
                     setState(entry, "usable", "dc_open");
+                    negotiationScheduler.release(entry.remote);
                     touchEntry(entry);
                     resolveEnsureWaiters(entry);
                     bus.emit("usable", entry.remote);
@@ -232,6 +237,10 @@ export function createPeerTransportRegistry(
                         entry.remote,
                         new TextEncoder().encode(JSON.stringify(envelope)),
                     );
+                },
+                onSpaceMembershipHint: () => {
+                    touchEntry(entry);
+                    opts.onSpaceMembershipHint?.(entry.remote);
                 },
                 onChatHistorySync: (envelope: ChatHistorySyncEnvelope) => {
                     touchEntry(entry);
@@ -260,6 +269,18 @@ export function createPeerTransportRegistry(
         });
     };
 
+    const releaseNegotiationSlotIfIdle = (entry: PeerEntry) => {
+        if (
+            entry.state === "waiting_ws" ||
+            entry.state === "usable" ||
+            entry.state === "absent" ||
+            entry.state === "disposing" ||
+            entry.state === "suspected_dead"
+        ) {
+            negotiationScheduler.release(entry.remote);
+        }
+    };
+
     const beginNegotiation = (entry: PeerEntry) => {
         if (entry.peer) return;
         if (!opts.pairSignaling.isRealtimeReady(entry.pairId)) {
@@ -278,6 +299,20 @@ export function createPeerTransportRegistry(
         setState(entry, "negotiating", "pc_handshake");
         createPeerForEntry(entry);
         void flushPendingRemoteSignals(entry);
+    };
+
+    const requestNegotiation = (entry: PeerEntry, reason: EnsureReason) => {
+        if (
+            entry.state === "joining_pair" ||
+            entry.state === "negotiating" ||
+            entry.state === "usable"
+        ) {
+            return;
+        }
+        negotiationScheduler.schedule(entry.remote, reason, () => {
+            beginNegotiation(entry);
+            releaseNegotiationSlotIfIdle(entry);
+        });
     };
 
     const flushPendingRemoteSignals = async (entry: PeerEntry) => {
@@ -312,6 +347,20 @@ export function createPeerTransportRegistry(
         return entry;
     };
 
+    const isTransportEstablishing = (peer: NonNullable<PeerEntry["peer"]>) => {
+        const snap = peer.transportSnapshot;
+        if (snap.dataChannelReady) return false;
+        if (snap.negotiationInProgress) return true;
+        if (snap.iceConnectionState === "checking") return true;
+        if (
+            snap.iceConnectionState === "connected" &&
+            snap.connectionState !== "connected"
+        ) {
+            return true;
+        }
+        return snap.connectionState === "connecting";
+    };
+
     const checkStuckPeers = () => {
         const now = Date.now();
         for (const entry of entries.values()) {
@@ -343,7 +392,11 @@ export function createPeerTransportRegistry(
             const startedAt =
                 entry.negotiationStartedAt ?? entry.lastUsedAt;
             const ageMs = now - startedAt;
-            if (peer.needsReconnect || ageMs >= PEER_NEGOTIATION_STUCK_MS) {
+            const establishing = isTransportEstablishing(peer);
+            const stuckThreshold = establishing
+                ? PEER_ESTABLISHING_STUCK_MS
+                : PEER_NEGOTIATION_STUCK_MS;
+            if (peer.needsReconnect || ageMs >= stuckThreshold) {
                 recoverStuckPeer(
                     entry,
                     peer.needsReconnect
@@ -362,11 +415,13 @@ export function createPeerTransportRegistry(
 
     const retryNegotiationOnRealtimeReady = () => {
         for (const entry of entries.values()) {
+            if (entry.state === "waiting_ws" || entry.state === "suspected_dead") {
+                requestNegotiation(entry, "ws_ready");
+                continue;
+            }
             if (
-                entry.state === "waiting_ws" ||
                 entry.state === "joining_pair" ||
-                entry.state === "negotiating" ||
-                entry.state === "suspected_dead"
+                entry.state === "negotiating"
             ) {
                 beginNegotiation(entry);
             }
@@ -374,7 +429,6 @@ export function createPeerTransportRegistry(
     };
 
     opts.realtime.on("ready", retryNegotiationOnRealtimeReady);
-    opts.auxiliaryRealtime?.on("ready", retryNegotiationOnRealtimeReady);
 
     const kickNegotiation = (remoteAccount: string) => {
         const entry = entries.get(remoteAccount);
@@ -385,7 +439,14 @@ export function createPeerTransportRegistry(
         touchEntry(entry);
         if (entry.state === "usable") return;
         if (!entry.peer) {
-            beginNegotiation(entry);
+            if (negotiationScheduler.shouldDeferKick(entry.remote, entry.state)) {
+                chatDataRecord("peer-registry-kick-deferred", {
+                    remote: entry.remote,
+                    state: entry.state,
+                });
+                return;
+            }
+            requestNegotiation(entry, "roster_kick");
             return;
         }
 
@@ -426,7 +487,9 @@ export function createPeerTransportRegistry(
             return Promise.resolve();
         }
         if (entry.state === "absent" || entry.state === "suspected_dead") {
-            beginNegotiation(entry);
+            requestNegotiation(entry, _reason);
+        } else if (entry.state === "waiting_ws") {
+            requestNegotiation(entry, _reason);
         }
         if (entries.get(remoteAccount)?.state === "usable") {
             return Promise.resolve();
@@ -479,6 +542,8 @@ export function createPeerTransportRegistry(
                 ok = entry.peer.sendHistorySync(envelope);
             } else if (envelope.t === "messageAck") {
                 ok = entry.peer.sendMessageAck(envelope);
+            } else if (envelope.t === "spaceMembershipHint") {
+                ok = entry.peer.sendSpaceMembershipHint(envelope);
             }
             if (ok) touchEntry(entry);
             return ok
@@ -509,7 +574,20 @@ export function createPeerTransportRegistry(
             const entry = getOrCreateEntry(remoteAccount);
             if (!entry.peer) {
                 entry.pendingRemoteSignals.push(frame);
-                beginNegotiation(entry);
+                const selfJoinedOnServer = opts.pairSignaling.isJoined(entry.pairId);
+                chatDataRecord("peer-registry-remote-signal-buffered", {
+                    remote: entry.remote,
+                    pairId: entry.pairId,
+                    state: entry.state,
+                    kind: frame.kind,
+                    selfJoinedOnServer,
+                    pending: entry.pendingRemoteSignals.length,
+                });
+                if (selfJoinedOnServer) {
+                    beginNegotiation(entry);
+                } else {
+                    requestNegotiation(entry, "peer_focus");
+                }
             }
             const peer = entries.get(remoteAccount)?.peer;
             if (peer) {

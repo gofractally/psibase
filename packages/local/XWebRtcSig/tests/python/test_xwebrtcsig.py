@@ -679,6 +679,52 @@ class TestXWebRtcSig(unittest.TestCase):
         asyncio.run(body())
 
     @testutil.psinode_test
+    def test_same_socket_can_join_multiple_pair_sessions(self, cluster):
+        """One websocket can join multiple wrtc:pair:* sessions without aborting recv."""
+        a = self._boot_with_chat_and_sig(cluster)
+        _ensure_test_accounts(a, 'e2ealicegc', 'e2ecarolgc', 'daviddavid')
+        token = Transact(a).login('e2ealicegc')
+        pair_alice_carol = 'wrtc:pair:e2ealicegc:e2ecarolgc'
+        pair_david_alice = 'wrtc:pair:daviddavid:e2ealicegc'
+        url = websocket_url(a, '/ws', service='x-webrtcsig')
+
+        async def body():
+            async with _unix_connect(a, url, [('Authorization', 'Bearer ' + token)]) as ws:
+                await _welcome_and_presence(ws)
+                await _client_ready(ws, 'alice-tab-1')
+
+                await ws.send(
+                    json.dumps(
+                        {
+                            't': 'joinSession',
+                            'sessionId': pair_david_alice,
+                            'clientInstanceId': 'alice-tab-1',
+                        }
+                    )
+                )
+                await _read_until(ws, 'sessionSnapshot')
+
+                await ws.send(
+                    json.dumps(
+                        {
+                            't': 'joinSession',
+                            'sessionId': pair_alice_carol,
+                            'clientInstanceId': 'alice-tab-1',
+                        }
+                    )
+                )
+                second_snap = await _read_until(ws, 'sessionSnapshot')
+                self.assertEqual(second_snap['sessionId'], pair_alice_carol)
+                self.assertIn('e2ealicegc', second_snap['joinedParticipants'])
+
+                await ws.send(json.dumps({'t': 'ping'}))
+                pong = await _read_until(ws, 'pong')
+                self.assertEqual(pong['t'], 'pong')
+
+        import asyncio
+        asyncio.run(body())
+
+    @testutil.psinode_test
     def test_pair_session_join_and_signal_relay(self, cluster):
         """Pair-only wrtc:pair:* sessions join and relay signals (e2e-style names)."""
         a = self._boot_with_chat_and_sig(cluster)
