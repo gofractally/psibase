@@ -254,12 +254,16 @@ function(psibase_package)
                     message(FATAL_ERROR "Missing schema for ${service}")
                 endif()
             endif()
+            set(service-info-deps ${schema-target})
+            if(_WASM_${service})
+                list(APPEND service-info-deps ${_DEPENDS})
+            endif()
             write_service_info(
                 OUTPUT ${outdir}/service/${service}.json
                 FLAGS ${_FLAGS_${service}}
                 SERVER ${_SERVER_${service}}
                 SCHEMA ${_SCHEMA_${service}}
-                DEPENDS ${schema-target}
+                DEPENDS ${service-info-deps}
             )
             list(APPEND zip-deps ${outdir}/service/${service}.json)
             if(_INIT_${service})
@@ -453,26 +457,31 @@ function(psibase_schema target)
         target_link_libraries(${target}-schema-gen PRIVATE "$<FILTER:$<TARGET_PROPERTY:${target},LINK_LIBRARIES>,EXCLUDE,.*(Psibase::service).*>" Psibase::test)
     endif()
 
-    if (NOT _OUTPUT)
-        set(_OUTPUT "${target}-schema.json")
-    endif()
-    if (NOT _OUTPUT_DIRECTORY)
-        set(_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-    endif()
-    if (CMAKE_VERSION VERSION_LESS 3.20)
-        if (_OUTPUT MATCHES "^[^/]")
-            set(_OUTFILE "${_OUTPUT_DIRECTORY}/${_OUTPUT}")
-        endif()
+    if (_OUTPUT)
+        # OUTPUT keyword (e.g. from psibase_package) — already a concrete path.
+        set(_OUTFILE "${_OUTPUT}")
+        set(_EXTRA_OUTPUTS "${_OUTPUT}")
+    elseif(_OUTPUT_DIRECTORY)
+        # OUTPUT_DIRECTORY keyword (e.g. from add_system_service).
+        set(_OUTFILE "${_OUTPUT_DIRECTORY}/${target}-schema.json")
+        set(_EXTRA_OUTPUTS "${_OUTFILE}")
+    elseif(ARGC GREATER_EQUAL 2)
+        # Legacy positional output path.
+        set(_OUTFILE ${ARGV1})
+        set(_EXTRA_OUTPUTS ${_OUTFILE})
     else()
-        cmake_path(APPEND _OUTFILE "${_OUTPUT_DIRECTORY}" "${_OUTPUT}")
+        set(_OUTFILE $<TARGET_PROPERTY:${target},RUNTIME_OUTPUT_DIRECTORY>/${target}-schema.json)
+        set(_EXTRA_OUTPUTS "")
     endif()
 
+    # Stamp file is always an OUTPUT because _OUTFILE may contain a generator expression
+    # (not allowed in OUTPUT). When a concrete path is provided, it is added as an additional
+    # OUTPUT so the Makefile generator creates a rule for it and downstream DEPENDS are satisfied.
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
-        BYPRODUCTS ${_OUTFILE}
-        DEPENDS ${target}
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp ${_EXTRA_OUTPUTS}
+        DEPENDS ${target}-schema-gen
         COMMAND ${PSITEST_EXECUTABLE} $<TARGET_FILE:${target}-schema-gen> --schema > ${_OUTFILE}
-        COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
+        COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp
     )
     add_custom_target(${target}-schema ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}-schema.json.stamp)
 endfunction()
