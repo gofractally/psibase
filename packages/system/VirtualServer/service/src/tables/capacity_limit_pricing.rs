@@ -166,7 +166,7 @@ impl CurvePosition {
         }
         let dy = amount_consumed as u128;
 
-        check(self.y > dy, "Insufficient disk capacity");
+        check(self.y > dy, "Insufficient capacity");
 
         let new_y = self.y - dy;
         let required_x = self.k.div_ceil(new_y);
@@ -305,7 +305,7 @@ impl CapacityPricing {
         Self::update(resource, |p| {
             check(
                 amount_consumed <= p.remaining_capacity,
-                "Insufficient disk capacity",
+                &format!("Insufficient {} capacity", resource.name()),
             );
             let c = p
                 .curve()
@@ -329,8 +329,9 @@ impl CapacityPricing {
 
             if balance < amt {
                 abort_message(&format!(
-                    "{} has insufficient resource balance for disk",
-                    user
+                    "{} has insufficient resource balance for {}",
+                    user,
+                    resource.name(),
                 ));
             }
 
