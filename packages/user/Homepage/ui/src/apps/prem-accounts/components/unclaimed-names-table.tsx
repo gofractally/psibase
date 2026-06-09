@@ -47,28 +47,32 @@ export function UnclaimedNamesTable({
                 accessorKey: "account",
                 header: "Account",
                 cell: ({ row }) => (
-                    <span className="font-mono">{row.original.account}</span>
+                    <span className="font-mono text-sm font-medium">
+                        {row.original.account}
+                    </span>
                 ),
             },
             {
                 id: "actions",
                 header: () => <div className="text-right">Action</div>,
+                meta: { className: "w-[1%] whitespace-nowrap pl-3" },
                 cell: ({ row }) => {
                     const name = row.original.account;
                     const isClaiming =
                         isClaimPending && variables === name;
 
                     return (
-                        <div className="text-right">
+                        <div className="flex justify-end">
                             <Button
                                 type="button"
-                                size="sm"
+                                variant="outline"
+                                size="xs"
                                 disabled={isClaiming}
                                 onClick={() => {
                                     void claimName(name);
                                 }}
                             >
-                                {isClaiming ? "Claiming..." : "Claim"}
+                                {isClaiming ? "Claiming…" : "Claim"}
                             </Button>
                         </div>
                     );
