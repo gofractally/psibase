@@ -10,6 +10,7 @@ use super::query::{get_enable_billing_cost, get_user_resources};
 
 impl ProposeExt for Wrapper {}
 
+#[track_caller]
 pub(super) fn assert_error(result: ChainEmptyResult, message: &str) {
     let err = result.trace.error.unwrap();
     let contains_error = err.contains(message);
@@ -20,6 +21,7 @@ pub(super) fn assert_error(result: ChainEmptyResult, message: &str) {
     );
 }
 
+#[track_caller]
 pub(super) fn check_balance(
     chain: &psibase::Chain,
     token_id: tokens::TID,
