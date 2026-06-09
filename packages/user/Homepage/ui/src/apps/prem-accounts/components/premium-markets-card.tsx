@@ -43,16 +43,6 @@ function comparePrices(
     return "down";
 }
 
-function MarketStatusBadge({ row }: { row: PremiumMarketOverviewRow }) {
-    if (!row.configured) {
-        return <Badge variant="outline">Not configured</Badge>;
-    }
-    if (row.enabled) {
-        return <Badge>Enabled</Badge>;
-    }
-    return <Badge variant="secondary">Disabled</Badge>;
-}
-
 function PriceCell({
     row,
     systemToken,
@@ -96,6 +86,12 @@ function PriceCell({
         return () => window.clearTimeout(timeoutId);
     }, [flash, flashKey]);
 
+    if (!row.configured) {
+        return <Badge variant="outline">Not configured</Badge>;
+    }
+    if (!row.enabled) {
+        return <Badge variant="secondary">Disabled</Badge>;
+    }
     if (price === null) {
         return <span className="text-muted-foreground">—</span>;
     }
@@ -152,7 +148,6 @@ export function PremiumMarketsCard({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Name length</TableHead>
-                                <TableHead>Status</TableHead>
                                 <TableHead className="text-right">
                                     Current price
                                 </TableHead>
@@ -166,9 +161,6 @@ export function PremiumMarketsCard({
                                         {row.length === 1
                                             ? "character"
                                             : "characters"}
-                                    </TableCell>
-                                    <TableCell>
-                                        <MarketStatusBadge row={row} />
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <PriceCell
