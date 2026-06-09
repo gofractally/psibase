@@ -180,7 +180,9 @@ impl CurvePosition {
         let required_X = self.k.div_ceil(new_Y);
         let dx = check_some(required_X.checked_sub(self.X), "Excess reserve detected");
 
-        dx as u64
+        // Avoid silently truncating: `dx` exceeds `u64::MAX` only when
+        // `new_Y` drops below `y0` (resources driven negative).
+        check_some(u64::try_from(dx).ok(), "Insufficient capacity")
     }
 
     // Gross refund for freeing `amount` units of resource.
