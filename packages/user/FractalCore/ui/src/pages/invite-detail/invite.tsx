@@ -24,6 +24,7 @@ import {
     CardHeader,
     CardTitle,
 } from "@shared/shadcn/ui/card";
+import { useFractal } from "@/hooks/fractals/use-fractal";
 
 dayjs.extend(relativeTime);
 
@@ -31,6 +32,8 @@ export const Invite = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get("token");
 
+
+    const { data: fractal } = useFractal();
     const {
         data: invite,
         error,
@@ -110,9 +113,9 @@ export const Invite = () => {
 
         const description = isExpired
             ? `This invitation expired ${dayjs().to(expiry)} (${dayjs(
-                  expiry,
-              ).format("YYYY/MM/DD h:mm A z")}).`
-            : `${inviter} has invited you to apply to join the ${guildInvite.guild.displayName} guild in the ${guildInvite.guild.fractal.name} fractal.`;
+                expiry,
+            ).format("YYYY/MM/DD h:mm A z")}).`
+            : `${inviter} has invited you to apply to join the ${guildInvite.guild.displayName} guild in the ${fractal?.fractal?.name} fractal.`;
 
         if (isExpired) {
             return (

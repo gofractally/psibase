@@ -17,6 +17,7 @@
 
 namespace psibase
 {
+   using UserService::PackageExport;
    using UserService::PackageMeta;
    using UserService::PackageRef;
 
@@ -29,6 +30,7 @@ namespace psibase
       std::vector<PackageRef>    depends;
       std::vector<AccountNumber> accounts;
       std::vector<AccountNumber> services;
+      std::vector<PackageExport> exports;
       Checksum256                sha256;
       std::string                file;
    };
@@ -40,6 +42,7 @@ namespace psibase
                 depends,
                 accounts,
                 services,
+                exports,
                 sha256,
                 file)
 

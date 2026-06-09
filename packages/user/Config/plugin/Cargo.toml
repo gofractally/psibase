@@ -31,3 +31,4 @@ world = "impl"
 "tokens:plugin" = { path = "../../Tokens/plugin/wit/admin.wit" }
 "virtual-server:plugin" = { path = "../../../system/VirtualServer/plugin/wit/world.wit" }
 "accounts:plugin" = { path = "wit/deps/accounts-admin.wit" }
+"prem-accounts:plugin" = { path = "../../PremAccounts/plugin/wit/world.wit" }

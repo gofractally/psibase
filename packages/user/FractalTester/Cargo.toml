@@ -1,6 +1,6 @@
 [package]
 name = "frac-tester-pkg"
-description = "Creates 18 auth-any test accounts and adds them as members of the system guild. Depends on FractalGen. Not for production use."
+description = "Adds 18 auth-any test accounts (testfrac01 through testfrac18) to genesis guild of the system fractal. Not for production use."
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

@@ -9,7 +9,7 @@ import {
 } from "@/lib/graphql/evaluations/get-users-and-groups";
 import QueryKey from "@/lib/query-keys";
 
-import { FRACTALS_SERVICE } from "@shared/domains/fractal/lib/constants";
+import { GUILDS_SERVICE } from "@shared/domains/fractal/lib/constants";
 import { assertUser } from "@shared/hooks/use-current-user";
 import { queryClient } from "@shared/lib/query-client";
 import { updateArray } from "@shared/lib/update-array";
@@ -27,7 +27,7 @@ export const useUsersAndGroups = (
         queryFn: async () => {
             try {
                 const res = await getUsersAndGroups(
-                    FRACTALS_SERVICE,
+                    GUILDS_SERVICE,
                     evaluationId!,
                 );
 
