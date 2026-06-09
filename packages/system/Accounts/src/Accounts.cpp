@@ -8,6 +8,7 @@
 #include <services/system/Transact.hpp>
 
 static constexpr bool enable_print = false;
+static constexpr std::size_t MIN_ALLOWED_ACCOUNT_LENGTH = 8;
 
 using namespace psibase;
 
@@ -83,7 +84,9 @@ namespace SystemService
       {
          check(!strName.starts_with("x-"),
                "The 'x-' account prefix is reserved for infrastructure providers");
-         check(strName.length() >= 8, "account name must be at least 8 characters: " + strName);
+         check(strName.length() >= MIN_ALLOWED_ACCOUNT_LENGTH,
+               "account name must be at least " +
+                   std::to_string(MIN_ALLOWED_ACCOUNT_LENGTH) + " characters: " + strName);
       }
 
       // Check compression roundtrip
