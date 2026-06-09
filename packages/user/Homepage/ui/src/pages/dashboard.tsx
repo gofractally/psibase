@@ -1,5 +1,13 @@
 import { motion } from "framer-motion";
-import { Book, BookUser, Coins, Mail, MoveRight, ArrowRightLeft, } from "lucide-react";
+import {
+    ArrowRightLeft,
+    Book,
+    BookUser,
+    Coins,
+    Mail,
+    MoveRight,
+    Store,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
@@ -48,7 +56,13 @@ const apps: App[] = [
         service: zAccount.parse("contacts"),
     },
     {
-        title: "Doc",
+        title: "Account marketplace",
+        description: "Buy and claim premium account names.",
+        icon: <Store className="h-6 w-6" />,
+        service: zAccount.parse("prem-accounts"),
+    },
+    {
+        title: "Docs",
         description: "Review technical documentation and guides.",
         icon: <Book className="h-6 w-6" />,
         href: siblingUrl(null, "docs", null),
