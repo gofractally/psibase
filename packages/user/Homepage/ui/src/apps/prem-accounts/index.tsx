@@ -2,6 +2,7 @@ import { type SidebarVisibility, defineAppConfig } from "@/app-config";
 import { History, Package, ShoppingCart, Store } from "lucide-react";
 
 import { useNameEvents } from "@/apps/prem-accounts/hooks/use-name-events";
+import { NAME_EVENTS_EXISTENCE_PAGE_SIZE } from "@/apps/prem-accounts/lib/graphql/prem-accounts-api";
 
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { usePremMarkets } from "@shared/hooks/use-prem-markets";
@@ -24,7 +25,10 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
 
     const { data: history, isLoading: isLoadingHistory } = useNameEvents(
         currentUser,
-        { enabled: isSuccessMarkets && !isMarketEnabled },
+        {
+            first: NAME_EVENTS_EXISTENCE_PAGE_SIZE,
+            enabled: isSuccessMarkets && !isMarketEnabled,
+        },
     );
 
     if (isPendingMarkets) {
@@ -41,7 +45,7 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
         return { visible: false, isLoading: true }; // No markets are enabled and we are waiting for name events to load
     }
 
-    if (!isMarketEnabled && history?.length) {
+    if (!isMarketEnabled && history?.events.length) {
         return { visible: true, isLoading: false }; // The user has account market history, so we should show it even though no markets are enabled
     }
 

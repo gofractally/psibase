@@ -25,7 +25,28 @@ const QueryKey = {
         ["premValidatedMaxCost", tokenId, maxCost] as const,
     premUnclaimedNames: (user?: string | null) =>
         ["premUnclaimedNames", user] as const,
-    premNameEvents: (user?: string | null) => ["premNameEvents", user] as const,
+    premNameEvents: (
+        user?: string | null,
+        {
+            first,
+            after,
+            last,
+            before,
+        }: {
+            first?: number;
+            after?: string;
+            last?: number;
+            before?: string;
+        } = {},
+    ) =>
+        [
+            "premNameEvents",
+            user,
+            first ?? null,
+            after ?? null,
+            last ?? null,
+            before ?? null,
+        ] as const,
 } as const satisfies Record<string, QueryKeyGenerator>;
 
 export type QueryKeysType = typeof QueryKey;
