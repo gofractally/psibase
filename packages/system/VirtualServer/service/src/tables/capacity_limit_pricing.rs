@@ -242,6 +242,10 @@ impl CapacityPricing {
     }
 
     fn cost_of(&self, amount_consumed: u64) -> u64 {
+        if amount_consumed > self.remaining_capacity {
+            abort_message(&format!("Insufficient {} capacity", self.resource().name()));
+        }
+
         self.curve()
             .pos_from_resources(self.remaining_capacity)
             .cost_of(amount_consumed)
