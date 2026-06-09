@@ -12,6 +12,7 @@ import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/b
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useUserTokenBalances, getSystemTokenBalance } from "@shared/hooks/use-user-token-balances";
 import { getAccount } from "@shared/lib/get-account";
+import { premAccounts } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
@@ -66,6 +67,10 @@ export function BuyForm({
     const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
     const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
+    const [purchaseComplete, setPurchaseComplete] = useState(false);
+    const [purchasedAccountName, setPurchasedAccountName] = useState<
+        string | null
+    >(null);
 
     const pricesRef = useRef(prices);
     pricesRef.current = prices;
@@ -232,8 +237,8 @@ export function BuyForm({
                     slippagePercent,
                 ),
             });
-            setBuyConfirmOpen(false);
-            setConfirmPrice(null);
+            setPurchasedAccountName(name);
+            setPurchaseComplete(true);
             form.reset();
             form.setFieldValue("slippage", DEFAULT_NAME_PURCHASE_SLIPPAGE);
         } catch (error) {
@@ -431,13 +436,17 @@ export function BuyForm({
                         setBuyConfirmOpen(open);
                         if (!open) {
                             setConfirmPrice(null);
+                            setPurchaseComplete(false);
+                            setPurchasedAccountName(null);
                         }
                     }}
                     mode="buy-only"
-                    account={accountName}
+                    account={purchasedAccountName ?? accountName}
                     price={confirmPrice}
                     slippage={slippagePercent}
                     isLoading={isBuying}
+                    purchaseComplete={purchaseComplete}
+                    claimPageHref={`/${premAccounts.service}/claim`}
                     onConfirm={() => void handleBuy()}
                 />
             ) : null}
