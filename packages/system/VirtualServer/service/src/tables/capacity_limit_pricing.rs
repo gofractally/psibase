@@ -101,11 +101,12 @@ pub(crate) struct Curve {
     pub(crate) k: u128,
 }
 
+#[allow(non_snake_case)]
 pub(crate) struct CurvePosition {
     pub(crate) reserves: u64,
 
-    x: u128,
-    y: u128,
+    X: u128,
+    Y: u128,
     k: u128,
 }
 
@@ -152,12 +153,12 @@ impl Curve {
     ///
     /// Rounds the required reserves up, keeping the pool fully capitalized.
     pub(crate) fn pos_from_resources(&self, resources: u64) -> CurvePosition {
-        let y = resources as u128 + self.y0 as u128;
-        let reserves = (self.k.div_ceil(y) - self.x0 as u128) as u64;
+        let Y = resources as u128 + self.y0 as u128;
+        let reserves = (self.k.div_ceil(Y) - self.x0 as u128) as u64;
         CurvePosition {
             reserves,
-            x: reserves as u128 + self.x0 as u128,
-            y,
+            X: reserves as u128 + self.x0 as u128,
+            Y,
             k: self.k,
         }
     }
@@ -173,11 +174,11 @@ impl CurvePosition {
         }
         let dy = amount_consumed as u128;
 
-        check(self.y > dy, "Insufficient capacity");
+        check(self.Y > dy, "Insufficient capacity");
 
-        let new_y = self.y - dy;
-        let required_x = self.k.div_ceil(new_y);
-        let dx = check_some(required_x.checked_sub(self.x), "Excess reserve detected");
+        let new_Y = self.Y - dy;
+        let required_X = self.k.div_ceil(new_Y);
+        let dx = check_some(required_X.checked_sub(self.X), "Excess reserve detected");
 
         dx as u64
     }
@@ -191,18 +192,18 @@ impl CurvePosition {
         }
         let dy = amount_freed as u128;
 
-        let new_y = self.y + dy;
+        let new_Y = self.Y + dy;
 
         // ceil division here makes the subtracted term larger, so dx is smaller
-        let new_x = self.k.div_ceil(new_y);
-        let dx = self.x.saturating_sub(new_x);
+        let new_X = self.k.div_ceil(new_Y);
+        let dx = self.X.saturating_sub(new_X);
 
         dx as u64
     }
 
     // Spot price: X / Y
     pub(crate) fn spot_price(&self) -> u64 {
-        (self.x / self.y) as u64
+        (self.X / self.Y) as u64
     }
 }
 
