@@ -20,7 +20,6 @@ import { pluginId } from "@psibase/common-lib/messaging/plugin-id";
 
 import { AppInterface } from "./app-interface";
 import { CallContext } from "./call-context";
-import { REDIRECT_ERROR_CODE } from "./constants";
 import { getRecoverableError } from "./plugin/errors";
 import { PluginLoader } from "./plugin/plugin-loader";
 import { Plugins } from "./plugin/plugins";
@@ -49,6 +48,19 @@ const systemPlugins: Array<QualifiedPluginId> = [
     pluginId("webcrypto", "plugin"),
 ];
 
+// Control-flow signal thrown to unwind out of a plugin call.
+//
+// It extends Error so that JCO-transpiled glue never intercepts it: JCO's
+// getErrorPayload() re-throws Error instances rather than converting them into a
+// component Result::Err. The one exception is an Error carrying its own "payload"
+// property, so this class must NOT define one.
+class PromptSignal extends Error {
+    constructor(readonly kind: "prompt" | "embedded-error" | "preload-error") {
+        super(`prompt-signal:${kind}`);
+        this.name = "PromptSignal";
+    }
+}
+
 // The supervisor facilitates all communication
 export class Supervisor implements AppInterface {
     private plugins: Plugins;
@@ -58,6 +70,8 @@ export class Supervisor implements AppInterface {
     private context: CallContext | undefined;
 
     private embedder: string | undefined;
+
+    private inPreload = false;
 
     parser: Promise<any>;
 
@@ -117,55 +131,72 @@ export class Supervisor implements AppInterface {
     }
 
     private async doPreload(plugins: QualifiedPluginId[]) {
-        await chainIdPromise;
+        this.inPreload = true;
+        try {
+            await chainIdPromise;
 
-        if (plugins.length === 0) {
-            return;
-        }
-
-        // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
-        this.loader.trackPlugins([...systemPlugins]);
-        await this.loader.processPlugins();
-        await this.loader.awaitReady();
-
-        // Required to instantiate system plugins to execute the plugin calls below
-        await this.plugins.instantiateAll();
-
-        if (isEmbedded) {
-            const promptDetails = await this.supervisorCall(
-                getCallArgs("host", "prompt", "admin", "get-active-prompt", []),
-            );
-            if (promptDetails) {
-                this.embedder = promptDetails.activeApp;
-                delete this.context; // A new one will be created with the embedder
+            if (plugins.length === 0) {
+                return;
             }
+
+            // Phase 0: Loads systemPlugins, including those needed to get current user, i.e., accounts, host:auth
+            this.loader.trackPlugins([...systemPlugins]);
+            await this.loader.processPlugins();
+            await this.loader.awaitReady();
+
+            // Required to instantiate system plugins to execute the plugin calls below
+            await this.plugins.instantiateAll();
+
+            if (isEmbedded) {
+                const promptDetails = await this.supervisorCall(
+                    getCallArgs(
+                        "host",
+                        "prompt",
+                        "admin",
+                        "get-active-prompt",
+                        [],
+                    ),
+                );
+                if (promptDetails) {
+                    this.embedder = promptDetails.activeApp;
+                    delete this.context; // A new one will be created with the embedder
+                }
+            }
+
+            setQueryToken(this.getActiveQueryToken());
+
+            // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
+            // The sync call to getAuthServices below only touches Phase 0 plugins.
+            this.loader.trackPlugins([...plugins]);
+            await this.loader.processPlugins();
+            await this.loader.awaitReady();
+
+            // Phase 2: Load the auth services for all connected accounts.
+            // This sync call uses accounts:plugin (Phase 0, already instantiated).
+            const auth_services: string[] = this.supervisorCall(
+                getCallArgs(
+                    "accounts",
+                    "plugin",
+                    "admin",
+                    "get-auth-services",
+                    [],
+                ),
+            );
+
+            const addtl_plugins: QualifiedPluginId[] = [];
+            for (const service of auth_services) {
+                if (!service) continue;
+
+                // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
+                addtl_plugins.push(pluginId(service, "plugin"));
+            }
+            this.loader.trackPlugins(addtl_plugins);
+
+            await this.loader.processPlugins();
+            await this.loader.awaitReady();
+        } finally {
+            this.inPreload = false;
         }
-
-        setQueryToken(this.getActiveQueryToken());
-
-        // Phase 1: Compile app plugins (NO instantiation yet — Memory deferred).
-        // The sync call to getAuthServices below only touches Phase 0 plugins.
-        this.loader.trackPlugins([...plugins]);
-        await this.loader.processPlugins();
-        await this.loader.awaitReady();
-
-        // Phase 2: Load the auth services for all connected accounts.
-        // This sync call uses accounts:plugin (Phase 0, already instantiated).
-        const auth_services: string[] = this.supervisorCall(
-            getCallArgs("accounts", "plugin", "admin", "get-auth-services", []),
-        );
-
-        const addtl_plugins: QualifiedPluginId[] = [];
-        for (const service of auth_services) {
-            if (!service) continue;
-
-            // Current limitation: an auth service plugin must be called "plugin" ("<service>:plugin")
-            addtl_plugins.push(pluginId(service, "plugin"));
-        }
-        this.loader.trackPlugins(addtl_plugins);
-
-        await this.loader.processPlugins();
-        await this.loader.awaitReady();
     }
 
     private replyToParent(id: string, result: any) {
@@ -274,6 +305,13 @@ export class Supervisor implements AppInterface {
         return this.supervisorCall(
             getCallArgs("webcrypto", "plugin", "api", "sign", [msg, publicKey]),
         );
+    }
+
+    requestPrompt(): never {
+        if (this.inPreload) {
+            throw new PromptSignal("preload-error");
+        }
+        throw new PromptSignal(isEmbedded ? "embedded-error" : "prompt");
     }
 
     call(args: QualifiedFunctionCallArgs): any {
@@ -426,22 +464,35 @@ export class Supervisor implements AppInterface {
 
             this.context = undefined;
         } catch (e) {
-            const err = getRecoverableError(e);
-            if (err) {
-                let newError;
-                if (err.code === REDIRECT_ERROR_CODE) {
-                    newError = new RedirectErrorObject(
-                        err.producer,
-                        err.message,
-                    );
-                } else {
-                    newError = new PluginErrorObject(err.producer, err.message);
-                }
-                this.replyToParent(id, newError);
+            let result: any;
+            if (e instanceof PromptSignal && e.kind === "prompt") {
+                result = new RedirectErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "user_prompt_request",
+                );
+            } else if (
+                e instanceof PromptSignal &&
+                e.kind === "embedded-error"
+            ) {
+                result = new PluginErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "Cannot prompt in embedded mode",
+                );
+            } else if (
+                e instanceof PromptSignal &&
+                e.kind === "preload-error"
+            ) {
+                result = new PluginErrorObject(
+                    { service: "host", plugin: "prompt" },
+                    "Cannot trigger user prompt during plugin preload",
+                );
             } else {
-                this.replyToParent(id, e);
+                const err = getRecoverableError(e);
+                result = err
+                    ? new PluginErrorObject(err.producer, err.message)
+                    : e;
             }
-
+            this.replyToParent(id, result);
             this.context = undefined;
         } finally {
             this.plugins.disposeAll();
