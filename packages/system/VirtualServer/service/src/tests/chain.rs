@@ -4,7 +4,7 @@ use psibase::{
     fracpack::Pack,
     services::{
         auth_sig::SubjectPublicKeyInfo,
-        credentials, http_server,
+        credentials,
         invite::{self, InvPayload},
         nft::Wrapper as Nft,
         tokens::{self, Decimal, Precision, Quantity, Wrapper as Tokens},
@@ -291,7 +291,7 @@ fn metering(chain: psibase::Chain) -> Result<(), psibase::Error> {
 
     // Send some more tokens to the producer account
     tokens::Wrapper::push_from(&chain, alice)
-        .credit(sys, PRODUCER_ACCOUNT, 10_000_0000.into(), "".into())
+        .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
         .get()?;
 
     // Credit the settlement cost to VirtualServer before enabling billing
@@ -393,12 +393,6 @@ fn invites(chain: psibase::Chain) -> Result<(), psibase::Error> {
     let token_prod = chain.login(PRODUCER_ACCOUNT, Wrapper::SERVICE)?;
 
     initial_setup(&chain)?;
-
-    http_server::Wrapper::push_from(&chain, invite)
-        .registerServer(account!("r-invite"))
-        .get()?;
-    chain.finish_block();
-
     setup_enable_billing(&chain)?;
 
     // Create the invite

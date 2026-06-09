@@ -78,6 +78,11 @@ pub(super) fn enable_billing(chain: &psibase::Chain) -> Result<(), psibase::Erro
             .get()?;
     }
 
+    // Give producer account some more tokens for general use
+    tokens::Wrapper::push_from(&chain, alice)
+        .credit(sys, PRODUCER_ACCOUNT, 50_000_0000.into(), "".into())
+        .get()?;
+
     Wrapper::propose(&chain, PRODUCER_ACCOUNT)
         .enable_billing(true, Some(PRODUCER_ACCOUNT))
         .get()?;
