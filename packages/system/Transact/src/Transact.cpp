@@ -603,8 +603,6 @@ namespace SystemService
                // Anything that could be billed should be done after first auth, because first
                //   auth may set a billable subaccount on the VirtualServer.
 
-               includedTable.put({tapos.expiration, id});
-
                if (isResMonitoring())
                {
                   uint64_t      netUsage = t.size();
@@ -626,6 +624,8 @@ namespace SystemService
             psibase::call(act.unpack(), CallFlags::none);
          }
       }
+
+      includedTable.put({tapos.expiration, id});
 
       if (auto callbacks =
               tables.open<CallbacksTable>().getIndex<0>().get(CallbackType::onTransaction))
