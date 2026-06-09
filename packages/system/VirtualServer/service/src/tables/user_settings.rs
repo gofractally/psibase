@@ -1,11 +1,34 @@
+use crate::resource_type::ResourceType;
 use crate::tables::tables::*;
 use async_graphql::ComplexObject;
 use psibase::services::tokens::{Quantity, Wrapper as Tokens};
 use psibase::*;
 
-// Relatively arbitrary initial values
-const EXAMPLE_LARGE_TX_COST: u64 = 3_000_000; // e.g. Net cost of a 3MB upload when NET is at minimum cost
 pub const DEFAULT_AUTO_FILL_THRESHOLD_PERCENT: u8 = 20;
+
+struct ResourceRequirement {
+    disk: u64,
+    net: u64,
+    cpu: u64,
+}
+
+// Manually measured - Resources required for a token credit action
+const SIMPLE_ACTION_REQ: ResourceRequirement = ResourceRequirement {
+    disk: 144,
+    net: 113,
+    cpu: 15,
+};
+
+const LARGE_TX_MULTIPLIER: u8 = 10;
+
+fn simple_action_cost() -> u64 {
+    let disk = CapacityPricing::get_assert(ResourceType::Disk)
+        .get_cost(SIMPLE_ACTION_REQ.disk)
+        .value;
+    let net = SIMPLE_ACTION_REQ.net * RateLimitPricing::get_assert(ResourceType::Net).price();
+    let cpu = SIMPLE_ACTION_REQ.cpu * RateLimitPricing::get_assert(ResourceType::Cpu).price();
+    disk + net + cpu
+}
 
 impl UserSettings {
     pub fn get(user: AccountNumber) -> Self {
@@ -42,8 +65,12 @@ impl UserSettings {
         }
     }
 
-    pub fn to_sub_account_key(account: AccountNumber, sub_account: &str) -> String {
-        format!("{}.{}", account, sub_account)
+    pub fn to_sub_account_key(account: AccountNumber, sub_account: Option<String>) -> String {
+        if let Some(sub_account) = sub_account {
+            format!("{}.{}", account, sub_account)
+        } else {
+            account.to_string()
+        }
     }
 
     pub fn get_resource_balance(account: AccountNumber, sub_account: Option<String>) -> Quantity {
@@ -54,18 +81,14 @@ impl UserSettings {
         account: AccountNumber,
         sub_account: Option<String>,
     ) -> Option<Quantity> {
-        let sub_account_key = if let Some(sub_account) = sub_account {
-            Self::to_sub_account_key(account, &sub_account)
-        } else {
-            account.to_string()
-        };
-
+        let sub_account_key = Self::to_sub_account_key(account, sub_account);
         Tokens::call().getSubBal(BillingConfig::get_assert().sys, sub_account_key)
     }
 
     fn get_min_buffer_capacity() -> u64 {
         // Ensures that the large tx could still be submitted when at the refill threshold
-        EXAMPLE_LARGE_TX_COST * 100 / (DEFAULT_AUTO_FILL_THRESHOLD_PERCENT as u64)
+        let large_tx_cost = simple_action_cost() * LARGE_TX_MULTIPLIER as u64;
+        large_tx_cost * 100 / (DEFAULT_AUTO_FILL_THRESHOLD_PERCENT as u64)
     }
 
     pub fn get_default_buffer_capacity() -> u64 {

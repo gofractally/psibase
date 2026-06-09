@@ -1,8 +1,5 @@
 use crate::math_utils::*;
-use crate::service::{
-    get_resource_name,
-    resources::{CPU, NET},
-};
+use crate::resource_type::ResourceType;
 use crate::tables::tables::*;
 use async_graphql::{ComplexObject, SimpleObject};
 use psibase::services::diff_adjust::Wrapper as DiffAdjust;
@@ -50,6 +47,8 @@ fn create_diff_adjust(doubling_time_sec: u32, halving_time_sec: u32) -> u32 {
     const DEFAULT_INITIAL_DIFFICULTY: u64 = 1;
     const DEFAULT_FLOOR_DIFFICULTY: u64 = DEFAULT_INITIAL_DIFFICULTY;
     const DEFAULT_WINDOW_SECONDS: u32 = 1;
+    // Target utilization band: 45%-55% (in ppm). Below 45% the price decreases,
+    //   above 55% it increases; in between it holds steady.
     const DEFAULT_TARGET_MIN: u32 = 45_0000;
     const DEFAULT_TARGET_MAX: u32 = 55_0000;
 
@@ -66,20 +65,24 @@ fn create_diff_adjust(doubling_time_sec: u32, halving_time_sec: u32) -> u32 {
     diff_adjust_id
 }
 
-// Updates the average_history with the specified current_usage, then zeroes out the current_usage.
+// Updates avg_usage with an exponentially-weighted average, then zeroes out current_usage.
 // Increments the specified diff_adjust by the amount of the average usage in PPM (of total capacity).
 fn update_average_usage(
-    usage_history: &mut Vec<u64>,
+    avg_usage: &mut u64,
     last_block_usage: &mut u64,
     num_blocks_to_average: u8,
     capacity: u64,
     diff_adjust_id: u32,
 ) -> u32 {
-    usage_history.insert(0, *last_block_usage);
-    usage_history.truncate(num_blocks_to_average as usize);
+    let n = num_blocks_to_average as u64;
 
-    let avg = average(&usage_history);
-    let ppm = ratio_to_ppm(avg, capacity);
+    // Exponential moving average (https://en.wikipedia.org/wiki/Exponential_smoothing):
+    //   avg = α * sample + (1 − α) * avg_prev
+    // Setting α = 1/N and multiplying through by N to keep everything in integer arithmetic:
+    //   avg = (sample + (N − 1) * avg_prev) / N
+    *avg_usage = (*last_block_usage + (n - 1) * *avg_usage) / n;
+
+    let ppm = ratio_to_ppm(*avg_usage, capacity);
 
     // We need to clamp this to fit in u32 which is a DiffAdjust constraint.
     // This clamps it at u32 max, which means that if the usage is more than 4,294x over capacity,
@@ -107,68 +110,71 @@ pub fn bill_user(user: AccountNumber, cost: u64, sub_account: Option<String>) {
         abort_message(&format!("{} has insufficient resource balance", user));
     }
 
-    let user_key = match sub_account {
-        Some(ref sub) => UserSettings::to_sub_account_key(user, sub),
-        None => user.to_string(),
-    };
+    let user_key = UserSettings::to_sub_account_key(user, sub_account);
 
     Tokens::call().fromSub(sys, user_key, amt);
     Tokens::call().credit(sys, config.fee_receiver, amt, "".into());
 }
 
-fn capacity(resource_id: u8) -> u64 {
+fn capacity(resource: ResourceType) -> u64 {
     let specs = NetworkSpecs::get_assert();
-    match resource_id {
-        NET => specs.net_bps,
-        CPU => specs.cpu_ns,
-        _ => abort_message(&format!("Unknown resource id: {}", resource_id)),
+    match resource {
+        ResourceType::Net => specs.net_bps,
+        ResourceType::Cpu => specs.cpu_ns,
+        ResourceType::Disk => abort_message("Disk is not a rate-limited resource"),
     }
 }
 
-impl BandwidthPricing {
+impl RateLimitPricing {
     pub fn initialize(
-        resource_id: u8,
+        resource: ResourceType,
         num_blocks_to_average: u8,
         doubling_time_sec: u32,
         halving_time_sec: u32,
         billable_unit: u64,
     ) {
-        let row = BandwidthPricing {
-            resource_id,
+        let row = RateLimitPricing {
+            resource_id: resource.as_id(),
             num_blocks_to_average,
-            usage_history: Vec::new(),
+            avg_usage: 0,
             current_usage: 0,
             diff_adjust_id: create_diff_adjust(doubling_time_sec, halving_time_sec),
             doubling_time_sec,
             halving_time_sec,
             billable_unit,
         };
-        BandwidthPricingTable::read_write().put(&row).unwrap();
+        RateLimitPricingTable::read_write().put(&row).unwrap();
     }
 
-    fn update<F: FnOnce(&mut BandwidthPricing)>(resource_id: u8, f: F) {
-        let table = BandwidthPricingTable::read_write();
+    fn update<F: FnOnce(&mut RateLimitPricing)>(resource: ResourceType, f: F) {
+        let id = resource.as_id();
+        let table = RateLimitPricingTable::read_write();
         let mut row = check_some(
-            table.get_index_pk().get(&resource_id),
-            &format!("resource {} not initialized", resource_id),
+            table.get_index_pk().get(&id),
+            &format!("resource {} not initialized", resource.name()),
         );
         f(&mut row);
         table.put(&row).unwrap();
     }
 
-    pub fn get_assert(resource_id: u8) -> Self {
-        let row = Self::get(resource_id);
-        check_some(row, &format!("resource {} not initialized", resource_id))
+    pub fn get_assert(resource: ResourceType) -> Self {
+        check_some(
+            Self::get(resource),
+            &format!("resource {} not initialized", resource.name()),
+        )
     }
 
-    pub fn get(resource_id: u8) -> Option<Self> {
-        BandwidthPricingTable::read()
-            .get_index_pk()
-            .get(&resource_id)
+    pub fn get(resource: ResourceType) -> Option<Self> {
+        let id = resource.as_id();
+        RateLimitPricingTable::read().get_index_pk().get(&id)
+    }
+
+    fn resource(&self) -> ResourceType {
+        ResourceType::from_id(self.resource_id)
     }
 
     pub fn set_num_blocks_to_average(&self, num_blocks: u8) {
-        Self::update(self.resource_id, |r| r.num_blocks_to_average = num_blocks);
+        Self::update(self.resource(), |r| r.num_blocks_to_average = num_blocks);
     }
 
     pub fn consume(
@@ -178,10 +184,11 @@ impl BandwidthPricing {
         sub_account: Option<String>,
         billing_enabled: bool,
     ) -> u64 {
+        let resource = self.resource();
         let price = Cell::new(0u64);
         let billable_unit = Cell::new(0u64);
 
-        Self::update(self.resource_id, |r| {
+        Self::update(resource, |r| {
             r.current_usage += amount;
             price.set(r.price());
             billable_unit.set(r.billable_unit);
@@ -191,11 +198,11 @@ impl BandwidthPricing {
         let price = price.get();
 
         // Round up to the nearest billable unit
-        let amount_units = (amount + billable_unit - 1) / billable_unit;
+        let amount_units = amount.div_ceil(billable_unit);
 
         let mut cost = check_some(
             amount_units.checked_mul(price),
-            &format!("{} usage overflow", get_resource_name(self.resource_id)),
+            &format!("{} usage overflow", resource.name()),
         );
 
         if !billing_enabled {
@@ -208,14 +215,15 @@ impl BandwidthPricing {
     }
 
     pub fn new_block(&self) -> u32 {
+        let resource = self.resource();
         let last_block_usage_ppm = Cell::new(0u32);
 
-        Self::update(self.resource_id, |r| {
+        Self::update(resource, |r| {
             last_block_usage_ppm.set(update_average_usage(
-                &mut r.usage_history,
+                &mut r.avg_usage,
                 &mut r.current_usage,
                 r.num_blocks_to_average,
-                capacity(self.resource_id),
+                capacity(resource),
                 r.diff_adjust_id,
             ));
         });
@@ -248,7 +256,7 @@ impl BandwidthPricing {
         );
         check(halving_time_sec > 0, "halving time must be greater than 0");
 
-        Self::update(self.resource_id, |r| {
+        Self::update(self.resource(), |r| {
             r.doubling_time_sec = doubling_time_sec;
             r.halving_time_sec = halving_time_sec;
         });
@@ -261,7 +269,7 @@ impl BandwidthPricing {
     }
 
     pub fn set_billable_unit(&self, unit: u64) {
-        Self::update(self.resource_id, |r| r.billable_unit = unit);
+        Self::update(self.resource(), |r| r.billable_unit = unit);
     }
 
     pub fn get_billable_unit(&self) -> u64 {
@@ -280,12 +288,11 @@ pub struct Thresholds {
 }
 
 #[ComplexObject]
-impl BandwidthPricing {
+impl RateLimitPricing {
     /// The resource usage as a percentage of total capacity averaged over the
     /// last `num_blocks_to_average` blocks
     pub async fn avg_usage_pct(&self) -> String {
-        let avg = self.usage_history.iter().sum::<u64>() / self.usage_history.len() as u64;
-        let ppm = ratio_to_ppm(avg, capacity(self.resource_id)) as u64;
+        let ppm = ratio_to_ppm(self.avg_usage, capacity(self.resource())) as u64;
         ppm_to_pct(ppm).to_string()
     }
 
@@ -305,6 +312,6 @@ impl BandwidthPricing {
 
     /// The total number of available billable units
     pub async fn available_units(&self) -> u64 {
-        capacity(self.resource_id) / self.billable_unit
+        capacity(self.resource()) / self.billable_unit
     }
 }

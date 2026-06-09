@@ -8,10 +8,10 @@
 #include <services/system/VirtualServer.hpp>
 
 #include <boost/container/flat_map.hpp>
+#include <cstdio>
+#include <psibase/api.hpp>
 #include <psibase/crypto.hpp>
 #include <psibase/serviceEntry.hpp>
-
-#include <cstdio>
 
 using namespace psibase;
 
@@ -82,6 +82,10 @@ namespace SystemService
    //          If you're tempted to do anything application-specific in startBlock,
    //          or are considering adding new features to startBlock, then consider
    //          the risk of it halting the chain if a bug or exploit appears.
+   //
+   // This function is executed outside the context of any action/transaction context.
+   //          Therefore, any database write operations are treated as system writes
+   //          and their cost is socialized.
    void Transact::startBlock()
    {
       check(getSender().value == 0, "Only native code may call startBlock");
@@ -531,6 +535,12 @@ namespace SystemService
                                      act.method().unpack().str()));
          }
       }
+
+      namespace
+      {
+         AccountNumber trxSender = {};
+      }
+
    }  // namespace
    bool Transact::checkFirstAuth(Checksum256 id, psio::view<const psibase::Transaction> trx)
    {
@@ -564,6 +574,8 @@ namespace SystemService
 
       check(trx.actions().size() > 0, "transaction has no actions");
 
+      trxSender = trx.actions()[0].sender();
+
       // unpack some fields for convenience
       auto tapos  = trx.tapos().unpack();
       auto claims = trx.claims().unpack();
@@ -573,7 +585,6 @@ namespace SystemService
       auto includedIdx   = includedTable.getIndex<0>();
 
       check(!includedIdx.get(std::tuple{tapos.expiration, id}), "duplicate transaction");
-      includedTable.put({tapos.expiration, id});
 
       bool enforceAuth = checkTapos(id, tapos, speculative);
 
@@ -587,13 +598,17 @@ namespace SystemService
             auto first = get_view_data(act) == get_view_data(trx.actions()[0]);
             checkAuth(act, claims, first, false);
 
-            if (first && isResMonitoring())
+            if (first)
             {
-               // Billing network usage *after* first action auth, because first action auth may set
-               //   a billable subaccount on the VirtualServer.
-               uint64_t      netUsage = t.size();
-               AccountNumber sender   = act.sender();
-               to<VirtualServer>().useNetSys(sender, netUsage);
+               // Anything that could be billed should be done after first auth, because first
+               //   auth may set a billable subaccount on the VirtualServer.
+
+               if (isResMonitoring())
+               {
+                  uint64_t      netUsage = t.size();
+                  AccountNumber sender   = act.sender();
+                  to<VirtualServer>().useNetSys(sender, netUsage);
+               }
             }
          }
          if constexpr (enable_print)
@@ -609,6 +624,8 @@ namespace SystemService
             psibase::call(act.unpack(), CallFlags::none);
          }
       }
+
+      includedTable.put({tapos.expiration, id});
 
       if (auto callbacks =
               tables.open<CallbacksTable>().getIndex<0>().get(CallbackType::onTransaction))
@@ -660,6 +677,42 @@ namespace SystemService
                            std::uint32_t newValueLen)
    {
       check(getSender() == AccountNumber{}, "Wrong sender");
+
+      constexpr std::uint32_t DNE = static_cast<std::uint32_t>(-1);
+      check(!(oldValueLen == DNE && newValueLen == DNE), "Invalid kv notify");
+
+      if (isResMonitoring())
+      {
+         int64_t delta = 0;
+         if (oldValueLen == DNE)
+         {
+            delta = static_cast<int64_t>(keyLen) + static_cast<int64_t>(newValueLen);
+         }
+         else if (newValueLen == DNE)
+         {
+            delta = -(static_cast<int64_t>(keyLen) + static_cast<int64_t>(oldValueLen));
+         }
+         else
+         {
+            delta = static_cast<int64_t>(newValueLen) - static_cast<int64_t>(oldValueLen);
+         }
+         if (delta != 0)
+         {
+            if constexpr (enable_print)
+            {
+               psibase::writeConsole(
+                   "kvNotify: service=" + service.str() +
+                   " db=" + std::to_string(static_cast<int>(db)) +
+                   " key=" + std::to_string(keyLen) + " old=" +
+                   (oldValueLen == DNE ? std::string("DNE") : std::to_string(oldValueLen)) +
+                   " new=" +
+                   (newValueLen == DNE ? std::string("DNE") : std::to_string(newValueLen)) +
+                   " delta=" + std::to_string(delta) + " user=" + trxSender.str() + "\n");
+            }
+
+            recurse().to<VirtualServer>().useDiskSys(trxSender, db, delta);
+         }
+      }
    }
 
 #ifndef PSIBASE_GENERATE_SCHEMA
