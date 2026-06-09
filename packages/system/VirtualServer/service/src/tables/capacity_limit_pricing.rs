@@ -133,9 +133,13 @@ impl Curve {
         let xm = max_reserves as u128;
         let ym = max_resources as u128;
         let d = curve_d as u128;
+
         // `xm * ym * (d + 1)` stays within u128 because `check_curve_params`
         // bounds `max_capacity * (curve_d + 1)` against the largest possible
         // reserve (`u64::MAX`) whenever those inputs are set.
+        //
+        // Flooring x0/y0 and ceiling k all bias `pos_from_resources`'
+        // `ceil(k / (resources + y0)) - x0` upward, keeping the pool capitalized.
         Curve {
             x0: (max_reserves / curve_d),
             y0: (max_resources / curve_d),
