@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
-import { TriangleAlert } from "lucide-react";
+import { CircleCheck, TriangleAlert } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { Quantity } from "@shared/lib/quantity";
 import { Alert, AlertDescription, AlertTitle } from "@shared/shadcn/ui/alert";
@@ -14,6 +15,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@shared/shadcn/ui/alert-dialog";
+import { Button } from "@shared/shadcn/ui/button";
+import { Dialog, DialogContent } from "@shared/shadcn/ui/dialog";
+import {
+    Empty,
+    EmptyContent,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from "@shared/shadcn/ui/empty";
 import { Item, ItemContent } from "@shared/shadcn/ui/item";
 import { Separator } from "@shared/shadcn/ui/separator";
 
@@ -47,6 +58,8 @@ export const BuyNameConfirmationDialog = ({
     slippage,
     isLoading,
     onConfirm,
+    purchaseComplete = false,
+    claimPageHref,
 }: {
     open: boolean;
     setOpen: (open: boolean) => void;
@@ -58,10 +71,52 @@ export const BuyNameConfirmationDialog = ({
     slippage: number;
     isLoading: boolean;
     onConfirm: () => void;
+    /** When true (buy-only), show success state instead of the confirmation form. */
+    purchaseComplete?: boolean;
+    /** Route to the claim page; required when `purchaseComplete` is true in buy-only mode. */
+    claimPageHref?: string;
 }) => {
     const trimmedAccount = account.trim();
     const priceIncreased =
         previousPrice != null && price.isGreaterThan(previousPrice);
+
+    if (purchaseComplete && mode === "buy-only" && claimPageHref) {
+        return (
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <Empty className="border-0 p-0">
+                        <EmptyHeader>
+                            <EmptyMedia
+                                variant="icon"
+                                className="bg-green-500/10 text-green-600 dark:text-green-400"
+                            >
+                                <CircleCheck />
+                            </EmptyMedia>
+                            <EmptyTitle>Purchase complete</EmptyTitle>
+                            <EmptyDescription>
+                                You bought{" "}
+                                <span className="text-primary font-medium">
+                                    {trimmedAccount}
+                                </span>
+                                . You can claim your account anytime on the
+                                Claim page.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                        <EmptyContent>
+                            <Button asChild>
+                                <Link
+                                    to={claimPageHref}
+                                    onClick={() => setOpen(false)}
+                                >
+                                    Go to Claim
+                                </Link>
+                            </Button>
+                        </EmptyContent>
+                    </Empty>
+                </DialogContent>
+            </Dialog>
+        );
+    }
 
     return (
         <AlertDialog open={open} onOpenChange={setOpen}>
