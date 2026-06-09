@@ -45,7 +45,7 @@ pub mod service {
     };
     use psibase::services::accounts as Accounts;
     use psibase::services::auth_delegate as AuthDelegate;
-    use psibase::services::diff_adjust::Wrapper as DiffAdjust;
+    use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::events;
     use psibase::services::nft::{self as Nfts, NftHolderFlags};
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
@@ -204,14 +204,26 @@ pub mod service {
         require_caller_is_self();
 
         check_market_length(length);
+        check_some(
+            Tokens::Wrapper::call().getSysToken(),
+            "system token must be defined",
+        );
 
-        // check(systemToken exists (inline action on Tokens service))
-
+        // if market already exists and its config is identical, return
         let auctions_table = AuctionsTable::new();
-        if auctions_table.get_index_pk().get(&length).is_some() {
-            // market already exists; return (success)
-            // idempotent for postinstall
-            return;
+        if let Some(auction) = auctions_table.get_index_pk().get(&length) {
+            if let Some(rate_limit) = RateLimitTable::read().get_index_pk().get(&auction.nft_id) {
+                if rate_limit.window_seconds == MARKET_WINDOW_SECONDS
+                    && rate_limit.target_min == target
+                    && rate_limit.target_max == target
+                    && rate_limit.floor_difficulty == floor_price.value
+                    && rate_limit.increase_ppm == increase_ppm
+                    && rate_limit.decrease_ppm == decrease_ppm
+                {
+                    return;
+                }
+            }
+            abort_message("market already exists");
         }
 
         let nft_id = DiffAdjust::call().create(

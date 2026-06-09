@@ -112,13 +112,7 @@ impl Api for PremAccountsPlugin {
             return false;
         }
 
-        overview.market_params.iter().any(|market| {
-            market.enabled
-                && overview
-                    .current_prices
-                    .iter()
-                    .any(|price| price.length == market.length)
-        })
+        overview.market_params.iter().any(|market| market.enabled)
     }
 
     #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]

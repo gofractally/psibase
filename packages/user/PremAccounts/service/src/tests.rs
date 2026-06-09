@@ -188,7 +188,7 @@ mod tests {
             .expect("row for length 6");
         assert_eq!(row6.get("enabled"), Some(&serde_json::json!(false)));
 
-        // --- currentPrices, duplicate create(7) fails ---
+        // --- currentPrices includes length-7 market ---
         let raw: serde_json::Value = chain.graphql(
             PremAccounts::SERVICE,
             "query { currentPrices { length price } }",
@@ -203,7 +203,8 @@ mod tests {
             "expected length-7 market in currentPrices: {rows:?}"
         );
 
-        let err = PremAccounts::push_from(&chain, alice)
+        // --- duplicate create(7) with matching params is idempotent ---
+        PremAccounts::push_from(&chain, alice)
             .create(
                 7,
                 Quantity::from(1000u64),
@@ -212,16 +213,28 @@ mod tests {
                 DEFAULT_CREATE_PPM,
                 DEFAULT_CREATE_PPM,
             )
+            .get()?;
+
+        // --- duplicate create(7) with different params fails ---
+        let err = PremAccounts::push_from(&chain, alice)
+            .create(
+                7,
+                Quantity::from(2000u64),
+                10,
+                Quantity::from(100u64),
+                DEFAULT_CREATE_PPM,
+                DEFAULT_CREATE_PPM,
+            )
             .trace
             .error
-            .expect("duplicate create should fail");
+            .expect("duplicate create with mismatched params should fail");
         assert!(
             err.contains("market already exists"),
             "unexpected error: {err}"
         );
 
-        // --- create(3) rejected (init market) ---
-        let err = PremAccounts::push_from(&chain, alice)
+        // --- create(3) with matching params is idempotent ---
+        PremAccounts::push_from(&chain, alice)
             .create(
                 3,
                 Quantity::from(1000u64),
@@ -230,13 +243,7 @@ mod tests {
                 DEFAULT_CREATE_PPM,
                 DEFAULT_CREATE_PPM,
             )
-            .trace
-            .error
-            .expect("create for existing bootstrap market should fail");
-        assert!(
-            err.contains("market already exists"),
-            "unexpected error: {err}"
-        );
+            .get()?;
 
         // --- create(8) succeeds: valid on-chain name length, no market yet (bootstrap is 1..=7) ---
         PremAccounts::push_from(&chain, alice)
