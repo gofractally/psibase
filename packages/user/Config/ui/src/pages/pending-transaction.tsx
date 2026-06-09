@@ -1,6 +1,7 @@
 import { Ban, Check, Trash } from "lucide-react";
 import { useParams } from "react-router-dom";
 
+import { ActionDataDialog } from "@/components/action-data-dialog";
 import { LoadingBlock } from "@/components/loading-block";
 
 import { useAcceptStaged } from "@/hooks/use-accept-staged";
@@ -254,11 +255,14 @@ export const PendingTransaction = () => {
                                     <TableHead>Sender</TableHead>
                                     <TableHead>Service</TableHead>
                                     <TableHead>Method</TableHead>
+                                    <TableHead className="w-[1%]">
+                                        Data
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {data.details.actionList.actions.map(
-                                    (action, index) => (
+                                    (action, index, actions) => (
                                         <TableRow className="text-muted-foreground">
                                             <TableCell key={index} className="">
                                                 {action.sender}
@@ -268,6 +272,16 @@ export const PendingTransaction = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {action.method}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <ActionDataDialog
+                                                    sender={action.sender}
+                                                    service={action.service}
+                                                    method={action.method}
+                                                    rawData={action.rawData}
+                                                    index={index}
+                                                    total={actions.length}
+                                                />
                                             </TableCell>
                                         </TableRow>
                                     ),
