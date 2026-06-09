@@ -12,24 +12,6 @@ data = [{ src = "../ui/dist", dst = "/" }]
 postinstall = [
     { sender = "prem-accounts", service = "prem-accounts", method = "init", data = {} },
     { sender = "prem-accounts", service = "sites", method = "enablespa", data = { enable = true } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 1, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 2, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 3, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 4, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 5, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 6, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 7, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 8, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 9, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 10, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 11, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 12, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 13, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 14, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 15, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 16, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 17, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
-    { sender = "prem-accounts", service = "prem-accounts", method = "create", data = { length = 18, initial_price = { value = 1000 }, target = 10, floor_price = { value = 100 }, increase_ppm = 50000, decrease_ppm = 50000 } },
 ]
 
 [dependencies]

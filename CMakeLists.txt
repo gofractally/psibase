@@ -1037,6 +1037,15 @@ psibase_package(
 )
 
 psibase_package(
+    OUTPUT ${SERVICE_DIR}/PremMarkets.psi
+    NAME PremMarkets
+    VERSION ${PSIBASE_VERSION}.0
+    DESCRIPTION "Creates the default premium account markets. Not for production use."
+    PACKAGE_DEPENDS "PremAccounts(^${PSIBASE_VERSION}.0)"
+    POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/PremAccounts/src/PremMarkets.json
+)
+
+psibase_package(
     OUTPUT ${SERVICE_DIR}/Packages.psi
     NAME Packages
     VERSION ${PSIBASE_VERSION}.0
@@ -1210,7 +1219,7 @@ psibase_package(
     DESCRIPTION "Network initializes with development-only apps, insecure authentication, and no governance."
     PACKAGE_DEPENDS Accounts Aes AuthAny AuthDyn AuthSig AuthDelegate Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi Config CpuLimit Credentials Db
                     Docs DiffAdjust Evaluations Events Fractals FractalCore Guilds Explorer Homepage Host HttpServer Identity Invite Kdf Nft Packages Permissions Producers Profiles Registry 
-                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
+                    Sites SetCode StagedTx Subgroups Supervisor Symbol Tokens PremAccounts PremMarkets TokenStream TokenSwap Transact VirtualServer WebCrypto Workshop
 )
 
 psibase_package(
@@ -1273,7 +1282,7 @@ endfunction()
 write_package_index(package-index ${SERVICE_DIR}
     Accounts AccountsService Aes AuthAny AuthDyn AuthDelegate AuthSig AuthSigService Base64 Branding BrotliCodec BrotliSvc Chainmail ClientData CommonApi CpuLimit Credentials Db DevDefault ProdDefault ProdWithFG
     Docs DiffAdjust DynLd Events Evaluations FaucetTok Fractals FractalCore FractalGen FractalTester Guilds Explorer Host Identity Invite InviteService Kdf Kvtests Nft Nop Minimal Packages Permissions Producers Profiles TestDefault HttpServer Registry
-    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
+    Sites SetCode StagedTx Subgroups Supervisor Symbol TokenUsers Tokens TokenStream TokenSwap PremAccounts PremMarkets Transact TransactService Homepage VirtualServer WebCrypto Workshop Config
     XAdmin XBasic XDb XDefault XHttp XPackages XPeers XProxy XRun XSites XTimer XTransact)
 
 install(
@@ -1325,6 +1334,7 @@ install(
           ${SERVICE_DIR}/Packages.psi
           ${SERVICE_DIR}/Permissions.psi
           ${SERVICE_DIR}/PremAccounts.psi
+          ${SERVICE_DIR}/PremMarkets.psi
           ${SERVICE_DIR}/Producers.psi
           ${SERVICE_DIR}/Profiles.psi
           ${SERVICE_DIR}/Registry.psi
