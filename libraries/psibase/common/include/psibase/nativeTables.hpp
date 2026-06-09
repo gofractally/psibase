@@ -351,11 +351,12 @@ namespace psibase
    //   PSIO_REFLECT(ContinuationArgs, id, trace, token)
    //};
 
-   struct BoundMethod
+   /// Identifies a method on a particular service
+   struct ServiceMethod
    {
       AccountNumber service;
       MethodNumber  method;
-      PSIO_REFLECT(BoundMethod, service, method)
+      PSIO_REFLECT(ServiceMethod, service, method)
    };
 
    using RunKeyType = std::tuple<std::uint16_t, std::uint8_t, std::uint64_t>;
@@ -407,8 +408,8 @@ namespace psibase
       // not limited and therefore should be a system service.
       MicroSeconds maxTime;
       // the action to run
-      Action      action;
-      BoundMethod continuation;
+      Action        action;
+      ServiceMethod continuation;
 
       static const auto db = psibase::DbId::nativeSubjective;
       auto              key() const -> RunKeyType;
