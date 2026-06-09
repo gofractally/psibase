@@ -28,6 +28,10 @@ type ServerPagination = {
     isLoading?: boolean;
 };
 
+type ColumnClassNameMeta = {
+    className?: string;
+};
+
 type DataTableProps<TData> = {
     columns: ColumnDef<TData, unknown>[];
     data: TData[];
@@ -36,6 +40,10 @@ type DataTableProps<TData> = {
     emptyMessage?: string;
     serverPagination?: ServerPagination;
 };
+
+function getColumnClassName(meta: unknown) {
+    return (meta as ColumnClassNameMeta | undefined)?.className;
+}
 
 function PaginationBar({
     pageLabel,
@@ -131,7 +139,12 @@ export function DataTable<TData>({
                             {headerGroup.headers.map((header) => (
                                 <TableHead
                                     key={header.id}
-                                    className="text-muted-foreground h-11 px-4 text-xs font-semibold tracking-wide uppercase"
+                                    className={cn(
+                                        "text-muted-foreground h-11 px-4 text-xs font-semibold tracking-wide uppercase",
+                                        getColumnClassName(
+                                            header.column.columnDef.meta,
+                                        ),
+                                    )}
                                 >
                                     {header.isPlaceholder
                                         ? null
@@ -156,7 +169,12 @@ export function DataTable<TData>({
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell
                                         key={cell.id}
-                                        className="px-4 py-3"
+                                        className={cn(
+                                            "px-4 py-3",
+                                            getColumnClassName(
+                                                cell.column.columnDef.meta,
+                                            ),
+                                        )}
                                     >
                                         {flexRender(
                                             cell.column.columnDef.cell,

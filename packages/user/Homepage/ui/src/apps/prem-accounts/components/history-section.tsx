@@ -99,28 +99,10 @@ export function HistorySection({
     const columns = useMemo<ColumnDef<NameEvent>[]>(
         () => [
             {
-                accessorKey: "blockTime",
-                header: "Date",
-                cell: ({ row }) => {
-                    const { blockTime } = row.original;
-                    const formatted = formatEventTime(blockTime);
-
-                    return (
-                        <time
-                            dateTime={blockTime}
-                            title={
-                                blockTime
-                                    ? dayjs(blockTime).format(
-                                          "MMMM D, YYYY h:mm:ss A",
-                                      )
-                                    : undefined
-                            }
-                            className="text-muted-foreground text-sm"
-                        >
-                            {formatted}
-                        </time>
-                    );
-                },
+                accessorKey: "action",
+                header: "Event",
+                meta: { className: "w-32 whitespace-nowrap pr-3" },
+                cell: ({ row }) => <EventBadge action={row.original.action} />,
             },
             {
                 accessorKey: "account",
@@ -132,9 +114,30 @@ export function HistorySection({
                 ),
             },
             {
-                accessorKey: "action",
-                header: "Event",
-                cell: ({ row }) => <EventBadge action={row.original.action} />,
+                accessorKey: "blockTime",
+                header: () => <div className="text-right">Date</div>,
+                cell: ({ row }) => {
+                    const { blockTime } = row.original;
+                    const formatted = formatEventTime(blockTime);
+
+                    return (
+                        <div className="text-right">
+                            <time
+                                dateTime={blockTime}
+                                title={
+                                    blockTime
+                                        ? dayjs(blockTime).format(
+                                              "MMMM D, YYYY h:mm:ss A",
+                                          )
+                                        : undefined
+                                }
+                                className="text-muted-foreground text-sm"
+                            >
+                                {formatted}
+                            </time>
+                        </div>
+                    );
+                },
             },
         ],
         [],
