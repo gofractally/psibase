@@ -16,6 +16,11 @@ import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
 import { Spinner } from "@shared/shadcn/ui/spinner";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@shared/shadcn/ui/tooltip";
 
 const DEFAULT_NAME_PURCHASE_SLIPPAGE = "5";
 
@@ -177,15 +182,41 @@ export function BuyForm({
         [accountName, prices, isAccountTaken, resolveLivePrice],
     );
 
+    const maxCostWithSlippage = useMemo(() => {
+        if (!livePrice || slippagePercent === null) {
+            return null;
+        }
+        return livePrice.multiply(1 + slippagePercent / 100);
+    }, [livePrice, slippagePercent]);
+
     const hasInsufficientFunds = useMemo(() => {
-        if (!livePrice || isPendingBalances) {
+        if (!maxCostWithSlippage || isPendingBalances) {
             return false;
         }
         if (!availableBalance) {
             return true;
         }
-        return availableBalance.isLessThan(livePrice);
-    }, [livePrice, availableBalance, isPendingBalances]);
+        return availableBalance.isLessThan(maxCostWithSlippage);
+    }, [maxCostWithSlippage, availableBalance, isPendingBalances]);
+
+    const insufficientFundsDueToSlippage = useMemo(() => {
+        if (
+            !hasInsufficientFunds ||
+            !livePrice ||
+            !maxCostWithSlippage ||
+            isPendingBalances ||
+            !availableBalance
+        ) {
+            return false;
+        }
+        return !availableBalance.isLessThan(livePrice);
+    }, [
+        hasInsufficientFunds,
+        livePrice,
+        maxCostWithSlippage,
+        availableBalance,
+        isPendingBalances,
+    ]);
 
     const handleBuy = async () => {
         if (!confirmPrice || slippagePercent === null) return;
@@ -361,14 +392,35 @@ export function BuyForm({
                             balance={availableBalance}
                             isPending={isPendingBalances}
                         />
-                        <form.SubmitButton
-                            labels={
-                                hasInsufficientFunds
-                                    ? ["Insufficient funds", "Processing"]
-                                    : ["Buy", "Processing"]
-                            }
-                            disabled={isBuying || hasInsufficientFunds}
-                        />
+                        {insufficientFundsDueToSlippage && !isBuying ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span className="inline-flex">
+                                        <form.SubmitButton
+                                            labels={[
+                                                "Insufficient funds",
+                                                "Processing",
+                                            ]}
+                                            disabled
+                                        />
+                                    </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    {maxCostWithSlippage && slippagePercent !== null
+                                        ? `Balance must cover price + ${slippagePercent}% slippage (${maxCostWithSlippage.format({ includeLabel: true })} max).`
+                                        : "Balance must cover price plus slippage."}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : (
+                            <form.SubmitButton
+                                labels={
+                                    hasInsufficientFunds
+                                        ? ["Insufficient funds", "Processing"]
+                                        : ["Buy", "Processing"]
+                                }
+                                disabled={isBuying || hasInsufficientFunds}
+                            />
+                        )}
                     </CardFooter>
                 </div>
             </form>
