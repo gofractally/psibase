@@ -99,6 +99,7 @@ pub(crate) struct Curve {
     pub(crate) x0: u64,
     pub(crate) y0: u64,
     pub(crate) k: u128,
+    max_reserve: u64,
 }
 
 #[allow(non_snake_case)]
@@ -145,6 +146,7 @@ impl Curve {
             x0: (max_reserves / curve_d),
             y0: (max_resources / curve_d),
             k: (xm * ym * (d + 1)).div_ceil(d * d),
+            max_reserve: max_reserves,
         }
     }
 
@@ -154,7 +156,9 @@ impl Curve {
     /// Rounds the required reserves up, keeping the pool fully capitalized.
     pub(crate) fn pos_from_resources(&self, resources: u64) -> CurvePosition {
         let Y = resources as u128 + self.y0 as u128;
-        let reserves = (self.k.div_ceil(Y) - self.x0 as u128) as u64;
+        // True reserves never exceed `max_reserve`; clamp so the upward rounding
+        // bias can't push past it and wrap the `as u64` cast.
+        let reserves = (self.k.div_ceil(Y) - self.x0 as u128).min(self.max_reserve as u128) as u64;
         CurvePosition {
             reserves,
             X: reserves as u128 + self.x0 as u128,
