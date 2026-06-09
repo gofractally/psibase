@@ -112,15 +112,15 @@ pub(crate) struct CurvePosition {
 /// This is a constant product curve, where the fundamental equation is XY = k. In this case,
 /// we derive X = (x+x0) and Y = (y+y0) where x0 and y0 are virtual offsets.
 ///
-/// Plugging in our curve endpoints yields:
-/// k = x0(y_max+y0) = y0(x_max + x0)
+/// Evaluating k = XY at each endpoint and equating yields:
+/// x0(y_max+y0) = y0(x_max + x0)
 ///
 /// Algebraically simplifying yields:
-/// k = x_max / x0 = y_max / y0
+/// x_max / x0 = y_max / y0
 ///
 /// We refer to this single constant as the "shape parameter", or `D`. D controls how "aggressive"
-/// pricing is near the endpoints. Smaller D means larger offsets (smoother), larger D means
-/// smaller offsets (more aggressive).
+/// pricing is near the endpoints. Smaller D means larger offsets (flatter), larger D means
+/// smaller offsets (steeper).
 impl Curve {
     /// All parameters can be expressed in terms of x_max, y_max, and D.
     /// x0 = x_max / D
