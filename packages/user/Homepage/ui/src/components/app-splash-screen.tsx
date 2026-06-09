@@ -1,4 +1,5 @@
 import { useNavLocation } from "@/hooks/use-nav-location";
+import { useLocation } from "react-router-dom";
 
 import { useConnectAccount } from "@shared/hooks/use-connect-account";
 import { Button } from "@shared/shadcn/ui/button";
@@ -12,12 +13,20 @@ import {
 import { toast } from "@shared/shadcn/ui/sonner";
 
 export const AppSplashScreen = () => {
+    const location = useLocation();
     const { currentApp } = useNavLocation();
     const { mutate: login, isPending } = useConnectAccount({
         onError: (error) => {
             toast.error(error.message);
         },
     });
+
+    const onLogin = () => {
+        login({
+            enabled: true,
+            returnPath: `${location.pathname}${location.search}${location.hash}`,
+        });
+    };
 
     return (
         <div className="mx-auto mt-4 w-[350px]">
@@ -38,7 +47,7 @@ export const AppSplashScreen = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardFooter className="flex justify-center pb-4">
-                    <Button disabled={isPending} onClick={() => login()}>
+                    <Button disabled={isPending} onClick={onLogin}>
                         Log in
                     </Button>
                 </CardFooter>
