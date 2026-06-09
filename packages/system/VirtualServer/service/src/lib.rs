@@ -762,13 +762,6 @@ mod service {
             return;
         }
 
-        const SYSTEM_USER_SENTINEL: AccountNumber = AccountNumber::new(0);
-        let user = if user == SYSTEM_USER_SENTINEL {
-            AccountNumber::from("system")
-        } else {
-            user
-        };
-
         let sub = tx_cache::get_sub(user);
 
         let cost = match db_id {

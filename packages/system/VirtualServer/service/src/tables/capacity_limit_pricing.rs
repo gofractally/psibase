@@ -214,7 +214,7 @@ impl CurvePosition {
 }
 
 fn is_system(user: AccountNumber) -> bool {
-    user == AccountNumber::from("system")
+    user == AccountNumber::new(0)
 }
 
 /// Rejects `max_capacity`/`curve_d` combinations that would overflow `Curve::new`'s
