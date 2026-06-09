@@ -133,6 +133,9 @@ impl Curve {
         let xm = max_reserves as u128;
         let ym = max_resources as u128;
         let d = curve_d as u128;
+        // `xm * ym * (d + 1)` stays within u128 because `check_curve_params`
+        // bounds `max_capacity * (curve_d + 1)` against the largest possible
+        // reserve (`u64::MAX`) whenever those inputs are set.
         Curve {
             x0: (max_reserves / curve_d),
             y0: (max_resources / curve_d),
@@ -203,6 +206,21 @@ fn is_system(user: AccountNumber) -> bool {
     user == AccountNumber::from("system")
 }
 
+/// Rejects `max_capacity`/`curve_d` combinations that would overflow `Curve::new`'s
+/// `k` computation (`xm * ym * (d + 1)`).
+///
+/// `max_reserve` starts at `u64::MAX` and only ever decreases, so validating against
+/// `u64::MAX` guarantees no overflow for any reachable reserve value.
+fn check_curve_params(max_capacity: u64, curve_d: u64) {
+    let max_xm = u64::MAX as u128;
+    let ym = max_capacity as u128;
+    let d_plus_1 = curve_d as u128 + 1;
+    check(
+        (max_xm * ym).checked_mul(d_plus_1).is_some(),
+        "max_capacity and curve_d too large: pricing math would overflow",
+    );
+}
+
 impl CapacityPricing {
     fn resource(&self) -> ResourceType {
         ResourceType::from_id(self.resource_id)
@@ -248,6 +266,7 @@ impl CapacityPricing {
         check(curve_d > 0, "curve_d must be > 0");
         check(fee_ppm > 0, "fee_ppm must be > 0");
         check(fee_ppm <= PPM as u32, "fee_ppm must be <= 1,000,000");
+        check_curve_params(max_capacity, curve_d);
 
         let id = resource.as_id();
         let table = CapacityPricingTable::read_write();
@@ -406,6 +425,7 @@ impl CapacityPricing {
             new_max_capacity >= self.max_capacity,
             "Capacity can only increase",
         );
+        check_curve_params(new_max_capacity, self.curve_d);
         let delta = new_max_capacity - self.max_capacity;
         if delta > 0 {
             self.increase_capacity(delta);
