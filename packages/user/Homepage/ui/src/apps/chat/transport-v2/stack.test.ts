@@ -344,7 +344,7 @@ describe("createChatTransportStack integration", () => {
         );
     });
 
-    it("roster rejoin kicks a negotiating initiator to retransmit its offer", async () => {
+    it("roster burst does not fan out kickNegotiation storms", async () => {
         const hub = createTwoPartyHub();
         const alice = createStackFixture(hub, "alice");
         alice.stack.wireRealtimeHandlers({});
@@ -354,6 +354,9 @@ describe("createChatTransportStack integration", () => {
         void alice.stack.peerRegistry.ensure("bob", "presence_online");
         await Promise.resolve();
 
+        const kickSpy = vi.spyOn(alice.stack.peerRegistry, "kickNegotiation");
+        const resendSpy = vi.spyOn(alice.stack.peerRegistry, "resendOffer");
+
         alice.rt.dispatch({
             t: "sessionSnapshot",
             sessionId: pairId,
@@ -361,23 +364,15 @@ describe("createChatTransportStack integration", () => {
             pendingParticipants: [],
             epoch: 2,
         });
-
-        const alicePeer = mockPeers.find(
-            (p) => p.selfAccount === "alice" && p.peerAccount === "bob",
-        );
-        expect(alicePeer).toBeDefined();
-        expect(alice.stack.peerRegistry.getState("bob")).toBe("negotiating");
-        const resendCallsBeforeRejoin = alicePeer?.resendOfferCalls ?? 0;
-
         alice.rt.dispatch({
             t: "participantJoined",
             sessionId: pairId,
             participant: "bob",
         });
+        await vi.advanceTimersByTimeAsync(150);
 
-        expect(alicePeer?.resendOfferCalls).toBeGreaterThan(
-            resendCallsBeforeRejoin,
-        );
+        expect(kickSpy).not.toHaveBeenCalled();
+        expect(resendSpy.mock.calls.length).toBeLessThanOrEqual(1);
     });
 
     it("ignores non-pair sessionSnapshot and signal frames", async () => {

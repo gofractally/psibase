@@ -18,6 +18,7 @@ import { isLexInitiator, pairSessionId } from "./pair-id";
 import type { RealtimeTransport } from "./l1-realtime-transport";
 import type { PairSignaling } from "./l2-pair-signaling";
 import { createNegotiationScheduler } from "./negotiation-scheduler";
+import type { PeerRosterSnapshot } from "./roster-renegotiation-coordinator";
 import {
     PEER_IDLE_TTL_MS,
     PEER_JOIN_STUCK_MS,
@@ -41,6 +42,10 @@ export interface PeerTransportRegistry {
     ensure(remoteAccount: string, reason: EnsureReason): Promise<void>;
     /** Re-drive join/negotiation when roster shows a remote is reachable. */
     kickNegotiation(remoteAccount: string): void;
+    getRosterSnapshot(remoteAccount: string): PeerRosterSnapshot | null;
+    resendOffer(remoteAccount: string): void;
+    retriggerHandshake(remoteAccount: string): void;
+    recoverPeer(remoteAccount: string, reason: string): void;
     getState(remoteAccount: string): PeerState;
     send(remoteAccount: string, bytes: Uint8Array): SendResult;
     on(
@@ -66,6 +71,8 @@ export interface PeerTransportRegistry {
     /** Prevent idle TTL dispose while Meet holds the pair PC. */
     holdMeet(remoteAccount: string): void;
     releaseMeet(remoteAccount: string): void;
+    getKickCounts(): Readonly<Record<string, number>>;
+    resetKickCounts(): void;
 }
 
 type PeerEntry = {
@@ -104,6 +111,7 @@ export function createPeerTransportRegistry(
 ): PeerTransportRegistry {
     const bus = new EventBus<PeerRegistryEvents>();
     const entries = new Map<string, PeerEntry>();
+    const kickCounts = new Map<string, number>();
     const negotiationScheduler = createNegotiationScheduler();
 
     const touchEntry = (entry: PeerEntry) => {
@@ -249,21 +257,16 @@ export function createPeerTransportRegistry(
                         new TextEncoder().encode(JSON.stringify(envelope)),
                     );
                 },
+                // Route through recoverStuckPeer so the scheduler slot is
+                // released and a fresh negotiation is requested. Parking the
+                // entry in suspected_dead without re-driving it (and with the
+                // slot leaked) wedges the remote permanently once the roster
+                // kick fan-out no longer exists.
                 onTransportLost: () => {
-                    entry.dataChannelReady = false;
-                    entry.peer?.dispose();
-                    entry.peer = null;
-                    entry.negotiationStartedAt = null;
-                    setState(entry, "suspected_dead", "transport_lost");
-                    bus.emit("suspected_dead", entry.remote);
+                    recoverStuckPeer(entry, "transport_lost");
                 },
                 onFailed: () => {
-                    entry.dataChannelReady = false;
-                    entry.peer?.dispose();
-                    entry.peer = null;
-                    entry.negotiationStartedAt = null;
-                    setState(entry, "suspected_dead", "pc_failed");
-                    bus.emit("suspected_dead", entry.remote);
+                    recoverStuckPeer(entry, "pc_failed");
                 },
             },
         });
@@ -431,6 +434,10 @@ export function createPeerTransportRegistry(
     opts.realtime.on("ready", retryNegotiationOnRealtimeReady);
 
     const kickNegotiation = (remoteAccount: string) => {
+        kickCounts.set(
+            remoteAccount,
+            (kickCounts.get(remoteAccount) ?? 0) + 1,
+        );
         const entry = entries.get(remoteAccount);
         if (!entry) {
             void registryEnsure(remoteAccount, "roster_kick");
@@ -471,8 +478,11 @@ export function createPeerTransportRegistry(
             peer.resendOffer();
             return;
         }
-        // Polite side: cannot send offers — re-drive L2 join so the initiator
-        // gets another roster kick when they come online.
+        // Polite side: cannot send offers — wait for initiator offer when
+        // already joined on L2; only re-join when not yet on server roster.
+        if (opts.pairSignaling.isJoined(entry.pairId)) {
+            return;
+        }
         opts.pairSignaling.joinPair(opts.localAccount, entry.remote);
         touchEntry(entry);
     };
@@ -546,9 +556,44 @@ export function createPeerTransportRegistry(
                 ok = entry.peer.sendSpaceMembershipHint(envelope);
             }
             if (ok) touchEntry(entry);
+            if (!ok && entry.state === "usable") {
+                recoverStuckPeer(entry, "send_failed");
+            }
             return ok
                 ? { ok: true }
                 : { ok: false, reason: "peer_not_ready" };
+        },
+
+        getRosterSnapshot(remoteAccount) {
+            const entry = entries.get(remoteAccount);
+            if (!entry) return null;
+            return {
+                remote: entry.remote,
+                state: entry.state,
+                negotiationStartedAt: entry.negotiationStartedAt,
+                isJoined: opts.pairSignaling.isJoined(entry.pairId),
+                isInitiator: isLexInitiator(
+                    opts.localAccount,
+                    entry.remote,
+                ),
+                hasPeer: entry.peer != null,
+            };
+        },
+
+        resendOffer(remoteAccount) {
+            entries.get(remoteAccount)?.peer?.resendOffer();
+        },
+
+        retriggerHandshake(remoteAccount) {
+            const entry = entries.get(remoteAccount);
+            if (!entry) return;
+            beginNegotiation(entry);
+        },
+
+        recoverPeer(remoteAccount, reason) {
+            const entry = entries.get(remoteAccount);
+            if (!entry) return;
+            recoverStuckPeer(entry, reason);
         },
 
         on(event, handler) {
@@ -614,6 +659,14 @@ export function createPeerTransportRegistry(
             if (!entry) return;
             entry.meetHoldCount = Math.max(0, entry.meetHoldCount - 1);
             touchEntry(entry);
+        },
+
+        getKickCounts() {
+            return Object.fromEntries(kickCounts);
+        },
+
+        resetKickCounts() {
+            kickCounts.clear();
         },
     };
 }

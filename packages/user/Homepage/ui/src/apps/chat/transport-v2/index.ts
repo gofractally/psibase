@@ -7,4 +7,5 @@ export * from "./delivery-coordinator";
 export * from "./l3-peer-registry";
 export * from "./l4-messaging-service";
 export * from "./chat-transport-bridge";
+export * from "./roster-renegotiation-coordinator";
 export * from "./stack";

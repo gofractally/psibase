@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatHistorySyncEnvelope } from "./chat-data-envelope";
 import {
     historySyncToGroupEnvelopes,
+    resolveGroupMembersForHistorySync,
     shouldPushGroupHistoryOnConnect,
 } from "./group-history-sync";
 
@@ -64,5 +65,22 @@ describe("historySyncToGroupEnvelopes", () => {
             clientMsgId: "c2",
             localId: "c2",
         });
+    });
+});
+
+describe("resolveGroupMembersForHistorySync", () => {
+    it("falls back to objective spaces before contacts-filtered conversations load", () => {
+        const members = resolveGroupMembersForHistorySync(
+            "space:abc",
+            [],
+            [
+                {
+                    space_uuid: "space:abc",
+                    kind: "GROUP",
+                    members: ["alice", "bob", "carol"],
+                } as never,
+            ],
+        );
+        expect(members).toEqual(["alice", "bob", "carol"]);
     });
 });

@@ -81,8 +81,17 @@ import {
 } from "../lib/dm-history-sync";
 import {
     historySyncToGroupEnvelopes,
+    isGroupHistorySyncSpace,
+    resolveGroupMembersForHistorySync,
 } from "../lib/group-history-sync";
 import { listInboundAckTargets } from "../lib/inbound-message-ack";
+import { inboundMessageAcceptance } from "../lib/inbound-message-acceptance";
+import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
+import {
+    dequeueHistorySyncPush,
+    enqueueHistorySyncPush,
+    historySyncPushForPeer,
+} from "../lib/history-sync-push-queue";
 import { dmComposerDisabledReason } from "../lib/dm-compose-ux";
 import { composeTimingLog } from "../lib/dm-compose-timing";
 import {
@@ -1190,20 +1199,17 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     applyInboundChatMessageRef.current = applyInboundChatMessage;
 
     const applyInboundDmDataChannelMessage = useCallback(
-        (envelope: ChatDataMessageEnvelope): boolean => {
+        (envelope: ChatDataMessageEnvelope): InboundMessageAcceptance => {
             const self = selfRef.current;
-            if (!self || envelope.from === self) return false;
+            if (!self || envelope.from === self) return "rejected";
 
-            if (
-                !isInboundContactPeer(
-                    self,
-                    envelope.from,
-                    contactAccountsRef.current,
-                    contactsLoadedRef.current,
-                )
-            ) {
-                return false;
-            }
+            const acceptance = inboundMessageAcceptance(
+                self,
+                envelope.from,
+                contactAccountsRef.current,
+                contactsLoadedRef.current,
+            );
+            if (acceptance !== "accepted") return acceptance;
 
             const chain = chainIdRef.current;
             if (chain) {
@@ -1219,26 +1225,23 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 clientMsgId: envelope.clientMsgId,
                 clientTime: envelope.sendTimestamp,
             });
-            return true;
+            return "accepted";
         },
         [],
     );
 
     const applyInboundGroupDataChannelMessage = useCallback(
-        (envelope: ChatDataMessageEnvelope): boolean => {
+        (envelope: ChatDataMessageEnvelope): InboundMessageAcceptance => {
             const self = selfRef.current;
-            if (!self || envelope.from === self) return false;
+            if (!self || envelope.from === self) return "rejected";
 
-            if (
-                !isInboundContactPeer(
-                    self,
-                    envelope.from,
-                    contactAccountsRef.current,
-                    contactsLoadedRef.current,
-                )
-            ) {
-                return false;
-            }
+            const acceptance = inboundMessageAcceptance(
+                self,
+                envelope.from,
+                contactAccountsRef.current,
+                contactsLoadedRef.current,
+            );
+            if (acceptance !== "accepted") return acceptance;
 
             const chain = chainIdRef.current;
             if (chain) {
@@ -1302,7 +1305,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 () => flushPendingMessagesRef.current(),
                 0,
             );
-            return true;
+            return "accepted";
         },
         [persistGroupHistoryMessage],
     );
@@ -1421,16 +1424,18 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             const self = selfRef.current;
             if (!self) return;
 
-            const conversation = conversationsRef.current.find(
-                (row) => row.conversationId === envelope.spaceUuid,
+            const members = resolveGroupMembersForHistorySync(
+                envelope.spaceUuid,
+                conversationsRef.current,
+                objectiveSpacesRef.current,
             );
-            if (conversation?.kind !== "group") return;
+            if (!members) return;
 
             const incoming = historySyncToGroupEnvelopes(
                 self,
                 envelope.spaceUuid,
                 envelope,
-            ).filter((row) => conversation.members.includes(row.from));
+            ).filter((row) => members.includes(row.from));
             if (incoming.length === 0) return;
 
             for (const target of listInboundAckTargets(incoming, self)) {
@@ -1512,15 +1517,34 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             try {
                 const store = getDmMessageHistoryStore(chain, self);
                 const envelopes = await store.listBySpace(spaceUuid);
-                chatDataOrchestratorRef.current?.sendHistorySync(
+                const payload = {
+                    t: "chatHistorySync" as const,
                     spaceUuid,
-                    peerAccount,
-                    {
-                        t: "chatHistorySync",
+                    messages: envelopesToHistorySyncMessages(envelopes),
+                };
+                const bridge = chatDataOrchestratorRef.current;
+                const sent =
+                    bridge?.sendHistorySync(
                         spaceUuid,
-                        messages: envelopesToHistorySyncMessages(envelopes),
-                    },
-                );
+                        peerAccount,
+                        payload,
+                    ) ?? false;
+                if (!sent) {
+                    enqueueHistorySyncPush(chain, self, {
+                        peerAccount,
+                        spaceUuid,
+                        kind: "dm",
+                        enqueuedAt: Date.now(),
+                    });
+                } else {
+                    dequeueHistorySyncPush(
+                        chain,
+                        self,
+                        peerAccount,
+                        spaceUuid,
+                        "dm",
+                    );
+                }
             } catch (e) {
                 const detail =
                     e instanceof Error
@@ -1545,15 +1569,34 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             try {
                 const store = getGroupMessageHistoryStore(chain, self);
                 const envelopes = await store.listBySpace(spaceUuid);
-                chatDataOrchestratorRef.current?.sendGroupHistorySync(
+                const payload = {
+                    t: "chatHistorySync" as const,
                     spaceUuid,
-                    peerAccount,
-                    {
-                        t: "chatHistorySync",
+                    messages: envelopesToHistorySyncMessages(envelopes),
+                };
+                const bridge = chatDataOrchestratorRef.current;
+                const sent =
+                    bridge?.sendGroupHistorySync(
                         spaceUuid,
-                        messages: envelopesToHistorySyncMessages(envelopes),
-                    },
-                );
+                        peerAccount,
+                        payload,
+                    ) ?? false;
+                if (!sent) {
+                    enqueueHistorySyncPush(chain, self, {
+                        peerAccount,
+                        spaceUuid,
+                        kind: "group",
+                        enqueuedAt: Date.now(),
+                    });
+                } else {
+                    dequeueHistorySyncPush(
+                        chain,
+                        self,
+                        peerAccount,
+                        spaceUuid,
+                        "group",
+                    );
+                }
             } catch (e) {
                 const detail =
                     e instanceof Error
@@ -1565,6 +1608,27 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             }
         },
         [],
+    );
+
+    const drainHistorySyncPushForPeer = useCallback(
+        async (peerAccount: string) => {
+            const self = selfRef.current;
+            const chain = chainIdRef.current;
+            if (!self || !chain) return;
+
+            for (const record of historySyncPushForPeer(
+                chain,
+                self,
+                peerAccount,
+            )) {
+                if (record.kind === "group") {
+                    await pushGroupHistorySync(record.spaceUuid, peerAccount);
+                } else {
+                    await pushDmHistorySync(record.spaceUuid, peerAccount);
+                }
+            }
+        },
+        [pushDmHistorySync, pushGroupHistorySync],
     );
 
     const applyInboundDmDataChannelMessageRef = useRef(
@@ -2123,8 +2187,32 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     onAvCallMediaReadyRef.current = handleAvCallMediaReady;
     onAvCallParticipantStateRef.current = handleAvCallParticipantState;
 
+    const drainHistorySyncPushForPeerRef = useRef(drainHistorySyncPushForPeer);
+    drainHistorySyncPushForPeerRef.current = drainHistorySyncPushForPeer;
+
     useEffect(() => {
         if (!contactsLoaded || !selfAccount) return;
+        chatDataOrchestratorRef.current?.flushDeferredInboundAcceptance(
+            (record) => {
+                const envelope: ChatDataMessageEnvelope = {
+                    t: "chatMessage",
+                    spaceUuid: record.spaceUuid,
+                    from: record.from,
+                    body: record.body,
+                    sendTimestamp: record.sendTimestamp,
+                    clientMsgId: record.clientMsgId,
+                };
+                const conversation = conversationsRef.current.find(
+                    (row) => row.conversationId === record.spaceUuid,
+                );
+                if (conversation?.kind === "group") {
+                    return applyInboundGroupDataChannelMessageRef.current(
+                        envelope,
+                    );
+                }
+                return applyInboundDmDataChannelMessageRef.current(envelope);
+            },
+        );
         globalThis.setTimeout(
             () => flushPendingMessagesRef.current(),
             0,
@@ -2443,10 +2531,13 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             },
             onInboundHistorySync: (envelope) => {
                 reloadSpacesIfMissing(envelope.spaceUuid);
-                const conversation = conversationsRef.current.find(
-                    (row) => row.conversationId === envelope.spaceUuid,
-                );
-                if (conversation?.kind === "group") {
+                if (
+                    isGroupHistorySyncSpace(
+                        envelope.spaceUuid,
+                        conversationsRef.current,
+                        objectiveSpacesRef.current,
+                    )
+                ) {
                     void applyInboundGroupHistorySyncRef.current(envelope);
                 } else {
                     void applyInboundDmHistorySyncRef.current(envelope);
@@ -2455,6 +2546,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             onPeerUsable: (peerAccount) => {
                 const self = selfRef.current;
                 if (!self) return;
+                void drainHistorySyncPushForPeerRef.current(peerAccount);
                 for (const conv of conversationsRef.current) {
                     if (
                         conv.kind === "group" &&

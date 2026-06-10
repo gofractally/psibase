@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ChatDataPeerHandlers } from "../lib/chat-data-webrtc-peer";
+import { serializeChatDataWireEnvelope } from "../lib/chat-data-envelope";
 import { createPeerTransportRegistry } from "./l3-peer-registry";
 import type { PeerState } from "./types";
 
@@ -97,6 +98,22 @@ const peerMock = vi.hoisted(() => {
         }
 
         resendOffer(): void {}
+
+        sendChatMessage(): boolean {
+            return true;
+        }
+
+        sendHistorySync(): boolean {
+            return true;
+        }
+
+        sendMessageAck(): boolean {
+            return true;
+        }
+
+        sendSpaceMembershipHint(): boolean {
+            return true;
+        }
     }
 
     return { MockChatDataWebRtcPeer };
@@ -249,7 +266,7 @@ describe("l3-peer-registry", () => {
         );
     });
 
-    it("onTransportLost transitions to suspected_dead and drops peer", async () => {
+    it("onTransportLost drops peer, emits suspected_dead, and self-recovers", async () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
         const pairSignaling = createPairSignalingHarness(realtime);
@@ -269,10 +286,18 @@ describe("l3-peer-registry", () => {
         await ensureP;
         expect(registry.getState("bob")).toBe("usable");
 
+        const suspectedDead: string[] = [];
+        registry.on("suspected_dead", (remote) => {
+            suspectedDead.push(remote);
+        });
+
         peer.fireTransportLost();
-        expect(registry.getState("bob")).toBe("suspected_dead");
+        expect(suspectedDead).toEqual(["bob"]);
         expect(peer.disposed).toBe(true);
-        expect(registry.getChatPeer("bob")).toBe(null);
+        // Pair is still joined on L2, so a fresh negotiation begins
+        // immediately instead of parking the remote in suspected_dead.
+        expect(registry.getState("bob")).toBe("negotiating");
+        expect(peerMock.MockChatDataWebRtcPeer.created.length).toBe(2);
     });
 
     it("dispose removes entry and calls leavePair", async () => {
@@ -542,7 +567,7 @@ describe("l3-peer-registry", () => {
         expect(registry.getState("carol")).toBe("joining_pair");
     });
 
-    it("kickNegotiation does not dispose peer when needsReconnect during kick", async () => {
+    it("kickNegotiation does not re-join pair when polite side is already joined", () => {
         peerMock.MockChatDataWebRtcPeer.created.length = 0;
         const realtime = createRealtimeHarness(true);
         const pairSignaling = createPairSignalingHarness(realtime);
@@ -559,10 +584,54 @@ describe("l3-peer-registry", () => {
         void registry.ensure("alice", "peer_focus");
         const peer = peerMock.MockChatDataWebRtcPeer.created[0]!;
         peer.needsReconnectFlag = true;
+        pairSignaling.joinPair.mockClear();
 
         registry.kickNegotiation("alice");
         expect(peer.disposed).toBe(false);
-        expect(pairSignaling.joinPair).toHaveBeenCalledWith("bob", "alice");
+        expect(pairSignaling.joinPair).not.toHaveBeenCalled();
+    });
+
+    it("marks peer suspected_dead when send fails while state is usable", () => {
+        peerMock.MockChatDataWebRtcPeer.created.length = 0;
+        const realtime = createRealtimeHarness(true);
+        const pairSignaling = createPairSignalingHarness(realtime);
+        pairSignaling.markJoined("wrtc:pair:alice:bob");
+
+        const registry = createPeerTransportRegistry({
+            localAccount: "alice",
+            realtime: realtime as never,
+            pairSignaling: pairSignaling as never,
+            signaling: {} as never,
+            iceServers: null,
+        });
+
+        void registry.ensure("bob", "peer_focus");
+        const peer = peerMock.MockChatDataWebRtcPeer.created[0]!;
+        peer.fireDataChannelOpen();
+        expect(registry.getState("bob")).toBe("usable");
+
+        const suspectedDead: string[] = [];
+        registry.on("suspected_dead", (remote) => {
+            suspectedDead.push(remote);
+        });
+
+        vi.spyOn(peer, "sendChatMessage").mockReturnValue(false);
+        const bytes = new TextEncoder().encode(
+            serializeChatDataWireEnvelope({
+                t: "chatMessage",
+                spaceUuid: "space:dm",
+                from: "alice",
+                body: "hello",
+                sendTimestamp: 1,
+                clientMsgId: "msg-1",
+            }),
+        );
+
+        const result = registry.send("bob", bytes);
+        expect(result.ok).toBe(false);
+        expect(suspectedDead).toEqual(["bob"]);
+        expect(registry.getState("bob")).not.toBe("usable");
+        expect(peer.disposed).toBe(true);
     });
 });
 

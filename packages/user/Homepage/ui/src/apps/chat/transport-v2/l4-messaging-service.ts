@@ -1,6 +1,7 @@
 import {
     parseChatDataWireEnvelope,
     serializeChatDataMessage,
+    serializeChatDataWireEnvelope,
     type ChatDataMessageAckEnvelope,
     type ChatDataMessageEnvelope,
 } from "../lib/chat-data-envelope";
@@ -174,7 +175,9 @@ export function createMessagingService(
         remote: string,
         ack: ChatDataMessageAckEnvelope,
     ): boolean => {
-        const bytes = new TextEncoder().encode(JSON.stringify(ack));
+        const bytes = new TextEncoder().encode(
+            serializeChatDataWireEnvelope(ack),
+        );
         const result = opts.peerRegistry.send(remote, bytes);
         return result.ok;
     };

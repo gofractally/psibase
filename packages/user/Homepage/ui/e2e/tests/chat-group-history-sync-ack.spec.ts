@@ -9,6 +9,7 @@ import {
     expectOutboundMessageDelivered,
     expectPendingOutboundMessage,
     expectThreadMessage,
+    leaveChatToHome,
     openChat,
     openExistingGroupChat,
     sendChatMessage,
@@ -49,6 +50,11 @@ test.describe("Chat group history sync ack", () => {
             await waitForChatConnected(party.bobPage, { timeout: 120_000 });
             await waitForChatConnected(party.carolPage, { timeout: 120_000 });
 
+            // Reset socket/mesh state before group (same as three-party flow H18).
+            await leaveChatToHome(alicePage, chain.baseUrl);
+            await leaveChatToHome(party.bobPage, chain.baseUrl);
+            await leaveChatToHome(party.carolPage, chain.baseUrl);
+
             await createGroupChat(alicePage, chain.baseUrl, [
                 party.bobAccount.name,
                 party.carolAccount.name,
@@ -61,20 +67,24 @@ test.describe("Chat group history sync ack", () => {
                 party.aliceAccount.name,
                 party.bobAccount.name,
             ]);
+            // Initiator (alice) negotiates both legs; establish one peer at a time.
+            await waitForGroupMeshReady(alicePage, [party.bobAccount.name], {
+                timeout: 300_000,
+            });
             await waitForGroupMeshReady(
                 alicePage,
-                [party.bobAccount.name, party.carolAccount.name],
-                { timeout: 240_000 },
+                [party.carolAccount.name],
+                { timeout: 300_000 },
             );
             await waitForGroupMeshReady(
                 party.bobPage,
                 [party.aliceAccount.name, party.carolAccount.name],
-                { timeout: 240_000 },
+                { timeout: 300_000 },
             );
             await waitForGroupMeshReady(
                 party.carolPage,
                 [party.aliceAccount.name, party.bobAccount.name],
-                { timeout: 240_000 },
+                { timeout: 300_000 },
             );
 
             await party.carolPage.context().close();

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ChatTransportBridge } from "./chat-transport-bridge";
 
@@ -18,6 +18,7 @@ const stackMock = vi.hoisted(() => {
     const stack = {
         peerRegistry,
         messaging,
+        notifyRemoteReachable: vi.fn(),
         wireRealtimeHandlers: vi.fn(),
         dispose: vi.fn(),
     };
@@ -37,12 +38,22 @@ vi.mock("../lib/pending-message-store", () => ({
     loadPendingMessages: () => [],
 }));
 
+vi.mock("../lib/inbound-acceptance-queue", () => ({
+    enqueueInboundAcceptance: vi.fn(),
+    clearInboundAcceptanceQueue: vi.fn(() => []),
+    dequeueInboundAcceptance: vi.fn(),
+}));
+
 vi.mock("../lib/thread-lifecycle", () => ({
     recordThreadLifecycle: vi.fn(),
 }));
 
 function createBridge(
-    onInboundMessage: (envelope: unknown) => boolean = vi.fn(() => true),
+    onInboundMessage: (
+        envelope: unknown,
+    ) => "accepted" | "deferred_contacts" | "rejected" = vi.fn(
+        () => "accepted" as const,
+    ),
 ): ChatTransportBridge {
     return new ChatTransportBridge({
         getRealtime: () =>
@@ -74,33 +85,44 @@ const inboundEnvelope = {
 };
 
 describe("ChatTransportBridge", () => {
-    it("kicks existing peer negotiation when presence reports a peer online", () => {
-        stackMock.peerRegistry.ensure.mockClear();
+    beforeEach(() => {
+        stackMock.messaging.onInbound.mockClear();
+        stackMock.messaging.acknowledgeInbound.mockClear();
+        stackMock.stack.notifyRemoteReachable.mockClear();
         stackMock.peerRegistry.kickNegotiation.mockClear();
+    });
+
+    function latestInboundHandler(): (
+        envelope: typeof inboundEnvelope,
+    ) => void {
+        const calls = stackMock.messaging.onInbound.mock.calls;
+        return calls[calls.length - 1]![0] as (
+            envelope: typeof inboundEnvelope,
+        ) => void;
+    }
+
+    it("routes presence online through roster coordinator", () => {
+        stackMock.stack.notifyRemoteReachable.mockClear();
 
         const bridge = createBridge();
         bridge.start();
         bridge.onPeerOnline("bob");
 
-        expect(stackMock.peerRegistry.ensure).toHaveBeenCalledWith(
+        expect(stackMock.stack.notifyRemoteReachable).toHaveBeenCalledWith(
             "bob",
             "presence_online",
         );
-        expect(stackMock.peerRegistry.kickNegotiation).toHaveBeenCalledWith(
-            "bob",
-        );
+        expect(stackMock.peerRegistry.kickNegotiation).not.toHaveBeenCalled();
     });
 
     it("acks inbound chatMessage only after the consumer accepts it", () => {
         stackMock.messaging.onInbound.mockClear();
         stackMock.messaging.acknowledgeInbound.mockClear();
 
-        const bridge = createBridge(() => true);
+        const bridge = createBridge(() => "accepted");
         bridge.start();
 
-        const handler = stackMock.messaging.onInbound.mock.calls[0]![0] as (
-            envelope: typeof inboundEnvelope,
-        ) => void;
+        const handler = latestInboundHandler();
         handler(inboundEnvelope);
 
         expect(stackMock.messaging.acknowledgeInbound).toHaveBeenCalledWith(
@@ -110,16 +132,29 @@ describe("ChatTransportBridge", () => {
         );
     });
 
+    it("enqueues deferred contacts instead of acking immediately", async () => {
+        const queue = await import("../lib/inbound-acceptance-queue");
+        vi.mocked(queue.enqueueInboundAcceptance).mockClear();
+        stackMock.messaging.acknowledgeInbound.mockClear();
+
+        const bridge = createBridge(() => "deferred_contacts");
+        bridge.start();
+
+        const handler = latestInboundHandler();
+        handler(inboundEnvelope);
+
+        expect(queue.enqueueInboundAcceptance).toHaveBeenCalled();
+        expect(stackMock.messaging.acknowledgeInbound).not.toHaveBeenCalled();
+    });
+
     it("does not ack inbound chatMessage when the consumer rejects it", () => {
         stackMock.messaging.onInbound.mockClear();
         stackMock.messaging.acknowledgeInbound.mockClear();
 
-        const bridge = createBridge(() => false);
+        const bridge = createBridge(() => "rejected");
         bridge.start();
 
-        const handler = stackMock.messaging.onInbound.mock.calls[0]![0] as (
-            envelope: typeof inboundEnvelope,
-        ) => void;
+        const handler = latestInboundHandler();
         handler(inboundEnvelope);
 
         expect(stackMock.messaging.acknowledgeInbound).not.toHaveBeenCalled();

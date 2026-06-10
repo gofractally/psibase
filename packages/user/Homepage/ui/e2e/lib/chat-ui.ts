@@ -782,6 +782,41 @@ export async function waitForPeerOnline(
     ).toBeVisible({ timeout });
 }
 
+export async function resetTransportKickCounts(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        (
+            window as unknown as {
+                __chatTransportV2Debug?: { resetKickCounts?: () => void };
+            }
+        ).__chatTransportV2Debug?.resetKickCounts?.();
+    });
+}
+
+export async function expectRosterKickCountAtMost(
+    page: Page,
+    remotes: readonly string[],
+    maxPerRemote: number,
+): Promise<void> {
+    await expect
+        .poll(async () => {
+            return page.evaluate(
+                ({ peers, max }) => {
+                    const counts = (
+                        window as unknown as {
+                            __chatTransportV2Debug?: {
+                                kickCounts?: () => Record<string, number>;
+                            };
+                        }
+                    ).__chatTransportV2Debug?.kickCounts?.();
+                    if (!counts) return false;
+                    return peers.every((peer) => (counts[peer] ?? 0) <= max);
+                },
+                { peers: [...remotes], max: maxPerRemote },
+            );
+        })
+        .toBe(true);
+}
+
 /** Kick DM pair negotiation on one peer (same transport hook as group mesh bootstrap). */
 export async function bootstrapDmPeer(
     page: Page,
@@ -904,7 +939,6 @@ export async function bootstrapGroupMeshPeers(
                     ).__chatTransportV2Debug;
                     if (!v2?.started?.()) return false;
                     v2.ensurePeers?.(peers);
-                    v2.kickPeers?.(peers);
                     return true;
                 }, [...peerAccounts]);
             },
@@ -921,6 +955,7 @@ export async function waitForGroupMeshReady(
     options?: { timeout?: number },
 ): Promise<void> {
     const timeout = options?.timeout ?? 180_000;
+    await bootstrapGroupMeshPeers(page, peerAccounts);
     await expect
         .poll(
             async () => {

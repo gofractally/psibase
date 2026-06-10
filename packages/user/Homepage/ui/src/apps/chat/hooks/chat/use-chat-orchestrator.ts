@@ -5,6 +5,7 @@ import type {
     ChatDataMessageEnvelope,
     ChatHistorySyncEnvelope,
 } from "../../lib/chat-data-envelope";
+import type { InboundMessageAcceptance } from "../../lib/inbound-message-acceptance";
 import type { IceServerConfig } from "../../lib/protocol";
 import type { RealtimeClient } from "../../lib/realtime-client";
 import { ChatTransportBridge } from "../../transport-v2/chat-transport-bridge";
@@ -14,8 +15,9 @@ export type ChatTransportBridgeDeps = {
     getSelf: () => string | null;
     getChainId: () => string | null;
     getIceServers: () => IceServerConfig[] | null;
-    /** Returns true when the message was accepted (triggers the wire ack). */
-    onInboundMessage: (envelope: ChatDataMessageEnvelope) => boolean;
+    onInboundMessage: (
+        envelope: ChatDataMessageEnvelope,
+    ) => InboundMessageAcceptance;
     onInboundHistorySync: (envelope: ChatHistorySyncEnvelope) => void;
     onMessageAck: (
         spaceUuid: string,

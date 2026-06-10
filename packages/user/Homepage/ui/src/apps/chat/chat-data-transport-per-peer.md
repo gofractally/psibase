@@ -209,6 +209,8 @@ interface PairSignaling {
 
 Pair roster replaces per-Space `sessionSnapshot` for **transport**; Space membership for **authorization** stays on objective/Spaces (L4 validates envelopes).
 
+**Roster renegotiation:** `RosterRenegotiationCoordinator` owns roster-driven renegotiation (`presence_online`, `peer_joined`, `roster_kick`, `joinsIdle(completedPairId)`). It debounces per-remote notifications (~150ms), reads L3 roster snapshots, and chooses `ensure`, `resendOffer`, `retriggerHandshake`, or recovery — instead of fanning `kickNegotiation` from multiple stack/bridge call sites. `kickNegotiation` remains an internal L3 escape hatch; polite peers already joined on L2 never re-`joinPair` from a kick.
+
 ### L3 — `PeerTransportRegistry`
 
 ```typescript
@@ -704,7 +706,14 @@ stateDiagram-v2
 
 ## Persistence: unified outbox
 
-**Decision:** one **durable outbox** in **chain-scoped localStorage** (existing Homepage pattern: `chainScopedStorageKey` in `chat-chain-storage.ts`, same seam as `pending-message-store.ts`). **No separate history-sync persistence step** for unsent messages — the outbox **is** the source of truth across reload, tab crash, and browser kill.
+**Decision:** one **durable client seam** via `chat-durable-store.ts` (`chainScopedStorageKey` + JSON read/write). **No separate history-sync persistence step** for unsent messages — the outbox **is** the source of truth across reload, tab crash, and browser kill.
+
+| Queue / store | Module | Purpose |
+|---------------|--------|---------|
+| Outbound messages | `pending-message-store.ts` | L4 outbox rows (`PENDING` / `FAILED`) |
+| Inbound ack backlog | `pending-ack-store.ts` | Wire `messageAck` targets not yet sent |
+| Inbound acceptance deferral | `inbound-acceptance-queue.ts` | Messages received before contacts load; flushed → `acknowledgeInbound` |
+| History-sync push retry | `history-sync-push-queue.ts` | Failed `chatHistorySync` pushes; drained on `peer:usable` |
 
 **On `send()`:** write row immediately (status `PENDING`, `attempts`, `lastAttemptAt`, optional `expireAfter`, `spaceUuid`, `recipients`, body). UI thread history view reads from the same store (sent + pending rows) or a derived index — avoid a second write path that can diverge.
 

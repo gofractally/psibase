@@ -10,6 +10,13 @@ import { recordThreadLifecycle } from "../lib/thread-lifecycle";
 import type { IceServerConfig } from "../lib/protocol";
 import { RealtimeClient } from "../lib/realtime-client";
 import { loadPendingMessages } from "../lib/pending-message-store";
+import {
+    enqueueInboundAcceptance,
+    clearInboundAcceptanceQueue,
+    dequeueInboundAcceptance,
+    type InboundAcceptanceRecord,
+} from "../lib/inbound-acceptance-queue";
+import type { InboundMessageAcceptance } from "../lib/inbound-message-acceptance";
 import { spaceUuidFromPslackConversationId } from "../lib/space-bridge";
 import {
     createChatTransportStack,
@@ -22,8 +29,10 @@ export type ChatTransportBridgeDeps = {
     getSelf: () => string | null;
     getChainId: () => string | null;
     getIceServers: () => IceServerConfig[] | null;
-    /** Returns true when the message was accepted (triggers the wire ack). */
-    onInboundMessage: (envelope: ChatDataMessageEnvelope) => boolean;
+    /** Returns how the inbound message was handled (controls wire ack). */
+    onInboundMessage: (
+        envelope: ChatDataMessageEnvelope,
+    ) => InboundMessageAcceptance;
     onInboundHistorySync: (envelope: ChatHistorySyncEnvelope) => void;
     onMessageAck: (
         spaceUuid: string,
@@ -118,7 +127,7 @@ export class ChatTransportBridge {
                 clientMsgId: envelope.clientMsgId,
                 bodyLen: envelope.body.length,
             });
-            const accepted = this.deps.onInboundMessage({
+            const acceptance = this.deps.onInboundMessage({
                 t: "chatMessage",
                 spaceUuid: envelope.spaceUuid,
                 from: envelope.from,
@@ -126,12 +135,32 @@ export class ChatTransportBridge {
                 sendTimestamp: envelope.sendTimestamp,
                 clientMsgId: envelope.clientMsgId,
             });
-            if (accepted) {
+            if (acceptance === "accepted") {
                 this.stack?.messaging.acknowledgeInbound(
                     envelope.remote,
                     envelope.spaceUuid,
                     envelope.clientMsgId,
                 );
+            } else if (acceptance === "deferred_contacts") {
+                const chainId = this.deps.getChainId();
+                const self = this.deps.getSelf();
+                if (chainId && self) {
+                    enqueueInboundAcceptance(chainId, self, {
+                        remote: envelope.remote,
+                        spaceUuid: envelope.spaceUuid,
+                        clientMsgId: envelope.clientMsgId,
+                        from: envelope.from,
+                        body: envelope.body,
+                        sendTimestamp: envelope.sendTimestamp,
+                        receivedAt: Date.now(),
+                    });
+                }
+                this.recordDebug("inbound-deferred-contacts", {
+                    from: envelope.from,
+                    remote: envelope.remote,
+                    spaceUuid: envelope.spaceUuid,
+                    clientMsgId: envelope.clientMsgId,
+                });
             } else {
                 this.recordDebug("inbound-rejected-no-ack", {
                     from: envelope.from,
@@ -278,8 +307,38 @@ export class ChatTransportBridge {
     }
 
     onPeerOnline(account: string): void {
-        this.ensurePeer(account, "presence_online");
-        this.stack?.peerRegistry.kickNegotiation(account);
+        this.stack?.notifyRemoteReachable(account, "presence_online");
+    }
+
+    /** Flush deferred inbound acks after contacts load and re-apply messages. */
+    flushDeferredInboundAcceptance(
+        reapply: (record: InboundAcceptanceRecord) => InboundMessageAcceptance,
+    ): void {
+        const chainId = this.deps.getChainId();
+        const self = this.deps.getSelf();
+        if (!chainId || !self || !this.stack) return;
+
+        const pending = clearInboundAcceptanceQueue(chainId, self);
+        for (const record of pending) {
+            const acceptance = reapply(record);
+            if (acceptance === "accepted") {
+                this.stack.messaging.acknowledgeInbound(
+                    record.remote,
+                    record.spaceUuid,
+                    record.clientMsgId,
+                );
+            } else if (acceptance === "deferred_contacts") {
+                enqueueInboundAcceptance(chainId, self, record);
+            } else {
+                dequeueInboundAcceptance(
+                    chainId,
+                    self,
+                    record.remote,
+                    record.spaceUuid,
+                    record.clientMsgId,
+                );
+            }
+        }
     }
 
     onPeerOffline(_account: string): void {
@@ -491,17 +550,21 @@ export class ChatTransportBridge {
             },
             getMessageStatus: (msgId: string) =>
                 bridge.stack?.messaging.getStatus(msgId) ?? "UNKNOWN",
+            kickCounts: () =>
+                bridge.stack?.peerRegistry.getKickCounts() ?? {},
+            resetKickCounts: () => {
+                bridge.stack?.peerRegistry.resetKickCounts();
+            },
             events: () => [...bridge.debugEvents],
             started: () => bridge.stack != null,
             ensurePeers: (remotes: string[]) => {
                 for (const remote of remotes) {
                     bridge.ensurePeer(remote, "peer_focus");
-                    bridge.stack?.peerRegistry.kickNegotiation(remote);
                 }
             },
             kickPeers: (remotes: string[]) => {
                 for (const remote of remotes) {
-                    bridge.stack?.peerRegistry.kickNegotiation(remote);
+                    bridge.stack?.notifyRemoteReachable(remote, "presence_online");
                 }
             },
         };

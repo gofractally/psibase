@@ -20,7 +20,7 @@ type PairSignalingEvents = {
         payload: unknown,
     ) => void;
     /** All queued/in-flight pair joins have received a snapshot (or gave up). */
-    joinsIdle: () => void;
+    joinsIdle: (completedPairId?: string) => void;
 };
 
 export interface PairSignaling {
@@ -142,12 +142,13 @@ export function createPairSignaling(
         hasInFlightJoin() ||
         awaitingSnapshot.size > 0;
 
-    const maybeEmitJoinsIdle = () => {
+    const maybeEmitJoinsIdle = (completedPairId?: string) => {
         if (!hasPendingJoins()) {
             recordTransportLifecycle("l2", "joins-idle", {
                 localAccount: opts.localAccount,
+                completedPairId,
             });
-            bus.emit("joinsIdle");
+            bus.emit("joinsIdle", completedPairId);
         }
     };
 
@@ -158,7 +159,7 @@ export function createPairSignaling(
             scheduleDrain(true);
             return;
         }
-        maybeEmitJoinsIdle();
+        maybeEmitJoinsIdle(pairId);
     };
 
     const scheduleDrain = (afterCompleted = false) => {
@@ -345,7 +346,7 @@ export function createPairSignaling(
             if (selfOnRoster) {
                 markJoined(pairId);
             }
-            maybeEmitJoinsIdle();
+            maybeEmitJoinsIdle(pairId);
         },
 
         on(event, handler) {

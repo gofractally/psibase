@@ -6,10 +6,12 @@ import {
     createGroupChat,
     expectOutboundMessageDelivered,
     expectPendingOutboundMessage,
+    expectRosterKickCountAtMost,
     expectThreadMessage,
     leaveChatToHome,
     openChat,
     openExistingGroupChat,
+    resetTransportKickCounts,
     sendChatMessage,
     startDmWithContact,
     waitForChatConnected,
@@ -88,6 +90,7 @@ test.describe("Chat three-party online/offline flow", () => {
                 chain.baseUrl,
                 groupPeers("bob"),
             );
+            await resetTransportKickCounts(alicePage);
             await waitForPeerOnline(alicePage, party.bobAccount.name, {
                 timeout: 120_000,
             });
@@ -100,6 +103,11 @@ test.describe("Chat three-party online/offline flow", () => {
             await waitForGroupMeshReady(party.bobPage, [party.aliceAccount.name], {
                 timeout: 300_000,
             });
+            await expectRosterKickCountAtMost(
+                alicePage,
+                groupPeers("alice"),
+                2,
+            );
             await sendChatMessage(alicePage, GROUP_FROM_A);
             await expectThreadMessage(party.bobPage, GROUP_FROM_A, {
                 timeout: 240_000,

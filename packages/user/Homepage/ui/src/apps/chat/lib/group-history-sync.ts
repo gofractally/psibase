@@ -4,6 +4,8 @@ import {
     buildGroupEnvelope,
     type GroupMessageEnvelope,
 } from "./group-message-history-store";
+import type { ConversationSnapshot } from "./protocol";
+import type { GraphqlSpaceEntry } from "./space-bridge";
 
 /** Existing online peer pushes; late-joiner waits for inbound sync (architecture §5.3). */
 export function shouldPushGroupHistoryOnConnect(
@@ -18,6 +20,29 @@ export function shouldPushGroupHistoryOnConnect(
         peerIsOnlineNow: options?.peerIsOnlineNow ?? true,
         hadOpenDataChannel: options?.hadOpenDataChannel ?? false,
     });
+}
+
+/** Resolve group roster for history sync even before contacts-filtered conversations load. */
+export function resolveGroupMembersForHistorySync(
+    spaceUuid: string,
+    conversations: readonly ConversationSnapshot[],
+    spaces: readonly GraphqlSpaceEntry[],
+): readonly string[] | null {
+    const conversation = conversations.find(
+        (row) => row.conversationId === spaceUuid,
+    );
+    if (conversation?.kind === "group") return conversation.members;
+    const entry = spaces.find((row) => row.space_uuid === spaceUuid);
+    if (entry?.kind === "GROUP") return entry.members;
+    return null;
+}
+
+export function isGroupHistorySyncSpace(
+    spaceUuid: string,
+    conversations: readonly ConversationSnapshot[],
+    spaces: readonly GraphqlSpaceEntry[],
+): boolean {
+    return resolveGroupMembersForHistorySync(spaceUuid, conversations, spaces) != null;
 }
 
 export function historySyncToGroupEnvelopes(

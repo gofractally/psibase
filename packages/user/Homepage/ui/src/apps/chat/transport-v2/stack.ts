@@ -9,13 +9,20 @@ import {
     type MessagingService,
 } from "./l4-messaging-service";
 import { pairSessionId, parsePairSessionId } from "./pair-id";
+import {
+    createRosterRenegotiationCoordinator,
+    type RosterRenegotiationCoordinator,
+} from "./roster-renegotiation-coordinator";
+import type { EnsureReason } from "./types";
 
 export type ChatTransportStack = {
     messaging: MessagingService;
     pairSignaling: ReturnType<typeof createPairSignaling>;
     peerRegistry: ReturnType<typeof createPeerTransportRegistry>;
+    rosterCoordinator: RosterRenegotiationCoordinator;
     realtime: ReturnType<typeof createRealtimeTransport>;
     signaling: WebRtcSignalingClient;
+    notifyRemoteReachable: (remote: string, source: EnsureReason) => void;
     wireRealtimeHandlers(handlers: {
         sessionSnapshot?: (
             sessionId: string,
@@ -104,6 +111,38 @@ export function createChatTransportStack(
         onSpaceMembershipHint: opts.onSpaceMembershipHint,
     });
 
+    const rosterCoordinator = createRosterRenegotiationCoordinator({
+        localAccount: opts.localAccount,
+        pairIdForRemote: (remote) =>
+            pairSessionId(opts.localAccount, remote),
+        remoteForPairId: (pairId) => {
+            const parsed = parsePairSessionId(pairId);
+            if (!parsed) return null;
+            return parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
+        },
+        getSnapshot: (remote) => peerRegistry.getRosterSnapshot(remote),
+        actions: {
+            ensure: (remote, reason) => {
+                void peerRegistry.ensure(remote, reason);
+            },
+            resendOffer: (remote) => {
+                peerRegistry.resendOffer(remote);
+            },
+            retriggerHandshake: (remote) => {
+                peerRegistry.retriggerHandshake(remote);
+            },
+            recoverPeer: (remote, reason) => {
+                peerRegistry.recoverPeer(remote, reason);
+            },
+        },
+    });
+
+    stackUnsubs.push(
+        pairSignaling.on("joinsIdle", (completedPairId?: string) => {
+            rosterCoordinator.notifyJoinBatchIdle(completedPairId);
+        }),
+    );
+
     const messaging = createMessagingService({
         localAccount: opts.localAccount,
         chainId: opts.chainId,
@@ -113,41 +152,30 @@ export function createChatTransportStack(
     });
     messagingRef.current = messaging;
 
-    const kickFromPairRoster = (
+    const remoteFromSession = (sessionId: string): string | null => {
+        const parsed = parsePairSessionId(sessionId);
+        if (!parsed) return null;
+        return parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
+    };
+
+    const notifyRemoteFromRoster = (
         sessionId: string,
         joined: readonly string[],
+        source: EnsureReason,
     ) => {
-        const parsed = parsePairSessionId(sessionId);
-        if (!parsed) return;
-        const remote =
-            parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
+        const remote = remoteFromSession(sessionId);
+        if (!remote) return;
         if (!joined.includes(remote)) return;
         if (joined.includes(opts.localAccount)) {
             if (pairSignaling.hasPendingJoins()) return;
             const state = peerRegistry.getState(remote);
             if (state === "joining_pair") return;
-            peerRegistry.kickNegotiation(remote);
+            rosterCoordinator.notifyPairRosterUpdate(remote, source);
             return;
         }
         if (pairSignaling.hasPendingJoins()) return;
         void peerRegistry.ensure(remote, "peer_joined");
     };
-
-    const kickAllJoinedPeers = () => {
-        if (pairSignaling.hasPendingJoins()) return;
-        for (const [pairId, joined] of joinedPairs) {
-            if (!joined) continue;
-            const parsed = parsePairSessionId(pairId);
-            if (!parsed) continue;
-            const remote =
-                parsed[0] === opts.localAccount ? parsed[1] : parsed[0];
-            const state = peerRegistry.getState(remote);
-            if (state === "joining_pair") continue;
-            peerRegistry.kickNegotiation(remote);
-        }
-    };
-
-    stackUnsubs.push(pairSignaling.on("joinsIdle", kickAllJoinedPeers));
 
     const isPairSession = (sessionId: string) =>
         sessionId.startsWith("wrtc:pair:");
@@ -189,9 +217,10 @@ export function createChatTransportStack(
             if (frame.joinedParticipants.includes(opts.localAccount)) {
                 signaling.flushDeferredSignals(frame.sessionId);
             }
-            kickFromPairRoster(
+            notifyRemoteFromRoster(
                 frame.sessionId,
                 frame.joinedParticipants,
+                "roster_kick",
             );
             handlers.sessionSnapshot?.(
                 frame.sessionId,
@@ -208,7 +237,7 @@ export function createChatTransportStack(
             if (pairSignaling.hasPendingJoins()) return;
             const remote = frame.participant;
             if (remote === opts.localAccount) return;
-            peerRegistry.kickNegotiation(remote);
+            rosterCoordinator.notifyPairRosterUpdate(remote, "peer_joined");
         },
         signal: (frame: {
             sessionId: string;
@@ -267,10 +296,15 @@ export function createChatTransportStack(
         messaging,
         pairSignaling,
         peerRegistry,
+        rosterCoordinator,
         realtime,
         signaling,
+        notifyRemoteReachable: (remote, source) => {
+            rosterCoordinator.notifyRemoteReachable(remote, source);
+        },
         wireRealtimeHandlers,
         dispose() {
+            rosterCoordinator.dispose();
             unregisterPairHandlers?.();
             unregisterPairHandlers = null;
             for (const unsub of stackUnsubs.splice(0)) {
