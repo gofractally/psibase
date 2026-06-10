@@ -45,7 +45,6 @@ export function HistorySection({ historyNonce = 0 }: Props) {
                             `
                                 {
                                     nameEvents(
-                                        owner: "${loggedInUser}",
                                         first: 50${cursorArg}
                                     ) {
                                         edges {
