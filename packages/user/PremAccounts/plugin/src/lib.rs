@@ -7,6 +7,7 @@ use bindings::auth_sig::plugin::keyvault as AuthSigKeyvault;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
+use bindings::exports::prem_accounts::plugin::market_admin::MarketConfig;
 use bindings::host::common::server as CommonServer;
 use bindings::host::crypto::keyvault as HostCrypto;
 use bindings::tokens::plugin::helpers as TokensHelpers;
@@ -90,6 +91,46 @@ impl MarketAdmin for PremAccountsPlugin {
     #[psibase_plugin::authorized(Max, whitelist = ["config"])]
     fn disable(length: u8) -> Result<(), Error> {
         prem_accounts::Wrapper::add_to_tx().disable(length);
+        Ok(())
+    }
+
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
+    fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
+        let sys_token_id =
+            TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
+        let overview = markets_overview()?;
+
+        for cfg in configs {
+            let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &cfg.floor_price)?;
+            prem_accounts::Wrapper::add_to_tx().configure(
+                cfg.length,
+                cfg.window_seconds,
+                cfg.target,
+                Quantity::from(floor_price),
+                cfg.increase_ppm,
+                cfg.decrease_ppm,
+            );
+
+            let Some(current_enabled) = overview
+                .market_params
+                .iter()
+                .find(|market| market.length == cfg.length)
+                .map(|market| market.enabled)
+            else {
+                continue;
+            };
+
+            if current_enabled == cfg.enabled {
+                continue;
+            }
+
+            if cfg.enabled {
+                prem_accounts::Wrapper::add_to_tx().enable(cfg.length);
+            } else {
+                prem_accounts::Wrapper::add_to_tx().disable(cfg.length);
+            }
+        }
+
         Ok(())
     }
 }
