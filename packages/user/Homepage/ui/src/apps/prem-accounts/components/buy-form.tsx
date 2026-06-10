@@ -17,31 +17,9 @@ import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
 import { Spinner } from "@shared/shadcn/ui/spinner";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from "@shared/shadcn/ui/tooltip";
 
-const DEFAULT_NAME_PURCHASE_SLIPPAGE = "5";
-
-function parseSlippagePercent(raw: string): number | null {
-    const trimmed = raw.trim();
-    if (trimmed === "" || !/^\d*\.?\d+$/.test(trimmed)) {
-        return null;
-    }
-    const value = Number(trimmed);
-    if (!Number.isFinite(value) || value < 0) {
-        return null;
-    }
-    return value;
-}
-
-function maxCostFromPriceAndSlippage(
-    price: Quantity,
-    slippagePercent: number,
-): string {
-    return price.multiply(1 + slippagePercent / 100).format({
+function maxCostFromPrice(price: Quantity): string {
+    return price.format({
         includeLabel: false,
         fullPrecision: true,
         showThousandsSeparator: false,
@@ -102,17 +80,8 @@ export function BuyForm({
     const form = useAppForm({
         defaultValues: {
             accountName: "",
-            slippage: DEFAULT_NAME_PURCHASE_SLIPPAGE,
         },
         onSubmit: async ({ value }) => {
-            const slippagePercent = parseSlippagePercent(value.slippage);
-            if (slippagePercent === null) {
-                form.fieldInfo.slippage.instance?.setErrorMap({
-                    onSubmit: "Enter a valid slippage percentage.",
-                });
-                return;
-            }
-
             const priceAtSubmit = resolveLivePrice(value.accountName);
             if (!priceAtSubmit) {
                 form.fieldInfo.accountName.instance?.setErrorMap({
@@ -128,11 +97,9 @@ export function BuyForm({
         validators: {
             onChange: z.object({
                 accountName: zAccount.or(z.literal("")),
-                slippage: z.string(),
             }),
             onSubmitAsync: async ({ value }) => {
                 let taken = false;
-                const slippagePercent = parseSlippagePercent(value.slippage);
 
                 try {
                     const account = await getAccount(value.accountName);
@@ -160,10 +127,6 @@ export function BuyForm({
                             : !priceAtSubmit
                               ? "Market price is not available for this name."
                               : undefined,
-                        slippage:
-                            slippagePercent === null
-                                ? "Enter a valid slippage percentage."
-                                : undefined,
                     },
                 };
             },
@@ -174,11 +137,6 @@ export function BuyForm({
         form.store,
         (state) => state.values.accountName,
     );
-    const slippageInput = useStore(
-        form.store,
-        (state) => state.values.slippage,
-    );
-    const slippagePercent = parseSlippagePercent(slippageInput);
 
     const livePrice = useMemo(
         () => resolveLivePrice(accountName),
@@ -187,44 +145,18 @@ export function BuyForm({
         [accountName, prices, isAccountTaken, resolveLivePrice],
     );
 
-    const maxCostWithSlippage = useMemo(() => {
-        if (!livePrice || slippagePercent === null) {
-            return null;
-        }
-        return livePrice.multiply(1 + slippagePercent / 100);
-    }, [livePrice, slippagePercent]);
-
     const hasInsufficientFunds = useMemo(() => {
-        if (!maxCostWithSlippage || isPendingBalances) {
+        if (!livePrice || isPendingBalances) {
             return false;
         }
         if (!availableBalance) {
             return true;
         }
-        return availableBalance.isLessThan(maxCostWithSlippage);
-    }, [maxCostWithSlippage, availableBalance, isPendingBalances]);
-
-    const insufficientFundsDueToSlippage = useMemo(() => {
-        if (
-            !hasInsufficientFunds ||
-            !livePrice ||
-            !maxCostWithSlippage ||
-            isPendingBalances ||
-            !availableBalance
-        ) {
-            return false;
-        }
-        return !availableBalance.isLessThan(livePrice);
-    }, [
-        hasInsufficientFunds,
-        livePrice,
-        maxCostWithSlippage,
-        availableBalance,
-        isPendingBalances,
-    ]);
+        return availableBalance.isLessThan(livePrice);
+    }, [livePrice, availableBalance, isPendingBalances]);
 
     const handleBuy = async () => {
-        if (!confirmPrice || slippagePercent === null) return;
+        if (!confirmPrice) return;
 
         const name = accountName.trim();
         if (!name) return;
@@ -232,15 +164,11 @@ export function BuyForm({
         try {
             await buyName({
                 accountName: name,
-                maxCost: maxCostFromPriceAndSlippage(
-                    confirmPrice,
-                    slippagePercent,
-                ),
+                maxCost: maxCostFromPrice(confirmPrice),
             });
             setPurchasedAccountName(name);
             setPurchaseComplete(true);
             form.reset();
-            form.setFieldValue("slippage", DEFAULT_NAME_PURCHASE_SLIPPAGE);
         } catch (error) {
             setBuyConfirmOpen(false);
             setConfirmPrice(null);
@@ -306,18 +234,6 @@ export function BuyForm({
         }
     };
 
-    const validateSlippageOnChange = ({ value }: { value: string }) => {
-        const trimmed = value.trim();
-        if (trimmed === "") return;
-        if (!/^\d*\.?\d*$/.test(trimmed)) {
-            return "Enter a valid slippage percentage.";
-        }
-        const num = Number(trimmed);
-        if (!Number.isFinite(num) || num < 0) {
-            return "Enter a valid slippage percentage.";
-        }
-    };
-
     const priceEndContent = () => (
         <form.Subscribe selector={(state) => [state.isFieldsValidating]}>
             {([isFieldsValidating]) =>
@@ -326,7 +242,9 @@ export function BuyForm({
                         <Spinner className="size-3.5 shrink-0" />
                     </span>
                 ) : livePrice ? (
-                    <span className="shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums text-green-500">
+                    <span
+                        className={`shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums ${hasInsufficientFunds ? "text-red-500" : "text-green-500"}`}
+                    >
                         Costs {livePrice.format({ includeLabel: true })}
                     </span>
                 ) : null
@@ -344,52 +262,24 @@ export function BuyForm({
             >
                 <div className="flex flex-col gap-6">
                     <CardContent className="@container space-y-4">
-                        <div className="@xl:flex-row flex w-full flex-col gap-4">
-                            <div className="flex-1">
-                                <form.AppField
-                                    name="accountName"
-                                    asyncDebounceMs={500}
-                                    validators={{
-                                        onChange: validateAccountOnChange,
-                                        onChangeAsync:
-                                            validateAccountOnChangeAsync,
-                                    }}
-                                    children={(field) => (
-                                        <field.TextField
-                                            label="Desired account name"
-                                            placeholder="Account name"
-                                            autoComplete="off"
-                                            autoCorrect="off"
-                                            spellCheck={false}
-                                            endContent={priceEndContent()}
-                                        />
-                                    )}
+                        <form.AppField
+                            name="accountName"
+                            asyncDebounceMs={500}
+                            validators={{
+                                onChange: validateAccountOnChange,
+                                onChangeAsync: validateAccountOnChangeAsync,
+                            }}
+                            children={(field) => (
+                                <field.TextField
+                                    label="Desired account name"
+                                    placeholder="Account name"
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    endContent={priceEndContent()}
                                 />
-                            </div>
-                            <div className="min-w-56">
-                                <form.AppField
-                                    name="slippage"
-                                    validators={{
-                                        onChange: validateSlippageOnChange,
-                                    }}
-                                    children={(field) => (
-                                        <field.TextField
-                                            label="Slippage"
-                                            placeholder={
-                                                DEFAULT_NAME_PURCHASE_SLIPPAGE
-                                            }
-                                            autoComplete="off"
-                                            inputMode="decimal"
-                                            endContent={
-                                                <span className="text-muted-foreground pr-3 text-sm">
-                                                    %
-                                                </span>
-                                            }
-                                        />
-                                    )}
-                                />
-                            </div>
-                        </div>
+                            )}
+                        />
                     </CardContent>
                     <CardFooter className="flex w-full items-center justify-between gap-4">
                         <AvailableBalanceLabel
@@ -397,39 +287,18 @@ export function BuyForm({
                             balance={availableBalance}
                             isPending={isPendingBalances}
                         />
-                        {insufficientFundsDueToSlippage && !isBuying ? (
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span className="inline-flex">
-                                        <form.SubmitButton
-                                            labels={[
-                                                "Insufficient funds",
-                                                "Processing",
-                                            ]}
-                                            disabled
-                                        />
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                    {maxCostWithSlippage && slippagePercent !== null
-                                        ? `Balance must cover price + ${slippagePercent}% slippage (${maxCostWithSlippage.format({ includeLabel: true })} max).`
-                                        : "Balance must cover price plus slippage."}
-                                </TooltipContent>
-                            </Tooltip>
-                        ) : (
-                            <form.SubmitButton
-                                labels={
-                                    hasInsufficientFunds
-                                        ? ["Insufficient funds", "Processing"]
-                                        : ["Buy", "Processing"]
-                                }
-                                disabled={isBuying || hasInsufficientFunds}
-                            />
-                        )}
+                        <form.SubmitButton
+                            labels={
+                                hasInsufficientFunds
+                                    ? ["Insufficient funds", "Processing"]
+                                    : ["Buy", "Processing"]
+                            }
+                            disabled={isBuying || hasInsufficientFunds}
+                        />
                     </CardFooter>
                 </div>
             </form>
-            {confirmPrice && slippagePercent !== null ? (
+            {confirmPrice ? (
                 <BuyNameConfirmationDialog
                     open={buyConfirmOpen}
                     setOpen={(open) => {
@@ -443,7 +312,6 @@ export function BuyForm({
                     mode="buy-only"
                     account={purchasedAccountName ?? accountName}
                     price={confirmPrice}
-                    slippage={slippagePercent}
                     isLoading={isBuying}
                     purchaseComplete={purchaseComplete}
                     claimPageHref={`/${premAccounts.service}/claim`}

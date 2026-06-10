@@ -56,8 +56,6 @@ import { useCreateAccount } from "./hooks/use-create-account";
 import { useImportExisting } from "./hooks/use-import-existing";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
 
-const DEFAULT_NAME_PURCHASE_SLIPPAGE = 5;
-
 export const CreatePrompt = () => {
     const queryClient = useQueryClient();
     const { data: currentUser } = useCurrentUser();
@@ -212,13 +210,11 @@ export const CreatePrompt = () => {
             if (purchasePrice) {
                 privateKey = await purchaseAccountMutation.mutateAsync([
                     name,
-                    purchasePrice
-                        .multiply(1 + DEFAULT_NAME_PURCHASE_SLIPPAGE / 100)
-                        .format({
-                            includeLabel: false,
-                            fullPrecision: true,
-                            showThousandsSeparator: false,
-                        }),
+                    purchasePrice.format({
+                        includeLabel: false,
+                        fullPrecision: true,
+                        showThousandsSeparator: false,
+                    }),
                 ]);
             } else {
                 privateKey = await createAccountMutation.mutateAsync(name);
@@ -413,7 +409,9 @@ export const CreatePrompt = () => {
                         <Spinner className="size-3.5 shrink-0" />
                     </span>
                 ) : livePrice ? (
-                    <span className="shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums text-green-500">
+                    <span
+                        className={`shrink-0 whitespace-nowrap pr-3 text-sm font-medium tabular-nums ${hasInsufficientFunds ? "text-red-500" : "text-green-500"}`}
+                    >
                         Costs {livePrice.format({ includeLabel: true })}
                     </span>
                 ) : null
@@ -513,7 +511,6 @@ export const CreatePrompt = () => {
                             mode="buy-and-claim"
                             account={createdAccount}
                             price={confirmPrice}
-                            slippage={DEFAULT_NAME_PURCHASE_SLIPPAGE}
                             isLoading={purchaseAccountMutation.isPending}
                             onConfirm={() =>
                                 void handleCreateOrBuy(createdAccount)
