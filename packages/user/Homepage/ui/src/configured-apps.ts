@@ -5,7 +5,7 @@ import { tokenSwapConfig } from "./apps/token-swap";
 import { tokensConfig } from "./apps/tokens";
 
 export type { AppConfig } from "./app-config";
-export { defineAppConfig } from "./app-config";
+export { defineAppConfig, getAppPath } from "./app-config";
 
 export const configuredApps = [
     tokensConfig,

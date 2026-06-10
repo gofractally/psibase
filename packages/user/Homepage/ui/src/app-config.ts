@@ -4,6 +4,8 @@ import { zAccount } from "@shared/lib/schemas/account";
 
 const AppConfigSchema = z.object({
     service: zAccount,
+    /** URL path segment; defaults to `service` when omitted. */
+    path: z.string().optional(),
     name: z.string(),
     isMore: z.boolean(),
     element: z.any().optional(),
@@ -35,4 +37,8 @@ export type AppConfig = z.infer<typeof AppConfigSchema> & {
 export function defineAppConfig(config: AppConfig): AppConfig {
     AppConfigSchema.parse(config);
     return config;
+}
+
+export function getAppPath(app: AppConfig): string {
+    return app.path ?? app.service;
 }

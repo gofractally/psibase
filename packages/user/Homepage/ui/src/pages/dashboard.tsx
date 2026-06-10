@@ -13,6 +13,8 @@ import { z } from "zod";
 
 import { siblingUrl } from "@psibase/common-lib";
 
+import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/prem-accounts/route";
+
 import { zAccount } from "@shared/lib/schemas/account";
 
 export const AppSchema = z
@@ -24,6 +26,7 @@ export const AppSchema = z
     .and(
         z.union([
             z.object({ service: zAccount }),
+            z.object({ path: z.string() }),
             z.object({ href: z.string().url() }),
         ]),
     );
@@ -59,7 +62,7 @@ const apps: App[] = [
         title: "Account marketplace",
         description: "Buy and claim premium account names.",
         icon: <Store className="h-6 w-6" />,
-        service: zAccount.parse("prem-accounts"),
+        path: ACCOUNT_MARKETPLACE_PATH,
     },
     {
         title: "Docs",
@@ -73,10 +76,12 @@ const App = () => {
     const navigate = useNavigate();
 
     const handleNavigation = (app: App) => {
-        if ("service" in app) {
-            navigate(`/${app.service}`);
-        } else {
+        if ("href" in app) {
             window.location.href = app.href;
+        } else if ("path" in app) {
+            navigate(`/${app.path}`);
+        } else {
+            navigate(`/${app.service}`);
         }
     };
 

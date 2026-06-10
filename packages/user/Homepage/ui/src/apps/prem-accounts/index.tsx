@@ -13,6 +13,7 @@ import { BuyPage } from "./buy-page";
 import { ClaimPage } from "./claim-page";
 import { HistoryPage } from "./history-page";
 import { PremAccountsLayout } from "./layout";
+import { ACCOUNT_MARKETPLACE_PATH } from "./route";
 
 function usePremAccountsSidebarVisibility(): SidebarVisibility {
     const { data: currentUser, isPending: isPendingUser } = useCurrentUser();
@@ -54,6 +55,7 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
 
 export const premAccountsConfig = defineAppConfig({
     service: premAccounts.service,
+    path: ACCOUNT_MARKETPLACE_PATH,
     name: "Account Marketplace",
     description: "Buy and claim premium account names.",
     icon: <Store className="h-6 w-6" />,
