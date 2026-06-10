@@ -5,6 +5,11 @@ import {
     type ChatDataMessageEnvelope,
 } from "../lib/chat-data-envelope";
 import {
+    loadPendingAcks,
+    savePendingAcks,
+    type PendingAckRecord,
+} from "../lib/pending-ack-store";
+import {
     loadPendingMessages,
     savePendingMessagesWithQuotaRecovery,
     type PendingChatMessage,
@@ -115,6 +120,32 @@ export function createMessagingService(
             ack: ChatDataMessageAckEnvelope;
         }
     >();
+    const pendingAckKey = (
+        remote: string,
+        spaceUuid: string,
+        clientMsgId: string,
+    ): PendingAckKey =>
+        `${remote}\0${spaceUuid}\0${clientMsgId}` as PendingAckKey;
+    const persistPendingAcks = () => {
+        const records: PendingAckRecord[] = [...pendingAcks.values()].map(
+            ({ remote, ack }) => ({ remote, ack }),
+        );
+        savePendingAcks(opts.chainId, opts.localAccount, records);
+    };
+    const restorePendingAcks = () => {
+        pendingAcks.clear();
+        for (const record of loadPendingAcks(opts.chainId, opts.localAccount)) {
+            pendingAcks.set(
+                pendingAckKey(
+                    record.remote,
+                    record.ack.spaceUuid,
+                    record.ack.clientMsgId,
+                ),
+                record,
+            );
+        }
+    };
+    restorePendingAcks();
     const validAttempts = new Map<InFlightKey, number>();
     const statusByMsg = new Map<string, MessageStatus>();
 
@@ -139,13 +170,6 @@ export function createMessagingService(
     const findRow = (msgId: string) =>
         rows.find((r) => r.clientMsgId === msgId) ?? null;
 
-    const pendingAckKey = (
-        remote: string,
-        spaceUuid: string,
-        clientMsgId: string,
-    ): PendingAckKey =>
-        `${remote}\0${spaceUuid}\0${clientMsgId}` as PendingAckKey;
-
     const sendAck = (
         remote: string,
         ack: ChatDataMessageAckEnvelope,
@@ -156,14 +180,17 @@ export function createMessagingService(
     };
 
     const flushPendingAcks = (remote: string) => {
+        let changed = false;
         for (const [key, pending] of [...pendingAcks]) {
             if (pending.remote !== remote) continue;
             if (sendAck(remote, pending.ack)) {
                 pendingAcks.delete(key);
+                changed = true;
             } else {
                 void opts.peerRegistry.ensure(remote, "message_enqueued");
             }
         }
+        if (changed) persistPendingAcks();
     };
 
     const outboxByRemote = (): Map<string, PendingChatMessage[]> => {
@@ -506,10 +533,14 @@ export function createMessagingService(
 
         hydrateFromStorage() {
             rows = loadPendingMessages(opts.chainId, opts.localAccount);
+            restorePendingAcks();
             for (const row of rows) {
                 syncRowStatus(row);
             }
             flushAll();
+            for (const { remote } of pendingAcks.values()) {
+                flushPendingAcks(remote);
+            }
         },
 
         acknowledgeInbound(
@@ -528,6 +559,7 @@ export function createMessagingService(
                 remote,
                 ack,
             });
+            persistPendingAcks();
             void opts.peerRegistry.ensure(remote, "message_enqueued");
         },
 

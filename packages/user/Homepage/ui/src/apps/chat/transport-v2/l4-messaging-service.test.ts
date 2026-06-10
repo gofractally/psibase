@@ -373,4 +373,41 @@ describe("l4-messaging-service", () => {
             from: "bob",
         });
     });
+
+    it("persists pending acks across remount and sends on peer usable", () => {
+        const chainId = "test-chain-ack-persist";
+        const realtime1 = createMockRealtime({ alice: true });
+        const peerRegistry1 = createMockPeerRegistry();
+        const messaging1 = createMessagingService({
+            localAccount: "bob",
+            chainId,
+            realtime: realtime1,
+            peerRegistry: peerRegistry1,
+        });
+
+        messaging1.acknowledgeInbound("alice", "space:group", "msg-persist-1");
+        expect(peerRegistry1.sent).toHaveLength(0);
+
+        const realtime2 = createMockRealtime({ alice: true });
+        const peerRegistry2 = createMockPeerRegistry();
+        const messaging2 = createMessagingService({
+            localAccount: "bob",
+            chainId,
+            realtime: realtime2,
+            peerRegistry: peerRegistry2,
+        });
+
+        expect(peerRegistry2.sent).toHaveLength(0);
+        peerRegistry2.emitUsable("alice");
+
+        expect(peerRegistry2.sent).toHaveLength(1);
+        const { remote, bytes } = peerRegistry2.sent[0]!;
+        expect(remote).toBe("alice");
+        expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual({
+            t: "messageAck",
+            spaceUuid: "space:group",
+            clientMsgId: "msg-persist-1",
+            from: "bob",
+        });
+    });
 });

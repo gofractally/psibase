@@ -82,6 +82,7 @@ import {
 import {
     historySyncToGroupEnvelopes,
 } from "../lib/group-history-sync";
+import { listInboundAckTargets } from "../lib/inbound-message-ack";
 import { dmComposerDisabledReason } from "../lib/dm-compose-ux";
 import { composeTimingLog } from "../lib/dm-compose-timing";
 import {
@@ -1337,6 +1338,14 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             );
             if (incoming.length === 0) return;
 
+            for (const target of listInboundAckTargets(incoming, self)) {
+                chatDataOrchestratorRef.current?.messaging?.acknowledgeInbound(
+                    target.remote,
+                    target.spaceUuid,
+                    target.clientMsgId,
+                );
+            }
+
             const chain = chainIdRef.current;
             if (chain) {
                 try {
@@ -1423,6 +1432,14 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 envelope,
             ).filter((row) => conversation.members.includes(row.from));
             if (incoming.length === 0) return;
+
+            for (const target of listInboundAckTargets(incoming, self)) {
+                chatDataOrchestratorRef.current?.messaging?.acknowledgeInbound(
+                    target.remote,
+                    target.spaceUuid,
+                    target.clientMsgId,
+                );
+            }
 
             const chain = chainIdRef.current;
             if (chain) {
