@@ -1,18 +1,13 @@
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
-use crate::bindings::host::{
-    auth::api as HostAuth, common::client as Client, crypto::keyvault as HostCrypto,
-    types::types::Error,
-};
+use crate::bindings::host::{auth::api as HostAuth, common::client as Client, types::types::Error};
 use crate::bindings::invite::plugin::redemption as Invites;
 use crate::bindings::prem_accounts::plugin::api as PremAccounts;
-use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
 use crate::plugin::AccountsPlugin;
-use psibase::fracpack::Pack;
-use psibase::services::{accounts as AccountsService, auth_sig};
+use psibase::services::accounts as AccountsService;
 
 impl Prompt for AccountsPlugin {
     fn can_create_account() -> bool {
@@ -111,22 +106,7 @@ impl Prompt for AccountsPlugin {
         }
 
         PremAccounts::buy(&account_name, &max_cost)?;
-        PremAccounts::claim(&account_name)?;
-
-        let keypair = HostCrypto::generate_unmanaged_keypair()?;
-
-        Transact::set_propose_latch(Some(&account_name))?;
-        AuthSig::actions::set_key(&keypair.public_key)?;
-        Transact::add_action_to_transaction(
-            AccountsService::action_structs::setAuthServ::ACTION_NAME,
-            &AccountsService::action_structs::setAuthServ {
-                authService: auth_sig::Wrapper::SERVICE,
-            }
-            .packed(),
-        )?;
-        Transact::set_propose_latch(None)?;
-
-        Ok(keypair.private_key)
+        PremAccounts::claim_and_set_key(&account_name)
     }
 
     fn connect_account(account: String) {
