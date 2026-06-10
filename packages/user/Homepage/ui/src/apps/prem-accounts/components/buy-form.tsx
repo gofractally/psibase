@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import z from "zod";
 
 import { useBuyName } from "@/apps/prem-accounts/hooks/use-buy-name";
+import { ACCOUNT_MARKETPLACE_PATH } from "@/apps/prem-accounts/route";
 
 import { useAppForm } from "@shared/components/form/app-form";
 import { AvailableBalanceLabel } from "@shared/components/premium-accounts/available-balance-label";
@@ -12,7 +13,6 @@ import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/b
 import { useCurrentUser } from "@shared/hooks/use-current-user";
 import { useUserTokenBalances, getSystemTokenBalance } from "@shared/hooks/use-user-token-balances";
 import { getAccount } from "@shared/lib/get-account";
-import { premAccounts } from "@shared/lib/plugins";
 import { Quantity } from "@shared/lib/quantity";
 import { zAccount } from "@shared/lib/schemas/account";
 import { CardContent, CardFooter } from "@shared/shadcn/ui/card";
@@ -314,7 +314,7 @@ export function BuyForm({
                     price={confirmPrice}
                     isLoading={isBuying}
                     purchaseComplete={purchaseComplete}
-                    claimPageHref={`/${premAccounts.service}/claim`}
+                    claimPageHref={`/${ACCOUNT_MARKETPLACE_PATH}/claim`}
                     onConfirm={() => void handleBuy()}
                 />
             ) : null}

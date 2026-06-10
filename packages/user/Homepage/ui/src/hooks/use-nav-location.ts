@@ -1,4 +1,5 @@
 import { configuredApps } from "@/configured-apps";
+import { getAppPath } from "@/app-config";
 import { useLocation } from "react-router-dom";
 
 export const useNavLocation = () => {
@@ -8,11 +9,12 @@ export const useNavLocation = () => {
     const normalizedPath = location.pathname.replace(/\/+$/, "");
 
     const currentApp = configuredApps.find((app) =>
-        normalizedPath.startsWith(`/${app.service}`),
+        normalizedPath.startsWith(`/${getAppPath(app)}`),
     );
     const currentChild = currentApp?.children.find((child) => {
+        const appPath = getAppPath(currentApp);
         return child.path === ""
-            ? normalizedPath === `/${currentApp.service}`
+            ? normalizedPath === `/${appPath}`
             : normalizedPath.endsWith(child.path);
     });
 

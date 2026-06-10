@@ -1,4 +1,5 @@
 import { type AppConfig, configuredApps } from "@/configured-apps";
+import { getAppPath } from "@/app-config";
 import { type LucideIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -39,7 +40,7 @@ function NavAppItem({ app }: { app: AppConfig }) {
 
     return (
         <SidebarMenuItem>
-            <NavLink to={`/${app.service}`}>
+            <NavLink to={`/${getAppPath(app)}`}>
                 {({ isActive }) => (
                     <SidebarMenuButton
                         data-active={isActive}

@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 
 import { useNavLocation } from "@/hooks/use-nav-location";
+import { getAppPath } from "@/app-config";
 
 import { cn } from "@shared/lib/utils";
 import {
@@ -23,7 +24,7 @@ export function NavSubNav() {
                 {currentApp?.children.map((item) => (
                     <SidebarMenuItem key={item.path}>
                         <NavLink
-                            to={`/${currentApp.service}${item.path ? "/" + item.path : ""}`}
+                            to={`/${getAppPath(currentApp)}${item.path ? "/" + item.path : ""}`}
                             end
                         >
                             {({ isActive }) => (
