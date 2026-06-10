@@ -26,8 +26,6 @@ import {
     EmptyTitle,
 } from "@shared/shadcn/ui/empty";
 import { Item, ItemContent } from "@shared/shadcn/ui/item";
-import { Separator } from "@shared/shadcn/ui/separator";
-
 export type BuyNameConfirmationMode = "buy-and-claim" | "buy-only";
 
 const DESCRIPTION_BY_MODE: Record<
@@ -55,7 +53,6 @@ export const BuyNameConfirmationDialog = ({
     account,
     price,
     previousPrice,
-    slippage,
     isLoading,
     onConfirm,
     purchaseComplete = false,
@@ -68,7 +65,6 @@ export const BuyNameConfirmationDialog = ({
     price: Quantity;
     /** Price shown before submit re-validation; used to warn if the ask increased. */
     previousPrice?: Quantity | null;
-    slippage: number;
     isLoading: boolean;
     onConfirm: () => void;
     /** When true (buy-only), show success state instead of the confirmation form. */
@@ -156,33 +152,12 @@ export const BuyNameConfirmationDialog = ({
                         <ItemContent className="gap-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground text-sm font-light">
-                                    Market price
+                                    Price
                                 </span>
-                                <span className="text-primary text-sm font-medium tabular-nums">
+                                <span className="text-primary text-sm font-semibold tabular-nums">
                                     {price.format({
                                         includeLabel: true,
                                     })}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground text-sm font-light">
-                                    Slippage
-                                </span>
-                                <span className="text-primary text-sm font-medium tabular-nums">
-                                    Up to {slippage}%
-                                </span>
-                            </div>
-                            <Separator />
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground text-sm font-light">
-                                    Maximum cost
-                                </span>
-                                <span className="text-primary text-sm font-semibold tabular-nums">
-                                    {price
-                                        .multiply(1 + slippage / 100)
-                                        .format({
-                                            includeLabel: true,
-                                        })}
                                 </span>
                             </div>
                         </ItemContent>

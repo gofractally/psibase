@@ -54,7 +54,7 @@ function usePremAccountsSidebarVisibility(): SidebarVisibility {
 
 export const premAccountsConfig = defineAppConfig({
     service: premAccounts.service,
-    name: "Accounts Marketplace",
+    name: "Account Marketplace",
     description: "Buy and claim premium account names.",
     icon: <Store className="h-6 w-6" />,
     isMore: false,
