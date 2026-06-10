@@ -1,9 +1,9 @@
 use crate::services::{accounts, auth_delegate, auth_sig, producers, transact};
 use crate::{
-    get_schemas, method_raw, new_account_action, set_auth_service_action, set_key_action,
-    validate_dependencies, AccountNumber, Action, AnyPublicKey, Claim, EssentialServices,
-    GenesisActionData, MethodNumber, PackageList, PackageOrigin, PackagedService, Producer,
-    SchemaMap, SignedTransaction, Tapos, TimePointSec, Transaction, TransactionBuilder,
+    get_schemas, method_raw, new_account_action, set_key_action, validate_dependencies,
+    AccountNumber, Action, AnyPublicKey, Claim, EssentialServices, GenesisActionData, MethodNumber,
+    PackageList, PackageOrigin, PackagedService, Producer, SchemaMap, SignedTransaction, Tapos,
+    TimePointSec, Transaction, TransactionBuilder,
 };
 use fracpack::Pack;
 use sha2::{Digest, Sha256};
@@ -159,7 +159,11 @@ pub fn get_initial_actions<
         builder.set_label(format!("Installing {}", s.name()));
         for account in s.get_accounts() {
             if !s.has_service(*account) {
-                builder.push(new_account_action(accounts::SERVICE, *account))?
+                builder.push(accounts::Wrapper::pack().newAccount(
+                    *account,
+                    auth_delegate::SERVICE,
+                    true,
+                ))?
             }
         }
 
@@ -186,30 +190,33 @@ pub fn get_initial_actions<
     builder.set_label("Creating system accounts".to_string());
 
     // Create producer account
-    builder.push(new_account_action(accounts::SERVICE, initial_producer))?;
-
     if let Some(key) = tx_signing_key {
         // Set transaction signing key for producer
+        builder.push(accounts::Wrapper::pack().newAccount(
+            producers::ROOT,
+            auth_sig::SERVICE,
+            true,
+        ))?;
         builder.push(set_key_action(initial_producer, &key))?;
-        builder.push(set_auth_service_action(initial_producer, auth_sig::SERVICE))?;
+    } else {
+        builder.push(new_account_action(accounts::SERVICE, initial_producer))?;
     }
 
-    builder.push(new_account_action(accounts::SERVICE, producers::ROOT))?;
+    builder.push(accounts::Wrapper::pack().newAccount(
+        producers::ROOT,
+        auth_delegate::SERVICE,
+        true,
+    ))?;
     builder.push(
         auth_delegate::Wrapper::pack_from(producers::ROOT)
             .setOwner(producers::PRODUCER_ACCOUNT_STRONG),
     )?;
-    builder.push(set_auth_service_action(
-        producers::ROOT,
-        auth_delegate::SERVICE,
-    ))?;
 
     for s in &service_packages[..] {
         for account in s.get_accounts() {
             if !accounts_with_auth.contains(account) {
                 builder
                     .push(auth_delegate::Wrapper::pack_from(*account).setOwner(producers::ROOT))?;
-                builder.push(set_auth_service_action(*account, auth_delegate::SERVICE))?;
             }
         }
     }

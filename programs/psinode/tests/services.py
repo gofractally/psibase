@@ -104,16 +104,30 @@ class XAdmin(Service):
     def install(self, file):
         from zipfile import ZipFile
         with ZipFile(file) as package:
+            services = {}
+            class Filenames:
+                def __init__(self):
+                    self.json = None
+                    self.wasm = None
             for filename in package.namelist():
                 if filename.startswith('service/') and filename.endswith('.json'):
                     service = filename.removeprefix('service/').removesuffix('.json')
-                    with package.open(filename) as f:
+                    services.setdefault(service, Filenames()).json = filename
+                if filename.startswith('service/') and filename.endswith('.wasm'):
+                    service = filename.removeprefix('service/').removesuffix('.wasm')
+                    services.setdefault(service, Filenames()).wasm = filename
+            for (service, filenames) in services.items():
+                flags = ''
+                if filenames.json is not None:
+                    with package.open(filenames.json) as f:
                         info = json.load(f)
                     server = info.get('server')
                     if server is not None:
                         XHttp(self.api).register_server(service, server)
-                if filename.startswith('service/') and filename.endswith('.wasm'):
-                    service = filename.removeprefix('service/').removesuffix('.wasm')
-                    with package.open(filename) as f:
-                        with self.put('/services/' + service, data=f, headers={'Content-Type': 'application/wasm'}) as reply:
+                    flagsList = info.get('flags', [])
+                    if len(flagsList) != 0:
+                        flags = '?' + '&'.join(f + '=1' for f in flagsList)
+                if filenames.wasm is not None:
+                    with package.open(filenames.wasm) as f:
+                        with self.put('/services/' + service + flags, data=f, headers={'Content-Type': 'application/wasm'}) as reply:
                             reply.raise_for_status()
