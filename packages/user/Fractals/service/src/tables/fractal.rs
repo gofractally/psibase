@@ -23,7 +23,8 @@ use crate::tables::tables::{
     RoleTable,
 };
 use psibase::{
-    check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber, Table,
+    account, check_none, check_some, services::auth_dyn::policy::DynamicAuthPolicy, AccountNumber,
+    Table,
 };
 
 use psibase::services::fractals::{self, occu_wrapper};
@@ -90,7 +91,7 @@ impl Fractal {
         // auth service to AuthDyn.
         new_instance.save();
 
-        let defacto_service = "de-facto".into();
+        let defacto_service = account!("de-facto");
 
         let create_role = |role_account: AccountNumber, role: FractalRole| {
             Role::add(fractal, role_account, role, defacto_service)
@@ -102,7 +103,7 @@ impl Fractal {
         create_role(recruitment, Recruitment);
 
         create_managed_account(fractal, || {
-            sites::Wrapper::call_as(fractal).setProxy("fractal-core".into());
+            sites::Wrapper::call_as(fractal).setProxy(account!("fractal-core"));
         });
 
         FractalMember::add(fractal, get_sender(), None);

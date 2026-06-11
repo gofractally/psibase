@@ -90,7 +90,7 @@ pub mod guild {
     }
 
     pub fn get_guild(guild: &str) -> Result<Guild, Error> {
-        fetch_guild(guild.into()).map(|guild| Guild::from(guild))
+        fetch_guild(guild.parse().unwrap()).map(|guild| Guild::from(guild))
     }
 
     impl From<Guild> for GuildWit {

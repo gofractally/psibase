@@ -5,6 +5,7 @@ use bindings::exports::fractals::plugin::admin_fractal::Guest as AdminFractal;
 use bindings::exports::fractals::plugin::queries::Guest as Queries;
 use bindings::exports::fractals::plugin::user_fractal::Guest as UserFractal;
 
+use psibase::account;
 use psibase_plugin::{trust::*, *};
 
 use fractals::Wrapper as Fractals;
@@ -54,10 +55,10 @@ impl AdminFractal for FractallyPlugin {
 
         Fractals::add_to_tx().create_frac(
             fractal,
-            gen_rand_account(Some("leg"))?.as_str().into(),
-            gen_rand_account(Some("jud"))?.as_str().into(),
-            gen_rand_account(Some("exec"))?.as_str().into(),
-            gen_rand_account(Some("rec"))?.as_str().into(),
+            gen_rand_account(Some("leg"))?.parse().unwrap(),
+            gen_rand_account(Some("jud"))?.parse().unwrap(),
+            gen_rand_account(Some("exec"))?.parse().unwrap(),
+            gen_rand_account(Some("rec"))?.parse().unwrap(),
             name,
             mission,
         );
@@ -74,7 +75,7 @@ impl AdminFractal for FractallyPlugin {
         Guilds::admin_fractal::set_auto_join_fractal(true)?;
 
         let set_role_occ = |role_id: u8| {
-            Fractals::add_to_tx().set_r_occ(role_id, "guilds".into());
+            Fractals::add_to_tx().set_r_occ(role_id, account!("guilds"));
         };
 
         set_role_occ(Legislature.into());
@@ -86,7 +87,7 @@ impl AdminFractal for FractallyPlugin {
 
     #[psibase_plugin::authorized(High)]
     fn set_role_occupation(role_id: u8, occupation: String) -> Result<(), Error> {
-        Fractals::add_to_tx().set_r_occ(role_id, occupation.as_str().into());
+        Fractals::add_to_tx().set_r_occ(role_id, occupation.parse().unwrap());
         Ok(())
     }
 

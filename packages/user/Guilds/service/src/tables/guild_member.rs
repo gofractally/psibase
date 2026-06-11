@@ -13,7 +13,10 @@ use psibase::services::transact::Wrapper as TransactSvc;
 
 impl HasScore for GuildMember {
     fn get_score(&self) -> Decimal {
-        Decimal::new(Quantity::from(self.score as u64), Precision::new(4).unwrap())
+        Decimal::new(
+            Quantity::from(self.score as u64),
+            Precision::new(4).unwrap(),
+        )
     }
 }
 

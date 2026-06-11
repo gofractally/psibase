@@ -618,7 +618,7 @@ mod service {
         user: Option<AccountNumber>,
     ) -> Option<HttpReply> {
         check(
-            get_sender() == AccountNumber::from("http-server"),
+            get_sender() == psibase::services::http_server::SERVICE,
             "permission denied: tokens::serveSys only callable by 'http-server'",
         );
 
