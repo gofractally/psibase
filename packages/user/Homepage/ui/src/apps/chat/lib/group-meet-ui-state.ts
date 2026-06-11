@@ -75,9 +75,8 @@ export function groupMeetStatusLabel(
         case "waiting-peer":
             return "Ringing members…";
         case "signaling":
-            return "Connecting…";
         case "ready":
-            return "Connected";
+            return "Connecting…";
         default:
             return "Calling…";
     }

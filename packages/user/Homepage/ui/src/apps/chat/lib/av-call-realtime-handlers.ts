@@ -1,6 +1,7 @@
 import { avCallLog, shortSessionId, shortSpaceId } from "./av-call-debug";
 import { normalizeAvCallTerminalReason } from "./av-call-terminal";
 import { commitAvCallTimelineEvent } from "./av-call-timeline-commit";
+import { closeAvCallSession } from "./chat-api";
 import {
     dmPeerAccount,
     isGroupMembers,
@@ -26,6 +27,7 @@ function onSessionInvite(
     frame: Extract<ServerRealtimeFrame, { t: "sessionInvite" }>,
 ): void {
     if (frame.purpose !== "av-call") return;
+    if (host.isRetiredAvCallSession?.(frame.sessionId)) return;
     const self = host.getSelf();
     if (!self) return;
 
@@ -211,18 +213,64 @@ function onSignal(
     })();
 }
 
+function isGroupPeerVoluntaryLeave(reason: string): boolean {
+    const normalized = normalizeAvCallTerminalReason(reason);
+    return (
+        normalized === "ended" ||
+        normalized === "user" ||
+        normalized === "client-disposed"
+    );
+}
+
+/** Another participant left the group call (including server cleanup follow-ups). */
+function isGroupPeerDeparture(reason: string): boolean {
+    const normalized = normalizeAvCallTerminalReason(reason);
+    return (
+        isGroupPeerVoluntaryLeave(normalized) ||
+        normalized === "session-not-active"
+    );
+}
+
 function onSessionEnded(
     host: AvCallOrchestratorHost,
     frame: Extract<ServerRealtimeFrame, { t: "sessionEnded" }>,
 ): void {
+    if (host.isRetiredAvCallSession?.(frame.sessionId)) return;
     const run = host.findRunBySessionId(frame.sessionId);
     if (!run) return;
-    host.onInviteCleared?.(frame.sessionId);
+    const self = host.getSelf();
     const terminalReason = normalizeAvCallTerminalReason(
         frame.reason || "session ended",
     );
+
+    if (
+        run.kind === "group" &&
+        frame.by &&
+        self &&
+        frame.by !== self &&
+        isGroupPeerDeparture(terminalReason)
+    ) {
+        avCallLog("sessionEnded: group peer left", {
+            sessionId: shortSessionId(frame.sessionId),
+            by: frame.by,
+            reason: terminalReason,
+        });
+        host.tearDownMeshSignalingPeer(run, frame.by, terminalReason);
+        run.snapshot = {
+            ...host.liveSnapshot(run),
+            meshPeerSignalingReady: host.meshPeerSignalingReadyMap(run),
+        };
+        run.onUpdate();
+        return;
+    }
+
+    host.onInviteCleared?.(frame.sessionId);
+    host.retireAvCallSession?.(frame.sessionId);
     host.tearDownSignaling(run, terminalReason);
     commitAvCallTimelineEvent(frame.sessionId, frame.reason || terminalReason);
+    if (run.kind === "dm") {
+        void closeAvCallSession(frame.sessionId, terminalReason).catch(() => {});
+    }
     run.hasJoined = false;
     host.setPhase(run, "failed", {
         lastError: terminalReason,
@@ -244,6 +292,7 @@ export function wireAvCallRealtimeHandlers(
         participantJoined: (frame) => {
             const self = host.getSelf();
             if (!self || frame.participant === self) return;
+            if (host.isRetiredAvCallSession?.(frame.sessionId)) return;
             avCallLog("participantJoined", {
                 sessionId: shortSessionId(frame.sessionId),
                 participant: frame.participant,
@@ -251,6 +300,7 @@ export function wireAvCallRealtimeHandlers(
             let run = host.findRunBySessionId(frame.sessionId);
             if (!run) {
                 for (const candidate of host.getRuns()) {
+                    if (candidate.snapshot.phase === "failed") continue;
                     if (
                         candidate.kind === "dm" &&
                         candidate.peerAccount === frame.participant
@@ -324,6 +374,24 @@ export function wireAvCallRealtimeHandlers(
             if (!frame.sessionId) return;
             const run = host.findRunBySessionId(frame.sessionId);
             if (!run) return;
+            if (
+                frame.code === "session-not-active" ||
+                frame.code === "not-joined"
+            ) {
+                if (
+                    run.snapshot.phase === "failed" ||
+                    !run.hasJoined ||
+                    run.snapshot.phase === "ready" ||
+                    run.snapshot.phase === "signaling"
+                ) {
+                    return;
+                }
+                void host.recoverStaleAvCallSession?.(
+                    run,
+                    frame.sessionId,
+                );
+                return;
+            }
             host.fail(
                 run,
                 `${frame.code}: ${frame.reason}`.slice(0, 500),

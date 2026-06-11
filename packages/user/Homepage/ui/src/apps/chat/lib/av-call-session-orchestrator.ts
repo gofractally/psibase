@@ -16,7 +16,10 @@ import {
     shortSessionId,
     shortSpaceId,
 } from "./av-call-debug";
-import { commitAvCallTimelineEvent } from "./av-call-timeline-commit";
+import {
+    commitAvCallParticipantLeft,
+    commitAvCallTimelineEvent,
+} from "./av-call-timeline-commit";
 import {
     beginSignalingDmAvCall,
     beginSignalingDmAvCallSkipChecks,
@@ -97,6 +100,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
     > | null = null;
 
     private pendingInvite: AvCallIncomingInvite | null = null;
+
+    /** Objective/signaling sessions the user explicitly left; ignore WS resurrection. */
+    private readonly retiredAvCallSessionIds = new Set<string>();
 
     constructor(
         private readonly getRealtimeFn: () => RealtimeClient | null,
@@ -364,6 +370,9 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const run = this.getRun(spaceUuid);
         if (!run) return;
         const sessionId = run.snapshot.sessionId;
+        if (sessionId && run.kind === "dm") {
+            this.retireAvCallSession(sessionId);
+        }
         this.tearDownSignaling(run, reason);
         if (sessionId) {
             this.setPhase(run, "failed", {
@@ -732,7 +741,11 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const sessionId = run.snapshot.sessionId;
         if (signaling && run.hasJoined && sessionId) {
             signaling.leaveSession(sessionId, reason);
-            commitAvCallTimelineEvent(sessionId, reason);
+            if (run.kind === "group") {
+                commitAvCallParticipantLeft(sessionId, reason);
+            } else {
+                commitAvCallTimelineEvent(sessionId, reason);
+            }
         }
         run.hasJoined = false;
         if (run.kind === "group") {
@@ -771,6 +784,62 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         tearDownMeshSignalingPeer(this, run, remoteAccount, reason);
     }
 
+    retireAvCallSession(sessionId: string): void {
+        this.retiredAvCallSessionIds.add(sessionId);
+    }
+
+    isRetiredAvCallSession(sessionId: string): boolean {
+        return this.retiredAvCallSessionIds.has(sessionId);
+    }
+
+    /**
+     * Objective av-call session can outlive x-webrtcsig after everyone leaves
+     * signaling. Close the stale row and create a fresh session before retrying.
+     */
+    async recoverStaleAvCallSession(
+        run: AvCallSpaceRun,
+        staleSessionId: string,
+    ): Promise<void> {
+        const signal = run.abort.signal;
+        if (signal.aborted) return;
+
+        avCallLog("recoverStaleAvCallSession", {
+            space: shortSpaceId(run.spaceUuid),
+            sessionId: shortSessionId(staleSessionId),
+        });
+
+        this.retireAvCallSession(staleSessionId);
+        if (signal.aborted) return;
+
+        run.hasJoined = false;
+        run.snapshot = {
+            ...run.snapshot,
+            sessionId: undefined,
+            signalingJoined: false,
+            meshPeerSignalingReady:
+                run.kind === "group" ? {} : run.snapshot.meshPeerSignalingReady,
+        };
+
+        try {
+            this.setPhase(run, "creating");
+            await createAvCallSession(run.spaceUuid, run.members);
+            const session = await waitForActiveAvCallSession(run.spaceUuid);
+            if (signal.aborted) return;
+            if (!session) {
+                this.fail(run, "av-call session was not created on chain");
+                return;
+            }
+            await this.beginSignaling(run, session.session_id);
+        } catch (e) {
+            if (signal.aborted) return;
+            const detail =
+                e instanceof Error
+                    ? e.message
+                    : "av-call session recovery failed";
+            this.fail(run, detail);
+        }
+    }
+
     async runPipeline(run: AvCallSpaceRun): Promise<void> {
         const signal = run.abort.signal;
         const self = this.getSelf();
@@ -784,7 +853,16 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
             const existing = await fetchActiveAvCallSession(run.spaceUuid);
             if (signal.aborted) return;
 
-            if (!existing || existing.lifecycle !== 1) {
+            // Invariant: create (supersede) only when there is no joinable live
+            // session — none active on chain, or the active one is locally
+            // retired (this client saw it end). Otherwise join the existing
+            // session so participants can rejoin a live call (never supersede
+            // a call others may still be on).
+            const retiredActive =
+                existing?.lifecycle === 1 &&
+                this.isRetiredAvCallSession(existing.session_id);
+
+            if (!existing || existing.lifecycle !== 1 || retiredActive) {
                 await createAvCallSession(run.spaceUuid, run.members);
             }
 
@@ -820,6 +898,15 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 e instanceof Error
                     ? e.message
                     : "av-call session orchestration failed";
+            const staleId = run.snapshot.sessionId;
+            if (
+                staleId &&
+                (detail.includes("session-not-active") ||
+                    detail.includes("not-joined"))
+            ) {
+                await this.recoverStaleAvCallSession(run, staleId);
+                return;
+            }
             this.fail(run, detail);
         }
     }

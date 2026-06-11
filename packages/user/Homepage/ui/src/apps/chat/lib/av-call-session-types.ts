@@ -147,6 +147,12 @@ export interface AvCallOrchestratorHost {
     ): void;
     beginSignaling(run: AvCallSpaceRun, sessionId: string): Promise<void>;
     runPipeline(run: AvCallSpaceRun): Promise<void>;
+    recoverStaleAvCallSession?(
+        run: AvCallSpaceRun,
+        staleSessionId: string,
+    ): Promise<void>;
+    retireAvCallSession?(sessionId: string): void;
+    isRetiredAvCallSession?(sessionId: string): boolean;
     tearDownDmPeer(run: DmAvCallRun, reason: string): void;
 
     onPeerOnline(peerAccount: string): void;

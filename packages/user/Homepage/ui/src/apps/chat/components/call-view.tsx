@@ -418,7 +418,16 @@ export function CallView({
                             </>
                         ) : null}
                         {!showMedia ? (
-                            <Button type="button" variant="outline" onClick={onEnd}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onEnd}
+                                aria-label={
+                                    endButtonUseCancelLabel
+                                        ? "Cancel call"
+                                        : "End call"
+                                }
+                            >
                                 <PhoneOff className="size-4" />
                                 {endButtonUseCancelLabel ? "Cancel" : "End"}
                             </Button>
