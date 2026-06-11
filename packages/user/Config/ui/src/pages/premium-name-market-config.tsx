@@ -7,16 +7,12 @@ import { useConfigurePremiumNameMarket } from "@/hooks/premium-name-markets/use-
 import { useConfiguredPremiumNameMarkets } from "@/hooks/premium-name-markets/use-configured-markets";
 import { useDisablePremiumNameMarket } from "@/hooks/premium-name-markets/use-disable-market";
 import { useEnablePremiumNameMarket } from "@/hooks/premium-name-markets/use-enable-market";
-import {
-    DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET,
-    DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET,
-} from "@/lib/premium-name-market-defaults";
 
 import { PageContainer } from "@shared/components/page-container";
 import {
     MAX_ACCOUNT_NAME_LENGTH,
     MIN_ACCOUNT_NAME_LENGTH,
-} from "@shared/lib/schemas/account";
+} from "@shared/constants";
 import { useSystemToken } from "@shared/hooks/use-system-token";
 import { cn } from "@shared/lib/utils";
 import {
@@ -104,9 +100,9 @@ export const PremiumNameMarketConfig = () => {
                 </h2>
                 <ul className="text-muted-foreground list-disc space-y-1.5 pl-5 text-sm">
                     <li>
-                        Each row is a premium account name length (1–
-                        {DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET} characters).
-                        When you add a market, you set the initial price; it
+                        Each row is a premium account name length (
+                        {MIN_ACCOUNT_NAME_LENGTH}–{MAX_ACCOUNT_NAME_LENGTH}{" "}
+                        characters). When you add a market, you set the initial price; it
                         cannot be changed later.
                     </li>
                     <li>
@@ -184,7 +180,7 @@ export const PremiumNameMarketConfig = () => {
                     >
                         {bootstrapping
                             ? "Configuring…"
-                            : `Configure name markets ${DEFAULT_MIN_PREMIUM_NAME_LENGTH_MARKET}-${DEFAULT_MAX_PREMIUM_NAME_LENGTH_MARKET} with defaults`}
+                            : `Configure name markets ${MIN_ACCOUNT_NAME_LENGTH}-${MAX_ACCOUNT_NAME_LENGTH} with defaults`}
                     </Button>
                 </div>
             ) : null}

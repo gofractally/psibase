@@ -1,9 +1,11 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::accounts::plugin::api as AccountsApi;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
+use bindings::exports::prem_accounts::plugin::market_admin::MarketConfig;
 use bindings::host::common::server as CommonServer;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
@@ -86,10 +88,75 @@ impl MarketAdmin for PremAccountsPlugin {
         prem_accounts::Wrapper::add_to_tx().disable(length);
         Ok(())
     }
+
+    #[psibase_plugin::authorized(Max, whitelist = ["config"])]
+    fn configure_markets(configs: Vec<MarketConfig>) -> Result<(), Error> {
+        let sys_token_id =
+            TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
+        let overview = markets_overview()?;
+
+        for cfg in configs {
+            let floor_price = TokensHelpers::decimal_to_u64(sys_token_id, &cfg.floor_price)?;
+            prem_accounts::Wrapper::add_to_tx().configure(
+                cfg.length,
+                cfg.window_seconds,
+                cfg.target,
+                Quantity::from(floor_price),
+                cfg.increase_ppm,
+                cfg.decrease_ppm,
+            );
+
+            let Some(current_enabled) = overview
+                .market_params
+                .iter()
+                .find(|market| market.length == cfg.length)
+                .map(|market| market.enabled)
+            else {
+                continue;
+            };
+
+            if current_enabled == cfg.enabled {
+                continue;
+            }
+
+            if cfg.enabled {
+                prem_accounts::Wrapper::add_to_tx().enable(cfg.length);
+            } else {
+                prem_accounts::Wrapper::add_to_tx().disable(cfg.length);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Api for PremAccountsPlugin {
-    #[psibase_plugin::authorized(High, whitelist = ["accounts"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
+    fn can_create_premium_account() -> bool {
+        if !AccountsApi::is_logged_in() {
+            return false;
+        }
+
+        let Ok(overview) = markets_overview() else {
+            return false;
+        };
+
+        if TokensHelpers::fetch_network_token()
+            .ok()
+            .flatten()
+            .is_none()
+        {
+            return false;
+        }
+
+        if overview.market_params.is_empty() && overview.current_prices.is_empty() {
+            return false;
+        }
+
+        overview.market_params.iter().any(|market| market.enabled)
+    }
+
+    #[psibase_plugin::authorized(High, whitelist = ["accounts", "homepage"])]
     fn buy(account: String, max_cost: String) -> Result<(), Error> {
         let acct_name = AccountNumber::from_exact(&account)
             .map_err(|err| ErrorType::InvalidAccountName(err.to_string()))?;
@@ -100,8 +167,8 @@ impl Api for PremAccountsPlugin {
             TokensHelpers::fetch_network_token()?.ok_or(ErrorType::SystemTokenNotDefined)?;
 
         let length = account.len() as u8;
-        let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
         let ask_u64 = require_active_premium_market_ask(length, sys_token_id)?;
+        let max_cost_u64 = TokensHelpers::decimal_to_u64(sys_token_id, &max_cost)?;
         if max_cost_u64 < ask_u64 {
             return Err(ErrorType::MaxCostBelowCurrentAsk.into());
         }
@@ -118,7 +185,7 @@ impl Api for PremAccountsPlugin {
         Ok(())
     }
 
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
     fn claim(account: String) -> Result<(), Error> {
         let account = AccountNumber::from_exact(&account)
             .map_err(|_| ErrorType::InvalidAccountName(account))?;
@@ -131,14 +198,14 @@ impl Api for PremAccountsPlugin {
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct MarketPriceDto {
+struct MarketPrice {
     length: u8,
     price: psibase::services::tokens::Decimal,
 }
 
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct MarketConfigLiteDto {
+struct MarketConfigLite {
     length: u8,
     enabled: bool,
 }
@@ -146,8 +213,8 @@ struct MarketConfigLiteDto {
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct MarketsOverviewData {
-    market_params: Vec<MarketConfigLiteDto>,
-    current_prices: Vec<MarketPriceDto>,
+    market_params: Vec<MarketConfigLite>,
+    current_prices: Vec<MarketPrice>,
 }
 
 #[derive(serde::Deserialize)]
@@ -156,33 +223,30 @@ struct MarketsOverviewResponse {
     data: MarketsOverviewData,
 }
 
-/// Resolves sparse configured markets: missing row → not offered; disabled → unavailable; else current ask
-fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
+fn markets_overview() -> Result<MarketsOverviewData, Error> {
     let graphql_str = "query { marketParams { length enabled } currentPrices { length price } }";
-    let response = serde_json::from_str::<MarketsOverviewResponse>(
-        &CommonServer::post_graphql_get_json(graphql_str)?,
-    );
-    let response = response.map_err(|err| ErrorType::QueryResponseParseError(err.to_string()))?;
+    serde_json::from_str::<MarketsOverviewResponse>(&CommonServer::post_graphql_get_json(
+        graphql_str,
+    )?)
+    .map_err(|err| ErrorType::QueryResponseParseError(err.to_string()).into())
+    .map(|response| response.data)
+}
 
-    let status = response
-        .data
-        .market_params
-        .iter()
-        .find(|s| s.length == length);
+/// Resolves sparse configured markets: missing row means not offered; disabled means unavailable; else current ask
+fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u64, Error> {
+    let overview = markets_overview()?;
+
+    let status = overview.market_params.iter().find(|s| s.length == length);
 
     let Some(st) = status else {
-        return Err(ErrorType::PremiumNameLengthNotOffered.into());
+        return Err(ErrorType::NameLengthUnavailable.into());
     };
 
     if !st.enabled {
-        return Err(ErrorType::PremiumNameMarketDisabled.into());
+        return Err(ErrorType::NameLengthUnavailable.into());
     }
 
-    let row = response
-        .data
-        .current_prices
-        .iter()
-        .find(|p| p.length == length);
+    let row = overview.current_prices.iter().find(|p| p.length == length);
 
     let Some(row) = row else {
         return Err(ErrorType::QueryResponseParseError(
@@ -197,7 +261,7 @@ fn require_active_premium_market_ask(length: u8, sys_token_id: u32) -> Result<u6
 }
 
 impl Authorized for PremAccountsPlugin {
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts"])]
+    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
     fn graphql(query: String) -> Result<String, Error> {
         CommonServer::post_graphql_get_json(&query)
     }

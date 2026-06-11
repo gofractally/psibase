@@ -1,11 +1,21 @@
 use crate::bindings::auth_sig::plugin as AuthSig;
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::exports::accounts::plugin::prompt::{Credential, Guest as Prompt};
-use crate::bindings::host::{auth::api as HostAuth, common::client as Client, types::types::Error};
+use crate::bindings::host::{
+    auth::api as HostAuth,
+    common::client as Client,
+    crypto::keyvault as HostCrypto,
+    types::types::Error,
+};
 use crate::bindings::invite::plugin::redemption as Invites;
+use crate::bindings::prem_accounts::plugin::api as PremAccounts;
+use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
 use crate::plugin::AccountsPlugin;
+use psibase::fracpack::Pack;
+use psibase::services::accounts as AccountsService;
+use psibase::services::auth_sig;
 
 impl Prompt for AccountsPlugin {
     fn can_create_account() -> bool {
@@ -90,6 +100,38 @@ impl Prompt for AccountsPlugin {
         }
 
         Ok(private_key)
+    }
+
+    fn create_premium(account_name: String, max_cost: String) -> Result<String, Error> {
+        assert_eq!(Client::get_sender(), Client::get_receiver());
+
+        if account_name.len() >= AccountsService::MIN_ALLOWED_ACCOUNT_LENGTH.into() {
+            return Self::create_account(account_name);
+        }
+
+        if !PremAccounts::can_create_premium_account() {
+            return Err(ErrorType::CannotCreatePremiumAccount().into());
+        }
+
+        PremAccounts::buy(&account_name, &max_cost)?;
+        PremAccounts::claim(&account_name)?;
+
+        let keypair = HostCrypto::generate_unmanaged_keypair()?;
+
+        Transact::set_propose_latch(Some(&account_name))?;
+        AuthSig::actions::set_key(&keypair.public_key)?;
+        Transact::add_action_to_transaction(
+            AccountsService::action_structs::setAuthServ::ACTION_NAME,
+            &AccountsService::action_structs::setAuthServ {
+                authService: auth_sig::Wrapper::SERVICE,
+            }
+            .packed(),
+        )?;
+        Transact::set_propose_latch(None)?;
+
+        AuthSig::keyvault::import_key(&keypair.private_key)?;
+
+        Ok(keypair.private_key)
     }
 
     fn connect_account(account: String) {

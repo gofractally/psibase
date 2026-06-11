@@ -38,23 +38,21 @@ pub mod tables {
     }
 }
 
-pub mod constants;
-
 #[psibase::service(name = "prem-accounts", tables = "tables")]
 pub mod service {
-    use crate::constants::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
     use crate::tables::{
         Auction, AuctionsTable, InitRow, InitTable, PurchasedAccount, PurchasedAccountsTable,
     };
     use psibase::services::accounts as Accounts;
     use psibase::services::auth_delegate as AuthDelegate;
-    use psibase::services::diff_adjust::Wrapper as DiffAdjust;
+    use psibase::services::diff_adjust::{RateLimitTable, Wrapper as DiffAdjust};
     use psibase::services::events;
     use psibase::services::nft::{self as Nfts, NftHolderFlags};
     use psibase::services::tokens::{self as Tokens, BalanceFlags};
     use psibase::services::tokens::{Quantity, TID};
     use psibase::AccountNumber;
     use psibase::*;
+    use psibase::{MAX_ACCOUNT_NAME_LENGTH, MIN_ACCOUNT_NAME_LENGTH};
 
     /// DiffAdjust window for target semantics (30-day period).
     const MARKET_WINDOW_SECONDS: u32 = 30 * 86400;
@@ -206,12 +204,28 @@ pub mod service {
         require_caller_is_self();
 
         check_market_length(length);
-
-        let auctions_table = AuctionsTable::new();
-        check_none(
-            auctions_table.get_index_pk().get(&length),
-            "market already exists",
+        check_some(
+            Tokens::Wrapper::call().getSysToken(),
+            "system token must be defined",
         );
+
+        // if market already exists and its config is identical, return
+        let auctions_table = AuctionsTable::new();
+        if let Some(auction) = auctions_table.get_index_pk().get(&length) {
+            if let Some(rate_limit) = RateLimitTable::read().get_index_pk().get(&auction.nft_id) {
+                if rate_limit.window_seconds == MARKET_WINDOW_SECONDS
+                    && rate_limit.target_min == target
+                    && rate_limit.target_max == target
+                    && rate_limit.floor_difficulty == floor_price.value
+                    && rate_limit.increase_ppm == increase_ppm
+                    && rate_limit.decrease_ppm == decrease_ppm
+                {
+                    return;
+                }
+            }
+            abort_message("market already exists");
+        }
+
         let nft_id = DiffAdjust::call().create(
             initial_price.value,
             MARKET_WINDOW_SECONDS,

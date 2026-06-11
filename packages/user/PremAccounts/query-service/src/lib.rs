@@ -61,16 +61,6 @@ mod service {
     }
 
     impl Query {
-        fn check_user_auth(&self, user: AccountNumber) -> async_graphql::Result<()> {
-            if self.user != Some(user) {
-                return Err(async_graphql::Error::new(format!(
-                    "permission denied: '{}' must authorize this query.",
-                    user
-                )));
-            }
-            Ok(())
-        }
-
         fn require_authenticated(&self) -> async_graphql::Result<AccountNumber> {
             self.user.ok_or_else(|| {
                 async_graphql::Error::new(
@@ -173,19 +163,18 @@ mod service {
         /// Events: premium **name** history for `owner`
         async fn name_events(
             &self,
-            owner: AccountNumber,
             first: Option<i32>,
             last: Option<i32>,
             before: Option<String>,
             after: Option<String>,
         ) -> async_graphql::Result<EventConnection<PremiumAccountEvent>> {
-            self.check_user_auth(owner.clone())?;
+            let user = self.require_authenticated()?;
 
             EventQuery::new(format!(
                 "history.{}.premAcctEvent",
                 PremAccountsService::SERVICE
             ))
-            .condition(format!("owner = '{}'", owner))
+            .condition(format!("owner = '{}'", user))
             .first(first)
             .last(last)
             .before(before)
