@@ -4,8 +4,8 @@ use psibase::{
     AccountNumber, Table,
 };
 
-use psibase::services::fractals::weighted_normalization::HasScore;
 use crate::tables::tables::{Occupation, OccupationTable};
+use psibase::services::fractals::weighted_normalization::HasScore;
 
 impl Occupation {
     fn new(fractal: AccountNumber, index: u8, occupation: AccountNumber) -> Self {

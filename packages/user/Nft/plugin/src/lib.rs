@@ -50,7 +50,7 @@ impl User for NftPlugin {
         let packed_args = Nft::action_structs::credit {
             memo: memo.try_into().unwrap(),
             nftId: nft_id,
-            debitor: receiver.as_str().into(),
+            debitor: receiver.parse().unwrap(),
         }
         .packed();
 

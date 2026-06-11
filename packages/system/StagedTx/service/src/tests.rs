@@ -61,10 +61,10 @@ mod tests {
     fn test_propose(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
-        let alice = AccountNumber::from("alice");
+        let alice = account!("alice");
         chain.new_account(alice).unwrap();
 
-        let bob = AccountNumber::from("bob");
+        let bob = account!("bob");
         chain.new_account(bob).unwrap();
 
         assert_eq!(get_nr_nfts(&chain, bob)?, 0);

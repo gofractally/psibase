@@ -57,7 +57,7 @@ impl Admin for VirtualServerPlugin {
     fn init_billing(fee_receiver: String) -> Result<(), Error> {
         assert_caller(&["config"], "init_billing");
 
-        VirtualServer::add_to_tx().init_billing(AccountNumber::from(fee_receiver.as_str()));
+        VirtualServer::add_to_tx().init_billing(fee_receiver.parse().unwrap());
         Ok(())
     }
 

@@ -50,10 +50,10 @@ mod service {
         let prods = Producers::call().getProducers();
         let producer = prods.first().unwrap();
 
-        let legislature = "legislature".into();
-        let judiciary = "judiciary-a".into();
-        let executive = "executive-a".into();
-        let recruitment = "recruitment-a".into();
+        let legislature = account!("legislature");
+        let judiciary = account!("judiciary-a");
+        let executive = account!("executive-a");
+        let recruitment = account!("recruitment-a");
 
         Fractals::call_from(*producer).create_frac(
             SYS_FRACTAL,
@@ -70,8 +70,8 @@ mod service {
             SYS_FRACTAL,
             SYS_GUILD,
             "Genesis".into(),
-            "c-role-001".into(),
-            "r-role-001".into(),
+            account!("c-role-001"),
+            account!("r-role-001"),
         );
 
         let map_sys_guild_to_role_occ = |role: FractalRole| {

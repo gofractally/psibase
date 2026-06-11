@@ -43,7 +43,9 @@ impl AccountNumber {
     }
 
     pub fn from_exact(s: &str) -> Result<Self, AccountNumberError> {
-        let result: Self = s.into();
+        let result: Self = s
+            .parse()
+            .map_err(|_| AccountNumberError::Invalid { s: s.into() })?;
         if result.to_string() != s {
             return Err(AccountNumberError::Invalid { s: s.into() });
         }
@@ -70,12 +72,6 @@ impl FromStr for AccountNumber {
         Ok(AccountNumber {
             value: account_number_from_str(s),
         })
-    }
-}
-
-impl From<&str> for AccountNumber {
-    fn from(s: &str) -> Self {
-        AccountNumber::from_str(s).unwrap()
     }
 }
 
