@@ -16,7 +16,7 @@ import { recordChurnTrace } from "../lib/churn-trace";
 import { chatDataRecord } from "../lib/chat-data-debug";
 import { RealtimeClient } from "../lib/realtime-client";
 import { getHomepageQueryToken } from "../lib/ws-auth";
-import { ChatTransportBridge } from "../transport-v2/chat-transport-bridge";
+import { ChatTransportBridge } from "../transport/chat-transport-bridge";
 import {
     AvCallSessionOrchestrator,
     type AvCallIncomingInvite,
@@ -380,7 +380,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         }
     }, [connectionState]);
 
-    const chatDataOrchestratorRef = useRef<ChatTransportBridge | null>(
+    const transportBridgeRef = useRef<ChatTransportBridge | null>(
         null,
     );
     const avCallOrchestratorRef = useRef<AvCallSessionOrchestrator | null>(
@@ -1342,7 +1342,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             if (incoming.length === 0) return;
 
             for (const target of listInboundAckTargets(incoming, self)) {
-                chatDataOrchestratorRef.current?.messaging?.acknowledgeInbound(
+                transportBridgeRef.current?.messaging?.acknowledgeInbound(
                     target.remote,
                     target.spaceUuid,
                     target.clientMsgId,
@@ -1439,7 +1439,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             if (incoming.length === 0) return;
 
             for (const target of listInboundAckTargets(incoming, self)) {
-                chatDataOrchestratorRef.current?.messaging?.acknowledgeInbound(
+                transportBridgeRef.current?.messaging?.acknowledgeInbound(
                     target.remote,
                     target.spaceUuid,
                     target.clientMsgId,
@@ -1522,7 +1522,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     spaceUuid,
                     messages: envelopesToHistorySyncMessages(envelopes),
                 };
-                const bridge = chatDataOrchestratorRef.current;
+                const bridge = transportBridgeRef.current;
                 const sent =
                     bridge?.sendHistorySync(
                         spaceUuid,
@@ -1574,7 +1574,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     spaceUuid,
                     messages: envelopesToHistorySyncMessages(envelopes),
                 };
-                const bridge = chatDataOrchestratorRef.current;
+                const bridge = transportBridgeRef.current;
                 const sent =
                     bridge?.sendGroupHistorySync(
                         spaceUuid,
@@ -1732,7 +1732,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     markDmPendingDeliveredRef.current = markDmPendingDelivered;
 
     const flushPendingMessages = useCallback(() => {
-        chatDataOrchestratorRef.current?.messaging?.hydrateFromStorage();
+        transportBridgeRef.current?.messaging?.hydrateFromStorage();
     }, []);
 
     const flushPendingMessagesRef = useRef(flushPendingMessages);
@@ -2192,7 +2192,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     useEffect(() => {
         if (!contactsLoaded || !selfAccount) return;
-        chatDataOrchestratorRef.current?.flushDeferredInboundAcceptance(
+        transportBridgeRef.current?.flushDeferredInboundAcceptance(
             (record) => {
                 const envelope: ChatDataMessageEnvelope = {
                     t: "chatMessage",
@@ -2278,8 +2278,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     }
                 }
                 if (webrtcClient.isReconnectWelcome()) {
-                    chatDataOrchestratorRef.current?.invalidateJoinStateForWelcomeReconnect();
-                    chatDataOrchestratorRef.current?.reconcileAfterReconnect();
+                    transportBridgeRef.current?.invalidateJoinStateForWelcomeReconnect();
+                    transportBridgeRef.current?.reconcileAfterReconnect();
                     avCallOrchestratorRef.current?.reconcileAfterReconnect();
                 }
                 const selected = selectedConversationIdRef.current;
@@ -2298,7 +2298,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             kind: conversation.kind,
                             memberCount: conversation.members.length,
                         });
-                        chatDataOrchestratorRef.current?.ensureChatDataSession(
+                        transportBridgeRef.current?.ensureChatDataSession(
                             conversation.conversationId,
                             conversation.members,
                         );
@@ -2343,7 +2343,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         (conversation?.kind === "group" &&
                             conversation.members.length > 2)
                     ) {
-                        chatDataOrchestratorRef.current?.ensureChatDataSession(
+                        transportBridgeRef.current?.ensureChatDataSession(
                             conversation.conversationId,
                             conversation.members,
                         );
@@ -2367,7 +2367,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                                 ? canonicalDmMembers(self, pending.recipients)
                                 : null);
                         if (dmMembers) {
-                            chatDataOrchestratorRef.current?.ensureChatDataSession(
+                            transportBridgeRef.current?.ensureChatDataSession(
                                 spaceId,
                                 dmMembers,
                             );
@@ -2375,7 +2375,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                             conversation?.kind === "group" &&
                             conversation.members.length > 2
                         ) {
-                            chatDataOrchestratorRef.current?.ensureChatDataSession(
+                            transportBridgeRef.current?.ensureChatDataSession(
                                 spaceId,
                                 conversation.members,
                             );
@@ -2384,7 +2384,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 }
                 for (const [acct, status] of Object.entries(merged)) {
                     if (status === "online") {
-                        chatDataOrchestratorRef.current?.onPeerOnline(acct);
+                        transportBridgeRef.current?.onPeerOnline(acct);
                         avCallOrchestratorRef.current?.onPeerOnline(acct);
                     }
                 }
@@ -2439,7 +2439,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                                     pending.recipients,
                                 );
                             if (dmMembers) {
-                                chatDataOrchestratorRef.current?.ensureChatDataSession(
+                                transportBridgeRef.current?.ensureChatDataSession(
                                     spaceId,
                                     dmMembers,
                                 );
@@ -2447,14 +2447,14 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                                 conversation?.kind === "group" &&
                                 conversation.members.length > 2
                             ) {
-                                chatDataOrchestratorRef.current?.ensureChatDataSession(
+                                transportBridgeRef.current?.ensureChatDataSession(
                                     spaceId,
                                     conversation.members,
                                 );
                             }
                         }
                     }
-                    chatDataOrchestratorRef.current?.onPeerOnline(
+                    transportBridgeRef.current?.onPeerOnline(
                         frame.account,
                     );
                     avCallOrchestratorRef.current?.onPeerOnline(
@@ -2472,7 +2472,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                                     conversation.members.length > 2)) &&
                             conversation.members.includes(frame.account)
                         ) {
-                            chatDataOrchestratorRef.current?.ensureChatDataSession(
+                            transportBridgeRef.current?.ensureChatDataSession(
                                 conversation.conversationId,
                                 conversation.members,
                             );
@@ -2483,7 +2483,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                         0,
                     );
                 } else {
-                    chatDataOrchestratorRef.current?.onPeerOffline(
+                    transportBridgeRef.current?.onPeerOffline(
                         frame.account,
                     );
                     avCallOrchestratorRef.current?.onPeerOffline(
@@ -2501,8 +2501,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         installChatDataDebugGlobal();
         installThreadLifecycleGlobal();
 
-        if (!chatDataOrchestratorRef.current) {
-            chatDataOrchestratorRef.current = createChatTransportBridge({
+        if (!transportBridgeRef.current) {
+            transportBridgeRef.current = createChatTransportBridge({
             getRealtime: () => realtimeClientRef.current,
             getSelf: () => selfRef.current,
             getChainId: () => chainIdRef.current,
@@ -2601,9 +2601,16 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     spaceUuid,
                 );
             },
+            getRemotePresence: (account) => {
+                const presence = presenceByAccountRef.current[account];
+                if (presence === "online" || presence === "offline") {
+                    return presence;
+                }
+                return undefined;
+            },
         });
         }
-        const chatBridge = chatDataOrchestratorRef.current;
+        const chatBridge = transportBridgeRef.current;
         chatBridge?.start();
         chatBridge?.installDebugGlobal();
 
@@ -2663,8 +2670,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     state,
                 );
             },
-            () => chatDataOrchestratorRef.current?.peerRegistry ?? null,
-            () => chatDataOrchestratorRef.current?.signaling ?? null,
+            () => transportBridgeRef.current?.peerRegistry ?? null,
+            () => transportBridgeRef.current?.signaling ?? null,
         );
         avCallOrchestratorRef.current.start();
 
@@ -2726,7 +2733,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             composeTimingLog("scheduleDmChatDataSession", {
                 space: shortSpaceId(spaceUuid),
             });
-            chatDataOrchestratorRef.current?.ensureChatDataSession(
+            transportBridgeRef.current?.ensureChatDataSession(
                 spaceUuid,
                 members,
             );
@@ -2746,7 +2753,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             composeTimingLog("scheduleGroupChatDataSession", {
                 space: shortSpaceId(spaceUuid),
             });
-            chatDataOrchestratorRef.current?.ensureChatDataSession(
+            transportBridgeRef.current?.ensureChatDataSession(
                 spaceUuid,
                 members,
             );
@@ -2843,7 +2850,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     ]);
 
     const releaseIdleChatDataForSelection = useCallback(() => {
-        const bridge = chatDataOrchestratorRef.current;
+        const bridge = transportBridgeRef.current;
         if (!bridge) return;
         const self = selfRef.current;
         if (!self) return;
@@ -2873,7 +2880,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     // chainId resolves async from GraphQL; retry stack start once it is available.
     useEffect(() => {
-        const bridge = chatDataOrchestratorRef.current;
+        const bridge = transportBridgeRef.current;
         if (!bridge || !chainId || !selfAccount || !onChatRoute) return;
         bridge.start();
         bridge.installDebugGlobal();
@@ -2912,7 +2919,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             globalThis.clearTimeout(flushDebounceRef.current);
             flushDebounceRef.current = null;
         }
-        if (chatDataOrchestratorRef.current?.isNavigationSuspended()) {
+        if (transportBridgeRef.current?.isNavigationSuspended()) {
             recordChurnTrace("navigation-suspend-skip-duplicate", {
                 pathname: location.pathname,
                 selectedConversationId: selectedConversationIdRef.current,
@@ -2926,14 +2933,14 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             realtimeReady: realtimeClientRef.current?.isSessionReady ?? null,
             lag: churnLagRef.current,
         });
-        chatDataOrchestratorRef.current?.suspendForNavigation();
+        transportBridgeRef.current?.suspendForNavigation();
         recordChurnTrace("navigation-suspend-return", {
             elapsedMs: Date.now() - startedAt,
             churnState: {
                 leavingChat: leavingChatRef.current,
-                hasChatOrchestrator: Boolean(chatDataOrchestratorRef.current),
+                hasTransportBridge: Boolean(transportBridgeRef.current),
                 navigationSuspended:
-                    chatDataOrchestratorRef.current?.isNavigationSuspended() ??
+                    transportBridgeRef.current?.isNavigationSuspended() ??
                     false,
             },
         });
@@ -2946,17 +2953,17 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             flushDebounceRef.current = null;
         }
         recordChurnTrace("transport-drop-start", {
-            chatDataOrchestrator: Boolean(chatDataOrchestratorRef.current),
+            transportBridge: Boolean(transportBridgeRef.current),
             avCallOrchestrator: Boolean(avCallOrchestratorRef.current),
             selectedConversationId: selectedConversationId ?? null,
             pathname: location.pathname,
             onChatRoute,
         });
-        chatDataOrchestratorRef.current?.dropTransportStack();
+        transportBridgeRef.current?.dropTransportStack();
         avCallOrchestratorRef.current?.dispose();
         avCallOrchestratorRef.current = null;
         recordChurnTrace("transport-drop-done", {
-            chatDataOrchestrator: Boolean(chatDataOrchestratorRef.current),
+            transportBridge: Boolean(transportBridgeRef.current),
         });
     }, [selectedConversationId, location.pathname, onChatRoute]);
 
@@ -2967,17 +2974,17 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             flushDebounceRef.current = null;
         }
         recordChurnTrace("teardown-start", {
-            chatDataOrchestrator: Boolean(chatDataOrchestratorRef.current),
+            transportBridge: Boolean(transportBridgeRef.current),
             avCallOrchestrator: Boolean(avCallOrchestratorRef.current),
             selectedConversationId: selectedConversationId ?? null,
             pathname: location.pathname,
         });
-        chatDataOrchestratorRef.current?.dropStackForNavigation();
+        transportBridgeRef.current?.dropStackForNavigation();
         avCallOrchestratorRef.current?.dispose();
         avCallOrchestratorRef.current = null;
         webrtcClient?.close();
         recordChurnTrace("teardown-done", {
-            chatDataOrchestrator: Boolean(chatDataOrchestratorRef.current),
+            transportBridge: Boolean(transportBridgeRef.current),
             avCallOrchestrator: Boolean(avCallOrchestratorRef.current),
             leavingChat: leavingChatRef.current,
         });
@@ -2990,7 +2997,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             wasOnChatRouteRef.current = true;
             if (enteringChat) {
                 leavingChatRef.current = false;
-                chatDataOrchestratorRef.current?.resumeAfterNavigation();
+                transportBridgeRef.current?.resumeAfterNavigation();
                 recordChurnTrace("chat-route-enter", {
                     pathname: location.pathname,
                 });
@@ -3011,7 +3018,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     useEffect(() => {
         if (!contactsLoaded) return;
-        chatDataOrchestratorRef.current?.setFocusedSpace(
+        transportBridgeRef.current?.setFocusedSpace(
             selectedConversationId,
         );
         releaseIdleChatDataForSelection();
@@ -3122,7 +3129,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             try {
                 await ensureGroup(uniqueOthers);
                 await loadObjectiveSpaces();
-                chatDataOrchestratorRef.current?.notifySpaceMembershipHint(
+                transportBridgeRef.current?.notifySpaceMembershipHint(
                     uniqueOthers,
                 );
             } catch (e) {
@@ -3193,7 +3200,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             setPendingMessages(pendingMessagesRef.current);
             upsertPendingTimelineRow(pending);
 
-            const messaging = chatDataOrchestratorRef.current?.messaging;
+            const messaging = transportBridgeRef.current?.messaging;
             if (messaging) {
                 void (async () => {
                     if (recipients.length === 1) {
@@ -3925,7 +3932,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             return;
         }
         const readPeerUsability = () => {
-            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            const registry = transportBridgeRef.current?.peerRegistry;
             if (!registry) {
                 setThreadPeersUsable(false);
                 return;
@@ -3966,7 +3973,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         const establishing = threadEstablishingConnection;
         const was = prevEstablishingRef.current;
         if (establishing && !was) {
-            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            const registry = transportBridgeRef.current?.peerRegistry;
             recordThreadLifecycle("establishing-start", {
                 recipients: threadRemoteRecipients,
                 peerStates: registry
@@ -3991,7 +3998,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
     useEffect(() => {
         if (threadPeersUsable && !prevPeersUsableRef.current) {
-            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            const registry = transportBridgeRef.current?.peerRegistry;
             recordThreadLifecycle("mesh-live", {
                 recipients: threadRemoteRecipients,
                 peerStates: registry
@@ -4092,7 +4099,7 @@ export function useChatSocket(options?: UseChatSocketOptions) {
             const resolved =
                 listed ??
                 (selected ? resolveConversationSync(selected) : undefined);
-            const registry = chatDataOrchestratorRef.current?.peerRegistry;
+            const registry = transportBridgeRef.current?.peerRegistry;
             const peerStates = registry
                 ? peerStatesForRemotes(
                       threadRemoteRecipients,
@@ -4131,10 +4138,10 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                     ).length,
                     objectiveSpacesCount: objectiveSpacesRef.current.length,
                 },
-                hasChatOrchestrator: Boolean(chatDataOrchestratorRef.current),
+                hasTransportBridge: Boolean(transportBridgeRef.current),
                 hasAvOrchestrator: Boolean(avCallOrchestratorRef.current),
                 navigationSuspended:
-                    chatDataOrchestratorRef.current?.isNavigationSuspended() ??
+                    transportBridgeRef.current?.isNavigationSuspended() ??
                     false,
                 realtimeState: realtimeClientRef.current?.state ?? null,
                 realtimeReady: realtimeClientRef.current?.isSessionReady ?? null,

@@ -2,7 +2,7 @@ import type { MeetPeerHandle } from "./meet-peer-handle";
 import type { IceServerConfig } from "./protocol";
 import type { RealtimeClient } from "./realtime-client";
 import type { WebRtcSignalingClient } from "./webrtc-signaling-client";
-import type { PeerTransportRegistry } from "../transport-v2/l3-peer-registry";
+import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 /** Transport-recovery tunables (A4). Mirror of chat-data values; can be
  * tuned independently if av-call needs different backoff. */
@@ -119,7 +119,7 @@ export interface AvCallOrchestratorHost {
     getSignaling(): WebRtcSignalingClient | null;
     setSignaling(signaling: WebRtcSignalingClient): void;
 
-    /** v2 transport: one pair PC per remote for chat + Meet. */
+    /** Per-peer transport: one pair PC per remote for chat + Meet. */
     getSharedPeerRegistry?(): PeerTransportRegistry | null;
     usesSharedTransport?(): boolean;
 

@@ -8,6 +8,6 @@
     "exclude": [
         "**/*.test.ts",
         "**/*.spec.ts",
-        "src/apps/chat/transport-v2/stack-test-harness.ts"
+        "src/apps/chat/transport/stack-test-harness.ts"
     ]
 }

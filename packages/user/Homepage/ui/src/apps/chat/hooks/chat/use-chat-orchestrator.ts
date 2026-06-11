@@ -8,7 +8,7 @@ import type {
 import type { InboundMessageAcceptance } from "../../lib/inbound-message-acceptance";
 import type { IceServerConfig } from "../../lib/protocol";
 import type { RealtimeClient } from "../../lib/realtime-client";
-import { ChatTransportBridge } from "../../transport-v2/chat-transport-bridge";
+import { ChatTransportBridge } from "../../transport/chat-transport-bridge";
 
 export type ChatTransportBridgeDeps = {
     getRealtime: () => RealtimeClient | null;
@@ -26,9 +26,10 @@ export type ChatTransportBridgeDeps = {
     onPeerUsable: (remoteAccount: string) => void;
     onSessionInvite: (spaceUuid: string) => void;
     onSpaceMembershipHint?: (from: string) => void;
+    getRemotePresence?: (account: string) => "online" | "offline" | undefined;
 };
 
-/** Construct v2 per-peer chat transport for a hook lifetime. */
+/** Construct per-peer chat transport for a hook lifetime. */
 export function createChatTransportBridge(
     deps: ChatTransportBridgeDeps,
 ): ChatTransportBridge {
@@ -37,13 +38,4 @@ export function createChatTransportBridge(
 
 export function useChatTransportBridgeRef(): MutableRefObject<ChatTransportBridge | null> {
     return useRef<ChatTransportBridge | null>(null);
-}
-
-/** @deprecated Use {@link createChatTransportBridge}. */
-export const createChatDataOrchestratorBridge = createChatTransportBridge;
-
-export type ChatOrchestratorBridgeDeps = ChatTransportBridgeDeps;
-
-export function useChatOrchestratorRef(): MutableRefObject<ChatTransportBridge | null> {
-    return useChatTransportBridgeRef();
 }

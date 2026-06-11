@@ -107,7 +107,7 @@ yarn workspace @psibase/homepage-ui e2e:random-churn:diag:wedge
 # PSIBASE_E2E_RANDOM_CHURN_HUMAN_MS=3000
 ```
 
-On failure, logs include `[churn-trace]` (product), `[random-churn-diag] dump`, and `[random-churn] transport-snapshot` (v2 peer states + pending outbox via `__chatTransportV2Debug.snapshot` / `deliverySnapshot`). Product ring buffer also records `peer-registry-state`, `pending-flush-skip`, and `pending-flush-remote` in `[chat-data]`.
+On failure, logs include `[churn-trace]` (product), `[random-churn-diag] dump`, and `[random-churn] transport-snapshot` (v2 peer states + pending outbox via `__chatTransportDebug.snapshot` / `deliverySnapshot`). Product ring buffer also records `peer-registry-state`, `pending-flush-skip`, and `pending-flush-remote` in `[chat-data]`.
 # Stall kill: no completed step for PSIBASE_E2E_RANDOM_CHURN_STALL_SEC (default 120s).
 # After a step FAIL, kills if log idle PSIBASE_E2E_RANDOM_CHURN_FAIL_IDLE_SEC (default 60s).
 # Per-step budget: PSIBASE_E2E_RANDOM_CHURN_STEP_MS (default 90000).

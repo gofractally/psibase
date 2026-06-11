@@ -159,4 +159,70 @@ describe("ChatTransportBridge", () => {
 
         expect(stackMock.messaging.acknowledgeInbound).not.toHaveBeenCalled();
     });
+
+    it("ensureChatDataSession skips offline group members", () => {
+        stackMock.peerRegistry.ensure.mockClear();
+
+        const bridge = new ChatTransportBridge({
+            getRealtime: () =>
+                ({
+                    registerHandlers: vi.fn(() => () => {}),
+                    welcomeGeneration: 1,
+                    isSessionReady: true,
+                    isReconnectWelcome: () => false,
+                    sendClientFrame: vi.fn(),
+                }) as never,
+            getSelf: () => "alice",
+            getChainId: () => "test-chain",
+            getIceServers: () => null,
+            onInboundMessage: vi.fn(() => "accepted" as const),
+            onInboundHistorySync: vi.fn(),
+            onMessageAck: vi.fn(),
+            onPeerUsable: vi.fn(),
+            onSessionInvite: vi.fn(),
+            getRemotePresence: (account) =>
+                account === "carol" ? "offline" : "online",
+        });
+        bridge.start();
+        bridge.ensureChatDataSession("space:group", [
+            "alice",
+            "bob",
+            "carol",
+        ]);
+
+        expect(stackMock.peerRegistry.ensure).toHaveBeenCalledTimes(1);
+        expect(stackMock.peerRegistry.ensure).toHaveBeenCalledWith(
+            "bob",
+            "peer_focus",
+        );
+    });
+
+    it("ensurePeer skips offline peers for peer_focus", () => {
+        stackMock.peerRegistry.ensure.mockClear();
+
+        const bridge = new ChatTransportBridge({
+            getRealtime: () =>
+                ({
+                    registerHandlers: vi.fn(() => () => {}),
+                    welcomeGeneration: 1,
+                    isSessionReady: true,
+                    isReconnectWelcome: () => false,
+                    sendClientFrame: vi.fn(),
+                }) as never,
+            getSelf: () => "alice",
+            getChainId: () => "test-chain",
+            getIceServers: () => null,
+            onInboundMessage: vi.fn(() => "accepted" as const),
+            onInboundHistorySync: vi.fn(),
+            onMessageAck: vi.fn(),
+            onPeerUsable: vi.fn(),
+            onSessionInvite: vi.fn(),
+            getRemotePresence: (account) =>
+                account === "carol" ? "offline" : "online",
+        });
+        bridge.start();
+        bridge.ensurePeer("carol", "peer_focus");
+
+        expect(stackMock.peerRegistry.ensure).not.toHaveBeenCalled();
+    });
 });

@@ -767,7 +767,7 @@ export async function ensureContact(
     });
 }
 
-/** Wait until a contact/DM row shows the peer as online (presence dot title). */
+/** Wait until a contact/DM row shows the peer as online, or transport leg is usable. */
 export async function waitForPeerOnline(
     page: Page,
     peerAccount: string,
@@ -777,18 +777,233 @@ export async function waitForPeerOnline(
     const peerContainers = page.locator("div").filter({
         has: page.getByRole("button").filter({ hasText: peerAccount }),
     });
-    await expect(
-        peerContainers.locator('span[title="Online"]').first(),
-    ).toBeVisible({ timeout });
+    await expect
+        .poll(
+            async () => {
+                const transportUsable = await page
+                    .evaluate((peer) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        return transport?.peerState?.(peer) === "usable";
+                    }, peerAccount)
+                    .catch(() => false);
+                if (transportUsable) return true;
+                return peerContainers
+                    .locator('span[title="Online"]')
+                    .first()
+                    .isVisible()
+                    .catch(() => false);
+            },
+            { timeout, intervals: [500, 1000, 2000] },
+        )
+        .toBe(true);
+}
+
+/** Wait until a contact row no longer shows Online and transport is not mid-handshake. */
+export async function waitForPeerOffline(
+    page: Page,
+    peerAccount: string,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 120_000;
+    const peerContainers = page.locator("div").filter({
+        has: page.getByRole("button").filter({ hasText: peerAccount }),
+    });
+    await expect
+        .poll(
+            async () => {
+                const transportState = await page
+                    .evaluate((peer) => {
+                        const transport = (
+                            window as unknown as {
+                                __chatTransportDebug?: {
+                                    peerState?: (remote: string) => string;
+                                };
+                            }
+                        ).__chatTransportDebug;
+                        return transport?.peerState?.(peer) ?? null;
+                    }, peerAccount)
+                    .catch(() => null);
+                if (
+                    transportState === "usable" ||
+                    transportState === "negotiating" ||
+                    transportState === "joining_pair"
+                ) {
+                    return false;
+                }
+                const online = await peerContainers
+                    .locator('span[title="Online"]')
+                    .first()
+                    .isVisible()
+                    .catch(() => false);
+                return !online;
+            },
+            { timeout, intervals: [500, 1000, 2000] },
+        )
+        .toBe(true);
+}
+
+export const GROUP_MESH_TIMEOUT_MS = 300_000;
+
+/** Staggered mesh: alice (initiator) one leg at a time, then bob/carol. */
+export async function establishThreePartyGroupMesh(
+    pages: { alice: Page; bob: Page; carol: Page },
+    accounts: { alice: string; bob: string; carol: string },
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
+    await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
+    await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(
+        pages.bob,
+        [accounts.alice, accounts.carol],
+        { timeout },
+    );
+    await waitForGroupMeshReady(
+        pages.carol,
+        [accounts.alice, accounts.bob],
+        { timeout },
+    );
+}
+
+/**
+ * Establish mesh with carol joining last — avoids alice dual-leg negotiation
+ * while bob is still settling (H18 / churn pattern).
+ */
+export async function establishThreePartyGroupMeshCarolLast(
+    pages: { alice: Page; bob: Page; carol: Page },
+    accounts: { alice: string; bob: string; carol: string },
+    openCarolGroup: () => Promise<void>,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
+    await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.alice], { timeout });
+    await openCarolGroup();
+    await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(
+        pages.carol,
+        [accounts.alice, accounts.bob],
+        { timeout },
+    );
+}
+
+/** H18: connect all three to chat, then leave home before creating a group. */
+export async function resetThreePartyChatBeforeGroup(
+    pages: { alice: Page; bob: Page; carol: Page },
+    baseUrl: string,
+): Promise<void> {
+    await openChat(pages.alice, baseUrl);
+    await openChat(pages.bob, baseUrl);
+    await openChat(pages.carol, baseUrl);
+    await waitForChatConnected(pages.alice, { timeout: 120_000 });
+    await waitForChatConnected(pages.bob, { timeout: 120_000 });
+    await waitForChatConnected(pages.carol, { timeout: 120_000 });
+    await leaveChatToHome(pages.alice, baseUrl);
+    await leaveChatToHome(pages.bob, baseUrl);
+    await leaveChatToHome(pages.carol, baseUrl);
+}
+
+/** Leave all three clients home (carol → bob → alice) before a churn re-entry round. */
+export async function leaveThreePartyChatForChurn(
+    pages: { alice: Page; bob: Page; carol: Page },
+    baseUrl: string,
+): Promise<void> {
+    for (const page of [pages.carol, pages.bob, pages.alice]) {
+        await page
+            .evaluate(() => {
+                (
+                    window as Window & {
+                        __chatChurnSuspend?: () => void;
+                        __chatChurnTeardown?: () => void;
+                    }
+                ).__chatChurnSuspend?.();
+                (
+                    window as Window & {
+                        __chatChurnTeardown?: () => void;
+                    }
+                ).__chatChurnTeardown?.();
+            })
+            .catch(() => {});
+        await leaveChatToHome(page, baseUrl);
+        await page.waitForTimeout(500);
+    }
+    await pages.alice.waitForTimeout(1_000);
+}
+
+/** After chat ↔ home churn: alice+bob first, then carol, then full mesh. */
+export async function reenterThreePartyGroupAfterChurn(
+    baseUrl: string,
+    pages: { alice: Page; bob: Page; carol: Page },
+    accounts: { alice: string; bob: string; carol: string },
+    groupPeersFor: (who: "alice" | "bob" | "carol") => string[],
+    options?: { groupSpaceId?: string; timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? GROUP_MESH_TIMEOUT_MS;
+    const groupSpaceId = options?.groupSpaceId;
+
+    await openChat(pages.alice, baseUrl);
+    await openChat(pages.bob, baseUrl);
+    await waitForChatConnected(pages.alice, { timeout: 120_000 });
+    await waitForChatConnected(pages.bob, { timeout: 120_000 });
+
+    const openAliceBobGroup = async (who: "alice" | "bob"): Promise<void> => {
+        const page = who === "alice" ? pages.alice : pages.bob;
+        if (groupSpaceId) {
+            await focusChurnGroupThread(page, baseUrl, groupPeersFor(who), {
+                groupSpaceId,
+                composerTimeout: 90_000,
+            });
+            return;
+        }
+        await openExistingGroupChat(page, baseUrl, groupPeersFor(who));
+    };
+
+    await openAliceBobGroup("alice");
+    await openAliceBobGroup("bob");
+    await resetTransportKickCounts(pages.alice);
+    await resetTransportKickCounts(pages.bob);
+    await waitForGroupMeshReady(pages.alice, [accounts.bob], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.alice], { timeout });
+
+    await openChat(pages.carol, baseUrl);
+    await waitForChatConnected(pages.carol, { timeout: 120_000 });
+    if (groupSpaceId) {
+        await focusChurnGroupThread(
+            pages.carol,
+            baseUrl,
+            groupPeersFor("carol"),
+            { groupSpaceId, composerTimeout: 90_000 },
+        );
+    } else {
+        await openExistingGroupChat(
+            pages.carol,
+            baseUrl,
+            groupPeersFor("carol"),
+        );
+    }
+    await waitForGroupMeshReady(pages.alice, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(pages.bob, [accounts.carol], { timeout });
+    await waitForGroupMeshReady(
+        pages.carol,
+        [accounts.alice, accounts.bob],
+        { timeout },
+    );
 }
 
 export async function resetTransportKickCounts(page: Page): Promise<void> {
     await page.evaluate(() => {
         (
             window as unknown as {
-                __chatTransportV2Debug?: { resetKickCounts?: () => void };
+                __chatTransportDebug?: { resetKickCounts?: () => void };
             }
-        ).__chatTransportV2Debug?.resetKickCounts?.();
+        ).__chatTransportDebug?.resetKickCounts?.();
     });
 }
 
@@ -803,11 +1018,11 @@ export async function expectRosterKickCountAtMost(
                 ({ peers, max }) => {
                     const counts = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 kickCounts?: () => Record<string, number>;
                             };
                         }
-                    ).__chatTransportV2Debug?.kickCounts?.();
+                    ).__chatTransportDebug?.kickCounts?.();
                     if (!counts) return false;
                     return peers.every((peer) => (counts[peer] ?? 0) <= max);
                 },
@@ -847,65 +1062,33 @@ export async function waitForDmDataChannelReady(
             .poll(
                 async () => {
                 return page.evaluate((peer) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 peerState?: (remote: string) => string;
-                                started?: () => boolean;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (v2?.peerState) {
-                        return v2.peerState(peer) === "usable";
-                    }
-
-                    const snap = (
-                            window as unknown as {
-                                __chatDataDebug?: {
-                                    snapshot?: () => {
-                                        peers?: {
-                                            peerAccount: string;
-                                            pc: {
-                                                connectionState?: string;
-                                            } | null;
-                                        }[];
-                                    };
-                                };
-                            }
-                        ).__chatDataDebug?.snapshot?.();
-                        const leg = snap?.peers?.find(
-                            (p) => p.peerAccount === peer,
-                        );
-                        return leg?.pc?.connectionState === "connected";
-                    }, peerAccount);
+                    ).__chatTransportDebug;
+                    return transport?.peerState?.(peer) === "usable";
+                }, peerAccount);
                 },
                 { timeout, intervals: [500, 1000, 2000] },
             )
             .toBe(true);
     } catch (e) {
         const diag = await page.evaluate((peer) => {
-            const v2 = (
+            const transport = (
                 window as unknown as {
-                    __chatTransportV2Debug?: {
+                    __chatTransportDebug?: {
                         peerState?: (remote: string) => string;
                     };
                 }
-            ).__chatTransportV2Debug;
-            const v2State = v2?.peerState?.(peer) ?? null;
-            const snap = (
-                window as unknown as {
-                    __chatDataDebug?: {
-                        snapshot?: () => unknown;
-                        events?: () => unknown;
-                    };
-                }
-            ).__chatDataDebug;
+            ).__chatTransportDebug;
+            const transportState = transport?.peerState?.(peer) ?? null;
             return {
                 peer,
-                v2State,
-                chatDataSnapshot: snap?.snapshot?.() ?? null,
-                chatDataEvents: snap?.events?.() ?? null,
-                hasV2Debug: Boolean(v2),
+                transportState,
+                hasTransportDebug: Boolean(transport),
             };
         }, peerAccount);
         throw new Error(
@@ -928,17 +1111,17 @@ export async function bootstrapGroupMeshPeers(
         .poll(
             async () => {
                 return page.evaluate((peers) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 started?: () => boolean;
                                 ensurePeers?: (remotes: string[]) => void;
                                 kickPeers?: (remotes: string[]) => void;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (!v2?.started?.()) return false;
-                    v2.ensurePeers?.(peers);
+                    ).__chatTransportDebug;
+                    if (!transport?.started?.()) return false;
+                    transport.ensurePeers?.(peers);
                     return true;
                 }, [...peerAccounts]);
             },
@@ -960,40 +1143,17 @@ export async function waitForGroupMeshReady(
         .poll(
             async () => {
                 return page.evaluate((peers) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 peerState?: (remote: string) => string;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (v2?.peerState) {
-                        return peers.every(
-                            (p: string) => v2.peerState?.(p) === "usable",
-                        );
-                    }
-
-                    const snap = (
-                        window as unknown as {
-                            __chatDataDebug?: {
-                                snapshot?: () => {
-                                    peers?: {
-                                        peerAccount: string;
-                                        pc: { connectionState?: string } | null;
-                                    }[];
-                                };
-                            };
-                        }
-                    ).__chatDataDebug?.snapshot?.();
-                    if (!snap?.peers?.length) return false;
-                    const connected = new Set(
-                        snap.peers
-                            .filter(
-                                (p) => p.pc?.connectionState === "connected",
-                            )
-                            .map((p) => p.peerAccount),
+                    ).__chatTransportDebug;
+                    if (!transport?.peerState) return false;
+                    return peers.every(
+                        (p: string) => transport.peerState?.(p) === "usable",
                     );
-                    return peers.every((account) => connected.has(account));
                 }, [...peerAccounts]);
             },
             { timeout, intervals: [1000, 2000, 3000] },
@@ -1016,7 +1176,7 @@ export async function waitForThreadComposerReady(
     await expect(page.getByLabel("Message text")).toBeEnabled({ timeout });
 }
 
-/** Poll until v2 peer legs for every account are `usable`. */
+/** Poll until peer legs for every account are `usable`. */
 export async function waitForThreadMeshLive(
     page: Page,
     peerAccounts: readonly string[],
@@ -1027,16 +1187,16 @@ export async function waitForThreadMeshLive(
         .poll(
             async () => {
                 return page.evaluate((peers) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 peerState?: (remote: string) => string;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    if (!v2?.peerState) return false;
+                    ).__chatTransportDebug;
+                    if (!transport?.peerState) return false;
                     return peers.every(
-                        (peer) => v2.peerState!(peer) === "usable",
+                        (peer) => transport.peerState!(peer) === "usable",
                     );
                 }, [...peerAccounts]);
             },
@@ -1380,9 +1540,9 @@ export async function assertOutboundDmRouting(
 ): Promise<void> {
     const routing = await page.evaluate(
         ({ body, groupSpaceId }) => {
-            const v2 = (
+            const transport = (
                 window as unknown as {
-                    __chatTransportV2Debug?: {
+                    __chatTransportDebug?: {
                         routingSnapshot?: () => {
                             pendingRows?: {
                                 bodyPreview: string;
@@ -1397,14 +1557,14 @@ export async function assertOutboundDmRouting(
                         }[];
                     };
                 }
-            ).__chatTransportV2Debug;
+            ).__chatTransportDebug;
             const churn = (
                 window as Window & {
                     __chatChurnState?: () => Record<string, unknown>;
                 }
             ).__chatChurnState?.();
-            const snap = v2?.routingSnapshot?.() ?? null;
-            const rows = (v2?.getOutbox?.() ?? []).filter((r) => r.body === body);
+            const snap = transport?.routingSnapshot?.() ?? null;
+            const rows = (transport?.getOutbox?.() ?? []).filter((r) => r.body === body);
             const groupTail = groupSpaceId.replace(/^space:/, "");
             const onGroup = rows.some(
                 (r) =>
@@ -1886,29 +2046,27 @@ export async function expectThreadMessage(
 
 async function dumpChatTransportDebug(page: Page): Promise<unknown> {
     return page.evaluate(() => {
-        const v2 = (
+        const transport = (
             window as unknown as {
-                __chatTransportV2Debug?: Record<string, unknown>;
+                __chatTransportDebug?: Record<string, unknown>;
             }
-        ).__chatTransportV2Debug;
+        ).__chatTransportDebug;
         const msg = (
             window as unknown as {
                 __chatMessagingDebug?: Record<string, unknown>;
             }
         ).__chatMessagingDebug;
-        const legacy = (
-            window as unknown as {
-                __chatDataDebug?: { snapshot?: () => unknown; events?: () => unknown };
-            }
-        ).__chatDataDebug;
         return {
-            v2: v2
+            transport: transport
                 ? {
-                      started: v2.started,
-                      events: typeof v2.events === "function" ? v2.events() : null,
+                      started: transport.started,
+                      events:
+                          typeof transport.events === "function"
+                              ? transport.events()
+                              : null,
                       outbox:
-                          typeof v2.getOutbox === "function"
-                              ? v2.getOutbox()
+                          typeof transport.getOutbox === "function"
+                              ? transport.getOutbox()
                               : null,
                   }
                 : null,
@@ -1921,7 +2079,6 @@ async function dumpChatTransportDebug(page: Page): Promise<unknown> {
                               : null,
                   }
                 : null,
-            chatDataSnapshot: legacy?.snapshot?.() ?? null,
         };
     });
 }
@@ -1945,9 +2102,9 @@ export async function expectPendingOutboundMessage(
         .poll(
             async () =>
                 page.evaluate((msg) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 getOutbox?: () => Array<{ body?: string }>;
                                 deliverySnapshot?: () => Array<{
                                     bodyPreview?: string;
@@ -1955,15 +2112,15 @@ export async function expectPendingOutboundMessage(
                                 }>;
                             };
                         }
-                    ).__chatTransportV2Debug;
-                    const outbox = v2?.getOutbox?.();
+                    ).__chatTransportDebug;
+                    const outbox = transport?.getOutbox?.();
                     if (
                         Array.isArray(outbox) &&
                         outbox.some((e) => e.body === msg)
                     ) {
                         return true;
                     }
-                    const snapshot = v2?.deliverySnapshot?.();
+                    const snapshot = transport?.deliverySnapshot?.();
                     return (
                         Array.isArray(snapshot) &&
                         snapshot.some(

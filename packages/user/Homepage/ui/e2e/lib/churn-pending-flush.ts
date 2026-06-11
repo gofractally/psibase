@@ -55,7 +55,7 @@ function perEntryMeshMs(totalMeshMs: number): number {
     return Math.min(totalMeshMs, 60_000);
 }
 
-/** Dump v2 transport + pending outbox from every online tab (for flush failures). */
+/** Dump transport + pending outbox from every online tab (for flush failures). */
 export async function dumpTransportDeliverySnapshot(
     pages: ChurnPages,
     online: Set<PartyActor>,
@@ -67,9 +67,9 @@ export async function dumpTransportDeliverySnapshot(
         try {
             const payload = await pageFor(who, pages).evaluate(
                 (peerAccounts) => {
-                    const v2 = (
+                    const transport = (
                         window as unknown as {
-                            __chatTransportV2Debug?: {
+                            __chatTransportDebug?: {
                                 snapshot?: (remotes: string[]) => unknown;
                                 deliverySnapshot?: () => unknown;
                                 getOutbox?: () => unknown;
@@ -78,7 +78,7 @@ export async function dumpTransportDeliverySnapshot(
                                 started?: () => boolean;
                             };
                         }
-                    ).__chatTransportV2Debug;
+                    ).__chatTransportDebug;
                     const churn = (
                         window as unknown as {
                             __chatChurnState?: () => Record<string, unknown>;
@@ -96,25 +96,25 @@ export async function dumpTransportDeliverySnapshot(
                         url: location.href,
                         churn,
                         transport:
-                            v2?.snapshot?.(peerAccounts) ??
+                            transport?.snapshot?.(peerAccounts) ??
                             (v2
                                 ? {
-                                      started: v2.started?.(),
+                                      started: transport.started?.(),
                                       peers: peerAccounts.map((remote) => ({
                                           remote,
-                                          state: v2.peerState?.(remote),
+                                          state: transport.peerState?.(remote),
                                       })),
                                   }
                                 : null),
                         delivery:
-                            v2?.deliverySnapshot?.() ?? v2?.getOutbox?.() ?? null,
+                            transport?.deliverySnapshot?.() ?? transport?.getOutbox?.() ?? null,
                         routing:
-                            typeof v2?.routingSnapshot === "function"
-                                ? v2.routingSnapshot()
+                            typeof transport?.routingSnapshot === "function"
+                                ? transport.routingSnapshot()
                                 : null,
                         v2Events:
-                            typeof v2?.events === "function"
-                                ? v2.events()
+                            typeof transport?.events === "function"
+                                ? transport.events()
                                 : null,
                         chatDataEvents:
                             legacy?.events?.()?.slice(-40) ?? null,

@@ -61,7 +61,7 @@ export type PendingCount = {
     total: number;
 };
 
-/** v2 transport constants (locked in chat-data-transport-per-peer.md). */
+/** Transport constants (locked in chat-data-transport-per-peer.md). */
 export const PEER_IDLE_TTL_MS = 5 * 60 * 1000;
 export const PEER_MAX_WARM = 10;
 export const IN_FLIGHT_ACK_WAIT_MS = 2_500;

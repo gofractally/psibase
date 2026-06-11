@@ -41,11 +41,12 @@ export type ChatTransportBridgeDeps = {
     onPeerUsable: (remoteAccount: string) => void;
     onSessionInvite: (spaceUuid: string) => void;
     onSpaceMembershipHint?: (from: string) => void;
+    /** When `"offline"`, peer_focus ensure is skipped until presence updates. */
+    getRemotePresence?: (account: string) => "online" | "offline" | undefined;
 };
 
 /**
- * v2 chat-data transport — one PC per remote contact (replaces the
- * legacy Space-run orchestrator stack).
+ * Chat-data transport — one PC per remote contact (per-peer stack).
  */
 export class ChatTransportBridge {
     private stack: ChatTransportStack | null = null;
@@ -292,12 +293,21 @@ export class ChatTransportBridge {
         if (!self || !this.stack) return;
         for (const member of members) {
             if (member === self) continue;
+            if (this.deps.getRemotePresence?.(member) === "offline") {
+                continue;
+            }
             void this.ensurePeer(member, "peer_focus");
         }
     }
 
     ensurePeer(remote: string, reason: EnsureReason = "message_enqueued"): void {
         if (this.suspended) return;
+        if (
+            (reason === "peer_focus" || reason === "roster_kick") &&
+            this.deps.getRemotePresence?.(remote) === "offline"
+        ) {
+            return;
+        }
         if (!this.stack) {
             this.pendingEnsures.set(remote, reason);
             this.start();
@@ -342,7 +352,7 @@ export class ChatTransportBridge {
     }
 
     onPeerOffline(_account: string): void {
-        /* v2: no per-Space teardown on offline; peer TTL handles idle dispose. */
+        /* No per-Space teardown on offline; peer TTL handles idle dispose. */
     }
 
     sendChatMessage(
@@ -409,7 +419,7 @@ export class ChatTransportBridge {
     private readonly pendingSpaceHints = new Set<string>();
 
     releaseIdleTransport(_spaceUuid: string): void {
-        /* v2: peer TTL + LRU in PeerTransportRegistry; no per-Space release. */
+        /* Peer TTL + LRU in PeerTransportRegistry; no per-Space release. */
     }
 
     releaseIdlePeer(remote: string): void {
@@ -445,12 +455,12 @@ export class ChatTransportBridge {
         svc?.handleWireFromRemote?.(remote, raw);
     }
 
-    /** No-op — v2 stack re-joins pairs on welcome via L2. */
+    /** No-op — stack re-joins pairs on welcome via L2. */
     invalidateJoinStateForWelcomeReconnect(): void {
-        chatDataLog("welcome reconnect: v2 pair re-join", {});
+        chatDataLog("welcome reconnect: pair re-join", {});
     }
 
-    /** No-op — v2 keeps usable PCs on welcome. */
+    /** No-op — keeps usable PCs on welcome. */
     reconcileAfterReconnect(): void {
         const self = this.deps.getSelf();
         if (!self) return;
@@ -466,9 +476,9 @@ export class ChatTransportBridge {
         const bridge = this;
         (
             globalThis as typeof globalThis & {
-                __chatTransportV2Debug?: Record<string, unknown>;
+                __chatTransportDebug?: Record<string, unknown>;
             }
-        ).__chatTransportV2Debug = {
+        ).__chatTransportDebug = {
             peerState: (remote: string) =>
                 bridge.stack?.peerRegistry.getState(remote) ?? "absent",
             snapshot: (remotes: string[]) => {

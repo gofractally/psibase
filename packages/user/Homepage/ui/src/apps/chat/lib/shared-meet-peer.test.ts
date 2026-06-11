@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSharedMeetPeer } from "./shared-meet-peer";
-import type { PeerTransportRegistry } from "../transport-v2/l3-peer-registry";
+import type { PeerTransportRegistry } from "../transport/l3-peer-registry";
 
 function createMockChatPeer() {
     return {

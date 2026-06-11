@@ -239,6 +239,17 @@ export function createChatTransportStack(
             if (remote === opts.localAccount) return;
             rosterCoordinator.notifyPairRosterUpdate(remote, "peer_joined");
         },
+        transportLost: (frame: {
+            sessionId: string;
+            participant: string;
+        }) => {
+            if (!isPairSession(frame.sessionId)) return;
+            const remote = remoteFromSession(frame.sessionId);
+            if (!remote || frame.participant !== remote) return;
+            const state = peerRegistry.getState(remote);
+            if (state === "absent" || state === "disposing") return;
+            peerRegistry.recoverPeer(remote, "signaling_transport_lost");
+        },
         signal: (frame: {
             sessionId: string;
             from: string;

@@ -344,6 +344,28 @@ describe("createChatTransportStack integration", () => {
         );
     });
 
+    it("transportLost for remote peer recovers stale usable leg", async () => {
+        const hub = createTwoPartyHub();
+        const { alice, bob } = createTwoPartyStacks(hub);
+        await establishPair(hub, alice, bob);
+        expect(alice.stack.peerRegistry.getState("bob")).toBe("usable");
+
+        const recoverSpy = vi.spyOn(alice.stack.peerRegistry, "recoverPeer");
+        const pairId = pairIdFor("alice", "bob");
+
+        alice.rt.dispatch({
+            t: "transportLost",
+            sessionId: pairId,
+            participant: "bob",
+        });
+
+        expect(recoverSpy).toHaveBeenCalledWith(
+            "bob",
+            "signaling_transport_lost",
+        );
+        void bob;
+    });
+
     it("roster burst does not fan out kickNegotiation storms", async () => {
         const hub = createTwoPartyHub();
         const alice = createStackFixture(hub, "alice");

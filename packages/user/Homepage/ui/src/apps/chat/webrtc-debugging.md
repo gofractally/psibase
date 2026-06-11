@@ -313,7 +313,7 @@ Baseline confirmed: `yarn e2e:random-churn:decaf` — 1×30 steps, seed `0xdecaf
 **Implemented:**
 
 - E2e (`e2e/lib/chat-ui.ts`): keep **CDP** path (`Page.stopLoading` + non-awaiting `__chatChurnSuspend?.()`); **conditional** `page.evaluate` suspend only when `[churn-probe]` shows `navigationSuspended` still false after 150ms (avoids duplicate suspend when CDP succeeded).
-- Optional product (`use-chat-socket.ts` → `suspendChatNavigation`): early-return when `chatDataOrchestratorRef.current?.isNavigationSuspended()` already true (orchestrator `suspendForNavigation` is already idempotent; avoids double `setTimeout(0)` `close()`).
+- Optional product (`use-chat-socket.ts` → `suspendChatNavigation`): early-return when `transportBridgeRef.current?.isNavigationSuspended()` already true (bridge `suspendForNavigation` is already idempotent; avoids double `setTimeout(0)` `close()`).
 
 **Risk:** Low. Wedge regression only if CDP path fails to run JS while renderer is wedged — mitigated by deferred `webrtcClient.close()` and `forceLeaveChatToHome`.
 

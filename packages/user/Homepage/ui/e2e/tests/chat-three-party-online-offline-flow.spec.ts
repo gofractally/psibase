@@ -8,6 +8,7 @@ import {
     expectPendingOutboundMessage,
     expectRosterKickCountAtMost,
     expectThreadMessage,
+    GROUP_MESH_TIMEOUT_MS,
     leaveChatToHome,
     openChat,
     openExistingGroupChat,
@@ -49,7 +50,6 @@ test.describe("Chat three-party online/offline flow", () => {
         };
 
         try {
-            // (a) Alice messages Bob while Bob has never opened Chat.
             await startDmWithContact(
                 alicePage,
                 chain.baseUrl,
@@ -70,12 +70,9 @@ test.describe("Chat three-party online/offline flow", () => {
                 timeout: 180_000,
             });
 
-            // Bob was in Chat for (a); we leave and re-enter so group mesh can form
-            // (DM + group on one socket without this reset leaves mesh stuck — H18).
             await leaveChatToHome(alicePage, chain.baseUrl);
             await leaveChatToHome(party.bobPage, chain.baseUrl);
 
-            // (b) Alice creates ABC group; Bob re-enters Chat and joins the thread.
             await createGroupChat(alicePage, chain.baseUrl, [
                 party.bobAccount.name,
                 party.carolAccount.name,
@@ -98,10 +95,10 @@ test.describe("Chat three-party online/offline flow", () => {
                 timeout: 120_000,
             });
             await waitForGroupMeshReady(alicePage, [party.bobAccount.name], {
-                timeout: 300_000,
+                timeout: GROUP_MESH_TIMEOUT_MS,
             });
             await waitForGroupMeshReady(party.bobPage, [party.aliceAccount.name], {
-                timeout: 300_000,
+                timeout: GROUP_MESH_TIMEOUT_MS,
             });
             await expectRosterKickCountAtMost(
                 alicePage,
@@ -113,15 +110,13 @@ test.describe("Chat three-party online/offline flow", () => {
                 timeout: 240_000,
             });
 
-            // (c) Bob replies in group; Alice (still on group thread) sees it.
             await sendChatMessage(party.bobPage, GROUP_FROM_B);
             await expectThreadMessage(alicePage, GROUP_FROM_B, {
                 timeout: 240_000,
             });
 
-            // (d) Carol opens Chat for the first time; history catch-up via late-joiner mesh.
             await openChat(party.carolPage, chain.baseUrl);
-            await waitForChatConnected(party.carolPage);
+            await waitForChatConnected(party.carolPage, { timeout: 120_000 });
             await openExistingGroupChat(
                 party.carolPage,
                 chain.baseUrl,
