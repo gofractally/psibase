@@ -15,11 +15,11 @@ custom_error! { pub AccountNumberError
 ///
 /// # Examples
 ///
-/// You can create an `AccountNumber` from [a literal string][`&str`] with [`AccountNumber::from`]:
+/// You can create an `AccountNumber` from [a literal string][`&str`] with [`account!`]:
 ///
 /// ```
-/// use psibase::AccountNumber;
-/// let hello = AccountNumber::from("hello");
+/// use psibase::account;
+/// let hello = account!("hello");
 /// ```
 #[derive(Debug, Default, PartialEq, Eq, Copy, Clone, Hash, Pack, Unpack, ToKey, ToSchema)]
 #[fracpack(
