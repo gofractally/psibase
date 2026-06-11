@@ -39,7 +39,7 @@ export function ensureDmAvCallSession(
     if (existing?.kind === "dm") {
         const peerOnline = host.getPeerPresence()[peer] === "online";
         if (
-            existing.snapshot.phase === "waiting-peer" &&
+            host.liveSnapshot(existing).phase === "waiting-peer" &&
             peerOnline &&
             existing.snapshot.sessionId
         ) {
@@ -47,16 +47,17 @@ export function ensureDmAvCallSession(
                 space: shortSpaceId(spaceUuid),
                 peer,
             });
-            void host.beginSignaling(existing, existing.snapshot.sessionId);
+            host.dispatchRunEventForRun?.(existing, { type: "ensure" });
             return;
         }
 
+        const livePhase = host.liveSnapshot(existing).phase;
         const inProgress =
-            existing.snapshot.phase === "ensuring" ||
-            existing.snapshot.phase === "creating" ||
-            existing.snapshot.phase === "joining" ||
-            existing.snapshot.phase === "waiting-peer" ||
-            existing.snapshot.phase === "signaling";
+            livePhase === "ensuring" ||
+            livePhase === "creating" ||
+            livePhase === "joining" ||
+            livePhase === "waiting-peer" ||
+            livePhase === "signaling";
 
         if (inProgress) {
             if (
@@ -68,10 +69,7 @@ export function ensureDmAvCallSession(
                     space: shortSpaceId(spaceUuid),
                     peer,
                 });
-                void host.beginSignaling(
-                    existing,
-                    existing.snapshot.sessionId,
-                );
+                host.dispatchRunEventForRun?.(existing, { type: "ensure" });
             } else if (
                 existing.snapshot.sessionId &&
                 !existing.snapshot.mediaConnected &&
@@ -132,7 +130,7 @@ export function ensureDmAvCallSession(
     };
     host.setRun(spaceUuid, run);
     run.onUpdate();
-    void host.runPipeline(run);
+    host.dispatchRunEventForRun?.(run, { type: "ensure" });
 }
 
 export function startDmAvCallPeer(
@@ -153,6 +151,20 @@ export function startDmAvCallPeer(
             isInitiator,
             sharedPc: host.usesSharedTransport?.() ?? false,
         });
+        if (existing!.isMediaConnected) {
+            host.dispatchRunEventForRun?.(run, {
+                type: "mediaConnected",
+                remoteAccount: run.peerAccount,
+            });
+            const local = existing!.getLocalStream();
+            if (local) {
+                host.onAvCallMediaReady?.(run.spaceUuid, {
+                    peerAccount: run.peerAccount,
+                    localStream: local,
+                    remoteStream: existing!.getRemoteStream() ?? null,
+                });
+            }
+        }
         return;
     }
     host.tearDownDmPeer(run, "replacing peer");
@@ -167,13 +179,10 @@ export function startDmAvCallPeer(
         wantAudio: run.wantAudio,
         handlers: {
             onMediaConnected: () => {
-                if (run.snapshot.mediaConnected) return;
-                run.snapshot = {
-                    ...run.snapshot,
-                    phase: "ready",
-                    mediaConnected: true,
-                };
-                run.onUpdate();
+                host.dispatchRunEventForRun?.(run, {
+                    type: "mediaConnected",
+                    remoteAccount: run.peerAccount,
+                });
                 const local = run.peer?.getLocalStream();
                 if (local) {
                     host.onAvCallMediaReady?.(run.spaceUuid, {
@@ -225,13 +234,15 @@ export function startDmAvCallPeer(
 }
 
 export function beginSignalingDmAvCallSkipChecks(
+    host: AvCallOrchestratorHost,
     run: DmAvCallRun,
     sessionId: string,
 ): boolean {
+    const phase = host.liveSnapshot(run).phase;
     if (
         run.hasJoined &&
         run.peer?.isMediaConnected &&
-        run.snapshot.phase === "ready" &&
+        phase === "ready" &&
         run.snapshot.sessionId === sessionId
     ) {
         avCallLog("beginSignaling skipped (already active)", {
@@ -245,8 +256,7 @@ export function beginSignalingDmAvCallSkipChecks(
         !run.peer.isDisposed &&
         run.snapshot.sessionId === sessionId &&
         !run.peer.isMediaConnected &&
-        (run.snapshot.phase === "signaling" ||
-            run.snapshot.phase === "joining")
+        (phase === "signaling" || phase === "joining")
     ) {
         avCallLog("beginSignaling skipped (negotiation in flight)", {
             sessionId: shortSessionId(sessionId),
@@ -263,7 +273,7 @@ export function beginSignalingDmAvCall(
     sessionId: string,
     self: string,
 ): void {
-    if (beginSignalingDmAvCallSkipChecks(run, sessionId)) {
+    if (beginSignalingDmAvCallSkipChecks(host, run, sessionId)) {
         return;
     }
 
@@ -277,8 +287,6 @@ export function beginSignalingDmAvCall(
         mustJoin,
     });
 
-    host.setPhase(run, "joining", { sessionId });
-
     const signaling = host.getSignaling();
     if (mustJoin && signaling) {
         signaling.joinSession(sessionId);
@@ -286,12 +294,12 @@ export function beginSignalingDmAvCall(
         commitAvCallJoin(sessionId);
         run.snapshot = {
             ...run.snapshot,
+            sessionId,
             signalingJoined: true,
         };
     }
 
     startDmAvCallPeer(host, run, sessionId, self, isInitiator);
-    host.setPhase(run, "signaling", { sessionId });
 }
 
 export function declineDmAvCallInvite(

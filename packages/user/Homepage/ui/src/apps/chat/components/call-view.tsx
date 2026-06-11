@@ -73,13 +73,16 @@ function ParticipantVideoTile({
 
     const videoTrack = stream?.getVideoTracks()[0];
     const videoLive = !!videoTrack && videoTrack.readyState === "live";
+    const mountVideo =
+        !!stream &&
+        wantVideo &&
+        !audioOnlyFallback &&
+        (isSelf ? !videoMuted : !remoteVideoMuted);
     const videoShows =
+        mountVideo &&
         videoLive &&
         videoTrack.enabled !== false &&
-        !videoMuted &&
-        !(isSelf ? false : remoteVideoMuted) &&
-        !audioOnlyFallback &&
-        wantVideo;
+        !(isSelf ? false : remoteVideoMuted);
 
     const secondaryLabel = isSelf
         ? videoMuted
@@ -103,14 +106,29 @@ function ParticipantVideoTile({
 
     return (
         <div className="relative aspect-video overflow-hidden rounded-lg bg-gradient-to-b from-zinc-900 to-zinc-950 ring-1 ring-white/10">
-            {videoShows ? (
-                <video
-                    ref={videoRef}
-                    className="size-full object-cover"
-                    autoPlay
-                    playsInline
-                    muted={isSelf}
-                />
+            {mountVideo ? (
+                <>
+                    <video
+                        ref={videoRef}
+                        className={cn(
+                            "size-full object-cover",
+                            !videoShows && "opacity-0",
+                        )}
+                        autoPlay
+                        playsInline
+                        muted={isSelf}
+                    />
+                    {!videoShows ? (
+                        <div className="text-muted-foreground absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center text-xs">
+                            <span className="text-sm font-medium text-white/90">
+                                {isSelf ? "You" : account}
+                            </span>
+                            <span className="text-white/70">
+                                {secondaryLabel ?? "Connecting…"}
+                            </span>
+                        </div>
+                    ) : null}
+                </>
             ) : (
                 <div className="text-muted-foreground flex size-full flex-col items-center justify-center gap-1.5 px-3 text-center text-xs">
                     <span className="text-sm font-medium text-white/90">
@@ -212,9 +230,6 @@ export function CallView({
               ? "Connected"
               : "Ended";
 
-    const showMedia =
-        call.source === "av-call" && call.status === "connected";
-
     /** Outbound ringing cancel, or purely local mock preview → Cancel label. */
     const endButtonUseCancelLabel =
         (call.status === "ringing" && call.direction === "outgoing") ||
@@ -224,8 +239,19 @@ export function CallView({
         call.callKind === "group" &&
         (call.groupParticipants?.length ?? 0) > 0;
 
+    const showMedia =
+        call.source === "av-call" &&
+        (call.status === "connected" ||
+            (isGroupMeet &&
+                remoteStreamsByAccount != null &&
+                Object.values(remoteStreamsByAccount).some(
+                    (stream) => stream != null,
+                )));
+
     const showGroupGrid =
-        isGroupMeet && showMedia && remoteStreamsByAccount != null;
+        isGroupMeet &&
+        showMedia &&
+        remoteStreamsByAccount != null;
 
     const participantStatusLabel = (
         status: NonNullable<typeof call.groupParticipants>[number]["status"],
@@ -318,10 +344,12 @@ export function CallView({
                 size="sm"
                 className="pointer-events-auto shadow-md"
                 onClick={onEnd}
-                aria-label={endButtonUseCancelLabel ? "Cancel call" : "End call"}
+                aria-label={
+                    endButtonUseCancelLabel ? "Cancel call" : "Leave call"
+                }
             >
                 <PhoneOff className="size-4" />
-                {endButtonUseCancelLabel ? "Cancel" : "End"}
+                {endButtonUseCancelLabel ? "Cancel" : "Leave"}
             </Button>
         </div>
     );
@@ -418,9 +446,18 @@ export function CallView({
                             </>
                         ) : null}
                         {!showMedia ? (
-                            <Button type="button" variant="outline" onClick={onEnd}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onEnd}
+                                aria-label={
+                                    endButtonUseCancelLabel
+                                        ? "Cancel call"
+                                        : "Leave call"
+                                }
+                            >
                                 <PhoneOff className="size-4" />
-                                {endButtonUseCancelLabel ? "Cancel" : "End"}
+                                {endButtonUseCancelLabel ? "Cancel" : "Leave"}
                             </Button>
                         ) : null}
                     </div>

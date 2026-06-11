@@ -223,6 +223,29 @@ pub fn allocate_session_id(
     format!("wrtc:{}", sha256(&bytes))
 }
 
+/// Objective session ids hash creation time; bump `created_at` until unused.
+pub fn allocate_unique_session_id(
+    space_uuid: &str,
+    purpose: &str,
+    participants: &[AccountNumber],
+    mut created_at: i64,
+    created_by: AccountNumber,
+) -> (String, i64) {
+    loop {
+        let session_id = allocate_session_id(
+            space_uuid,
+            purpose,
+            participants,
+            created_at,
+            created_by,
+        );
+        if session_row(&session_id).is_none() {
+            return (session_id, created_at);
+        }
+        created_at = created_at.saturating_add(1);
+    }
+}
+
 pub fn session_row(session_id: &str) -> Option<SessionRow> {
     SessionTable::read().get_index_pk().get(&session_id.to_owned())
 }
@@ -260,10 +283,10 @@ pub fn active_session_for_space(space_uuid: &str, purpose: &str) -> Option<Sessi
 }
 
 pub fn sessions_for_space(space_uuid: &str, purpose: &str) -> Vec<SessionRow> {
-    let key = (space_uuid.to_owned(), purpose.to_owned());
     SessionTable::read()
-        .get_index_by_space_purpose()
-        .range(key.clone()..=key)
+        .get_index_pk()
+        .iter()
+        .filter(|row| row.space_uuid == space_uuid && row.purpose == purpose)
         .collect()
 }
 
@@ -293,18 +316,31 @@ pub fn create_session(
     );
     let participants = validate_session_participants(sender, &space_members, &resolved)?;
 
+    let mut session_created_at = now;
     if let Some(existing) = active_session_for_space(space_uuid, purpose) {
-        return Ok(session_to_view(existing));
+        if purpose == PURPOSE_AV_CALL {
+            close_session(&existing.session_id, "superseded", sender, now)?;
+            // Distinct objective session id when superseding within the same block time.
+            session_created_at = now.saturating_add(1);
+        } else {
+            return Ok(session_to_view(existing));
+        }
     }
 
     let expires_at = now.saturating_add(DEFAULT_SESSION_TTL_US);
-    let session_id = allocate_session_id(space_uuid, purpose, &participants, now, sender);
+    let (session_id, session_created_at) = allocate_unique_session_id(
+        space_uuid,
+        purpose,
+        &participants,
+        session_created_at,
+        sender,
+    );
     let row = SessionRow {
         session_id: session_id.clone(),
         space_uuid: space_uuid.to_owned(),
         purpose: purpose.to_owned(),
         lifecycle: SESSION_LIFECYCLE_ACTIVE,
-        created_at: now,
+        created_at: session_created_at,
         expires_at,
         created_by: sender,
     };

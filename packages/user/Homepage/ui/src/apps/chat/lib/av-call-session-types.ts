@@ -64,6 +64,8 @@ export type AvCallSpaceRunBase = {
     onUpdate: () => void;
     /** Capped exponential-backoff attempt counter for transport recovery (A4). */
     transportRecoveryAttempt: number;
+    /** Set synchronously on sessionInvite until callee accepts/declines. */
+    awaitingInviteAccept?: boolean;
 };
 
 export type DmAvCallRun = AvCallSpaceRunBase & {
@@ -83,6 +85,10 @@ export type GroupAvCallRun = AvCallSpaceRunBase & {
     /** Shared camera/mic stream across all mesh peer connections. */
     localStream: MediaStream | null;
     peerOnlineAtSessionStart: Map<string, boolean>;
+    /** Outgoing host start must mint a fresh objective session when re-starting. */
+    hostFreshStart?: boolean;
+    /** User clicked Rejoin after partial leave — join live session, do not mint new one. */
+    rejoinFreshStart?: boolean;
 };
 
 export type AvCallSpaceRun = DmAvCallRun | GroupAvCallRun;
@@ -147,6 +153,80 @@ export interface AvCallOrchestratorHost {
     ): void;
     beginSignaling(run: AvCallSpaceRun, sessionId: string): Promise<void>;
     runPipeline(run: AvCallSpaceRun): Promise<void>;
+    recoverStaleAvCallSession?(
+        run: AvCallSpaceRun,
+        staleSessionId: string,
+    ): Promise<void>;
+    applyAvCallSessionSnapshotFromRealtime?(
+        sessionId: string,
+        joinedParticipants: string[],
+        pendingParticipants: string[],
+        epoch?: number,
+    ): void;
+    recordAvCallSessionSnapshot?(
+        sessionId: string,
+        joinedParticipants: string[],
+        pendingParticipants: string[],
+        epoch?: number,
+    ): void;
+    removeParticipantFromAvCallSessionRoster?(
+        sessionId: string,
+        participant: string,
+    ): void;
+    getAvCallSessionJoinedParticipants?(
+        sessionId: string,
+    ): readonly string[];
+    getAvCallSessionPendingParticipants?(
+        sessionId: string,
+    ): readonly string[];
+    /** Participant rejoined from pending roster; suppress stale leave echoes. */
+    markAvCallPendingRejoin?(sessionId: string, participant: string): void;
+    isAvCallPendingRejoin?(sessionId: string, participant: string): boolean;
+    clearAvCallPendingRejoin?(sessionId: string, participant: string): void;
+    /** Move a participant from pending to joined in the local roster mirror. */
+    promoteAvCallParticipantToJoined?(
+        sessionId: string,
+        participant: string,
+    ): void;
+    isAvCallRecentDeparture?(sessionId: string, participant: string): boolean;
+    retireAvCallSession?(sessionId: string): void;
+    unretireAvCallSession?(sessionId: string): void;
+    /** True when the callee has an incoming ring and has not accepted yet. */
+    isAvCallPendingInvite?(spaceUuid: string): boolean;
+    /** Group Meet voluntary leave in progress or left-rejoinable — block invite re-arm. */
+    isGroupMeetLeaveInProgress?(spaceUuid: string): boolean;
+    shouldBlockGroupMeetRearm?(spaceUuid: string): boolean;
+    beginGroupMeetFreshStart?(spaceUuid: string): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
+    beginGroupMeetRejoin?(
+        spaceUuid: string,
+        sessionId: string,
+        joinedCount: number,
+    ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
+    beginGroupMeetLeave?(spaceUuid: string): void;
+    completeGroupMeetLeave?(
+        spaceUuid: string,
+        rejoinHint: { sessionId: string; joinedCount: number } | null,
+    ): void;
+    markGroupMeetActive?(spaceUuid: string): void;
+    isGroupMeetRejoinAttempt?(spaceUuid: string): boolean;
+    isGroupMeetFreshHostAttempt?(spaceUuid: string): boolean;
+    classifyGroupMeetSessionInvite?(
+        spaceUuid: string,
+        sessionId: string,
+        run: import("./group-meet-attempt-coordinator").GroupMeetRunContext | null,
+    ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
+    classifyGroupMeetParticipantJoined?(
+        spaceUuid: string,
+        sessionId: string,
+        run: import("./group-meet-attempt-coordinator").GroupMeetRunContext | null,
+    ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
+    classifyGroupMeetSessionEnded?(
+        sessionId: string,
+        ctx: import("./group-meet-attempt-coordinator").GroupMeetSessionEndedContext,
+    ): import("./group-meet-attempt-coordinator").GroupMeetFrameDecision;
+    bindGroupMeetSession?(spaceUuid: string, sessionId: string): void;
+    markGroupMeetJoined?(spaceUuid: string, sessionId: string): void;
+    isRetiredAvCallSession?(sessionId: string): boolean;
     tearDownDmPeer(run: DmAvCallRun, reason: string): void;
 
     onPeerOnline(peerAccount: string): void;
@@ -161,15 +241,20 @@ export interface AvCallOrchestratorHost {
         run: AvCallSpaceRun,
         event: import("./av-call-run-state-machine").AvRunEvent,
     ): void;
+    dispatchRunEventAndWait?(
+        run: AvCallSpaceRun,
+        event: import("./av-call-run-state-machine").AvRunEvent,
+    ): Promise<void>;
 
     setPendingInvite(invite: AvCallIncomingInvite): void;
+    clearPendingInvite?(sessionId: string): void;
     onInviteCleared?(sessionId: string): void;
     onSpaceUpdate?(spaceUuid: string, snap: AvCallSessionSnapshot): void;
     onAvCallMediaReady?(
         spaceUuid: string,
         info: {
             peerAccount: string;
-            localStream: MediaStream;
+            localStream: MediaStream | null;
             remoteStream: MediaStream | null;
         },
     ): void;

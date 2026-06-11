@@ -417,18 +417,33 @@ fn join_session_subjective(
     let flushed = flush_pending_signals_to_socket(&session_id, user, socket);
 
     // Multi-pair mesh: one browser tab joins several pair sessions on the same
-    // websocket. Multiple inline sends during the second join abort the recv
-    // action and can kill the socket (no frames reach the client). Return a
-    // single sessionSnapshot; clients complete join from roster ground truth.
+    // websocket. Multiple inline sends to the *joining* socket during a second
+    // join abort the recv action and can kill the socket. Return only a
+    // sessionSnapshot to the joiner, but still fan out invites/roster deltas to
+    // other participants (e.g. group Meet after chat-data pair PCs are live).
     let socket_has_other_sessions = sig_joins_for_socket(socket)
         .iter()
         .any(|row| row.session_id != session_id);
     if socket_has_other_sessions {
+        let invite = session_invite_frame(&auth, user);
         let mut out = vec![(
             socket,
             build_session_snapshot(&session_id, &auth.participants),
         )];
         out.extend(flushed);
+        if !duplicate_same_socket {
+            out.extend(fanout_participant_joined(
+                &session_id,
+                user,
+                &auth.participants,
+            ));
+            out.extend(fanout_to_participant_sockets(
+                &auth.participants,
+                Some(user),
+                &invite,
+            ));
+            out.extend(fanout_session_snapshot(&session_id, &auth.participants));
+        }
         return out;
     }
 

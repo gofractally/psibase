@@ -10,6 +10,7 @@ import {
     createMeetPeerForRemote,
     shouldReuseMeetPeer,
 } from "./av-call-meet-peer-factory";
+import type { MeetPeerHandle } from "./meet-peer-handle";
 import { acquireMeetLocalMedia } from "./local-media";
 import {
     avCallConnectivityErrorMessage,
@@ -74,10 +75,53 @@ export async function ensureGroupLocalMedia(
     }
 }
 
+function peerMeshMediaReady(peer: MeetPeerHandle): boolean {
+    return (
+        !peer.isDisposed &&
+        (peer.isMediaConnected || peer.getRemoteStream() != null)
+    );
+}
+
+export function reconcileGroupMeshMediaConnected(
+    host: AvCallOrchestratorHost,
+    run: GroupAvCallRun,
+): void {
+    if (
+        run.awaitingInviteAccept ||
+        host.isAvCallPendingInvite?.(run.spaceUuid)
+    ) {
+        return;
+    }
+    const local = run.localStream;
+    for (const [remoteAccount, peer] of run.meshPeers) {
+        if (peer.isDisposed) continue;
+        const remoteStream = peer.getRemoteStream();
+        if (!peerMeshMediaReady(peer)) continue;
+        host.dispatchRunEventForRun?.(run, {
+            type: "mediaConnected",
+            remoteAccount,
+        });
+        host.onAvCallMediaReady?.(run.spaceUuid, {
+            peerAccount: remoteAccount,
+            localStream: local ?? peer.getLocalStream(),
+            remoteStream,
+        });
+    }
+    run.onUpdate();
+}
+
+export type EnsureGroupAvCallSessionOptions = {
+    /** Host clicked Start Meet — recover stale objective session if needed. */
+    hostFreshStart?: boolean;
+    /** Leaver clicked Rejoin — discard local run and re-join the live session. */
+    rejoinFreshStart?: boolean;
+};
+
 export function ensureGroupAvCallSession(
     host: AvCallOrchestratorHost,
     spaceUuid: string,
     members: readonly string[],
+    options?: EnsureGroupAvCallSessionOptions,
 ): void {
     const self = host.getSelf();
     if (!self || !isGroupMembers(members)) return;
@@ -85,58 +129,53 @@ export function ensureGroupAvCallSession(
     avCallLog("ensureGroupAvCallSession", {
         space: shortSpaceId(spaceUuid),
         memberCount: members.length,
+        hostFreshStart: options?.hostFreshStart ?? false,
     });
 
     const remotes = remoteMembers(members, self);
     const presence = host.getPeerPresence();
     const onlineRemotes = remotes.filter((m) => presence[m] === "online");
 
-    const existing = host.getRun(spaceUuid);
+    const freshLocalRun =
+        options?.hostFreshStart === true || options?.rejoinFreshStart === true;
+
+    let existing = host.getRun(spaceUuid);
+    if (existing?.kind === "group" && freshLocalRun) {
+        existing.abort.abort();
+        host.deleteRun(spaceUuid);
+        existing = undefined;
+    }
     if (existing?.kind === "group") {
+        if (options?.hostFreshStart) {
+            existing.hostFreshStart = true;
+        }
+        if (options?.rejoinFreshStart) {
+            existing.rejoinFreshStart = true;
+        }
+        const phase = existing.snapshot.phase;
+        if (
+            (phase === "joining" ||
+                phase === "signaling" ||
+                phase === "ready") &&
+            existing.hasJoined &&
+            !options?.rejoinFreshStart &&
+            !options?.hostFreshStart
+        ) {
+            return;
+        }
         const allOnlineMediaReady =
             onlineRemotes.length > 0 &&
             onlineRemotes.every((m) => runMeshPeerMediaReady(existing, m));
-        if (allOnlineMediaReady && existing.snapshot.signalingJoined) {
-            return;
-        }
-
-        const waitingForAnyOnline =
-            onlineRemotes.length === 0 &&
-            existing.snapshot.phase === "waiting-peer";
         if (
-            waitingForAnyOnline ||
-            existing.snapshot.phase === "ensuring" ||
-            existing.snapshot.phase === "creating" ||
-            existing.snapshot.phase === "joining" ||
-            existing.snapshot.phase === "signaling"
+            allOnlineMediaReady &&
+            existing.snapshot.signalingJoined &&
+            !options?.rejoinFreshStart &&
+            !options?.hostFreshStart
         ) {
-            if (existing.snapshot.sessionId && onlineRemotes.length > 0) {
-                void host.beginSignaling(
-                    existing,
-                    existing.snapshot.sessionId,
-                );
-            }
             return;
         }
-
-        if (
-            existing.snapshot.phase === "ready" ||
-            existing.snapshot.phase === "failed"
-        ) {
-            existing.abort.abort();
-            for (const peer of existing.meshPeers.values()) {
-                peer.dispose();
-            }
-            existing.meshPeers.clear();
-            tearDownGroupLocalMedia(existing);
-            host.deleteRun(spaceUuid);
-        } else if (existing.snapshot.sessionId) {
-            void host.beginSignaling(
-                existing,
-                existing.snapshot.sessionId,
-            );
-            return;
-        }
+        host.dispatchRunEventForRun?.(existing, { type: "ensure" });
+        return;
     } else if (existing?.kind === "dm") {
         return;
     }
@@ -165,21 +204,20 @@ export function ensureGroupAvCallSession(
         },
         hasJoined: false,
         transportRecoveryAttempt: 0,
+        hostFreshStart: options?.hostFreshStart ?? false,
+        rejoinFreshStart: options?.rejoinFreshStart ?? false,
         onUpdate: () => {
             host.onSpaceUpdate?.(spaceUuid, host.liveSnapshot(run));
         },
     };
     host.setRun(spaceUuid, run);
-    avCallLog("group runPipeline start", {
-        space: shortSpaceId(spaceUuid),
-        onlineRemotes: onlineRemotes.length,
-    });
     run.onUpdate();
-    void host.runPipeline(run);
+    host.dispatchRunEventForRun?.(run, { type: "ensure" });
 }
 
 function runMeshPeerMediaReady(run: GroupAvCallRun, remote: string): boolean {
-    return run.meshPeers.get(remote)?.isMediaConnected ?? false;
+    const peer = run.meshPeers.get(remote);
+    return peer != null && peerMeshMediaReady(peer);
 }
 
 export function syncMeshAvCallPeers(
@@ -189,8 +227,11 @@ export function syncMeshAvCallPeers(
     self: string,
 ): void {
     const presence = host.getPeerPresence();
+    const joinedRoster =
+        host.getAvCallSessionJoinedParticipants?.(sessionId) ?? [];
     for (const remote of remoteMembers(run.members, self)) {
-        if (presence[remote] !== "online") {
+        const inJoinedRoster = joinedRoster.includes(remote);
+        if (presence[remote] !== "online" && !inJoinedRoster) {
             tearDownMeshAvCallPeer(host, run, remote, "peer offline");
             continue;
         }
@@ -211,6 +252,12 @@ export function startMeshAvCallPeer(
     self: string,
     remoteAccount: string,
 ): void {
+    if (
+        run.awaitingInviteAccept ||
+        host.isAvCallPendingInvite?.(run.spaceUuid)
+    ) {
+        return;
+    }
     const signaling = host.getSignaling();
     if ((!signaling && !host.usesSharedTransport?.()) || !run.localStream) {
         return;
@@ -224,6 +271,18 @@ export function startMeshAvCallPeer(
             mediaConnected: existing!.isMediaConnected,
             sharedPc: host.usesSharedTransport?.() ?? false,
         });
+        if (existing!.isMediaConnected) {
+            host.dispatchRunEventForRun?.(run, {
+                type: "mediaConnected",
+                remoteAccount,
+            });
+            host.onAvCallMediaReady?.(run.spaceUuid, {
+                peerAccount: remoteAccount,
+                localStream: run.localStream ?? existing!.getLocalStream(),
+                remoteStream: existing!.getRemoteStream(),
+            });
+            run.onUpdate();
+        }
         return;
     }
     existing?.dispose();
@@ -241,32 +300,42 @@ export function startMeshAvCallPeer(
         sharedLocalStream: run.localStream,
         handlers: {
             onMediaConnected: () => {
-                run.snapshot = {
-                    ...host.liveSnapshot(run),
-                    phase: "ready",
-                    meshPeerSignalingReady:
-                        host.meshPeerSignalingReadyMap(run),
-                };
-                run.onUpdate();
-                const local = run.localStream ?? peer.getLocalStream();
-                if (local) {
-                    host.onAvCallMediaReady?.(run.spaceUuid, {
-                        peerAccount: remoteAccount,
-                        localStream: local,
-                        remoteStream: peer.getRemoteStream(),
-                    });
+                if (
+                    run.awaitingInviteAccept ||
+                    host.isAvCallPendingInvite?.(run.spaceUuid)
+                ) {
+                    return;
                 }
+                host.clearAvCallPendingRejoin?.(sessionId, remoteAccount);
+                host.promoteAvCallParticipantToJoined?.(
+                    sessionId,
+                    remoteAccount,
+                );
+                host.dispatchRunEventForRun?.(run, {
+                    type: "mediaConnected",
+                    remoteAccount,
+                });
+                const local = run.localStream ?? peer.getLocalStream();
+                const remote = peer.getRemoteStream();
+                host.onAvCallMediaReady?.(run.spaceUuid, {
+                    peerAccount: remoteAccount,
+                    localStream: local,
+                    remoteStream: remote,
+                });
+                run.onUpdate();
             },
             onRemoteStream: (remote) => {
                 if (!remote) return;
-                const local = run.localStream ?? peer.getLocalStream();
-                if (local && peer.isMediaConnected) {
-                    host.onAvCallMediaReady?.(run.spaceUuid, {
-                        peerAccount: remoteAccount,
-                        localStream: local,
-                        remoteStream: remote,
-                    });
-                }
+                host.promoteAvCallParticipantToJoined?.(
+                    sessionId,
+                    remoteAccount,
+                );
+                host.onAvCallMediaReady?.(run.spaceUuid, {
+                    peerAccount: remoteAccount,
+                    localStream: run.localStream ?? peer.getLocalStream(),
+                    remoteStream: remote,
+                });
+                run.onUpdate();
             },
             onFailed: (detail) => {
                 tearDownMeshAvCallPeer(host, run, remoteAccount, detail);
@@ -312,32 +381,55 @@ export function startMeshAvCallPeer(
 }
 
 export function beginSignalingGroupAvCallSkipChecks(
+    host: AvCallOrchestratorHost,
     run: GroupAvCallRun,
     sessionId: string,
 ): boolean {
+    if (host.isGroupMeetRejoinAttempt?.(run.spaceUuid)) {
+        return false;
+    }
+    const phase = host.liveSnapshot(run).phase;
     if (
         run.hasJoined &&
         run.snapshot.signalingJoined &&
         run.snapshot.sessionId === sessionId &&
-        (run.snapshot.phase === "signaling" || run.snapshot.phase === "ready")
+        (phase === "signaling" || phase === "ready")
     ) {
-        const onlineRemotes = [...run.meshPeers.values()].filter(
-            (p) => !p.isDisposed,
-        );
-        if (onlineRemotes.length > 0 && onlineRemotes.every((p) => p.isMediaConnected)) {
-            avCallLog("beginSignaling group skipped (all mesh media ready)", {
-                sessionId: shortSessionId(sessionId),
-                meshPeers: onlineRemotes.length,
-            });
-            return true;
+        const self = host.getSelf();
+        if (self) {
+            const pending =
+                host.getAvCallSessionPendingParticipants?.(sessionId) ?? [];
+            if (pending.length > 0) {
+                return false;
+            }
+            const presence = host.getPeerPresence();
+            const remotes = remoteMembers(run.members, self).filter(
+                (m) => presence[m] === "online",
+            );
+            const allRemotesMeshed =
+                remotes.length > 0 &&
+                remotes.every((m) => {
+                    const peer = run.meshPeers.get(m);
+                    return (
+                        peer !== undefined &&
+                        !peer.isDisposed &&
+                        peer.isMediaConnected
+                    );
+                });
+            if (allRemotesMeshed) {
+                avCallLog("beginSignaling group skipped (all mesh media ready)", {
+                    sessionId: shortSessionId(sessionId),
+                    meshPeers: remotes.length,
+                });
+                return true;
+            }
         }
     }
     if (
         run.hasJoined &&
         run.snapshot.sessionId === sessionId &&
         !run.snapshot.signalingJoined &&
-        (run.snapshot.phase === "signaling" ||
-            run.snapshot.phase === "joining")
+        (phase === "signaling" || phase === "joining")
     ) {
         avCallLog("beginSignaling group skipped (join in flight)", {
             sessionId: shortSessionId(sessionId),
@@ -354,7 +446,17 @@ export async function beginSignalingGroupAvCall(
     sessionId: string,
     self: string,
 ): Promise<void> {
-    if (beginSignalingGroupAvCallSkipChecks(run, sessionId)) {
+    if (
+        run.awaitingInviteAccept ||
+        host.isAvCallPendingInvite?.(run.spaceUuid)
+    ) {
+        avCallLog("beginSignaling group deferred (pending invite accept)", {
+            space: shortSpaceId(run.spaceUuid),
+            sessionId: shortSessionId(sessionId),
+        });
+        return;
+    }
+    if (beginSignalingGroupAvCallSkipChecks(host, run, sessionId)) {
         return;
     }
 
@@ -365,8 +467,6 @@ export async function beginSignalingGroupAvCall(
         mustJoin,
     });
 
-    host.setPhase(run, "joining", { sessionId });
-
     const signaling = host.getSignaling();
     if (mustJoin && signaling) {
         signaling.joinSession(sessionId);
@@ -374,8 +474,14 @@ export async function beginSignalingGroupAvCall(
         commitAvCallJoin(sessionId);
         run.snapshot = {
             ...run.snapshot,
+            sessionId,
             signalingJoined: true,
         };
+        host.dispatchRunEventForRun?.(run, {
+            type: "joinedSignaling",
+            sessionId,
+        });
+        host.markGroupMeetJoined?.(run.spaceUuid, sessionId);
     }
 
     try {
@@ -388,7 +494,9 @@ export async function beginSignalingGroupAvCall(
     }
     if (run.abort.signal.aborted) return;
     syncMeshAvCallPeers(host, run, sessionId, self);
-    host.setPhase(run, "signaling", { sessionId });
+    if (host.isGroupMeetRejoinAttempt?.(run.spaceUuid)) {
+        run.rejoinFreshStart = false;
+    }
 }
 
 export function declineGroupAvCallInvite(

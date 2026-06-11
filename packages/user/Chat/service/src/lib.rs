@@ -62,13 +62,6 @@ pub mod tables {
         pub created_by: AccountNumber,
     }
 
-    impl SessionRow {
-        #[secondary_key(1)]
-        fn by_space_purpose(&self) -> (String, String) {
-            (self.space_uuid.clone(), self.purpose.clone())
-        }
-    }
-
     #[table(name = "SessionParticipantTable", index = 4)]
     #[derive(Debug, Clone, PartialEq, Eq, Fracpack, ToSchema, Serialize, Deserialize)]
     pub struct SessionParticipantRow {

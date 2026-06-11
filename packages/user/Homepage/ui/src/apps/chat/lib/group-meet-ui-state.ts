@@ -75,9 +75,8 @@ export function groupMeetStatusLabel(
         case "waiting-peer":
             return "Ringing members…";
         case "signaling":
-            return "Connecting…";
         case "ready":
-            return "Connected";
+            return "Connecting…";
         default:
             return "Calling…";
     }
@@ -87,6 +86,52 @@ export function anyGroupMeetJoined(
     meshReady: Readonly<Record<string, boolean>> | undefined,
 ): boolean {
     return Object.values(meshReady ?? {}).some(Boolean);
+}
+
+/** True when every expected remote in the active session roster has live mesh media. */
+export function allSessionGroupMeetJoined(
+    self: string,
+    joinedParticipants: readonly string[],
+    meshReady: Readonly<Record<string, boolean>> | undefined,
+): boolean {
+    const remotes = joinedParticipants.filter((member) => member !== self);
+    if (remotes.length === 0) return false;
+    return remotes.every((member) => meshReady?.[member] === true);
+}
+
+/** Connected when all online group remotes have mesh media (pre-roster / ringing). */
+export function allOnlineGroupMeetJoined(
+    members: readonly string[],
+    self: string,
+    presence: Readonly<Record<string, string>>,
+    meshReady: Readonly<Record<string, boolean>> | undefined,
+): boolean {
+    const remotes = members.filter(
+        (member) => member !== self && presence[member] === "online",
+    );
+    if (remotes.length === 0) return false;
+    return remotes.every((member) => meshReady?.[member] === true);
+}
+
+export function groupMeetFullyConnected(
+    members: readonly string[],
+    self: string,
+    presence: Readonly<Record<string, string>>,
+    joinedParticipants: readonly string[],
+    meshReady: Readonly<Record<string, boolean>> | undefined,
+): boolean {
+    if (joinedParticipants.length > 0) {
+        const onlineJoinedRemotes = joinedParticipants.filter(
+            (member) => member !== self && presence[member] === "online",
+        );
+        if (onlineJoinedRemotes.length === 0) {
+            return anyGroupMeetJoined(meshReady);
+        }
+        return onlineJoinedRemotes.every(
+            (member) => meshReady?.[member] === true,
+        );
+    }
+    return allOnlineGroupMeetJoined(members, self, presence, meshReady);
 }
 
 export type GroupMeetRemoteStreamPeer = {

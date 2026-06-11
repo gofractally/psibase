@@ -1,5 +1,5 @@
 import { PhoneCall, PhoneOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@shared/shadcn/ui/button";
 import {
@@ -21,26 +21,41 @@ type Props = {
 };
 
 const RING_SECONDS = 20;
+/** Group invites can sit open while other members connect first (e2e + real UX). */
+const GROUP_RING_SECONDS = 180;
+
+function ringSecondsForCall(call: PslackIncomingCall | null): number {
+    if (call?.groupParticipantCount && call.groupParticipantCount > 2) {
+        return GROUP_RING_SECONDS;
+    }
+    return RING_SECONDS;
+}
 
 export function IncomingCallDialog({ call, onAccept, onDecline }: Props) {
-    const [remaining, setRemaining] = useState(RING_SECONDS);
+    const ringSeconds = ringSecondsForCall(call);
+    const [remaining, setRemaining] = useState(ringSeconds);
+    const acceptingRef = useRef(false);
 
     useEffect(() => {
         if (!call) {
             setRemaining(RING_SECONDS);
             return;
         }
-        setRemaining(RING_SECONDS);
+        const seconds = ringSecondsForCall(call);
+        setRemaining(seconds);
         const started = Date.now();
         let finished = false;
         const id = globalThis.setInterval(() => {
             if (finished) return;
-            const left = RING_SECONDS - Math.floor((Date.now() - started) / 1000);
+            const left =
+                seconds - Math.floor((Date.now() - started) / 1000);
             setRemaining(Math.max(0, left));
             if (left <= 0) {
                 finished = true;
                 globalThis.clearInterval(id);
-                onDecline("timeout");
+                if (!acceptingRef.current) {
+                    onDecline("timeout");
+                }
             }
         }, 250);
         return () => {
@@ -49,11 +64,18 @@ export function IncomingCallDialog({ call, onAccept, onDecline }: Props) {
         };
     }, [call?.callId, call, onDecline]);
 
+    const handleAccept = () => {
+        acceptingRef.current = true;
+        onAccept();
+    };
+
     return (
         <Dialog
             open={call !== null}
             onOpenChange={(open) => {
-                if (!open) onDecline("user");
+                if (!open) {
+                    acceptingRef.current = false;
+                }
             }}
         >
             <DialogContent className="max-w-sm">
@@ -105,7 +127,7 @@ export function IncomingCallDialog({ call, onAccept, onDecline }: Props) {
                         <PhoneOff className="size-4" />
                         Decline
                     </Button>
-                    <Button type="button" onClick={onAccept}>
+                    <Button type="button" onClick={handleAccept}>
                         <PhoneCall className="size-4" />
                         Accept
                     </Button>

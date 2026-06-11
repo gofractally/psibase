@@ -81,6 +81,7 @@ export const AV_CALL_PURPOSE = "av-call";
 
 /** Objective Chat session event kinds (matches Chat service SESSION_EVENT_*). */
 export const CHAT_WEBRTC_EVENT_PARTICIPANT_JOINED = 1;
+export const CHAT_WEBRTC_EVENT_PARTICIPANT_LEFT = 2;
 export const CHAT_WEBRTC_EVENT_SESSION_FAILED = 3;
 export const CHAT_WEBRTC_EVENT_SESSION_ENDED = 4;
 
@@ -260,6 +261,19 @@ export async function createAvCallSession(
         intf: "api",
         method: "create-session",
         params: [spaceUuid, AV_CALL_PURPOSE, canonicalChatParticipants(participants)],
+    });
+}
+
+export async function closeAvCallSession(
+    sessionId: string,
+    reason: string,
+): Promise<void> {
+    await supervisor.functionCall({
+        service: CHAT_SERVICE,
+        plugin: "plugin",
+        intf: "api",
+        method: "close-session",
+        params: [sessionId, reason],
     });
 }
 

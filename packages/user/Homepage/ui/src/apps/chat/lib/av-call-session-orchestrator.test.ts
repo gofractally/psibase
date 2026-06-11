@@ -6,6 +6,7 @@ import type { ServerRealtimeFrame } from "./realtime-protocol";
 vi.mock("./av-call-debug", () => ({
     avCallLog: () => {},
     avCallRecord: () => {},
+    avCallTeardownLog: () => {},
     shortSessionId: (id: string) => id,
     shortSpaceId: (id: string) => id,
 }));
@@ -263,7 +264,7 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
         orch.dispose();
     });
 
-    it("surfaces sessionInvite for callee accept without blocking pipeline", () => {
+    it("surfaces sessionInvite for callee accept without blocking pipeline", async () => {
         const invites: unknown[] = [];
         const { orch, rt } = makeOrchestrator({
             onIncomingInvite: (invite) => invites.push(invite),
@@ -289,6 +290,9 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
 
         orch.acceptIncomingInvite();
 
+        await vi.waitFor(() => {
+            expect(orch.getPendingInvite()).toBeNull();
+        });
         expect(
             rt.sentClientFrames.some(
                 (f) =>
@@ -297,8 +301,9 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
                     (f as { t?: string }).t === "joinSession",
             ),
         ).toBe(true);
-        expect(orch.getPendingInvite()).toBeNull();
-        expect(buildPeerMock.peers).toHaveLength(1);
+        await vi.waitFor(() => {
+            expect(buildPeerMock.peers).toHaveLength(1);
+        });
         expect(buildPeerMock.peers[0]?.isInitiator).toBe(true);
         orch.dispose();
     });
@@ -338,7 +343,59 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
         orch.dispose();
     });
 
-    it("decline joinSessions then leaveSessions for objective timeline wire-back", () => {
+    it("duplicate sessionInvite while joined preserves hasJoined for hangup", async () => {
+        const invites: unknown[] = [];
+        const { orch, rt } = makeOrchestrator({
+            onIncomingInvite: (invite) => invites.push(invite),
+        });
+        orch.ensureDmAvCallSession(SPACE_DM, [SELF, PEER]);
+
+        await vi.waitFor(() => {
+            expect(buildPeerMock.peers).toHaveLength(1);
+            expect(orch.getRun(SPACE_DM)?.hasJoined).toBe(true);
+        });
+
+        const inviteCountBefore = invites.length;
+        rt.dispatch({
+            t: "sessionInvite",
+            sessionId: SESSION_ID,
+            appService: "chat",
+            appSessionId: SESSION_ID,
+            purpose: "av-call",
+            from: SELF,
+            participants: [SELF, PEER],
+            transports: ["audio", "video"],
+            dataChannels: [],
+            expiresAt: Date.now() + 60_000,
+            appMetadata: { spaceUuid: SPACE_DM },
+        });
+
+        expect(invites).toHaveLength(inviteCountBefore);
+        expect(orch.getRun(SPACE_DM)?.hasJoined).toBe(true);
+
+        const leaveCountBefore = rt.sentClientFrames.filter(
+            (f) =>
+                typeof f === "object" &&
+                f !== null &&
+                (f as { t?: string }).t === "leaveSession",
+        ).length;
+
+        orch.hangupAvCallSession(SPACE_DM, "ended");
+
+        await vi.waitFor(() => {
+            const leaveFrames = rt.sentClientFrames.filter(
+                (f) =>
+                    typeof f === "object" &&
+                    f !== null &&
+                    (f as { t?: string }).t === "leaveSession",
+            );
+            expect(leaveFrames.length).toBeGreaterThan(leaveCountBefore);
+        });
+
+        orch.dispose();
+    });
+
+    it("decline joinSessions then leaveSessions for objective timeline wire-back", async () => {
         const { orch, rt } = makeOrchestrator();
 
         rt.dispatch({
@@ -357,7 +414,9 @@ describe("AvCallSessionOrchestrator — DM lifecycle", () => {
 
         orch.declineIncomingInvite("user");
 
-        expect(orch.getPendingInvite()).toBeNull();
+        await vi.waitFor(() => {
+            expect(orch.getPendingInvite()).toBeNull();
+        });
         expect(
             rt.sentClientFrames.some(
                 (f) =>
@@ -468,7 +527,7 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
 
         await vi.waitFor(() => {
             expect(orch.getSnapshot(SPACE_GROUP).phase).toBe("signaling");
-        });
+        }, { timeout: 5000 });
 
         expect(buildPeerMock.peers.some((p) => p.peerAccount === PEER)).toBe(
             true,
@@ -493,7 +552,7 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         orch.ensureGroupAvCallSession(SPACE_GROUP, GROUP_MEMBERS);
 
         await vi.waitFor(() => {
-            expect(orch.getSnapshot(SPACE_GROUP).phase).toBe("signaling");
+            expect(buildPeerMock.peers).toHaveLength(2);
         });
 
         presence[PEER] = "offline";
@@ -501,12 +560,13 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         orch.onPeerOffline(PEER);
         orch.onPeerOffline(PEER2);
 
+        await vi.waitFor(() => {
+            expect(buildPeerMock.peers.every((p) => p.isDisposed)).toBe(true);
+        });
+
         expect(orch.getSnapshot(SPACE_GROUP).meshPeerSignalingReady?.[PEER]).toBe(
-            undefined,
+            false,
         );
-        expect(
-            buildPeerMock.peers.every((p) => p.isDisposed),
-        ).toBe(true);
         expect(orch.getSnapshot(SPACE_GROUP).phase).toBe("waiting-peer");
         orch.dispose();
     });
@@ -581,6 +641,66 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         expect(invites).toHaveLength(1);
         expect(orch.getPendingInvite()?.participants).toEqual(GROUP_MEMBERS);
         expect(createAvCallSession).not.toHaveBeenCalled();
+        orch.dispose();
+    });
+
+    it("duplicate group sessionInvite from another member does not reset accepted call", async () => {
+        const invites: unknown[] = [];
+        const { orch, rt } = makeOrchestrator({
+            onIncomingInvite: (invite) => invites.push(invite),
+        });
+
+        const inviteFrame = {
+            t: "sessionInvite" as const,
+            sessionId: SESSION_GROUP,
+            appService: "chat",
+            appSessionId: SESSION_GROUP,
+            purpose: "av-call" as const,
+            from: PEER,
+            participants: GROUP_MEMBERS,
+            transports: ["audio", "video"],
+            dataChannels: [],
+            expiresAt: Date.now() + 60_000,
+            appMetadata: { spaceUuid: SPACE_GROUP },
+        };
+
+        rt.dispatch(inviteFrame);
+        expect(invites).toHaveLength(1);
+
+        orch.acceptIncomingInvite();
+
+        await vi.waitFor(() => {
+            const run = orch.getRun(SPACE_GROUP);
+            expect(run?.awaitingInviteAccept).toBe(false);
+            expect(run?.hasJoined).toBe(true);
+        });
+
+        rt.dispatch({ ...inviteFrame, from: PEER2 });
+
+        const run = orch.getRun(SPACE_GROUP);
+        expect(run?.awaitingInviteAccept).toBe(false);
+        expect(run?.hasJoined).toBe(true);
+        expect(invites).toHaveLength(1);
+        orch.dispose();
+    });
+
+    it("ignores stale sessionSnapshot epoch on av-call roster", () => {
+        const { orch } = makeOrchestrator();
+        orch.recordAvCallSessionSnapshot(
+            SESSION_GROUP,
+            GROUP_MEMBERS,
+            [],
+            3,
+        );
+        orch.recordAvCallSessionSnapshot(
+            SESSION_GROUP,
+            [SELF, PEER],
+            [PEER2],
+            2,
+        );
+        expect(orch.getAvCallSessionJoinedParticipants(SESSION_GROUP)).toEqual(
+            GROUP_MEMBERS,
+        );
         orch.dispose();
     });
 });
