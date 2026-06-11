@@ -159,6 +159,32 @@ TEST_CASE("events")
                           R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID)""") ==
          std::vector<TestEvent>{{42}, {72}, {42}, {91}});
 
+   CHECK(query<TestEvent>(
+             chain, R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID DESC)""") ==
+         std::vector<TestEvent>{{91}, {42}, {72}, {42}});
+
+   CHECK(query<TestEvent>(
+             chain,
+             R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID DESC LIMIT 1)""") ==
+         std::vector<TestEvent>{{91}});
+
+   CHECK(
+       query<TestEvent>(
+           chain,
+           R"""(SELECT i FROM "history.test-service.testevent" WHERE ROWID <= (SELECT MAX(ROWID) FROM "history.test-service.testevent") ORDER BY ROWID DESC LIMIT 2)""") ==
+       std::vector<TestEvent>{{91}, {42}});
+
+   CHECK(
+       query<TestEvent>(
+           chain,
+           R"""(SELECT i FROM "history.test-service.testevent" WHERE ROWID > (SELECT MIN(ROWID) FROM "history.test-service.testevent") ORDER BY ROWID DESC)""") ==
+       std::vector<TestEvent>{{91}, {42}, {72}});
+
+   CHECK(query<TestEvent>(
+             chain,
+             R"""(SELECT i FROM "history.test-service.testevent" WHERE d > 2 ORDER BY ROWID DESC)""") ==
+         std::vector<TestEvent>{{42}, {72}});
+
    CHECK(
        query<TestEvent>(
            chain,
