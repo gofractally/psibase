@@ -932,6 +932,9 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    key.push_back(static_cast<char>(index));
    c->prefixLen = key.size();
    c->key       = key;
+   // xFilter may be called multiple times to restart a scan on the same
+   // cursor; the upper bound must not leak from a previous filter.
+   c->end.clear();
    auto keyType = index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &u64};
    auto incKey  = [&](std::vector<char>& k)
    {
