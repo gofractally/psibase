@@ -1,0 +1,14 @@
+package homepage:plugin;
+
+world impl {
+    include host:common/imports;
+    include host:crypto/imports;
+    include transact:plugin/imports;
+    include auth-sig:plugin/imports;
+    include prem-accounts:plugin/imports;
+
+    import accounts:plugin/api;
+    import accounts:plugin/prompt;
+
+    export premium-accounts;
+}

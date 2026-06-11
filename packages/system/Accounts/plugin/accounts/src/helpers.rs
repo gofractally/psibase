@@ -1,11 +1,8 @@
 use crate::bindings::exports::accounts::plugin::api::Guest;
 use crate::bindings::host::common::client as Client;
 use crate::bindings::host::types::types as CommonTypes;
-use crate::bindings::prem_accounts::plugin::authorized as PremAccountsAuth;
 use crate::errors::ErrorType::*;
 use crate::plugin::AccountsPlugin;
-use psibase::services::tokens::Decimal;
-use serde::Deserialize;
 
 /// Asserts that the caller of the current plugin function is the top-level app,
 ///    or one of the privileged apps.
@@ -85,55 +82,4 @@ pub fn generate_account(prefix: Option<String>) -> Result<String, CommonTypes::E
         }
     }
     Err(MaxGenerationAttemptsExceeded().into())
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketPrice {
-    length: u8,
-    price: Decimal,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketConfigLite {
-    length: u8,
-    enabled: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketsOverviewData {
-    market_params: Vec<MarketConfigLite>,
-    current_prices: Vec<MarketPrice>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MarketsOverviewResponse {
-    data: MarketsOverviewData,
-}
-
-pub fn premium_market_ask(account_name: &str) -> Result<String, CommonTypes::Error> {
-    let length = account_name.len() as u8;
-    let query = "query { marketParams { length enabled } currentPrices { length price } }";
-    let response =
-        serde_json::from_str::<MarketsOverviewResponse>(&PremAccountsAuth::graphql(query)?)
-            .map_err(|e| QueryError(e.to_string()))?;
-
-    response
-        .data
-        .market_params
-        .iter()
-        .find(|s| s.length == length)
-        .filter(|s| s.enabled)
-        .ok_or(NameLengthUnavailable())?;
-
-    response
-        .data
-        .current_prices
-        .iter()
-        .find(|p| p.length == length)
-        .map(|row| row.price.to_string())
-        .ok_or(QueryError("missing price row for configured premium name market".into()).into())
 }

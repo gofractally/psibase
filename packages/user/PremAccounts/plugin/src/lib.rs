@@ -2,19 +2,14 @@
 mod bindings;
 
 use bindings::accounts::plugin::api as AccountsApi;
-use bindings::auth_sig::plugin::actions as AuthSigActions;
-use bindings::auth_sig::plugin::keyvault as AuthSigKeyvault;
 use bindings::exports::prem_accounts::plugin::api::Guest as Api;
 use bindings::exports::prem_accounts::plugin::authorized::Guest as Authorized;
 use bindings::exports::prem_accounts::plugin::market_admin::Guest as MarketAdmin;
 use bindings::exports::prem_accounts::plugin::market_admin::MarketConfig;
 use bindings::host::common::server as CommonServer;
-use bindings::host::crypto::keyvault as HostCrypto;
 use bindings::tokens::plugin::helpers as TokensHelpers;
 use bindings::tokens::plugin::user as TokensUser;
-use bindings::transact::plugin::intf as TransactPlugin;
 
-use psibase::services::auth_sig;
 use psibase::services::tokens::Quantity;
 use psibase::AccountNumber;
 mod errors;
@@ -198,22 +193,6 @@ impl Api for PremAccountsPlugin {
         prem_accounts::Wrapper::add_to_tx().claim(account);
 
         Ok(())
-    }
-
-    #[psibase_plugin::authorized(Medium, whitelist = ["accounts", "homepage"])]
-    fn claim_and_set_key(account: String) -> Result<String, Error> {
-        Self::claim(account.clone())?;
-
-        let keypair = HostCrypto::generate_unmanaged_keypair()?;
-
-        TransactPlugin::set_propose_latch(Some(&account))?;
-        AuthSigActions::set_key(&keypair.public_key)?;
-        AccountsApi::set_auth_service(&auth_sig::Wrapper::SERVICE.to_string())?;
-        TransactPlugin::set_propose_latch(None)?;
-
-        AuthSigKeyvault::import_key(&keypair.private_key)?;
-
-        Ok(keypair.private_key)
     }
 }
 

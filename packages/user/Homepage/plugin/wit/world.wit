@@ -1,0 +1,14 @@
+package homepage:plugin;
+
+interface premium-accounts {
+    use host:types/types.{error};
+
+    /// Purchases a premium account name, claims it, configures auth-sig, and returns the new account's private key.
+    ///
+    /// The account is imported onto this device.
+    claim-and-set-key: func(account: string) -> result<string, error>;
+}
+
+world imports {
+    import premium-accounts;
+}

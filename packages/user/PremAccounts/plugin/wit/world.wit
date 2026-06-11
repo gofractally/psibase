@@ -63,12 +63,6 @@ interface api {
     /// Claim a premium name
     /// * `account`: the account to claim the name for
     claim: func(account: string) -> result<_, error>;
-
-    /// Claim a premium name and immediately key the account with a newly generated keypair.
-    /// * `account`: the account to claim the name for
-    ///
-    /// Private key is imported into the host keyvault and returned for password-manager storage.
-    claim-and-set-key: func(account: string) -> result<string, error>;
 }
 
 /// Interface that makes authorized queries to this app's http server.

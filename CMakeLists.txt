@@ -301,6 +301,7 @@ add_rs_component_workspace(packages/:Plugins
     workshop
     fractal-core
     config
+    homepage
     producers
 )
 
@@ -762,9 +763,11 @@ psibase_package(
     DESCRIPTION "Network homepage"
     SERVICE homepage
         DATA GLOB ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/ui/dist/*  /
+        DATA ${Plugins_OUTPUT_FILE_homepage} /plugin.wasm
         POSTINSTALL ${CMAKE_CURRENT_SOURCE_DIR}/packages/user/Homepage/postinstall.json
-    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)"
+    PACKAGE_DEPENDS "HttpServer(^${PSIBASE_VERSION}.0)" "Sites(^${PSIBASE_VERSION}.0)" "Accounts(^${PSIBASE_VERSION}.0)" "AccountsService(^${PSIBASE_VERSION}.0)" "Profiles(^${PSIBASE_VERSION}.0)" "Branding(^${PSIBASE_VERSION}.0)" "PremAccounts(^${PSIBASE_VERSION}.0)" "AuthSig(^${PSIBASE_VERSION}.0)" "Transact(^${PSIBASE_VERSION}.0)" "Host(^${PSIBASE_VERSION}.0)"
     DEPENDS ${Homepage_js_DEP}
+    DEPENDS ${Plugins_DEP}
 )
 
 cargo_psibase_package(
