@@ -22,7 +22,7 @@ define_trust! {
         High => "",
     }
     functions {
-        Low => [ensure_space, ensure_dm, ensure_group, create_session],
+        Low => [ensure_space, ensure_dm, ensure_group, create_session, close_session],
     }
 }
 
@@ -90,6 +90,21 @@ impl Api for ChatPlugin {
         }
         .packed();
         add_action_to_transaction(chat::action_structs::createSession::ACTION_NAME, &packed)
+            .unwrap();
+        Ok(())
+    }
+
+    fn close_session(session_id: String, reason: String) -> Result<(), Error> {
+        trust::assert_authorized_with_whitelist(
+            trust::FunctionName::close_session,
+            vec!["homepage".into()],
+        )?;
+        let packed = chat::action_structs::closeSession {
+            session_id,
+            reason,
+        }
+        .packed();
+        add_action_to_transaction(chat::action_structs::closeSession::ACTION_NAME, &packed)
             .unwrap();
         Ok(())
     }

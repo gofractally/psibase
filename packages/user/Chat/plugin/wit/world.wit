@@ -7,6 +7,7 @@ interface api {
     ensure-dm: func(contact: string) -> result<_, error>;
     ensure-group: func(other-members: list<string>) -> result<_, error>;
     create-session: func(space-uuid: string, purpose: string, participants: list<string>) -> result<_, error>;
+    close-session: func(session-id: string, reason: string) -> result<_, error>;
     commit-webrtc-session-event: func(session-id: string, kind: u8, reason: string) -> result<_, error>;
 }
 

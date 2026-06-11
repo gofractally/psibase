@@ -713,6 +713,91 @@ mod tests {
     }
 
     #[psibase::test_case(packages("Chat"))]
+    fn test_create_av_call_supersedes_existing_active_session(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init();
+
+        let alice = AccountNumber::from("alice");
+        let bob = AccountNumber::from("bob");
+        let carol = AccountNumber::from("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+
+        let space = Wrapper::push_from(&chain, alice)
+            .ensureGroup(vec![bob, carol])
+            .get()?;
+        let first = Wrapper::push_from(&chain, alice)
+            .createSession(
+                space.space_uuid.clone(),
+                "av-call".into(),
+                vec![alice, bob],
+            )
+            .get()?;
+        let second = Wrapper::push_from(&chain, alice)
+            .createSession(
+                space.space_uuid,
+                "av-call".into(),
+                vec![alice, bob],
+            )
+            .get()?;
+
+        assert_ne!(first.session_id, second.session_id);
+        assert_eq!(second.lifecycle, 1);
+
+        let first_row = Wrapper::push_from(&chain, alice)
+            .getSession(first.session_id)
+            .get()?
+            .expect("first session stored");
+        assert_eq!(first_row.lifecycle, 2);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Chat"))]
+    fn test_create_av_call_after_explicit_close(
+        chain: psibase::Chain,
+    ) -> Result<(), psibase::Error> {
+        Wrapper::push(&chain).init();
+
+        let alice = AccountNumber::from("alice");
+        let bob = AccountNumber::from("bob");
+        let carol = AccountNumber::from("carol");
+        chain.new_account(alice).unwrap();
+        chain.new_account(bob).unwrap();
+        chain.new_account(carol).unwrap();
+
+        let space = Wrapper::push_from(&chain, alice)
+            .ensureGroup(vec![bob, carol])
+            .get()?;
+        let first = Wrapper::push_from(&chain, alice)
+            .createSession(
+                space.space_uuid.clone(),
+                "av-call".into(),
+                vec![alice, bob],
+            )
+            .get()?;
+
+        Wrapper::push_from(&chain, alice)
+            .closeSession(first.session_id.clone(), "done".into())
+            .get()?;
+
+        let second = Wrapper::push_from(&chain, alice)
+            .createSession(
+                space.space_uuid,
+                "av-call".into(),
+                vec![alice, bob],
+            )
+            .get()?;
+
+        assert_ne!(first.session_id, second.session_id);
+        assert_eq!(second.lifecycle, 1);
+
+        Ok(())
+    }
+
+    #[psibase::test_case(packages("Chat"))]
     fn test_close_session_by_participant(chain: psibase::Chain) -> Result<(), psibase::Error> {
         Wrapper::push(&chain).init();
 
