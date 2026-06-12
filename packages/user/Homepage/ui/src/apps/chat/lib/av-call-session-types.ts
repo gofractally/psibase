@@ -64,6 +64,8 @@ export type AvCallSpaceRunBase = {
     onUpdate: () => void;
     /** Capped exponential-backoff attempt counter for transport recovery (A4). */
     transportRecoveryAttempt: number;
+    /** Set synchronously on sessionInvite until callee accepts/declines. */
+    awaitingInviteAccept?: boolean;
 };
 
 export type DmAvCallRun = AvCallSpaceRunBase & {
@@ -162,6 +164,8 @@ export interface AvCallOrchestratorHost {
     ): void;
     retireAvCallSession?(sessionId: string): void;
     unretireAvCallSession?(sessionId: string): void;
+    /** True when the callee has an incoming ring and has not accepted yet. */
+    isAvCallPendingInvite?(spaceUuid: string): boolean;
     isRetiredAvCallSession?(sessionId: string): boolean;
     tearDownDmPeer(run: DmAvCallRun, reason: string): void;
 

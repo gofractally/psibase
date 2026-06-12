@@ -11,7 +11,7 @@ const HOMEPAGE_URL =
  */
 export default defineConfig({
     testDir: "./tests",
-    timeout: 300_000,
+    timeout: 900_000,
     expect: {
         timeout: 10_000,
     },

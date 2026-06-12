@@ -620,8 +620,8 @@ describe("av-call-run-state-machine", () => {
                     liveMediaReady: { [BOB]: true, [CAROL]: true },
                 }),
             );
-            expect(result.state.tag).toBe("signaling");
-            if (result.state.tag === "signaling") {
+            expect(result.state.tag).toBe("ready");
+            if (result.state.tag === "ready") {
                 expect(result.state.peerSlots[BOB]).toBe("absent");
                 expect(result.state.peerSlots[CAROL]).toBe("ready");
                 expect(result.state.departedPeers?.[BOB]).toBe(true);
@@ -990,6 +990,45 @@ describe("av-call-run-state-machine", () => {
                 }),
             );
             expect(result.state.tag).toBe("waitingPeer");
+        });
+
+        it("group presenceOffline during ready keeps survivors connected", () => {
+            const result = avTransition(
+                {
+                    tag: "ready",
+                    sessionId: SESSION,
+                    peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                    signalingJoined: true,
+                },
+                { type: "presenceOffline", account: BOB },
+                ctx({
+                    kind: "group",
+                    members: [SELF, BOB, CAROL],
+                    presence: { [BOB]: "offline", [CAROL]: "online" },
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true, [CAROL]: true },
+                }),
+            );
+            expect(result.state.tag).toBe("ready");
+            if (result.state.tag === "ready") {
+                expect(result.state.peerSlots[BOB]).toBe("absent");
+                expect(result.state.peerSlots[CAROL]).toBe("ready");
+            }
+        });
+
+        it("presenceOnline while pending invite does not begin signaling", () => {
+            const result = avTransition(
+                {
+                    tag: "pendingInvite",
+                    sessionId: SESSION,
+                    from: BOB,
+                    wantVideo: true,
+                    wantAudio: true,
+                },
+                { type: "presenceOnline", account: BOB },
+                ctx({ kind: "group", hasJoined: false }),
+            );
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
         });
     });
 

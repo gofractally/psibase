@@ -642,4 +642,44 @@ describe("AvCallSessionOrchestrator — group lifecycle", () => {
         expect(createAvCallSession).not.toHaveBeenCalled();
         orch.dispose();
     });
+
+    it("duplicate group sessionInvite from another member does not reset accepted call", async () => {
+        const invites: unknown[] = [];
+        const { orch, rt } = makeOrchestrator({
+            onIncomingInvite: (invite) => invites.push(invite),
+        });
+
+        const inviteFrame = {
+            t: "sessionInvite" as const,
+            sessionId: SESSION_GROUP,
+            appService: "chat",
+            appSessionId: SESSION_GROUP,
+            purpose: "av-call" as const,
+            from: PEER,
+            participants: GROUP_MEMBERS,
+            transports: ["audio", "video"],
+            dataChannels: [],
+            expiresAt: Date.now() + 60_000,
+            appMetadata: { spaceUuid: SPACE_GROUP },
+        };
+
+        rt.dispatch(inviteFrame);
+        expect(invites).toHaveLength(1);
+
+        orch.acceptIncomingInvite();
+
+        await vi.waitFor(() => {
+            const run = orch.getRun(SPACE_GROUP);
+            expect(run?.awaitingInviteAccept).toBe(false);
+            expect(run?.hasJoined).toBe(true);
+        });
+
+        rt.dispatch({ ...inviteFrame, from: PEER2 });
+
+        const run = orch.getRun(SPACE_GROUP);
+        expect(run?.awaitingInviteAccept).toBe(false);
+        expect(run?.hasJoined).toBe(true);
+        expect(invites).toHaveLength(1);
+        orch.dispose();
+    });
 });

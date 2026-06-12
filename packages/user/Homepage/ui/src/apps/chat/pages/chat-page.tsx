@@ -8,6 +8,7 @@ import { useMediaQuery } from "usehooks-ts";
 
 import { ChatComposer } from "@/apps/chat/components/chat-composer";
 import { CallView } from "@/apps/chat/components/call-view";
+import { GroupMeetRejoinBanner } from "@/apps/chat/components/group-meet-rejoin-banner";
 import { ConnectionStatusBanner } from "@/apps/chat/components/connection-status-banner";
 import { RealtimeConnectionIndicator } from "@/apps/chat/components/realtime-connection-indicator";
 import {
@@ -184,6 +185,8 @@ export const ChatPage = () => {
         acceptIncomingCall,
         declineIncomingCall,
         endPlaceholderCall,
+        groupMeetRejoinHint,
+        rejoinGroupMeetCall,
         callLocalStream,
         callRemoteStream,
         callRemoteStreamsByAccount,
@@ -647,6 +650,21 @@ export const ChatPage = () => {
                                             Meet
                                         </Button>
                                     </div>
+                                ) : null}
+                                {groupMeetRejoinHint &&
+                                selectedConversationId ===
+                                    groupMeetRejoinHint.spaceUuid &&
+                                !activeCallForSelected ? (
+                                    <GroupMeetRejoinBanner
+                                        joinedCount={
+                                            groupMeetRejoinHint.joinedCount
+                                        }
+                                        onRejoin={() =>
+                                            rejoinGroupMeetCall(
+                                                groupMeetRejoinHint.spaceUuid,
+                                            )
+                                        }
+                                    />
                                 ) : null}
                                 {activeCallForSelected ? (
                                     <CallView

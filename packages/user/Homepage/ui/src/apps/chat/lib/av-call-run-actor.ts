@@ -8,6 +8,7 @@ import {
     beginSignalingGroupAvCall,
     beginSignalingGroupAvCallSkipChecks,
     ensureGroupLocalMedia,
+    reconcileGroupMeshMediaConnected,
     startMeshAvCallPeer,
     tearDownGroupLocalMedia,
     tearDownMeshAvCallPeer,
@@ -65,6 +66,7 @@ export function buildAvRunContext(
         hasActivePeer,
         hasJoined: run.hasJoined,
         hasLocalStream,
+        snapshotSessionId: run.snapshot.sessionId,
     };
 }
 
@@ -323,6 +325,14 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
             run.kind === "group" &&
             beginSignalingGroupAvCallSkipChecks(this.host, run, sessionId)
         ) {
+            if (run.hasJoined) {
+                this.host.dispatchRunEventForRun?.(run, {
+                    type: "joinedSignaling",
+                    sessionId,
+                });
+            }
+            reconcileGroupMeshMediaConnected(this.host, run);
+            syncSnapshot();
             return;
         }
 
@@ -346,6 +356,9 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
                 type: "joinedSignaling",
                 sessionId,
             });
+        }
+        if (run.kind === "group") {
+            reconcileGroupMeshMediaConnected(this.host, run);
         }
         syncSnapshot();
     }

@@ -392,6 +392,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
     const wasOnChatRouteRef = useRef(false);
     const [incomingAvCallInvite, setIncomingAvCallInvite] =
         useState<AvCallIncomingInvite | null>(null);
+    const [groupMeetRejoinHint, setGroupMeetRejoinHint] = useState<{
+        spaceUuid: string;
+        sessionId: string;
+        joinedCount: number;
+    } | null>(null);
     const selfRef = useRef<string | null>(null);
 
     const shouldAcceptInboundFrom = (account: string): boolean =>
@@ -1881,6 +1886,11 @@ export function useChatSocket(options?: UseChatSocketOptions) {
                 const isConnected =
                     snap.phase === "ready" &&
                     anyGroupMeetJoined(snap.meshPeerSignalingReady);
+                if (isConnected) {
+                    setGroupMeetRejoinHint((prev) =>
+                        prev?.spaceUuid === spaceUuid ? null : prev,
+                    );
+                }
                 const anyParticipantJoined = groupParticipants.some(
                     (participant) => participant.status === "joined",
                 );
@@ -3560,6 +3570,9 @@ export function useChatSocket(options?: UseChatSocketOptions) {
 
             avCallDirectionRef.current = "outgoing";
             avCallUiArmedRef.current = convId;
+            setGroupMeetRejoinHint((prev) =>
+                prev?.spaceUuid === convId ? null : prev,
+            );
             setSelectedConversationId(convId);
 
             if (
@@ -3698,6 +3711,29 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         [],
     );
 
+    const rejoinGroupMeetCall = useCallback((spaceUuid: string) => {
+        const self = selfRef.current;
+        const orch = avCallOrchestratorRef.current;
+        if (!self || !orch) return;
+
+        const conversation = conversationsRef.current.find(
+            (row) => row.conversationId === spaceUuid,
+        );
+        if (
+            !conversation ||
+            conversation.kind !== "group" ||
+            !conversation.members.includes(self)
+        ) {
+            return;
+        }
+
+        setGroupMeetRejoinHint(null);
+        avCallDirectionRef.current = "incoming";
+        avCallUiArmedRef.current = spaceUuid;
+        setSelectedConversationId(spaceUuid, "rejoinGroupMeet");
+        orch.ensureGroupAvCallSession(spaceUuid, conversation.members);
+    }, [setSelectedConversationId]);
+
     const endPlaceholderCall = useCallback(() => {
         if (ringOutTimerRef.current != null) {
             globalThis.clearTimeout(ringOutTimerRef.current);
@@ -3709,14 +3745,36 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         hangupInitiatedCallIdRef.current = ac.callId;
 
         if (ac.source === "av-call") {
+            const orch = avCallOrchestratorRef.current;
+            const self = selfRef.current;
+            const run = orch?.getRun(ac.conversationId);
+            const sessionId = run?.snapshot.sessionId;
+            if (
+                ac.callKind === "group" &&
+                sessionId &&
+                self &&
+                orch?.othersStillJoinedInGroupMeet(sessionId, self)
+            ) {
+                const joinedCount =
+                    orch.getAvCallSessionRosterJoinedCount(sessionId);
+                setGroupMeetRejoinHint({
+                    spaceUuid: ac.conversationId,
+                    sessionId,
+                    joinedCount: Math.max(0, joinedCount - 1),
+                });
+            } else if (ac.callKind === "group") {
+                setGroupMeetRejoinHint((prev) =>
+                    prev?.spaceUuid === ac.conversationId ? null : prev,
+                );
+            }
+
             const reason =
                 ac.status === "ringing" && ac.direction === "outgoing"
                     ? "cancelled"
-                    : "ended";
-            avCallOrchestratorRef.current?.hangupAvCallSession(
-                ac.conversationId,
-                reason,
-            );
+                    : ac.callKind === "group"
+                      ? "left"
+                      : "ended";
+            orch?.hangupAvCallSession(ac.conversationId, reason);
             avCallUiArmedRef.current = null;
             clearAvCallMedia();
             void refreshObjectiveCallEventsForSpaceRef.current(
@@ -4214,6 +4272,8 @@ export function useChatSocket(options?: UseChatSocketOptions) {
         acceptIncomingCall,
         declineIncomingCall,
         endPlaceholderCall,
+        groupMeetRejoinHint,
+        rejoinGroupMeetCall,
 
         callLocalStream: uiCallLocalStream,
         callRemoteStream: uiCallRemoteStream,

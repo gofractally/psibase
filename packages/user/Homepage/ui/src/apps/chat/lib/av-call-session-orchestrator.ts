@@ -30,6 +30,7 @@ import {
     beginSignalingGroupAvCall,
     beginSignalingGroupAvCallSkipChecks,
     ensureGroupAvCallSession,
+    reconcileGroupMeshMediaConnected,
     tearDownGroupLocalMedia,
     tearDownMeshSignalingPeer,
 } from "./av-call-group-orchestrator";
@@ -168,6 +169,12 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         return actor;
     }
 
+    isAvCallPendingInvite(spaceUuid: string): boolean {
+        const run = this.getRun(spaceUuid);
+        if (run?.awaitingInviteAccept) return true;
+        return this.actors.get(spaceUuid)?.machineState.tag === "pendingInvite";
+    }
+
     dispatchRunEventForRun(run: AvCallSpaceRun, event: AvRunEvent): void {
         this.getOrCreateActor(run).dispatch(event);
     }
@@ -282,7 +289,11 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const run = this.ensureRunForInvite(invite, self);
         void (async () => {
             await this.ensurePendingInviteOnActor(run, invite);
+            run.awaitingInviteAccept = false;
             await this.dispatchRunEventAndWait(run, { type: "acceptInvite" });
+            if (run.kind === "group") {
+                reconcileGroupMeshMediaConnected(this, run);
+            }
         })();
     }
 
@@ -302,6 +313,7 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
                 type: "declineInvite",
                 reason,
             });
+            run.awaitingInviteAccept = false;
             this.deleteRun(run.spaceUuid);
         })();
     }
@@ -806,6 +818,15 @@ export class AvCallSessionOrchestrator implements AvCallOrchestratorHost {
         const roster = this.avCallSessionRosters.get(sessionId);
         if (!roster) return false;
         return roster.joined.some((p) => p !== self);
+    }
+
+    /** Whether other participants remain in an active group Meet session. */
+    othersStillJoinedInGroupMeet(sessionId: string, self: string): boolean {
+        return this.othersStillJoinedInAvCallSession(sessionId, self);
+    }
+
+    getAvCallSessionRosterJoinedCount(sessionId: string): number {
+        return this.avCallSessionRosters.get(sessionId)?.joined.length ?? 0;
     }
 
     /**

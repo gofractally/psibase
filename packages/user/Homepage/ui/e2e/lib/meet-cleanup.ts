@@ -26,7 +26,7 @@ export async function bestEffortEndActiveMeet(page: Page): Promise<void> {
     const section = meetCallSection(page);
     if ((await section.count()) === 0) return;
     const endButton = section.getByRole("button", {
-        name: /End call|Cancel call/,
+        name: /Leave call|Cancel call/,
     });
     if ((await endButton.count()) === 0) return;
     await endButton.first().click({ timeout: 5_000 }).catch(() => {});

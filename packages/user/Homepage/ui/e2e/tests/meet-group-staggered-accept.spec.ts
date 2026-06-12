@@ -6,15 +6,12 @@ import {
     openExistingGroupChat,
     waitForGroupMeshReady,
 } from "../lib/chat-ui";
-import { attachDiagnostics, snapshotStep } from "../lib/diagnostics";
+import { attachDiagnostics } from "../lib/diagnostics";
 import {
     acceptIncomingMeet,
     clickStartMeet,
     installMeetFsmGuard,
-    leaveMeetCall,
     waitForIncomingMeetRing,
-    waitForMeetCallStatus,
-    waitForMeetEnded,
     waitForMeetFullyConnected,
     waitForMeetVideoElements,
 } from "../lib/meet-ui";
@@ -25,10 +22,10 @@ import {
 } from "../lib/meet-spec-hooks";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
 
-test.describe("Meet group three-party", () => {
+test.describe("Meet group staggered accept", () => {
     installMeetSpecCleanup(test);
 
-    test("group Meet rings all members, connects media, supports exit and rejoin", async ({
+    test("late acceptor connects with full remote video grid", async ({
         chain,
         alicePage,
         browser,
@@ -42,15 +39,12 @@ test.describe("Meet group three-party", () => {
             chain,
             alicePage,
             browser!,
-            "m3tp",
+            "m3sa",
         );
         trackMeetPage(party.bobPage);
         trackMeetPage(party.carolPage);
         installMeetFsmGuard(party.bobPage, "bob");
         installMeetFsmGuard(party.carolPage, "carol");
-        await snapshotStep(alicePage, "01-alice-ready");
-        await snapshotStep(party.bobPage, "02-bob-ready");
-        await snapshotStep(party.carolPage, "03-carol-ready");
 
         try {
             await createGroupChat(alicePage, chain.baseUrl, [
@@ -87,47 +81,25 @@ test.describe("Meet group three-party", () => {
             ]);
 
             await clickStartMeet(alicePage);
-            await waitForMeetCallStatus(alicePage, "Ringing");
-            await snapshotStep(alicePage, "04-alice-ringing");
-
             await Promise.all([
                 waitForIncomingMeetRing(party.bobPage),
                 waitForIncomingMeetRing(party.carolPage),
             ]);
+
             await acceptIncomingMeet(party.bobPage);
+            await waitForMeetFullyConnected(alicePage);
+            await waitForMeetFullyConnected(party.bobPage);
+
+            await party.carolPage.waitForTimeout(10_000);
+
             await acceptIncomingMeet(party.carolPage);
-            await snapshotStep(party.bobPage, "05-bob-accepted");
-            await snapshotStep(party.carolPage, "06-carol-accepted");
+            await waitForMeetFullyConnected(party.carolPage);
+            await waitForMeetVideoElements(party.carolPage, 2);
 
             await waitForMeetFullyConnected(alicePage);
             await waitForMeetFullyConnected(party.bobPage);
-            await waitForMeetFullyConnected(party.carolPage);
             await waitForMeetVideoElements(alicePage, 2);
             await waitForMeetVideoElements(party.bobPage, 2);
-            await waitForMeetVideoElements(party.carolPage, 2);
-            await snapshotStep(alicePage, "07-all-connected");
-
-            await Promise.all([
-                leaveMeetCall(alicePage),
-                leaveMeetCall(party.bobPage),
-                leaveMeetCall(party.carolPage),
-            ]);
-            await waitForMeetEnded(alicePage);
-            await waitForMeetEnded(party.bobPage);
-            await waitForMeetEnded(party.carolPage);
-
-            await clickStartMeet(alicePage);
-            await waitForMeetCallStatus(alicePage, "Ringing");
-            await Promise.all([
-                waitForIncomingMeetRing(party.bobPage),
-                waitForIncomingMeetRing(party.carolPage),
-            ]);
-            await acceptIncomingMeet(party.bobPage);
-            await acceptIncomingMeet(party.carolPage);
-            await waitForMeetFullyConnected(alicePage);
-            await waitForMeetFullyConnected(party.bobPage);
-            await waitForMeetFullyConnected(party.carolPage);
-            await snapshotStep(alicePage, "08-rejoined-call");
         } finally {
             await meetSpecTeardownBeforeClose([
                 alicePage,

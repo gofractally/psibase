@@ -2,6 +2,11 @@ import { expect, type Page } from "@playwright/test";
 
 const INCOMING_DIALOG = "Incoming Meet call";
 
+const FSM_IGNORED_PATTERNS = [
+    "mediaConnected without session",
+    "joinedSignaling unexpected phase",
+] as const;
+
 function meetCallSection(page: Page) {
     return page.locator("section").filter({
         hasText: "Meet (av-call)",
@@ -13,6 +18,20 @@ function meetStatusBadge(page: Page, status: "Ringing" | "Connected" | "Ended") 
     return meetCallSection(page)
         .locator("span.rounded-full")
         .filter({ hasText: new RegExp(`^${status}$`) });
+}
+
+export function installMeetFsmGuard(page: Page, who: string): void {
+    page.on("console", (msg) => {
+        const text = msg.text();
+        if (!text.includes("[av-call] av-call run event ignored")) return;
+        for (const pattern of FSM_IGNORED_PATTERNS) {
+            if (text.includes(pattern)) {
+                throw new Error(
+                    `[${who}] Meet FSM ignored event: ${text.slice(0, 400)}`,
+                );
+            }
+        }
+    });
 }
 
 export async function clickStartMeet(page: Page): Promise<void> {
@@ -53,6 +72,18 @@ export async function waitForMeetCallStatus(
     });
 }
 
+export async function waitForMeetFullyConnected(
+    page: Page,
+    options?: { timeout?: number },
+): Promise<void> {
+    const timeout = options?.timeout ?? 180_000;
+    await waitForMeetCallStatus(page, "Connected", { timeout });
+    const section = meetCallSection(page);
+    await expect(section.getByText("Connecting…")).toHaveCount(0, {
+        timeout,
+    });
+}
+
 export async function waitForMeetEnded(
     page: Page,
     options?: { timeout?: number },
@@ -70,17 +101,36 @@ export async function waitForMeetEnded(
         .toBe(true);
 }
 
-export async function endMeetCall(page: Page): Promise<void> {
+export async function leaveMeetCall(page: Page): Promise<void> {
     const section = meetCallSection(page);
     await expect(section).toBeVisible({ timeout: 60_000 });
-    const endButton = section.getByRole("button", {
-        name: /End call|Cancel call/,
+    const leaveButton = section.getByRole("button", {
+        name: /Leave call|Cancel call/,
     });
-    await expect(endButton.first()).toBeVisible({ timeout: 60_000 });
-    await endButton.first().click();
+    await expect(leaveButton.first()).toBeVisible({ timeout: 60_000 });
+    await leaveButton.first().click();
 }
 
-/** Best-effort: fake media devices should surface at least one <video> in-call. */
+/** @deprecated use leaveMeetCall */
+export const endMeetCall = leaveMeetCall;
+
+export async function waitForGroupMeetRejoinBanner(
+    page: Page,
+    options?: { timeout?: number },
+): Promise<void> {
+    await expect(page.getByText("Meet call in progress")).toBeVisible({
+        timeout: options?.timeout ?? 60_000,
+    });
+    await expect(
+        page.getByRole("button", { name: "Rejoin" }),
+    ).toBeVisible({ timeout: options?.timeout ?? 60_000 });
+}
+
+export async function clickRejoinGroupMeet(page: Page): Promise<void> {
+    await page.getByRole("button", { name: "Rejoin" }).click();
+}
+
+/** Best-effort: fake media devices should surface at least minCount <video> in-call. */
 export async function waitForMeetVideoElements(
     page: Page,
     minCount: number,
@@ -100,4 +150,14 @@ export async function expectNoIncomingMeetRing(
     await expect(
         page.getByRole("dialog", { name: INCOMING_DIALOG }),
     ).toBeHidden({ timeout: options?.timeout ?? 5_000 });
+}
+
+export async function expectMeetNotConnecting(
+    page: Page,
+    options?: { timeout?: number },
+): Promise<void> {
+    const section = meetCallSection(page);
+    await expect(section.getByText("Connecting…")).toHaveCount(0, {
+        timeout: options?.timeout ?? 30_000,
+    });
 }

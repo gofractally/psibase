@@ -318,10 +318,12 @@ export function CallView({
                 size="sm"
                 className="pointer-events-auto shadow-md"
                 onClick={onEnd}
-                aria-label={endButtonUseCancelLabel ? "Cancel call" : "End call"}
+                aria-label={
+                    endButtonUseCancelLabel ? "Cancel call" : "Leave call"
+                }
             >
                 <PhoneOff className="size-4" />
-                {endButtonUseCancelLabel ? "Cancel" : "End"}
+                {endButtonUseCancelLabel ? "Cancel" : "Leave"}
             </Button>
         </div>
     );
@@ -425,11 +427,11 @@ export function CallView({
                                 aria-label={
                                     endButtonUseCancelLabel
                                         ? "Cancel call"
-                                        : "End call"
+                                        : "Leave call"
                                 }
                             >
                                 <PhoneOff className="size-4" />
-                                {endButtonUseCancelLabel ? "Cancel" : "End"}
+                                {endButtonUseCancelLabel ? "Cancel" : "Leave"}
                             </Button>
                         ) : null}
                     </div>

@@ -10,10 +10,12 @@ import { attachDiagnostics } from "../lib/diagnostics";
 import {
     acceptIncomingMeet,
     clickStartMeet,
-    endMeetCall,
+    installMeetFsmGuard,
+    leaveMeetCall,
     waitForIncomingMeetRing,
     waitForMeetCallStatus,
     waitForMeetEnded,
+    waitForMeetFullyConnected,
 } from "../lib/meet-ui";
 import {
     installMeetSpecCleanup,
@@ -40,6 +42,9 @@ test.describe("Meet group partial rejoin", () => {
             );
             trackMeetPage(party.bobPage);
             trackMeetPage(party.carolPage);
+            installMeetFsmGuard(alicePage, "alice");
+            installMeetFsmGuard(party.bobPage, "bob");
+            installMeetFsmGuard(party.carolPage, "carol");
 
             try {
                 await createGroupChat(alicePage, chain.baseUrl, [
@@ -85,21 +90,21 @@ test.describe("Meet group partial rejoin", () => {
                 ]);
                 await acceptIncomingMeet(party.bobPage);
                 await acceptIncomingMeet(party.carolPage);
-                await waitForMeetCallStatus(alicePage, "Connected", {
+                await waitForMeetFullyConnected(alicePage, {
                     timeout: 180_000,
                 });
-                await waitForMeetCallStatus(party.bobPage, "Connected");
-                await waitForMeetCallStatus(party.carolPage, "Connected");
+                await waitForMeetFullyConnected(party.bobPage);
+                await waitForMeetFullyConnected(party.carolPage);
 
-                await endMeetCall(party.bobPage);
+                await leaveMeetCall(party.bobPage);
                 await waitForMeetEnded(party.bobPage);
-                await waitForMeetCallStatus(alicePage, "Connected");
-                await waitForMeetCallStatus(party.carolPage, "Connected");
+                await waitForMeetFullyConnected(alicePage);
+                await waitForMeetFullyConnected(party.carolPage);
 
                 await clickStartMeet(party.bobPage);
-                await waitForMeetCallStatus(party.bobPage, "Connected");
-                await waitForMeetCallStatus(alicePage, "Connected");
-                await waitForMeetCallStatus(party.carolPage, "Connected");
+                await waitForMeetFullyConnected(party.bobPage);
+                await waitForMeetFullyConnected(alicePage);
+                await waitForMeetFullyConnected(party.carolPage);
             } finally {
                 await meetSpecTeardownBeforeClose([
                     alicePage,

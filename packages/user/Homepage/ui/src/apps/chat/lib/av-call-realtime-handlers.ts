@@ -59,18 +59,30 @@ function onSessionInvite(
     }
 
     if (
-        existing?.hasJoined &&
-        existing.snapshot.sessionId === frame.sessionId &&
-        existing.snapshot.signalingJoined
+        existing?.snapshot.sessionId === frame.sessionId &&
+        existingPhase !== "idle" &&
+        existingPhase !== "failed"
     ) {
-        avCallLog("sessionInvite ignored (already joined)", {
-            phase: existing.snapshot.phase,
-        });
-        return;
+        const duplicateWhileActive =
+            existingPhase === "waiting-peer" ||
+            existingPhase === "joining" ||
+            existingPhase === "signaling" ||
+            existingPhase === "ready" ||
+            (existing.hasJoined && existing.snapshot.signalingJoined);
+        if (duplicateWhileActive) {
+            avCallLog("sessionInvite ignored (duplicate for active session)", {
+                phase: existingPhase,
+                hasJoined: existing.hasJoined,
+                awaitingInviteAccept: existing.awaitingInviteAccept,
+                signalingJoined: existing.snapshot.signalingJoined,
+            });
+            return;
+        }
     }
 
     if (existing) {
         existing.hasJoined = false;
+        existing.awaitingInviteAccept = true;
         existing.snapshot = {
             ...existing.snapshot,
             sessionId: frame.sessionId,
@@ -108,6 +120,7 @@ function onSessionInvite(
                 },
                 hasJoined: false,
                 transportRecoveryAttempt: 0,
+                awaitingInviteAccept: true,
                 onUpdate: () => {
                     host.onSpaceUpdate?.(spaceUuid, host.liveSnapshot(groupRun));
                 },
@@ -134,6 +147,7 @@ function onSessionInvite(
                 },
                 hasJoined: false,
                 transportRecoveryAttempt: 0,
+                awaitingInviteAccept: true,
                 onUpdate: () => {
                     host.onSpaceUpdate?.(spaceUuid, host.liveSnapshot(dmRun));
                 },

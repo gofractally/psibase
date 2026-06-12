@@ -74,6 +74,25 @@ export async function ensureGroupLocalMedia(
     }
 }
 
+export function reconcileGroupMeshMediaConnected(
+    host: AvCallOrchestratorHost,
+    run: GroupAvCallRun,
+): void {
+    if (
+        run.awaitingInviteAccept ||
+        host.isAvCallPendingInvite?.(run.spaceUuid)
+    ) {
+        return;
+    }
+    for (const [remoteAccount, peer] of run.meshPeers) {
+        if (peer.isDisposed || !peer.isMediaConnected) continue;
+        host.dispatchRunEventForRun?.(run, {
+            type: "mediaConnected",
+            remoteAccount,
+        });
+    }
+}
+
 export function ensureGroupAvCallSession(
     host: AvCallOrchestratorHost,
     spaceUuid: string,
@@ -93,6 +112,14 @@ export function ensureGroupAvCallSession(
 
     const existing = host.getRun(spaceUuid);
     if (existing?.kind === "group") {
+        const phase = existing.snapshot.phase;
+        if (
+            phase === "joining" ||
+            phase === "signaling" ||
+            phase === "ready"
+        ) {
+            return;
+        }
         const allOnlineMediaReady =
             onlineRemotes.length > 0 &&
             onlineRemotes.every((m) => runMeshPeerMediaReady(existing, m));
@@ -171,6 +198,12 @@ export function startMeshAvCallPeer(
     self: string,
     remoteAccount: string,
 ): void {
+    if (
+        run.awaitingInviteAccept ||
+        host.isAvCallPendingInvite?.(run.spaceUuid)
+    ) {
+        return;
+    }
     const signaling = host.getSignaling();
     if ((!signaling && !host.usesSharedTransport?.()) || !run.localStream) {
         return;
@@ -184,6 +217,12 @@ export function startMeshAvCallPeer(
             mediaConnected: existing!.isMediaConnected,
             sharedPc: host.usesSharedTransport?.() ?? false,
         });
+        if (existing!.isMediaConnected) {
+            host.dispatchRunEventForRun?.(run, {
+                type: "mediaConnected",
+                remoteAccount,
+            });
+        }
         return;
     }
     existing?.dispose();
@@ -201,6 +240,12 @@ export function startMeshAvCallPeer(
         sharedLocalStream: run.localStream,
         handlers: {
             onMediaConnected: () => {
+                if (
+                    run.awaitingInviteAccept ||
+                    host.isAvCallPendingInvite?.(run.spaceUuid)
+                ) {
+                    return;
+                }
                 host.dispatchRunEventForRun?.(run, {
                     type: "mediaConnected",
                     remoteAccount,
@@ -312,6 +357,16 @@ export async function beginSignalingGroupAvCall(
     sessionId: string,
     self: string,
 ): Promise<void> {
+    if (
+        run.awaitingInviteAccept ||
+        host.isAvCallPendingInvite?.(run.spaceUuid)
+    ) {
+        avCallLog("beginSignaling group deferred (pending invite accept)", {
+            space: shortSpaceId(run.spaceUuid),
+            sessionId: shortSessionId(sessionId),
+        });
+        return;
+    }
     if (beginSignalingGroupAvCallSkipChecks(host, run, sessionId)) {
         return;
     }
