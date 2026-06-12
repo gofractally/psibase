@@ -1,4 +1,4 @@
-#[psibase::service(name = "profiles☺1")]
+#[psibase::service(name = "profiles+1")]
 #[allow(non_snake_case)]
 mod service {
     use async_graphql::*;

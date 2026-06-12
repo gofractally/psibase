@@ -50,7 +50,7 @@ mod tests {
     fn test_set_metadata_simple(chain: psibase::Chain) -> Result<(), psibase::Error> {
         chain.new_account(account!("alice"))?;
         chain.new_account(account!("bob"))?;
-        http_server::Wrapper::push_from(&chain, SERVICE).registerServer(account!("registry☺1"));
+        http_server::Wrapper::push_from(&chain, SERVICE).registerServer(account!("registry+1"));
 
         push_set_metadata(&chain, default_metadata(), default_tags()).get()?;
 

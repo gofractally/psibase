@@ -11,7 +11,7 @@ namespace UserService
 {
    struct EventIndex : psibase::Service
    {
-      static constexpr psibase::AccountNumber service{"events☺2"};
+      static constexpr psibase::AccountNumber service{"events+2"};
       static constexpr auto                   serviceFlags = 0;
 
       /// Mark the table as having a pending index update

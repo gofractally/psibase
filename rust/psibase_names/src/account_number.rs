@@ -4,7 +4,7 @@ const ACCOUNT_ENCODER: NameEncoder<10> = NameEncoder::new(36);
 
 const CHARS: &'static str = "-0123456789abcdefghijklmnopqrstuvwxyz";
 
-const SUBACCOUNT_SEPARATOR: &'static str = "☺";
+const SUBACCOUNT_SEPARATOR: &'static str = "+";
 
 fn char_index(ch: u8) -> u64 {
     let ch = ch as char;

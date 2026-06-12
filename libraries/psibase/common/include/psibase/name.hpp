@@ -11,7 +11,7 @@ namespace psibase
 {
    namespace detail
    {
-      inline constexpr std::string_view subaccountSeparator = "☺";
+      inline constexpr std::string_view subaccountSeparator = "+";
 
       // removes and encodes the trailing subaccount
       constexpr std::uint8_t subaccount_from_str(std::string_view& s, std::string_view sep)

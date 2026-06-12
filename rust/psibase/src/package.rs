@@ -418,10 +418,10 @@ impl<R: Read + Seek> PackagedService<R> {
             } else if let Some(captures) = service_re.captures(filename) {
                 match captures.extract() {
                     (_, [name, "wasm"]) => {
-                        service_files.push((name.replace("/", "☺").parse()?, index));
+                        service_files.push((name.replace("/", "+").parse()?, index));
                     }
                     (_, [name, "json"]) => {
-                        info_files.insert(name.replace("/", "☺").parse()?, index);
+                        info_files.insert(name.replace("/", "+").parse()?, index);
                     }
                     _ => {}
                 }

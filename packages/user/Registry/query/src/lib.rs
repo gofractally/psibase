@@ -6,7 +6,7 @@ fn increment_last_char(s: String) -> String {
     String::from_utf8(bytes).unwrap()
 }
 
-#[psibase::service(name = "registry☺1")]
+#[psibase::service(name = "registry+1")]
 #[allow(non_snake_case)]
 mod service {
     use super::increment_last_char;

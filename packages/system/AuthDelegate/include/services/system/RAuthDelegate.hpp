@@ -7,7 +7,7 @@ namespace SystemService
    class RAuthDelegate : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("auth-delg☺1");
+      static constexpr auto service = psibase::AccountNumber("auth-delg+1");
 
       auto serveSys(psibase::HttpRequest request) -> std::optional<psibase::HttpReply>;
    };

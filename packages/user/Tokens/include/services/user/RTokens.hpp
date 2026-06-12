@@ -5,7 +5,7 @@ namespace UserService
    class RTokens : public psibase::Service
    {
      public:
-      static constexpr auto service = psibase::AccountNumber("tokens☺1");
+      static constexpr auto service = psibase::AccountNumber("tokens+1");
 
       auto serveSys(psibase::HttpRequest                  request,
                     std::optional<std::int32_t>           socket,

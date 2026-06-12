@@ -390,7 +390,7 @@ class InvalidName(Exception):
 
 ACCOUNT_ENCODER = NameEncoder(10, 36)
 CHARS = "-0123456789abcdefghijklmnopqrstuvwxyz"
-SUBACCOUNT_SEPARATOR = "☺"
+SUBACCOUNT_SEPARATOR = "+"
 
 def account_to_number(s):
     parts = s.split(SUBACCOUNT_SEPARATOR, 1)

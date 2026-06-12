@@ -7,7 +7,7 @@ namespace SystemService
 {
    struct RProducers : public psibase::Service
    {
-      static constexpr auto service = psibase::AccountNumber("producers☺1");
+      static constexpr auto service = psibase::AccountNumber("producers+1");
 
       std::optional<psibase::HttpReply> serveSys(psibase::HttpRequest request);
    };

@@ -1,6 +1,6 @@
 mod events;
 
-#[psibase::service(name = "tokens☺1")]
+#[psibase::service(name = "tokens+1")]
 #[allow(non_snake_case)]
 mod service {
 

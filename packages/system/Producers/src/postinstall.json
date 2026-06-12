@@ -1,4 +1,4 @@
 [
-    {"sender":"producers","service":"accounts","method":"newAccount","data":{"name":"producers☺2","authService":"producers","requireMatch":true}},
-    {"sender":"producers","service":"accounts","method":"newAccount","data":{"name":"producers☺3","authService":"producers","requireMatch":true}}
+    {"sender":"producers","service":"accounts","method":"newAccount","data":{"name":"producers+2","authService":"producers","requireMatch":true}},
+    {"sender":"producers","service":"accounts","method":"newAccount","data":{"name":"producers+3","authService":"producers","requireMatch":true}}
 ]

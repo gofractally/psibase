@@ -8,7 +8,7 @@
       "objective": false,
       "action": {
         "sender": "",
-        "service": "transact☺1",
+        "service": "transact+1",
         "method": "onTrx",
         "rawData": ""
       }
@@ -23,7 +23,7 @@
       "objective": false,
       "action": {
         "sender": "",
-        "service": "transact☺1",
+        "service": "transact+1",
         "method": "onTrx",
         "rawData": ""
       }
@@ -38,7 +38,7 @@
       "objective": false,
       "action": {
         "sender": "",
-        "service": "transact☺1",
+        "service": "transact+1",
         "method": "onBlock",
         "rawData": "0000"
       }

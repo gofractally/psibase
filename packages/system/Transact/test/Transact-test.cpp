@@ -462,7 +462,7 @@ TEST_CASE("Test runAs")
    SECTION("subaccount can be authorized by base account")
    {
       t.addService<AuthNone>("AuthNone.wasm");
-      auto alice1 = AccountNumber("alice☺1");
+      auto alice1 = AccountNumber("alice+1");
       REQUIRE(t.from(alice).to<Accounts>().newAccount(alice1, AuthNone::service, true).succeeded());
       auto act = transactor<Accounts>().from(alice1).setAuthServ(AuthAny::service);
       REQUIRE(t.from(alice)

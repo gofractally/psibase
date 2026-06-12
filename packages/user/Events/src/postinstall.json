@@ -23,7 +23,7 @@
       "objective": false,
       "action": {
         "sender": "",
-        "service": "events☺2",
+        "service": "events+2",
         "method": "onBlock",
         "rawData": "0000"
       }
