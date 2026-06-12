@@ -80,7 +80,7 @@ namespace psibase
          bool        allowsEnd = true;
          for (T idx : rng)
          {
-            if (maxlen == 0 || idx > numRegularChars + 1 || (idx == sepIdx && !allowsSep))
+            if (maxlen == 0 || idx >= numRegularChars + 1 || (idx == sepIdx && !allowsSep))
                return -1;
             // Count the prefix
             if (allowsEnd)

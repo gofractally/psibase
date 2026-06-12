@@ -44,7 +44,7 @@ impl<const N: usize> NameEncoder<N> {
         let mut allows_sep = false;
         let mut allows_end = true;
         for idx in s {
-            if maxlen == 0 || idx > self.num_regular_chars + 1 || idx == sep_idx && !allows_sep {
+            if maxlen == 0 || idx >= self.num_regular_chars + 1 || idx == sep_idx && !allows_sep {
                 return u64::MAX;
             }
             // Count the prefix
