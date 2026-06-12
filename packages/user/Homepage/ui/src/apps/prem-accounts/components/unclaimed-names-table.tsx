@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 
-import { useClaimName } from "@/apps/prem-accounts/hooks/use-claim-name";
+import { ClaimNameDialog } from "@/apps/prem-accounts/components/claim-name-dialog";
 
 import { Loading } from "@/components/loading";
 
@@ -33,8 +33,7 @@ export function UnclaimedNamesTable({
     isError,
     error,
 }: Props) {
-    const { mutateAsync: claimName, isPending: isClaimPending, variables } =
-        useClaimName();
+    const [accountToClaim, setAccountToClaim] = useState<string | null>(null);
 
     const data = useMemo(
         () => names.map((account) => ({ account })),
@@ -56,80 +55,93 @@ export function UnclaimedNamesTable({
                 id: "actions",
                 header: () => <div className="text-right">Action</div>,
                 meta: { className: "w-[1%] whitespace-nowrap pl-3" },
-                cell: ({ row }) => {
-                    const name = row.original.account;
-                    const isClaiming =
-                        isClaimPending && variables === name;
-
-                    return (
-                        <div className="flex justify-end">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="xs"
-                                disabled={isClaiming}
-                                onClick={() => {
-                                    void claimName(name);
-                                }}
-                            >
-                                {isClaiming ? "Claiming…" : "Claim"}
-                            </Button>
-                        </div>
-                    );
-                },
+                cell: ({ row }) => (
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            onClick={() =>
+                                setAccountToClaim(row.original.account)
+                            }
+                        >
+                            Claim
+                        </Button>
+                    </div>
+                ),
             },
         ],
-        [claimName, isClaimPending, variables],
+        [],
+    );
+
+    const claimDialog = (
+        <ClaimNameDialog
+            account={accountToClaim ?? ""}
+            open={accountToClaim !== null}
+            onClose={() => setAccountToClaim(null)}
+        />
     );
 
     if (isPending) {
         return (
-            <GlowingCard>
-                <Loading />
-            </GlowingCard>
+            <>
+                <GlowingCard>
+                    <Loading />
+                </GlowingCard>
+                {claimDialog}
+            </>
         );
     }
 
     if (isError) {
         return (
-            <GlowingCard>
-                <ErrorCard
-                    error={
-                        error ??
-                        new Error("Failed to load unclaimed names.")
-                    }
-                />
-            </GlowingCard>
+            <>
+                <GlowingCard>
+                    <ErrorCard
+                        error={
+                            error ??
+                            new Error("Failed to load unclaimed names.")
+                        }
+                    />
+                </GlowingCard>
+                {claimDialog}
+            </>
         );
     }
 
     if (names.length === 0) {
         return (
-            <GlowingCard>
-                <CardContent className="text-muted-foreground py-8 text-center">
-                    You have no purchased accounts waiting to be claimed.
-                </CardContent>
-            </GlowingCard>
+            <>
+                <GlowingCard>
+                    <CardContent className="text-muted-foreground py-8 text-center">
+                        You have no purchased accounts waiting to be claimed.
+                    </CardContent>
+                </GlowingCard>
+                {claimDialog}
+            </>
         );
     }
 
     return (
-        <GlowingCard>
-            <CardHeader>
-                <CardTitle>Unclaimed names</CardTitle>
-                <CardDescription>
-                    Claim purchased names to activate them on this chain.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <DataTable
-                    columns={columns}
-                    data={data}
-                    pageSize={10}
-                    caption="Purchased names awaiting claim."
-                    emptyMessage="You have no purchased accounts waiting to be claimed."
-                />
-            </CardContent>
-        </GlowingCard>
+        <>
+            <GlowingCard>
+                <CardHeader>
+                    <CardTitle>Unclaimed names</CardTitle>
+                    <CardDescription>
+                        Claim purchased names to activate them on this chain.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <DataTable
+                        columns={columns}
+                        data={data}
+                        pageSize={10}
+                        caption="Purchased names awaiting claim."
+                        emptyMessage="You have no purchased accounts waiting to be claimed."
+                    />
+                </CardContent>
+            </GlowingCard>
+            {claimDialog}
+        </>
     );
 }
