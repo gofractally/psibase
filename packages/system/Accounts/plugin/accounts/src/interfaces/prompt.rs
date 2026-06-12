@@ -13,6 +13,7 @@ use crate::bindings::transact::plugin::intf as Transact;
 use crate::db::{apps_table::AppsTable, user_table::UserTable};
 use crate::errors::ErrorType;
 use crate::plugin::AccountsPlugin;
+use crate::trust::*;
 use psibase::fracpack::Pack;
 use psibase::services::accounts as AccountsService;
 use psibase::services::auth_sig;
@@ -33,7 +34,8 @@ impl Prompt for AccountsPlugin {
     }
 
     fn import_existing(credentials: Vec<Credential>) -> Result<(), Vec<(String, Error)>> {
-        assert_eq!(Client::get_sender(), Client::get_receiver());
+        assert_authorized_with_whitelist(FunctionName::import_existing, vec!["homepage".into()])
+            .unwrap();
 
         let mut invalid_accounts = Vec::new();
         for credential in credentials {

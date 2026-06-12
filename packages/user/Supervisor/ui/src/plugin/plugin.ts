@@ -7,14 +7,14 @@ import {
 
 import { kebabToCamel, kebabToPascal } from "../case";
 import { CompiledPlugin } from "../component-loading";
-import { 
+import {
     ServiceMap,
+    compilePlugin,
     getPluginService,
-    compilePlugin
 } from "../component-loading/loader";
 import { DownloadFailed } from "../errors";
 import { HostInterface } from "../host-interface";
-import { parser, wasmFromUrl } from "../utils";
+import { networkName, parser, wasmFromUrl } from "../utils";
 import { ComponentAPI } from "../wit-extraction";
 import { InvalidCall, PluginDownloadFailed, PluginInvalid } from "./errors";
 
@@ -62,7 +62,12 @@ export class Plugin {
 
     private async doFetchPlugin(): Promise<Uint8Array> {
         const { service, plugin } = this.id;
-        const url = siblingUrl(null, service, `/${plugin}.wasm`);
+        // The homepage service is served from the configured network name's
+        // subdomain. Fetching it via the "homepage" alias would redirect,
+        // which breaks authenticated (preflighted) requests.
+        const host =
+            service === "homepage" && networkName ? networkName : service;
+        const url = siblingUrl(null, host, `/${plugin}.wasm`);
         try {
             this.bytes = await wasmFromUrl(url);
             return this.bytes;
@@ -91,7 +96,7 @@ export class Plugin {
         let api: ComponentAPI | undefined;
         try {
             api = await this.parsed;
-            let services = await this.services;
+            const services = await this.services;
             return api.importedFuncs.interfaces
                 .filter(
                     (intf) =>
@@ -106,7 +111,9 @@ export class Plugin {
             if (e instanceof PluginDownloadFailed) {
                 return [];
             } else {
-                console.error(`Error fetching dependencies of plugin: ${pluginString(this.id)}`);
+                console.error(
+                    `Error fetching dependencies of plugin: ${pluginString(this.id)}`,
+                );
                 throw e;
             }
         }

@@ -5,9 +5,10 @@ import { z } from "zod";
 
 import { prompt } from "@psibase/common-lib";
 
+import { ConfirmKeyStep } from "@shared/components/account-key/confirm-key-step";
+import { SaveKeyStep } from "@shared/components/account-key/save-key-step";
 import { BrandedGlowingCard } from "@shared/components/branded-glowing-card";
 import { useAppForm } from "@shared/components/form/app-form";
-import { FieldAccountExisting } from "@shared/components/form/field-account-existing";
 import { AvailableBalanceLabel } from "@shared/components/premium-accounts/available-balance-label";
 import { BuyNameConfirmationDialog } from "@shared/components/premium-accounts/buy-name-confirmation-dialog";
 import { useBranding } from "@shared/hooks/use-branding";
@@ -22,7 +23,7 @@ import {
     getSystemTokenBalance,
     useUserTokenBalances,
 } from "@shared/hooks/use-user-token-balances";
-import { b64ToPem, pemToB64, validateB64 } from "@shared/lib/b64-key-utils";
+import { pemToB64 } from "@shared/lib/b64-key-utils";
 import { getAccount } from "@shared/lib/get-account";
 import { Quantity } from "@shared/lib/quantity";
 import QueryKey from "@shared/lib/query-keys";
@@ -33,27 +34,18 @@ import {
     zAccountFree,
 } from "@shared/lib/schemas/account";
 import { premMarketPricesFromOverview } from "@shared/lib/schemas/prem-accounts";
-import { Button } from "@shared/shadcn/ui/button";
 import {
-    CardAction,
     CardContent,
     CardDescription,
     CardFooter,
     CardTitle,
 } from "@shared/shadcn/ui/card";
-import { Checkbox } from "@shared/shadcn/ui/checkbox";
-import { Input } from "@shared/shadcn/ui/input";
-import { Label } from "@shared/shadcn/ui/label";
 import { Progress } from "@shared/shadcn/ui/progress";
 import { Spinner } from "@shared/shadcn/ui/spinner";
 
-import { CopyButton } from "./components/copy-button";
 import { Loader } from "./components/create-prompt/loader";
-import { DownloadKeyFileButton } from "./components/download-key-file-button";
-import { PasswordVisibilityButton } from "./components/password-visibility-button";
 import { useConnectAccount } from "./hooks/use-connect-account";
 import { useCreateAccount } from "./hooks/use-create-account";
-import { useImportExisting } from "./hooks/use-import-existing";
 import { usePurchaseAccount } from "./hooks/use-purchase-account";
 
 export const CreatePrompt = () => {
@@ -63,8 +55,6 @@ export const CreatePrompt = () => {
     const [step, setStep] = useState<"1_CREATE" | "2_SAVE" | "3_CONFIRM">(
         "1_CREATE",
     );
-    const [showPassword, setShowPassword] = useState(false);
-    const [acknowledged, setAcknowledged] = useState(false);
     const [buyConfirmOpen, setBuyConfirmOpen] = useState(false);
     const [confirmPrice, setConfirmPrice] = useState<Quantity | null>(null);
     const [isAccountTaken, setIsAccountTaken] = useState<boolean | null>(null);
@@ -143,7 +133,6 @@ export const CreatePrompt = () => {
         isPendingCanCreatePremiumAccount ||
         (canCreatePremiumAccount && isPendingMarkets);
 
-    const importExistingMutation = useImportExisting();
     const createAccountMutation = useCreateAccount();
     const purchaseAccountMutation = usePurchaseAccount({
         onSuccess: () => {
@@ -280,68 +269,6 @@ export const CreatePrompt = () => {
         }
         return availableBalance.isLessThan(livePrice);
     }, [livePrice, availableBalance, isPendingBalances]);
-
-    const importForm = useAppForm({
-        defaultValues: {
-            account: {
-                account: "",
-            },
-            privateKey: "",
-        },
-        validators: {
-            onChange: z.object({
-                account: z.object({
-                    account: zAccount.or(z.literal("")),
-                }),
-                privateKey: z.string(),
-            }),
-            onSubmit: z.object({
-                account: z.object({
-                    account: zAccount.refine(
-                        (val) => val.trim() === createdAccount?.trim(),
-                        {
-                            message:
-                                "Account name must match the account name you just created",
-                        },
-                    ),
-                }),
-                privateKey: z.string().refine(
-                    (val) => {
-                        return validateB64(val);
-                    },
-                    {
-                        message: "Private key must be a valid base64 string",
-                    },
-                ),
-            }),
-        },
-        onSubmit: async (data) => {
-            await handleImportAndLogin(
-                data.value.account.account.trim(),
-                data.value.privateKey,
-            );
-        },
-    });
-
-    const handleImportAndLogin = async (account: string, b64: string) => {
-        const pemFormatted = b64ToPem(b64);
-
-        try {
-            await importExistingMutation.mutateAsync({
-                account: account,
-                key: pemFormatted,
-            });
-            await connectAccountMutation.mutateAsync(account);
-            prompt.finished();
-        } catch (e) {
-            console.error("Import and login failed");
-            console.error(e);
-            importForm.fieldInfo.privateKey.instance?.setErrorMap({
-                onSubmit:
-                    "Error signing in. Check your private key and try again.",
-            });
-        }
-    };
 
     if (isLoading) {
         return <Loader />;
@@ -521,185 +448,22 @@ export const CreatePrompt = () => {
             )}
 
             {step === "2_SAVE" && (
-                <>
-                    <CardContent className="flex flex-col gap-8">
-                        <div>
-                            <CardTitle className="text-3xl font-normal">
-                                Secure your {networkName} account
-                            </CardTitle>
-                            <CardDescription>
-                                Your{" "}
-                                <span className="font-semibold">
-                                    Private Key
-                                </span>{" "}
-                                serves as your account password allowing you to
-                                sign into your account from any browser or
-                                device.{" "}
-                                <span className="font-semibold">
-                                    Store it safely and securely
-                                </span>
-                                , as it cannot be recovered if you lose it.
-                            </CardDescription>
-                        </div>
-                        <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-2">
-                                <Label>Account Name</Label>
-                                <div className="mb-2 flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Input
-                                            type="text"
-                                            value={createdAccount}
-                                            readOnly
-                                            onFocus={(e) => e.target.select()}
-                                        />
-                                        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-                                            <CopyButton
-                                                text={createdAccount}
-                                                ariaLabel="Copy account name"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <Label>Private Key</Label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Input
-                                            type={
-                                                showPassword
-                                                    ? "text"
-                                                    : "password"
-                                            }
-                                            value={key}
-                                            readOnly
-                                            className="pr-24"
-                                            onFocus={(e) => e.target.select()}
-                                        />
-                                        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-1">
-                                            <PasswordVisibilityButton
-                                                showPassword={showPassword}
-                                                onToggle={() =>
-                                                    setShowPassword(
-                                                        !showPassword,
-                                                    )
-                                                }
-                                            />
-                                            <DownloadKeyFileButton
-                                                pemContent={b64ToPem(key)}
-                                                filename={`${createdAccount}.pem`}
-                                            />
-                                            <CopyButton
-                                                text={key}
-                                                ariaLabel="Copy private key"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <Label className="hover:bg-accent/50 flex items-start gap-3 rounded-lg border p-3 has-[[aria-checked=true]]:border-blue-600 has-[[aria-checked=true]]:bg-blue-50 dark:has-[[aria-checked=true]]:border-blue-900 dark:has-[[aria-checked=true]]:bg-blue-950">
-                                <Checkbox
-                                    id="acknowledge"
-                                    checked={acknowledged}
-                                    onCheckedChange={(checked) =>
-                                        setAcknowledged(checked === true)
-                                    }
-                                    className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
-                                />
-                                <div className="grid gap-1.5 font-normal">
-                                    <p className="text-sm font-medium leading-none">
-                                        Do not lose this!
-                                    </p>
-                                    <p className="text-muted-foreground text-sm">
-                                        I understand that if I lose my private
-                                        key, I may permanently lose access to my{" "}
-                                        {networkName} account.
-                                    </p>
-                                </div>
-                            </Label>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex flex-1 justify-end">
-                        <CardAction>
-                            <Button
-                                type="button"
-                                onClick={() => setStep("3_CONFIRM")}
-                                disabled={!acknowledged}
-                            >
-                                Continue
-                            </Button>
-                        </CardAction>
-                    </CardFooter>
-                </>
+                <SaveKeyStep
+                    accountName={createdAccount}
+                    keyB64={key}
+                    onContinue={() => setStep("3_CONFIRM")}
+                />
             )}
 
             {step === "3_CONFIRM" && (
-                <importForm.AppForm>
-                    <form
-                        id="import-account-form"
-                        onSubmit={(e) => {
-                            e.preventDefault();
-                            importForm.handleSubmit();
-                        }}
-                        className="flex flex-col gap-6"
-                    >
-                        <CardContent className="flex flex-col">
-                            <div className="mb-6 flex-1 space-y-2">
-                                <CardTitle className="text-3xl font-normal">
-                                    Sign in
-                                </CardTitle>
-                                <CardDescription>
-                                    Use your {networkName} account
-                                </CardDescription>
-                            </div>
-                            <div className="flex flex-1 flex-col gap-4">
-                                <importForm.Subscribe
-                                    selector={(state) => [state.isSubmitting]}
-                                >
-                                    {([isSubmitting]) => (
-                                        <FieldAccountExisting
-                                            form={importForm}
-                                            fields="account"
-                                            label="Account name"
-                                            description={undefined}
-                                            placeholder="Account name"
-                                            disabled={isSubmitting}
-                                            onValidate={undefined}
-                                        />
-                                    )}
-                                </importForm.Subscribe>
-                                <importForm.AppField
-                                    name="privateKey"
-                                    children={(field) => {
-                                        return (
-                                            <field.TextField
-                                                type="password"
-                                                label="Private key"
-                                                placeholder="Private key"
-                                            />
-                                        );
-                                    }}
-                                />
-                            </div>
-                        </CardContent>
-                        <CardFooter className="mt-4 flex flex-1 justify-between">
-                            <CardAction>
-                                <Button
-                                    type="button"
-                                    variant="link"
-                                    onClick={() => setStep("2_SAVE")}
-                                    className="-ml-4"
-                                >
-                                    Back
-                                </Button>
-                            </CardAction>
-                            <CardAction>
-                                <importForm.SubmitButton
-                                    labels={["Confirm", "Confirming..."]}
-                                />
-                            </CardAction>
-                        </CardFooter>
-                    </form>
-                </importForm.AppForm>
+                <ConfirmKeyStep
+                    expectedAccount={createdAccount}
+                    onBack={() => setStep("2_SAVE")}
+                    onImported={async (account) => {
+                        await connectAccountMutation.mutateAsync(account);
+                        prompt.finished();
+                    }}
+                />
             )}
         </BrandedGlowingCard>
     );
