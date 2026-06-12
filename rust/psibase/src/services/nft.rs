@@ -109,25 +109,13 @@ mod service {
     }
 
     #[event(history)]
-    fn minted(nftId: NID, issuer: AccountNumber) {
-        unimplemented!()
-    }
-    #[event(history)]
-    fn burned(nftId: NID, owner: AccountNumber) {
-        unimplemented!()
-    }
-
-    #[event(history)]
-    fn credited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
-        unimplemented!()
-    }
-    #[event(history)]
-    fn uncredited(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
-        unimplemented!()
-    }
-
-    #[event(merkle)]
-    fn transferred(nftId: NID, creditor: AccountNumber, debitor: AccountNumber, memo: String) {
+    pub fn ownerChange(
+        nftId: NID,
+        action: String,
+        prev_owner: AccountNumber,
+        new_owner: AccountNumber,
+        memo: Memo,
+    ) {
         unimplemented!()
     }
 
