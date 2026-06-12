@@ -1,4 +1,4 @@
-#[psibase::service]
+#[psibase::service(name = "psimacro-t")]
 #[allow(non_snake_case)]
 mod service {}
 
@@ -16,7 +16,7 @@ mod tests {
         println!("{}", Wrapper::SERVICE);
         http_server::Wrapper::push_from(&chain, Wrapper::SERVICE).registerServer(Wrapper::SERVICE);
 
-        assert_eq!(Wrapper::SERVICE, AccountNumber::from("basicwquery"));
+        assert_eq!(Wrapper::SERVICE, AccountNumber::from("basicquery"));
 
         assert_eq!(Wrapper::push(&chain).add(3, 4).get()?, 7);
 
@@ -37,7 +37,7 @@ mod tests {
         use addcheckinit::Wrapper;
         use psibase::AccountNumber;
 
-        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
+        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addckinit"));
 
         // call action to trigger the pre_action() which is there and should find service not inited
         let _retval = Wrapper::push(&chain).add(3, 4).get();
@@ -52,7 +52,7 @@ mod tests {
         use addcheckinit::Wrapper;
         use psibase::AccountNumber;
 
-        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addcheckinit"));
+        assert_eq!(Wrapper::SERVICE, AccountNumber::from("addckinit"));
 
         // init service
         let _retval = Wrapper::push(&chain).init();

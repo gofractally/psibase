@@ -24,7 +24,7 @@ pub mod tables {
     }
 }
 
-#[psibase::service(name = "fractal-gen", tables = "tables")]
+#[psibase::service(name = "frac-gen", tables = "tables")]
 mod service {
     use crate::tables::ConfigRow;
     use psibase::services::{

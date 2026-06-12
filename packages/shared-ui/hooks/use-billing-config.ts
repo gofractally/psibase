@@ -23,7 +23,7 @@ export const useBillingConfig = (options: GraphQLUrlOptions = {}) => {
                 }
             `;
             const res = await graphql<BillingConfigResponse>(query, {
-                service: "virtual-server",
+                service: "vserver",
                 ...options,
             });
 

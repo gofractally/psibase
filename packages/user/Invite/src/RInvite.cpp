@@ -115,7 +115,7 @@ namespace UserService
       class RInvite : public Service
       {
         public:
-         static constexpr auto service = AccountNumber("r-invite");
+         static constexpr auto service = AccountNumber("invite+1");
 
          auto serveSys(HttpRequest request) -> std::optional<HttpReply>
          {
