@@ -34,9 +34,7 @@ async function premAccountsAuthorizedGraphql<T>(query: string): Promise<T> {
     return response.data;
 }
 
-function mapNameEventEdges(
-    edges: Array<{ cursor?: string; node?: unknown }>,
-) {
+function mapNameEventEdges(edges: Array<{ cursor?: string; node?: unknown }>) {
     return edges
         .filter((edge) => edge.node)
         .map((edge) => {
@@ -105,10 +103,7 @@ const NAME_EVENT_NODE_FIELDS = `
     }
 `;
 
-export async function fetchNameEventsPage(
-    owner: string,
-    params: FetchNameEventsPageParams,
-) {
+export async function fetchNameEventsPage(params: FetchNameEventsPageParams) {
     const isBackward = "last" in params;
     const paginationArg = isBackward
         ? `last: ${params.last}${
@@ -122,7 +117,7 @@ export async function fetchNameEventsPage(
         await premAccountsAuthorizedGraphql(
             `
                 {
-                    nameEvents(owner: "${owner}", ${paginationArg}) {
+                    nameEvents(${paginationArg}) {
                         edges {
                             cursor
                             node {

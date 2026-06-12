@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
-    fetchNameEventsPage,
     type FetchNameEventsPageParams,
+    fetchNameEventsPage,
 } from "@/apps/prem-accounts/lib/graphql/prem-accounts-api";
 
 import QueryKey from "@/lib/query-keys";
@@ -21,7 +21,7 @@ export const useNameEvents = (
 
     return useQuery({
         queryKey: QueryKey.premNameEvents(user, params),
-        queryFn: () => fetchNameEventsPage(user!, params),
+        queryFn: () => fetchNameEventsPage(params),
         enabled: !!user && enabled,
     });
 };
