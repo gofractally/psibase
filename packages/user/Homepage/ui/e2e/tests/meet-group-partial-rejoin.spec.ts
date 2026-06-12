@@ -15,14 +15,22 @@ import {
     waitForMeetCallStatus,
     waitForMeetEnded,
 } from "../lib/meet-ui";
+import {
+    installMeetSpecCleanup,
+    meetSpecTeardownBeforeClose,
+    trackMeetPage,
+} from "../lib/meet-spec-hooks";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
 
 test.describe("Meet group partial rejoin", () => {
+    installMeetSpecCleanup(test);
+
     test(
         "departing member can rejoin while others remain connected",
         async ({ chain, alicePage, browser }) => {
             test.setTimeout(900_000);
             attachDiagnostics(alicePage, "alice");
+            trackMeetPage(alicePage);
 
             const party = await setupThreePartyAccounts(
                 chain,
@@ -30,6 +38,8 @@ test.describe("Meet group partial rejoin", () => {
                 browser!,
                 "m3pr",
             );
+            trackMeetPage(party.bobPage);
+            trackMeetPage(party.carolPage);
 
             try {
                 await createGroupChat(alicePage, chain.baseUrl, [
@@ -91,6 +101,11 @@ test.describe("Meet group partial rejoin", () => {
                 await waitForMeetCallStatus(alicePage, "Connected");
                 await waitForMeetCallStatus(party.carolPage, "Connected");
             } finally {
+                await meetSpecTeardownBeforeClose([
+                    alicePage,
+                    party.bobPage,
+                    party.carolPage,
+                ]);
                 await party.cleanup();
             }
         },

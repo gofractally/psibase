@@ -23,8 +23,15 @@ import {
     waitForMeetEnded,
     waitForMeetVideoElements,
 } from "../lib/meet-ui";
+import {
+    installMeetSpecCleanup,
+    meetSpecTeardownBeforeClose,
+    trackMeetPage,
+} from "../lib/meet-spec-hooks";
 
 test.describe("Meet DM two-party", () => {
+    installMeetSpecCleanup(test);
+
     test("alice calls bob: ring, accept, media, exit, and bob rejoins while alice stays", async ({
         chain,
         alicePage,
@@ -32,6 +39,7 @@ test.describe("Meet DM two-party", () => {
     }) => {
         test.setTimeout(600_000);
         attachDiagnostics(alicePage, "alice");
+        trackMeetPage(alicePage);
 
         const ALICE = uniqueE2eAccountName("m2a");
         const BOB = uniqueE2eAccountName("m2b");
@@ -45,6 +53,7 @@ test.describe("Meet DM two-party", () => {
         const bobContext = await browser!.newContext();
         const bobPage = await bobContext.newPage();
         attachDiagnostics(bobPage, "bob");
+        trackMeetPage(bobPage);
 
         try {
             const bob = await createAccountViaInviteUrl(
@@ -88,6 +97,7 @@ test.describe("Meet DM two-party", () => {
             await waitForMeetEnded(alicePage);
             await waitForMeetEnded(bobPage);
         } finally {
+            await meetSpecTeardownBeforeClose([alicePage, bobPage]);
             await bobContext.close();
         }
     });

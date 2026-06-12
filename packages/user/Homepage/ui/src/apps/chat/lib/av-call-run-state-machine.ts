@@ -6,10 +6,13 @@ import {
 import type { SignalKind } from "./webrtc-signaling-client";
 
 /**
- * Per-remote peer slot in the AV-call logical state machine. Tracks media
- * connection state, not the underlying MeetWebRtcPeer object.
+ * Per-remote media leg in the Meet Call FSM (v2b: `mediaLegs`). Tracks media
+ * connection state, not the underlying SharedMeetPeer / PC object.
  */
 export type AvPeerSlotState = "absent" | "connecting" | "ready";
+
+/** Remotes whose voluntary departure has already been processed (dedupe). */
+export type AvDepartedPeers = Readonly<Record<string, true>>;
 
 export type AvRunMachineState =
     | { tag: "idle" }
@@ -23,12 +26,14 @@ export type AvRunMachineState =
           peerSlots: Record<string, AvPeerSlotState>;
           /** True after joinSession + commitAvCallJoin succeeded. */
           signalingJoined: boolean;
+          departedPeers?: AvDepartedPeers;
       }
     | {
           tag: "ready";
           sessionId: string;
           peerSlots: Record<string, AvPeerSlotState>;
           signalingJoined: boolean;
+          departedPeers?: AvDepartedPeers;
       }
     | {
           tag: "pendingInvite";
@@ -90,7 +95,7 @@ export type AvRunEvent =
     | { type: "presenceOnline"; account: string }
     | { type: "presenceOffline"; account: string }
     | { type: "recoveryTick"; sessionId: string }
-    | { type: "sessionEnded"; sessionId: string; reason: string }
+    | { type: "sessionEnded"; sessionId: string; reason: string; by?: string }
     | { type: "failed"; detail: string }
     | { type: "hangup"; reason: string }
     | { type: "dispose" };
@@ -124,6 +129,9 @@ export type AvRunCommand =
     | { type: "cancelRecovery" }
     | { type: "notifyMediaReady"; remoteAccount: string }
     | { type: "commitTimelineEvent"; sessionId: string; reason: string }
+    | { type: "commitParticipantLeft"; sessionId: string; reason: string }
+    | { type: "commitSessionEnded"; sessionId: string; reason: string }
+    | { type: "commitSessionFailed"; sessionId: string; reason: string }
     | {
           type: "notifyPendingInvite";
           sessionId: string;
@@ -425,6 +433,92 @@ function currentSessionId(state: AvRunMachineState): string | undefined {
     return undefined;
 }
 
+function isGroupRemoteVoluntaryDeparture(
+    ctx: AvRunContext,
+    by: string | undefined,
+): boolean {
+    return (
+        ctx.kind === "group" &&
+        !!by &&
+        by !== ctx.self &&
+        ctx.members.includes(by)
+    );
+}
+
+function markDeparted(
+    departedPeers: AvDepartedPeers | undefined,
+    account: string,
+): AvDepartedPeers {
+    return { ...departedPeers, [account]: true };
+}
+
+function isAlreadyDeparted(
+    state: AvRunMachineState,
+    account: string,
+): boolean {
+    if (state.tag !== "signaling" && state.tag !== "ready") {
+        return false;
+    }
+    return state.departedPeers?.[account] === true;
+}
+
+function fullTeardownCommands(
+    sessionId: string | undefined,
+    reason: string,
+    opts: {
+        hasJoined: boolean;
+        timeline?:
+            | "commitSessionEnded"
+            | "commitSessionFailed"
+            | "commitTimelineEvent";
+    },
+): AvRunCommand[] {
+    const commands: AvRunCommand[] = [
+        { type: "cancelRecovery" },
+        { type: "disposeAllPeers" },
+        { type: "releaseLocalMedia" },
+    ];
+    if (sessionId && opts.hasJoined && opts.timeline) {
+        commands.push({
+            type: "leaveSession",
+            sessionId,
+            reason,
+        });
+        commands.push({
+            type: opts.timeline,
+            sessionId,
+            reason,
+        });
+    }
+    return commands;
+}
+
+function handleGroupRemoteDeparture(
+    state: Extract<AvRunMachineState, { tag: "signaling" | "ready" }>,
+    remote: string,
+    reason: string,
+): AvTransitionResult {
+    if (isAlreadyDeparted(state, remote)) {
+        return ignore(
+            state,
+            { type: "sessionEnded", sessionId: state.sessionId, reason, by: remote },
+            "duplicate remote departure",
+        );
+    }
+    const peerSlots = { ...state.peerSlots, [remote]: "absent" as const };
+    const departedPeers = markDeparted(state.departedPeers, remote);
+    return {
+        state: {
+            tag: "signaling",
+            sessionId: state.sessionId,
+            peerSlots,
+            signalingJoined: state.signalingJoined,
+            departedPeers,
+        },
+        commands: [{ type: "disposePeer", remoteAccount: remote }],
+    };
+}
+
 export function avTransition(
     state: AvRunMachineState,
     event: AvRunEvent,
@@ -451,6 +545,9 @@ export function avTransition(
                         state,
                         commands: [{ type: "beginSignaling", sessionId }],
                     };
+                }
+                if (state.tag === "ensuring") {
+                    return { state, commands: [{ type: "runPipeline" }] };
                 }
                 return ignore(state, event, "ensure in progress");
             }
@@ -507,7 +604,12 @@ export function avTransition(
             // Server pushes an invite. Stash as pendingInvite so the UI can
             // show accept/decline; do NOT auto-join.
             const existingSessionId = currentSessionId(state);
-            if (existingSessionId && existingSessionId !== event.sessionId) {
+            if (
+                existingSessionId &&
+                existingSessionId !== event.sessionId &&
+                state.tag !== "idle" &&
+                state.tag !== "failed"
+            ) {
                 return ignore(state, event, "session id mismatch on invite");
             }
             // If we're already joined (e.g. accepted then re-received), ignore.
@@ -541,7 +643,12 @@ export function avTransition(
             // Same as sessionInvite but synthesized from objective state
             // (M5 path for offline users discovering an active group call).
             const existingSessionId = currentSessionId(state);
-            if (existingSessionId && existingSessionId !== event.sessionId) {
+            if (
+                existingSessionId &&
+                existingSessionId !== event.sessionId &&
+                state.tag !== "idle" &&
+                state.tag !== "failed"
+            ) {
                 return ignore(state, event, "session id mismatch on discovered invite");
             }
             if (
@@ -613,6 +720,9 @@ export function avTransition(
             ) {
                 return ignore(state, event, "cross-session participantJoined");
             }
+            if (state.tag === "pendingInvite") {
+                return ignore(state, event, "participantJoined while pending invite");
+            }
             // DM rejoin: peer already had a media connection but they re-joined.
             if (
                 ctx.kind === "dm" &&
@@ -632,19 +742,67 @@ export function avTransition(
                 };
             }
 
-            const next = withSignaling(
-                event.sessionId,
-                ctx,
+            const rejoiningAfterPartialLeave =
+                ctx.kind === "group" &&
+                (state.tag === "signaling" || state.tag === "ready") &&
+                state.departedPeers?.[event.participant] === true;
+
+            let peerSlots: Record<string, AvPeerSlotState> =
                 state.tag === "signaling" || state.tag === "ready"
                     ? { ...state.peerSlots }
-                    : {},
+                    : {};
+            let departedPeers: AvDepartedPeers | undefined =
+                state.tag === "signaling" || state.tag === "ready"
+                    ? { ...state.departedPeers }
+                    : undefined;
+            if (rejoiningAfterPartialLeave && departedPeers) {
+                const { [event.participant]: _removed, ...rest } = departedPeers;
+                departedPeers = Object.keys(rest).length > 0 ? rest : undefined;
+            }
+            peerSlots[event.participant] = "connecting";
+
+            const signalingJoined =
                 state.tag === "signaling" || state.tag === "ready"
                     ? state.signalingJoined
-                    : ctx.hasJoined,
-            );
+                    : ctx.hasJoined;
+
+            for (const remote of onlineRemotes(ctx)) {
+                if (!peerSlots[remote]) {
+                    peerSlots[remote] = ctx.liveMediaReady[remote]
+                        ? "ready"
+                        : "connecting";
+                }
+            }
+
+            const nextState: AvRunMachineState = {
+                tag: "signaling",
+                sessionId: event.sessionId,
+                peerSlots,
+                signalingJoined,
+                departedPeers,
+            };
+
             const commands: AvRunCommand[] = [
                 { type: "beginSignaling", sessionId: event.sessionId },
             ];
+            const peerSlot =
+                state.tag === "signaling" || state.tag === "ready"
+                    ? state.peerSlots[event.participant]
+                    : undefined;
+            const participantDeparted =
+                state.tag === "signaling" || state.tag === "ready"
+                    ? departedPeers?.[event.participant] === true
+                    : false;
+            const needsPeerRecycle =
+                rejoiningAfterPartialLeave ||
+                participantDeparted ||
+                peerSlot === "absent";
+            if (ctx.kind === "group" && needsPeerRecycle) {
+                commands.unshift({
+                    type: "disposePeer",
+                    remoteAccount: event.participant,
+                });
+            }
             if (
                 ctx.kind === "group" &&
                 ctx.liveMediaReady[event.participant] !== true
@@ -654,15 +812,7 @@ export function avTransition(
                     remoteAccount: event.participant,
                 });
             }
-            // Group rejoin while ready: dispose the stale peer so a new one is
-            // created via beginSignaling.
-            if (state.tag === "ready" && ctx.kind === "group") {
-                commands.unshift({
-                    type: "disposePeer",
-                    remoteAccount: event.participant,
-                });
-            }
-            return { state: next, commands };
+            return { state: nextState, commands };
         }
 
         case "beginSignaling": {
@@ -695,11 +845,12 @@ export function avTransition(
             if (
                 state.tag !== "signaling" &&
                 state.tag !== "joining" &&
-                state.tag !== "ready"
+                state.tag !== "ready" &&
+                state.tag !== "waitingPeer"
             ) {
                 return ignore(state, event, "joinedSignaling unexpected phase");
             }
-            if (state.tag === "joining") {
+            if (state.tag === "joining" || state.tag === "waitingPeer") {
                 return {
                     state: withSignaling(event.sessionId, ctx, {}, true),
                     commands: [],
@@ -872,9 +1023,19 @@ export function avTransition(
             }
             if (
                 ctx.liveMediaReady[event.account] &&
-                state.tag === "ready"
+                (state.tag === "ready" || state.tag === "signaling")
             ) {
-                return ignore(state, event, "already ready");
+                const departed =
+                    state.tag === "signaling" || state.tag === "ready"
+                        ? state.departedPeers?.[event.account] === true
+                        : false;
+                const slot =
+                    state.tag === "signaling" || state.tag === "ready"
+                        ? state.peerSlots[event.account]
+                        : undefined;
+                if (!departed && slot !== "absent") {
+                    return ignore(state, event, "group peer already connected");
+                }
             }
             return {
                 state,
@@ -886,54 +1047,67 @@ export function avTransition(
             if (!ctx.members.includes(event.account)) {
                 return ignore(state, event, "presence for non-member");
             }
+            if (
+                state.tag === "failed" ||
+                state.tag === "idle" ||
+                state.tag === "pendingInvite"
+            ) {
+                return ignore(
+                    state,
+                    event,
+                    "presenceOffline in idle/failed/pending",
+                );
+            }
             if (ctx.kind === "group") {
-                const sessionId =
-                    state.tag === "signaling" || state.tag === "ready"
-                        ? state.sessionId
-                        : undefined;
+                const sessionId = currentSessionId(state);
                 if (!sessionId) {
                     return ignore(state, event, "presenceOffline without session");
                 }
-                const peerSlots: Record<string, AvPeerSlotState> =
-                    state.tag === "signaling" || state.tag === "ready"
-                        ? {
-                              ...state.peerSlots,
-                              [event.account]: "absent",
-                          }
-                        : {};
-                const signalingJoined =
-                    state.tag === "signaling" || state.tag === "ready"
-                        ? state.signalingJoined
-                        : ctx.hasJoined;
-                // If no remote is online any longer, fall back to waiting-peer
-                // (group dial-tone semantics).
+                const commands: AvRunCommand[] = [];
+                if (
+                    ctx.hasActivePeer[event.account] ||
+                    state.tag === "signaling" ||
+                    state.tag === "ready"
+                ) {
+                    commands.push({
+                        type: "disposePeer",
+                        remoteAccount: event.account,
+                    });
+                }
                 const remainingOnline = onlineRemotes(ctx).filter(
                     (m) => m !== event.account,
                 );
                 if (remainingOnline.length === 0 && ctx.hasJoined) {
                     return {
                         state: { tag: "waitingPeer", sessionId },
-                        commands: [
-                            {
-                                type: "disposePeer",
-                                remoteAccount: event.account,
-                            },
-                        ],
+                        commands,
                     };
                 }
+                if (state.tag === "waitingPeer") {
+                    return { state, commands };
+                }
+                const peerSlots: Record<string, AvPeerSlotState> = {
+                    ...(state.tag === "signaling" || state.tag === "ready"
+                        ? state.peerSlots
+                        : {}),
+                    [event.account]: "absent",
+                };
+                const signalingJoined =
+                    state.tag === "signaling" || state.tag === "ready"
+                        ? state.signalingJoined
+                        : ctx.hasJoined;
                 return {
                     state: {
                         tag: "signaling",
                         sessionId,
                         peerSlots,
                         signalingJoined,
+                        departedPeers:
+                            state.tag === "signaling" || state.tag === "ready"
+                                ? state.departedPeers
+                                : undefined,
                     },
-                    commands: [
-                        {
-                            type: "disposePeer",
-                            remoteAccount: event.account,
-                        },
-                    ],
+                    commands,
                 };
             }
             const sessionId =
@@ -970,48 +1144,105 @@ export function avTransition(
             };
         }
 
-        case "sessionEnded":
-        case "failed":
+        case "sessionEnded": {
+            const sessionId = event.sessionId;
+            const activeSessionId = currentSessionId(state);
+            if (state.tag === "idle") {
+                return ignore(state, event, "sessionEnded after local hangup");
+            }
+            if (
+                state.tag === "failed" &&
+                activeSessionId === sessionId
+            ) {
+                return ignore(state, event, "duplicate sessionEnded");
+            }
+            if (state.tag === "pendingInvite") {
+                // Delayed timeout/cleanup from a prior call round must not cancel
+                // a fresh ring; only the inviting host ending the session counts.
+                if (event.by && event.by !== state.from) {
+                    return ignore(
+                        state,
+                        event,
+                        "sessionEnded during pending invite (not from host)",
+                    );
+                }
+            }
+            if (
+                activeSessionId &&
+                activeSessionId !== sessionId
+            ) {
+                return ignore(state, event, "sessionEnded session mismatch");
+            }
+            if (
+                isGroupRemoteVoluntaryDeparture(ctx, event.by) &&
+                (state.tag === "signaling" || state.tag === "ready")
+            ) {
+                return handleGroupRemoteDeparture(state, event.by!, event.reason);
+            }
+            const commands = fullTeardownCommands(sessionId, event.reason, {
+                hasJoined: ctx.hasJoined,
+                timeline: "commitSessionEnded",
+            });
+            return {
+                state: { tag: "failed", sessionId, lastError: event.reason },
+                commands,
+            };
+        }
+
+        case "failed": {
+            const sessionId = currentSessionId(state);
+            const commands = fullTeardownCommands(sessionId, event.detail, {
+                hasJoined: ctx.hasJoined,
+                timeline: "commitSessionFailed",
+            });
+            return {
+                state: { tag: "failed", sessionId, lastError: event.detail },
+                commands,
+            };
+        }
+
         case "hangup": {
-            const detail =
-                event.type === "failed"
-                    ? event.detail
-                    : event.type === "hangup"
-                      ? event.reason
-                      : event.reason;
-            const sessionId =
-                event.type === "sessionEnded"
-                    ? event.sessionId
-                    : currentSessionId(state);
+            const sessionId = currentSessionId(state);
             const commands: AvRunCommand[] = [
                 { type: "cancelRecovery" },
                 { type: "disposeAllPeers" },
                 { type: "releaseLocalMedia" },
             ];
             if (
-                event.type === "hangup" &&
                 sessionId &&
                 ctx.hasJoined &&
-                state.tag !== "failed"
+                state.tag !== "failed" &&
+                state.tag !== "idle"
             ) {
                 commands.push({
                     type: "leaveSession",
                     sessionId,
                     reason: event.reason,
                 });
+                if (ctx.kind === "group") {
+                    commands.push({
+                        type: "commitParticipantLeft",
+                        sessionId,
+                        reason: event.reason,
+                    });
+                    return { state: { tag: "idle" }, commands };
+                }
                 commands.push({
-                    type: "commitTimelineEvent",
+                    type: "commitSessionEnded",
                     sessionId,
                     reason: event.reason,
                 });
             }
             return {
-                state: { tag: "failed", sessionId, lastError: detail },
+                state: { tag: "failed", sessionId, lastError: event.reason },
                 commands,
             };
         }
 
-        case "remoteSignal":
+        case "remoteSignal": {
+            if (state.tag === "pendingInvite") {
+                return ignore(state, event, "remoteSignal while pending invite");
+            }
             return {
                 state,
                 commands: [
@@ -1028,6 +1259,7 @@ export function avTransition(
                     },
                 ],
             };
+        }
 
         case "dispose": {
             const sessionId = currentSessionId(state);

@@ -16,9 +16,16 @@ import {
     waitForMeetEnded,
     waitForMeetVideoElements,
 } from "../lib/meet-ui";
+import {
+    installMeetSpecCleanup,
+    meetSpecTeardownBeforeClose,
+    trackMeetPage,
+} from "../lib/meet-spec-hooks";
 import { setupThreePartyAccounts } from "../lib/setup-three-party";
 
 test.describe("Meet group three-party", () => {
+    installMeetSpecCleanup(test);
+
     test("group Meet rings all members, connects media, supports exit and rejoin", async ({
         chain,
         alicePage,
@@ -26,6 +33,7 @@ test.describe("Meet group three-party", () => {
     }) => {
         test.setTimeout(900_000);
         attachDiagnostics(alicePage, "alice");
+        trackMeetPage(alicePage);
 
         const party = await setupThreePartyAccounts(
             chain,
@@ -33,6 +41,8 @@ test.describe("Meet group three-party", () => {
             browser!,
             "m3tp",
         );
+        trackMeetPage(party.bobPage);
+        trackMeetPage(party.carolPage);
         await snapshotStep(alicePage, "01-alice-ready");
         await snapshotStep(party.bobPage, "02-bob-ready");
         await snapshotStep(party.carolPage, "03-carol-ready");
@@ -114,6 +124,11 @@ test.describe("Meet group three-party", () => {
             await waitForMeetCallStatus(party.carolPage, "Connected");
             await snapshotStep(alicePage, "08-rejoined-call");
         } finally {
+            await meetSpecTeardownBeforeClose([
+                alicePage,
+                party.bobPage,
+                party.carolPage,
+            ]);
             await party.cleanup();
         }
     });

@@ -194,7 +194,7 @@ function makeFakeHost(opts: {
         setPendingInvite(invite) {
             opts.onPendingInvite?.(invite);
         },
-        onInviteCleared(sessionId) {
+        clearPendingInvite(sessionId) {
             opts.onInviteCleared?.(sessionId);
         },
     };
@@ -372,7 +372,7 @@ describe("AvRunActor", () => {
         expect(run.snapshot.phase).toBe("signaling");
     });
 
-    it("hangup from ready emits leaveSession + commitTimelineEvent + dispose", async () => {
+    it("hangup from ready emits leaveSession + commitSessionEnded + dispose", async () => {
         const run = buildDm();
         run.hasJoined = true;
         const host = makeFakeHost({ presence: { [BOB]: "online" } });
@@ -387,10 +387,58 @@ describe("AvRunActor", () => {
         await actor.dispatchAndWait({ type: "hangup", reason: "ended" });
 
         expect(exec.countOf("leaveSession")).toBe(1);
-        expect(exec.countOf("commitTimelineEvent")).toBe(1);
+        expect(exec.countOf("commitSessionEnded")).toBe(1);
         expect(exec.countOf("disposeAllPeers")).toBe(1);
         expect(exec.countOf("releaseLocalMedia")).toBe(1);
         expect(run.snapshot.phase).toBe("failed");
+    });
+
+    it("group hangup from ready commits participant left and returns idle", async () => {
+        const run = buildGroup();
+        run.hasJoined = true;
+        const host = makeFakeHost({
+            presence: { [BOB]: "online", [CAROL]: "online" },
+        });
+        const exec = new RecordingExecutor();
+        const actor = new AvRunActor(run, host, exec, {
+            tag: "ready",
+            sessionId: SESSION,
+            peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+            signalingJoined: true,
+        });
+
+        await actor.dispatchAndWait({ type: "hangup", reason: "ended" });
+
+        expect(exec.countOf("leaveSession")).toBe(1);
+        expect(exec.countOf("commitParticipantLeft")).toBe(1);
+        expect(exec.countOf("commitSessionEnded")).toBe(0);
+        expect(run.snapshot.phase).toBe("idle");
+    });
+
+    it("group sessionEnded from remote disposes one peer and stays in call", async () => {
+        const run = buildGroup();
+        run.hasJoined = true;
+        const host = makeFakeHost({
+            presence: { [BOB]: "online", [CAROL]: "online" },
+        });
+        const exec = new RecordingExecutor();
+        const actor = new AvRunActor(run, host, exec, {
+            tag: "ready",
+            sessionId: SESSION,
+            peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+            signalingJoined: true,
+        });
+
+        await actor.dispatchAndWait({
+            type: "sessionEnded",
+            sessionId: SESSION,
+            reason: "session-not-active",
+            by: BOB,
+        });
+
+        expect(exec.countOf("disposePeer")).toBe(1);
+        expect(exec.countOf("disposeAllPeers")).toBe(0);
+        expect(run.snapshot.phase).toBe("signaling");
     });
 
     it("draining is FIFO even with rapid synchronous dispatches", async () => {

@@ -44,6 +44,36 @@ export function commitAvCallParticipantLeft(
     });
 }
 
+/** Commits SESSION_ENDED — closes the objective session for all participants. */
+export function commitAvCallSessionEnded(
+    sessionId: string,
+    reason: string,
+): void {
+    const normalized = normalizeAvCallTerminalReason(reason);
+    void commitWebRtcSessionEvent(
+        sessionId,
+        CHAT_WEBRTC_EVENT_SESSION_ENDED,
+        normalized,
+    ).catch(() => {
+        /* Non-fatal; timeline may lag until retry. */
+    });
+}
+
+/** Commits SESSION_FAILED — terminal failure for the objective session. */
+export function commitAvCallSessionFailed(
+    sessionId: string,
+    reason: string,
+): void {
+    const normalized = normalizeAvCallTerminalReason(reason);
+    void commitWebRtcSessionEvent(
+        sessionId,
+        CHAT_WEBRTC_EVENT_SESSION_FAILED,
+        normalized,
+    ).catch(() => {
+        /* Non-fatal; timeline may lag until retry. */
+    });
+}
+
 export function commitAvCallTimelineEvent(
     sessionId: string,
     reason: string,

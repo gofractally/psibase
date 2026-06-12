@@ -184,6 +184,29 @@ describe("av-call-run-state-machine", () => {
             expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
         });
 
+        it("remoteSignal during pendingInvite is ignored (callee must accept first)", () => {
+            const pending: AvRunMachineState = {
+                tag: "pendingInvite",
+                sessionId: SESSION,
+                from: BOB,
+                wantVideo: true,
+                wantAudio: true,
+            };
+            const result = avTransition(
+                pending,
+                {
+                    type: "remoteSignal",
+                    sessionId: SESSION,
+                    from: BOB,
+                    kind: "offer",
+                    sdp: "v=0",
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state).toEqual(pending);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
         it("sessionInvite for different session is ignored", () => {
             const state: AvRunMachineState = {
                 tag: "pendingInvite",
@@ -205,6 +228,57 @@ describe("av-call-run-state-machine", () => {
             );
             expect(result.state).toEqual(state);
             expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("sessionInvite after failed accepts a new session", () => {
+            const failed: AvRunMachineState = {
+                tag: "failed",
+                sessionId: SESSION,
+                lastError: "ended",
+            };
+            const result = avTransition(
+                failed,
+                {
+                    type: "sessionInvite",
+                    sessionId: "wrtc:new-session",
+                    from: BOB,
+                    wantVideo: true,
+                    wantAudio: true,
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state.tag).toBe("pendingInvite");
+            if (result.state.tag === "pendingInvite") {
+                expect(result.state.sessionId).toBe("wrtc:new-session");
+            }
+            expect(result.commands[0]).toMatchObject({
+                type: "notifyPendingInvite",
+                sessionId: "wrtc:new-session",
+            });
+        });
+
+        it("sessionInvite after failed accepts same session (group re-ring)", () => {
+            const failed: AvRunMachineState = {
+                tag: "failed",
+                sessionId: SESSION,
+                lastError: "timeout",
+            };
+            const result = avTransition(
+                failed,
+                {
+                    type: "sessionInvite",
+                    sessionId: SESSION,
+                    from: BOB,
+                    wantVideo: true,
+                    wantAudio: true,
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state.tag).toBe("pendingInvite");
+            expect(result.commands[0]).toMatchObject({
+                type: "notifyPendingInvite",
+                sessionId: SESSION,
+            });
         });
 
         it("sessionInvite while joined is ignored", () => {
@@ -318,6 +392,27 @@ describe("av-call-run-state-machine", () => {
     });
 
     describe("participantJoined", () => {
+        it("is ignored while pending invite (callee must accept first)", () => {
+            const pending: AvRunMachineState = {
+                tag: "pendingInvite",
+                sessionId: SESSION,
+                from: SELF,
+                wantVideo: true,
+                wantAudio: true,
+            };
+            const result = avTransition(
+                pending,
+                {
+                    type: "participantJoined",
+                    sessionId: SESSION,
+                    participant: BOB,
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state).toEqual(pending);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
         it("for unknown session id is ignored", () => {
             const state: AvRunMachineState = {
                 tag: "signaling",
@@ -342,8 +437,9 @@ describe("av-call-run-state-machine", () => {
             const ready: AvRunMachineState = {
                 tag: "ready",
                 sessionId: SESSION,
-                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                peerSlots: { [BOB]: "absent", [CAROL]: "ready" },
                 signalingJoined: true,
+                departedPeers: { [BOB]: true },
             };
             const result = avTransition(
                 ready,
@@ -359,6 +455,43 @@ describe("av-call-run-state-machine", () => {
                     hasActivePeer: { [BOB]: true, [CAROL]: true },
                 }),
             );
+            expect(result.commands[0]).toMatchObject({
+                type: "disposePeer",
+                remoteAccount: BOB,
+            });
+            expect(result.state.tag).toBe("signaling");
+            expect(
+                result.commands.some((c) => c.type === "beginSignaling"),
+            ).toBe(true);
+        });
+
+        it("group rejoin after partial leave clears departed and reconnects", () => {
+            const signaling: AvRunMachineState = {
+                tag: "signaling",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "absent", [CAROL]: "ready" },
+                signalingJoined: true,
+                departedPeers: { [BOB]: true },
+            };
+            const result = avTransition(
+                signaling,
+                {
+                    type: "participantJoined",
+                    sessionId: SESSION,
+                    participant: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [CAROL]: true },
+                    hasActivePeer: { [CAROL]: true },
+                }),
+            );
+            expect(result.state.tag).toBe("signaling");
+            if (result.state.tag === "signaling") {
+                expect(result.state.peerSlots[BOB]).toBe("connecting");
+                expect(result.state.departedPeers?.[BOB]).toBeUndefined();
+            }
             expect(result.commands[0]).toMatchObject({
                 type: "disposePeer",
                 remoteAccount: BOB,
@@ -465,8 +598,191 @@ describe("av-call-run-state-machine", () => {
         });
     });
 
+    describe("group partial leave", () => {
+        it("remote voluntary leave keeps call active in signaling", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "session-not-active",
+                    by: BOB,
+                },
+                ctx({
+                    kind: "group",
+                    hasJoined: true,
+                    liveMediaReady: { [BOB]: true, [CAROL]: true },
+                }),
+            );
+            expect(result.state.tag).toBe("signaling");
+            if (result.state.tag === "signaling") {
+                expect(result.state.peerSlots[BOB]).toBe("absent");
+                expect(result.state.peerSlots[CAROL]).toBe("ready");
+                expect(result.state.departedPeers?.[BOB]).toBe(true);
+            }
+            expect(result.commands).toEqual([
+                { type: "disposePeer", remoteAccount: BOB },
+            ]);
+            expect(
+                result.commands.some((c) => c.type === "disposeAllPeers"),
+            ).toBe(false);
+        });
+
+        it("duplicate sessionEnded from same remote is ignored", () => {
+            const signaling: AvRunMachineState = {
+                tag: "signaling",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "absent", [CAROL]: "ready" },
+                signalingJoined: true,
+                departedPeers: { [BOB]: true },
+            };
+            const result = avTransition(
+                signaling,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "session-not-active",
+                    by: BOB,
+                },
+                ctx({ kind: "group", hasJoined: true }),
+            );
+            expect(result.state).toEqual(signaling);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("DM sessionEnded from remote fully tears down", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "ended",
+                    by: BOB,
+                },
+                ctx({ kind: "dm", hasJoined: true }),
+            );
+            expect(result.state.tag).toBe("failed");
+            expect(
+                result.commands.some((c) => c.type === "disposeAllPeers"),
+            ).toBe(true);
+            expect(
+                result.commands.some((c) => c.type === "commitSessionEnded"),
+            ).toBe(true);
+        });
+
+        it("group sessionEnded without by fully tears down", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "ended",
+                },
+                ctx({ kind: "group", hasJoined: true }),
+            );
+            expect(result.state.tag).toBe("failed");
+            expect(
+                result.commands.some((c) => c.type === "disposeAllPeers"),
+            ).toBe(true);
+        });
+
+        it("sessionEnded after local hangup (idle) is ignored", () => {
+            const result = avTransition(
+                { tag: "idle" },
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "timeout",
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state.tag).toBe("idle");
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("duplicate sessionEnded while failed is ignored", () => {
+            const failed: AvRunMachineState = {
+                tag: "failed",
+                sessionId: SESSION,
+                lastError: "timeout",
+            };
+            const result = avTransition(
+                failed,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "timeout",
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state).toEqual(failed);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+
+        it("sessionEnded from non-host during pendingInvite is ignored", () => {
+            const pending: AvRunMachineState = {
+                tag: "pendingInvite",
+                sessionId: SESSION,
+                from: SELF,
+                wantVideo: true,
+                wantAudio: true,
+            };
+            const result = avTransition(
+                pending,
+                {
+                    type: "sessionEnded",
+                    sessionId: SESSION,
+                    reason: "timeout",
+                    by: CAROL,
+                },
+                ctx({ kind: "group" }),
+            );
+            expect(result.state).toEqual(pending);
+            expect(result.commands[0]).toMatchObject({ type: "logIgnored" });
+        });
+    });
+
+    describe("create-vs-join invariant", () => {
+        it("ensure while waitingPeer reuses session via beginSignaling not pipeline", () => {
+            const waiting: AvRunMachineState = {
+                tag: "waitingPeer",
+                sessionId: SESSION,
+            };
+            const result = avTransition(
+                waiting,
+                { type: "ensure" },
+                ctx({ kind: "group", hasJoined: false }),
+            );
+            expect(result.state).toEqual(waiting);
+            expect(result.commands).toEqual([
+                { type: "beginSignaling", sessionId: SESSION },
+            ]);
+            expect(
+                result.commands.some((c) => c.type === "runPipeline"),
+            ).toBe(false);
+        });
+    });
+
     describe("hangup and dispose", () => {
-        it("hangup from ready emits leaveSession + commitTimelineEvent", () => {
+        it("hangup from ready emits leaveSession + commitSessionEnded", () => {
             const ready: AvRunMachineState = {
                 tag: "ready",
                 sessionId: SESSION,
@@ -481,9 +797,30 @@ describe("av-call-run-state-machine", () => {
             expect(result.state.tag).toBe("failed");
             const types = result.commands.map((c) => c.type);
             expect(types).toContain("leaveSession");
-            expect(types).toContain("commitTimelineEvent");
+            expect(types).toContain("commitSessionEnded");
+            expect(types).not.toContain("commitParticipantLeft");
             expect(types).toContain("disposeAllPeers");
             expect(types).toContain("releaseLocalMedia");
+        });
+
+        it("group hangup from ready commits participant left and returns idle", () => {
+            const ready: AvRunMachineState = {
+                tag: "ready",
+                sessionId: SESSION,
+                peerSlots: { [BOB]: "ready", [CAROL]: "ready" },
+                signalingJoined: true,
+            };
+            const result = avTransition(
+                ready,
+                { type: "hangup", reason: "ended" },
+                ctx({ kind: "group", hasJoined: true }),
+            );
+            expect(result.state.tag).toBe("idle");
+            const types = result.commands.map((c) => c.type);
+            expect(types).toContain("leaveSession");
+            expect(types).toContain("commitParticipantLeft");
+            expect(types).not.toContain("commitSessionEnded");
+            expect(types).toContain("disposeAllPeers");
         });
 
         it("dispose from ready issues leaveSession", () => {

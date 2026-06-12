@@ -151,7 +151,17 @@ export interface AvCallOrchestratorHost {
         run: AvCallSpaceRun,
         staleSessionId: string,
     ): Promise<void>;
+    recordAvCallSessionSnapshot?(
+        sessionId: string,
+        joinedParticipants: string[],
+        pendingParticipants: string[],
+    ): void;
+    removeParticipantFromAvCallSessionRoster?(
+        sessionId: string,
+        participant: string,
+    ): void;
     retireAvCallSession?(sessionId: string): void;
+    unretireAvCallSession?(sessionId: string): void;
     isRetiredAvCallSession?(sessionId: string): boolean;
     tearDownDmPeer(run: DmAvCallRun, reason: string): void;
 
@@ -167,8 +177,13 @@ export interface AvCallOrchestratorHost {
         run: AvCallSpaceRun,
         event: import("./av-call-run-state-machine").AvRunEvent,
     ): void;
+    dispatchRunEventAndWait?(
+        run: AvCallSpaceRun,
+        event: import("./av-call-run-state-machine").AvRunEvent,
+    ): Promise<void>;
 
     setPendingInvite(invite: AvCallIncomingInvite): void;
+    clearPendingInvite?(sessionId: string): void;
     onInviteCleared?(sessionId: string): void;
     onSpaceUpdate?(spaceUuid: string, snap: AvCallSessionSnapshot): void;
     onAvCallMediaReady?(

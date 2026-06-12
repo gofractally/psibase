@@ -16,6 +16,11 @@ import {
     waitForMeetEnded,
 } from "../lib/meet-ui";
 import {
+    installMeetSpecCleanup,
+    meetSpecTeardownBeforeClose,
+    trackMeetPage,
+} from "../lib/meet-spec-hooks";
+import {
     setupSixPartyAccounts,
     type SixPartyMemberKey,
 } from "../lib/setup-six-party";
@@ -29,6 +34,8 @@ const OTHER_MEMBERS: SixPartyMemberKey[] = [
 ];
 
 test.describe("Meet group six-party", () => {
+    installMeetSpecCleanup(test);
+
     test("alice starts Meet, all five ring and connect; one member leaves and rejoins", async ({
         chain,
         alicePage,
@@ -36,8 +43,12 @@ test.describe("Meet group six-party", () => {
     }) => {
         test.setTimeout(1_200_000);
         attachDiagnostics(alicePage, "alice");
+        trackMeetPage(alicePage);
 
         const party = await setupSixPartyAccounts(chain, alicePage, browser!, "m6");
+        for (const key of OTHER_MEMBERS) {
+            trackMeetPage(party.pages[key]);
+        }
 
         try {
             const otherMemberNames = OTHER_MEMBERS.map(
@@ -115,6 +126,10 @@ test.describe("Meet group six-party", () => {
                 timeout: 300_000,
             });
         } finally {
+            await meetSpecTeardownBeforeClose([
+                alicePage,
+                ...OTHER_MEMBERS.map((key) => party.pages[key]),
+            ]);
             await party.cleanup();
         }
     });

@@ -6,6 +6,7 @@ import {
 } from "./av-call-dm-orchestrator";
 import {
     beginSignalingGroupAvCall,
+    beginSignalingGroupAvCallSkipChecks,
     ensureGroupLocalMedia,
     startMeshAvCallPeer,
     tearDownGroupLocalMedia,
@@ -27,7 +28,12 @@ import {
     type DmAvCallRun,
     type GroupAvCallRun,
 } from "./av-call-session-types";
-import { commitAvCallTimelineEvent } from "./av-call-timeline-commit";
+import {
+    commitAvCallParticipantLeft,
+    commitAvCallSessionEnded,
+    commitAvCallSessionFailed,
+    commitAvCallTimelineEvent,
+} from "./av-call-timeline-commit";
 
 export function buildAvRunContext(
     host: AvCallOrchestratorHost,
@@ -204,6 +210,18 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
                 commitAvCallTimelineEvent(command.sessionId, command.reason);
                 return;
 
+            case "commitParticipantLeft":
+                commitAvCallParticipantLeft(command.sessionId, command.reason);
+                return;
+
+            case "commitSessionEnded":
+                commitAvCallSessionEnded(command.sessionId, command.reason);
+                return;
+
+            case "commitSessionFailed":
+                commitAvCallSessionFailed(command.sessionId, command.reason);
+                return;
+
             case "notifyPendingInvite": {
                 const invite: AvCallIncomingInvite = {
                     sessionId: command.sessionId,
@@ -218,7 +236,7 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
             }
 
             case "clearPendingInvite":
-                this.host.onInviteCleared?.(command.sessionId);
+                this.host.clearPendingInvite?.(command.sessionId);
                 return;
 
             case "abortRun":
@@ -298,7 +316,13 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
         const self = this.host.getSelf();
         if (!self || signal.aborted) return;
 
-        if (run.kind === "dm" && beginSignalingDmAvCallSkipChecks(run, sessionId)) {
+        if (run.kind === "dm" && beginSignalingDmAvCallSkipChecks(this.host, run, sessionId)) {
+            return;
+        }
+        if (
+            run.kind === "group" &&
+            beginSignalingGroupAvCallSkipChecks(this.host, run, sessionId)
+        ) {
             return;
         }
 
@@ -316,6 +340,12 @@ export class AvCallRunCommandExecutor implements AvRunCommandExecutor {
             await beginSignalingGroupAvCall(this.host, run, sessionId, self);
         } else {
             beginSignalingDmAvCall(this.host, run, sessionId, self);
+        }
+        if (run.hasJoined) {
+            this.host.dispatchRunEventForRun?.(run, {
+                type: "joinedSignaling",
+                sessionId,
+            });
         }
         syncSnapshot();
     }
