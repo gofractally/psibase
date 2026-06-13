@@ -141,8 +141,10 @@ struct EventCursor : sqlite3_vtab_cursor
 {
    std::vector<char> key;
    std::vector<char> end;
+   std::vector<char> begin;
    std::vector<char> data;
    std::size_t       prefixLen;
+   bool              descending = false;
    EventIndexHandle  handle{KvMode::read};
    EventCursor(const EventVTab& vtab) : key(vtab.key()), prefixLen(key.size() + 1) {}
    EventVTab* vtab() { return static_cast<EventVTab*>(pVtab); }
@@ -153,94 +155,95 @@ struct EventCursor : sqlite3_vtab_cursor
    }
    bool          eof() { return key.size() < prefixLen; }
    std::uint64_t eventId() const { return keyToEventId(key, prefixLen); }
-   void          seek()
+   void          load(std::uint32_t sz)
    {
-      auto sz = psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen);
       if (sz == 0xffffffffu)
       {
          setEof();
+         return;
       }
+      auto key_size = psibase::raw::getKey(nullptr, 0);
+      key.resize(key_size);
+      psibase::raw::getKey(key.data(), key.size());
+      bool outOfRange = descending ? compare_blob(key, begin) < 0
+                                   : (!end.empty() && compare_blob(key, end) >= 0);
+      if (outOfRange)
+         setEof();
       else
       {
-         // vtab()->index.db
-         auto key_size = psibase::raw::getKey(nullptr, 0);
-         key.resize(key_size);
-         psibase::raw::getKey(key.data(), key.size());
-         if (!end.empty() && compare_blob(key, end) >= 0)
-            setEof();
-         else
+         sz = psibase::raw::getSequential(vtab()->index.db, eventId());
+         if (sz == 0xffffffffu)
          {
-            sz = psibase::raw::getSequential(vtab()->index.db, eventId());
-            if (sz == 0xffffffffu)
-            {
-               check(false, "Internal error: indexed event does not exist");
-            }
-            data.resize(sz);
-            psibase::raw::getResult(data.data(), data.size(), 0);
-            // Extract just the data
-            psio::FracStream stream{data};
-            std::uint16_t    fixed_size;
-            if (!stream.unpack<true, true>(&fixed_size))
-            {
-               check(false, "Internal error: malformed event");
-            }
-            std::uint32_t fixed_end = stream.pos + fixed_size;
-            if (fixed_end > stream.end_pos || fixed_end < stream.pos)
-            {
-               check(false, "Internal error: fixed size out-of-bounds");
-            }
-            std::uint32_t heap_end = stream.end_pos;
-            stream.end_pos         = fixed_end;
-            AccountNumber eventService;
-            if (!stream.unpack<true, true>(&eventService))
-            {
-               check(false, "Internal error: event missing service");
-            }
-            if (eventService != vtab()->index.service)
-            {
-               check(false, "Internal error: event service does not match index");
-            }
-            std::uint32_t typePtr;
-            if (!stream.unpack<true, true>(&typePtr) || typePtr == 1)
-            {
-               check(false, "Internal error: event missing type");
-            }
-            std::uint32_t valuePtr;
-            if (!stream.unpack<true, true>(&valuePtr) || typePtr == 1)
-            {
-               check(false, "Internal error: event mising data");
-            }
-            std::uint32_t valueStart = stream.pos - 4 + valuePtr;
-            if (valueStart < valuePtr || valueStart > heap_end)
-            {
-               check(false, "Internal error: event data out-of-bounds");
-            }
-            // Find the end of the event data (either the end of the wrapper,
-            // or the start of the next heap object)
-            std::uint32_t nextPtr;
-            while (true)
-            {
-               if (!stream.unpack<true, true>(&nextPtr))
-               {
-                  nextPtr = heap_end;
-                  break;
-               }
-               else if (nextPtr > 1)
-               {
-                  nextPtr = stream.pos - 4 + nextPtr;
-                  if (nextPtr > heap_end || nextPtr < stream.pos)
-                  {
-                     check(false, "extension out-of-bounds");
-                  }
-                  break;
-               }
-            }
-
-            data.erase(data.begin() + nextPtr, data.end());
-            data.erase(data.begin(), data.begin() + valueStart);
+            check(false, "Internal error: indexed event does not exist");
          }
+         data.resize(sz);
+         psibase::raw::getResult(data.data(), data.size(), 0);
+         // Extract just the data
+         psio::FracStream stream{data};
+         std::uint16_t    fixed_size;
+         if (!stream.unpack<true, true>(&fixed_size))
+         {
+            check(false, "Internal error: malformed event");
+         }
+         std::uint32_t fixed_end = stream.pos + fixed_size;
+         if (fixed_end > stream.end_pos || fixed_end < stream.pos)
+         {
+            check(false, "Internal error: fixed size out-of-bounds");
+         }
+         std::uint32_t heap_end = stream.end_pos;
+         stream.end_pos         = fixed_end;
+         AccountNumber eventService;
+         if (!stream.unpack<true, true>(&eventService))
+         {
+            check(false, "Internal error: event missing service");
+         }
+         if (eventService != vtab()->index.service)
+         {
+            check(false, "Internal error: event service does not match index");
+         }
+         std::uint32_t typePtr;
+         if (!stream.unpack<true, true>(&typePtr) || typePtr == 1)
+         {
+            check(false, "Internal error: event missing type");
+         }
+         std::uint32_t valuePtr;
+         if (!stream.unpack<true, true>(&valuePtr) || typePtr == 1)
+         {
+            check(false, "Internal error: event mising data");
+         }
+         std::uint32_t valueStart = stream.pos - 4 + valuePtr;
+         if (valueStart < valuePtr || valueStart > heap_end)
+         {
+            check(false, "Internal error: event data out-of-bounds");
+         }
+         // Find the end of the event data (either the end of the wrapper,
+         // or the start of the next heap object)
+         std::uint32_t nextPtr;
+         while (true)
+         {
+            if (!stream.unpack<true, true>(&nextPtr))
+            {
+               nextPtr = heap_end;
+               break;
+            }
+            else if (nextPtr > 1)
+            {
+               nextPtr = stream.pos - 4 + nextPtr;
+               if (nextPtr > heap_end || nextPtr < stream.pos)
+               {
+                  check(false, "extension out-of-bounds");
+               }
+               break;
+            }
+         }
+
+         data.erase(data.begin() + nextPtr, data.end());
+         data.erase(data.begin(), data.begin() + valueStart);
       }
    }
+   void seek() { load(psibase::raw::kvGreaterEqual(handle, key.data(), key.size(), prefixLen)); }
+   void seekPrev() { load(psibase::raw::kvLessThan(handle, key.data(), key.size(), prefixLen)); }
+   void seekLast() { load(psibase::raw::kvMax(handle, key.data(), prefixLen)); }
 };
 
 int event_eof(sqlite3_vtab_cursor* cursor)
@@ -256,8 +259,15 @@ int event_next(sqlite3_vtab_cursor* cursor)
    {
       return SQLITE_ERROR;
    }
-   c->key.push_back('\0');
-   c->seek();
+   if (c->descending)
+   {
+      c->seekPrev();
+   }
+   else
+   {
+      c->key.push_back('\0');
+      c->seek();
+   }
    return SQLITE_OK;
 }
 
@@ -609,13 +619,20 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
       }
    }
    int  best = std::ranges::min_element(constraints) - constraints.begin() - 1;
-   auto buf  = static_cast<char*>(alloca(info->nConstraint + 1));
+   bool desc = false;
+   if (best == -1 && info->nOrderBy == 1 && info->aOrderBy[0].iColumn == -1)
+   {
+      info->orderByConsumed = 1;
+      desc                  = info->aOrderBy[0].desc;
+   }
+   auto buf  = static_cast<char*>(alloca(info->nConstraint + 2));
    int  argc = 0;
+   buf[0]    = desc ? '-' : '+';
    for (int i = 0; i < info->nConstraint; ++i)
    {
       auto appendArg = [&](char type)
       {
-         buf[argc]                           = type;
+         buf[argc + 1]                       = type;
          info->aConstraintUsage[i].argvIndex = argc + 1;
          ++argc;
       };
@@ -641,12 +658,12 @@ int event_best_index(sqlite3_vtab* base_vtab, sqlite3_index_info* info)
          }
       }
    }
-   buf[argc]    = '\0';
-   info->idxNum = best;
-   info->idxStr = (char*)sqlite3_malloc(argc + 1);
+   buf[argc + 1] = '\0';
+   info->idxNum  = best;
+   info->idxStr  = (char*)sqlite3_malloc(argc + 2);
    if (!info->idxStr)
       return SQLITE_NOMEM;
-   std::memcpy(info->idxStr, buf, argc + 1);
+   std::memcpy(info->idxStr, buf, argc + 2);
    info->needToFreeIdxStr = 1;
    info->estimatedCost    = constraints[best + 1].estimatedCost();
    return SQLITE_OK;
@@ -915,6 +932,9 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    key.push_back(static_cast<char>(index));
    c->prefixLen = key.size();
    c->key       = key;
+   // xFilter may be called multiple times to restart a scan on the same
+   // cursor; the upper bound must not leak from a previous filter.
+   c->end.clear();
    auto keyType = index >= 0 ? vtab->rowType->children[index] : CompiledMember{.type = &u64};
    auto incKey  = [&](std::vector<char>& k)
    {
@@ -938,7 +958,7 @@ int event_filter(sqlite3_vtab_cursor* cursor,
    {
       key.resize(c->prefixLen);
       auto adj = sql_to_key(keyType, argv[i], key);
-      switch (argTypes[i])
+      switch (argTypes[i + 1])
       {
          case '=':
             if (adj != KeyResult::exact)
@@ -968,7 +988,25 @@ int event_filter(sqlite3_vtab_cursor* cursor,
             break;
       }
    }
-   c->seek();
+   c->descending = (argTypes[0] == '-');
+   if (c->descending)
+   {
+      c->begin = c->key;
+      if (c->end.empty())
+      {
+         c->key.resize(c->prefixLen);
+         c->seekLast();
+      }
+      else
+      {
+         c->key = c->end;
+         c->seekPrev();
+      }
+   }
+   else
+   {
+      c->seek();
+   }
    return SQLITE_OK;
 }
 
