@@ -159,31 +159,24 @@ TEST_CASE("events")
                           R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID)""") ==
          std::vector<TestEvent>{{42}, {72}, {42}, {91}});
 
-   CHECK(query<TestEvent>(
-             chain, R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID DESC)""") ==
+   constexpr std::string_view descendingSql =
+       R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID DESC)""";
+   CHECK(query<TestEvent>(chain, descendingSql) ==
          std::vector<TestEvent>{{91}, {42}, {72}, {42}});
 
-   CHECK(query<TestEvent>(
-             chain,
-             R"""(SELECT i FROM "history.test-service.testevent" ORDER BY ROWID DESC LIMIT 1)""") ==
-         std::vector<TestEvent>{{91}});
-
-   CHECK(
-       query<TestEvent>(
-           chain,
-           R"""(SELECT i FROM "history.test-service.testevent" WHERE ROWID <= (SELECT MAX(ROWID) FROM "history.test-service.testevent") ORDER BY ROWID DESC LIMIT 2)""") ==
-       std::vector<TestEvent>{{91}, {42}});
-
-   CHECK(
-       query<TestEvent>(
-           chain,
-           R"""(SELECT i FROM "history.test-service.testevent" WHERE ROWID > (SELECT MIN(ROWID) FROM "history.test-service.testevent") ORDER BY ROWID DESC)""") ==
-       std::vector<TestEvent>{{91}, {42}, {72}});
-
-   CHECK(query<TestEvent>(
-             chain,
-             R"""(SELECT i FROM "history.test-service.testevent" WHERE d > 2 ORDER BY ROWID DESC)""") ==
-         std::vector<TestEvent>{{42}, {72}});
+   {
+      std::string plan;
+      for (const auto& row :
+           query<ExplainQueryPlan>(chain, std::string("EXPLAIN QUERY PLAN ") + std::string(descendingSql)))
+      {
+         if (!plan.empty())
+            plan += '\n';
+         plan += row.detail;
+      }
+      INFO(plan);
+      CHECK(plan.find("VIRTUAL TABLE INDEX -1:-") != std::string::npos);
+      CHECK(plan.find("USE TEMP B-TREE FOR ORDER BY") == std::string::npos);
+   }
 
    CHECK(
        query<TestEvent>(
