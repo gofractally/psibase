@@ -9,8 +9,8 @@ impl NetworkSpecs {
     /// the offsets like a normal "consumption" because then whoever enables billing
     ///  would be required to settle a much larger virtual balance.
     pub(crate) fn obj_storage_offset() -> u64 {
-        // code uploaded at boot
-        InitRow::code_bytes()
+        // Bytes already in db at boot (`Native` + `Service`)
+        InitRow::used_bytes()
 
         // One misc gigabyte
         + 1_000_000_000

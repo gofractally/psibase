@@ -143,6 +143,10 @@ pub(super) fn get_disk_state(chain: &psibase::Chain) -> DiskPricingState {
     query(chain, Wrapper::SERVICE, "diskPricing", DISK_PRICING_QUERY).unwrap()
 }
 
+pub(super) fn get_db_prealloc(chain: &psibase::Chain) -> u64 {
+    query(chain, Wrapper::SERVICE, "dbPrealloc", r#"query { dbPrealloc }"#).unwrap()
+}
+
 pub(super) fn get_total_consumed_disk(
     chain: &psibase::Chain,
     account: AccountNumber,

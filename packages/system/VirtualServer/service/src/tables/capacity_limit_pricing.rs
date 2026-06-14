@@ -305,7 +305,10 @@ impl CapacityPricing {
                 virtual_balance: VirtualBalance::default(),
             })
             .unwrap();
+    }
 
+    /// Creates the relay sub-account that holds reserve tokens for `resource`.
+    pub fn create_relay(resource: ResourceType) {
         Tokens::call().createSub(relay_sub(resource));
     }
 

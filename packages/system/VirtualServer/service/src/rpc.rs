@@ -2,8 +2,8 @@ use crate::{
     math_utils::ppm_to_pct,
     resource_type::ResourceType,
     tables::tables::{
-        BillingConfig, BillingConfigTable, CapacityPricing, NetworkSpecs, NetworkSpecsTable,
-        NetworkVariables, RateLimitPricing, ServerSpecs as InternalServerSpecs, ServerSpecsTable,
+        BillingConfig, BillingConfigTable, CapacityPricing, InitRow, NetworkSpecs,
+        NetworkSpecsTable, NetworkVariables, RateLimitPricing, ServerSpecs as InternalServerSpecs,
         UserSettings,
     },
 };
@@ -209,8 +209,7 @@ impl Query {
     /// per server. Any less than this amount of memory may result in degraded
     /// node performance.
     async fn get_server_specs(&self) -> ServerSpecs {
-        let server_specs: InternalServerSpecs =
-            ServerSpecsTable::read().get_index_pk().get(&()).unwrap();
+        let server_specs = InternalServerSpecs::get().unwrap_or_default();
 
         let vars = NetworkVariables::get();
         let recommended_min_memory_bytes = vars.obj_storage_bytes / MEMORY_RATIO as u64;
@@ -249,6 +248,11 @@ impl Query {
     /// Returns the data related to pricing of disk storage
     async fn disk_pricing(&self) -> Option<CapacityPricing> {
         CapacityPricing::get(ResourceType::Disk)
+    }
+
+    /// Returns the objective disk bytes already written when the service was initialized
+    async fn db_prealloc(&self) -> u64 {
+        InitRow::used_bytes()
     }
 
     /// Returns the current cost of consuming the specified number of bytes of disk

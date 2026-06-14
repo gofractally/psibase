@@ -22,8 +22,9 @@ use super::utils::{fmt_mb, fmt_num, fmt_sys};
 
 use super::helpers::{assert_error, check_balance, enable_billing as setup_enable_billing};
 use super::query::{
-    get_billing_config, get_disk_state, get_enable_billing_cost, get_invite_cost, get_network_vars,
-    get_server_specs, get_total_consumed_disk, get_user_resources, DiskPricingState,
+    get_billing_config, get_db_prealloc, get_disk_state, get_enable_billing_cost, get_invite_cost,
+    get_network_vars, get_server_specs, get_total_consumed_disk, get_user_resources,
+    DiskPricingState,
 };
 
 fn consumption_details(
@@ -381,6 +382,93 @@ fn system_writes_accumulate_virtual_balance(chain: psibase::Chain) -> Result<(),
         freed_bytes, 93,
         "Expected exactly 93 bytes freed by startBlock system writes, got {}",
         freed_bytes,
+    );
+
+    Ok(())
+}
+
+// Bytes consumed since init
+fn disk_consumed(chain: &psibase::Chain) -> u64 {
+    let disk = get_disk_state(chain);
+    disk.max_capacity - disk.remaining_capacity
+}
+
+fn check_disk_invariant(label: &str, chain: &psibase::Chain) -> bool {
+    let native = chain.database_usage(DbId::Native);
+    let service = chain.database_usage(DbId::Service);
+    let scanned = native + service;
+    let prealloc = get_db_prealloc(chain);
+    let consumed = disk_consumed(chain);
+    let accounted = prealloc + consumed;
+    let delta = scanned as i128 - accounted as i128;
+    println!(
+        "[{label}] scanned={} (native={}, service={}) = prealloc={} + consumed={} ({}), delta={}",
+        fmt_num(scanned),
+        fmt_num(native),
+        fmt_num(service),
+        fmt_num(prealloc),
+        fmt_num(consumed),
+        fmt_num(accounted),
+        delta,
+    );
+    delta == 0
+}
+
+// Full-database accounting invariant test
+//
+// The core invariant: every byte written to the service + native db is
+// either part of the prealloc baseline measured at init, or was written
+// after that baseline was measured and therefore is tracked by the disk
+// billing system.
+#[psibase::test_case(packages("VirtualServer", "StagedTx"))]
+fn disk_accounting_invariant(chain: psibase::Chain) -> Result<(), psibase::Error> {
+    chain.finish_block();
+    let after_boot = check_disk_invariant("after boot", &chain);
+
+    // Test a few actions that exercise edge-case paths in database writes, namely those
+    // cases where a table is written to by both native and a service.
+
+    // The status row is written by native internally during an isVerify service upload
+    chain.deploy_service_with_flags(
+        account!("vrfy-svc"),
+        b"verify service placeholder code",
+        psibase::CodeRow::IS_VERIFY,
+    )?;
+    chain.finish_block();
+    let after_isverify = check_disk_invariant("after isVerify service", &chain);
+
+    // The status row is also written by the producer service when the producer set is changed
+    let producers = psibase::services::producers::SERVICE;
+    chain.new_account(account!("prod2"))?;
+    let auth_any = psibase::Claim::default();
+    psibase::services::producers::Wrapper::push_from(&chain, producers)
+        .setProducers(vec![
+            psibase::Producer {
+                name: PRODUCER_ACCOUNT,
+                auth: auth_any.clone(),
+            },
+            psibase::Producer {
+                name: account!("prod2"),
+                auth: auth_any,
+            },
+        ])
+        .get()?;
+    chain.finish_block();
+    let after_producers = check_disk_invariant("after producer change", &chain);
+
+    // Verify invariant holds
+    if !after_boot {
+        println!("disk accounting invariant violated: after_boot={after_boot}",);
+    }
+    if !after_isverify {
+        println!("disk accounting invariant violated: after_isverify={after_isverify}");
+    }
+    if !after_producers {
+        println!("disk accounting invariant violated: after_producers={after_producers}");
+    }
+    assert!(
+        after_boot && after_isverify && after_producers,
+        "disk accounting invariant violated"
     );
 
     Ok(())

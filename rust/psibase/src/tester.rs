@@ -625,6 +625,61 @@ impl Chain {
             .get()
     }
 
+    /// Deploy a service and set its code flags in a single transaction.
+    pub fn deploy_service_with_flags(
+        &self,
+        account: AccountNumber,
+        code: &[u8],
+        flags: u64,
+    ) -> Result<(), anyhow::Error> {
+        self.new_account(account)?;
+        let actions = vec![
+            services::setcode::Wrapper::pack_from(account).setCode(
+                account,
+                0,
+                0,
+                code.to_vec().into(),
+            ),
+            services::setcode::Wrapper::pack().setFlags(account, flags),
+        ];
+        let mut trx = Transaction {
+            tapos: Default::default(),
+            actions,
+            claims: vec![],
+        };
+        self.fill_tapos(&mut trx, 2);
+        let trace = self.push(&SignedTransaction {
+            transaction: trx.packed().into(),
+            proofs: Default::default(),
+            subjectiveData: None,
+        });
+        self.start_block();
+        ChainEmptyResult { trace }.get()
+    }
+
+    /// Total database usage footprint in bytes
+    pub fn database_usage(&self, db: DbId) -> u64 {
+        let mut total: u64 = 0;
+        let mut key: Vec<u8> = Vec::new();
+        loop {
+            let value_size = unsafe {
+                tester_raw::kvGreaterEqual(self.chain_handle, db, key.as_ptr(), key.len() as u32, 0)
+            };
+            if value_size == u32::MAX {
+                break;
+            }
+            let key_size = unsafe { tester_raw::getKey(null_mut(), 0) };
+            key = Vec::with_capacity(key_size as usize);
+            unsafe {
+                tester_raw::getKey(key.as_mut_ptr(), key_size);
+                key.set_len(key_size as usize);
+            }
+            total += key_size as u64 + value_size as u64;
+            key.push(0); // advance the cursor past the matched key
+        }
+        total
+    }
+
     fn push_transactions(
         &self,
         transactions: Vec<(String, Vec<Vec<Action>>, bool)>,

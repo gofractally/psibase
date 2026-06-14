@@ -6,9 +6,10 @@ pub mod tables {
     use serde::{Deserialize, Serialize};
 
     #[table(name = "InitTable", index = 0)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, Default)]
     pub struct InitRow {
-        pub code_bytes: u64,
+        /// Bytes already in db at boot (`Native` + `Service`),
+        pub used_bytes: u64,
     }
     impl InitRow {
         #[primary_key]
@@ -16,9 +17,9 @@ pub mod tables {
     }
 
     impl InitRow {
-        pub fn init(code_bytes: u64) {
+        pub fn init(used_bytes: u64) {
             InitTable::read_write()
-                .put(&InitRow { code_bytes })
+                .put(&InitRow { used_bytes })
                 .unwrap();
         }
 
@@ -26,11 +27,11 @@ pub mod tables {
             InitTable::read().get_index_pk().get(&()).is_some()
         }
 
-        pub fn code_bytes() -> u64 {
+        pub fn used_bytes() -> u64 {
             InitTable::read()
                 .get_index_pk()
                 .get(&())
-                .map_or(0, |r| r.code_bytes)
+                .map_or(0, |r| r.used_bytes)
         }
 
         pub fn check_init() {
@@ -211,7 +212,7 @@ pub mod tables {
 
     /// Capacity-limited pricing state
     #[table(name = "CapacityPricingTable", index = 7)]
-    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone)]
+    #[derive(Serialize, Deserialize, ToSchema, Fracpack, Debug, SimpleObject, Clone, Default)]
     #[graphql(complex)]
     pub struct CapacityPricing {
         #[primary_key]

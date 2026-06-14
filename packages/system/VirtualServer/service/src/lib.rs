@@ -175,39 +175,28 @@ mod service {
     use crate::resource_type::ResourceType;
     use ResourceType::{Cpu, Disk, Net};
 
-    fn get_prealloc() -> u64 {
-        let table_size = |table: NativeTable| {
-            let prefix = (table, NATIVE_TABLE_PRIMARY_INDEX).to_key();
-            let handle = unsafe {
-                psibase_proxy_kv_open(
-                    DbId::Native,
-                    prefix.as_ptr(),
-                    prefix.len() as u32,
-                    KvMode::Read,
-                )
-            };
-            let mut total: u64 = 0;
-            let mut key: Vec<u8> = vec![];
-            loop {
-                // Returns value size without copying into memory
-                let size = unsafe {
-                    native_raw::kvGreaterEqual(handle, key.as_ptr(), key.len() as u32, 0)
-                };
-                if size == u32::MAX {
-                    break; // No more rows under this prefix
-                }
-                total += size as u64;
-                // Advance cursor past the current key
-                key = get_key_bytes();
-                key.push(0);
-            }
-            unsafe { native_raw::kvClose(handle) };
-            total
-        };
+    /// Sum of every row's `key + value` bytes in a database.
+    fn db_used_bytes(db: DbId) -> u64 {
+        let handle = KvHandle::new(db, &[], KvMode::Read);
+        let mut total: u64 = 0;
+        let mut key: Vec<u8> = Vec::new();
+        while let Some(value_size) = kv_greater_equal_value_size(&handle, &key, 0) {
+            key = get_key_bytes();
+            total += key.len() as u64 + value_size as u64;
+            key.push(0); // advance the cursor past the matched key
+        }
+        total
+    }
 
-        let code_table_size = table_size(CODE_TABLE);
-        let code_by_hash_table_size = table_size(CODE_BY_HASH_TABLE);
-        code_table_size + code_by_hash_table_size
+    fn get_prealloc() -> u64 {
+        db_used_bytes(DbId::Native) + db_used_bytes(DbId::Service)
+    }
+
+    /// Exact on-disk footprint (`key + value`) of a single fixed-width table row.
+    fn row_size<R: TableRecord, T: Table<R>>(table: &T, sample: &R) -> u64 {
+        let prefix = (T::SERVICE, T::TABLE_INDEX).to_key();
+        let key = table.serialize_key(0, &sample.get_primary_key());
+        (prefix.len() + key.data.len() + sample.packed().len()) as u64
     }
 
     #[action]
@@ -216,35 +205,47 @@ mod service {
             return;
         }
 
-        InitRow::init(get_prealloc());
-
         Nft::call().setUserConf(NftHolderFlags::MANUAL_DEBIT.index(), true);
         Tokens::call().setUserConf(BalanceFlags::MANUAL_DEBIT.index(), true);
         Tokens::call().setUserConf(BalanceFlags::KEEP_ZERO_BALANCE.index(), true);
-
-        Wrapper::call().set_specs(MIN_SERVER_SPECS);
-
-        let billable_obj_storage = NetworkSpecs::get_assert().obj_storage_bytes;
 
         // Initialize network resource consumption tracking
         RateLimitPricing::initialize(Net, 5, 600, 1800, 8);
         RateLimitPricing::initialize(Cpu, 5, 600, 1800, 1_000_000);
 
+        // Create a few records before scanning for preallocated db usage
+        CapacityPricing::create_relay(Disk);
+        Transact::call().resMonitoring(false);
+
+        // `InitRow`, `NetworkSpecs`, and `CapacityPricing` are necessarily written
+        // after the db scan, and before resMonitoring is enabled. Therefore we must
+        // explicitly add their exact footprints to the baseline.
+        let used_bytes = get_prealloc()
+            + row_size(&InitTable::new(), &InitRow::default())
+            + row_size(&NetworkSpecsTable::new(), &NetworkSpecs::default())
+            + row_size(&CapacityPricingTable::new(), &CapacityPricing::default());
+
+        InitRow::init(used_bytes);
+
+        // Must run after `InitRow::init` because it transitively depends on `InitRow::used_bytes()`
+        NetworkSpecs::update();
+        let billable_obj_storage = NetworkSpecs::get_assert().obj_storage_bytes;
+
         // Disk capacity pricing parameters:
         //   `DISK_CURVE_D` controls the aggressiveness of the constant-product curve.
-        //   Smaller values make pricing smoother near the endpoints; larger values
-        //   make pricing more aggressive.
+        //   Smaller values make pricing flatter near the endpoints; larger values
+        //   make pricing steeper.
         const DISK_CURVE_D: u64 = 15;
         // Refund fee in ppm: 50% of any disk refund is paid to the fee receiver.
         const DISK_FEE_PPM: u32 = 500_000;
         CapacityPricing::initialize(Disk, billable_obj_storage, DISK_CURVE_D, DISK_FEE_PPM);
 
+        Transact::call().resMonitoring(true);
+
         // Event indexes
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("consumed"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 0);
         events::Wrapper::call().addIndex(DbId::HistoryEvent, SERVICE, method!("subsidized"), 1);
-
-        Transact::call().resMonitoring(true);
     }
 
     #[pre_action(exclude(init))]
